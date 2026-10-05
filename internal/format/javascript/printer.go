@@ -84,7 +84,8 @@ func format(fileName string, text string, options formatoptions.Options, parser 
 	if err != nil {
 		return "", err
 	}
-	return doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs}), nil
+	return doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs,
+		ExpectedLength: len(text)}), nil
 }
 
 // PrintToDoc is upstream's textToDoc (src/main/multiparser.js) for a JavaScript-family parser: the doc
@@ -116,12 +117,13 @@ func printToDoc(fileName string, text string, options formatoptions.Options, par
 
 	var root *estree.Node
 	var comments []*estree.Node
+	var strippedText *estree.StrippedText
 	printer := estreePrinter
 	switch parser {
 	case "typescript":
-		root, comments, err = estree.ParseTypeScript(fileName, text, nodes)
+		root, comments, strippedText, err = estree.ParseTypeScript(fileName, text, nodes)
 	case "babel":
-		root, comments, err = estree.ParseJavaScript(fileName, text, nodes)
+		root, comments, strippedText, err = estree.ParseJavaScript(fileName, text, nodes)
 	case "json":
 		root, comments, err = estree.ParseJSON(text, true)
 		// main/normalize-format-options.js: the json parser never prints a trailing comma.
@@ -138,9 +140,10 @@ func printToDoc(fileName string, text string, options formatoptions.Options, par
 	printOptions := &Options{
 		Printer:                    printer,
 		OriginalText:               text,
-		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser, docs: docs},
+		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser, docs: docs, strippedText: strippedText},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
+		NodeCount:                  nodes.Len(),
 	}
 	return printing.PrintAstToDoc(root, comments, printOptions)
 }

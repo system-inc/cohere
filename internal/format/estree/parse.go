@@ -12,19 +12,20 @@ import (
 )
 
 // ParseTypeScript is Prettier's typescript parser, src/language-js/parse/typescript.js: parse, convert,
-// postprocess. It returns the Program and the file's comments, ready for comment attachment.
+// postprocess. It returns the Program and the file's comments, ready for comment attachment, and the text
+// stripped of those comments, for the printer to share with the postprocess.
 //
 // Prettier is given a file path, so JSX is decided by the extension, the way typescript-estree decides
 // it for a known file type: .tsx parses with JSX and .ts without. A hashbang becomes a line comment,
 // upstream's replaceHashbang, before parsing; the caller keeps the original text for printing.
-func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node, error) {
+func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
 	sourceFile := ParseSourceFile(fileName, ReplaceHashbang(text))
 	program, comments, err := Convert(sourceFile, nodes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	program, comments = Postprocess(program, comments, text)
-	return program, comments, nil
+	program, comments, stripped := Postprocess(program, comments, text)
+	return program, comments, stripped, nil
 }
 
 // ParseJavaScript stands in for Prettier's babel parser, which it uses for .js, .mjs, .cjs and .jsx.
@@ -41,17 +42,17 @@ func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node
 // or a file Babel would reject, and either way the file is refused rather than printed as TypeScript.
 //
 // The tree is typescript-estree's with Babel's one postprocess difference: see ConvertForBabel.
-func ParseJavaScript(fileName string, text string, nodes *Arena) (*Node, []*Node, error) {
+func ParseJavaScript(fileName string, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
 	program, comments, err := ConvertForBabel(ParseSourceFile(fileName, ReplaceHashbang(text)), nodes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	program, comments = Postprocess(program, comments, text)
+	program, comments, stripped := Postprocess(program, comments, text)
 	if found := findTypeScriptNode(program); found != nil {
-		return nil, nil, fmt.Errorf("%s: %s at byte %d is TypeScript syntax, which the babel parser does not read",
+		return nil, nil, nil, fmt.Errorf("%s: %s at byte %d is TypeScript syntax, which the babel parser does not read",
 			fileName, found.Type(), found.Start())
 	}
-	return program, comments, nil
+	return program, comments, stripped, nil
 }
 
 // findTypeScriptNode is the first node, depth first, whose type is one only TypeScript produces.

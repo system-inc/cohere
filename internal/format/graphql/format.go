@@ -55,9 +55,10 @@ func Format(text string, prettierOptions formatoptions.Options) (formatted strin
 		return "", err
 	}
 	return doc.Print(document, doc.Options{
-		PrintWidth: prettierOptions.PrintWidth,
-		TabWidth:   prettierOptions.TabWidth,
-		UseTabs:    prettierOptions.UseTabs,
+		PrintWidth:     prettierOptions.PrintWidth,
+		TabWidth:       prettierOptions.TabWidth,
+		UseTabs:        prettierOptions.UseTabs,
+		ExpectedLength: len(text),
 	}), nil
 }
 
