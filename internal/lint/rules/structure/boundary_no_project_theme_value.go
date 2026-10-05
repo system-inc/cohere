@@ -12,6 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -345,14 +346,15 @@ func isThemeFileName(fileName string) bool {
 		return false
 	}
 	baseName := normalizedPath[strings.LastIndex(normalizedPath, "/")+1:]
-	if !strings.HasSuffix(baseName, "Theme.ts") {
+	// An Adamic `XTheme.a` is named as the `XTheme.ts` it is (#kwt1htp).
+	if !strings.HasSuffix(sourcename.TreatedAs(baseName), "Theme.ts") {
 		return false
 	}
 	if baseName == "" || baseName[0] < 'A' || baseName[0] > 'Z' {
 		return false
 	}
 	// `\w*` between the capital and `Theme`: letters, digits, underscore.
-	for index := 1; index < len(baseName)-len("Theme.ts"); index++ {
+	for index := 1; index < len(sourcename.TreatedAs(baseName))-len("Theme.ts"); index++ {
 		character := baseName[index]
 		switch {
 		case character >= 'a' && character <= 'z':

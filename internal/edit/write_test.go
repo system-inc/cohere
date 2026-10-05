@@ -265,3 +265,20 @@ func TestTypeScriptParsableDiscriminates(t *testing.T) {
 		}
 	}
 }
+
+// An Adamic `.a` file is TypeScript to the guard (#6mhafvb): it is parsable, valid TypeScript in it parses, and
+// a broken one is refused with a reason, which is the refusal that lets autofix write a `.a` at all. Dropping
+// sourcename.TreatedAs from TypeScriptParsable passes the broken text through unguarded, and this fails.
+func TestTheParseGuardJudgesAnAdamicFileAsTypeScript(t *testing.T) {
+	t.Parallel()
+	if !TypeScriptParsable("/repo/geometry.a") {
+		t.Fatal("an Adamic .a file is not TypeScript to the guard")
+	}
+	if parses, reason := Parses("/repo/geometry.a", "const widened = <number>value;\nexport const area = (width: number): number => width;\n"); !parses {
+		t.Fatalf("valid TypeScript in a .a file was refused: %s", reason)
+	}
+	parses, reason := Parses("/repo/geometry.a", "export function alpha( {\n")
+	if parses || reason == "" {
+		t.Fatalf("a broken .a file was accepted (reason %q), so the guard is off for it", reason)
+	}
+}
