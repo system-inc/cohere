@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"go/ast"
@@ -62,7 +62,7 @@ func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
 func TestRulePackageHelperCensus(t *testing.T) {
 	t.Parallel()
 
-	files, err := filepath.Glob("../../lint/rules/*/*.go")
+	files, err := filepath.Glob("../lint/rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)
 	}
@@ -108,9 +108,13 @@ type ruleLocalFunction struct {
 func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
 	t.Helper()
 
-	files, err := filepath.Glob("../../lint/rules/*/*.go")
+	files, err := filepath.Glob("../lint/rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)
+	}
+	if len(files) == 0 {
+		// A glob that matched nothing finds no helper to refuse, which passes for the wrong reason.
+		t.Fatal("found no rule files, so this test read nothing")
 	}
 
 	var found []ruleLocalFunction
@@ -137,15 +141,19 @@ func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
 func exportedUtilityNames(t *testing.T) map[string]string {
 	t.Helper()
 
-	files, err := filepath.Glob("../../lint/ecmascript/*/*/*.go")
+	files, err := filepath.Glob("../lint/ecmascript/*/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing utility files: %v", err)
 	}
-	nested, err := filepath.Glob("../../lint/ecmascript/*/*.go")
+	nested, err := filepath.Glob("../lint/ecmascript/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing utility files: %v", err)
 	}
 	files = append(files, nested...)
+	if len(files) == 0 {
+		// With no utility names, no helper can shadow one, which passes for the wrong reason.
+		t.Fatal("found no shared utility files, so this test read nothing")
+	}
 
 	names := map[string]string{}
 	for _, path := range files {
@@ -280,7 +288,7 @@ var wrappedAccessors = []wrappedAccessor{
 func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
 	t.Parallel()
 
-	files, err := filepath.Glob("../../lint/rules/*/*.go")
+	files, err := filepath.Glob("../lint/rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)
 	}
