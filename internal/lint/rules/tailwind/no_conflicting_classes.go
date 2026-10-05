@@ -1,7 +1,6 @@
 package tailwind
 
 import (
-	"errors"
 	"sort"
 	"strings"
 
@@ -30,6 +29,7 @@ func propertyWord(properties []string) string {
 
 // NoConflictingClassesOptions lets a project name the surfaces that carry class strings.
 type NoConflictingClassesOptions struct {
+	TailwindLocationOptions
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
@@ -89,15 +89,15 @@ var NoConflictingClasses = rule.Rule{
 		// Resolved once per file and before the listeners are built, matching the other migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
-		designSystem := DesignSystemForProgram(ctx.Program)
+		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
 		if designSystem.Err != nil {
 			if ctx.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) {
-				ctx.Skip("no Tailwind entry point is configured")
+			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
+				ctx.Skip(reason)
 				return nil
 			}
 			return declineListeners(ctx, "no-conflicting-classes", designSystem)

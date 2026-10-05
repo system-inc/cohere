@@ -1,7 +1,6 @@
 package tailwind
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -26,6 +25,7 @@ func messageVariantOrder(written string, sorted string) rule.Message {
 
 // EnforceConsistentVariantOrderOptions lets a project name the surfaces that carry class strings.
 type EnforceConsistentVariantOrderOptions struct {
+	TailwindLocationOptions
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
@@ -91,15 +91,15 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		// never looks at this rule (#zwd43jn).
 		configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options)
 
-		designSystem := DesignSystemForProgram(ctx.Program)
+		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
 		if designSystem.Err != nil {
 			if ctx.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) {
-				ctx.Skip("no Tailwind entry point is configured")
+			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
+				ctx.Skip(reason)
 				return nil
 			}
 			return declineListeners(ctx, "enforce-consistent-variant-order", designSystem)

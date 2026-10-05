@@ -20,6 +20,7 @@ func messageUnnecessaryWhitespace() rule.Message {
 
 // NoUnnecessaryWhitespaceOptions lets a project name the surfaces that carry class strings.
 type NoUnnecessaryWhitespaceOptions struct {
+	TailwindLocationOptions
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`

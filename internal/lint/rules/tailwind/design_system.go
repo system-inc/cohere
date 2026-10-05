@@ -110,7 +110,28 @@ var ErrNoTailwindEntryPoint = errors.New("no Tailwind entry point found in this 
 var designSystemCache struct {
 	sync.Mutex
 	program rule.ProgramIdentity
-	result  DesignSystemResult
+	// results holds one design system per location the rules' options name in this program. Nearly
+	// every project names none, so this holds the one default entry.
+	results map[DesignSystemLocation]DesignSystemResult
+}
+
+// DesignSystemLocation is where a rule's options say the design system is: upstream's `cwd`,
+// `entryPoint` and `tailwindConfig`, with the directory a relative path anchors to. The zero value is
+// the default, the project's own stylesheet found by FindEntryPoint.
+type DesignSystemLocation struct {
+	// Anchor is upstream's `ctx.cwd`, the directory ESLint runs from, which is the config file's
+	// directory here. Empty means the project root.
+	Anchor string
+	// Cwd is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
+	// relative to Anchor when relative.
+	Cwd string
+	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
+	ConfigPath string
+}
+
+// isDefault reports whether no option named a location, so the project's own stylesheet is used.
+func (location DesignSystemLocation) isDefault() bool {
+	return location.Cwd == "" && location.ConfigPath == ""
 }
 
 // DesignSystemForProgram returns this run's design system, building it at most once.
@@ -132,6 +153,12 @@ var designSystemCache struct {
 // hand leave Program nil, and letting them share one cache slot would mean two unrelated fixtures
 // reading each other's design system, which is the same bug the pointer key exists to prevent.
 func DesignSystemForProgram(program rule.Program) DesignSystemResult {
+	return DesignSystemForProgramAt(program, DesignSystemLocation{})
+}
+
+// DesignSystemForProgramAt is DesignSystemForProgram for the location a rule's options name, built at
+// most once per program and location.
+func DesignSystemForProgramAt(program rule.Program, location DesignSystemLocation) DesignSystemResult {
 	if program == nil {
 		return DesignSystemResult{Err: fmt.Errorf("no program: a design system cannot be located without one")}
 	}
@@ -139,13 +166,16 @@ func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 	designSystemCache.Lock()
 	defer designSystemCache.Unlock()
 
-	if designSystemCache.program == program.Identity() {
-		return designSystemCache.result
+	if designSystemCache.program != program.Identity() || designSystemCache.results == nil {
+		designSystemCache.program = program.Identity()
+		designSystemCache.results = map[DesignSystemLocation]DesignSystemResult{}
+	}
+	if result, isBuilt := designSystemCache.results[location]; isBuilt {
+		return result
 	}
 
-	result := loadDesignSystemForProgram(program)
-	designSystemCache.program = program.Identity()
-	designSystemCache.result = result
+	result := loadDesignSystemForProgram(program, location)
+	designSystemCache.results[location] = result
 	return result
 }
 
@@ -153,18 +183,21 @@ func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 //
 // Call `DesignSystemForProgram` rather than this: an uncached call re-walks the `@import` graph, and
 // the rules that will read it run on every file in the tree.
-func loadDesignSystemForProgram(program rule.Program) DesignSystemResult {
+func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocation) DesignSystemResult {
 	fileSystem := program.DesignSystemFS()
-	result := loadDesignSystemThrough(program, fileSystem)
+	result := loadDesignSystemThrough(program, fileSystem, location)
 	result.Reads = fileSystem.Reads()
 	return result
 }
 
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
-func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS) DesignSystemResult {
+func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
 		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
+	}
+	if !location.isDefault() {
+		return loadConfiguredDesignSystem(projectRoot, fileSystem, location)
 	}
 
 	// Every question about the disk goes through the program's own filesystem rather than to `os`,
@@ -316,7 +349,7 @@ func resetDesignSystemCacheForTest() {
 	designSystemCache.Lock()
 	defer designSystemCache.Unlock()
 	designSystemCache.program = rule.ProgramIdentity{}
-	designSystemCache.result = DesignSystemResult{}
+	designSystemCache.results = nil
 }
 
 // stylesheetsUnder reports the design system's stylesheet graph as project-relative paths.

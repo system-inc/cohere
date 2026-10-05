@@ -26,6 +26,7 @@ func messageImportantPosition(written string, corrected string) rule.Message {
 // because a repository mid-migration wants to pick a target rather than have one read off its
 // node_modules.
 type EnforceConsistentImportantPositionOptions struct {
+	TailwindLocationOptions
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
