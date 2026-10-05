@@ -140,15 +140,28 @@ func Build(options Options) (Result, error) {
 
 	result := Result{}
 
+	packageDirectoryNames := []string{}
 	for _, target := range targets {
 		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
 		if err != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, err)
 		}
 		result.Packages = append(result.Packages, staged)
+		packageDirectoryNames = append(packageDirectoryNames, target.DirectoryName())
 	}
 
-	dispatcher, err := buildDispatcherPackage(options)
+	// After every platform package is signed, so the sums describe the bytes that ship. One rendering is
+	// written twice, into the dispatcher and beside the packages for the GitHub release, so the copy a
+	// reader downloads and the copy the launcher checks cannot disagree.
+	checksums, err := Checksums(options.OutputDirectory, packageDirectoryNames)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := os.WriteFile(filepath.Join(options.OutputDirectory, ChecksumsFileName), checksums, 0o644); err != nil {
+		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, err)
+	}
+
+	dispatcher, err := buildDispatcherPackage(options, checksums)
 	if err != nil {
 		return Result{}, fmt.Errorf("building the dispatcher package: %w", err)
 	}
@@ -302,8 +315,17 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 // manager rather than by guessing at directory layouts.
 //
 // It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
-// into, and threading them in would imply this package carries provenance that it does not.
-func buildDispatcherPackage(options Options) (StagedPackage, error) {
+// into, and threading them in would imply this package carries provenance that it does not. What it
+// does carry is the platform binaries' checksums, which the launcher checks before it runs one. The
+// dispatcher pins every platform package exactly, so the sums for this version describe the only
+// binaries it will ever be installed beside.
+func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, error) {
+	if len(checksums) == 0 {
+		// The launcher refuses to run any binary its checksums do not list, so this package would
+		// install and then run nothing anywhere.
+		return StagedPackage{}, fmt.Errorf("the dispatcher package needs the platform binaries' checksums")
+	}
+
 	directory := filepath.Join(options.OutputDirectory, UnscopedDispatcherPackageName)
 	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
 		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", err)
@@ -330,6 +352,10 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 
 	if err := stageSettingsSchemas(options.ModuleDirectory, directory); err != nil {
 		return StagedPackage{}, err
+	}
+
+	if err := os.WriteFile(filepath.Join(directory, ChecksumsFileName), checksums, 0o644); err != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher's %s: %w", ChecksumsFileName, err)
 	}
 
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil

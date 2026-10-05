@@ -116,8 +116,10 @@ func DispatcherManifest(version string) ([]byte, error) {
 			FullCommandName:  launcherRelativePath,
 		},
 		// schema/ is there so a settings file's "$schema" can name a path inside the install and be
-		// validated offline, in any editor, against the schema of the cohere that reads it.
-		"files": []string{"bin/", SchemaDirectoryName + "/"},
+		// validated offline, in any editor, against the schema of the cohere that reads it. SHA256SUMS
+		// is what the launcher checks the platform binary against, and a launcher installed without it
+		// refuses to run anything.
+		"files": []string{"bin/", SchemaDirectoryName + "/", ChecksumsFileName},
 
 		"optionalDependencies": optionalDependencies,
 	}

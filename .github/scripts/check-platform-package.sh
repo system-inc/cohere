@@ -135,6 +135,25 @@ printf 'export const crlf = 1;\r\n' > "$directory/Crlf.ts"
 status=$(run "$directory" crlf.log --no-fix --format)
 expect "a CRLF file is reported, with the fix" 1 "$status" crlf.log "text=auto eol=lf"
 
+# The installed binary is checked against the dispatcher's SHA256SUMS before it runs. It passes once, so
+# the launcher remembers the verdict, then has one byte flipped with its modification time put back: the
+# remembered verdict must not cover it, and the binary must not run.
+directory=$(project tampered)
+binary="$directory/node_modules/@system-inc/cohere-$platform/bin/cohere"
+if [ "${platform%%-*}" = "win32" ]; then
+    binary="$binary.exe"
+fi
+status=$(run "$directory" untampered.log --version)
+expect "an intact binary passes its checksum" 0 "$status" untampered.log "platform:"
+touch -r "$binary" "$gate/stamp"
+node "$(dirname "$0")/flip-byte.js" "$binary"
+touch -r "$gate/stamp" "$binary"
+status=$(run "$directory" tampered.log --version)
+expect "a binary with a flipped byte is refused" 1 "$status" tampered.log "does not match the checksum"
+if grep -Fq "platform:" "$logs/tampered.log"; then
+    fail "the tampered binary ran before it was refused"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "$failures checks failed on $platform; logs are in $logs"
     exit 1

@@ -20,7 +20,7 @@ func TestDispatcherPackageShipsTheSettingsSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	staged, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: t.TempDir(), Version: "1.0.0"})
+	staged, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: t.TempDir(), Version: "1.0.0"}, placeholderChecksums)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestDispatcherPackageRefusesASchemaThatValidatesNothing(t *testing.T) {
 				writeFile(t, broken, *testCase.contents)
 			}
 
-			_, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: t.TempDir(), Version: "1.0.0"})
+			_, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: t.TempDir(), Version: "1.0.0"}, placeholderChecksums)
 			if err == nil {
 				t.Fatal("the dispatcher was staged with a schema that validates nothing")
 			}

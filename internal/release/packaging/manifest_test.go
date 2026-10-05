@@ -166,8 +166,10 @@ func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
 	// bare command name appears as something it could run instead.
 	launcher := DispatcherLauncher()
 
-	if strings.Contains(launcher, "__PLATFORM_PACKAGE_PREFIX__") || strings.Contains(launcher, "__OVERRIDE_VARIABLE__") {
-		t.Fatalf("the launcher shipped with an unreplaced placeholder, so it would resolve nothing")
+	for _, placeholder := range []string{"__PLATFORM_PACKAGE_PREFIX__", "__PACKAGE_SCOPE__", "__OVERRIDE_VARIABLE__", "__CHECKSUMS_FILE_NAME__"} {
+		if strings.Contains(launcher, placeholder) {
+			t.Fatalf("the launcher shipped with %s unreplaced, so it would resolve or check nothing", placeholder)
+		}
 	}
 	if !strings.Contains(launcher, "'"+PlatformPackagePrefix+"'") {
 		t.Errorf("the launcher never names the %s prefix, so it cannot find a platform package", PlatformPackagePrefix)
