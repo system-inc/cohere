@@ -551,3 +551,16 @@ func TestNarrowToAppendsToTheScopesOwnWording(t *testing.T) {
 		t.Error("both kinds of scope described themselves identically")
 	}
 }
+
+// TestTheScopeLineNamesSkippedSymbolicLinks: a walk that skipped links says so, so a link that held a
+// source file is a stated skip rather than an absence.
+func TestTheScopeLineNamesSkippedSymbolicLinks(t *testing.T) {
+	t.Parallel()
+	description := describeEnumeration(formatfiles.Enumeration{Root: "/project", Walked: 4, SymbolicLinks: 2, Files: []string{"/project/a.ts", "/project/b.ts"}}, 2)
+	if !strings.Contains(description, "skipped 2 symbolic links") {
+		t.Fatalf("description %q does not name the skipped links", description)
+	}
+	if description := describeEnumeration(formatfiles.Enumeration{Root: "/project", Walked: 1, Files: []string{"/project/a.ts"}}, 1); strings.Contains(description, "symbolic") {
+		t.Fatalf("a walk with no links names them: %q", description)
+	}
+}

@@ -269,6 +269,11 @@ func describeEnumeration(enumeration formatfiles.Enumeration, formattable int) s
 		description += ", skipped nested repositories " + strings.Join(names, ", ")
 	}
 
+	// A symbolic link is never followed or read (see Enumeration.SymbolicLinks), and says so.
+	if enumeration.SymbolicLinks > 0 {
+		description += fmt.Sprintf(", skipped %d symbolic links, which are never followed", enumeration.SymbolicLinks)
+	}
+
 	// Declines are the requirement this whole change exists for: a file the engine cannot handle is a
 	// named zero rather than an absence.
 	if len(enumeration.DeclinedExtensions) > 0 {
