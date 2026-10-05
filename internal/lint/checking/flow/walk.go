@@ -48,8 +48,10 @@ type Pair struct {
 // the walk there, so two rules do not report one hole twice.
 //
 // A judge rules only where the target has an object part: a mutable slot exists only inside an array,
-// tuple, container or object, and a class instance and an optional property are object types. So a site
-// whose target has none (`const x: string = e`, a `number` argument) is never offered, which spares the
+// tuple, container or object, and a class instance and an optional property are object types. A union with
+// such a member has one, an intersection with an array-like or container member does, and so does a type
+// parameter whose constraint has one (#53w68gt).
+// So a site whose target has none (`const x: string = e`, a `number` argument) is never offered, which spares the
 // checker its source on the most common sites (#m6tyg79). A judge that would rule on such a target needs
 // that condition lifted in offer first.
 type Judge func(pair Pair) (wrong bool, descend bool)
@@ -78,6 +80,11 @@ const maximumDepth = 8
 //	                        method-signature-style's and nominal-class's business
 //	unions                  a source union pairs each member; a target union pairs the members the
 //	                        source is assignable to, and passes when any one of them passes
+//	intersections           a target intersection pairs its array, tuple and container members with
+//	                        the source; a source one meeting such a target pairs its members of that
+//	                        kind assignable to the target alone
+//	type parameters         a target parameter whose constraint has a writable slot is one mutable
+//	                        slot, judged whole: its parts are no type the shim can build
 //
 // Index signatures outside arrays are not paired yet: whether one is readonly is an IndexInfo field the
 // shim does not reach, and `Record<string, T>` is a map Adamic refuses in favor of `Map`. A lib generic
@@ -245,7 +252,139 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 		}
 		return first, failed
 	}
+	/*
+	 * An intersection's array, tuple or container member is paired like a union's, its slot judged whole
+	 * above (#53w68gt). A target intersection's value is every member at once, so a write through its array
+	 * member reaches the source: that member is related to the whole source. A source intersection meeting
+	 * an array-like or container target is related through its members of that kind assignable to the
+	 * target alone, since their slots are the ones the target's names reach.
+	 *
+	 * Only those members. Pairing every member reached two shapes no ruling covers: a branded primitive
+	 * (`string & { readonly [brand]?: ... }`), whose phantom member no-optional-widening then read as an
+	 * optional property a string literal lacks, about 2,900 findings on each frontend; and an intersection
+	 * of object types (React props, typescript-eslint's RuleModuleWithName), a few hundred more for
+	 * invariant-mutable. Measured on the four consumers, and left for their own ruling.
+	 */
+	if pair.Target.Flags()&checker.TypeFlagsIntersection != 0 {
+		for _, member := range pair.Target.Types() {
+			if !w.isSlotContainer(member) {
+				continue
+			}
+			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1); isWrong {
+				return found, true
+			}
+		}
+		return Pair{}, false
+	}
+	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && w.isSlotContainer(pair.Target) {
+		for _, member := range pair.Source.Types() {
+			if !w.isSlotContainer(member) || !w.IsAssignable(member, pair.Target) {
+				continue
+			}
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path}, depth+1); isWrong {
+				return found, true
+			}
+		}
+		return Pair{}, false
+	}
+	if pair.Target.Flags()&checker.TypeFlagsTypeParameter != 0 {
+		return w.typeParameterSlot(pair)
+	}
 	return w.parts(pair, depth)
+}
+
+// isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
+// type argument, as opposed to by property name.
+func (w *Walker) isSlotContainer(t *checker.Type) bool {
+	if IsArrayLike(w.typeChecker, t) {
+		return true
+	}
+	_, _, isContainer := containerOf(t)
+	return isContainer
+}
+
+/*
+ * typeParameterSlot judges a type parameter target as one mutable slot when its constraint has a writable
+ * slot anywhere in it (#53w68gt). The walk cannot go into the parameter's parts: `Pack[number]` is no type
+ * the shim can build, and relating the constraints alone compares `Animal[]` with `Animal[]` and misses the
+ * hole the parameter hides, `const pack: Pack = narrow` with `Narrow extends Pack`, where `pack.push` stores
+ * a `Pack[number]` into a value that holds only `Narrow[number]`. Judged mutable, invariant-mutable asks
+ * whether the parameter is assignable back to the source, which a narrower source is not.
+ *
+ * Only a source that flows into the parameter: one assignable to it, and not merely the parameter narrowed.
+ * Measured on the four consumers, the walk otherwise met three shapes that are no flow at all:
+ *   - `clone: <T extends this>() => T` seen under two receivers pairs one signature's `T` with the
+ *     other's, two unrelated parameters (21 findings, api);
+ *   - a source union pairs every member, so `readonly Entity[]` met the parameter `Entity` it is not
+ *     assignable to (4);
+ *   - `{} & T` into `T` is `T` with its nullishness ruled out, whose parts are `T`'s own (3, SharedState).
+ * An `any` or `never` source is no value the slot could be shared with either.
+ */
+func (w *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
+	if pair.Source.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsNever) != 0 || !w.IsAssignable(pair.Source, pair.Target) {
+		return Pair{}, false
+	}
+	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && slices.Contains(pair.Source.Types(), pair.Target) {
+		return Pair{}, false
+	}
+	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Target)
+	if constraint == nil || constraint == pair.Target || !w.hasWritableSlot(constraint, 0) {
+		return Pair{}, false
+	}
+	pair.Mutable = true
+	if wrong, _ := w.judge(pair); wrong {
+		pair.Path = slices.Clone(pair.Path)
+		return pair, true
+	}
+	return Pair{}, false
+}
+
+/*
+ * hasWritableSlot is a type with a slot a write reaches: an element of a mutable array or tuple, the
+ * contents of a mutable container, or a property that is not readonly (methods aside, as in parts), at any
+ * depth below a readonly one, since `readonly items: Animal[]` still holds a mutable array.
+ */
+func (w *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
+	if t == nil || depth > maximumDepth {
+		return false
+	}
+	if t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 {
+		for _, member := range t.Types() {
+			if w.hasWritableSlot(member, depth+1) {
+				return true
+			}
+		}
+		return false
+	}
+	if checker.Checker_isArrayType(w.typeChecker, t) {
+		return !isNamed(t, "ReadonlyArray") || w.hasWritableSlot(w.typeArgument(t, 0), depth+1)
+	}
+	if checker.IsTupleType(t) {
+		if !t.TargetTupleType().IsReadonly() {
+			return true
+		}
+		return slices.ContainsFunc(checker.Checker_getTypeArguments(w.typeChecker, t), func(element *checker.Type) bool {
+			return w.hasWritableSlot(element, depth+1)
+		})
+	}
+	if _, readonly, isContainer := containerOf(t); isContainer {
+		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(w.typeChecker, t), func(argument *checker.Type) bool {
+			return w.hasWritableSlot(argument, depth+1)
+		})
+	}
+	if t.Flags()&checker.TypeFlagsObject == 0 {
+		return false
+	}
+	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, t) {
+		if property.Flags&ast.SymbolFlagsMethod != 0 {
+			continue
+		}
+		if !checker.Checker_isReadonlySymbol(w.typeChecker, property) ||
+			w.hasWritableSlot(checker.Checker_getTypeOfSymbol(w.typeChecker, property), depth+1) {
+			return true
+		}
+	}
+	return false
 }
 
 // into relates part, one step below pair, with the step on the path while the part is judged.

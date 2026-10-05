@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/replace"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.
@@ -47,9 +48,14 @@ import (
 // formatter can never touch css or markdown. The formatter's own parser is the guard for those, and
 // a transform that produces unparseable output in its own language fails inside the engine rather
 // than here.
+//
+// An Adamic `.a` file is TypeScript (#6mhafvb), so the name is read through sourcename.TreatedAs. Only the
+// program's `.a` files reach the engine: the format walk holds every `.a` back until the program claims
+// it, so a static library named libfoo.a is never handed to this parser.
 func TypeScriptParsable(fileName string) bool {
+	treatedAs := sourcename.TreatedAs(fileName)
 	for _, extension := range []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"} {
-		if strings.HasSuffix(fileName, extension) {
+		if strings.HasSuffix(treatedAs, extension) {
 			return true
 		}
 	}

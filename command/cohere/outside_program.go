@@ -8,13 +8,16 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/gitignore"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // programExtensions are the extensions a tsconfig can put into a program at all. Anything else, a
 // markdown file or a JSON file, is outside every program by construction, whatever the config says.
+// Adamic's `.a` is one, since a tsconfig's "sourceExtensions" can claim it (#6mhafvb).
 var programExtensions = map[string]bool{
 	".ts": true, ".tsx": true, ".mts": true, ".cts": true,
 	".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
+	sourcename.AdamicExtension: true,
 }
 
 // errNamedPathsOutsideProgram is the refusal for a named-path run that reached no program file,

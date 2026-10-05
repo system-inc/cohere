@@ -64,12 +64,12 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 	if err != nil {
 		return err
 	}
-	transform, err := stdinTransform(formatter, request.Location, path)
+
+	propose, held, err := stdinProposals(ctx, request, path, text)
 	if err != nil {
 		return err
 	}
-
-	propose, err := stdinProposals(ctx, request, path, text)
+	transform, err := stdinTransform(formatter, request.Location, path, held)
 	if err != nil {
 		return err
 	}
@@ -97,8 +97,9 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 }
 
 // stdinTransform is the gate's format transform for one named file: the same engine, the same ignore
-// layers, the same scope a run naming this path would have. A file outside it comes back skipped.
-func stdinTransform(formatter formatEngine, location projectLocation, path string) (edit.Transform, error) {
+// layers, the same scope a run naming this path would have. A file outside it comes back skipped, and so
+// does an Adamic `.a` file the program does not hold (held is the program's `.a` files; see claimAdamic).
+func stdinTransform(formatter formatEngine, location projectLocation, path string, held map[string]struct{}) (edit.Transform, error) {
 	if formatter == nil {
 		return nil, nil
 	}
@@ -114,17 +115,19 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 		// hook that silently stopped formatting would read as files that need none.
 		return nil, fmt.Errorf("enumerating what the formatter handles under %s: %w", location.Root, err)
 	}
-	return scopedTransform(formatTransform(formatter), scope.narrowToEnumeration(enumeration)), nil
+	scope, _ = scope.narrowToEnumeration(enumeration).claimAdamic(held)
+	return scopedTransform(formatTransform(formatter), scope), nil
 }
 
 // stdinProposals is the gate's fix proposals for one file, computed from the buffer: the first pass
 // from a walk of a type graph that holds the buffer, later passes by re-linting the rewritten text,
 // exactly as applyProposedFixes does. A file outside the program has no rules, so nothing is proposed
-// and only the format transform applies, which is what the gate does with a .md or a .css.
-func stdinProposals(ctx context.Context, request stdinRequest, path string, text string) (edit.Propose, error) {
+// and only the format transform applies, which is what the gate does with a .md or a .css. held is the
+// program's Adamic `.a` files, for the format transform to know whether this one is source.
+func stdinProposals(ctx context.Context, request stdinRequest, path string, text string) (edit.Propose, map[string]struct{}, error) {
 	none := func(string, string) ([]edit.Proposal, error) { return nil, nil }
 	if !edit.TypeScriptParsable(path) {
-		return none, nil
+		return none, nil, nil
 	}
 
 	graph, err := program.Build(program.Options{
@@ -134,8 +137,9 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 		Overlay:          map[string]string{path: text},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("building the type graph: %w", err)
+		return nil, nil, fmt.Errorf("building the type graph: %w", err)
 	}
+	held := adamicHeld(graph)
 
 	var sourceFile *ast.SourceFile
 	normalized := tspath.NormalizePath(path)
@@ -146,16 +150,16 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 		}
 	}
 	if sourceFile == nil {
-		return none, nil
+		return none, held, nil
 	}
 
 	if _, err := configureLint(graph, request.Location); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rules := registry.All()
 	walk, err := graph.Walk(ctx, []*ast.SourceFile{sourceFile}, rules)
 	if err != nil {
-		return nil, fmt.Errorf("collecting proposals: %w", err)
+		return nil, nil, fmt.Errorf("collecting proposals: %w", err)
 	}
 	var firstPass []edit.Proposal
 	for _, diagnostic := range walk.Diagnostics {
@@ -174,7 +178,7 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 			return firstPass, nil
 		}
 		return proposalsForText(fileName, current, graph, rules)
-	}, nil
+	}, held, nil
 }
 
 // errStdinNeedsFix is the refusal for --stdin-filepath without --fix: the mode answers what --fix

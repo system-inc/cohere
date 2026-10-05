@@ -10,6 +10,8 @@
 package flow
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
@@ -164,7 +166,7 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 // object part, where no judge can rule (see Judge). The target is read first so such a site never asks the
 // checker for its source.
 func (w *Walker) offer(expression *ast.Node, target *checker.Type) {
-	if expression == nil || target == nil || !hasObjectPart(target) {
+	if expression == nil || target == nil || !w.hasObjectPart(target) {
 		return
 	}
 	source := w.typeChecker.GetTypeAtLocation(expression)
@@ -214,7 +216,7 @@ func (w *Walker) offerUpcast(node *ast.Node) {
 	}
 	expression := node.Expression()
 	target := checker.Checker_getTypeFromTypeNode(w.typeChecker, typeNode)
-	if target == nil || !hasObjectPart(target) {
+	if target == nil || !w.hasObjectPart(target) {
 		return
 	}
 	source := w.typeChecker.GetTypeAtLocation(expression)
@@ -224,18 +226,22 @@ func (w *Walker) offerUpcast(node *ast.Node) {
 	w.offer(expression, target)
 }
 
-// hasObjectPart is a type the walk can relate parts of: an object type, or a union with one among its
-// members. Union members are never unions themselves.
-func hasObjectPart(t *checker.Type) bool {
-	if t.Flags()&checker.TypeFlagsObject != 0 {
+// hasObjectPart is a type the walk can relate parts of: an object type, a union with one among its
+// members, an intersection with an array, tuple or container member, or a type parameter whose constraint
+// has one (#53w68gt). A union's members are never
+// unions, and a type parameter's base constraint is never a type parameter, so this goes at most two deep.
+func (w *Walker) hasObjectPart(t *checker.Type) bool {
+	switch {
+	case t.Flags()&checker.TypeFlagsObject != 0:
 		return true
-	}
-	if t.Flags()&checker.TypeFlagsUnion != 0 {
-		for _, member := range t.Types() {
-			if member.Flags()&checker.TypeFlagsObject != 0 {
-				return true
-			}
-		}
+	case t.Flags()&checker.TypeFlagsUnion != 0:
+		return slices.ContainsFunc(t.Types(), w.hasObjectPart)
+	case t.Flags()&checker.TypeFlagsIntersection != 0:
+		// Only the members the walk pairs; see relate.
+		return slices.ContainsFunc(t.Types(), w.isSlotContainer)
+	case t.Flags()&checker.TypeFlagsTypeParameter != 0:
+		constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, t)
+		return constraint != nil && constraint != t && w.hasObjectPart(constraint)
 	}
 	return false
 }

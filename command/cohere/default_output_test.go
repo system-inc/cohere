@@ -51,7 +51,7 @@ func TestADefaultRunPrintsNoNotes(t *testing.T) {
 		if !isExit {
 			t.Fatalf("running cohere: %v\n%s", err, output)
 		}
-		return string(output), exitError.ExitCode()
+		return string(output), childExitCode(t, exitError)
 	}
 	discardTable := func() {
 		t.Helper()

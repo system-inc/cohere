@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The gates must not change what masking produces, only how fast it gets there.
@@ -12,7 +14,7 @@ func TestShoutingMaskGatesPreserveOutput(t *testing.T) {
 	t.Parallel()
 
 	var texts []string
-	root := "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
+	root := corpus.Structure.Path(t, "source")
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || len(texts) >= 800 {
 			return nil
@@ -26,7 +28,7 @@ func TestShoutingMaskGatesPreserveOutput(t *testing.T) {
 		return nil
 	})
 	if len(texts) < 100 {
-		t.Skip("corpus unavailable")
+		t.Fatal("the structure corpus gave no comment texts, so there is nothing to compare the gates over")
 	}
 
 	// Ungated reference implementations, copied from before the gates.

@@ -26,7 +26,7 @@ func TestTheOutputSettingIsHonored(t *testing.T) {
 		command.Dir = root
 		output, err := command.CombinedOutput()
 		if exitError, isExit := err.(*exec.ExitError); isExit {
-			return string(output), exitError.ExitCode()
+			return string(output), childExitCode(t, exitError)
 		}
 		return string(output), 0
 	}

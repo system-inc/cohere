@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // Enumeration is what a walk found, and why each file did not survive it.
@@ -23,8 +24,8 @@ import (
 // coverage line cannot tell them apart unless the enumeration says so.
 //
 // So every number here is a subtraction someone can check: Walked minus the ignore counts minus
-// Unhandled minus SymbolicLinks should equal len(Files), and DeclinedExtensions names what the engine
-// refused rather than leaving it to be inferred from a smaller total.
+// Unhandled minus SymbolicLinks should equal len(Files) plus len(Adamic), and DeclinedExtensions names
+// what the engine refused rather than leaving it to be inferred from a smaller total.
 type Enumeration struct {
 	// Root is the directory that was walked. A count means nothing without the root it was taken
 	// against, which is how a corpus silently measures half a tree.
@@ -69,6 +70,12 @@ type Enumeration struct {
 
 	// Files is what survived, absolute paths.
 	Files []string
+
+	// Adamic is the Adamic `.a` files that survived the ignore layers, absolute paths, held back from
+	// Files (#6mhafvb). `.a` is also the static library's extension, so the walk cannot tell Adamic
+	// source from a libfoo.a: only a program whose tsconfig lists ".a" in its sourceExtensions can. A run
+	// offers one to the formatter once the program holds it, and never before the graph is built.
+	Adamic []string
 }
 
 // ignoreLayer is one of the project's ignore lists after git's, and how its patterns are read.
@@ -255,6 +262,11 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 
 		if info.Mode()&os.ModeSymlink != 0 {
 			enumeration.SymbolicLinks++
+			return nil
+		}
+
+		if sourcename.IsAdamic(path) {
+			enumeration.Adamic = append(enumeration.Adamic, path)
 			return nil
 		}
 

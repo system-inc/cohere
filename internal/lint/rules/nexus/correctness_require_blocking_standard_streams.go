@@ -1,6 +1,8 @@
 package nexus
 
 import (
+	"crypto/sha256"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -130,8 +132,9 @@ var (
 // The program index (which files are imported, which can reach the streams) is built once per run,
 // under a package lock, as `correctness-no-import-cycle-load-time-read` builds its graph: one
 // resolution per import specifier and no checker. The rule reads other files, so it declares
-// `ReadsOtherFiles` and the findings cache never replays it. A file that never spells `exit` is
-// declined before the index is asked for.
+// `ReadsOtherFiles`, and the findings cache replays it on a file while its bytes, its type fingerprint
+// and the program fingerprint hold (#5yfbdse). A file that never spells `exit` is declined before the
+// index is asked for.
 //
 // # No fix
 //
@@ -145,8 +148,12 @@ var CorrectnessRequireBlockingStandardStreams = rule.Rule{
 	// own function from a call of an import.
 	NeedsTypeChecker: true,
 
-	// The index reads every file's imports and their resolutions, this file's among them.
-	ProgramReads: rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+	// The index reads every file's imports and their resolutions, this file's among them. The run's
+	// directory, which the fingerprint names files relative to.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+
+	// See correctnessRequireBlockingStandardStreamsFingerprint for what a file's verdict reads.
+	ProgramFingerprint: correctnessRequireBlockingStandardStreamsFingerprint,
 
 	// Only a file that calls `process.exit` can hold a finding, and most files do not.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
@@ -197,16 +204,44 @@ var correctnessRequireBlockingStandardStreamsCache struct {
 	index   *correctnessRequireBlockingStandardStreamsIndex
 }
 
-func correctnessRequireBlockingStandardStreamsIndexFor(ctx rule.Context) *correctnessRequireBlockingStandardStreamsIndex {
+func correctnessRequireBlockingStandardStreamsIndexFor(program rule.Program) *correctnessRequireBlockingStandardStreamsIndex {
 	correctnessRequireBlockingStandardStreamsCache.Lock()
 	defer correctnessRequireBlockingStandardStreamsCache.Unlock()
-	if correctnessRequireBlockingStandardStreamsCache.program == ctx.Program.Identity() && correctnessRequireBlockingStandardStreamsCache.index != nil {
+	if correctnessRequireBlockingStandardStreamsCache.program == program.Identity() && correctnessRequireBlockingStandardStreamsCache.index != nil {
 		return correctnessRequireBlockingStandardStreamsCache.index
 	}
-	index := correctnessRequireBlockingStandardStreamsBuildIndex(ctx.Program)
-	correctnessRequireBlockingStandardStreamsCache.program = ctx.Program.Identity()
+	index := correctnessRequireBlockingStandardStreamsBuildIndex(program)
+	correctnessRequireBlockingStandardStreamsCache.program = program.Identity()
 	correctnessRequireBlockingStandardStreamsCache.index = index
 	return index
+}
+
+// correctnessRequireBlockingStandardStreamsFingerprint is the rule's program fingerprint (#5yfbdse): the
+// files something in the program imports, by name, in a stable order.
+//
+// A file's verdict reads, beyond the file, whether any other file imports it, and, for the files it
+// imports, transitively, their edges, whether each can reach the streams, and what their top-level code
+// calls. Only the first lies outside the file's import closure. Every edge the index holds is a
+// resolution from the program's own table, the table the type fingerprint's edges come from, so the
+// files a file's imports reach are its closure, whose bytes and resolutions its type fingerprint holds;
+// and whether one of them can reach the streams is decided by its own imports, inside that closure. So
+// the imported set is the whole of it: an edit that makes a file imported or unimported moves this, and
+// an edit that does neither leaves it, and the findings replay.
+func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program) [sha256.Size]byte {
+	index := correctnessRequireBlockingStandardStreamsIndexFor(program)
+	var imported []string
+	for path := range index.imported {
+		imported = append(imported, rule.FingerprintPath(program, index.files[path].FileName()))
+	}
+	slices.Sort(imported)
+	hash := sha256.New()
+	for _, name := range imported {
+		hash.Write([]byte(name))
+		hash.Write([]byte{0})
+	}
+	var fingerprint [sha256.Size]byte
+	copy(fingerprint[:], hash.Sum(nil))
+	return fingerprint
 }
 
 // correctnessRequireBlockingStandardStreamsBuildIndex resolves every import of every source file once.
@@ -355,7 +390,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 	if !correctnessRequireBlockingStandardStreamsHasCandidate(ctx, sourceFile.AsNode()) {
 		return
 	}
-	index := correctnessRequireBlockingStandardStreamsIndexFor(ctx)
+	index := correctnessRequireBlockingStandardStreamsIndexFor(ctx.Program)
 	reason := correctnessRequireBlockingStandardStreamsShebang
 	if !strings.HasPrefix(sourceFile.Text(), "#!") {
 		if index.imported[sourceFile.Path()] {
