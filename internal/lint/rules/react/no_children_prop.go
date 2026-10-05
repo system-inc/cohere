@@ -16,6 +16,28 @@ var messageNoChildrenProp = rule.Message{
 		"or pass them as the arguments after the props object to `createElement`.",
 }
 
+var messageNoChildrenPropNestFunction = rule.Message{
+	Id: "nestFunction",
+	Description: "A function is nested between this element's tags while the configuration allows " +
+		"function children only as a prop. A render function written as the element's children " +
+		"reads like content until the reader notices it is called, and the project has chosen to " +
+		"name that call. Pass the function as the `children` prop instead.",
+}
+
+var messageNoChildrenPropPassFunctionAsArgs = rule.Message{
+	Id: "passFunctionAsArgs",
+	Description: "A function is passed to `createElement` as a child argument while the " +
+		"configuration allows function children only as a prop. Pass it as `children` in the " +
+		"props object instead, so a render function is named where it is passed.",
+}
+
+// NoChildrenPropOptions configures the rule, as upstream's single options object.
+type NoChildrenPropOptions struct {
+	// AllowFunctions permits a function as the `children` prop, and then reports a function passed
+	// the other way: nested between the tags, or as createElement's third argument. Off by default.
+	AllowFunctions bool `json:"allowFunctions"`
+}
+
 // NoChildrenProp flags children passed as a prop instead of as children.
 //
 //	valid:   <div>Children</div>
@@ -29,12 +51,15 @@ var messageNoChildrenProp = rule.Message{
 //
 // # Where the two upstreams disagree, and which one this follows
 //
-// **The option surface.** ESLint carries an `allowFunctions` option and three further messages
-// (`nestFunction`, `passFunctionAsArgs`, `nestChildren`, `passChildrenAsArgs`) that exempt a
-// function-valued child and instead report a function passed the other way around. oxc implements
-// none of it: its `declare_oxc_lint` takes no configuration and it emits one diagnostic. This rule
-// takes no options for the same reason, and adding them later is a real behavior change rather
-// than a refinement.
+// **The option surface.** ESLint carries an `allowFunctions` option that exempts a function-valued
+// `children` prop and instead reports a function passed the other way around, nested as an
+// element's only child (`nestFunction`) or as createElement's third argument (`passFunctionAsArgs`).
+// oxc implements none of it. This rule takes it, because ESLint's schema accepts it and an accepted
+// option is an implemented one (#d21war2), checked against upstream's twelve rows for it. "A
+// function" is upstream's: an arrow or a function expression, async and generator ones included,
+// and in a props object a method or accessor too, since ESTree gives each a function value. The two
+// new findings point where upstream's do, at the whole element and the whole call, since oxc has no
+// opinion on them. Off, the rule is unchanged.
 //
 // **Where the finding points.** ESLint reports the whole `JSXAttribute` and the whole
 // `CallExpression`. oxc reports the *name* alone: `attr_ident.span` and `prop.key.span()`. The
@@ -76,7 +101,13 @@ var NoChildrenProp = rule.Rule{
 	// `internal/rules/next/` shipped that way and was inert, which is why this comment is here.
 	Name: "react/no-children-prop",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		return rule.Listeners{
+		// An unconfigured rule gets the zero value, which is upstream's `allowFunctions: false`.
+		settings, _ := rule.OptionsAs[NoChildrenPropOptions](options)
+		isFunction := func(node *ast.Node) bool {
+			return settings.AllowFunctions && noChildrenPropIsFunction(node)
+		}
+
+		listeners := rule.Listeners{
 			// A spread attribute (`<div {...props} />`) produces no JsxAttribute node at all, so it
 			// is invisible to this listener rather than exempted by it. That matches oxc, which
 			// listens on `JSXAttribute` and therefore also never sees one. A spread whose object
@@ -89,6 +120,10 @@ var NoChildrenProp = rule.Rule{
 				// returning early on anything else.
 				name, named := jsx.AttributeName(node)
 				if !named || name != "children" {
+					return
+				}
+				if initializer := node.AsJsxAttribute().Initializer; initializer != nil &&
+					initializer.Kind == ast.KindJsxExpression && isFunction(initializer.AsJsxExpression().Expression) {
 					return
 				}
 				ctx.ReportNode(node.AsJsxAttribute().Name(), messageNoChildrenProp)
@@ -112,13 +147,66 @@ var NoChildrenProp = rule.Rule{
 						continue
 					}
 					if name, static := staticKeyName(key); static && name == "children" {
-						ctx.ReportNode(key, messageNoChildrenProp)
+						if !isFunction(noChildrenPropPropertyValue(property)) {
+							ctx.ReportNode(key, messageNoChildrenProp)
+						}
 						return
 					}
 				}
+				// No `children` key, so a function as the third and last argument is the other way
+				// round, which upstream reports only under the option.
+				if arguments := node.AsCallExpression().Arguments.Nodes; len(arguments) == 3 && isFunction(arguments[2]) {
+					ctx.ReportNode(node, messageNoChildrenPropPassFunctionAsArgs)
+				}
 			},
 		}
+		if settings.AllowFunctions {
+			// Upstream's `JSXElement` listener: an element whose one child is a function. A child
+			// count of one counts whitespace text too, as upstream's does, so a function on its own
+			// line between the tags is not this shape.
+			listeners[ast.KindJsxElement] = func(node *ast.Node) {
+				children := node.AsJsxElement().Children
+				if children == nil || len(children.Nodes) != 1 {
+					return
+				}
+				child := children.Nodes[0]
+				if child.Kind == ast.KindJsxExpression && isFunction(child.AsJsxExpression().Expression) {
+					ctx.ReportNode(node, messageNoChildrenPropNestFunction)
+				}
+			}
+		}
+		return listeners
 	},
+}
+
+// noChildrenPropIsFunction is upstream's `isFunction` without its option check: an arrow or a
+// function expression, through any parentheses, which ESTree does not materialize.
+//
+// A method or accessor in a props object is passed as its own node rather than as a value, and is
+// a function too: ESTree gives it a FunctionExpression value.
+func noChildrenPropIsFunction(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch ast.SkipParentheses(node).Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression,
+		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	}
+	return false
+}
+
+// noChildrenPropPropertyValue is the value a props-object member passes: a property's initializer,
+// or the member itself for a method or accessor, whose value is its function. A shorthand passes the
+// identifier.
+func noChildrenPropPropertyValue(property *ast.Node) *ast.Node {
+	switch property.Kind {
+	case ast.KindPropertyAssignment:
+		return property.AsPropertyAssignment().Initializer
+	case ast.KindShorthandPropertyAssignment:
+		return property.Name()
+	}
+	return property
 }
 
 // createElementPropertiesObject returns the props object literal a createElement call was given.

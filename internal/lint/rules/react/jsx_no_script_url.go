@@ -119,9 +119,10 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url options object: %w", err)
 	}
 	if object.IncludeFromSettings {
-		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings reads " +
-			"ESLint's shared settings, which cohere does not have, so `true` would be accepted and " +
-			"never honoured; list the link components in the first element instead")
+		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings: true " +
+			"reads ESLint's shared settings.linkComponents, and cohere carries no shared settings, so " +
+			"it would be accepted and never honoured. List the link components in this rule's own " +
+			`first option instead: ["error", [{"name": "Link", "props": ["to"]}]]`)
 	}
 	return options, nil
 }

@@ -90,6 +90,11 @@ type optionElementCase struct {
 
 var optionElementCases = []optionElementCase{
 	{
+		rule: "grouped-accessor-pairs", source: "export interface I { get a(): any, x: 1, set a(v: any): void }\n",
+		control:   `["error", "anyOrder"]`,
+		treatment: `["error", "anyOrder", {"enforceForTSTypes": true}]`, treatmentCount: 1,
+	},
+	{
 		rule: "prefer-destructuring", source: "var foobar = object.bar;\n",
 		control:   `["error", {"object": true}]`,
 		treatment: `["error", {"object": true}, {"enforceForRenamedProperties": true}]`, treatmentCount: 1,
@@ -175,10 +180,9 @@ var optionElementCases = []optionElementCase{
 /*
  * The second element changes what the rule reports, measured through the config layer.
  *
- * `grouped-accessor-pairs` and `react/jsx-no-script-url` are not in this table because their second
- * element's only key is one this tree cannot honour (`enforceForTSTypes`, `includeFromSettings`),
- * so its `true` is refused rather than enforced; `TestASecondElementTheRuleCannotHonourIsRefused`
- * covers them.
+ * `react/jsx-no-script-url` is not in this table because its second element's only key is one this
+ * tree cannot honour (`includeFromSettings`), so its `true` is refused rather than enforced;
+ * `TestASecondElementTheRuleCannotHonourIsRefused` covers it.
  */
 func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 	t.Parallel()
@@ -227,14 +231,14 @@ func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 	}
 
 	for _, name := range optionElementRules {
-		if !covered[name] && name != "grouped-accessor-pairs" && name != "react/jsx-no-script-url" {
+		if !covered[name] && name != "react/jsx-no-script-url" {
 			t.Errorf("%s takes several option elements and has no control-and-treatment row here", name)
 		}
 	}
 }
 
-// TestASecondElementTheRuleCannotHonourIsRefused covers the two rules whose second element's only
-// key is unimplemented here. Its default is accepted, because that is what the rule already does,
+// TestASecondElementTheRuleCannotHonourIsRefused covers the rule whose second element's only key is
+// unimplemented here. Its default is accepted, because that is what the rule already does,
 // and `true` is refused by name, because accepting it would be an option read and never honoured.
 func TestASecondElementTheRuleCannotHonourIsRefused(t *testing.T) {
 	t.Parallel()
@@ -242,12 +246,6 @@ func TestASecondElementTheRuleCannotHonourIsRefused(t *testing.T) {
 	for _, testCase := range []struct {
 		rule, accepted, refused, key string
 	}{
-		{
-			rule:     "grouped-accessor-pairs",
-			accepted: `["error", "getBeforeSet", {"enforceForTSTypes": false}]`,
-			refused:  `["error", "getBeforeSet", {"enforceForTSTypes": true}]`,
-			key:      "enforceForTSTypes",
-		},
 		{
 			rule:     "react/jsx-no-script-url",
 			accepted: `["error", [{"name": "Link", "props": ["to"]}], {"includeFromSettings": false}]`,

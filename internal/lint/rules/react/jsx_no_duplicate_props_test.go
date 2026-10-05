@@ -3,6 +3,7 @@ package react
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -270,5 +271,41 @@ func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(t *testing.T) {
 		if got := result.Diagnostics[index].Range.Pos(); got != want {
 			t.Errorf("finding %d points at offset %d, want %d", index, got, want)
 		}
+	}
+}
+
+// Upstream's `ignoreCase` rows, the four that pass the option, read through the registered decoder.
+//
+// The three failing ones are clean without the option, which the clean table above pins; under it
+// they report once each. The namespaced `a:b` stays clean under it, as upstream's clean case says.
+func TestJsxNoDuplicatePropsIgnoreCase(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignoreCase": true}`))
+	if err != nil {
+		t.Fatalf("decoding ignoreCase: %v", err)
+	}
+	cases := []struct {
+		sourceText string
+		wantCount  int
+	}{
+		{"<App A a />;", 1},
+		{"<App a b c A />;", 1},
+		{`<App A="a" b="b" B="B" />;`, 1},
+		{`<App a:b="c" />;`, 0},
+		{`<svg a:b="c" A:b="d" />;`, 0},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunWithOptions(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText, decoded)
+			if len(result.Diagnostics) != testCase.wantCount {
+				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+			}
+		})
+	}
+
+	if _, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignorecase": true}`)); err == nil {
+		t.Error("a misspelled ignoreCase decoded")
 	}
 }

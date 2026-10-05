@@ -12458,6 +12458,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/config",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "invalidTypeConfiguration"
             ],
@@ -12475,6 +12478,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/error-boundaries",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "jsxInTryStatement"
             ],
@@ -12547,6 +12553,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/globals",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "globalReassignment"
             ],
@@ -12564,6 +12573,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/immutability",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "immutableValue",
                 "knownMutableFunction",
@@ -12584,6 +12596,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/incompatible-library",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "incompatibleLibrary"
             ],
@@ -12601,6 +12616,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/no-deriving-state-in-effects",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noDerivingStateInEffects"
             ],
@@ -12618,6 +12636,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/preserve-manual-memoization",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "preserveManualMemoizationDependencyMutable",
                 "preserveManualMemoizationValueUnmemoized"
@@ -12636,6 +12657,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/purity",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "impureFunctionCall"
             ],
@@ -12653,6 +12677,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/refs",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "functionAccessesRef",
                 "refPassedToFunction",
@@ -12698,6 +12725,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/set-state-in-effect",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "setStateInEffect"
             ],
@@ -12715,6 +12745,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/set-state-in-render",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "setStateInRender",
                 "setStateInUseMemo"
@@ -12733,6 +12766,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/static-components",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "staticComponents"
             ],
@@ -12750,6 +12786,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/unsupported-syntax",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "unsupportedEval",
                 "unsupportedInlineClass",
@@ -12769,6 +12808,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/use-memo",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "useMemoCallbackAsyncOrGenerator",
                 "useMemoCallbackHasParameters",
@@ -12792,6 +12834,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/void-use-memo",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "useMemoCallbackReturnsNothing",
                 "useMemoResultUnused"
@@ -13136,6 +13181,9 @@
             "origin": "react",
             "upstreamName": "react/jsx-no-duplicate-props",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "jsxNoDuplicateProps"
             ],
@@ -13195,6 +13243,9 @@
             "origin": "react",
             "upstreamName": "react/jsx-no-undef",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "jsxIdentifierNotDefined"
             ],
@@ -13321,6 +13372,9 @@
             "origin": "react",
             "upstreamName": "react/no-children-prop",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noChildrenProp"
             ],
@@ -13466,6 +13520,9 @@
             "origin": "react",
             "upstreamName": "react/no-invalid-html-attribute",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "emptyIsMeaningless",
                 "neverValid",

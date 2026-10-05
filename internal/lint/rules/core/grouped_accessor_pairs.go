@@ -22,18 +22,17 @@ const (
 	GroupedAccessorPairsSetBeforeGet GroupedAccessorPairsOrder = "setBeforeGet"
 )
 
-// GroupedAccessorPairsOptions carries the part of upstream's option surface this port implements.
+// GroupedAccessorPairsOptions carries upstream's whole option surface.
 //
 // The wire shape is a LIST, unlike most rules here, because upstream's schema is positional:
 // `["error", "getBeforeSet", { enforceForTSTypes: true }]`. The rule registers with
 // `DecodeOptionList`, so the decoder is handed that list with the severity removed.
-//
-// `enforceForTSTypes` is deliberately not implemented; see the rule's doc comment and
-// `TestGroupedAccessorPairsTypeMembersAreNotChecked`. It defaults to false, so declining it matches
-// what an unset project gets, and the decoder refuses `true` by name rather than accepting an
-// option the rule would never honour.
 type GroupedAccessorPairsOptions struct {
 	Order GroupedAccessorPairsOrder
+
+	// EnforceForTSTypes also checks the accessor signatures in an interface body or a type literal.
+	// Off by default, as upstream's is.
+	EnforceForTSTypes bool
 }
 
 // DecodeGroupedAccessorPairsOptions turns the configured array into options.
@@ -70,20 +69,14 @@ func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 		return options, nil
 	}
 
-	// The second element's only key is `enforceForTSTypes`, which this port does not implement. Its
-	// default, false, is what the rule already does, so false is accepted; true is refused, because
-	// accepting it would be the option-read-and-ignored shape this decoder exists to refuse.
+	// The second element's only key is `enforceForTSTypes`.
 	var second struct {
 		EnforceForTSTypes bool `json:"enforceForTSTypes"`
 	}
 	if err := rule.UnmarshalOptions(configured[1], &second); err != nil {
 		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", err)
 	}
-	if second.EnforceForTSTypes {
-		return options, fmt.Errorf("grouped-accessor-pairs: enforceForTSTypes is not implemented " +
-			"in this port, so `true` would be accepted and never honoured; see " +
-			"TestGroupedAccessorPairsTypeMembersAreNotChecked")
-	}
+	options.EnforceForTSTypes = second.EnforceForTSTypes
 	return options, nil
 }
 
@@ -139,13 +132,19 @@ var messageGroupedAccessorPairsInvalidOrder = rule.Message{
 // the same span is the member's own token start through its key's end. Probed against seven shapes
 // including a static, a computed key, a private name, and numeric and string keys.
 //
-// # What is deliberately not ported
+// # Type members, under enforceForTSTypes
 //
-// `enforceForTSTypes` extends the judgment to accessor signatures in a TypeScript type literal or
-// interface body. It defaults to FALSE, so declining it is what an unset project already gets, and
-// the live config sets it nowhere. Upstream's 14 cases for it are recorded in
-// `TestGroupedAccessorPairsTypeMembersAreNotChecked` rather than dropped, so the next person has
-// them if the option is ever wanted.
+// The option extends the same judgment to the accessor signatures in an interface body or a type
+// literal, nested ones included. Upstream checks only its `TSMethodSignature`s of kind get or set
+// there; this parser gives those the same GetAccessor and SetAccessor kinds a class accessor has,
+// and the list scan already counts only those, so the scan runs unchanged over the members. Type
+// members carry no `static`, so the list is scanned once. Spans and names match the class case,
+// measured against the installed eslint at 10.8.1 over ten shapes (#d21war2).
+//
+// One kept divergence, in the message only: a signature whose key is computed and not literal,
+// `get [k](): any`, renders upstream as `getter 'null'`, because upstream reads the signature's name
+// through `getStaticPropertyName` and quotes the null it gets back. A class accessor with the same
+// key renders as a bare `getter`, and so does a signature here. The finding and its span agree.
 var GroupedAccessorPairs = rule.Rule{
 	Name: "grouped-accessor-pairs",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -156,7 +155,7 @@ var GroupedAccessorPairs = rule.Rule{
 			settings = GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
 		}
 
-		return rule.Listeners{
+		listeners := rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				checkGroupedAccessorList(ctx, settings.Order,
 					node.AsObjectLiteralExpression().Properties.Nodes, nil)
@@ -168,6 +167,15 @@ var GroupedAccessorPairs = rule.Rule{
 				checkGroupedAccessorClassBody(ctx, settings.Order, node.AsClassExpression().Members.Nodes)
 			},
 		}
+		if settings.EnforceForTSTypes {
+			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
+				checkGroupedAccessorList(ctx, settings.Order, node.AsInterfaceDeclaration().Members.Nodes, nil)
+			}
+			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
+				checkGroupedAccessorList(ctx, settings.Order, node.AsTypeLiteralNode().Members.Nodes, nil)
+			}
+		}
+		return listeners
 	},
 }
 

@@ -1,6 +1,7 @@
 package react
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -78,13 +79,46 @@ var noInvalidHtmlAttributeTags = map[string][]string{
 
 // noInvalidHtmlAttributeDefaultAttributes is upstream's `DEFAULT_ATTRIBUTES`.
 //
-// The rule's schema is an array whose items are the enum `['rel']`, so `rel` is simultaneously the
-// default and the only configurable value. There is therefore no configuration that changes this
-// rule's behaviour: the empty option list and `['rel']` are the same rule, and no other string is
-// accepted by the schema. The option surface is carried anyway, because reading the schema is how
-// that was established and a future upstream that adds a second attribute should find the shape
-// waiting.
+// The rule's schema is an array whose unique items are the enum `['rel']`, so `rel` is both the
+// default and the only attribute a configuration can name. The list a configuration can write is
+// therefore `["rel"]`, the default, or `[]`, which checks nothing; see NoInvalidHtmlAttributeOptions.
 var noInvalidHtmlAttributeDefaultAttributes = []string{"rel"}
+
+// NoInvalidHtmlAttributeOptions configures the rule, as upstream's one option, a list of the
+// attributes to check.
+type NoInvalidHtmlAttributeOptions struct {
+	// Attributes are the attributes checked. Only `rel` exists, so a configured list is either
+	// `["rel"]`, the same as no option, or empty, which turns the rule off: upstream reads
+	// `context.options[0] || DEFAULT_ATTRIBUTES`, and an empty array is truthy in JavaScript, so `[]`
+	// is not the default. Measured at 7.37.5: `[[]]` is silent on a `rel="bogus"` that reports
+	// under `[["rel"]]` and under no option.
+	Attributes []string
+}
+
+// DecodeNoInvalidHtmlAttributeOptions reads upstream's list, refusing what its schema refuses: an
+// item other than "rel", and a duplicate, which `uniqueItems` forbids.
+func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (any, error) {
+	options := NoInvalidHtmlAttributeOptions{Attributes: noInvalidHtmlAttributeDefaultAttributes}
+	if len(raw) == 0 {
+		return options, nil
+	}
+	var attributes []string
+	if err := json.Unmarshal(raw, &attributes); err != nil || attributes == nil {
+		return options, fmt.Errorf(`expected a list of attributes, [] or ["rel"], got %s`, raw)
+	}
+	seen := map[string]bool{}
+	for _, attribute := range attributes {
+		if attribute != "rel" {
+			return options, fmt.Errorf(`attribute %q is not one this rule checks; the only one is "rel"`, attribute)
+		}
+		if seen[attribute] {
+			return options, fmt.Errorf(`attribute %q is listed twice`, attribute)
+		}
+		seen[attribute] = true
+	}
+	options.Attributes = attributes
+	return options, nil
+}
 
 // noInvalidHtmlAttributeHtmlElements is upstream's `HTML_ELEMENTS`, the set used to skip custom
 // components.
@@ -297,12 +331,13 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // the wrong span. Reporting without a repair is the subset that
 // can be shown correct, and a wrong repair is worse than none because it is applied to real code.
 //
-// # The option surface exists and cannot change anything
+// # The option surface can only turn the rule off
 //
 // The schema is `{type: 'array', uniqueItems: true, items: {enum: ['rel']}}`, so the only values a
-// configuration can contain are `rel`, which is also the default. `[]` and `['rel']` and an absent
-// option are therefore three spellings of one rule, and no configuration can widen or narrow it.
-// Measured rather than reasoned: every one of the 265 corpus cases carries no options at all.
+// configuration can contain are `rel`, which is also the default. `['rel']` and an absent option are
+// one rule. `[]` is not: upstream's `||` keeps an empty array, which is truthy, so it checks no
+// attribute at all. This port read the three as one rule until #d21war2 measured them, because
+// every one of the 265 corpus cases carries no options and so none could tell.
 //
 // # Two tables whose ITERATION ORDER reaches the message
 //
@@ -342,6 +377,11 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 var NoInvalidHtmlAttribute = rule.Rule{
 	Name: "react/no-invalid-html-attribute",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// The only list besides the default is the empty one, which checks nothing, so the default
+		// check below is the whole rule whenever any attribute is configured.
+		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](options); configured && len(settings.Attributes) == 0 {
+			return rule.Listeners{}
+		}
 		return rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
 				noInvalidHtmlAttributeCheckJsxAttribute(ctx, node)

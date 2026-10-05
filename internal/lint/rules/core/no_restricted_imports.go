@@ -121,6 +121,15 @@ func DecodeNoRestrictedImportsOptions(list []byte) (any, error) {
 
 	var probe map[string]json.RawMessage
 	if err := json.Unmarshal(elements[0], &probe); err == nil {
+		// `[{}]`, the object form with nothing in it, restricts nothing. Upstream's schema accepts it
+		// through the object branch, since a path object requires a name, and `[{}, "foo"]` fails
+		// both branches. Kept divergence, ruled on #e06zm4b (#d21war2): upstream's runtime finds no
+		// `paths` or `patterns` key, reads `{}` as a path entry, and keys it by its missing name, so
+		// ESLint 10.8.1's Linter reports `import b from "undefined"` under `[{}]` and nothing else.
+		// That is a missing key read as the name "undefined", not a restriction anyone wrote.
+		if len(probe) == 0 && len(elements) == 1 {
+			return options, nil
+		}
 		_, hasPaths := probe["paths"]
 		_, hasPatterns := probe["patterns"]
 		if hasPaths || hasPatterns {

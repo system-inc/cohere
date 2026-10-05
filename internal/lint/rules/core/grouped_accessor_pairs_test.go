@@ -33,8 +33,7 @@ func decodedGroupedAccessorPairsOptions(t *testing.T, raw string) any {
 // that file with a stub rule tester rather than retyped, so every string is upstream's own bytes.
 //
 // 79 clean cases and 57 reporting ones. Upstream ships 14 more behind `enforceForTSTypes`, which
-// this port does not implement; they are recorded in
-// `TestGroupedAccessorPairsTypeMembersAreNotChecked` rather than silently dropped.
+// are in `TestGroupedAccessorPairsTypeMembers`.
 func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
 	t.Parallel()
 
@@ -303,49 +302,99 @@ func TestGroupedAccessorPairsSpans(t *testing.T) {
 	}
 }
 
-// Upstream's `enforceForTSTypes` option, which this port does not implement, recorded rather than
-// silently dropped.
+// Upstream's `enforceForTSTypes` option: the same judgment over the accessor signatures in an
+// interface body or a type literal.
 //
-// It extends the same judgment to accessor signatures inside a TypeScript type literal or an
-// interface body. Upstream ships 14 cases for it behind its own parser, 9 clean and 5 reporting.
-// The option DEFAULTS TO FALSE, so declining it is the same behaviour a project gets by leaving
-// it unset, and the live config sets it nowhere.
-//
-// What is asserted here is the decline itself: with the option absent, a type literal holding an
-// ungrouped accessor pair stays clean, which is upstream's behaviour too. If somebody later wants
-// the option, these are the cases to import.
-func TestGroupedAccessorPairsTypeMembersAreNotChecked(t *testing.T) {
+// Upstream's 14 cases for it, 9 clean and 5 reporting, extracted with the rest of the corpus, plus
+// five shapes measured against the installed eslint at 10.8.1 through the typescript-eslint parser:
+// a string key pairing with a computed literal one, a non-literal computed key, a method signature
+// of the same name between the pair, a duplicate getter, and a type literal nested in an interface.
+// The span column is the measured one, the accessor head, as for class members.
+func TestGroupedAccessorPairsTypeMembers(t *testing.T) {
 	t.Parallel()
 
-	cases := []string{
-		"interface I { get a(): any, between: true, set a(value: any): void }",
-		"interface I { get a(): any, set a(value: any): void }",
-		"interface I { set a(value: any): void, get a(): any }",
-		"type T = { get a(): any, between: true, set a(value: any): void }",
-		"type T = { get a(): any, set a(value: any): void }",
+	const enforced = `["anyOrder", {"enforceForTSTypes": true}]`
+	cases := []struct {
+		sourceText string
+		options    string
+		wantId     string
+		wantSpan   string
+	}{
+		{"interface I { get prop(): any, set prop(value: any): void }", enforced, "", ""},
+		{"interface I { set prop(value: any): void, get prop(): any }", enforced, "", ""},
+		{"interface I { get a(): any, between: true, set b(value: any): void }", enforced, "", ""},
+		{"interface I { before: true, get prop(): any, set prop(value: any): void, after: true }", `["getBeforeSet", {"enforceForTSTypes": true}]`, "", ""},
+		{"interface I { set prop(value: any): void, get prop(): any }", `["setBeforeGet", {"enforceForTSTypes": true}]`, "", ""},
+		{"type T = { get prop(): any, set prop(value: any): void }", enforced, "", ""},
+		{"type T = { set prop(value: any): void, get prop(): any }", `["setBeforeGet", {"enforceForTSTypes": true}]`, "", ""},
+		{"interface I { get prop(): any, between: true, set prop(value: any): void }", "", "", ""},
+		{"type T = { get prop(): any, between: true, set prop(value: any): void }", "", "", ""},
+		{"interface I { get a(): any, between: true, set a(value: any): void }", enforced, "notGrouped", "set a"},
+		{"interface I { get a(): any, set a(value: any): void }", `["setBeforeGet", {"enforceForTSTypes": true}]`, "invalidOrder", "set a"},
+		{"interface I { set a(value: any): void, get a(): any }", `["getBeforeSet", {"enforceForTSTypes": true}]`, "invalidOrder", "get a"},
+		{"type T = { get a(): any, between: true, set a(value: any): void }", enforced, "notGrouped", "set a"},
+		{"type T = { get a(): any, set a(value: any): void }", `["setBeforeGet", {"enforceForTSTypes": true}]`, "invalidOrder", "set a"},
+
+		// Measured, not in upstream's corpus.
+		{"interface I { get 'a'(): any, x: 1, set ['a'](v: any): void }", enforced, "notGrouped", "set ['a']"},
+		{"interface I { get [k](): any, x: 1, set [k](v: any): void }", enforced, "notGrouped", "set [k]"},
+		{"interface I { get a(): any, a(): void, set a(v: any): void }", enforced, "notGrouped", "set a"},
+		{"interface I { get a(): any, x: 1, set a(v: any): void, get a(): any }", enforced, "", ""},
+		{"interface O { m: { get a(): any, x: 1, set a(v: any): void } }", enforced, "notGrouped", "set a"},
+
+		// The option is what turns the check on: the same reporting source, off and at its default.
+		{"interface I { get a(): any, x: 1, set a(v: any): void }", `["anyOrder", {"enforceForTSTypes": false}]`, "", ""},
+		{"interface I { get a(): any, x: 1, set a(v: any): void }", `["anyOrder"]`, "", ""},
 	}
 
-	// Upstream's nine clean cases for the same option, kept beside the five reporting ones so the
-	// whole surface is here if somebody imports it later. These are clean both ways.
-	alsoClean := []string{
-		"interface I { get prop(): any, between: true, set prop(value: any): void }",
-		"type T = { get prop(): any, between: true, set prop(value: any): void }",
-		"interface I { get prop(): any, set prop(value: any): void }",
-		"interface I { set prop(value: any): void, get prop(): any }",
-		"interface I { get a(): any, between: true, set b(value: any): void }",
-		"interface I { before: true, get prop(): any, set prop(value: any): void, after: true }",
-		"interface I { set prop(value: any): void, get prop(): any }",
-		"type T = { get prop(): any, set prop(value: any): void }",
-		"type T = { set prop(value: any): void, get prop(): any }",
-	}
-	cases = append(cases, alsoClean...)
-
-	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText+" "+testCase.options, func(t *testing.T) {
 			t.Parallel()
-			// Clean under this port AND clean upstream without the option, which is the default.
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
-				groupedAccessorPairsFile, sourceText, nil))
+			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+			if testCase.wantId == "" {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			diagnostic := result.Diagnostics[0]
+			if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
+				t.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
+			}
+		})
+	}
+}
+
+// The rendered names for type members, measured against the installed eslint at 10.8.1.
+//
+// The last row is the kept divergence the rule's doc comment names: upstream renders a non-literal
+// computed signature key as `getter 'null'`, and this renders it as the bare `getter` a class
+// accessor with the same key gets upstream too.
+func TestGroupedAccessorPairsTypeMemberMessageText(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sourceText string
+		options    string
+		want       string
+	}{
+		{"interface I { get a(): any, between: true, set a(value: any): void }", `["anyOrder", {"enforceForTSTypes": true}]`, "Accessor pair getter 'a' and setter 'a' should be grouped."},
+		{"type T = { get a(): any, set a(value: any): void }", `["setBeforeGet", {"enforceForTSTypes": true}]`, "Expected setter 'a' to be before getter 'a'."},
+		{"interface I { get 'a'(): any, x: 1, set ['a'](v: any): void }", `["anyOrder", {"enforceForTSTypes": true}]`, "Accessor pair getter 'a' and setter 'a' should be grouped."},
+		{"interface I { get [k](): any, x: 1, set [k](v: any): void }", `["anyOrder", {"enforceForTSTypes": true}]`, "Accessor pair getter and setter should be grouped."},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+			}
+			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
+				t.Errorf("message %q, want %q", got, testCase.want)
+			}
 		})
 	}
 }
@@ -366,6 +415,7 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 		{"getBeforeSet", `["getBeforeSet"]`, "getBeforeSet"},
 		{"setBeforeGet", `["setBeforeGet"]`, "setBeforeGet"},
 		{"a second element at its default is accepted", `["setBeforeGet", {"enforceForTSTypes": false}]`, "setBeforeGet"},
+		{"a second element turning on type members", `["getBeforeSet", {"enforceForTSTypes": true}]`, "getBeforeSet"},
 	}
 
 	for _, testCase := range cases {
@@ -398,9 +448,8 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing
 		`["sideways"]`, `["GetBeforeSet"]`, `[""]`, `[123]`,
 		// A bare string, which the config layer never delivers to a list rule.
 		`"getBeforeSet"`,
-		// The second element: the one key it has is not implemented, so true is refused, and an
-		// unknown key and a third element are refused the way upstream's schema refuses them.
-		`["getBeforeSet", {"enforceForTSTypes": true}]`,
+		// The second element: an unknown key and a third element are refused the way upstream's
+		// schema refuses them.
 		`["getBeforeSet", {"enforceForTypes": false}]`,
 		`["getBeforeSet", {"enforceForTSTypes": false}, "anyOrder"]`,
 	} {

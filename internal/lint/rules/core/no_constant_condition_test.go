@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -145,6 +146,60 @@ func TestNoConstantConditionStaysSilent(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstantCondition, constantConditionFile,
 				constantConditionDeclarations+testCase.sourceText))
+		})
+	}
+}
+
+// TestNoConstantConditionCheckLoops pins every `checkLoops` value upstream's schema accepts, read
+// through the registered decoder and run over the two loops that tell them apart.
+//
+// `while(true)` separates "all" from "allExceptWhileTrue", and `while(1)` separates both of them
+// from "none". The booleans are upstream's older spelling: true reads as "all" and false as "none".
+func TestNoConstantConditionCheckLoops(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		raw            string
+		whileTrueFires bool
+		whileOneFires  bool
+	}{
+		{`{}`, false, true},
+		{`{"checkLoops": "allExceptWhileTrue"}`, false, true},
+		{`{"checkLoops": "all"}`, true, true},
+		{`{"checkLoops": "none"}`, false, false},
+		{`{"checkLoops": true}`, true, true},
+		{`{"checkLoops": false}`, false, false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
+			decoded, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("decoding %s: %v", testCase.raw, err)
+			}
+			for _, loop := range []struct {
+				sourceText string
+				fires      bool
+			}{
+				{"while (true) {}", testCase.whileTrueFires},
+				{"while (1) {}", testCase.whileOneFires},
+			} {
+				result := rule_testing.RunWithOptions(t, NoConstantCondition, constantConditionFile, loop.sourceText, decoded)
+				if loop.fires {
+					rule_testing.ExpectFindings(t, result, "unexpected")
+				} else {
+					rule_testing.ExpectClean(t, result)
+				}
+			}
+		})
+	}
+
+	for _, raw := range []string{`{"checkLoops": "sometimes"}`, `{"checkLoops": "All"}`, `{"checkLoops": 1}`, `{"checkLoops": null}`} {
+		t.Run(raw+" is refused", func(t *testing.T) {
+			t.Parallel()
+			if _, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(raw)); err == nil {
+				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+			}
 		})
 	}
 }
