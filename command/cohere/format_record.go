@@ -341,6 +341,7 @@ func startFormatWalkAhead(engine formatEngine, root string) {
 	go func() {
 		defer close(ahead.done)
 		ahead.enumeration, ahead.err = engine.Enumerate(root)
+		ahead.enumeration = withoutYieldedDirectories(ahead.enumeration)
 	}()
 	aheadFormatWalk = ahead
 }
@@ -353,7 +354,9 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 		<-ahead.done
 		return ahead.enumeration, ahead.err
 	}
-	return engine.Enumerate(root)
+	// Less what the projects below this one format, when it is one project of several. See ownership.go.
+	enumeration, err := engine.Enumerate(root)
+	return withoutYieldedDirectories(enumeration), err
 }
 
 // declaredSubmodules reads the submodule paths a repository's `.gitmodules` declares. A repository with

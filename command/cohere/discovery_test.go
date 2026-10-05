@@ -41,11 +41,11 @@ func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []discoveredProject{
-		{".", engineTypeScript},
-		{".", engineSwift},
-		{"apps/web", engineTypeScript},
-		{"packages/a/b", engineSwift},
-		{"packages/a-b", engineTypeScript},
+		{Directory: ".", Engine: engineTypeScript},
+		{Directory: ".", Engine: engineSwift},
+		{Directory: "apps/web", Engine: engineTypeScript},
+		{Directory: "packages/a/b", Engine: engineSwift},
+		{Directory: "packages/a-b", Engine: engineTypeScript},
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		t.Fatalf("found %+v, want %+v", found.Projects, want)
@@ -81,7 +81,7 @@ func TestDiscoveryNeverEntersWhatItMustNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []discoveredProject{{".", engineSwift}}; !reflect.DeepEqual(found.Projects, want) {
+	if want := []discoveredProject{{Directory: ".", Engine: engineSwift}}; !reflect.DeepEqual(found.Projects, want) {
 		t.Fatalf("found %+v, want only the root's package", found.Projects)
 	}
 	// node_modules, .build, .cache and testdata; the root's own .git is passed over without counting.
@@ -162,14 +162,18 @@ func TestDiscoveryRootIsTheRepositoryTheCallerStandsIn(t *testing.T) {
 	}
 }
 
-// A run that names one project, by directory, tsconfig, lint config or path, checks that project alone, as
-// it always did, and so do the listings and explanations; a bare run discovers.
+// A run that names one project, by directory, tsconfig or path, checks that project alone, as it always
+// did, and so do the listings and explanations; a bare run discovers, and so does one naming a lint config,
+// which says which rules apply and not which project (#wvgxtey).
 func TestDiscoveryAppliesOnlyToARunThatNamesNoProject(t *testing.T) {
 	t.Parallel()
 	if !discoveryApplies(map[string]bool{"no-fix": true, "format-all": true}, nil) {
 		t.Error("a bare --no-fix --format-all run does not discover")
 	}
-	for _, named := range []string{"directory", "tsconfig", "lint-config", "rules", "print-config", "explain", "stdin-filepath", "version"} {
+	if !discoveryApplies(map[string]bool{"lint-config": true}, nil) {
+		t.Error("a run naming --lint-config does not discover")
+	}
+	for _, named := range []string{"directory", "tsconfig", "rules", "print-config", "explain", "stdin-filepath", "version"} {
 		if discoveryApplies(map[string]bool{named: true}, nil) {
 			t.Errorf("a run naming --%s discovers", named)
 		}

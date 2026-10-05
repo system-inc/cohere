@@ -7,7 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"runtime"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,14 +27,18 @@ const projectEngineVariable = "COHERE_PROJECT_ENGINE"
 const projectLabelVariable = "COHERE_PROJECT_LABEL"
 
 // discoveryApplies reports whether a run discovers its projects. Anything that names one project, a
-// directory, a tsconfig, a lint config or a path, narrows the run to it as it always did, and so do the
-// listings, the explanations and the editor's save, which answer about one project.
+// directory, a tsconfig or a path, narrows the run to it as it always did, and so do the listings, the
+// explanations and the editor's save, which answer about one project.
+//
+// A lint config does not: it says which rules apply, not which project, so every project discovered runs
+// under it. It used to narrow, and the quiet hundred's harness, which names one, checked 2 of TanStack
+// Query's thousand files and refused prisma outright (#wvgxtey).
 func discoveryApplies(given map[string]bool, arguments []string) bool {
 	if len(arguments) > 0 {
 		return false
 	}
 	for _, name := range []string{
-		"directory", "tsconfig", "lint-config", "rules", "rules-enabled", "print-config",
+		"directory", "tsconfig", "rules", "rules-enabled", "print-config",
 		"version", "cache-dump", "explain", "stdin-filepath", "profile",
 	} {
 		if given[name] {
@@ -43,7 +51,10 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 // checkDiscoveredProjects discovers the projects under the root and, when there is more than the one the
 // walk up located, checks them all and reports checked with the merged exit code. With only that one it
 // prints what discovery passed over and leaves the run to check it in this process.
-func checkDiscoveredProjects(location projectLocation, locateError error, workingDirectory string) (int, bool, error) {
+//
+// lintConfigFileName is the lint config the command line named, absolute, or empty: every project's run
+// gets it, since a path typed here would resolve against each project's directory there.
+func checkDiscoveredProjects(location projectLocation, locateError error, workingDirectory string, lintConfigFileName string) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
 	patterns, err := rootIgnorePatterns(root)
 	if err != nil {
@@ -53,12 +64,20 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 	if err != nil {
 		return 0, false, err
 	}
+	if found.Ownership, err = resolveOwnership(&found); err != nil {
+		return 0, false, err
+	}
 	if len(found.Projects) == 0 {
 		// Nothing to check is a failure, never a green over nothing.
+		solutions := ""
+		if len(found.Ownership.Solutions) > 0 {
+			solutions = fmt.Sprintf(" (%d solution tsconfigs found, %s, whose references reach no project here)",
+				len(found.Ownership.Solutions), strings.Join(found.Ownership.Solutions, ", "))
+		}
 		return 0, false, fmt.Errorf("no %s or %s in %s, any directory above it, or any directory below it that the repository keeps, "+
-			"so there is no project here to check (not searched: %d directories .gitignore ignores, %d dependency, build, cache "+
+			"so there is no project here to check%s (not searched: %d directories .gitignore ignores, %d dependency, build, cache "+
 			"or fixture directories, %d nested repositories): run from inside one, or name it with -tsconfig or -directory",
-			projectMarker, swiftProjectMarker, root, found.Ignored, found.NeverDescended,
+			projectMarker, swiftProjectMarker, root, solutions, found.Ignored, found.NeverDescended,
 			len(found.NestedRepositories)+found.Submodules)
 	}
 	if found.isTheLocatedProject(location, locateError) {
@@ -67,7 +86,28 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 		}
 		return 0, false, nil
 	}
-	return runProjects(found, os.Args[1:], os.Stdout), true, nil
+	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), os.Stdout), true, nil
+}
+
+// childArguments are the arguments every project's run gets: this run's, with a named lint config made
+// absolute. Discovery runs only when no path was named, so every argument is a flag, and a flag's value is
+// either joined to it with `=` or the next argument, since no boolean flag takes a separate one.
+func childArguments(arguments []string, lintConfigFileName string) []string {
+	if lintConfigFileName == "" {
+		return arguments
+	}
+	kept := make([]string, 0, len(arguments)+2)
+	for index := 0; index < len(arguments); index++ {
+		name, _, joined := strings.Cut(strings.TrimLeft(arguments[index], "-"), "=")
+		if name == "lint-config" && strings.HasPrefix(arguments[index], "-") {
+			if !joined {
+				index++
+			}
+			continue
+		}
+		kept = append(kept, arguments[index])
+	}
+	return append(kept, "--lint-config", lintConfigFileName)
 }
 
 // isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which
@@ -77,20 +117,30 @@ func (found discovery) isTheLocatedProject(location projectLocation, locateError
 		return false
 	}
 	project := found.Projects[0]
-	return project.Engine == location.Engine &&
+	return project.Engine == location.Engine && project.ConfigFile == "" &&
 		filepath.Clean(filepath.Join(found.Root, project.Directory)) == filepath.Clean(location.Root)
 }
 
 // notes are the lines a run carries about markers discovery found and did not run, which a reader could have
-// expected checked: those the root's ignorePatterns refuse. Ignored and dependency directories are not
-// named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
-// program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always
-// was. They are counted on the summary line.
+// expected checked: those the root's ignorePatterns refuse, solution roots, and projects left with no file of
+// their own. Ignored and dependency directories are not named, since skipping them is what everyone
+// expects, and neither is a nested repository: one inside a program, such as Structure or Base, is checked
+// as part of it, its drift reported read-only, as it always was. They are counted on the summary line.
 func (found discovery) notes() []string {
 	var lines []string
 	for _, marker := range found.Refused {
 		lines = append(lines, fmt.Sprintf("%s not checked: the root's ignorePatterns match it", marker))
 	}
+	for _, label := range found.Ownership.Solutions {
+		lines = append(lines, fmt.Sprintf("%s not run: a solution tsconfig, which includes no file and references the projects checked instead", label))
+	}
+	for _, label := range found.Ownership.Yielding {
+		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
+	}
+	for label := range found.Ownership.SharedDirectory {
+		lines = append(lines, fmt.Sprintf("%s ran with the cache off: another tsconfig's run keeps its cache in the same directory", label))
+	}
+	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
 	return lines
 }
 
@@ -111,21 +161,44 @@ type projectRun struct {
 // Each project is a child process rather than a goroutine, because a run is a whole program: its own
 // type graph, its own settings and cache table, and its own memory ceiling. A child is exactly the run
 // `cohere --directory <project>` makes alone, so a project's section reads the same as its own run's, and
-// its exit code is the one that run alone would give.
+// its exit code is the one that run alone would give, less what it yields to nearer projects.
+//
+// At most projectRunsAtOnce run together. Each builds a whole type graph and checks it on every core, so
+// TanStack Query's 95 projects started at once were 95 graphs in memory, and more children than that buys no
+// time the cores do not already give one.
 func runProjects(found discovery, arguments []string, out io.Writer) int {
 	executable, err := os.Executable()
 	if err != nil {
 		fmt.Fprintf(out, "cohere: finding this binary to run each project: %v\n", err)
 		return 1
 	}
+	yieldDirectory, err := os.MkdirTemp("", "cohere-yield-")
+	if err != nil {
+		fmt.Fprintf(out, "cohere: making a place for what each project yields: %v\n", err)
+		return 1
+	}
+	defer os.RemoveAll(yieldDirectory)
 
 	runs := make([]projectRun, len(found.Projects))
 	var group sync.WaitGroup
+	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
+		label := projectLabel(project)
+		yieldFile, err := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
+		if err != nil {
+			runs[index] = projectRun{project: project, exitCode: 1, err: fmt.Errorf("writing what it yields: %w", err)}
+			continue
+		}
+		projectArguments := arguments
+		if found.Ownership.SharedDirectory[label] {
+			projectArguments = append(slices.Clone(arguments), "--no-cache")
+		}
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			runs[index] = runProject(executable, found.Root, project, arguments)
+			running <- struct{}{}
+			defer func() { <-running }()
+			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile)
 		}()
 	}
 	group.Wait()
@@ -185,17 +258,32 @@ func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
 	return facts
 }
 
-// runProject runs one project's check as a child and keeps everything it printed.
-func runProject(executable string, root string, project discoveredProject, arguments []string) projectRun {
+// projectRunsAtOnce is how many projects' runs share the machine: a quarter of its cores, and at least one.
+// Each run checks its own program on every core already, so the bound costs little time, and it is what
+// keeps a laptop alive on a repository with a hundred tsconfigs.
+func projectRunsAtOnce() int {
+	return max(1, runtime.NumCPU()/4)
+}
+
+// runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
+// names what it yields to nearer projects (see ownership.go).
+func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string) projectRun {
 	directory := filepath.Join(root, filepath.FromSlash(project.Directory))
-	child := exec.Command(executable, append([]string{"--directory", directory}, arguments...)...)
+	prefix := []string{"--directory", directory}
+	if project.ConfigFile != "" {
+		prefix = append(prefix, "--tsconfig", project.ConfigFile)
+	}
+	child := exec.Command(executable, append(prefix, arguments...)...)
 	// Started in the project, so its report does not add that it checked somewhere other than where it
 	// started: the section's heading already says which project it is.
 	child.Dir = directory
 	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
 	// only the merged one may answer the caller.
-	child.Env = append(withoutVariable(os.Environ(), VerdictVariable),
+	child.Env = append(withoutVariable(withoutVariable(os.Environ(), VerdictVariable), projectYieldVariable),
 		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+projectLabel(project))
+	if yieldFile != "" {
+		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
+	}
 	var output bytes.Buffer
 	child.Stdout = &output
 	child.Stderr = &output
@@ -227,8 +315,12 @@ func withoutVariable(environment []string, name string) []string {
 	return kept
 }
 
-// projectLabel names a project by its directory, the root by ".".
+// projectLabel names a project by its directory, the root by ".", or by its tsconfig's path when that is
+// not the directory's tsconfig.json.
 func projectLabel(project discoveredProject) string {
+	if project.ConfigFile != "" {
+		return path.Join(project.Directory, project.ConfigFile)
+	}
 	return project.Directory
 }
 
@@ -258,8 +350,13 @@ func summaryLine(found discovery, runs []projectRun) string {
 	if failed > 0 {
 		verdict = fmt.Sprintf("%d failed", failed)
 	}
-	return fmt.Sprintf("projects: %d checked (%s), %s; not searched for projects: %d directories .gitignore ignores, "+
+	notRun := ""
+	if len(found.Ownership.Solutions) > 0 || len(found.Ownership.Yielding) > 0 {
+		notRun = fmt.Sprintf("; not run: %d solution tsconfigs, %d whose every file a nearer tsconfig owns",
+			len(found.Ownership.Solutions), len(found.Ownership.Yielding))
+	}
+	return fmt.Sprintf("projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 		"%d dependency, build, cache or fixture directories, %d nested repositories",
-		len(runs), strings.Join(engines, ", "), verdict, found.Ignored, found.NeverDescended,
+		len(runs), strings.Join(engines, ", "), verdict, notRun, found.Ignored, found.NeverDescended,
 		len(found.NestedRepositories)+found.Submodules)
 }

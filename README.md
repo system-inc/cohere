@@ -38,7 +38,14 @@ only when every project is. A run that finds no project fails.
 
 Finding projects never enters what `.gitignore` ignores, at any level, nor `node_modules`, `.build`,
 `.cache` or `testdata`, nor a directory that is a repository of its own: a submodule stays part of the
-program above it, as it always was. `--directory` or a path narrows the run to one project.
+program above it, as it always was. `--directory`, `--tsconfig` or a path narrows the run to one
+project; `--lint-config` doesn't, and every project runs under the settings it names.
+
+Each file is checked once, by the nearest `tsconfig.json` that includes it, the one your editor opens it
+under. Another tsconfig that includes it still types against it and doesn't report it, and each project
+formats its own directory, leaving the directories of the projects below it to theirs. A solution
+`tsconfig.json`, `"files": []` with `references`, includes nothing to check: what it references is
+checked instead, whatever those tsconfigs are named.
 
 ```sh
 cohere                  # type-check, lint, apply every available fix, and format, in one call
