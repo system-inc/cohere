@@ -669,6 +669,9 @@ func run() error {
 	if runTypes {
 		attachTypesCache(graph, location)
 	}
+	if graph != nil {
+		report.contentKeyedShapes = graph.ContentKeyedShapes
+	}
 
 	// The types phase's checking starts here, alongside the fix phase's walk, rather than after it. See
 	// startTypeCheck. Its result is used only if the walk leaves this graph in place.

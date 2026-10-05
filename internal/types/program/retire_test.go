@@ -29,7 +29,7 @@ func TestARetiredGraphRecordsNothing(t *testing.T) {
 		if err != nil {
 			t.Fatalf("building: %v", err)
 		}
-		graph.Shapes, _ = graph.Signatures(ctx, nil)
+		graph.Shapes, _ = graph.Signatures(ctx, program.RecordedRealSignatures(graph))
 		return graph
 	}
 	key := sha256.Sum256([]byte("compiler options"))

@@ -28,9 +28,18 @@ import (
 //
 // Computing one means emitting a file's declarations, which needs the checker. Every project file costs
 // about 500ms on ahra, so only files whose bytes changed since their signature was recorded are computed,
-// and every other file carries its recorded signature forward. A file with nothing recorded falls back to
-// its version, the hash of its bytes: the compiler's own conservative default, which can only make the
-// first edit to that file invalidate more than it had to.
+// and every other file carries its recorded signature forward. A file with no signature recorded, from the
+// table or the compiler's build info, falls back to its version, the hash of its bytes: the compiler's own
+// conservative default, which keys the file's shape on its content, so an edit to it re-runs its
+// importers' shape-keyed rules rather than replaying them. It never replays anything stale.
+//
+// That fallback is also the bound. Declaration emit has no ceiling: on www-ahra-ai one ESLint config, whose
+// export's type is inferred from typescript-eslint's and the plugins' objects, ran 9 minutes and grew to
+// 17 GB without finishing, and tsgo's own --declaration emit does the same on it (#5txm9gg). It cannot be
+// cancelled part way, and it runs on the checker the walk takes next, so a time limit around it would not
+// be sound. So a file is emitted up front only when its recorded signature is a real one, computed by an
+// emit that once finished: the edit of a known file, the case shapes exist for. A first run on a project
+// with no build info emits nothing, and says how many shapes it keyed on content (ContentKeyedShapes).
 //
 // # What a signature does not cover, and the syntax hash that does
 //
@@ -73,6 +82,7 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	projectFiles := g.ProjectFiles()
 	signatures := make(map[string]SignatureEntry, len(projectFiles))
 	stale := []*ast.SourceFile{}
+	contentKeyed := 0
 	for _, sourceFile := range projectFiles {
 		version := FileVersion(sourceFile.Text())
 		if recorded, found := previous[sourceFile.FileName()]; found && recorded.Version == version && recorded.Signature != "" {
@@ -91,13 +101,21 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 			continue
 		}
+		// No real signature recorded, so none is computed: see the bound above. Its whole text is its shape.
+		if recorded, found := previous[sourceFile.FileName()]; !found || recorded.Signature == "" || recorded.Signature == recorded.Version {
+			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+			contentKeyed++
+			continue
+		}
 		stale = append(stale, sourceFile)
 	}
+	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
 	if len(stale) == 0 {
-		return signatures, 0
+		return signatures, contentKeyed
 	}
 
 	var mutex sync.Mutex
+	g.signatureEmits += len(stale)
 	g.Program.Emit(ctx, compiler.EmitOptions{
 		TargetSourceFiles: stale,
 		EmitOnly:          compiler.EmitOnlyBuilderSignature,
@@ -126,7 +144,24 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 		}
 	}
-	return signatures, len(stale)
+	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
+	return signatures, len(stale) + contentKeyed
+}
+
+// countContentKeyed is how many of the project's source files have their version for a signature: no
+// declaration output stands behind their shape. Declaration files and JSON modules are left out, since
+// their version is their signature by definition.
+func countContentKeyed(projectFiles []*ast.SourceFile, signatures map[string]SignatureEntry) int {
+	count := 0
+	for _, sourceFile := range projectFiles {
+		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
+			continue
+		}
+		if entry := signatures[sourceFile.FileName()]; entry.Signature == entry.Version {
+			count++
+		}
+	}
+	return count
 }
 
 // syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.

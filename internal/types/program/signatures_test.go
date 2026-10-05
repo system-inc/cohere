@@ -49,6 +49,7 @@ func (tree *signatureTree) graph() *Graph {
 type signatureState struct {
 	signatures map[string]SignatureEntry
 	computed   int
+	emits      int
 	bySignature,
 	byContent map[string]string
 }
@@ -56,8 +57,13 @@ type signatureState struct {
 func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureState {
 	tree.t.Helper()
 	graph := tree.graph()
+	// A first state has its signatures computed, as a project with build info does: these tests are about
+	// what a computed signature holds. A first run with nothing recorded is its own test below.
+	if previous == nil {
+		previous = RecordedRealSignatures(graph)
+	}
 	signatures, computed := graph.Signatures(context.Background(), previous)
-	state := signatureState{signatures: signatures, computed: computed, bySignature: map[string]string{}, byContent: map[string]string{}}
+	state := signatureState{signatures: signatures, computed: computed, emits: graph.SignatureEmits(), bySignature: map[string]string{}, byContent: map[string]string{}}
 	signatureFingerprints := graph.SignatureFingerprints(signatures)
 	contentFingerprints := graph.TypeFingerprints()
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -250,7 +256,7 @@ func TestSeededSignaturesEqualComputedOnes(t *testing.T) {
 
 	graph := tree.graph()
 	seeded := graph.SeedSignatures(nil)
-	computed, _ := graph.Signatures(context.Background(), nil)
+	computed, _ := graph.Signatures(context.Background(), RecordedRealSignatures(graph))
 	if len(seeded) == 0 {
 		t.Fatal("nothing was seeded from the buildinfo, so this proves nothing")
 	}
@@ -261,5 +267,66 @@ func TestSeededSignaturesEqualComputedOnes(t *testing.T) {
 	}
 	if _, recomputed := graph.Signatures(context.Background(), seeded); recomputed != 3-len(seeded) {
 		t.Errorf("after seeding %d entries, %d were computed again", len(seeded), recomputed)
+	}
+}
+
+// A first run with nothing recorded emits no declarations: every source file's version stands in for its
+// signature, and the graph says how many. Declaration emit has no ceiling (an ESLint config whose export type
+// is inferred from typescript-eslint ran 9 minutes and 17 GB on www-ahra-ai, #5txm9gg), so up front it runs
+// only for a file whose signature is known. Counted by the emits themselves, not timed.
+func TestAFirstRunEmitsNoDeclarations(t *testing.T) {
+	t.Parallel()
+	tree := newSignatureTree(t, map[string]string{
+		"a.ts":      signatureFixtureA,
+		"b.ts":      signatureFixtureB,
+		"c.ts":      signatureFixtureC,
+		"config.ts": "import { measure } from \"./b\";\nexport default [{ rules: { width: measure }, files: [\"**/*.ts\"] }];\n",
+	})
+	graph := tree.graph()
+	signatures, _ := graph.Signatures(context.Background(), nil)
+	if graph.SignatureEmits() != 0 {
+		t.Errorf("a first run emitted declarations for %d files, want none", graph.SignatureEmits())
+	}
+	for fileName, entry := range signatures {
+		if entry.Signature != entry.Version || entry.Syntax != entry.Version {
+			t.Errorf("%s: a first run's shape is not its content (%+v)", filepath.Base(fileName), entry)
+		}
+	}
+	if graph.ContentKeyedShapes != 4 {
+		t.Errorf("the graph counts %d shapes keyed on content, want 4", graph.ContentKeyedShapes)
+	}
+}
+
+// An edited file is emitted only when its recorded signature is real. One keyed on content stays keyed on
+// content, and its edit still reaches its importer, since its whole text is its shape.
+func TestOnlyAnEditedFileWithARealSignatureIsEmitted(t *testing.T) {
+	t.Parallel()
+	tree := signatureFixture(t)
+	known := tree.state(nil)
+	if known.emits != 3 {
+		t.Fatalf("the fixture's first state emitted %d files, so its signatures are not real ones", known.emits)
+	}
+	bodyEdit := strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1)
+	tree.write(map[string]string{"b.ts": bodyEdit})
+	edited := tree.state(known.signatures)
+	if edited.emits != 1 {
+		t.Errorf("an edit to a file with a real signature emitted %d files, want the one edited", edited.emits)
+	}
+
+	tree.write(map[string]string{"b.ts": signatureFixtureB})
+	graph := tree.graph()
+	contentKeyed, _ := graph.Signatures(context.Background(), nil)
+	before := graph.SignatureFingerprints(contentKeyed)
+	tree.write(map[string]string{"b.ts": bodyEdit})
+	graph = tree.graph()
+	after, _ := graph.Signatures(context.Background(), contentKeyed)
+	if graph.SignatureEmits() != 0 {
+		t.Errorf("an edit to a file keyed on content emitted %d files, want none", graph.SignatureEmits())
+	}
+	moved := graph.SignatureFingerprints(after)
+	for _, sourceFile := range graph.ProjectFiles() {
+		if filepath.Base(sourceFile.FileName()) == "a.ts" && moved[sourceFile.Path()] == before[sourceFile.Path()] {
+			t.Error("a body edit to a file keyed on content did not reach its importer, so the importer would replay stale")
+		}
 	}
 }
