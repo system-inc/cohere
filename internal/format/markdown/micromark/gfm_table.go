@@ -44,371 +44,428 @@ func gfmTableExtension() *Extension {
 	return &Extension{Flow: &ConstructRecord{Null: []*Construct{gfmTable}}}
 }
 
+// tokenizeGfmTable is tried at every code of flow, so its state is a gfmTableRun from the parse's Memory,
+// whose states were bound when the slot was made, and a try allocates nothing (#vbjv3d6).
 func tokenizeGfmTable(self *Self, effects *Effects, ok State, nok State) State {
-	size := 0
-	sizeB := 0
+	run := effects.memory().gfmTable()
+	run.gfmTableCall = gfmTableCall{self: self, effects: effects, ok: ok, nok: nok}
+	return run.startState
+}
+
+// gfmTableCall is what one call of tokenizeGfmTable keeps: upstream's closure variables.
+type gfmTableCall struct {
+	self    *Self
+	effects *Effects
+	ok, nok State
+
+	size, sizeB int
 	// Upstream's `boolean | undefined`, only ever tested for truthiness.
-	seen := false
+	seen bool
+}
 
-	var start, headRowBefore, headRowStart, headRowBreak, headRowData, headRowEscape State
-	var headDelimiterStart, headDelimiterBefore, headDelimiterCellBefore, headDelimiterValueBefore State
-	var headDelimiterLeftAlignmentAfter, headDelimiterFiller, headDelimiterRightAlignmentAfter State
-	var headDelimiterCellAfter, headDelimiterNok, bodyRowStart, bodyRowBreak, bodyRowData, bodyRowEscape State
+// gfmTableRun is one GFM table: its call's variables, and its states made once per slot.
+type gfmTableRun struct {
+	gfmTableCall
 
-	// Start of a GFM table.
+	startState                            State
+	headRowBeforeState                    State
+	headRowStartState                     State
+	headRowBreakState                     State
+	headRowDataState                      State
+	headRowEscapeState                    State
+	headDelimiterStartState               State
+	headDelimiterBeforeState              State
+	headDelimiterCellBeforeState          State
+	headDelimiterValueBeforeState         State
+	headDelimiterLeftAlignmentAfterState  State
+	headDelimiterFillerState              State
+	headDelimiterRightAlignmentAfterState State
+	headDelimiterCellAfterState           State
+	headDelimiterNokState                 State
+	bodyRowStartState                     State
+	bodyRowBreakState                     State
+	bodyRowDataState                      State
+	bodyRowEscapeState                    State
+}
+
+func newGfmTableRun() *gfmTableRun {
+	run := &gfmTableRun{}
+	run.startState = run.start
+	run.headRowBeforeState = run.headRowBefore
+	run.headRowStartState = run.headRowStart
+	run.headRowBreakState = run.headRowBreak
+	run.headRowDataState = run.headRowData
+	run.headRowEscapeState = run.headRowEscape
+	run.headDelimiterStartState = run.headDelimiterStart
+	run.headDelimiterBeforeState = run.headDelimiterBefore
+	run.headDelimiterCellBeforeState = run.headDelimiterCellBefore
+	run.headDelimiterValueBeforeState = run.headDelimiterValueBefore
+	run.headDelimiterLeftAlignmentAfterState = run.headDelimiterLeftAlignmentAfter
+	run.headDelimiterFillerState = run.headDelimiterFiller
+	run.headDelimiterRightAlignmentAfterState = run.headDelimiterRightAlignmentAfter
+	run.headDelimiterCellAfterState = run.headDelimiterCellAfter
+	run.headDelimiterNokState = run.headDelimiterNok
+	run.bodyRowStartState = run.bodyRowStart
+	run.bodyRowBreakState = run.bodyRowBreak
+	run.bodyRowDataState = run.bodyRowData
+	run.bodyRowEscapeState = run.bodyRowEscape
+	return run
+}
+
+// release zeroes the run's call for its next parse, keeping its bound states.
+func (run *gfmTableRun) release() { run.gfmTableCall = gfmTableCall{} }
+
+// Start of a GFM table.
+//
+// If there is a valid table row or table head before, then we try to parse
+// another row.
+// Otherwise, we try to parse a head.
+func (run *gfmTableRun) start(code Code) State {
+	index := len(run.self.Events) - 1
+	for index > -1 {
+		tokenType := run.self.Events[index].Token.Type
+		if tokenType == TypeLineEnding ||
+			// Note: markdown-rs uses `whitespace` instead of `linePrefix`
+			tokenType == TypeLinePrefix {
+			index--
+		} else {
+			break
+		}
+	}
+	tail := ""
+	if index > -1 {
+		tail = run.self.Events[index].Token.Type
+	}
+	isBody := tail == typeTableHead || tail == typeTableRow
+
+	// Don’t allow lazy body rows.
+	if isBody && run.self.Parser.Lazy[run.self.Now().Line] {
+		return run.nok(code)
+	}
+
+	if isBody {
+		return run.bodyRowStart(code)
+	}
+	return run.headRowBefore(code)
+}
+
+// Before table head row.
+func (run *gfmTableRun) headRowBefore(code Code) State {
+	run.effects.Enter(typeTableHead, nil)
+	run.effects.Enter(typeTableRow, nil)
+	return run.headRowStart(code)
+}
+
+// Before table head row, after whitespace.
+func (run *gfmTableRun) headRowStart(code Code) State {
+	if code == CodeVerticalBar {
+		return run.headRowBreak(code)
+	}
+
+	// To do: micromark-js should let us parse our own whitespace in extensions,
+	// like `markdown-rs`:
 	//
-	// If there is a valid table row or table head before, then we try to parse
-	// another row.
-	// Otherwise, we try to parse a head.
-	start = func(code Code) State {
-		index := len(self.Events) - 1
-		for index > -1 {
-			tokenType := self.Events[index].Token.Type
-			if tokenType == TypeLineEnding ||
-				// Note: markdown-rs uses `whitespace` instead of `linePrefix`
-				tokenType == TypeLinePrefix {
-				index--
-			} else {
-				break
-			}
-		}
-		tail := ""
-		if index > -1 {
-			tail = self.Events[index].Token.Type
-		}
-		isBody := tail == typeTableHead || tail == typeTableRow
+	// ```js
+	// // 4+ spaces.
+	// if (markdownSpace(code)) {
+	//   return nok(code)
+	// }
+	// ```
 
-		// Don’t allow lazy body rows.
-		if isBody && self.Parser.Lazy[self.Now().Line] {
-			return nok(code)
-		}
+	run.seen = true
+	// Count the first character, that isn’t a pipe, double.
+	run.sizeB++
+	return run.headRowBreak(code)
+}
 
-		if isBody {
-			return bodyRowStart(code)
-		}
-		return headRowBefore(code)
-	}
-
-	// Before table head row.
-	headRowBefore = func(code Code) State {
-		effects.Enter(typeTableHead, nil)
-		effects.Enter(typeTableRow, nil)
-		return headRowStart(code)
-	}
-
-	// Before table head row, after whitespace.
-	headRowStart = func(code Code) State {
-		if code == CodeVerticalBar {
-			return headRowBreak(code)
-		}
-
-		// To do: micromark-js should let us parse our own whitespace in extensions,
-		// like `markdown-rs`:
-		//
-		// ```js
-		// // 4+ spaces.
-		// if (markdownSpace(code)) {
-		//   return nok(code)
-		// }
-		// ```
-
-		seen = true
-		// Count the first character, that isn’t a pipe, double.
-		sizeB++
-		return headRowBreak(code)
-	}
-
-	// At break in table head row.
-	headRowBreak = func(code Code) State {
-		if code == CodeEof {
-			// Note: in `markdown-rs`, we need to reset, in `micromark-js` we don‘t.
-			return nok(code)
-		}
-
-		if markdownLineEnding(code) {
-			// If anything other than one pipe (ignoring whitespace) was used, it’s fine.
-			if sizeB > 1 {
-				sizeB = 0
-				// To do: check if this works.
-				// Feel free to interrupt:
-				self.SetInterrupt(true)
-				effects.Exit(typeTableRow)
-				effects.Enter(TypeLineEnding, nil)
-				effects.Consume(code)
-				effects.Exit(TypeLineEnding)
-				return headDelimiterStart
-			}
-
-			// Note: in `markdown-rs`, we need to reset, in `micromark-js` we don‘t.
-			return nok(code)
-		}
-
-		if markdownSpace(code) {
-			// To do: check if this is fine.
-			// effects.attempt(State::Next(StateName::GfmTableHeadRowBreak), State::Nok)
-			// State::Retry(space_or_tab(tokenizer))
-			return factorySpace(effects, headRowBreak, TypeWhitespace, 0)(code)
-		}
-
-		sizeB++
-
-		if seen {
-			seen = false
-			// Header cell count.
-			size++
-		}
-
-		if code == CodeVerticalBar {
-			effects.Enter(typeTableCellDivider, nil)
-			effects.Consume(code)
-			effects.Exit(typeTableCellDivider)
-			// Whether a delimiter was seen.
-			seen = true
-			return headRowBreak
-		}
-
-		// Anything else is cell data.
-		effects.Enter(TypeData, nil)
-		return headRowData(code)
-	}
-
-	// In table head row data.
-	headRowData = func(code Code) State {
-		if code == CodeEof || code == CodeVerticalBar || markdownLineEndingOrSpace(code) {
-			effects.Exit(TypeData)
-			return headRowBreak(code)
-		}
-
-		effects.Consume(code)
-		if code == CodeBackslash {
-			return headRowEscape
-		}
-		return headRowData
-	}
-
-	// In table head row escape.
-	headRowEscape = func(code Code) State {
-		if code == CodeBackslash || code == CodeVerticalBar {
-			effects.Consume(code)
-			return headRowData
-		}
-
-		return headRowData(code)
-	}
-
-	// Before delimiter row.
-	headDelimiterStart = func(code Code) State {
-		// Reset `interrupt`.
-		self.SetInterrupt(false)
-
-		// Note: in `markdown-rs`, we need to handle piercing here too.
-		if self.Parser.Lazy[self.Now().Line] {
-			return nok(code)
-		}
-
-		effects.Enter(typeTableDelimiterRow, nil)
-		// Track if we’ve seen a `:` or `|`.
-		seen = false
-
-		if markdownSpace(code) {
-			// `undefined` as the maximum is no limit, which factorySpace spells 0.
-			limit := tabSize
-			if slices.Contains(self.Parser.Constructs.Disable, "codeIndented") {
-				limit = 0
-			}
-			return factorySpace(effects, headDelimiterBefore, TypeLinePrefix, limit)(code)
-		}
-
-		return headDelimiterBefore(code)
-	}
-
-	// Before delimiter row, after optional whitespace.
-	//
-	// Reused when a `|` is found later, to parse another cell.
-	headDelimiterBefore = func(code Code) State {
-		if code == CodeDash || code == CodeColon {
-			return headDelimiterValueBefore(code)
-		}
-
-		if code == CodeVerticalBar {
-			seen = true
-			// If we start with a pipe, we open a cell marker.
-			effects.Enter(typeTableCellDivider, nil)
-			effects.Consume(code)
-			effects.Exit(typeTableCellDivider)
-			return headDelimiterCellBefore
-		}
-
-		// More whitespace / empty row not allowed at start.
-		return headDelimiterNok(code)
-	}
-
-	// After `|`, before delimiter cell.
-	headDelimiterCellBefore = func(code Code) State {
-		if markdownSpace(code) {
-			return factorySpace(effects, headDelimiterValueBefore, TypeWhitespace, 0)(code)
-		}
-
-		return headDelimiterValueBefore(code)
-	}
-
-	// Before delimiter cell value.
-	headDelimiterValueBefore = func(code Code) State {
-		// Align: left.
-		if code == CodeColon {
-			sizeB++
-			seen = true
-
-			effects.Enter(typeTableDelimiterMarker, nil)
-			effects.Consume(code)
-			effects.Exit(typeTableDelimiterMarker)
-			return headDelimiterLeftAlignmentAfter
-		}
-
-		// Align: none.
-		if code == CodeDash {
-			sizeB++
-			// To do: seems weird that this *isn’t* left aligned, but that state is used?
-			return headDelimiterLeftAlignmentAfter(code)
-		}
-
-		if code == CodeEof || markdownLineEnding(code) {
-			return headDelimiterCellAfter(code)
-		}
-
-		return headDelimiterNok(code)
-	}
-
-	// After delimiter cell left alignment marker.
-	headDelimiterLeftAlignmentAfter = func(code Code) State {
-		if code == CodeDash {
-			effects.Enter(typeTableDelimiterFiller, nil)
-			return headDelimiterFiller(code)
-		}
-
-		// Anything else is not ok after the left-align colon.
-		return headDelimiterNok(code)
-	}
-
-	// In delimiter cell filler.
-	headDelimiterFiller = func(code Code) State {
-		if code == CodeDash {
-			effects.Consume(code)
-			return headDelimiterFiller
-		}
-
-		// Align is `center` if it was `left`, `right` otherwise.
-		if code == CodeColon {
-			seen = true
-			effects.Exit(typeTableDelimiterFiller)
-			effects.Enter(typeTableDelimiterMarker, nil)
-			effects.Consume(code)
-			effects.Exit(typeTableDelimiterMarker)
-			return headDelimiterRightAlignmentAfter
-		}
-
-		effects.Exit(typeTableDelimiterFiller)
-		return headDelimiterRightAlignmentAfter(code)
-	}
-
-	// After delimiter cell right alignment marker.
-	headDelimiterRightAlignmentAfter = func(code Code) State {
-		if markdownSpace(code) {
-			return factorySpace(effects, headDelimiterCellAfter, TypeWhitespace, 0)(code)
-		}
-
-		return headDelimiterCellAfter(code)
-	}
-
-	// After delimiter cell.
-	headDelimiterCellAfter = func(code Code) State {
-		if code == CodeVerticalBar {
-			return headDelimiterBefore(code)
-		}
-
-		if code == CodeEof || markdownLineEnding(code) {
-			// Exit when:
-			// * there was no `:` or `|` at all (it’s a thematic break or setext
-			//   underline instead)
-			// * the header cell count is not the delimiter cell count
-			if !seen || size != sizeB {
-				return headDelimiterNok(code)
-			}
-
-			// Note: in markdown-rs`, a reset is needed here.
-			effects.Exit(typeTableDelimiterRow)
-			effects.Exit(typeTableHead)
-			// To do: in `markdown-rs`, resolvers need to be registered manually.
-			// effects.register_resolver(ResolveName::GfmTable)
-			return ok(code)
-		}
-
-		return headDelimiterNok(code)
-	}
-
-	// In delimiter row, at a disallowed byte.
-	headDelimiterNok = func(code Code) State {
+// At break in table head row.
+func (run *gfmTableRun) headRowBreak(code Code) State {
+	if code == CodeEof {
 		// Note: in `markdown-rs`, we need to reset, in `micromark-js` we don‘t.
-		return nok(code)
+		return run.nok(code)
 	}
 
-	// Before table body row.
-	bodyRowStart = func(code Code) State {
-		// Note: in `markdown-rs` we need to manually take care of a prefix,
-		// but in `micromark-js` that is done for us, so if we’re here, we’re
-		// never at whitespace.
-		effects.Enter(typeTableRow, nil)
-		return bodyRowBreak(code)
+	if markdownLineEnding(code) {
+		// If anything other than one pipe (ignoring whitespace) was used, it’s fine.
+		if run.sizeB > 1 {
+			run.sizeB = 0
+			// To do: check if this works.
+			// Feel free to interrupt:
+			run.self.SetInterrupt(true)
+			run.effects.Exit(typeTableRow)
+			run.effects.Enter(TypeLineEnding, nil)
+			run.effects.Consume(code)
+			run.effects.Exit(TypeLineEnding)
+			return run.headDelimiterStartState
+		}
+
+		// Note: in `markdown-rs`, we need to reset, in `micromark-js` we don‘t.
+		return run.nok(code)
 	}
 
-	// At break in table body row.
-	bodyRowBreak = func(code Code) State {
-		if code == CodeVerticalBar {
-			effects.Enter(typeTableCellDivider, nil)
-			effects.Consume(code)
-			effects.Exit(typeTableCellDivider)
-			return bodyRowBreak
-		}
-
-		if code == CodeEof || markdownLineEnding(code) {
-			effects.Exit(typeTableRow)
-			return ok(code)
-		}
-
-		if markdownSpace(code) {
-			return factorySpace(effects, bodyRowBreak, TypeWhitespace, 0)(code)
-		}
-
-		// Anything else is cell content.
-		effects.Enter(TypeData, nil)
-		return bodyRowData(code)
+	if markdownSpace(code) {
+		// To do: check if this is fine.
+		// effects.attempt(State::Next(StateName::GfmTableHeadRowBreak), State::Nok)
+		// State::Retry(space_or_tab(tokenizer))
+		return factorySpace(run.effects, run.headRowBreakState, TypeWhitespace, 0)(code)
 	}
 
-	// In table body row data.
-	bodyRowData = func(code Code) State {
-		if code == CodeEof || code == CodeVerticalBar || markdownLineEndingOrSpace(code) {
-			effects.Exit(TypeData)
-			return bodyRowBreak(code)
-		}
+	run.sizeB++
 
-		effects.Consume(code)
-		if code == CodeBackslash {
-			return bodyRowEscape
-		}
-		return bodyRowData
+	if run.seen {
+		run.seen = false
+		// Header cell count.
+		run.size++
 	}
 
-	// In table body row escape.
-	bodyRowEscape = func(code Code) State {
-		if code == CodeBackslash || code == CodeVerticalBar {
-			effects.Consume(code)
-			return bodyRowData
-		}
-
-		return bodyRowData(code)
+	if code == CodeVerticalBar {
+		run.effects.Enter(typeTableCellDivider, nil)
+		run.effects.Consume(code)
+		run.effects.Exit(typeTableCellDivider)
+		// Whether a delimiter was seen.
+		run.seen = true
+		return run.headRowBreakState
 	}
 
-	return start
+	// Anything else is cell data.
+	run.effects.Enter(TypeData, nil)
+	return run.headRowData(code)
+}
+
+// In table head row data.
+func (run *gfmTableRun) headRowData(code Code) State {
+	if code == CodeEof || code == CodeVerticalBar || markdownLineEndingOrSpace(code) {
+		run.effects.Exit(TypeData)
+		return run.headRowBreak(code)
+	}
+
+	run.effects.Consume(code)
+	if code == CodeBackslash {
+		return run.headRowEscapeState
+	}
+	return run.headRowDataState
+}
+
+// In table head row escape.
+func (run *gfmTableRun) headRowEscape(code Code) State {
+	if code == CodeBackslash || code == CodeVerticalBar {
+		run.effects.Consume(code)
+		return run.headRowDataState
+	}
+
+	return run.headRowData(code)
+}
+
+// Before delimiter row.
+func (run *gfmTableRun) headDelimiterStart(code Code) State {
+	// Reset `interrupt`.
+	run.self.SetInterrupt(false)
+
+	// Note: in `markdown-rs`, we need to handle piercing here too.
+	if run.self.Parser.Lazy[run.self.Now().Line] {
+		return run.nok(code)
+	}
+
+	run.effects.Enter(typeTableDelimiterRow, nil)
+	// Track if we’ve seen a `:` or `|`.
+	run.seen = false
+
+	if markdownSpace(code) {
+		// `undefined` as the maximum is no limit, which factorySpace spells 0.
+		limit := tabSize
+		if slices.Contains(run.self.Parser.Constructs.Disable, "codeIndented") {
+			limit = 0
+		}
+		return factorySpace(run.effects, run.headDelimiterBeforeState, TypeLinePrefix, limit)(code)
+	}
+
+	return run.headDelimiterBefore(code)
+}
+
+// Before delimiter row, after optional whitespace.
+//
+// Reused when a `|` is found later, to parse another cell.
+func (run *gfmTableRun) headDelimiterBefore(code Code) State {
+	if code == CodeDash || code == CodeColon {
+		return run.headDelimiterValueBefore(code)
+	}
+
+	if code == CodeVerticalBar {
+		run.seen = true
+		// If we start with a pipe, we open a cell marker.
+		run.effects.Enter(typeTableCellDivider, nil)
+		run.effects.Consume(code)
+		run.effects.Exit(typeTableCellDivider)
+		return run.headDelimiterCellBeforeState
+	}
+
+	// More whitespace / empty row not allowed at start.
+	return run.headDelimiterNok(code)
+}
+
+// After `|`, before delimiter cell.
+func (run *gfmTableRun) headDelimiterCellBefore(code Code) State {
+	if markdownSpace(code) {
+		return factorySpace(run.effects, run.headDelimiterValueBeforeState, TypeWhitespace, 0)(code)
+	}
+
+	return run.headDelimiterValueBefore(code)
+}
+
+// Before delimiter cell value.
+func (run *gfmTableRun) headDelimiterValueBefore(code Code) State {
+	// Align: left.
+	if code == CodeColon {
+		run.sizeB++
+		run.seen = true
+
+		run.effects.Enter(typeTableDelimiterMarker, nil)
+		run.effects.Consume(code)
+		run.effects.Exit(typeTableDelimiterMarker)
+		return run.headDelimiterLeftAlignmentAfterState
+	}
+
+	// Align: none.
+	if code == CodeDash {
+		run.sizeB++
+		// To do: seems weird that this *isn’t* left aligned, but that state is used?
+		return run.headDelimiterLeftAlignmentAfter(code)
+	}
+
+	if code == CodeEof || markdownLineEnding(code) {
+		return run.headDelimiterCellAfter(code)
+	}
+
+	return run.headDelimiterNok(code)
+}
+
+// After delimiter cell left alignment marker.
+func (run *gfmTableRun) headDelimiterLeftAlignmentAfter(code Code) State {
+	if code == CodeDash {
+		run.effects.Enter(typeTableDelimiterFiller, nil)
+		return run.headDelimiterFiller(code)
+	}
+
+	// Anything else is not ok after the left-align colon.
+	return run.headDelimiterNok(code)
+}
+
+// In delimiter cell filler.
+func (run *gfmTableRun) headDelimiterFiller(code Code) State {
+	if code == CodeDash {
+		run.effects.Consume(code)
+		return run.headDelimiterFillerState
+	}
+
+	// Align is `center` if it was `left`, `right` otherwise.
+	if code == CodeColon {
+		run.seen = true
+		run.effects.Exit(typeTableDelimiterFiller)
+		run.effects.Enter(typeTableDelimiterMarker, nil)
+		run.effects.Consume(code)
+		run.effects.Exit(typeTableDelimiterMarker)
+		return run.headDelimiterRightAlignmentAfterState
+	}
+
+	run.effects.Exit(typeTableDelimiterFiller)
+	return run.headDelimiterRightAlignmentAfter(code)
+}
+
+// After delimiter cell right alignment marker.
+func (run *gfmTableRun) headDelimiterRightAlignmentAfter(code Code) State {
+	if markdownSpace(code) {
+		return factorySpace(run.effects, run.headDelimiterCellAfterState, TypeWhitespace, 0)(code)
+	}
+
+	return run.headDelimiterCellAfter(code)
+}
+
+// After delimiter cell.
+func (run *gfmTableRun) headDelimiterCellAfter(code Code) State {
+	if code == CodeVerticalBar {
+		return run.headDelimiterBefore(code)
+	}
+
+	if code == CodeEof || markdownLineEnding(code) {
+		// Exit when:
+		// * there was no `:` or `|` at all (it’s a thematic break or setext
+		//   underline instead)
+		// * the header cell count is not the delimiter cell count
+		if !run.seen || run.size != run.sizeB {
+			return run.headDelimiterNok(code)
+		}
+
+		// Note: in markdown-rs`, a reset is needed here.
+		run.effects.Exit(typeTableDelimiterRow)
+		run.effects.Exit(typeTableHead)
+		// To do: in `markdown-rs`, resolvers need to be registered manually.
+		// effects.register_resolver(ResolveName::GfmTable)
+		return run.ok(code)
+	}
+
+	return run.headDelimiterNok(code)
+}
+
+// In delimiter row, at a disallowed byte.
+func (run *gfmTableRun) headDelimiterNok(code Code) State {
+	// Note: in `markdown-rs`, we need to reset, in `micromark-js` we don‘t.
+	return run.nok(code)
+}
+
+// Before table body row.
+func (run *gfmTableRun) bodyRowStart(code Code) State {
+	// Note: in `markdown-rs` we need to manually take care of a prefix,
+	// but in `micromark-js` that is done for us, so if we’re here, we’re
+	// never at whitespace.
+	run.effects.Enter(typeTableRow, nil)
+	return run.bodyRowBreak(code)
+}
+
+// At break in table body row.
+func (run *gfmTableRun) bodyRowBreak(code Code) State {
+	if code == CodeVerticalBar {
+		run.effects.Enter(typeTableCellDivider, nil)
+		run.effects.Consume(code)
+		run.effects.Exit(typeTableCellDivider)
+		return run.bodyRowBreakState
+	}
+
+	if code == CodeEof || markdownLineEnding(code) {
+		run.effects.Exit(typeTableRow)
+		return run.ok(code)
+	}
+
+	if markdownSpace(code) {
+		return factorySpace(run.effects, run.bodyRowBreakState, TypeWhitespace, 0)(code)
+	}
+
+	// Anything else is cell content.
+	run.effects.Enter(TypeData, nil)
+	return run.bodyRowData(code)
+}
+
+// In table body row data.
+func (run *gfmTableRun) bodyRowData(code Code) State {
+	if code == CodeEof || code == CodeVerticalBar || markdownLineEndingOrSpace(code) {
+		run.effects.Exit(TypeData)
+		return run.bodyRowBreak(code)
+	}
+
+	run.effects.Consume(code)
+	if code == CodeBackslash {
+		return run.bodyRowEscapeState
+	}
+	return run.bodyRowDataState
+}
+
+// In table body row escape.
+func (run *gfmTableRun) bodyRowEscape(code Code) State {
+	if code == CodeBackslash || code == CodeVerticalBar {
+		run.effects.Consume(code)
+		return run.bodyRowDataState
+	}
+
+	return run.bodyRowData(code)
 }
 
 // resolveGfmTable is upstream's resolveTable.

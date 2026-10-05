@@ -46,8 +46,14 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	units := utf16.Encode([]rune(text))
 	offsets := newUnitOffsets(text)
 
+	memory := parseMemories.Get().(*parseMemory)
+	defer func() {
+		memory.reset()
+		parseMemories.Put(memory)
+	}()
+
 	lineCounter := cst.NewLineCounter()
-	context := newContext(units, lineCounter, nodes)
+	context := newContext(units, lineCounter, nodes, memory)
 	parser := cst.NewParser(lineCounter.AddNewLine)
 	composer := compose.NewComposer(compose.UnistParserOptions())
 	parsedDocuments := []*compose.Document{}

@@ -5,6 +5,7 @@ package unist
 
 import (
 	"fmt"
+	"sync"
 	"unicode/utf16"
 
 	"github.com/system-inc/cohere/internal/format/arena"
@@ -43,12 +44,33 @@ type context struct {
 
 	// nodes is where the tree's nodes come from, nil to allocate each (#93dpede).
 	nodes *arena.Arena[Node]
+	// memory is where the parse's points and positions come from (#vbjv3d6).
+	memory *parseMemory
 }
 
-func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node]) *context {
+func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node], memory *parseMemory) *context {
 	// Sized for about a node per eight units of text, so the map is not rebuilt as it grows.
 	positions := make(map[*Node]*position, len(text)/8)
-	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: positions, nodes: nodes}
+	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: positions, nodes: nodes, memory: memory}
+}
+
+// parseMemory is what one Parse uses only while it runs, kept for the next (#vbjv3d6): its point and
+// position objects, which Parse copies into each node's Position before it returns.
+type parseMemory struct {
+	points    arena.Arena[point]
+	positions arena.Arena[position]
+}
+
+// parseMemories hold the memory of parses that have finished, one per caller at a time.
+var parseMemories = sync.Pool{New: func() any {
+	released := point{line: 1 << 30, column: 1 << 30, offset: 1 << 30}
+	// A released position holds no points, so reading one through it stops the parse.
+	return &parseMemory{points: arena.Arena[point]{Poison: released}}
+}}
+
+func (memory *parseMemory) reset() {
+	memory.points.Reset()
+	memory.positions.Reset()
 }
 
 // position is node.position.
@@ -59,12 +81,12 @@ func (context *context) position(node *Node) *position {
 // transformOffset is upstream's transformOffset: a new point.
 func (context *context) transformOffset(offset int) *point {
 	line, col := context.lineCounter.LinePos(offset)
-	return &point{line: line, column: col, offset: offset}
+	return context.memory.points.New(point{line: line, column: col, offset: offset})
 }
 
 // transformRange is upstream's transformRange: a new position over two new points.
 func (context *context) transformRange(start int, end int) *position {
-	return createPosition(context.transformOffset(start), context.transformOffset(end))
+	return context.createPosition(context.transformOffset(start), context.transformOffset(end))
 }
 
 // transformComment is upstream's Context.transformComment and transformComment (comment.mjs).

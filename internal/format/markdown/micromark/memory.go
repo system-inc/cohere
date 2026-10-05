@@ -1,6 +1,10 @@
 package micromark
 
-import "github.com/system-inc/cohere/internal/format/arena"
+import (
+	"slices"
+
+	"github.com/system-inc/cohere/internal/format/arena"
+)
 
 // Memory is what a parse takes its tokens, attempts and tokenizers from, kept for the next parse once the
 // events it returned are done (#93dpede, #vbjv3d6). A Memory belongs to one parse at a time.
@@ -12,10 +16,40 @@ import "github.com/system-inc/cohere/internal/format/arena"
 type Memory struct {
 	Tokens arena.Arena[Token]
 
-	attempts       []*attempt
-	attemptsUsed   int
-	tokenizers     []*TokenizeContext
-	tokenizersUsed int
+	attempts       slots[attempt]
+	tokenizers     slots[TokenizeContext]
+	spaceRuns      slots[spaceRun]
+	emailAutolinks slots[emailAutolink]
+	blankLines     slots[blankLineRun]
+	gfmTables      slots[gfmTableRun]
+
+	// stackCopies and eventCopies hold the copies an attempt saves of the token stack and a resolver is
+	// given of the events. A released copy holds nil tokens, so reading one stops the parse.
+	stackCopies arena.Slab[*Token]
+	eventCopies arena.Slab[Event]
+}
+
+// slots hands out values of T, each made once by its fresh function and reused by later parses.
+type slots[T any] struct {
+	values []*T
+	used   int
+}
+
+func (slots *slots[T]) take(fresh func() *T) *T {
+	if slots.used == len(slots.values) {
+		slots.values = append(slots.values, fresh())
+	}
+	value := slots.values[slots.used]
+	slots.used++
+	return value
+}
+
+// release hands every value taken back, each reset for its next parse.
+func (slots *slots[T]) release(reset func(*T)) {
+	for _, value := range slots.values[:slots.used] {
+		reset(value)
+	}
+	slots.used = 0
 }
 
 // NewMemory is an empty Memory whose released tokens hold a poison no parse produces.
@@ -30,14 +64,30 @@ func NewMemory() *Memory {
 // dereferences nil and stops the format rather than reading another file's state.
 func (memory *Memory) Reset() {
 	memory.Tokens.Reset()
-	for _, run := range memory.attempts[:memory.attemptsUsed] {
-		run.release()
+	memory.attempts.release((*attempt).release)
+	memory.tokenizers.release((*TokenizeContext).release)
+	memory.spaceRuns.release((*spaceRun).release)
+	memory.emailAutolinks.release((*emailAutolink).release)
+	memory.blankLines.release((*blankLineRun).release)
+	memory.gfmTables.release((*gfmTableRun).release)
+	memory.stackCopies.Reset()
+	memory.eventCopies.Reset()
+}
+
+// copyStack is a copy of the token stack, for an attempt to restore.
+func (memory *Memory) copyStack(stack []*Token) []*Token {
+	if memory == nil {
+		return slices.Clone(stack)
 	}
-	memory.attemptsUsed = 0
-	for _, context := range memory.tokenizers[:memory.tokenizersUsed] {
-		context.release()
+	return append(memory.stackCopies.Make(len(stack)), stack...)
+}
+
+// copyEvents is a copy of events, for a resolver to rewrite.
+func (memory *Memory) copyEvents(events []Event) []Event {
+	if memory == nil {
+		return slices.Clone(events)
 	}
-	memory.tokenizersUsed = 0
+	return append(memory.eventCopies.Make(len(events)), events...)
 }
 
 // tokens is where a parse's tokens come from, nil to allocate each.
@@ -53,12 +103,7 @@ func (memory *Memory) attempt() *attempt {
 	if memory == nil {
 		return newAttempt()
 	}
-	if memory.attemptsUsed == len(memory.attempts) {
-		memory.attempts = append(memory.attempts, newAttempt())
-	}
-	run := memory.attempts[memory.attemptsUsed]
-	memory.attemptsUsed++
-	return run
+	return memory.attempts.take(newAttempt)
 }
 
 // tokenizer is a tokenizer with its effects bound and every other field zero.
@@ -66,10 +111,37 @@ func (memory *Memory) tokenizer() *TokenizeContext {
 	if memory == nil {
 		return newTokenizeContext()
 	}
-	if memory.tokenizersUsed == len(memory.tokenizers) {
-		memory.tokenizers = append(memory.tokenizers, newTokenizeContext())
+	return memory.tokenizers.take(newTokenizeContext)
+}
+
+// spaceRun is a factorySpace with its states bound.
+func (memory *Memory) spaceRun() *spaceRun {
+	if memory == nil {
+		return newSpaceRun()
 	}
-	context := memory.tokenizers[memory.tokenizersUsed]
-	memory.tokenizersUsed++
-	return context
+	return memory.spaceRuns.take(newSpaceRun)
+}
+
+// emailAutolink is an email autolink literal with its states bound.
+func (memory *Memory) emailAutolink() *emailAutolink {
+	if memory == nil {
+		return newEmailAutolink()
+	}
+	return memory.emailAutolinks.take(newEmailAutolink)
+}
+
+// blankLine is a blank line with its states bound.
+func (memory *Memory) blankLine() *blankLineRun {
+	if memory == nil {
+		return newBlankLineRun()
+	}
+	return memory.blankLines.take(newBlankLineRun)
+}
+
+// gfmTable is a GFM table with its states bound.
+func (memory *Memory) gfmTable() *gfmTableRun {
+	if memory == nil {
+		return newGfmTableRun()
+	}
+	return memory.gfmTables.take(newGfmTableRun)
 }

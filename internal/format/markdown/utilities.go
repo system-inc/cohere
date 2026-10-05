@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -49,20 +50,30 @@ func inClass(ranges [][2]rune, point rune) bool {
 
 // firstUnit and lastUnit are JavaScript's text[0] and text.at(-1): one UTF-16 unit, which for an astral
 // character is a lone surrogate. The class tables answer for surrogates too.
+//
+// Both decode one character at the end they read rather than encoding the text (#vbjv3d6). Invalid UTF-8
+// decodes to U+FFFD a byte at a time either way, and a backward decode stops on the same last character a
+// forward one does: a valid character's first byte is never another's continuation.
 func firstUnit(text string) rune {
-	units := utf16.Encode([]rune(text))
-	if len(units) == 0 {
+	if text == "" {
 		return -1
 	}
-	return rune(units[0])
+	character, _ := utf8.DecodeRuneInString(text)
+	if high, _ := utf16.EncodeRune(character); high != unicode.ReplacementChar {
+		return high
+	}
+	return character
 }
 
 func lastUnit(text string) rune {
-	units := utf16.Encode([]rune(text))
-	if len(units) == 0 {
+	if text == "" {
 		return -1
 	}
-	return rune(units[len(units)-1])
+	character, _ := utf8.DecodeLastRuneInString(text)
+	if _, low := utf16.EncodeRune(character); low != unicode.ReplacementChar {
+		return low
+	}
+	return character
 }
 
 // isPunctuationUnit is PUNCTUATION_REGEXP.test of a one-unit string.
@@ -105,6 +116,8 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 	tokens := splitKeepingSeparators(text, func(character rune) bool {
 		return character == '\t' || character == '\n' || character == ' '
 	})
+	// innerTokens is reused for every token: its pieces are read only within the token's iteration.
+	var innerTokens []string
 	for index, token := range tokens {
 		// whitespace
 		if index%2 == 1 {
@@ -122,7 +135,7 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			continue
 		}
 
-		innerTokens := splitOnCJK(token)
+		innerTokens = appendSplitOnCJK(innerTokens[:0], token)
 		for innerIndex, innerToken := range innerTokens {
 			if (innerIndex == 0 || innerIndex == len(innerTokens)-1) && innerToken == "" {
 				continue
@@ -195,10 +208,9 @@ func splitKeepingSeparators(text string, isSeparator func(rune) bool) []string {
 	return append(parts, text[start:])
 }
 
-// splitOnCJK is token.split(new RegExp(`(${CJK_REGEXP.source})`, "u")): pieces alternate with the CJK
-// matches, each one CJK character and an optional variation selector after it.
-func splitOnCJK(token string) []string {
-	var parts []string
+// appendSplitOnCJK appends token.split(new RegExp(`(${CJK_REGEXP.source})`, "u")) to parts: pieces
+// alternate with the CJK matches, each one CJK character and an optional variation selector after it.
+func appendSplitOnCJK(parts []string, token string) []string {
 	start := 0
 	index := 0
 	for index < len(token) {
@@ -266,22 +278,32 @@ func hasGitDiffFriendlyOrderedList(node *Node, originalText string) bool {
 
 // mapAst is upstream's mapAst: a preorder walk that replaces each node with what the handler returns and
 // each parent's children with their replacements, the parent stack holding the replacements.
+//
+// Upstream spreads each handled node into a new object and each parent's mapped children into a new
+// array. Here neither is copied: no caller holds the tree a pass was given (preprocess replaces it with
+// each pass's result), so the copies would only be garbage, the largest share of a markdown format's
+// allocation (#93dpede). A parent's children are replaced in place, left to right, so a handler that read
+// an earlier sibling through its parent would see the replacement where upstream sees the original. None
+// of preprocess's handlers does: they read the next sibling, which is not yet mapped, and the count.
+//
+// The parent stacks are not copied per parent either (#vbjv3d6). The stack for a node at one depth is
+// built in that depth's buffer, which its siblings reuse once its subtree is done, and a handler reads its
+// stack only while it runs.
 func mapAst(ast *Node, handler func(node *Node, index int, parentStack []*Node) *Node) *Node {
+	var stacks [][]*Node
 	var preorder func(node *Node, index int, parentStack []*Node) *Node
 	preorder = func(node *Node, index int, parentStack []*Node) *Node {
-		// Upstream spreads each handled node into a new object. Here the handled node itself is kept: no
-		// caller holds the tree a pass was given (preprocess replaces it with each pass's result), so a copy
-		// would only be garbage, the largest share of a markdown format's allocation (#93dpede). What a
-		// handler sees is unchanged: its parents' Children are still the slices being walked, since each
-		// is replaced only once all its children are mapped.
 		newNode := handler(node, index, parentStack)
 		if newNode.Children != nil {
-			children := make([]*Node, len(newNode.Children))
-			stack := append([]*Node{newNode}, parentStack...)
-			for childIndex, child := range newNode.Children {
-				children[childIndex] = preorder(child, childIndex, stack)
+			depth := len(parentStack)
+			if depth == len(stacks) {
+				stacks = append(stacks, make([]*Node, 0, depth+1))
 			}
-			newNode.Children = children
+			stack := append(append(stacks[depth][:0], newNode), parentStack...)
+			stacks[depth] = stack
+			for childIndex, child := range newNode.Children {
+				newNode.Children[childIndex] = preorder(child, childIndex, stack)
+			}
 		}
 		return newNode
 	}
@@ -343,7 +365,11 @@ func isNewLine(node *Node) bool {
 func locStart(node *Node) int { return node.Position.Start.Offset }
 func locEnd(node *Node) int   { return node.Position.End.Offset }
 
-// utf16Length is JavaScript's String.length.
+// utf16Length is JavaScript's String.length, counted without encoding the text (#vbjv3d6).
 func utf16Length(text string) int {
-	return len(utf16.Encode([]rune(text)))
+	length := 0
+	for _, character := range text {
+		length += utf16.RuneLen(character)
+	}
+	return length
 }

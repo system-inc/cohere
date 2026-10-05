@@ -3,6 +3,7 @@ package markdown
 import (
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -63,6 +64,11 @@ func printingCallParentIsFirst(path *astPath) bool {
 // it runs over UTF-16 units, and `.` matches any unit but a line terminator; the matcher below tries the
 // alternatives in the regex's order, backtracking the same way.
 func escapeDelimiterRuns(text string, previousValue string, nextValue string) string {
+	// Without a `*` or `_` nothing matches, and the text comes back as it went in: decoding its units
+	// rebuilds it exactly when it is valid UTF-8, so only then is the walk skipped (#vbjv3d6).
+	if !strings.ContainsAny(text, "*_") && utf8.ValidString(text) {
+		return text
+	}
 	units := utf16.Encode([]rune(text))
 	var output []uint16
 	position := 0

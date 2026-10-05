@@ -88,24 +88,17 @@ func gfmAutolinkLiteralExtension() *Extension {
 
 // tokenizeGfmAutolinkLiteralEmailAutolink is an email autolink literal: `a contact@example.org b`.
 //
-// It is tried at nearly every position of text, and nearly every try fails its first check, so the states
-// past the start are made only once one passes, all in one struct (#93dpede).
+// It is tried at nearly every position of text, and nearly every try fails its first check, so its state is
+// an emailAutolink from the parse's Memory, whose states were bound when the slot was made, and a try
+// allocates nothing (#93dpede, #vbjv3d6).
 func tokenizeGfmAutolinkLiteralEmailAutolink(self *Self, effects *Effects, ok State, nok State) State {
-	// Start of email autolink literal.
-	return func(code Code) State {
-		if !gfmAutolinkLiteralAtext(code) || !gfmAutolinkLiteralPreviousEmail(self.Previous) ||
-			gfmAutolinkLiteralPreviousUnbalanced(self.Events) {
-			return nok(code)
-		}
-		effects.Enter(typeLiteralAutolink, nil)
-		effects.Enter(typeLiteralAutolinkEmail, nil)
-		return newEmailAutolink(self, effects, ok, nok).atext(code)
-	}
+	run := effects.memory().emailAutolink()
+	run.self, run.effects, run.ok, run.nok = self, effects, ok, nok
+	return run.startState
 }
 
-// emailAutolink is an email autolink literal past its start: the closure state upstream keeps in
-// variables, and its states, each made once. Most words that start one have no `@`, so the domain's states
-// are made only when one is consumed.
+// emailAutolink is one email autolink literal: the closure state upstream keeps in variables, and its
+// states, each made once per slot.
 type emailAutolink struct {
 	self    *Self
 	effects *Effects
@@ -113,13 +106,33 @@ type emailAutolink struct {
 
 	dot, data bool
 
-	atextState, emailDomainState, emailDomainDotState, emailDomainAfterState State
+	startState, atextState, emailDomainState, emailDomainDotState, emailDomainAfterState State
 }
 
-func newEmailAutolink(self *Self, effects *Effects, ok State, nok State) *emailAutolink {
-	run := &emailAutolink{self: self, effects: effects, ok: ok, nok: nok}
-	run.atextState = run.atext
+func newEmailAutolink() *emailAutolink {
+	run := &emailAutolink{}
+	run.startState, run.atextState = run.start, run.atext
+	run.emailDomainState, run.emailDomainDotState, run.emailDomainAfterState = run.emailDomain, run.emailDomainDot, run.emailDomainAfter
 	return run
+}
+
+// release zeroes the autolink for its next parse, keeping its bound states.
+func (run *emailAutolink) release() {
+	*run = emailAutolink{
+		startState: run.startState, atextState: run.atextState, emailDomainState: run.emailDomainState,
+		emailDomainDotState: run.emailDomainDotState, emailDomainAfterState: run.emailDomainAfterState,
+	}
+}
+
+// Start of email autolink literal.
+func (run *emailAutolink) start(code Code) State {
+	if !gfmAutolinkLiteralAtext(code) || !gfmAutolinkLiteralPreviousEmail(run.self.Previous) ||
+		gfmAutolinkLiteralPreviousUnbalanced(run.self.Events) {
+		return run.nok(code)
+	}
+	run.effects.Enter(typeLiteralAutolink, nil)
+	run.effects.Enter(typeLiteralAutolinkEmail, nil)
+	return run.atext(code)
 }
 
 // In email atext.
@@ -130,7 +143,6 @@ func (run *emailAutolink) atext(code Code) State {
 	}
 	if code == CodeAtSign {
 		run.effects.Consume(code)
-		run.emailDomainState, run.emailDomainDotState, run.emailDomainAfterState = run.emailDomain, run.emailDomainDot, run.emailDomainAfter
 		return run.emailDomainState
 	}
 	return run.nok(code)
