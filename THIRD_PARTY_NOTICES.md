@@ -50,7 +50,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 - Source: https://github.com/microsoft/typescript-go
 - License: `Apache-2.0`
-- In cohere: The TypeScript compiler, built from the modified fork https://github.com/kirkouimet/TypeScript, and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).
+- In cohere: The TypeScript compiler, built from System, Inc.'s modified fork https://github.com/system-inc/TypeScript, and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).
 
 ````text
 Apache License

@@ -112,7 +112,7 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 	git(module, "clone", "--quiet", compiler, "TypeScript")
 	git(filepath.Join(module, "TypeScript"), "checkout", "--quiet", recorded)
 	write(filepath.Join(module, ".gitmodules"),
-		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/kirkouimet/TypeScript.git\n")
+		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/system-inc/TypeScript.git\n\tbranch = adamic\n")
 	git(module, "-c", "advice.addEmbeddedRepo=false", "add", ".gitmodules", "TypeScript")
 	git(module, "commit", "--quiet", "-m", "pin the compiler")
 
@@ -236,8 +236,8 @@ func TestUpstreamIsReadFromTheCommittedGitmodules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pin.Upstream != "kirkouimet/TypeScript" {
-		t.Fatalf("the upstream is %q, and the commit's .gitmodules names kirkouimet/TypeScript", pin.Upstream)
+	if pin.Upstream != "system-inc/TypeScript" {
+		t.Fatalf("the upstream is %q, and the commit's .gitmodules names system-inc/TypeScript", pin.Upstream)
 	}
 }
 
@@ -253,10 +253,10 @@ func TestCompilerUpstreamFromGitmodules(t *testing.T) {
 	}{
 		{"the fork, after another submodule, over ssh",
 			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
-				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:kirkouimet/TypeScript.git\n",
-			"kirkouimet/TypeScript"},
-		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/kirkouimet/TypeScript.git\"\n",
-			"kirkouimet/TypeScript"},
+				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
+			"system-inc/TypeScript"},
+		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"system-inc/TypeScript"},
 		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", "unknown"},
 		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", "unknown"},
 		{"empty", "", "unknown"},
