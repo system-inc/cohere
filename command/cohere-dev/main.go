@@ -70,20 +70,51 @@ func test(arguments []string) int {
 		return 1
 	}
 
-	waitingSince := time.Now()
-	announced := false
-	for {
-		held, err := takeSlot(directory, slots, arguments)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: taking a test slot: %v\n", err)
+	// In line, in arrival order, where a lock holds; see queueTicket.
+	var ticket *queueTicket
+	if filesLock {
+		if ticket, err = joinQueue(directory); err != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: joining the line for a test slot: %v\n", err)
 			return 1
 		}
-		if held != nil {
-			if announced {
-				fmt.Fprintf(os.Stderr, "cohere-dev: took a test slot after waiting %s\n", time.Since(waitingSince).Round(time.Second))
+		// Left as soon as a slot is taken, so the next in line moves up while this run tests; this covers
+		// every way out before that.
+		defer func() {
+			if ticket != nil {
+				ticket.leave()
 			}
-			defer held.release()
-			return goTest(arguments)
+		}()
+	}
+
+	waitingSince := time.Now()
+	announced := false
+	lastAhead := -1
+	for {
+		ahead, waiting := 0, 0
+		if ticket != nil {
+			if ahead, waiting, err = ticket.place(); err != nil {
+				fmt.Fprintf(os.Stderr, "cohere-dev: reading the line for a test slot: %v\n", err)
+				return 1
+			}
+		}
+		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.
+		if ahead < slots {
+			held, err := takeSlot(directory, slots, arguments)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cohere-dev: taking a test slot: %v\n", err)
+				return 1
+			}
+			if held != nil {
+				if ticket != nil {
+					ticket.leave()
+					ticket = nil
+				}
+				if announced {
+					fmt.Fprintf(os.Stderr, "cohere-dev: took a test slot after waiting %s\n", time.Since(waitingSince).Round(time.Second))
+				}
+				defer held.release()
+				return goTest(arguments)
+			}
 		}
 		if !announced {
 			fmt.Fprintf(os.Stderr, "cohere-dev: waiting for a test slot; the machine runs %d whole-module runs at once, and these hold them:\n", slots)
@@ -91,6 +122,10 @@ func test(arguments []string) int {
 				fmt.Fprintf(os.Stderr, "  %s\n", holder)
 			}
 			announced = true
+		}
+		if ticket != nil && ahead != lastAhead {
+			fmt.Fprintf(os.Stderr, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
+			lastAhead = ahead
 		}
 		time.Sleep(time.Second)
 	}

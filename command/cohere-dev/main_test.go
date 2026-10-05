@@ -132,3 +132,94 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 		t.Errorf("a -count=1 run of one package was held back:\n%s (%v)", output, err)
 	}
 }
+
+// Waiters take the slot in the order they arrived, and one that dies while waiting is passed over rather
+// than waited on (#nf1qj58). Five runs on a one-slot machine: the first holds the slot, three more queue
+// behind it in a known order, the middle one is killed while it waits, and the rest run in arrival order.
+// With the old polling, whichever waiter polled first after a release went next, so this order held by
+// chance one time in six.
+func TestWaitersTakeTheSlotInArrivalOrder(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("slots are a Unix lock")
+	}
+	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
+		t.Fatalf("building: %v\n%s", err, output)
+	}
+	bin := t.TempDir()
+	order := filepath.Join(bin, "order")
+	home := t.TempDir()
+	slots := filepath.Join(home, "cache", "cohere", "test-slots")
+	if runtime.GOOS == "darwin" {
+		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
+	}
+	tickets := func() int {
+		entries, _ := os.ReadDir(queueDirectory(slots))
+		count := 0
+		for _, entry := range entries {
+			if !strings.HasPrefix(entry.Name(), ".") {
+				count++
+			}
+		}
+		return count
+	}
+	waitFor := func(what string, done func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(time.Minute); !done(); time.Sleep(10 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("waited a minute for %s", what)
+			}
+		}
+	}
+
+	// A go that records which run reached it and takes a second to test. The first run's waits for a release
+	// file too, so the line forms behind it before anyone can move.
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
+		"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runs := map[string]*exec.Cmd{}
+	for index, name := range []string{"A", "B", "C", "D", "E"} {
+		command := exec.Command(wrapper, "test", "./...")
+		command.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), slotsVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		runs[name] = command
+		if index == 0 {
+			waitFor("the first run to reach go", func() bool { contents, _ := os.ReadFile(order); return string(contents) == "A\n" })
+		} else {
+			waitFor(name+" to join the line", func() bool { return tickets() == index })
+		}
+	}
+	if err := runs["C"].Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	runs["C"].Wait()
+	if err := os.WriteFile(order+".release", nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"A", "B", "D", "E"} {
+		if err := runs[name].Wait(); err != nil {
+			t.Errorf("run %s failed: %v", name, err)
+		}
+	}
+	if contents, _ := os.ReadFile(order); string(contents) != "A\nB\nD\nE\n" {
+		t.Errorf("the runs reached go in the order %q, want A, B, D, E: arrival order, passing over C, which died waiting",
+			strings.ReplaceAll(strings.TrimSpace(string(contents)), "\n", ", "))
+	}
+	if left := tickets(); left != 0 {
+		t.Errorf("%d tickets were left in line after every run ended", left)
+	}
+}
+
+func TestOrdinalSaysAPlaceAsAPersonWould(t *testing.T) {
+	t.Parallel()
+	for place, want := range map[int]string{1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 11: "11th", 12: "12th", 13: "13th", 21: "21st", 112: "112th"} {
+		if got := ordinal(place); got != want {
+			t.Errorf("ordinal(%d) is %q, want %q", place, got, want)
+		}
+	}
+}
