@@ -398,6 +398,13 @@ func signatureOf(path string) (RunCacheInput, error) {
 // was recorded with. The first mismatch is the answer; there is no partial hit, because a run's
 // verdict is a property of all its inputs together.
 func (c *RunCache) Check(key string) error {
+	return c.CheckNoting(key, nil)
+}
+
+// CheckNoting is Check, noting in snapshot the identity of every file it statted, so the content pack can
+// validate against stats this run already took rather than take each again (#kdee854). A nil snapshot notes
+// nothing.
+func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
 	if c == nil {
 		return fmt.Errorf("%w: no cache", ErrRunCacheMiss)
 	}
@@ -412,7 +419,7 @@ func (c *RunCache) Check(key string) error {
 		// an empty list is a manifest that was written wrong, not a run that read nothing.
 		return fmt.Errorf("%w: the manifest records no inputs", ErrRunCacheMiss)
 	}
-	return c.ChangedInput()
+	return c.changedInput(snapshot)
 }
 
 // ChangedInput reports the first recorded input whose signature no longer matches the disk, nil when every
@@ -422,6 +429,11 @@ func (c *RunCache) Check(key string) error {
 // The input named is the earliest recorded one that moved, whichever worker found it, so a run that misses
 // says the same thing every time rather than the first thing a worker happened to reach (#547dhjz).
 func (c *RunCache) ChangedInput() error {
+	return c.changedInput(nil)
+}
+
+// changedInput is ChangedInput, noting each file's identity in snapshot when it is not nil.
+func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 	workers := min(runtime.NumCPU(), 8)
 	var mutex sync.Mutex
 	var mismatch error
@@ -434,7 +446,7 @@ func (c *RunCache) ChangedInput() error {
 		go func() {
 			defer waitGroup.Done()
 			for index := range next {
-				if err := c.Inputs[index].stillMatches(); err != nil {
+				if err := c.Inputs[index].stillMatches(snapshot); err != nil {
 					mutex.Lock()
 					if index < earliest {
 						earliest, mismatch = index, err
@@ -453,9 +465,13 @@ func (c *RunCache) ChangedInput() error {
 	return mismatch
 }
 
-// stillMatches compares one input against the filesystem now.
-func (input RunCacheInput) stillMatches() error {
+// stillMatches compares one input against the filesystem now, noting a file's identity in snapshot, matching or
+// not: the stat is current either way.
+func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
 	information, err := os.Stat(input.Path)
+	if err == nil && snapshot != nil && !information.IsDir() {
+		snapshot.note(input.Path, information)
+	}
 	if !input.Exists {
 		if err == nil {
 			return fmt.Errorf("%w: %s now exists", ErrRunCacheMiss, input.Path)
