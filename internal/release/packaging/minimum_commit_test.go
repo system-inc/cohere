@@ -109,6 +109,11 @@ func TestBuildRefusesBeforeTheMinimum(t *testing.T) {
 	if err == nil {
 		t.Fatal("Build released from a repository that never contained the minimum commit")
 	}
+	// Refused for the minimum, by name. Any earlier refusal also returns an error, and passed this test
+	// unnoticed when the copyright check first stopped the fixture on a missing license.
+	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
+		t.Fatalf("Build refused, but not for the minimum commit: %v", err)
+	}
 	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
 		t.Fatalf("Build failed, but not on the minimum commit: %v", err)
 	}

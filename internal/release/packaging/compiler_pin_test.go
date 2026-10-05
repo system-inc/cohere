@@ -113,6 +113,10 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 	git(filepath.Join(module, "TypeScript"), "checkout", "--quiet", recorded)
 	write(filepath.Join(module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/kirkouimet/TypeScript.git\n")
+	// Licenses with a named holder, since Build refuses a placeholder or a missing one before it reads the
+	// pin, and a refusal there would stand in for the one a test is after.
+	write(filepath.Join(module, "LICENSE-APACHE"), "terms\n")
+	write(filepath.Join(module, "LICENSE-MIT"), "MIT License\n\nCopyright (c) 2026 Fixture, Inc.\n")
 	git(module, "-c", "advice.addEmbeddedRepo=false", "add", ".gitmodules", "TypeScript")
 	git(module, "commit", "--quiet", "-m", "pin the compiler")
 

@@ -1,0 +1,59 @@
+package release
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// LicenseExpression is cohere's license, as the SPDX expression every package it publishes declares:
+// MIT or Apache-2.0, at the user's option, as Rust and Biome are licensed (Kirk, #m5wmxnk).
+//
+// The OR is uppercase because SPDX requires it. A lowercase one is not an operator, so a registry or a
+// license scanner reads the field as one unknown license rather than a choice of two.
+const LicenseExpression = "MIT OR Apache-2.0"
+
+// LicenseFileNames are the license texts at the module root, shipped in every package beside the code.
+//
+// Both, because a dual license is two offers and a recipient may take either, which they can only do with
+// each text in hand. Named as Rust names them, which GitHub and license scanners recognize as a pair.
+var LicenseFileNames = []string{"LICENSE-APACHE", "LICENSE-MIT"}
+
+// copyrightHolderPlaceholder stands in LICENSE-MIT's copyright line until Kirk confirms the copyright
+// holder's legal name. A release refuses to stage while it is there, so it cannot be published by
+// accident, and a contributor's tests still pass meanwhile.
+const copyrightHolderPlaceholder = "[[COPYRIGHT HOLDER PENDING"
+
+// requireConfirmedCopyright refuses a release whose license still carries the placeholder copyright
+// holder. A license naming no one grants nothing clearly, and npm cannot take a published version back.
+func requireConfirmedCopyright(moduleDirectory string) error {
+	for _, name := range LicenseFileNames {
+		contents, err := os.ReadFile(filepath.Join(moduleDirectory, name))
+		if err != nil {
+			return fmt.Errorf("reading the license a release ships: %w", err)
+		}
+		if bytes.Contains(contents, []byte(copyrightHolderPlaceholder)) {
+			return fmt.Errorf("%s still names a placeholder as the copyright holder, so it is refused until the legal name is written in", name)
+		}
+	}
+	return nil
+}
+
+// stageLicenses copies both license texts into a package, refusing one that is missing or empty: a
+// package published without them carries a license field that points at nothing.
+func stageLicenses(moduleDirectory string, packageDirectory string) error {
+	for _, name := range LicenseFileNames {
+		contents, err := os.ReadFile(filepath.Join(moduleDirectory, name))
+		if err != nil {
+			return fmt.Errorf("reading the license every package ships: %w", err)
+		}
+		if len(bytes.TrimSpace(contents)) == 0 {
+			return fmt.Errorf("%s is empty, so the package would ship a license with no terms in it", name)
+		}
+		if err := os.WriteFile(filepath.Join(packageDirectory, name), contents, 0o644); err != nil {
+			return fmt.Errorf("staging %s: %w", name, err)
+		}
+	}
+	return nil
+}
