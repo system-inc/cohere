@@ -295,7 +295,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		for index, tuple := range printedGroup {
 			parts[index] = tuple.printed
 		}
-		return doc.Concat(parts)
+		return sequenceIn(path, parts)
 	}
 
 	printIndentedGroup := func(groups [][]printedNode) Doc {
@@ -314,7 +314,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	for index, printedGroup := range groups {
 		printedGroups[index] = printGroup(printedGroup)
 	}
-	oneLine := doc.Concat(printedGroups)
+	oneLine := sequenceIn(path, printedGroups)
 
 	cutoff := 2
 	if shouldMerge {

@@ -15,8 +15,8 @@ import (
 // `hardline` separator printJsxChildren pushes. isSameDoc is that `===`.
 
 // isSameDoc is JavaScript's `===` between two docs: strings compare by value, arrays and objects by
-// identity. A Concat is a slice, which Go cannot compare with ==, so two Concats are the same doc when
-// they share a backing array and length, which is what a copy of the one `hardline` value does.
+// identity. A Concat is a slice, which Go cannot compare with ==, so two arrays are the same doc when
+// their parts share a backing array and length, which is what a copy of the one `hardline` value does.
 func isSameDoc(left Doc, right Doc) bool {
 	switch typedLeft := left.(type) {
 	case nil:
@@ -24,9 +24,12 @@ func isSameDoc(left Doc, right Doc) bool {
 	case doc.Text:
 		typedRight, isText := right.(doc.Text)
 		return isText && typedLeft == typedRight
-	case doc.Concat:
-		typedRight, isConcat := right.(doc.Concat)
-		return isConcat && len(typedLeft) > 0 && len(typedLeft) == len(typedRight) && &typedLeft[0] == &typedRight[0]
+	}
+	leftParts, leftIsArray := doc.Parts(left)
+	rightParts, rightIsArray := doc.Parts(right)
+	if leftIsArray || rightIsArray {
+		return leftIsArray && rightIsArray &&
+			len(leftParts) > 0 && len(leftParts) == len(rightParts) && &leftParts[0] == &rightParts[0]
 	}
 	// Every other doc is a pointer or an empty struct; interfaces holding different dynamic types
 	// compare unequal without panicking.

@@ -141,8 +141,6 @@ func showDoc(document Doc) string {
 		return "undefined"
 	case Text:
 		return quote(string(typed))
-	case Concat:
-		return "[" + list(typed) + "]"
 	case *Group:
 		result := "group(" + idName(typed.ID) + "," + fmt.Sprint(typed.Break) + "," + showDoc(typed.Contents)
 		if typed.ExpandedStates != nil {
@@ -182,6 +180,9 @@ func showDoc(document Doc) string {
 		return "trim"
 	case *Label:
 		return "label(" + typed.Label + "," + showDoc(typed.Contents) + ")"
+	}
+	if parts, isArray := Parts(document); isArray {
+		return "[" + list(parts) + "]"
 	}
 	panic(fmt.Sprintf("unknown doc %T", document))
 }

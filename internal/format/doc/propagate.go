@@ -33,10 +33,6 @@ func traverse(root Doc, onEnter func(Doc) bool, onExit func(Doc)) {
 		}
 
 		switch document := current.(type) {
-		case Concat:
-			for index := len(document) - 1; index >= 0; index-- {
-				stack = append(stack, document[index])
-			}
 		case *Fill:
 			for index := len(document.Parts) - 1; index >= 0; index-- {
 				stack = append(stack, document.Parts[index])
@@ -63,7 +59,13 @@ func traverse(root Doc, onEnter func(Doc) bool, onExit func(Doc)) {
 			stack = append(stack, document.Contents)
 		case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc:
 		default:
-			panic(fmt.Sprintf("invalid doc %T", current))
+			parts, isArray := Parts(current)
+			if !isArray {
+				panic(fmt.Sprintf("invalid doc %T", current))
+			}
+			for index := len(parts) - 1; index >= 0; index-- {
+				stack = append(stack, parts[index])
+			}
 		}
 	}
 }

@@ -67,12 +67,12 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 
 	if node.Child("open") == nil {
 		forceHardLine := shouldBreakList(path)
-		withComma := chunk(doc.Join(doc.Text(","), groupDocs).(doc.Concat), 2)
+		withComma := chunk(doc.Join(doc.Text(","), groupDocs), 2)
 		var separator doc.Doc = doc.LineDoc
 		if forceHardLine {
 			separator = doc.Hardline
 		}
-		parts := doc.Join(separator, withComma).(doc.Concat)
+		parts := doc.Join(separator, withComma)
 		if forceHardLine {
 			return doc.NewIndent(doc.Concat{doc.Hardline, parts})
 		}
