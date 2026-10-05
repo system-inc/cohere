@@ -78,7 +78,7 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 	}()
 	memory := parseMemories.Get().(*parseMemory)
 	defer func() {
-		memory.tokens.Reset()
+		memory.parse.Reset()
 		parseMemories.Put(memory)
 	}()
 	memory.units = micromark.AppendSourceUnits(memory.units[:0], source)
@@ -87,15 +87,16 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 	if len(memory.offsets) != len(units)+1 {
 		return nil, fmt.Errorf("markdown: the parsed text and the original differ in length (%d and %d UTF-16 units)", len(units), len(memory.offsets)-1)
 	}
-	events := micromark.Parse(units, micromark.MarkdownConstructs(), &memory.tokens)
+	events := micromark.Parse(units, micromark.MarkdownConstructs(), memory.parse)
 	return compile(events, compileConfig(), memory.offsets, nodes), nil
 }
 
-// parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): the tokens, the text
-// as UTF-16 units, and the map from UTF-16 index to byte offset. The tree compile builds keeps none of them:
-// every point copies its offset out, and every value is copied out of the units as a string.
+// parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): micromark's tokens
+// and tokenizers, the text as UTF-16 units, and the map from UTF-16 index to byte offset. The tree compile
+// builds keeps none of them: every point copies its offset out, and every value is copied out of the units
+// as a string.
 type parseMemory struct {
-	tokens  arena.Arena[micromark.Token]
+	parse   *micromark.Memory
 	units   []uint16
 	offsets []int
 }
@@ -103,8 +104,7 @@ type parseMemory struct {
 // parseMemories hold the memory of parses that have finished. A pool, because files are formatted on
 // several goroutines at once and each Get is that caller's alone.
 var parseMemories = sync.Pool{New: func() any {
-	released := micromark.Point{Line: 1 << 30, Column: 1 << 30, Offset: 1 << 30}
-	return &parseMemory{tokens: arena.Arena[micromark.Token]{Poison: micromark.Token{Type: "released", Start: released, End: released}}}
+	return &parseMemory{parse: micromark.NewMemory()}
 }}
 
 // byteOffsets maps every UTF-16 index of text, and its end, to a byte offset, appended to offsets. An index

@@ -20,8 +20,6 @@
 //     reproduces that binding: reads are live, and a write lands on the view when there is one.
 package micromark
 
-import "github.com/system-inc/cohere/internal/format/arena"
-
 // Code is a character code: a UTF-16 code unit, or one of the negative virtual codes, or CodeEof.
 type Code int
 
@@ -121,6 +119,35 @@ type InitialConstruct struct {
 type ConstructRecord struct {
 	ByCode map[Code][]*Construct
 	Null   []*Construct
+
+	// withNull is each code's list followed by Null, made once when the record is combined, so an attempt
+	// at a code builds no list (#vbjv3d6). Nil for a record made by hand.
+	withNull map[Code][]*Construct
+}
+
+// constructsAt is upstream's handleMapOfConstructs list: the constructs for the code, then those for every
+// code, and none at the end of input. Callers only read it.
+func (record *ConstructRecord) constructsAt(code Code) []*Construct {
+	if code == CodeEof {
+		return nil
+	}
+	if record.withNull != nil {
+		if list, found := record.withNull[code]; found {
+			return list
+		}
+		return record.Null
+	}
+	var list []*Construct
+	list = append(list, record.ByCode[code]...)
+	return append(list, record.Null...)
+}
+
+// combine fills withNull from ByCode and Null.
+func (record *ConstructRecord) combine() {
+	record.withNull = make(map[Code][]*Construct, len(record.ByCode))
+	for code, list := range record.ByCode {
+		record.withNull[code] = append(append([]*Construct(nil), list...), record.Null...)
+	}
 }
 
 // Constructs is what attempt, check and interrupt accept: one construct, a list, or a record.
@@ -169,6 +196,11 @@ type TokenizeContext struct {
 	initialize           *InitialConstruct
 	effects              *Effects
 	expectedCode         Code
+
+	// initialContainerState and initialSelf are the container state and the `this` the tokenizer starts
+	// with, held here so that starting one allocates neither (#vbjv3d6).
+	initialContainerState ContainerState
+	initialSelf           Self
 }
 
 // resolvable is upstream's resolveAllConstructs entry: a construct, or the initial construct, which also
@@ -255,8 +287,9 @@ type ParseContext struct {
 	// parser: the identifiers of the footnote definitions seen so far.
 	GfmFootnotes []string
 
-	// tokens is where the parse's tokens come from, nil to allocate each (#93dpede).
-	tokens *arena.Arena[Token]
+	// memory is where the parse's tokens, attempts and tokenizers come from, nil to allocate each (#93dpede,
+	// #vbjv3d6).
+	memory *Memory
 }
 
 // Content types, upstream's constants.contentType*.
