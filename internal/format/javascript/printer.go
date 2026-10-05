@@ -73,7 +73,11 @@ func JSONParser(fileName string) string {
 // format parses, prints and lays out one file. Byte order marks and line endings, main/core.js's part,
 // are normalized by the caller, native.Formatter, once for every printer.
 func format(fileName string, text string, options formatoptions.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
-	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nil)
+	// The tree lives until the doc is laid out, and not a moment longer, so its nodes come from an arena
+	// released once the text is printed (#fyw36kf).
+	nodes := estree.AcquireArena()
+	defer nodes.Release()
+	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nodes)
 	if err != nil {
 		return "", err
 	}
