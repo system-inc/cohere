@@ -19,7 +19,8 @@ const translationsConfig = `{
         "strict": true,
         "noEmit": true
     },
-    "include": ["./**/*.ts"]
+    "sourceExtensions": [".a"],
+    "include": ["./**/*.ts", "./**/*.a"]
 }`
 
 // runOnTranslations lays a translations directory on disk, builds a real program over it, and runs

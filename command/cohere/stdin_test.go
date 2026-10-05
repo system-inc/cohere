@@ -27,7 +27,7 @@ func runCohereWithStdin(t *testing.T, binary string, directory string, stdin str
 	if !isExit {
 		t.Fatalf("running cohere: %v\n%s", err, stderr.String())
 	}
-	return stdout.String(), stderr.String(), exitError.ExitCode()
+	return stdout.String(), stderr.String(), childExitCode(t, exitError)
 }
 
 // TestStdinAnswersWhatTheGateWrites is the editor save's contract: for a buffer at a path, the stdin
