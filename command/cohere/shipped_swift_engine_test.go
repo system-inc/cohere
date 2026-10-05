@@ -10,27 +10,83 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// installCohere builds cohere into `<install>/bin/cohere`, the layout of a platform package, stamped with
+// installCohere puts cohere at `<install>/bin/cohere`, the layout of a platform package, stamped with
 // version when it is not empty, and returns the binary. The install directory has no cohere module above
 // it, so the only engine a run can find is one placed beside the binary.
+//
+// Each install is a directory of its own, holding a hard link to a build shared by every install of that
+// stamp: the package's binary for no stamp, and stampedCohere's for a version. Linking cohere once per
+// install was three links of about 50 MB in each package run, for two distinct binaries (#nxgt2ca). Nothing
+// writes to an installed binary; a test places files beside it.
 func installCohere(t *testing.T, version string) string {
 	t.Helper()
 	binary := filepath.Join(t.TempDir(), "bin", "cohere")
-	arguments := []string{"build", "-o", binary}
-	if version != "" {
-		arguments = append(arguments, "-ldflags=-X github.com/system-inc/cohere/internal/release/packaging.version="+version)
+	if err := os.MkdirAll(filepath.Dir(binary), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	build := exec.Command("go", append(arguments, ".")...)
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("cannot build cohere: %v\n%s", err, output)
+	source := buildCohere(t)
+	if version != "" {
+		source = stampedCohere(t, version)
+	}
+	if err := os.Link(source, binary); err != nil {
+		// Across filesystems a link fails, and a copy is the same install.
+		contents, readError := os.ReadFile(source)
+		if readError != nil {
+			t.Fatal(readError)
+		}
+		if writeError := os.WriteFile(binary, contents, 0o755); writeError != nil {
+			t.Fatal(writeError)
+		}
 	}
 	return binary
+}
+
+// stampedBinaries is this command built once per version stamp for the package run, each in a directory
+// TestMain removes.
+var stampedBinaries = struct {
+	sync.Mutex
+	byVersion map[string]*stampedBinary
+}{byVersion: map[string]*stampedBinary{}}
+
+type stampedBinary struct {
+	once      sync.Once
+	directory string
+	path      string
+	output    []byte
+	err       error
+}
+
+// stampedCohere returns this command's binary stamped with version, built on the first call for it.
+func stampedCohere(t *testing.T, version string) string {
+	t.Helper()
+	stampedBinaries.Lock()
+	stamped := stampedBinaries.byVersion[version]
+	if stamped == nil {
+		stamped = &stampedBinary{}
+		stampedBinaries.byVersion[version] = stamped
+	}
+	stampedBinaries.Unlock()
+	stamped.once.Do(func() {
+		stamped.directory, stamped.err = os.MkdirTemp("", "cohere-test-stamped-binary-")
+		if stamped.err != nil {
+			return
+		}
+		stamped.path = filepath.Join(stamped.directory, "cohere")
+		build := exec.Command("go", "build", "-o", stamped.path,
+			"-ldflags=-X github.com/system-inc/cohere/internal/release/packaging.version="+version, ".")
+		stamped.output, stamped.err = build.CombinedOutput()
+	})
+	if stamped.err != nil {
+		t.Fatalf("cannot build cohere stamped %s: %v\n%s", version, stamped.err, stamped.output)
+	}
+	return stamped.path
 }
 
 // placeSiblingEngine puts a stand-in cohere-swift beside binary that records its arguments in a file

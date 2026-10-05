@@ -37,6 +37,11 @@ func TestMain(m *testing.M) {
 	if sharedBinary.directory != "" {
 		os.RemoveAll(sharedBinary.directory)
 	}
+	for _, stamped := range stampedBinaries.byVersion {
+		if stamped.directory != "" {
+			os.RemoveAll(stamped.directory)
+		}
+	}
 	os.Exit(code)
 }
 
