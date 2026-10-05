@@ -239,8 +239,7 @@ var PreferConst = rule.Rule{
 				// dead code standing in front of a decision already made below. The clean fixture
 				// stays, because it pins the OUTCOME rather than the guard.
 
-				sourceFile := ast.GetSourceFileOfNode(node)
-				if sourceFile == nil {
+				if ctx.SourceFile == nil {
 					return
 				}
 
@@ -263,7 +262,7 @@ var PreferConst = rule.Rule{
 						anyDeclined := false
 						forEachBoundName(declaration.AsVariableDeclaration().Name(),
 							func(boundName *ast.Node) {
-								if judgeConstCandidate(ctx, settings, sourceFile, boundName,
+								if judgeConstCandidate(ctx, settings, boundName,
 									declaration, isLoopHead) == nil {
 									anyDeclined = true
 								}
@@ -287,7 +286,7 @@ var PreferConst = rule.Rule{
 					}
 					forEachBoundName(declaration.AsVariableDeclaration().Name(),
 						func(boundName *ast.Node) {
-							if judgeConstCandidate(ctx, settings, sourceFile, boundName,
+							if judgeConstCandidate(ctx, settings, boundName,
 								declaration, isLoopHead) == nil {
 								listIsFixable = false
 							}
@@ -302,7 +301,7 @@ var PreferConst = rule.Rule{
 				// first reported binding carries it; the rest carry the diagnosis alone.
 				fixAlreadyOffered := false
 				for _, declaration := range declarations {
-					reportConstCandidates(ctx, settings, sourceFile, node, declaration, isLoopHead,
+					reportConstCandidates(ctx, settings, node, declaration, isLoopHead,
 						listIsFixable, &fixAlreadyOffered)
 				}
 			},
@@ -315,9 +314,8 @@ var PreferConst = rule.Rule{
 // Split out from the listener because the `destructuring` option changes the *unit* of the
 // judgment, not the judgment itself: under "any" each bound name answers for itself, and under
 // "all" the pattern answers as a whole. Both arms call the same predicate.
-func reportConstCandidates(ctx rule.Context, settings PreferConstOptions,
-	sourceFile *ast.SourceFile, list *ast.Node, declaration *ast.Node, isLoopHead bool,
-	listIsFixable bool, fixAlreadyOffered *bool) {
+func reportConstCandidates(ctx rule.Context, settings PreferConstOptions, list *ast.Node,
+	declaration *ast.Node, isLoopHead bool, listIsFixable bool, fixAlreadyOffered *bool) {
 	name := declaration.AsVariableDeclaration().Name()
 	if name == nil {
 		return
@@ -337,7 +335,7 @@ func reportConstCandidates(ctx rule.Context, settings PreferConstOptions,
 	candidates := make([]*constCandidate, len(boundNames))
 	allConstable := true
 	for index, boundName := range boundNames {
-		candidates[index] = judgeConstCandidate(ctx, settings, sourceFile, boundName, declaration,
+		candidates[index] = judgeConstCandidate(ctx, settings, boundName, declaration,
 			isLoopHead)
 		if candidates[index] == nil {
 			allConstable = false
@@ -360,7 +358,7 @@ func reportConstCandidates(ctx rule.Context, settings PreferConstOptions,
 		// since the pattern moves into one declaration whole. `let a, b; ({a, b} = obj); b = 0;` names
 		// neither. ESLint groups by the assignment the same way.
 		if settings.Destructuring == PreferConstDestructuringAll && candidate.assignment != nil &&
-			!assignmentConvertsWhole(ctx, settings, sourceFile, candidate.assignment) {
+			!assignmentConvertsWhole(ctx, settings, candidate.assignment) {
 			continue
 		}
 		if listIsFixable && !*fixAlreadyOffered {
@@ -388,8 +386,8 @@ type constCandidate struct {
 //
 // The whole rule's judgment is here, and every branch that returns nil is a place the rule declines
 // to speak. That asymmetry is deliberate: see the inversion note on PreferConst.
-func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFile *ast.SourceFile,
-	boundName *ast.Node, declaration *ast.Node, isLoopHead bool) *constCandidate {
+func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, boundName *ast.Node,
+	declaration *ast.Node, isLoopHead bool) *constCandidate {
 	if boundName == nil || boundName.Kind != ast.KindIdentifier {
 		return nil
 	}
@@ -402,7 +400,7 @@ func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFi
 		return nil
 	}
 
-	writes := writesResolvingTo(ctx, sourceFile, boundName, anchor)
+	writes := writesResolvingTo(ctx, boundName, anchor)
 
 	if settings.IgnoreReadBeforeAssign {
 		// Upstream splits this option into two tests by whether the declarator has an initializer,
@@ -417,7 +415,7 @@ func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFi
 		if declaration.AsVariableDeclaration().Initializer == nil && len(writes) == 1 {
 			boundary = writes[0].Pos()
 		}
-		if readsBeforePosition(ctx, sourceFile, boundName, anchor, boundary) {
+		if readsBeforePosition(ctx, boundName, anchor, boundary) {
 			return nil
 		}
 	}
@@ -456,7 +454,7 @@ func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFi
 
 	// A read before the write moves the finding to the declaration, as ESLint does: the reader acting
 	// on it has to see that read, and it is at the declaration's end of the code, not the write's.
-	if readsBeforePosition(ctx, sourceFile, boundName, anchor, writes[0].Pos()) {
+	if readsBeforePosition(ctx, boundName, anchor, writes[0].Pos()) {
 		candidate.reportAt = boundName
 	}
 	return candidate
@@ -466,35 +464,19 @@ func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFi
 //
 // The whole file rather than any bounded subtree, for the sibling rules' reason: a write can sit
 // before the declaration, after it, or several scopes down inside a callback, and all three are the
-// same binding. That matters more here than there, because a write this walk fails to find is a
-// false positive rather than a missed report.
-func writesResolvingTo(ctx rule.Context, sourceFile *ast.SourceFile, boundName *ast.Node,
-	anchor *ast.Node) []*ast.Node {
+// same binding. That matters more here than there, because a write this misses is a false positive
+// rather than a missed report. The file's identifiers come from reference.IdentifiersNamed, which
+// walks it once for every binding rather than once per binding, in the same order (#hekjpw3).
+func writesResolvingTo(ctx rule.Context, boundName *ast.Node, anchor *ast.Node) []*ast.Node {
 	var found []*ast.Node
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil {
-			return
-		}
+	for _, current := range reference.IdentifiersNamed(ctx, boundName.Text()) {
 		// The declarator's own name is not a write: its parent is the declarator, which
 		// `reference.WritesToBinding` declines. No explicit exclusion is needed and adding one would be
 		// untested code.
-		//
-		// The text comparison is a pre-filter rather than a discrimination, since symbol identity
-		// already implies it. It is here because it is far cheaper than a checker call and this
-		// walk visits every identifier in the file.
-		if current.Kind == ast.KindIdentifier &&
-			current.Text() == boundName.Text() &&
-			reference.WritesToBinding(current) &&
-			resolvesToDeclaration(ctx, current, anchor) {
+		if reference.WritesToBinding(current) && resolvesToDeclaration(ctx, current, anchor) {
 			found = append(found, current)
 		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
 	}
-	visit(sourceFile.AsNode())
 	return found
 }
 
@@ -506,33 +488,19 @@ func writesResolvingTo(ctx rule.Context, sourceFile *ast.SourceFile, boundName *
 // a read before the declaration even though the call happens later. That is a coarse test and it is
 // reproduced rather than improved on, because the option exists to suppress a class of findings and
 // a narrower test would suppress fewer of them than the option's users expect.
-func readsBeforePosition(ctx rule.Context, sourceFile *ast.SourceFile, boundName *ast.Node,
-	anchor *ast.Node, position int) bool {
-	found := false
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil || found {
-			return
-		}
+func readsBeforePosition(ctx rule.Context, boundName *ast.Node, anchor *ast.Node, position int) bool {
+	for _, current := range reference.IdentifiersNamed(ctx, boundName.Text()) {
 		// The declaration's own name resolves to the declaration too, and is not a read. Counting it
 		// made every uninitialized binding read before its write, so under the option `let x; x = 0;`
 		// went silent, and ESLint reports it.
-		if current.Kind == ast.KindIdentifier &&
-			current != boundName &&
-			current.Text() == boundName.Text() &&
+		if current != boundName &&
 			current.Pos() < position &&
 			!reference.WritesToBinding(current) &&
 			resolvesToDeclaration(ctx, current, anchor) {
-			found = true
-			return
+			return true
 		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
 	}
-	visit(sourceFile.AsNode())
-	return found
+	return false
 }
 
 // isWriteOnly reports whether an occurrence writes without first reading.
@@ -699,8 +667,7 @@ func patternDeclaresOnlyNeighbors(ctx rule.Context, pattern *ast.Node, declarati
 
 // assignmentConvertsWhole reports whether every binding a destructuring assignment declares could be
 // const, which is what "all" asks of the pattern before naming any of them.
-func assignmentConvertsWhole(ctx rule.Context, settings PreferConstOptions, sourceFile *ast.SourceFile,
-	assignment *ast.Node) bool {
+func assignmentConvertsWhole(ctx rule.Context, settings PreferConstOptions, assignment *ast.Node) bool {
 	pattern := ast.SkipParentheses(assignment.AsBinaryExpression().Left)
 	return forEachAssignmentTarget(ctx, pattern, func(symbol *ast.Symbol) bool {
 		if !hasDeclaration(symbol) {
@@ -719,7 +686,7 @@ func assignmentConvertsWhole(ctx rule.Context, settings PreferConstOptions, sour
 		if declaration == nil {
 			return false
 		}
-		return judgeConstCandidate(ctx, settings, sourceFile, own[0].Name(), declaration, false) != nil
+		return judgeConstCandidate(ctx, settings, own[0].Name(), declaration, false) != nil
 	})
 }
 
