@@ -32,6 +32,15 @@ type EnforceCanonicalClassesOptions struct {
 	// oxlint refuse the whole plugin with "does not accept options", which failed as a silent
 	// zero-finding run rather than a crash.
 	Ignore []string `json:"ignore"`
+	// Collapse is upstream's `collapse`, on by default: whether classes that merge into one are
+	// reported. Off, upstream still rewrites single classes, and so this rule, which reports only
+	// collapses (single-class rewrites are out of its scope, see below), reports nothing.
+	Collapse *bool `json:"collapse"`
+	// Logical is upstream's `logical`, on by default: whether the canonicalizer reads logical
+	// properties as their physical longhands when it compares classes. Off, the families that only
+	// merge through that reading are not reported. Which families those are is measured by the
+	// generator, per family, as RequiresLogicalToPhysical.
+	Logical *bool `json:"logical"`
 }
 
 // EnforceCanonicalClasses reports class sets that collapse into a shorter, equivalent set.
@@ -116,7 +125,15 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		var ignore []string
+		collapse := canonicalCollapseOptions{logical: true}
 		if isConfigured {
+			if configured.Collapse != nil && !*configured.Collapse {
+				// Nothing this rule reports survives `collapse: false`, so it declines the file.
+				return nil
+			}
+			if configured.Logical != nil {
+				collapse.logical = *configured.Logical
+			}
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}
@@ -134,7 +151,7 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportCollapses(ctx, literal, ignored, designSystem)
+				reportCollapses(ctx, literal, ignored, designSystem, collapse)
 			}
 		}
 
@@ -202,6 +219,7 @@ func reportCollapses(
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
+	collapse canonicalCollapseOptions,
 ) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
@@ -223,7 +241,7 @@ func reportCollapses(
 	// real chain, which is the three steps of `m-1` plus one to notice there is nothing left.
 	const maximumPasses = 6
 	for pass := 0; pass < maximumPasses; pass++ {
-		inputs, output, didMerge := mergeOnce(remaining, designSystem)
+		inputs, output, didMerge := mergeOnce(remaining, designSystem, collapse)
 		if !didMerge {
 			return
 		}
@@ -242,8 +260,15 @@ func reportCollapses(
 	}
 }
 
+// canonicalCollapseOptions is what a collapse is allowed to use, from the rule's options.
+type canonicalCollapseOptions struct {
+	// logical is upstream's `logical`: whether a family that merges only through the canonicalizer's
+	// logical-to-physical reading counts.
+	logical bool
+}
+
 // mergeOnce finds the first mergeable pair and returns what it becomes.
-func mergeOnce(classes []string, designSystem DesignSystemResult) ([]string, string, bool) {
+func mergeOnce(classes []string, designSystem DesignSystemResult, collapse canonicalCollapseOptions) ([]string, string, bool) {
 	parsed := make([]candidateParts, 0, len(classes))
 	for _, className := range classes {
 		parts, canParse := splitCandidateIn(className, designSystem.System)
@@ -263,7 +288,7 @@ func mergeOnce(classes []string, designSystem DesignSystemResult) ([]string, str
 				continue
 			}
 
-			outputRoot, hasFamily := collapseOutputFor(left.Root, right.Root)
+			outputRoot, hasFamily := collapseOutputFor(left.Root, right.Root, collapse)
 			if !hasFamily {
 				continue
 			}
@@ -276,8 +301,11 @@ func mergeOnce(classes []string, designSystem DesignSystemResult) ([]string, str
 }
 
 // collapseOutputFor looks up two roots in the generated table, in either order.
-func collapseOutputFor(left string, right string) (string, bool) {
+func collapseOutputFor(left string, right string, collapse canonicalCollapseOptions) (string, bool) {
 	for _, family := range tailwindengine.CollapseFamilies {
+		if family.RequiresLogicalToPhysical && !collapse.logical {
+			continue
+		}
 		if family.First == left && family.Second == right {
 			return family.Output, true
 		}

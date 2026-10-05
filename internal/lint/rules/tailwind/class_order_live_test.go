@@ -652,7 +652,7 @@ func TestClassOrderRanksByTheReadingThatCompiles(t *testing.T) {
 		{[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"}, []string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"}},
 		{[]string{"flex", "dark:bg-transparent", "hover:content--0-4"}, []string{"hover:content--0-4", "flex", "dark:bg-transparent"}},
 	} {
-		ordered, decided := orderClasses(testCase.input, designSystem)
+		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
 			t.Errorf("%v was declined; every class in it has an engine answer", testCase.input)
 			continue

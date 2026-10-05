@@ -19,9 +19,9 @@
 // fact sitting beside several repository extractions, not as framework data throughout.
 //
 // CollapseFamilies re-measured on this run against:
-//	~/Projects/system/cohere/tools/tailwind/generate_descriptor_base/testdata/independent_theme.css (316 roots, 49770 pairs)
+//	tools/generate_descriptor_base/testdata/independent_theme.css (316 roots, 49770 pairs)
 //
-// Identical families, down to the value each was discovered at.
+// Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.
 
 package tailwind
 
@@ -34,6 +34,10 @@ type CollapseFamily struct {
 	First  string
 	Second string
 	Output string
+	// RequiresLogicalToPhysical is true when the canonicalizer collapses this pair only while it
+	// reads logical properties as their physical longhands, its logicalToPhysical option. With
+	// `logical: false`, enforce-canonical-classes skips the family.
+	RequiresLogicalToPhysical bool
 }
 
 // CollapseFamilies is every family the installed Tailwind knows, sorted by input roots.
@@ -50,92 +54,66 @@ type CollapseFamily struct {
 // corners, the `mask-*` edges and `border-spacing` collapse through a utility relationship rather
 // than a property one.
 var CollapseFamilies = []CollapseFamily{
-	{First: "-bottom", Second: "-top", Output: "-inset-y"},
-	{First: "-inset-x", Second: "-inset-y", Output: "-inset"},
-	{First: "-left", Second: "-right", Output: "-inset-x"},
-	{First: "-mb", Second: "-mt", Output: "-my"},
-	{First: "-ml", Second: "-mr", Output: "-mx"},
-	{First: "-mx", Second: "-my", Output: "-m"},
-	{First: "-scroll-mb", Second: "-scroll-mt", Output: "-scroll-my"},
-	{First: "-scroll-ml", Second: "-scroll-mr", Output: "-scroll-mx"},
-	{First: "-scroll-mx", Second: "-scroll-my", Output: "-scroll-m"},
-	{First: "-skew-x", Second: "-skew-y", Output: "-skew"},
-	{First: "-translate-x", Second: "-translate-y", Output: "-translate"},
-	{First: "border-b", Second: "border-t", Output: "border-y"},
-	{First: "border-l", Second: "border-r", Output: "border-x"},
-	{First: "border-spacing-x", Second: "border-spacing-y", Output: "border-spacing"},
-	{First: "border-x", Second: "border-y", Output: "border"},
-	{First: "bottom", Second: "top", Output: "inset-y"},
-	{First: "gap-x", Second: "gap-y", Output: "gap"},
-	{First: "h", Second: "w", Output: "size"},
-	{First: "inset-x", Second: "inset-y", Output: "inset"},
-	{First: "left", Second: "right", Output: "inset-x"},
-	{First: "mask-b-from", Second: "mask-t-from", Output: "mask-y-from"},
-	{First: "mask-b-to", Second: "mask-t-to", Output: "mask-y-to"},
-	{First: "mask-l-from", Second: "mask-r-from", Output: "mask-x-from"},
-	{First: "mask-l-to", Second: "mask-r-to", Output: "mask-x-to"},
-	{First: "max-w", Second: "max-w-screen", Output: "max-w"},
-	{First: "mb", Second: "mt", Output: "my"},
-	{First: "ml", Second: "mr", Output: "mx"},
-	{First: "mx", Second: "my", Output: "m"},
-	{First: "pb", Second: "pt", Output: "py"},
-	{First: "pl", Second: "pr", Output: "px"},
-	{First: "px", Second: "py", Output: "p"},
-	{First: "rounded-bl", Second: "rounded-br", Output: "rounded-b"},
-	{First: "rounded-bl", Second: "rounded-tl", Output: "rounded-l"},
-	{First: "rounded-br", Second: "rounded-tr", Output: "rounded-r"},
-	{First: "rounded-ee", Second: "rounded-se", Output: "rounded-e"},
-	{First: "rounded-es", Second: "rounded-ss", Output: "rounded-s"},
-	{First: "rounded-tl", Second: "rounded-tr", Output: "rounded-t"},
-	{First: "scroll-mb", Second: "scroll-mt", Output: "scroll-my"},
-	{First: "scroll-ml", Second: "scroll-mr", Output: "scroll-mx"},
-	{First: "scroll-mx", Second: "scroll-my", Output: "scroll-m"},
-	{First: "scroll-pb", Second: "scroll-pt", Output: "scroll-py"},
-	{First: "scroll-pl", Second: "scroll-pr", Output: "scroll-px"},
-	{First: "scroll-px", Second: "scroll-py", Output: "scroll-p"},
-	{First: "skew-x", Second: "skew-y", Output: "skew"},
-	{First: "translate-x", Second: "translate-y", Output: "translate"},
+	{First: "-bottom", Second: "-top", Output: "-inset-y", RequiresLogicalToPhysical: true},
+	{First: "-inset-x", Second: "-inset-y", Output: "-inset", RequiresLogicalToPhysical: true},
+	{First: "-left", Second: "-right", Output: "-inset-x", RequiresLogicalToPhysical: true},
+	{First: "-mb", Second: "-mt", Output: "-my", RequiresLogicalToPhysical: true},
+	{First: "-ml", Second: "-mr", Output: "-mx", RequiresLogicalToPhysical: true},
+	{First: "-mx", Second: "-my", Output: "-m", RequiresLogicalToPhysical: true},
+	{First: "-scroll-mb", Second: "-scroll-mt", Output: "-scroll-my", RequiresLogicalToPhysical: true},
+	{First: "-scroll-ml", Second: "-scroll-mr", Output: "-scroll-mx", RequiresLogicalToPhysical: true},
+	{First: "-scroll-mx", Second: "-scroll-my", Output: "-scroll-m", RequiresLogicalToPhysical: true},
+	{First: "-skew-x", Second: "-skew-y", Output: "-skew", RequiresLogicalToPhysical: false},
+	{First: "-translate-x", Second: "-translate-y", Output: "-translate", RequiresLogicalToPhysical: false},
+	{First: "border-b", Second: "border-t", Output: "border-y", RequiresLogicalToPhysical: true},
+	{First: "border-l", Second: "border-r", Output: "border-x", RequiresLogicalToPhysical: true},
+	{First: "border-spacing-x", Second: "border-spacing-y", Output: "border-spacing", RequiresLogicalToPhysical: false},
+	{First: "border-x", Second: "border-y", Output: "border", RequiresLogicalToPhysical: true},
+	{First: "bottom", Second: "top", Output: "inset-y", RequiresLogicalToPhysical: true},
+	{First: "gap-x", Second: "gap-y", Output: "gap", RequiresLogicalToPhysical: false},
+	{First: "h", Second: "w", Output: "size", RequiresLogicalToPhysical: false},
+	{First: "inset-x", Second: "inset-y", Output: "inset", RequiresLogicalToPhysical: true},
+	{First: "left", Second: "right", Output: "inset-x", RequiresLogicalToPhysical: true},
+	{First: "mask-b-from", Second: "mask-t-from", Output: "mask-y-from", RequiresLogicalToPhysical: false},
+	{First: "mask-b-to", Second: "mask-t-to", Output: "mask-y-to", RequiresLogicalToPhysical: false},
+	{First: "mask-l-from", Second: "mask-r-from", Output: "mask-x-from", RequiresLogicalToPhysical: false},
+	{First: "mask-l-to", Second: "mask-r-to", Output: "mask-x-to", RequiresLogicalToPhysical: false},
+	{First: "max-w", Second: "max-w-screen", Output: "max-w", RequiresLogicalToPhysical: false},
+	{First: "mb", Second: "mt", Output: "my", RequiresLogicalToPhysical: true},
+	{First: "ml", Second: "mr", Output: "mx", RequiresLogicalToPhysical: true},
+	{First: "mx", Second: "my", Output: "m", RequiresLogicalToPhysical: true},
+	{First: "pb", Second: "pt", Output: "py", RequiresLogicalToPhysical: true},
+	{First: "pl", Second: "pr", Output: "px", RequiresLogicalToPhysical: true},
+	{First: "px", Second: "py", Output: "p", RequiresLogicalToPhysical: true},
+	{First: "rounded-bl", Second: "rounded-br", Output: "rounded-b", RequiresLogicalToPhysical: false},
+	{First: "rounded-bl", Second: "rounded-tl", Output: "rounded-l", RequiresLogicalToPhysical: false},
+	{First: "rounded-br", Second: "rounded-tr", Output: "rounded-r", RequiresLogicalToPhysical: false},
+	{First: "rounded-ee", Second: "rounded-se", Output: "rounded-e", RequiresLogicalToPhysical: false},
+	{First: "rounded-es", Second: "rounded-ss", Output: "rounded-s", RequiresLogicalToPhysical: false},
+	{First: "rounded-tl", Second: "rounded-tr", Output: "rounded-t", RequiresLogicalToPhysical: false},
+	{First: "scroll-mb", Second: "scroll-mt", Output: "scroll-my", RequiresLogicalToPhysical: true},
+	{First: "scroll-ml", Second: "scroll-mr", Output: "scroll-mx", RequiresLogicalToPhysical: true},
+	{First: "scroll-mx", Second: "scroll-my", Output: "scroll-m", RequiresLogicalToPhysical: true},
+	{First: "scroll-pb", Second: "scroll-pt", Output: "scroll-py", RequiresLogicalToPhysical: true},
+	{First: "scroll-pl", Second: "scroll-pr", Output: "scroll-px", RequiresLogicalToPhysical: true},
+	{First: "scroll-px", Second: "scroll-py", Output: "scroll-p", RequiresLogicalToPhysical: true},
+	{First: "skew-x", Second: "skew-y", Output: "skew", RequiresLogicalToPhysical: false},
+	{First: "translate-x", Second: "translate-y", Output: "translate", RequiresLogicalToPhysical: false},
 }
 
 // RootSelectorShapes used to be printed here and is not any more.
 //
-// It held the eight roots whose utilities land somewhere other than the element itself. Upstream
-// stores no such table: a handle body wraps its declarations in `rule(selector, [...])` and six
-// roots do. Those bodies are ported, so `SelectorShapeForRoot` reads the wrapper off what the
-// emitter produced and returns the same eight shapes, byte for byte.
-//
-// Its own comment had already found the reason a table cannot be right here: the invariance
-// measurement across an independent design system was "necessary and insufficient", because a
-// repository `@utility` block can declare a nested selector no corpus writes. Computing the shape
-// removes the question rather than bounding it.
+// internal/tailwind's SelectorShapeForRoot reads the nested-rule wrapper off the ported handle
+// bodies, which is where upstream keeps it. The eight shapes this printed are reproduced exactly,
+// and a repository block that declares a nested selector is answered rather than missed.
 
-// ComposingRoots used to be printed here and is not any more.
-//
-// It answered whether two utilities of one root layer or overwrite, in 82 rows generated by
-// compiling two values through the real engine and diffing the CSS. `ComposesFor` in
-// declaredproperties.go now runs that same comparison against the ported handle bodies, across all
-// three emitter slices. Measured before the deletion: 81 of the 82 rows answered and all 81 agreed,
-// and the row that did not was `shadow-`, a trailing-dash repository token rather than a utility,
-// which is declined before composition is ever asked.
-//
-// The generator's 82 answers are kept as a fixture in composes_test.go so the computation stays
-// checked against an independent measurement rather than against itself.
-
-// KnownRoots is every functional utility root the design system defines.
-//
 // ColorNames used to be printed here and is not any more.
 //
-// It held 561 colour names so a caller could ask whether a value names a colour. Upstream has no
-// such table: it resolves through `--color` at 39 sites, always asking the theme in front of it.
-// `valueIsColorIn` now does the same, with `IsColorKeyword` beside it for the three CSS keywords
-// that sit in no namespace.
-//
-// Measured across both corpus systems before deleting: 558 of 561 answered by the live theme, the
-// other 3 answered by `colorKeywords`, 0 left uncovered. And in the other direction,
-// www-connected-app declares `--color-brand`, `--color-brand-hover` and `--color-brand-active`,
-// which this table knew nothing about because it was generated from ahra. A generated palette is
-// wrong for every repository except its source, which is why this is a deletion rather than a
-// simplification.
+// internal/rules/tailwind's valueIsColorIn asks the live theme's `--color` namespace, which is what
+// upstream does, with IsColorKeyword beside it for the three keywords that sit in no namespace.
+// Measured before the deletion: 558 of its 561 names answered by the theme and the other 3 by
+// colorKeywords, 0 uncovered, and the table knew nothing of the three colours www-connected-app
+// declares because it was generated from ahra.
 
 // TailwindVersion is the version these families were enumerated from.
 //

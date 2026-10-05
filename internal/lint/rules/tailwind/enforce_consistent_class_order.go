@@ -1,8 +1,12 @@
 package tailwind
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -24,6 +28,85 @@ type EnforceConsistentClassOrderOptions struct {
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
+	// Order is upstream's `order`: `official` (the default) is Tailwind's own order, and `asc` and
+	// `desc` sort the classes as plain strings. `strict` is refused until it is ported.
+	Order classOrderAlgorithm `json:"order"`
+	// UnknownClassPosition and UnknownClassOrder are upstream's options for the classes Tailwind
+	// ranks null: whether they go at the `start` (the default) or the `end`, and whether among
+	// themselves they keep their order (`preserve`, the default) or sort `asc` or `desc`.
+	UnknownClassPosition string `json:"unknownClassPosition"`
+	UnknownClassOrder    string `json:"unknownClassOrder"`
+	// ComponentClassPosition and ComponentClassOrder are the same two for component classes, the
+	// classes a project declares in its own CSS. Upstream finds those only under
+	// `detectComponentClasses`, and with it off it has none, so these change nothing; that option is
+	// refused until it is ported, so a config that loads here orders exactly as upstream does.
+	ComponentClassPosition string `json:"componentClassPosition"`
+	ComponentClassOrder    string `json:"componentClassOrder"`
+}
+
+// classOrderAlgorithm is the `order` option. Upstream's schema admits `strict`, and this refuses it
+// by name rather than accept a value it would then ignore: `strict` groups classes by their printed
+// variants, which needs Tailwind's variant printer, and that is not ported yet. The schema check that
+// runs after decoding refuses every other unknown value.
+type classOrderAlgorithm string
+
+// UnmarshalJSON decodes the option, refusing `strict`.
+func (algorithm *classOrderAlgorithm) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value == "strict" {
+		return fmt.Errorf("order %q is not ported yet, and is refused rather than read as %q: "+
+			"it groups classes by Tailwind's printed variants, which cohere cannot print yet", value, "official")
+	}
+	*algorithm = classOrderAlgorithm(value)
+	return nil
+}
+
+// classOrderOptions is how one literal is ordered, from the rule's options with upstream's defaults.
+type classOrderOptions struct {
+	order             classOrderAlgorithm
+	unknownPosition   string
+	unknownOrder      string
+	componentPosition string
+	componentOrder    string
+	// isComponentClass reports a project's component class. Nil until detectComponentClasses is
+	// ported, which is upstream's empty list with that option off.
+	isComponentClass func(className string) bool
+}
+
+// defaultClassOrderOptions is upstream's defaults: Tailwind's order, unknown classes first in
+// source order.
+func defaultClassOrderOptions() classOrderOptions {
+	return classOrderOptions{
+		order:             "official",
+		unknownPosition:   "start",
+		unknownOrder:      "preserve",
+		componentPosition: "start",
+		componentOrder:    "preserve",
+	}
+}
+
+// classOrderOptionsFrom applies the configured options over the defaults.
+func classOrderOptionsFrom(configured EnforceConsistentClassOrderOptions) classOrderOptions {
+	options := defaultClassOrderOptions()
+	if configured.Order != "" {
+		options.order = configured.Order
+	}
+	if configured.UnknownClassPosition != "" {
+		options.unknownPosition = configured.UnknownClassPosition
+	}
+	if configured.UnknownClassOrder != "" {
+		options.unknownOrder = configured.UnknownClassOrder
+	}
+	if configured.ComponentClassPosition != "" {
+		options.componentPosition = configured.ComponentClassPosition
+	}
+	if configured.ComponentClassOrder != "" {
+		options.componentOrder = configured.ComponentClassOrder
+	}
+	return options
 }
 
 // EnforceConsistentClassOrder reports class lists written in an order other than Tailwind's.
@@ -143,7 +226,9 @@ var EnforceConsistentClassOrder = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
+		ordering := defaultClassOrderOptions()
 		if isConfigured {
+			ordering = classOrderOptionsFrom(configured)
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}
@@ -159,10 +244,10 @@ var EnforceConsistentClassOrder = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportClassOrder(ctx, literal, designSystem)
+				reportClassOrder(ctx, literal, designSystem, ordering)
 			}
 			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
-				reportTemplateClassOrder(ctx, segments, designSystem)
+				reportTemplateClassOrder(ctx, segments, designSystem, ordering)
 			}
 		}
 
@@ -203,7 +288,7 @@ func declineListeners(ctx rule.Context, ruleName string, designSystem DesignSyst
 // engine's own ordering requires rather than a convenience. See class_order_key.go: a variant's
 // index is a rank among exactly the variants this list contains, so there is no per-class key to
 // compute and no pairwise comparator that could compute one.
-func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
+func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult, ordering classOrderOptions) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -222,7 +307,7 @@ func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem Desig
 	// The unknown classes are not reported here, only placed. `no-unknown-classes` is the rule that
 	// says which class is unknown, and two rules naming the same class in two different sentences is
 	// how an author ends up fixing it twice.
-	ordered, decided := orderClasses(classes, designSystem)
+	ordered, decided := orderClasses(classes, designSystem, ordering)
 	if !decided {
 		return
 	}
@@ -307,7 +392,7 @@ func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ord
 // removes it, the plugin's own order of operations: it dedupes a run, then sorts it. The repeat is
 // that rule's finding meanwhile, so the run is never left unordered in silence. A repeat split
 // across a hole is no repeat within either run and does not hold the ordering back.
-func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designSystem DesignSystemResult) {
+func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designSystem DesignSystemResult, ordering classOrderOptions) {
 	sourceText := ctx.SourceFile.Text()
 	for index, segment := range segments {
 		if strings.ContainsRune(segment.Text, '\v') {
@@ -346,7 +431,7 @@ func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designS
 			continue
 		}
 
-		ordered, decided := orderClasses(classes, designSystem)
+		ordered, decided := orderClasses(classes, designSystem, ordering)
 		if !decided || strings.Join(ordered, " ") == strings.Join(classes, " ") {
 			continue
 		}
@@ -384,16 +469,120 @@ func slotFixes(slots []classToken, ordered []string) []rule.Fix {
 
 // orderClasses is the plugin's order for one literal, or false when this port cannot decide it.
 //
-// The engine's nulls lead in source order and the ranked classes follow in the engine's order. A
-// class that parses and resolves and still cannot be placed is a gap in this port rather than a
-// null, so the literal is declined: ordering the rest around it would be guessing.
-func orderClasses(classes []string, designSystem DesignSystemResult) ([]string, bool) {
+// With the defaults, the engine's nulls lead in source order and the ranked classes follow in the
+// engine's order. A class that parses and resolves and still cannot be placed is a gap in this port
+// rather than a null, so the literal is declined: ordering the rest around it would be guessing.
+//
+// The options are upstream's `sortClassNames`. `asc` and `desc` sort the classes as strings and ask
+// the engine nothing. Otherwise every class falls in one of three groups, and upstream's comparator
+// is that grouping, decided in its order: a component class first, then an unknown one, then a ranked
+// one. Component and unknown classes go at the start or the end by their position option and keep
+// source order or sort by their order option; ranked classes keep the engine's order. Upstream's
+// comparator is a consistent order over those keys, so a stable sort here gives what its stable
+// `toSorted` gives.
+func orderClasses(classes []string, designSystem DesignSystemResult, ordering classOrderOptions) ([]string, bool) {
+	switch ordering.order {
+	case "asc", "desc":
+		ordered := make([]string, len(classes))
+		copy(ordered, classes)
+		sort.SliceStable(ordered, func(left int, right int) bool {
+			if ordering.order == "desc" {
+				return compareJavaScriptStrings(ordered[right], ordered[left]) < 0
+			}
+			return compareJavaScriptStrings(ordered[left], ordered[right]) < 0
+		})
+		return ordered, true
+	}
+
 	unranked, ranked := partitionUnranked(classes, designSystem)
 	keys, _, resolved := classOrderKeys(ranked, designSystem.System, designSystem.Table)
 	if !resolved {
 		return nil, false
 	}
-	return append(unranked, sortClassesByKey(ranked, keys)...), true
+	officially := sortClassesByKey(ranked, keys)
+
+	rankOf := make(map[string]int, len(officially))
+	for position, className := range officially {
+		rankOf[className] = position
+	}
+	isUnranked := make(map[string]bool, len(unranked))
+	for _, className := range unranked {
+		isUnranked[className] = true
+	}
+	isComponent := func(className string) bool {
+		return ordering.isComponentClass != nil && ordering.isComponentClass(className)
+	}
+
+	// group places a class: component classes outermost, then unknown ones, ranked classes between.
+	group := func(className string) int {
+		switch {
+		case isComponent(className):
+			return groupForPosition(ordering.componentPosition, 2)
+		case isUnranked[className]:
+			return groupForPosition(ordering.unknownPosition, 1)
+		}
+		return 0
+	}
+	// within orders two classes of one group: by their order option for component and unknown
+	// classes, by the engine's rank for ranked ones.
+	within := func(className string, other string, groupOf int) int {
+		order := ordering.unknownOrder
+		switch {
+		case groupOf == 0:
+			return rankOf[className] - rankOf[other]
+		case isComponent(className):
+			order = ordering.componentOrder
+		}
+		switch order {
+		case "asc":
+			return compareJavaScriptStrings(className, other)
+		case "desc":
+			return compareJavaScriptStrings(other, className)
+		}
+		return 0
+	}
+
+	ordered := make([]string, len(classes))
+	copy(ordered, classes)
+	sort.SliceStable(ordered, func(left int, right int) bool {
+		leftGroup, rightGroup := group(ordered[left]), group(ordered[right])
+		if leftGroup != rightGroup {
+			return leftGroup < rightGroup
+		}
+		return within(ordered[left], ordered[right], leftGroup) < 0
+	})
+	return ordered, true
+}
+
+// groupForPosition is where a group sorts: before the ranked classes at the `start`, after them at the
+// `end`, and further out the stronger the group, since upstream asks about component classes first.
+func groupForPosition(position string, strength int) int {
+	if position == "end" {
+		return strength
+	}
+	return -strength
+}
+
+// compareJavaScriptStrings orders two strings as JavaScript's `<` does, by UTF-16 code unit, which is
+// what upstream's `compareClasses` uses. It differs from Go's byte order only when one string holds a
+// character above U+FFFF and the other one between U+E000 and U+FFFF.
+func compareJavaScriptStrings(left string, right string) int {
+	if left == right {
+		return 0
+	}
+	leftUnits, rightUnits := utf16.Encode([]rune(left)), utf16.Encode([]rune(right))
+	for index := 0; index < len(leftUnits) && index < len(rightUnits); index++ {
+		if leftUnits[index] != rightUnits[index] {
+			if leftUnits[index] < rightUnits[index] {
+				return -1
+			}
+			return 1
+		}
+	}
+	if len(leftUnits) < len(rightUnits) {
+		return -1
+	}
+	return 1
 }
 
 // partitionUnranked splits off every class the engine ranks null, keeping source order in both.

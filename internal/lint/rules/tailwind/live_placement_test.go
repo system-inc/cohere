@@ -256,7 +256,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 
 			// The rule's own loop, so this counts findings rather than merge opportunities.
 			for pass := 0; pass < 6; pass++ {
-				inputs, output, didMerge := mergeOnce(remaining, designSystem)
+				inputs, output, didMerge := mergeOnce(remaining, designSystem, canonicalCollapseOptions{logical: true})
 				if !didMerge {
 					break
 				}

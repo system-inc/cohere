@@ -78,6 +78,9 @@ type enumeration struct {
 	StaticUtilities int      `json:"staticUtilities"`
 	PairsProbed     int      `json:"pairsProbed"`
 	Families        []family `json:"families"`
+	// PhysicalOnlyFamilies collapse only with logicalToPhysical off. The table cannot say that, so a
+	// run reporting one refuses to write rather than drop it.
+	PhysicalOnlyFamilies []family `json:"physicalOnlyFamilies"`
 	// The declared-property fields are gone along with the tables they printed.
 	//
 	// RootProperties, RootColorProperties, ClassProperties and StaticProperties fed
@@ -115,6 +118,18 @@ type family struct {
 	Inputs            []string `json:"inputs"`
 	Output            string   `json:"output"`
 	DiscoveredAtValue string   `json:"discoveredAtValue"`
+	// RequiresLogicalToPhysical is true when the pair does not collapse to Output with the
+	// canonicalizer's logicalToPhysical off, which is `enforce-canonical-classes`'s `logical: false`.
+	RequiresLogicalToPhysical bool `json:"requiresLogicalToPhysical"`
+}
+
+// signature is one family as the invariance check and the difference report compare it.
+func (f family) signature() string {
+	logical := ""
+	if f.RequiresLogicalToPhysical {
+		logical = " (logical)"
+	}
+	return fmt.Sprintf("%s => %s @ %s%s", strings.Join(f.Inputs, " + "), f.Output, f.DiscoveredAtValue, logical)
 }
 
 // pathList collects a repeatable flag.
@@ -164,7 +179,7 @@ func parseDesignSystemInput(value string) designSystemInput {
 func familySignature(families []family) string {
 	lines := make([]string, 0, len(families))
 	for _, entry := range families {
-		lines = append(lines, fmt.Sprintf("%s => %s @ %s", strings.Join(entry.Inputs, " + "), entry.Output, entry.DiscoveredAtValue))
+		lines = append(lines, entry.signature())
 	}
 	sort.Strings(lines)
 	return strings.Join(lines, "\n")
@@ -190,7 +205,7 @@ func invarianceProvenance(verifiedAgainst []string) string {
 	for _, system := range verifiedAgainst {
 		fmt.Fprintf(&buffer, "//\t%s\n", system)
 	}
-	buffer.WriteString("//\n// Identical families, down to the value each was discovered at.\n")
+	buffer.WriteString("//\n// Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.\n")
 	return buffer.String()
 }
 
@@ -218,7 +233,7 @@ func differingFamilies(left, right []family) []string {
 	lines := func(families []family) map[string]bool {
 		present := make(map[string]bool, len(families))
 		for _, entry := range families {
-			present[fmt.Sprintf("%s => %s @ %s", strings.Join(entry.Inputs, " + "), entry.Output, entry.DiscoveredAtValue)] = true
+			present[entry.signature()] = true
 		}
 		return present
 	}
@@ -268,6 +283,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "generate_collapse: the engine reported no collapse families at all.")
 		fmt.Fprintln(os.Stderr, "  That is almost certainly a broken enumeration rather than a Tailwind with no shorthands.")
 		fmt.Fprintln(os.Stderr, "  Check that canonicalizeCandidates is being called with {collapse: true}.")
+		os.Exit(1)
+	}
+	if len(result.PhysicalOnlyFamilies) > 0 {
+		fmt.Fprintln(os.Stderr, "generate_collapse: these pairs collapse only with logicalToPhysical off, which the table cannot record:")
+		for _, entry := range result.PhysicalOnlyFamilies {
+			fmt.Fprintf(os.Stderr, "  %s\n", entry.signature())
+		}
+		fmt.Fprintln(os.Stderr, "  CollapseFamily needs a way to say so before this Tailwind can be enumerated.")
 		os.Exit(1)
 	}
 	if result.FunctionalRoots < 100 {
@@ -512,9 +535,25 @@ type CollapseFamily struct {
 	First  string
 	Second string
 	Output string
+	// RequiresLogicalToPhysical is true when the canonicalizer collapses this pair only while it
+	// reads logical properties as their physical longhands, its logicalToPhysical option. With
+	// `+"`logical: false`"+`, enforce-canonical-classes skips the family.
+	RequiresLogicalToPhysical bool
 }
 
 // CollapseFamilies is every family the installed Tailwind knows, sorted by input roots.
+//
+// Upstream ships shorthand data and it does not derive this. Two maps keyed on CSS property,
+// `+"`"+`padding-inline: [padding-left, padding-right]`+"`"+` and its kin, cover inset, margin, padding,
+// scroll-margin, scroll-padding, border width/style/colour, gap, overflow, overscroll-behavior and
+// ten logical block/inline pairs. This is keyed on utility roots, `+"`"+`pl + pr => px`+"`"+`, and bridging the
+// two key spaces is `+"`"+`canonicalizeCandidates`+"`"+`, the signature-equivalence search `+"`"+`enumerate.mjs`+"`"+`
+// prices at eight to ten thousand lines that changes every Tailwind minor.
+//
+// It also holds families no CSS shorthand covers, which is the half that makes the two genuinely
+// different questions rather than one restated: `+"`"+`h + w => size`+"`"+`, `+"`"+`skew`+"`"+`, `+"`"+`translate`+"`"+`, the `+"`"+`rounded-*`+"`"+`
+// corners, the `+"`"+`mask-*`+"`"+` edges and `+"`"+`border-spacing`+"`"+` collapse through a utility relationship rather
+// than a property one.
 var CollapseFamilies = []CollapseFamily{
 `,
 		result.TailwindVersion,
@@ -530,7 +569,8 @@ var CollapseFamilies = []CollapseFamily{
 		if len(entry.Inputs) != 2 {
 			return nil, fmt.Errorf("family %v does not have exactly two inputs", entry.Inputs)
 		}
-		fmt.Fprintf(&buffer, "\t{First: %q, Second: %q, Output: %q},\n", entry.Inputs[0], entry.Inputs[1], entry.Output)
+		fmt.Fprintf(&buffer, "\t{First: %q, Second: %q, Output: %q, RequiresLogicalToPhysical: %t},\n",
+			entry.Inputs[0], entry.Inputs[1], entry.Output, entry.RequiresLogicalToPhysical)
 	}
 
 	fmt.Fprintf(&buffer, `}
@@ -605,8 +645,11 @@ var PropertyOrder = map[string]int{
 
 // SortOverrideProperties used to be printed here and is not any more.
 //
-// Nothing read it. The latch it described is implemented in walk.go by looking a --tw-sort value up
-// in PropertyOrder, which answers whether the value is legal by hitting or missing.
+// It held the twelve values a `+"`--tw-sort`"+` declaration can carry, and nothing read it. The latch it
+// describes is real and is implemented in walk.go: `+"`PropertySort`"+` reads a `+"`--tw-sort`"+` declaration's
+// value and looks it up in `+"`PropertyOrder`"+`, so a value that names a known property latches the order
+// there and a value that does not falls through. Neither branch consults a list of which values are
+// legal, because the lookup answers that by hitting or missing.
 
 `)
 
@@ -620,9 +663,7 @@ var PropertyOrder = map[string]int{
 	// If a consumer needs a root's emitted declarations again, ask an emitter in
 	// internal/lint/rules/tailwind/collapse/frameworkhandlers.go rather than reviving these: an emitter branches on the
 	// resolved value, which a table keyed on a root cannot.
-	fmt.Fprintf(&buffer, `}
-
-// VariantOrder is the position of each variant prefix in Tailwind's sort order.
+	fmt.Fprintf(&buffer, `// VariantOrder is the position of each variant prefix in Tailwind's sort order.
 //
 // Asked of the engine rather than guessed. Ranking variants by prefix length put focus: before
 // hover: because it is shorter, which is not the order Tailwind emits them in.
