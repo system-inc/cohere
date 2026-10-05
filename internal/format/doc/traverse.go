@@ -153,53 +153,125 @@ func isPointerDoc(document Doc) bool {
 	return false
 }
 
+// mapOne maps a node's children and hands fn the node rebuilt over them. Upstream always rebuilds; here a
+// node none of whose children changed is handed over as it is, which holds the same docs, so mapping a
+// tree fn leaves alone copies nothing (#r89mksm). No caller's fn writes to the node it is given, and the
+// one identity upstream's mapped tree is read for, a conditional group's states (sameStates), is still
+// rebuilt every time. The printer writes break marks onto groups in place, but a mark follows from the
+// group's contents alone, so a group the mapped doc shares with its source is marked as a copy would be.
 func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
 	switch typed := document.(type) {
 	case Concat:
-		parts := make(Concat, len(typed))
-		for index, part := range typed {
-			parts[index] = rec(part)
+		parts := mapParts(typed, rec)
+		if sameParts(parts, typed) {
+			// The doc itself, not typed: putting a slice back in an interface allocates.
+			return fn(document)
 		}
-		return fn(parts)
+		return fn(Concat(parts))
 	case *Fill:
-		parts := make([]Doc, len(typed.Parts))
-		for index, part := range typed.Parts {
-			parts[index] = rec(part)
+		parts := mapParts(typed.Parts, rec)
+		if sameParts(parts, typed.Parts) {
+			return fn(typed)
 		}
 		return fn(&Fill{Parts: parts})
 	case *IfBreak:
-		return fn(&IfBreak{BreakContents: rec(typed.BreakContents), FlatContents: rec(typed.FlatContents), GroupID: typed.GroupID})
-	case *Group:
-		copied := *typed
-		if typed.ExpandedStates != nil {
-			states := make([]Doc, len(typed.ExpandedStates))
-			for index, state := range typed.ExpandedStates {
-				states[index] = rec(state)
-			}
-			copied.ExpandedStates = states
-			copied.Contents = states[0]
-		} else {
-			copied.Contents = rec(typed.Contents)
+		breakContents, flatContents := rec(typed.BreakContents), rec(typed.FlatContents)
+		if sameDoc(breakContents, typed.BreakContents) && sameDoc(flatContents, typed.FlatContents) {
+			return fn(typed)
 		}
+		return fn(&IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupID: typed.GroupID})
+	case *Group:
+		if typed.ExpandedStates == nil {
+			contents := rec(typed.Contents)
+			if sameDoc(contents, typed.Contents) {
+				return fn(typed)
+			}
+			copied := *typed
+			copied.Contents = contents
+			return fn(&copied)
+		}
+		copied := *typed
+		states := make([]Doc, len(typed.ExpandedStates))
+		for index, state := range typed.ExpandedStates {
+			states[index] = rec(state)
+		}
+		copied.ExpandedStates = states
+		copied.Contents = states[0]
 		return fn(&copied)
 	case *Align:
+		contents := rec(typed.Contents)
+		if sameDoc(contents, typed.Contents) {
+			return fn(typed)
+		}
 		copied := *typed
-		copied.Contents = rec(typed.Contents)
+		copied.Contents = contents
 		return fn(&copied)
 	case *Indent:
-		return fn(&Indent{Contents: rec(typed.Contents)})
+		contents := rec(typed.Contents)
+		if sameDoc(contents, typed.Contents) {
+			return fn(typed)
+		}
+		return fn(&Indent{Contents: contents})
 	case *IndentIfBreak:
+		contents := rec(typed.Contents)
+		if sameDoc(contents, typed.Contents) {
+			return fn(typed)
+		}
 		copied := *typed
-		copied.Contents = rec(typed.Contents)
+		copied.Contents = contents
 		return fn(&copied)
 	case *Label:
-		return fn(&Label{Label: typed.Label, Contents: rec(typed.Contents)})
+		contents := rec(typed.Contents)
+		if sameDoc(contents, typed.Contents) {
+			return fn(typed)
+		}
+		return fn(&Label{Label: typed.Label, Contents: contents})
 	case *LineSuffix:
-		return fn(&LineSuffix{Contents: rec(typed.Contents)})
+		contents := rec(typed.Contents)
+		if sameDoc(contents, typed.Contents) {
+			return fn(typed)
+		}
+		return fn(&LineSuffix{Contents: contents})
 	case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc, nil:
 		return fn(document)
 	}
 	panic(fmt.Sprintf("invalid doc %T", document))
+}
+
+// mapParts maps each part, returning parts itself when every part maps to itself and a new slice
+// otherwise.
+func mapParts(parts []Doc, rec func(Doc) Doc) []Doc {
+	var mapped []Doc
+	for index, part := range parts {
+		result := rec(part)
+		if mapped == nil && !sameDoc(result, part) {
+			mapped = make([]Doc, len(parts))
+			copy(mapped, parts[:index])
+		}
+		if mapped != nil {
+			mapped[index] = result
+		}
+	}
+	if mapped == nil {
+		return parts
+	}
+	return mapped
+}
+
+// sameParts is whether mapParts handed parts back: the same array at the same length.
+func sameParts(left []Doc, right []Doc) bool {
+	return len(left) == len(right) && (len(left) == 0 || &left[0] == &right[0])
+}
+
+// sameDoc is whether two docs are the same doc: the same node, the same text, or for a concat, which Go
+// cannot compare, the same parts.
+func sameDoc(left Doc, right Doc) bool {
+	leftParts, leftIsConcat := left.(Concat)
+	rightParts, rightIsConcat := right.(Concat)
+	if leftIsConcat || rightIsConcat {
+		return leftIsConcat && rightIsConcat && (leftParts == nil) == (rightParts == nil) && sameParts(leftParts, rightParts)
+	}
+	return left == right
 }
 
 // isFalsy is JavaScript truthiness for a doc in the places upstream writes `!doc.contents`.
@@ -211,9 +283,72 @@ func isFalsy(document Doc) bool {
 	return isText && text == ""
 }
 
-// CleanDoc is upstream's cleanDoc.
+// CleanDoc is upstream's cleanDoc, mapDoc(doc, cleanDocFn), walked by docCleaner rather than MapDoc: the
+// same nodes, cleaned in the same order, with fewer copies (#r89mksm).
 func CleanDoc(document Doc) Doc {
-	return MapDoc(document, cleanDocFn)
+	if text, isText := document.(Text); isText {
+		return cleanDocFn(text)
+	}
+	cleaner := &docCleaner{}
+	cleaner.rec = cleaner.clean
+	return cleaner.clean(document)
+}
+
+// docCleaner is CleanDoc's walk. It is MapDoc with cleanDocFn, with one difference: a concat's cleaned
+// children are gathered in buffer, one stretch per concat on the walk's path, and the concat is built
+// once, at its cleaned length, or handed back as it is when cleaning leaves it unchanged. MapDoc builds
+// the mapped concat, then cleanDocFn builds the cleaned one by appending.
+type docCleaner struct {
+	// mapped is MapDoc's cache by identity, made at the first node that can carry one.
+	mapped map[Doc]Doc
+	buffer []Doc
+	rec    func(Doc) Doc
+}
+
+func (cleaner *docCleaner) clean(document Doc) Doc {
+	cacheable := isPointerDoc(document)
+	if cacheable {
+		if result, present := cleaner.mapped[document]; present {
+			return result
+		}
+	}
+	var result Doc
+	if parts, isConcat := document.(Concat); isConcat {
+		result = cleaner.cleanConcat(document, parts)
+	} else {
+		result = mapOne(document, cleaner.rec, cleanDocFn)
+	}
+	if cacheable {
+		if cleaner.mapped == nil {
+			cleaner.mapped = map[Doc]Doc{}
+		}
+		cleaner.mapped[document] = result
+	}
+	return result
+}
+
+// cleanConcat is mapOne and cleanDocFn for a concat. Each child's own walk leaves buffer as it found it,
+// so the concat's children are buffer[start:] once they are all cleaned.
+func (cleaner *docCleaner) cleanConcat(document Doc, parts Concat) Doc {
+	start := len(cleaner.buffer)
+	changed := false
+	for _, part := range parts {
+		cleaned := cleaner.clean(part)
+		if !sameDoc(cleaned, part) {
+			changed = true
+		}
+		cleaner.buffer = append(cleaner.buffer, cleaned)
+	}
+	children := cleaner.buffer[start:]
+	var result Doc
+	if !changed && isCleanConcat(parts) {
+		result = document
+	} else {
+		result = cleanParts(children)
+	}
+	clear(children)
+	cleaner.buffer = cleaner.buffer[:start]
+	return result
 }
 
 func cleanDocFn(document Doc) Doc {
@@ -261,40 +396,82 @@ func cleanDocFn(document Doc) Doc {
 			return Text("")
 		}
 	case Concat:
-		var parts Concat
-		for _, part := range typed {
-			if isFalsy(part) {
-				continue
-			}
-			current, rest := part, Concat(nil)
-			if nested, isConcat := part.(Concat); isConcat {
-				if len(nested) == 0 {
-					// `[first, ...rest] = []` makes first undefined, which upstream then pushes.
-					parts = append(parts, nil)
-					continue
-				}
-				current, rest = nested[0], nested[1:]
-			}
-			currentText, currentIsText := current.(Text)
-			if len(parts) > 0 {
-				if previous, previousIsText := parts[len(parts)-1].(Text); currentIsText && previousIsText {
-					parts[len(parts)-1] = previous + currentText
-					parts = append(parts, rest...)
-					continue
-				}
-			}
-			parts = append(parts, current)
-			parts = append(parts, rest...)
+		if isCleanConcat(typed) {
+			// The doc itself, not typed: putting a slice back in an interface allocates.
+			return document
 		}
-		if len(parts) == 0 {
-			return Text("")
-		}
-		if len(parts) == 1 {
-			return parts[0]
-		}
-		return parts
+		return cleanParts(typed)
 	}
 	return document
+}
+
+// cleanParts is cleanDocFn for a concat's parts: falsy parts dropped, a nested concat flattened one level,
+// and a text joined onto a text before it. The result is built at its final length.
+func cleanParts(parts []Doc) Doc {
+	size := 0
+	for _, part := range parts {
+		if nested, isConcat := part.(Concat); isConcat && len(nested) > 0 {
+			size += len(nested)
+		} else {
+			size++
+		}
+	}
+	cleaned := make(Concat, 0, size)
+	for _, part := range parts {
+		if isFalsy(part) {
+			continue
+		}
+		current, rest := part, Concat(nil)
+		if nested, isConcat := part.(Concat); isConcat {
+			if len(nested) == 0 {
+				// `[first, ...rest] = []` makes first undefined, which upstream then pushes.
+				cleaned = append(cleaned, nil)
+				continue
+			}
+			current, rest = nested[0], nested[1:]
+		}
+		currentText, currentIsText := current.(Text)
+		if len(cleaned) > 0 {
+			if previous, previousIsText := cleaned[len(cleaned)-1].(Text); currentIsText && previousIsText {
+				cleaned[len(cleaned)-1] = previous + currentText
+				cleaned = append(cleaned, rest...)
+				continue
+			}
+		}
+		cleaned = append(cleaned, current)
+		cleaned = append(cleaned, rest...)
+	}
+	if len(cleaned) == 0 {
+		return Text("")
+	}
+	if len(cleaned) == 1 {
+		return cleaned[0]
+	}
+	return cleaned
+}
+
+// isCleanConcat is whether cleanDocFn would rebuild parts equal to themselves: two or more, none falsy,
+// none a concat to flatten, and no two texts side by side to join. Then the concat is returned as it is
+// rather than copied (#r89mksm).
+func isCleanConcat(parts Concat) bool {
+	if len(parts) < 2 {
+		return false
+	}
+	previousIsText := false
+	for _, part := range parts {
+		if isFalsy(part) {
+			return false
+		}
+		if _, isConcat := part.(Concat); isConcat {
+			return false
+		}
+		_, isText := part.(Text)
+		if isText && previousIsText {
+			return false
+		}
+		previousIsText = isText
+	}
+	return true
 }
 
 // sameStates is upstream's `a.expandedStates === b.expandedStates`: identity of the array, which in
