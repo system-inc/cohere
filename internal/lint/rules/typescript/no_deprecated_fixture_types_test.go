@@ -11,9 +11,10 @@ import (
 
 // fixtureReactTypes is a synthetic @types package, the least of @types/react that the JSX case in
 // TestNoDeprecatedInJsx reads through: a generic component alias and the JSX namespace a <div> needs. It
-// proves the same mechanism as that case, a deprecation reached through an installed package's
-// declaration files and a generic component alias, on any machine, with nothing vendored. The live case
-// against the real @types/react stays beside it, opt-in through the ahra corpus (#sycrdr6).
+// proves the same mechanism as that case, a prop marked @deprecated, reached through a generic component
+// alias an installed package declares, on any machine, with nothing vendored. The tag is on the source's
+// own Props, as in upstream's invalid:145; the package supplies only the alias. The live case against the
+// real @types/react stays beside it, opt-in through the ahra corpus (#sycrdr6).
 const fixtureReactTypes = `export type FC<P> = (props: P) => unknown;
 
 declare global {
