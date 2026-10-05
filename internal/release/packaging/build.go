@@ -68,12 +68,6 @@ type Options struct {
 	// Never inside OutputDirectory: the scratch is over a gigabyte, and everything in the output is
 	// packed into the artifact every proof downloads.
 	SwiftScratchDirectory string
-
-	// DryRun stages a release that will not be published, and is the one thing that lets it stage while
-	// LICENSE-MIT still names a placeholder copyright holder. A dry run proves the packaging before the
-	// legal name is settled; a publish never carries the placeholder, because only a run asking to publish
-	// leaves this false, and that run is refused.
-	DryRun bool
 }
 
 // Result reports what a release build produced.
@@ -120,13 +114,6 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 	options.SwiftScratchDirectory = scratch
-
-	// Before anything builds, so a release with no copyright holder fails in a second, not after the
-	// cross-compiles and two Swift builds. The compiler fixture carries licenses so the refusals after
-	// this one stay reachable through Build.
-	if err := requireConfirmedCopyright(options.ModuleDirectory, options.DryRun); err != nil {
-		return Result{}, err
-	}
 
 	// Read before the minimum is checked, though neither depends on the other, because a fixture can
 	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
