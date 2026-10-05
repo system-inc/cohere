@@ -618,3 +618,53 @@ func TestTheHouseListReadsAsIgnoreFileLines(t *testing.T) {
 		}
 	}
 }
+
+// An Adamic `.a` file is held back from Files whatever the engine handles, after every ignore layer has had
+// its say (#6mhafvb). The walk cannot tell Adamic source from a static library, so it never offers one; the run
+// offers a held `.a` once the program claims it. Every handles predicate is told yes, so a `.a` in Files would be
+// the walk ignoring the hold, and the subtraction still balances with the held files counted.
+func TestEnumerateHoldsAdamicFilesBack(t *testing.T) {
+	t.Parallel()
+	// Ignored by name rather than by directory, so every ignore counted is a file the walk counted too.
+	root := settingsTree(t, "", `["archived/old.a"]`, map[string]string{
+		".gitignore":        "build/output.a\n",
+		"a.ts":              "export const a = 1;\n",
+		"geometry.a":        "export const area = 1;\n",
+		"lib/libfoo.a":      "!<arch>\n",
+		"build/output.a":    "!<arch>\n",
+		"archived/old.a":    "export const old = 1;\n",
+		"data.archive":      "not adamic\n",
+		"nested/deeper.a":   "export const deeper = 1;\n",
+		"nested/Thing.d.ts": "export {};\n",
+	})
+	if err := os.Symlink(filepath.Join(root, "geometry.a"), filepath.Join(root, "link.a")); err != nil {
+		t.Fatal(err)
+	}
+
+	enumeration, err := Enumerate(root, func(string) bool { return true })
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	for file := range survivorsOf(root, enumeration) {
+		if strings.HasSuffix(file, ".a") {
+			t.Errorf("%s was offered as a file, before any program claimed it", file)
+		}
+	}
+	held := []string{}
+	for _, file := range enumeration.Adamic {
+		relative, _ := filepath.Rel(root, file)
+		held = append(held, filepath.ToSlash(relative))
+	}
+	sort.Strings(held)
+	if want := []string{"geometry.a", "lib/libfoo.a", "nested/deeper.a"}; strings.Join(held, " ") != strings.Join(want, " ") {
+		t.Errorf("held back %v, want %v: the ignored and the linked stay out", held, want)
+	}
+	ignored := 0
+	for _, count := range enumeration.IgnoredByLayer {
+		ignored += count
+	}
+	if offered := enumeration.Walked - ignored - enumeration.Unhandled - enumeration.SymbolicLinks; offered != len(enumeration.Files)+len(enumeration.Adamic) {
+		t.Errorf("walked %d less %d ignored, %d unhandled and %d links is %d, but %d files and %d held back",
+			enumeration.Walked, ignored, enumeration.Unhandled, enumeration.SymbolicLinks, offered, len(enumeration.Files), len(enumeration.Adamic))
+	}
+}

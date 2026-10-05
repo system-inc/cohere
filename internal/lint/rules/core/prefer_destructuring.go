@@ -121,6 +121,7 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 
 // preferDestructuringDecodeStrictly decodes one element as an object and refuses unknown keys.
 func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error {
+	// Go whitespace: raw JSON bytes of the rule's options, whose whitespace is the same in both sets.
 	if bytes.Equal(bytes.TrimSpace(element), []byte("null")) {
 		return fmt.Errorf("takes an object, got null")
 	}

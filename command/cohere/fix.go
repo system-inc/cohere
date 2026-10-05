@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // applyProposedFixes rewrites every file whose rules proposed a repair, and reports what it did.
@@ -500,10 +501,12 @@ func proposalsForText(
 	}
 	rooted = tspath.NormalizePath(rooted)
 
+	// The kind the program parsed the file as: an Adamic `.a` name is read as `.ts`, as the program reads it
+	// (#6mhafvb). Unknown, which the bare name gives, is a parser panic.
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: rooted,
 		Path:     tspath.Path(rooted),
-	}, text, core.GetScriptKindFromFileName(rooted))
+	}, text, core.GetScriptKindFromFileName(sourcename.TreatedAs(rooted)))
 	if sourceFile == nil {
 		return nil, fmt.Errorf("re-parsing %s produced nothing", fileName)
 	}

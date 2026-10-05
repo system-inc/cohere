@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -718,8 +719,8 @@ func nestedTemplateSingleQuasiRaw(ctx rule.Context, node *ast.Node) (string, boo
 }
 
 // isAllWhitespace answers upstream's `isWhitespace`, which accepts the empty string.
-func isAllWhitespace(text string) bool {
-	return strings.TrimSpace(text) == ""
+func isAllWhitespace(literalText string) bool {
+	return text.TrimWhitespace(literalText) == ""
 }
 
 // startsWithNewLine answers whether a quasi's raw text begins with a line break.

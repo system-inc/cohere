@@ -24,7 +24,7 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 	// Its count below needs the pinned corpus beside the hand-written functions, so it is a corpus walk.
 	skipCorpusWalkInFastTier(t)
 
-	sources := map[string]string{
+	handWritten := map[string]string{
 		"Shapes.tsx": strings.Join([]string{
 			"function straight(a) { const b = a + 1; return b; }",
 			"function branch(a) { if (a) { return 1; } else if (a > 2) { foo(); } return 2; }",
@@ -37,13 +37,21 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			"function early(a) { if (!a) { return; } for (let i = 0; i < a; i++) { if (i % 2) { continue; } foo(i); } }",
 		}, "\n"),
 	}
-	if paths, contents := pinnedCorpusFilesIfPresent(t, 400); paths != nil {
+	sources := map[string]string{}
+	for name, code := range handWritten {
+		sources[name] = code
+	}
+	paths, contents := pinnedCorpusFilesIfPresent(t, 400)
+	if paths != nil {
 		for _, path := range paths {
 			sources[path] = contents[path]
 		}
 	}
 
-	compared := 0
+	handWrittenCompared, corpusCompared := 0, 0
+	// handWrittenFunctions counts the hand-written sources' function-like nodes at any depth, from the parse
+	// alone, so a hand-written function that stops lowering is missed against a count Lower did not make.
+	handWrittenFunctions := 0
 	for name, code := range sources {
 		kind := core.ScriptKindTS
 		if strings.HasSuffix(name, ".tsx") {
@@ -53,13 +61,21 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			FileName: "/" + name,
 			Path:     tspath.Path("/" + name),
 		}, code, kind)
+		_, isHandWritten := handWritten[name]
+		if isHandWritten {
+			handWrittenFunctions += functionLikeCount(source.AsNode())
+		}
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
 			var compare func(*Function)
 			compare = func(function *Function) {
 				if function == nil {
 					return
 				}
-				compared++
+				if isHandWritten {
+					handWrittenCompared++
+				} else {
+					corpusCompared++
+				}
 				r := &reactivity{function: function}
 				got := r.postDominatorFrontiers()
 				want := chainWalkFrontiers(function)
@@ -74,10 +90,32 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			compare(Lower(node, nil))
 		})
 	}
-	if compared < 20 {
-		t.Fatalf("compared only %d functions, so this proved little", compared)
+	// Two floors, counted apart so neither hides behind the other. Every hand-written function must compare,
+	// with or without the corpus: a total would let one that stops lowering hide behind the corpus's
+	// thousands. With the corpus, it must add at least 20 of its own, or it parsed to almost nothing. Without
+	// it, its subtest skipped naming the variable. This used to require 20 in total on every machine, so it
+	// failed wherever the Structure checkout was absent, until #sycrdr6.
+	if handWrittenCompared < handWrittenFunctions {
+		t.Fatalf("compared %d of the %d hand-written functions, so the rest stopped lowering", handWrittenCompared,
+			handWrittenFunctions)
 	}
-	t.Logf("compared %d functions", compared)
+	if paths != nil && corpusCompared < 20 {
+		t.Fatalf("compared only %d corpus functions, so the corpus proved little", corpusCompared)
+	}
+	t.Logf("compared %d hand-written and %d corpus functions", handWrittenCompared, corpusCompared)
+}
+
+// functionLikeCount is how many function-like nodes a parsed source holds, at any depth.
+func functionLikeCount(node *ast.Node) int {
+	count := 0
+	node.ForEachChild(func(child *ast.Node) bool {
+		if ast.IsFunctionLike(child) {
+			count++
+		}
+		count += functionLikeCount(child)
+		return false
+	})
+	return count
 }
 
 // pinnedCorpusFilesIfPresent is pinnedCorpusFiles, answering nothing when the repository is absent.

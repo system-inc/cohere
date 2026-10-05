@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -541,6 +542,7 @@ func run() error {
 			SingleThreaded:   *singleThreaded,
 			Inputs:           runCacheInputs,
 			ContentPack:      contentPack,
+			CheckedStats:     runCacheCheckStats,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,
@@ -847,6 +849,31 @@ func run() error {
 			} else {
 				scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
 			}
+		}
+
+		// The Adamic `.a` files the program holds join the format scope now that there is a program to ask
+		// (#6mhafvb). The walk held every `.a` back, since one could as well be a static library, and the early
+		// pass never saw one. A held `.a` git ignores is checked and not formatted, and the run says so. A nested
+		// repository's drift check has no program to ask, so it reads none of a library's `.a` files: their
+		// drift is the library's own run to find, not this one's.
+		if formatter != nil {
+			held := adamicHeld(graph)
+			if graph == nil && len(scope.adamic) > 0 {
+				// The tsconfig is an input this run declared it never reads, so it is not replayed.
+				declineRunCache("the tsconfig says which .a files are source")
+				included, includedError := adamicIncluded(location.ConfigFileName)
+				if includedError != nil {
+					// Said rather than swallowed: the `.a` files stay out of the scope, and the reason is the run's.
+					fmt.Fprintf(os.Stderr, "⚠ the Adamic .a files were not formatted: reading the tsconfig to see which are source: %v\n", includedError)
+				}
+				held = included
+			}
+			var claimedAdamic []string
+			scope, claimedAdamic = scope.claimAdamic(held)
+			if recordUniverse != nil {
+				recordUniverse = slices.Concat(recordUniverse, claimedAdamic)
+			}
+			activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(os.Stderr, repositoryRoot, held)
 		}
 
 		// The submodules this repository declares are read, never written: each file a run inside one
@@ -1306,6 +1333,8 @@ func rebuildGraph(
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
+	// The check's stats predate the rewrite. See distrustCheckStats.
+	distrustCheckStats()
 	rebuilt, err := program.Build(program.Options{
 		ConfigFileName:   configFileName,
 		CurrentDirectory: directory,

@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -483,16 +484,16 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 // Four passes over one attribute value, in upstream's order, and each can report independently, so
 // one attribute can produce several findings.
 func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName string, node *ast.Node, elementName string) {
-	text := node.Text()
+	attributeValue := node.Text()
 
-	if strings.TrimSpace(text) == "" {
+	if text.TrimWhitespace(attributeValue) == "" {
 		ctx.ReportNode(node, noInvalidHtmlAttributeNoEmpty(attributeName))
 		return
 	}
 
 	// Pass one: every whitespace-delimited token must be a valid value, and valid on this element.
 	allowedValues := noInvalidHtmlAttributeRelValues
-	for _, token := range strings.Fields(text) {
+	for _, token := range text.WhitespaceFields(attributeValue) {
 		allowedTags, isKnownValue := allowedValues[token]
 		if !isKnownValue {
 			ctx.ReportNode(node, noInvalidHtmlAttributeNeverValid(token, attributeName))
@@ -513,7 +514,7 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 	// Established by enumeration rather than by reading: for every corpus case the two formulations
 	// agree, and the shapes that could separate them (a pairing key at the end of the value, a
 	// pairing key followed by several spaces) are covered by cases 34 and its neighbours.
-	tokens := strings.Fields(text)
+	tokens := text.WhitespaceFields(attributeValue)
 	for index, token := range tokens {
 		siblings, isPairingKey := noInvalidHtmlAttributeRelPairs[token]
 		if !isPairingKey {

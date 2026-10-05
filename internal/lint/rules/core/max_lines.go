@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -204,8 +205,7 @@ func maxLinesCommentOnly(text string, fileComments []comments.Comment) func(star
 	}
 }
 
-// maxLinesIsBlank is upstream's `text.trim() === ""`. JavaScript's trim also drops a byte order mark,
-// which Go's TrimSpace keeps.
-func maxLinesIsBlank(text string) bool {
-	return strings.TrimSpace(strings.ReplaceAll(text, "\ufeff", "")) == ""
+// maxLinesIsBlank is upstream's `text.trim() === ""`.
+func maxLinesIsBlank(lineText string) bool {
+	return text.TrimWhitespace(lineText) == ""
 }

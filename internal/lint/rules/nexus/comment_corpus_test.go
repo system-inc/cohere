@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The corpus is text scanning with no dependency on the comment scanner, which is why it stays here
@@ -17,7 +19,7 @@ func realCommentCorpus(t *testing.T) []string {
 	t.Helper()
 
 	var comments []string
-	root := "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
+	root := corpus.Structure.Path(t, "source")
 	fileCount := 0
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || fileCount >= 400 {
@@ -43,7 +45,7 @@ func realCommentCorpus(t *testing.T) []string {
 	})
 
 	if len(comments) < 1000 {
-		t.Skipf("only %d comments available, too few to be a corpus", len(comments))
+		t.Fatalf("the structure corpus gave only %d comments, too few to be a corpus", len(comments))
 	}
 	return comments
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -197,7 +198,7 @@ func noLonelyIfIsIdentifierCharacter(character byte) bool {
 // space when the `else` keyword sits directly against the opening brace. Reproduced from upstream's
 // fixer and checked against every `output` its corpus asserts.
 func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing *ast.Node) (rule.Fix, bool) {
-	text := ctx.SourceFile.Text()
+	sourceText := ctx.SourceFile.Text()
 
 	blockStart := rule.TokenRange(ctx.SourceFile, block).Pos()
 	blockEnd := block.End()
@@ -207,10 +208,10 @@ func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing 
 	// A comment on either side of the inner statement would be discarded by the rewrite, and
 	// upstream declines rather than dropping it. The test is upstream's own: whether the text
 	// between the brace and the statement is anything but whitespace.
-	if strings.TrimSpace(text[blockStart+1:innerStart]) != "" {
+	if text.TrimWhitespace(sourceText[blockStart+1:innerStart]) != "" {
 		return rule.Fix{}, false
 	}
-	if strings.TrimSpace(text[innerEnd:blockEnd-1]) != "" {
+	if text.TrimWhitespace(sourceText[innerEnd:blockEnd-1]) != "" {
 		return rule.Fix{}, false
 	}
 
@@ -225,7 +226,7 @@ func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing 
 	}
 
 	return rule.ReplaceRange(core.NewTextRange(blockStart, blockEnd),
-		separator+text[innerStart:innerEnd]), true
+		separator+sourceText[innerStart:innerEnd]), true
 }
 
 // noLonelyIfElseKeywordEnd finds where the `else` keyword ends.
@@ -256,28 +257,28 @@ func noLonelyIfElseKeywordEnd(ctx rule.Context, enclosing *ast.Node, blockStart 
 //	the next token opens with one of `( [ / + ` -`, each of which continues an expression
 //	the consequent ends in `++` or `--`, which take the next token as an operand
 func noLonelyIfFixWouldChangeMeaning(ctx rule.Context, node *ast.Node, block *ast.Node) bool {
-	text := ctx.SourceFile.Text()
+	sourceText := ctx.SourceFile.Text()
 	consequent := node.AsIfStatement().ThenStatement
 	if consequent == nil || consequent.Kind == ast.KindBlock {
 		return false
 	}
 
-	lastToken := strings.TrimSpace(text[rule.TokenRange(ctx.SourceFile, consequent).Pos():consequent.End()])
+	lastToken := text.TrimWhitespace(sourceText[rule.TokenRange(ctx.SourceFile, consequent).Pos():consequent.End()])
 	if strings.HasSuffix(lastToken, ";") {
 		return false
 	}
 
-	afterBlock := scanner.SkipTrivia(text, block.End())
-	if afterBlock >= len(text) {
+	afterBlock := scanner.SkipTrivia(sourceText, block.End())
+	if afterBlock >= len(sourceText) {
 		// Nothing follows, so nothing can join. `if (foo) {} else { if (bar) baz() }` at the end of
 		// a file is fixable, which is why this is a guard rather than a refusal.
 		return false
 	}
 
-	if noLonelyIfOnSameLine(text, consequent.End(), afterBlock) {
+	if noLonelyIfOnSameLine(sourceText, consequent.End(), afterBlock) {
 		return true
 	}
-	switch text[afterBlock] {
+	switch sourceText[afterBlock] {
 	case '(', '[', '/', '+', '`', '-':
 		return true
 	}
