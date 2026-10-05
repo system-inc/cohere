@@ -179,10 +179,10 @@ func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(t *testing.T) {
 	}{
 		{"the fork, after another submodule, over ssh",
 			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
-				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:kirkouimet/TypeScript.git\n",
-			"kirkouimet/TypeScript"},
-		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/kirkouimet/TypeScript.git\"\n",
-			"kirkouimet/TypeScript"},
+				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
+			"system-inc/TypeScript"},
+		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"system-inc/TypeScript"},
 		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", ""},
 		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", ""},
 	} {
