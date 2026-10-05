@@ -2,13 +2,13 @@
     "rule": "better-tailwindcss/no-unknown-classes",
     "firing": {
         "file": "Component.tsx",
-        "source": "const merged = mergeClassNames('flx');\n",
+        "source": "const merged = cn('flx');\n",
         "findings": [
             {
                 "line": 1,
-                "column": 33,
+                "column": 20,
                 "endLine": 1,
-                "endColumn": 36,
+                "endColumn": 23,
                 "messageId": "unknownClass",
                 "message": "The class \"flx\" is not one Tailwind knows, so it generates no CSS and does nothing. Nothing errors: the class sits in the markup, the element renders, and the style it was meant to apply is simply absent. That is usually a typo, and occasionally a class from a stylesheet the design system does not know about, which needs adding to the ignore list rather than fixing."
             }
