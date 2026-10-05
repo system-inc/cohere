@@ -9,6 +9,7 @@ import (
 // same overrides resolve to one shared answer, and a path matching a different set gets its own, with the
 // settings each set implies: the memo may save the copy, never change the result.
 func TestPathsMatchingTheSameOverridesShareOneResolution(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{
 		Rules: map[string]RuleSetting{"no-var": {Severity: SeverityError}, "eqeqeq": {Severity: SeverityError}},
 		Overrides: []Override{
@@ -52,6 +53,7 @@ func TestPathsMatchingTheSameOverridesShareOneResolution(t *testing.T) {
 // file and a Node file can match the same overrides and still resolve through different house variants,
 // so the memo lives per variant, after the dispatch, and the two never share an answer.
 func TestHouseVariantsNeverShareAResolution(t *testing.T) {
+	// Not parallel: withHouseSetsForTest swaps the package-level house sets for the length of the test.
 	withHouseSetsForTest(t)
 	root := t.TempDir()
 	component := filepath.Join(root, "source", "Button.tsx")

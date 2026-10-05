@@ -12,6 +12,7 @@ import (
 // differently gets its own; and the scoped-off and unconfigured counts, which coverage reports per file,
 // are still counted once for every file rather than once for every selection.
 func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(t *testing.T) {
+	t.Parallel()
 	graph := &Graph{LintConfig: &configuration.Config{
 		Rules: map[string]configuration.RuleSetting{
 			"runs": {Severity: configuration.SeverityError},

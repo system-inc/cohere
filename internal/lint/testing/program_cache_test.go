@@ -47,6 +47,8 @@ func cachedEntries() (held int, ordered int) {
 // Shown able to fail: with eviction removed, it stops at the fifth planted fixture, 5 held against a
 // bound of 4.
 func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
+	// Not parallel: it sets the package-wide cache capacity and counts what the shared cache holds, which
+	// another test building fixtures at the same time would change.
 	const bound = 4
 	withProgramCacheCapacity(t, bound)
 
@@ -75,6 +77,7 @@ func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
 // test can still hold a graph the cache has evicted, and the compiler reads its files lazily, so a
 // rebuild of the same fixture writes a directory of its own and leaves the first one in place.
 func TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads(t *testing.T) {
+	// Not parallel: it sets the package-wide cache capacity to one, which would evict other tests' builds.
 	withProgramCacheCapacity(t, 1)
 
 	first := cachedFixture(t, 100)
