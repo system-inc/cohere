@@ -35,7 +35,7 @@ func TestEveryPackageDeclaresTheDualLicense(t *testing.T) {
 		}
 		// Listed in files, or npm publish drops the texts the license field promises.
 		files, _ := manifest["files"].([]any)
-		for _, license := range LicenseFileNames {
+		for _, license := range LegalFileNames {
 			if !slices.Contains(files, any(license)) {
 				t.Errorf("%s's files are %v, so npm publish would leave %s out", name, files, license)
 			}
@@ -76,7 +76,7 @@ func TestPackagesShipBothLicenseTextsAsCommitted(t *testing.T) {
 	}
 
 	for _, directory := range []string{dispatcher.Directory, platform} {
-		for _, name := range LicenseFileNames {
+		for _, name := range LegalFileNames {
 			committed, err := os.ReadFile(filepath.Join(module, name))
 			if err != nil {
 				t.Fatal(err)
@@ -92,7 +92,7 @@ func TestPackagesShipBothLicenseTextsAsCommitted(t *testing.T) {
 	}
 
 	empty := t.TempDir()
-	for _, name := range LicenseFileNames {
+	for _, name := range LegalFileNames {
 		writeFile(t, filepath.Join(empty, name), "\n")
 	}
 	if err := stageLicenses(empty, t.TempDir()); err == nil {

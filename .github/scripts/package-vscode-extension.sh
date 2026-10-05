@@ -31,7 +31,7 @@ fi
 
 stage=$(mktemp -d)
 cp -R "$source/." "$stage/"
-cp "$root/LICENSE-MIT" "$root/LICENSE-APACHE" "$stage/"
+cp "$root/LICENSE-MIT" "$root/LICENSE-APACHE" "$root/NOTICE" "$root/THIRD_PARTY_NOTICES.md" "$stage/"
 cat > "$stage/LICENSE.md" << 'EOF'
 # License
 
@@ -40,7 +40,8 @@ cohere is licensed under either of
 - the Apache License, Version 2.0, in [LICENSE-APACHE](LICENSE-APACHE), or
 - the MIT license, in [LICENSE-MIT](LICENSE-MIT),
 
-at your option.
+at your option. What it is built on, and those projects' licenses, are in [NOTICE](NOTICE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 EOF
 cd "$stage"
 npm pkg set version="$version"
@@ -53,7 +54,8 @@ if [ "$packaged" != "$version" ]; then
     exit 1
 fi
 listing=$(unzip -l "$vsix")
-for required in extension/extension.js extension/cohere-format.js extension/icon.png extension/readme.md extension/license.md extension/LICENSE-MIT extension/LICENSE-APACHE; do
+for required in extension/extension.js extension/cohere-format.js extension/icon.png extension/readme.md extension/license.md \
+    extension/LICENSE-MIT extension/LICENSE-APACHE extension/NOTICE extension/THIRD_PARTY_NOTICES.md; do
     if ! grep -qi " $required\$" <<< "$listing"; then
         echo "the .vsix holds no $required"
         exit 1

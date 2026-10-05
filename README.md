@@ -336,8 +336,9 @@ How cohere is built, and why, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 cohere is licensed under either of the Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-or the MIT license ([LICENSE-MIT](LICENSE-MIT)), at your option. Every package it publishes carries both
-texts.
+or the MIT license ([LICENSE-MIT](LICENSE-MIT)), at your option. cohere is built on the TypeScript
+compiler, whose notice is in [NOTICE](NOTICE), and on the projects credited, each with its license, in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Every package it publishes carries all four files.
 
 Unless you explicitly state otherwise, any contribution you intentionally submit for inclusion in cohere,
 as defined in the Apache-2.0 license, is dual licensed as above, without any additional terms or
