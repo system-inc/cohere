@@ -45,8 +45,8 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 	for _, fileName := range summary.FilesFailed {
 		unchecked = append(unchecked, uncheckedFile{FileName: fileName, Reason: "the file could not be processed, so the formatter never read it"})
 	}
-	for _, fileName := range summary.FilesRefused {
-		unchecked = append(unchecked, uncheckedFile{FileName: fileName, Reason: edit.ReasonParseFailure})
+	for _, refused := range summary.FilesRefused {
+		unchecked = append(unchecked, uncheckedFile{FileName: refused.FileName, Reason: edit.ReasonParseFailure})
 	}
 	return unchecked
 }

@@ -3,6 +3,8 @@ package edit
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -362,7 +364,7 @@ func TestSummaryReportsPopulationAndReasons(t *testing.T) {
 	if summary.RefusalsByReason[ReasonOverlap] != 1 {
 		t.Fatalf("expected 1 overlap refusal, got %+v", summary.RefusalsByReason)
 	}
-	if len(summary.FilesRefused) != 1 || summary.FilesRefused[0] != "c.ts" {
+	if len(summary.FilesRefused) != 1 || summary.FilesRefused[0].FileName != "c.ts" {
 		t.Fatalf("expected c.ts named as refused, got %v", summary.FilesRefused)
 	}
 
@@ -433,5 +435,82 @@ func TestTsxIsParsedAsTsx(t *testing.T) {
 	}
 	if parses, _ := Parses("component.ts", element); parses {
 		t.Fatalf("the .ts and .tsx parses are identical, so the script kind is not being honored")
+	}
+}
+
+// A refused pass names its file and the rule whose fix broke it (#v1ah2qq). The quiet hundred's trpc run
+// printed "1 refused (1 the rewritten file does not parse)" and nothing else, --verbose included, so the
+// broken fix could not be traced to its rule. Here one fix parses and one does not: the whole pass is
+// still refused and nothing is written, and the refusal blames the fix that breaks the file alone, not
+// the one beside it.
+func TestARefusedPassNamesItsFileAndTheFixThatBrokeIt(t *testing.T) {
+	t.Parallel()
+	text := "const first = 1;\nconst second = 2;\n"
+	fine := proposal("rule-that-is-fine", strings.Index(text, "1"), strings.Index(text, "1")+1, "3")
+	broken := proposal("rule-that-breaks", strings.Index(text, "2"), strings.Index(text, "2")+1, "(")
+
+	result, err := FixText("refused.ts", text, proposeOnce(fine, broken), DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Changed || result.Text != text {
+		t.Fatalf("a pass that did not parse was written in part: %q", result.Text)
+	}
+
+	summary := Summarize([]FileResult{result})
+	if len(summary.FilesRefused) != 1 {
+		t.Fatalf("expected one refused file, got %+v", summary.FilesRefused)
+	}
+	refused := summary.FilesRefused[0]
+	if refused.FileName != "refused.ts" || !slices.Equal(refused.Breaking, []string{"rule-that-breaks"}) ||
+		!slices.Equal(refused.Rules, []string{"rule-that-is-fine", "rule-that-breaks"}) {
+		t.Fatalf("the refusal blames %v of %v on %s, want rule-that-breaks of both on refused.ts", refused.Breaking, refused.Rules, refused.FileName)
+	}
+	lines := summary.Refusals()
+	if len(lines) != 1 {
+		t.Fatalf("expected one refusal line, got %q", lines)
+	}
+	for _, want := range []string{"refused.ts", ReasonParseFailure, "nothing was written to it", "the fix from rule-that-breaks breaks it"} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("the refusal line lacks %q: %s", want, lines[0])
+		}
+	}
+	if strings.Contains(lines[0], "rule-that-is-fine") {
+		t.Errorf("the refusal line blames the fix that parses: %s", lines[0])
+	}
+	// The parser's message is the actionable part. It used to read "TS1135: " with the text missing.
+	if !regexp.MustCompile(`TS\d+: \w`).MatchString(refused.Reason) {
+		t.Errorf("the refusal carries a code without its message: %s", refused.Reason)
+	}
+}
+
+// When no one fix breaks the file alone, the fixes broke it together, and the line names every rule in the
+// pass rather than inventing a culprit.
+func TestARefusalNoOneFixCausedNamesThePassRules(t *testing.T) {
+	t.Parallel()
+	summary := Summarize([]FileResult{{FileName: "together.ts", Passes: 1, Rejected: []Rejection{
+		{Proposal: Proposal{RuleName: "left"}, Reason: ReasonParseFailure + " (TS1005: ';' expected.)"},
+		{Proposal: Proposal{RuleName: "right"}, Reason: ReasonParseFailure + " (TS1005: ';' expected.)"},
+	}}})
+	lines := summary.Refusals()
+	if len(lines) != 1 || !strings.Contains(lines[0], "no one fix breaks it alone, the fixes from left, right together do") {
+		t.Fatalf("the refusal lines are %q", lines)
+	}
+}
+
+// A formatter failure carries its error, like a parse failure carries the parser's, so the tally collapses
+// it to its category. It did not: trpc's fix line listed each of its formatter failures as a reason of its
+// own, one per file, and ran to thousands of characters (#v1ah2qq).
+func TestTransformFailuresAreTalliedAsOneReason(t *testing.T) {
+	t.Parallel()
+	summary := Summarize([]FileResult{
+		{FileName: "a.yml", Passes: 1, Rejected: []Rejection{{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving a.yml)"}}},
+		{FileName: "b.yml", Passes: 1, Rejected: []Rejection{{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving b.yml)"}}},
+	})
+	if summary.RefusalsByReason[ReasonTransformFailed] != 2 || len(summary.RefusalsByReason) != 1 {
+		t.Fatalf("two formatter failures were tallied as %v", summary.RefusalsByReason)
+	}
+	if line := summary.String(); !strings.Contains(line, "(2 "+ReasonTransformFailed+")") {
+		t.Errorf("the summary line does not collapse them: %s", line)
 	}
 }

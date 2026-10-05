@@ -853,6 +853,9 @@ func run() error {
 		}
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
 		fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), fixSummary)
+		for _, refusal := range fixSummary.Refusals() {
+			fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), "  "+refusal)
+		}
 		// The files the fix phase rewrote, above the findings, in the views that list them.
 		if mutate {
 			activeSummary.Changed = changedFilesFrom(fixSummary.ChangedFiles, location.Root)

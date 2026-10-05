@@ -3,6 +3,7 @@ package edit
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -152,8 +153,9 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 		if parses, reason := Parses(fileName, rewritten); !parses {
 			for _, proposal := range plan.Applied {
 				result.Rejected = append(result.Rejected, Rejection{
-					Proposal: proposal,
-					Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
+					Proposal:         proposal,
+					Reason:           fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
+					BreaksParseAlone: breaksParseAlone(fileName, current, proposal),
 				})
 			}
 			// The pass is discarded whole and the loop stops. Trying again would re-collect the same
@@ -194,6 +196,21 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 
 	result.Text = current
 	return result, nil
+}
+
+// breaksParseAlone reports whether one fix, applied by itself to the text its pass started from, already
+// leaves a file that does not parse.
+//
+// Asked only of a pass the guard refused, to name the fix that broke it, and the text it builds is read and
+// dropped. The refusal stays whole, as FixText's comment says: this diagnoses the pass and never writes a
+// combination no rule proposed.
+func breaksParseAlone(fileName string, text string, proposal Proposal) bool {
+	alone, plan := applyToText(text, Plan{Applied: []Proposal{proposal}})
+	if len(plan.Applied) == 0 {
+		return false
+	}
+	parses, _ := Parses(fileName, alone)
+	return !parses
 }
 
 // ruleNamesOf reduces proposals to the distinct rules behind them, in first-seen order.
@@ -533,9 +550,10 @@ type Summary struct {
 	// reads code that is not the problem.
 	UnconvergedRules []string
 
-	// FilesRefused names the files where a pass was discarded because the rewrite did not parse.
-	// These are the interesting failures: a rule proposed something that looked fine and was not.
-	FilesRefused []string
+	// FilesRefused names the files where a pass was discarded because the rewrite did not parse, with the
+	// rule that broke each. These are the interesting failures: a rule proposed something that looked fine
+	// and was not, which is a bug in that rule's fix.
+	FilesRefused []RefusedFile
 
 	// FilesFailed names the files the engine could not process at all — unreadable, unwritable, or
 	// already unparseable before anything was applied.
@@ -562,6 +580,25 @@ type Summary struct {
 	// name. The counts above say how many; a caller whose verdict is the transform alone needs to know
 	// which, since a file the formatter could not read is a file nobody checked.
 	NotTransformed []NotTransformedFile
+}
+
+// RefusedFile is one file whose rewrite did not parse, so the engine wrote nothing to it.
+//
+// The count alone ("1 refused (1 the rewritten file does not parse)") named neither the file nor the rule,
+// even under --verbose, so a broken fix could not be traced to its rule (#v1ah2qq).
+type RefusedFile struct {
+	FileName string
+
+	// Reason is the refusal with the parser's own message.
+	Reason string
+
+	// Breaking names the rules whose fix, applied alone, already does not parse: the defect. Empty when
+	// only the pass's fixes together broke it, and then Rules is where to look.
+	Breaking []string
+
+	// Rules names every rule with a fix in the refused pass, or "format" when the whole-text transform's
+	// output did not parse.
+	Rules []string
 }
 
 // NotTransformedFile is one file the whole-text transform left as it was without having shaped it.
@@ -637,13 +674,21 @@ func Summarize(results []FileResult) Summary {
 			}
 		}
 
-		refusedHere := false
+		var refused *RefusedFile
 		for _, rejection := range result.Rejected {
 			reason := reasonKey(rejection.Reason)
 			summary.RefusalsByReason[reason]++
-			if reason == ReasonParseFailure && !refusedHere {
-				summary.FilesRefused = append(summary.FilesRefused, result.FileName)
-				refusedHere = true
+			if reason == ReasonParseFailure {
+				if refused == nil {
+					summary.FilesRefused = append(summary.FilesRefused, RefusedFile{FileName: result.FileName, Reason: rejection.Reason})
+					refused = &summary.FilesRefused[len(summary.FilesRefused)-1]
+				}
+				if !slices.Contains(refused.Rules, rejection.Proposal.RuleName) {
+					refused.Rules = append(refused.Rules, rejection.Proposal.RuleName)
+				}
+				if rejection.BreaksParseAlone && !slices.Contains(refused.Breaking, rejection.Proposal.RuleName) {
+					refused.Breaking = append(refused.Breaking, rejection.Proposal.RuleName)
+				}
 			}
 			if rejection.Proposal.RuleName == transformRuleName {
 				summary.NotTransformed = append(summary.NotTransformed, NotTransformedFile{FileName: result.FileName, Reason: rejection.Reason, Failed: true})
@@ -655,7 +700,9 @@ func Summarize(results []FileResult) Summary {
 	})
 
 	sort.Strings(summary.FilesNotConverged)
-	sort.Strings(summary.FilesRefused)
+	sort.Slice(summary.FilesRefused, func(first, second int) bool {
+		return summary.FilesRefused[first].FileName < summary.FilesRefused[second].FileName
+	})
 	sort.Strings(summary.FilesFailed)
 	sort.Slice(summary.ChangedFiles, func(first, second int) bool {
 		return summary.ChangedFiles[first].FileName < summary.ChangedFiles[second].FileName
@@ -663,12 +710,30 @@ func Summarize(results []FileResult) Summary {
 	return summary
 }
 
+// Refusals is a line for each file whose rewrite did not parse: the file, the rule to look at, and the
+// parser's message. Printed under the summary line, which counts them, so the count can be traced.
+func (s Summary) Refusals() []string {
+	lines := make([]string, 0, len(s.FilesRefused))
+	for _, refused := range s.FilesRefused {
+		blame := fmt.Sprintf("the fix from %s breaks it", strings.Join(refused.Breaking, " and from "))
+		switch {
+		case len(refused.Rules) == 1 && refused.Rules[0] == transformRuleName:
+			blame = "the formatter's output breaks it"
+		case len(refused.Breaking) == 0:
+			blame = fmt.Sprintf("no one fix breaks it alone, the fixes from %s together do", strings.Join(refused.Rules, ", "))
+		}
+		lines = append(lines, fmt.Sprintf("refused: %s: %s; nothing was written to it. %s", refused.FileName, refused.Reason, blame))
+	}
+	return lines
+}
+
 // reasonKey collapses a reason that carries detail down to its category.
 //
 // A parse failure reason embeds the compiler's message so a reader can act on it, which makes every
 // one of them a distinct string and would turn a tally into a list of four hundred singletons.
 func reasonKey(reason string) string {
-	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached, ReasonFormatFixUnsettled} {
+	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached, ReasonFormatFixUnsettled,
+		ReasonTransformFailed} {
 		if len(reason) >= len(known) && reason[:len(known)] == known {
 			return known
 		}
