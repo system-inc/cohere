@@ -11,7 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -174,11 +174,10 @@ func compareFormat(t *testing.T, inputs []string) int {
 	t.Helper()
 	texts, byteOrderMarks, trees := parseInputs(t, inputs)
 	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for variantIndex, options := range formatVariants {
-		engine, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		engine := golden.Engine(options)
 		for index, input := range inputs {
 			expected, oracleErr := engine.Format("fixture.yaml", input)
 			fullStack, fullStackErr := formatFullStack("fixture.yaml", input, options, "preserve", nil)
@@ -227,10 +226,7 @@ func TestFormatFixturesMatchOracle(t *testing.T) {
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // against the oracle's for another.
 func TestFormatOracleCanFail(t *testing.T) {
-	engine, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
-	}
+	engine := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
 	expected, err := engine.Format("fixture.yaml", "a: [b]")
 	if err != nil {
 		t.Fatal(err)

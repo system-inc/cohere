@@ -3,12 +3,14 @@ package yaml
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -17,24 +19,47 @@ import (
 // and every corpus leaves at "preserve", and a file path the engine does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
-type optionsOracle struct{ runtime *goja.Runtime }
+// Its answers are recorded (see oracletest), so the runtime is built only when they are recorded again.
+type optionsOracle struct {
+	golden  *oracletest.Golden
+	once    sync.Once
+	runtime *goja.Runtime
+	err     error
+}
 
 func newOptionsOracle(t *testing.T) *optionsOracle {
 	t.Helper()
+	return &optionsOracle{golden: oracletest.Open(t, t.Name())}
+}
+
+func (oracle *optionsOracle) load() {
 	bundles, err := prettier.Bundles()
 	if err != nil {
-		t.Fatal(err)
+		oracle.err = err
+		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
 		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			t.Fatalf("evaluating %s: %v", name, err)
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+			return
 		}
 	}
-	return &optionsOracle{runtime: runtime}
+	oracle.runtime = runtime
 }
 
 func (oracle *optionsOracle) format(text string, filePath string, parser string, options formatoptions.Options, proseWrap string) (string, error) {
+	key := oracletest.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
+	return oracle.golden.Answer(key, func() (string, error) {
+		oracle.once.Do(oracle.load)
+		if oracle.err != nil {
+			return "", oracle.err
+		}
+		return oracle.formatLive(text, filePath, parser, options, proseWrap)
+	})
+}
+
+func (oracle *optionsOracle) formatLive(text string, filePath string, parser string, options formatoptions.Options, proseWrap string) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__filePath", filePath)
 	oracle.runtime.Set("__parser", parser)
