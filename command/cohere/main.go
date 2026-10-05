@@ -641,8 +641,15 @@ func run() error {
 
 	// The types phase's checking starts here, alongside the fix phase's walk, rather than after it. See
 	// startTypeCheck. Its result is used only if the walk leaves this graph in place.
+	//
+	// A run with nothing to replay and no build info to read checks the whole program, and that check is done
+	// inside the fix phase's walk instead, file by file just before each file's rules (#679s763): beside the
+	// walk, the two fought over every checker. See program.FusedCheck.
 	var earlyTypeCheck *typeCheck
-	if runTypes && runFix {
+	switch {
+	case runTypes && runFix && cacheOff && activeTypesReuse() == nil && !*formatOnly && len(projectFiles) > 0:
+		graph.FusedCheck = program.NewFusedCheck()
+	case runTypes && runFix:
 		earlyTypeCheck = startTypeCheck(ctx, graph, !cacheOff)
 	}
 
@@ -1353,9 +1360,13 @@ func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool)
 			check.session = graph.NewIncrementalSession()
 		}
 		var parts program.TypeDiagnosticParts
-		if check.session != nil {
+		switch {
+		case graph.FusedCheck != nil && check.session == nil:
+			// The walk checked the files it visited, and this checks the rest.
+			parts = graph.FusedCheck.DiagnosticParts(checkContext, graph)
+		case check.session != nil:
 			parts = check.session.DiagnosticParts(checkContext)
-		} else {
+		default:
 			parts = graph.AllDiagnosticParts(checkContext)
 		}
 		check.checked = parts.All()

@@ -246,7 +246,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	// Each worker walks the files of one checker, and then helps finish the others. See assignFilesToWorkers
 	// and walkQueue.
-	needsCheckers := anyRuleNeedsTypeChecker(rules)
+	// A fused check needs each worker on one checker's files whether or not a rule reads one.
+	needsCheckers := anyRuleNeedsTypeChecker(rules) || g.FusedCheck != nil
 	assignments := g.assignFilesToWorkers(ctx, files, workers, needsCheckers)
 	queues := make([]*walkQueue, workers)
 	homeFiles := make([]*ast.SourceFile, workers)
@@ -302,6 +303,12 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					localForeign++
 				}
 				sourceFile := files[index]
+
+				// The type check first, on the file's own checker, before this worker takes a checker for the
+				// rules: the check takes that lock itself. See FusedCheck.
+				if g.FusedCheck != nil {
+					g.FusedCheck.checkFile(ctx, g, sourceFile)
+				}
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
 				// should cost nothing at all rather than cost a checker and then be discarded.

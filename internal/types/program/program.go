@@ -109,6 +109,10 @@ type Graph struct {
 	// stolen file's findings and type diagnostics to its home checker's. See walkQueue.
 	WalkOnForeignCheckers bool
 
+	// FusedCheck, when set, has the next Walk type-check each file it visits, just before the file's rules run,
+	// and the types phase read the result rather than check the program itself. Nil walks without checking.
+	FusedCheck *FusedCheck
+
 	// retired is set when the graph has been replaced, by Retire. See there.
 	retired atomic.Bool
 }
