@@ -109,3 +109,7 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
 - `prefer-regex-literals` finds `RegExp` calls as ESLint's reference tracker does: through an alias
   (`const R = RegExp`), a parenthesized callee, a pattern destructured from `globalThis`, and `window`,
   which an undeclared name makes the runtime's global object. A local named `RegExp` is still not it.
+- `prefer-object-spread` finds `Object.assign` calls as ESLint's reference tracker does: through a
+  destructured, renamed or copied `Object` (`const { assign } = Object; assign({}, a)`), a parenthesized
+  callee, and an optional call either way (`Object?.assign`, `Object.assign?.()`), which it now reports
+  and fixes, since `Object` is never nullish. A file that writes `Object` is still not followed.

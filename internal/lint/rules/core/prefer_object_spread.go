@@ -1,8 +1,11 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -45,10 +48,11 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 // still reports. Measured against the installed rule, which reports the single-argument form and
 // is silent on both two-argument forms.
 //
-// A SHADOWED `Object`. Upstream tracks references from the global scope with a ReferenceTracker, so
-// a parameter, a local binding or an import named `Object` is not the global and the call is not
-// this rule's business. Measured here: the checker resolves the real `Object` to a declaration file
-// and every shadow to a source declaration, which is exactly what `resolvesToAGlobal` asks.
+// A SHADOWED `Object`. The calls come from the shelf's port of eslint-utils' ReferenceTracker, as
+// ESLint finds them, so a parameter, a local binding or an import named `Object` is not the global
+// and the call is not this rule's business, while an alias such as `const { assign } = Object` is
+// (#jjfa7qb). A file that writes `Object` anywhere is not followed at all: the tracker declines a
+// global that is reassigned, which is what ESLint's does.
 //
 // # The fixer rewrites the call into an object literal
 //
@@ -64,31 +68,30 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 var PreferObjectSpread = rule.Rule{
 	Name: "prefer-object-spread",
 
-	// Telling the global `Object` from a shadow is name resolution.
+	// Telling the global `Object` from a shadow is name resolution, which the tracker asks the
+	// checker for.
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// Whether anything in this file WRITES to `Object`. Upstream's ReferenceTracker refuses to
-		// follow a global that is reassigned, so a single `Object = {}` anywhere suppresses the
-		// rule for the whole file. Measured against the installed rule: the write suppresses under
-		// both source types and from inside an unrelated function, so it is a file-level fact
-		// rather than a scope-local one.
-		//
-		// Computed once per file rather than per call, since it is the same answer every time.
-		objectIsReassigned := false
-
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				objectIsReassigned = preferObjectSpreadFileWritesToObject(node)
-			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				if objectIsReassigned {
+				// Every trace starts at a reference to Object, so a file that never spells it has
+				// nothing to follow, and the tracker's index is never built.
+				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "Object") {
 					return
 				}
-				checkPreferObjectSpread(ctx, node)
+				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				for _, tracked := range tracker.GlobalReferences(objectAssignCallTraceMap) {
+					checkPreferObjectSpread(ctx, tracked.Node)
+				}
 			},
 		}
 	},
+}
+
+// objectAssignCallTraceMap asks the tracker for every call of the global Object's assign.
+var objectAssignCallTraceMap = map[string]*reference.TraceMap{
+	"Object": {Members: map[string]*reference.TraceMap{"assign": {Call: true}}},
 }
 
 // checkPreferObjectSpread judges one call expression.
@@ -99,10 +102,6 @@ func checkPreferObjectSpread(ctx rule.Context, node *ast.Node) {
 
 	call := node.AsCallExpression()
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
-		return
-	}
-
-	if !isPreferObjectSpreadObjectAssignCall(ctx, call) {
 		return
 	}
 
@@ -142,56 +141,6 @@ func checkPreferObjectSpread(ctx rule.Context, node *ast.Node) {
 		return
 	}
 	ctx.ReportNodeWithFixes(node, message, fixes...)
-}
-
-// isPreferObjectSpreadObjectAssignCall says whether a call is `Object.assign` on the real global.
-func isPreferObjectSpreadObjectAssignCall(ctx rule.Context, call *ast.CallExpression) bool {
-	callee := call.Expression
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	access := callee.AsPropertyAccessExpression()
-	if access.Name() == nil || access.Name().Text() != "assign" {
-		return false
-	}
-	// An optional call, `Object?.assign({}, foo)`, is a different expression and upstream's
-	// tracker does not follow it. Declined rather than rewritten, since the repair would drop the
-	// short-circuit.
-	if access.QuestionDotToken != nil {
-		return false
-	}
-	object := access.Expression
-	if object == nil {
-		return false
-	}
-	// `globalThis.Object.assign` is the same function, and upstream's tracker follows it: measured,
-	// it reports and repairs. `window.Object.assign` is NOT followed and is silent, which is what
-	// keeps this from accepting any member path ending in `Object`.
-	if object.Kind == ast.KindPropertyAccessExpression {
-		outer := object.AsPropertyAccessExpression()
-		if outer.Name() == nil || outer.Name().Text() != "Object" {
-			return false
-		}
-		receiver := outer.Expression
-		if receiver == nil || !ast.IsIdentifier(receiver) || receiver.Text() != "globalThis" {
-			return false
-		}
-		// Resolve the `Object` PROPERTY rather than the `globalThis` receiver.
-		//
-		// `globalThis` resolves to a symbol carrying ZERO declarations, so `resolvesToAGlobal`
-		// answers false for it -- the exact trap this brief names for `undefined`. The property
-		// access `globalThis.Object` does resolve to the standard library, which is the same
-		// question asked one step in. Measured both ways before this was written.
-		//
-		// Upstream's own corpus pins that a local `globalThis` in an unrelated function does NOT
-		// suppress the finding, and reading the property keeps that behaviour, since the property
-		// still resolves to the library.
-		return resolvesToAGlobal(ctx, outer.Name())
-	}
-	if !ast.IsIdentifier(object) || object.Text() != "Object" {
-		return false
-	}
-	return resolvesToAGlobal(ctx, object)
 }
 
 // preferObjectSpreadHasArgumentWithAccessors is upstream's `hasArgumentsWithAccessors`.
@@ -677,53 +626,4 @@ func preferObjectSpreadUnwrap(node *ast.Node) *ast.Node {
 		node = inner
 	}
 	return node
-}
-
-// preferObjectSpreadFileWritesToObject says whether any assignment in the file targets `Object`.
-//
-// This reproduces upstream's ReferenceTracker declining to follow a reassigned global. A write is
-// an assignment whose left side is the bare identifier, an update expression on it, or a
-// declaration that shadows it -- though a declaration is already caught by the resolution test, so
-// only the assignment forms matter here.
-//
-// The KindSourceFile listener fires before its children, which is what lets this be computed once
-// and consulted by every call in the file.
-func preferObjectSpreadFileWritesToObject(sourceFile *ast.Node) bool {
-	found := false
-	var visit func(*ast.Node) bool
-	visit = func(current *ast.Node) bool {
-		if found {
-			return true
-		}
-		switch current.Kind {
-		case ast.KindBinaryExpression:
-			binary := current.AsBinaryExpression()
-			if binary != nil && binary.OperatorToken != nil &&
-				preferObjectSpreadIsAssignmentOperator(binary.OperatorToken.Kind) &&
-				binary.Left != nil && ast.IsIdentifier(binary.Left) &&
-				binary.Left.Text() == "Object" {
-				found = true
-				return true
-			}
-		case ast.KindPrefixUnaryExpression:
-			unary := current.AsPrefixUnaryExpression()
-			if unary != nil && unary.Operand != nil && ast.IsIdentifier(unary.Operand) &&
-				unary.Operand.Text() == "Object" &&
-				(unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken) {
-				found = true
-				return true
-			}
-		case ast.KindPostfixUnaryExpression:
-			postfix := current.AsPostfixUnaryExpression()
-			if postfix != nil && postfix.Operand != nil && ast.IsIdentifier(postfix.Operand) &&
-				postfix.Operand.Text() == "Object" {
-				found = true
-				return true
-			}
-		}
-		current.ForEachChild(visit)
-		return false
-	}
-	sourceFile.ForEachChild(visit)
-	return found
 }
