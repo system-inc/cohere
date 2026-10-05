@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -205,6 +206,12 @@ func applyProposedFixes(
 	}
 	sort.Strings(fileNames)
 
+	// linted is every file the walk ran the rules over, in the form the candidates are keyed by.
+	linted := make(map[string]bool, len(projectFiles))
+	for _, sourceFile := range projectFiles {
+		linted[filepath.Clean(sourceFile.FileName())] = true
+	}
+
 	// propose is what a file's fixpoint asks for proposals. The first pass reuses the proposals already
 	// collected; later passes re-lint the rewritten text. Reusing them for the first pass and only the
 	// first pass is what keeps offsets honest: a proposal is valid exactly against the text it was
@@ -221,7 +228,15 @@ func applyProposedFixes(
 		// the formatted text and applied them anyway: formatting one file in nexus rewrote it under
 		// nexus/consistency-no-multiline-arrow-function on a run that reported the repository's fixes as
 		// not applied.
-		fixesWithheld := writable.Everything && repositoryRoot != "" && unwritableRepository(repositoryRoot, fileName) != ""
+		//
+		// A format candidate the walk never linted is formatted and never fixed either, for the same reason:
+		// no rule ran over it, so no finding was reported for it, and a fix landing there is a repair nobody
+		// was told about. It was costly as well as wrong. angular/angular's deploy-docs-site action keeps a
+		// 2.8 MB esbuild bundle beside a tsconfig that does not include it; the format pass printed it, every
+		// later pass re-linted all 2.8 MB with every rule, and `--no-fix` reported prefer-template, strict and
+		// more as rewrites of a vendored file the lint phase never looked at (#xn1k1gz).
+		fixesWithheld := !linted[fileName] ||
+			writable.Everything && repositoryRoot != "" && unwritableRepository(repositoryRoot, fileName) != ""
 
 		return func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
@@ -242,14 +257,18 @@ func applyProposedFixes(
 	// same one: no proposal, and the bytes the walk read. The rest are formatted here, as before.
 	speculated := speculation.keepable(byFileName, graph)
 	attempts := formatInParallel(fileNames, byFileName, speculated, func(fileName string) (edit.FileResult, error) {
-		return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+		return watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
+			return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+		})
 	})
 
 	results := make([]edit.FileResult, 0, len(fileNames))
 	for index, fileName := range fileNames {
 		fileResult, err := attempts[index].result, attempts[index].err
 		if !attempts[index].done {
-			fileResult, err = process(fileName, propose(fileName, serially), transform, maxPasses)
+			fileResult, err = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
+				return process(fileName, propose(fileName, serially), transform, maxPasses)
+			})
 		}
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
@@ -273,6 +292,25 @@ func applyProposedFixes(
 	summary := edit.Summarize(results)
 	summary.Checked = !write
 	return summary, result, lineEndings, nil
+}
+
+// slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
+// milliseconds and the 2.8 MB bundle that found this takes about two seconds now; a file past this is a runaway
+// the run would otherwise sit in with nothing on screen, as angular/angular's deploy-docs-site bundle did for
+// 26 minutes and 19 GB (#xn1k1gz).
+const slowFixNotice = 30 * time.Second
+
+// watchedFile runs one file's fix and format, and names the file on out if it is still running after after.
+// The run goes on: the notice says which file to report, or to leave out, while it is still happening rather
+// than after a wait nobody can explain.
+func watchedFile(out io.Writer, after time.Duration, fileName string, process func() (edit.FileResult, error)) (edit.FileResult, error) {
+	notice := time.AfterFunc(after, func() {
+		fmt.Fprintf(out, "cohere: %s is still being fixed and formatted after %s, which no file should take. This is "+
+			"likely a bug in cohere, not in your code: please report it at %s with the output of `cohere --version` "+
+			"and the file.\n", fileName, after, reportBugsAt)
+	})
+	defer notice.Stop()
+	return process()
 }
 
 // errRelintRefused is what the parallel format pass's proposer answers when a file would need its
@@ -543,12 +581,24 @@ func proposalsForText(
 	 */
 	directives := suppression.Build(sourceFile.Text())
 
+	/*
+	 * One file cache for every rule re-linting this text, as the lint walk keeps one per file.
+	 *
+	 * Without it rule.Cached recomputes on every ask, and a derivation meant to be paid once per file is
+	 * paid wherever a rule asks: no-invalid-this asks for the file's comments at each function, so the
+	 * whole-file comment scan ran once per function. On a 2.8 MB esbuild bundle in angular/angular, which
+	 * the format pass printed and this path then re-linted, `--no-fix` took 26 minutes and 19 GB on one
+	 * core while each half of it finished in seconds (#xn1k1gz).
+	 */
+	fileCache := rule.NewFileCache()
+
 	var diagnostics []rule.Diagnostic
 	for _, subject := range applicable {
 		currentRule := subject
 		context := rule.Context{
 			SourceFile: sourceFile,
 			Program:    rule.ViewProgram(graph.Program, sourceFile, currentRule),
+			FileCache:  fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name
 				if diagnostic.SourceFile == nil {
