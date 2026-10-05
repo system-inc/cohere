@@ -47,6 +47,7 @@ func newTokenizeContext() *TokenizeContext {
 		Enter:     context.enter,
 		Exit:      context.exit,
 		Interrupt: context.constructFactory(context.onSuccessfulCheck, true),
+		tokenizer: context,
 	}
 	return context
 }
@@ -356,7 +357,7 @@ func (context *TokenizeContext) addResult(entry resolvable, from int) {
 	}
 
 	if construct != nil && construct.Resolve != nil {
-		resolved := construct.Resolve.Resolve(slices.Clone(context.Events[from:]), context)
+		resolved := construct.Resolve.Resolve(context.Parser.memory.copyEvents(context.Events[from:]), context)
 		context.Events = spliceEvents(context.Events, from, len(context.Events)-from, resolved)
 	}
 
@@ -385,7 +386,7 @@ func (context *TokenizeContext) store() storeInfo {
 		point:            context.Now(),
 		previous:         context.Previous,
 		currentConstruct: context.CurrentConstruct,
-		stack:            slices.Clone(context.stack),
+		stack:            context.Parser.memory.copyStack(context.stack),
 	}
 }
 

@@ -104,7 +104,7 @@ func (context *context) transformDocument(document *documentData) *Node {
 	documentHead, docStart, tokensBeforeBody := context.transformDocumentHead(document.tokensBeforeBody, document.cstNode, document.node)
 	documentBody, documentEndPoint, documentTrailingComment := context.transformDocumentBody(docStart, tokensBeforeBody,
 		document.cstNode, document.node, document.tokensAfterBody, document.documentEnd)
-	return context.createDocument(createPosition(context.position(documentHead).start, documentEndPoint), docStart != nil,
+	return context.createDocument(context.createPosition(context.position(documentHead).start, documentEndPoint), docStart != nil,
 		document.documentEnd != nil, documentHead, documentBody, documentTrailingComment)
 }
 

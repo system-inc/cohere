@@ -178,7 +178,9 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 	node := currentNode(path)
 	settings := settingsOf(options)
 
-	parts := doc.Concat{}
+	// Room for the usual parts (the node's group and the empty line after it, plus a comment or a
+	// property), made once rather than grown from nothing (#vbjv3d6).
+	parts := make(doc.Concat, 0, 4)
 
 	if node.NodeType != "mappingValue" && hasLeadingComments(node) {
 		parts = append(parts, doc.Concat{doc.Join(doc.Hardline, mapPrint(path, print, "leadingComments")), doc.Hardline})

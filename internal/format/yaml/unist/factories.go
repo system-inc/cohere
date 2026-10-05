@@ -21,13 +21,13 @@ func createContent(tag *Node, anchor *Node, middleComments []*Node) content {
 }
 
 // createPosition is upstream's createPosition: a new position object over the two point objects.
-func createPosition(start *point, end *point) *position {
-	return &position{start: start, end: end}
+func (context *context) createPosition(start *point, end *point) *position {
+	return context.memory.positions.New(position{start: start, end: end})
 }
 
 // createEmptyPosition is upstream's createEmptyPosition: start and end are one point object.
-func createEmptyPosition(at *point) *position {
-	return &position{start: at, end: at}
+func (context *context) createEmptyPosition(at *point) *position {
+	return context.memory.positions.New(position{start: at, end: at})
 }
 
 // newNode makes a node of the type and registers its position object.

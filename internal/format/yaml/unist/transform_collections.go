@@ -44,7 +44,7 @@ func (context *context) transformMap(mapNode *compose.Node, props []*cst.Token) 
 		throwTypeError("undefined", "position")
 	}
 	return context.createMapping(
-		createPosition(context.position(mappingItems[0]).start, context.position(mappingItems[len(mappingItems)-1]).end),
+		context.createPosition(context.position(mappingItems[0]).start, context.position(mappingItems[len(mappingItems)-1]).end),
 		context.transformContentProperties(mapNode, props), mappingItems)
 }
 
@@ -90,7 +90,7 @@ func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Nod
 		} else {
 			end = context.transformOffset(seqItemIndToken.Offset + len(seqItemIndToken.Source))
 		}
-		sequenceItems[index] = context.createSequenceItem(createPosition(start, end), item)
+		sequenceItems[index] = context.createSequenceItem(context.createPosition(start, end), item)
 	}
 	if len(seq.Items) < len(srcToken.Items) {
 		for i := len(seq.Items); i < len(srcToken.Items); i++ {
@@ -104,7 +104,7 @@ func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Nod
 		throwTypeError("undefined", "position")
 	}
 	return context.createSequence(
-		createPosition(context.position(sequenceItems[0]).start, context.position(sequenceItems[len(sequenceItems)-1]).end),
+		context.createPosition(context.position(sequenceItems[0]).start, context.position(sequenceItems[len(sequenceItems)-1]).end),
 		context.transformContentProperties(seq, props), sequenceItems)
 }
 
@@ -202,7 +202,7 @@ func (context *context) transformFlowSeq(flowSeq *compose.Node, props []*cst.Tok
 				throwTypeError("null", "position")
 			}
 			flowSequenceItems[index] = context.createFlowSequenceItem(
-				createPosition(context.position(node).start, context.position(node).end), node)
+				context.createPosition(context.position(node).start, context.position(node).end), node)
 		} else {
 			flowSequenceItems[index] = context.transformPair(item, srcItem, context.createFlowMappingItem)
 		}
@@ -378,7 +378,7 @@ func (context *context) transformAstPair(pair *compose.Node, createNode createIt
 	if mappingValue != nil {
 		itemEnd = context.position(mappingValue).end
 	} else {
-		mappingValue = context.createMappingValue(createEmptyPosition(context.position(mappingKey).end), nil)
+		mappingValue = context.createMappingValue(context.createEmptyPosition(context.position(mappingKey).end), nil)
 	}
-	return createNode(createPosition(context.position(mappingKey).start, itemEnd), mappingKey, mappingValue)
+	return createNode(context.createPosition(context.position(mappingKey).start, itemEnd), mappingKey, mappingValue)
 }

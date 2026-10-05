@@ -3,22 +3,43 @@ package micromark
 // blankLine is micromark-core-commonmark/lib/blank-line.js.
 var blankLine = &Construct{Partial: true, Tokenize: tokenizeBlankLine}
 
+// tokenizeBlankLine is tried at the start of every line of flow, so its state is a blankLineRun from the
+// parse's Memory, whose states were bound when the slot was made, and a try allocates nothing (#vbjv3d6).
 func tokenizeBlankLine(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	run := effects.memory().blankLine()
+	run.effects, run.ok, run.nok = effects, ok, nok
+	return run.startState
+}
 
-	start = func(code Code) State {
-		if markdownSpace(code) {
-			return factorySpace(effects, after, TypeLinePrefix, 0)(code)
-		}
-		return after(code)
+// blankLineRun is one blank line: upstream's closure state, with its states made once per slot.
+type blankLineRun struct {
+	effects *Effects
+	ok, nok State
+
+	startState, afterState State
+}
+
+func newBlankLineRun() *blankLineRun {
+	run := &blankLineRun{}
+	run.startState, run.afterState = run.start, run.after
+	return run
+}
+
+// release zeroes the run for its next parse, keeping its bound states.
+func (run *blankLineRun) release() {
+	*run = blankLineRun{startState: run.startState, afterState: run.afterState}
+}
+
+func (run *blankLineRun) start(code Code) State {
+	if markdownSpace(code) {
+		return factorySpace(run.effects, run.afterState, TypeLinePrefix, 0)(code)
 	}
+	return run.after(code)
+}
 
-	after = func(code Code) State {
-		if code == CodeEof || markdownLineEnding(code) {
-			return ok(code)
-		}
-		return nok(code)
+func (run *blankLineRun) after(code Code) State {
+	if code == CodeEof || markdownLineEnding(code) {
+		return run.ok(code)
 	}
-
-	return start
+	return run.nok(code)
 }

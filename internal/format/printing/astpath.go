@@ -313,11 +313,12 @@ func (path *AstPath[N]) Match(predicates ...Predicate[N]) bool {
 	return true
 }
 
-// FindAncestor is upstream's path.findAncestor(predicate).
+// FindAncestor is upstream's path.findAncestor(predicate). It walks the stack as Ancestors does, nearest
+// first, without building the list: markdown asks it of every node it prints (#vbjv3d6).
 func (path *AstPath[N]) FindAncestor(predicate func(N) bool) (N, bool) {
-	for _, ancestor := range path.Ancestors() {
-		if predicate(ancestor) {
-			return ancestor, true
+	for index := len(path.stack) - 3; index >= 0; index -= 2 {
+		if node, isNode := asNode[N](path.stack[index]); isNode && predicate(node) {
+			return node, true
 		}
 	}
 	var zero N

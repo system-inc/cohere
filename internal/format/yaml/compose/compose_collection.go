@@ -243,9 +243,16 @@ func findScalarTagByName(schema *Schema, value []uint16, tagName string, tagToke
 }
 
 func findScalarTagByTest(ctx *composeContext, value []uint16, _ *cst.Token, _ onErrorFunc) *Tag {
+	// The view every test reads is made once, at the first tag with a test, rather than per tag (#vbjv3d6).
+	view, viewMade := "", false
 	for _, tag := range ctx.schema.Tags {
-		if (tag.Default == defaultTrue || ctx.atKey && tag.Default == defaultKey) && tag.test(value) {
-			return tag
+		if (tag.Default == defaultTrue || ctx.atKey && tag.Default == defaultKey) && tag.Test != nil {
+			if !viewMade {
+				view, viewMade = asciiView(value), true
+			}
+			if tag.Test.MatchString(view) {
+				return tag
+			}
 		}
 	}
 	// schema.compat is never set on this path, so there is nothing to warn about.
