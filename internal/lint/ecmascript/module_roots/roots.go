@@ -10,6 +10,7 @@
 package module_roots
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -169,6 +170,12 @@ func (set *Set) IsRoot(fileName string) (bool, Reason) {
 	}
 
 	return false, ""
+}
+
+// DynamicImportDirectories returns the directories a computed `import()` roots, sorted, for a
+// fingerprint of what IsRoot decides by besides the file's own name.
+func (set *Set) DynamicImportDirectories() []string {
+	return slices.Sorted(slices.Values(set.dynamicImportDirectories))
 }
 
 // isTestFile reports whether a stem names a test, by the suffixes actually in use.
