@@ -2,6 +2,7 @@ package core
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -143,14 +144,24 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 // port reads the string's cooked value, which is what the engine receives, so both land on the same
 // path and the distinction upstream draws between them does not need to be redrawn here.
 //
-// # What this port does not do
+// # allowEscape
 //
-// Upstream takes an `allowEscape` option that silences a sequence when any member was written with a
-// backslash, and this port takes the default `false` and offers no surface, matching the choice
-// `no-invalid-regexp` made for the same reason: nothing in this repository sets it, and a rule
-// reading a value nobody writes is inert code wearing the shape of a feature. The default is
-// asserted by fixture rather than assumed, because a port with no option surface lands on one branch
-// or the other and the corpus alone cannot tell which.
+// `{"allowEscape": true}` lets an author who spelled a member as an escape keep it: `/[Á]/`
+// is clean, because nobody writes `́` without knowing it is a separate code point. What counts
+// as escaped is upstream's test, applied to each member's source text: it starts with a backslash
+// and is not just backslashes in front of the very character it denotes. So `́`, `\x41` and
+// `\n` are escapes, and `\\` or `\è` are not, since the character is still sitting there in plain
+// sight. For a pattern written as a string the source text is the string's raw text, so a string
+// escape counts as well as a regex one: `RegExp("[Á]")` and `RegExp("[A\\u0301]")` are both
+// clean. A pattern that reached the call through a name or a concatenation has no source text of
+// its own, and nothing in it counts as escaped.
+//
+// An escaped member drops out of every check it would have taken part in, with one exception: a
+// combining mark is excused only by its own spelling. The base it attaches to may be escaped or not,
+// so `/[\n̅]/` still reports, the mark being right there in the source.
+//
+// An astral character split into its halves takes the spelling of the whole: `\u{1F44D}` in a
+// string is two escaped halves, and `\👍` is two plain ones.
 var NoMisleadingCharacterClass = rule.Rule{
 	Name: "no-misleading-character-class",
 
@@ -160,6 +171,8 @@ var NoMisleadingCharacterClass = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		settings, _ := rule.OptionsAs[NoMisleadingCharacterClassOptions](options)
+		allowEscape := settings.AllowEscape
 		// The regex literals a RegExp call took with flags, so already checked under the call's.
 		// Filled from the file node, which the walk enters before any literal.
 		var checkedByACall map[*ast.Node]bool
@@ -173,7 +186,7 @@ var NoMisleadingCharacterClass = rule.Rule{
 				}
 				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
-					checkRegExpConstructorCall(ctx, tracked.Node, checkedByACall)
+					checkRegExpConstructorCall(ctx, tracked.Node, checkedByACall, allowEscape)
 				}
 			},
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
@@ -186,16 +199,44 @@ var NoMisleadingCharacterClass = rule.Rule{
 					return
 				}
 				literalStart := node.End() - len(text)
-				checkRegexPattern(ctx, pattern, literalStart+1, flags, func() []rule.Suggestion {
-					return unicodeFlagSuggestionForLiteral(node, text, flags)
-				})
+				checkRegexPattern(ctx, pattern, literalStart+1, flags, patternSource(pattern, allowEscape),
+					func() []rule.Suggestion {
+						return unicodeFlagSuggestionForLiteral(node, text, flags)
+					})
 			},
 		}
 	},
 }
 
+// NoMisleadingCharacterClassOptions is upstream's one option object.
+//
+// AllowEscape defaults to false, as upstream's, so a bare severity reports every misleading class
+// however its members were spelled.
+type NoMisleadingCharacterClassOptions struct {
+	AllowEscape bool `json:"allowEscape"`
+}
+
+// memberSource returns the source text of the pattern bytes [start, end), for the allowEscape test.
+// Nil means no member counts as escaped: the option is off, or the pattern has no source of its own.
+type memberSource func(start int, end int) string
+
+// patternSource is the memberSource for a pattern whose bytes are its own source text.
+func patternSource(pattern string, allowEscape bool) memberSource {
+	if !allowEscape {
+		return nil
+	}
+	return func(start int, end int) string {
+		return pattern[start:end]
+	}
+}
+
 // checkRegExpConstructorCall checks a call or construction of RegExp, as ESLint's tracker loop does.
-func checkRegExpConstructorCall(ctx rule.Context, call *ast.Node, checkedByACall map[*ast.Node]bool) {
+func checkRegExpConstructorCall(
+	ctx rule.Context,
+	call *ast.Node,
+	checkedByACall map[*ast.Node]bool,
+	allowEscape bool,
+) {
 	arguments := call.Arguments()
 	if len(arguments) == 0 {
 		return
@@ -224,7 +265,8 @@ func checkRegExpConstructorCall(ctx rule.Context, call *ast.Node, checkedByACall
 		if pattern == "" {
 			return
 		}
-		checkRegexPattern(ctx, pattern, patternNode.End()-len(text)+1, flags, nil)
+		checkRegexPattern(ctx, pattern, patternNode.End()-len(text)+1, flags,
+			patternSource(pattern, allowEscape), nil)
 		return
 	}
 
@@ -237,10 +279,10 @@ func checkRegExpConstructorCall(ctx rule.Context, call *ast.Node, checkedByACall
 	}
 	switch patternNode.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		checkRegexPatternInStringLiteral(ctx, pattern, patternNode, flags)
+		checkRegexPatternInStringLiteral(ctx, pattern, patternNode, flags, allowEscape)
 	default:
 		reported := map[string]bool{}
-		checkRegexPatternWithReporter(pattern, flags, func(finding pendingMisleadingFinding) {
+		checkRegexPatternWithReporter(pattern, flags, nil, func(finding pendingMisleadingFinding) {
 			if reported[finding.message.Id] {
 				return
 			}
@@ -272,6 +314,7 @@ func checkRegexPatternInStringLiteral(
 	pattern string,
 	node *ast.Node,
 	flags string,
+	allowEscape bool,
 ) {
 	textRange := rule.TokenRange(ctx.SourceFile, node)
 	raw := ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
@@ -287,8 +330,11 @@ func checkRegexPatternInStringLiteral(
 	// mapper computes exactly the identity mapping. It stays because the common case is a pattern
 	// with no escapes at all, and walking it rune by rune to rediscover that offsets are offsets is
 	// work this rule does on every string argument in the tree.
+	//
+	// Every string escape is wider than what it produces, so a raw text as long as the cooked one
+	// holds no escape and is the cooked text, which is why its members' source is the pattern itself.
 	if len(rawBody) == len(pattern) {
-		checkRegexPattern(ctx, pattern, bodyStart, flags, nil)
+		checkRegexPattern(ctx, pattern, bodyStart, flags, patternSource(pattern, allowEscape), nil)
 		return
 	}
 
@@ -306,7 +352,15 @@ func checkRegexPatternInStringLiteral(
 		// wrong, which is worse than no finding at all.
 		return
 	}
-	checkRegexPatternMapped(ctx, pattern, bodyStart, flags, offsets)
+	// A member's source is the raw text its cooked bytes came from, which is where a string escape
+	// shows: `"[Á]"` cooks to the mark itself, and the raw `́` is what excuses it.
+	var source memberSource
+	if allowEscape {
+		source = func(start int, end int) string {
+			return rawBody[offsets[start]:offsets[end]]
+		}
+	}
+	checkRegexPatternMapped(ctx, pattern, bodyStart, flags, offsets, source)
 }
 
 // checkRegexPatternMapped is checkRegexPattern for a pattern whose offsets need translating back
@@ -317,9 +371,10 @@ func checkRegexPatternMapped(
 	bodyStart int,
 	flagsText string,
 	offsets []int,
+	source memberSource,
 ) {
 	collector := &mappedFindingCollector{ctx: ctx, bodyStart: bodyStart, offsets: offsets}
-	checkRegexPatternWithReporter(pattern, flagsText, collector.report)
+	checkRegexPatternWithReporter(pattern, flagsText, source, collector.report)
 }
 
 // mappedFindingCollector reports a finding at the raw offsets its cooked span maps to.
@@ -350,9 +405,10 @@ func checkRegexPattern(
 	pattern string,
 	patternStart int,
 	flagsText string,
+	source memberSource,
 	suggestions func() []rule.Suggestion,
 ) {
-	checkRegexPatternWithReporter(pattern, flagsText, func(finding pendingMisleadingFinding) {
+	checkRegexPatternWithReporter(pattern, flagsText, source, func(finding pendingMisleadingFinding) {
 		textRange := core.NewTextRange(patternStart+finding.start, patternStart+finding.end)
 		if finding.suggest && suggestions != nil {
 			ctx.ReportRangeWithSuggestions(textRange, finding.message, suggestions()...)
@@ -372,6 +428,7 @@ func checkRegexPattern(
 func checkRegexPatternWithReporter(
 	pattern string,
 	flagsText string,
+	source memberSource,
 	report func(pendingMisleadingFinding),
 ) {
 	// The cheap gate: no bracket, no class. Most patterns in a real tree have none, and the class
@@ -409,7 +466,7 @@ func checkRegexPatternWithReporter(
 			classesParsed = false
 			return
 		}
-		for _, sequence := range characterSequences(elements, flags) {
+		for _, sequence := range characterSequences(pattern, elements, flags, source) {
 			found = append(found, misleadingSequenceFindings(sequence)...)
 		}
 	})
@@ -442,6 +499,9 @@ type misleadingCharacter struct {
 	// pair messages fires. An author who wrote `\u{d83d}` chose the code point deliberately, so
 	// telling them to add a flag would be the wrong advice.
 	isCodePointEscape bool
+	// escaped is allowEscape's verdict on this member: on, and written as an escape. Off, it is never
+	// set, so the detectors read it unconditionally.
+	escaped bool
 }
 
 // characterSequences splits a class's elements into the runs of adjacent characters the detectors
@@ -462,9 +522,14 @@ type misleadingCharacter struct {
 // the entire without-flag surrogate finding, and it is done in the rule rather than in the shared
 // scanner because it is a question about what this rule means by adjacency rather than about how the
 // pattern parses.
+//
+// source is the allowEscape test's view of the file, nil when the option is off or the pattern has
+// no source of its own.
 func characterSequences(
+	pattern string,
 	elements []regexsyntax.RegexCharElement,
 	flags regexsyntax.RegexFlags,
+	source memberSource,
 ) [][]misleadingCharacter {
 	var sequences [][]misleadingCharacter
 	var current []misleadingCharacter
@@ -477,19 +542,23 @@ func characterSequences(
 	}
 
 	appendCharacter := func(value uint32, start int, end int, isCodePointEscape bool) {
+		escaped := source != nil && isAcceptableEscape(source(start, end), value)
 		// Under no unicode flag the engine sees UTF-16 code units, so an astral character is two
-		// members rather than one. Their spans both cover the whole character, because there is no
-		// narrower source text to point at: the two halves were written as one glyph.
+		// members rather than one. Neither half has source text of its own, and where each points is
+		// ESLint's UTF-16 span moved onto bytes: the high half is the empty place where the character
+		// starts and the low half is the whole character. So a pair of halves points at the whole
+		// character, and a join ending at a high half, as in `👨‍👩` read without the flag, stops
+		// where 👩 starts, which is where ESLint's span stops too.
 		if !flags.UV() && value > 0xFFFF && !isCodePointEscape {
 			high := 0xD800 + ((value - 0x10000) >> 10)
 			low := 0xDC00 + ((value - 0x10000) & 0x3FF)
 			current = append(current,
-				misleadingCharacter{value: high, start: start, end: end},
-				misleadingCharacter{value: low, start: start, end: end})
+				misleadingCharacter{value: high, start: start, end: start, escaped: escaped},
+				misleadingCharacter{value: low, start: start, end: end, escaped: escaped})
 			return
 		}
 		current = append(current, misleadingCharacter{
-			value: value, start: start, end: end, isCodePointEscape: isCodePointEscape,
+			value: value, start: start, end: end, isCodePointEscape: isCodePointEscape, escaped: escaped,
 		})
 	}
 
@@ -501,15 +570,66 @@ func characterSequences(
 			// The minimum joins the run that was building and closes it; the maximum opens the next
 			// one. Reproducing that shape rather than dropping ranges is what makes
 			// `/[👍-￿]/` report exactly once.
-			appendCharacter(element.Value, element.Start, element.End, element.IsUBrace)
+			minimumEnd, maximumStart := rangeEndpointBounds(pattern, element, flags)
+			appendCharacter(element.Value, element.Start, minimumEnd, element.IsUBrace)
 			flush()
-			appendCharacter(element.Max, element.Start, element.End, element.MaxIsUBrace)
+			appendCharacter(element.Max, maximumStart, element.End, element.MaxIsUBrace)
 		default:
 			appendCharacter(element.Value, element.Start, element.End, element.IsUBrace)
 		}
 	}
 	flush()
 	return sequences
+}
+
+// rangeEndpointBounds splits a range element at its hyphen, returning where its minimum ends and its
+// maximum starts.
+//
+// The shelf's range element spans `min-max` whole, and each endpoint needs its own text twice over:
+// a finding that ends at the minimum, as in `/[👍-￿]/`, points at the pair and not at
+// the range, and allowEscape asks how each endpoint was spelled. The minimum's width is read the way
+// the class parser read it, and if the hyphen is not where that width says, the whole range is
+// returned for both rather than a guess.
+func rangeEndpointBounds(
+	pattern string,
+	element regexsyntax.RegexCharElement,
+	flags regexsyntax.RegexFlags,
+) (int, int) {
+	start := element.Start
+	width := 0
+	switch {
+	case pattern[start] != '\\':
+		_, width = utf8.DecodeRuneInString(pattern[start:])
+	case flags.UV() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
+		pattern[start+2] != '{':
+		// `👍` under a unicode flag is two escapes the parser folded into one member.
+		width = 12
+	default:
+		width, _ = regexsyntax.SkipPatternEscape(pattern, start, flags)
+	}
+	minimumEnd := start + width
+	if width == 0 || minimumEnd >= element.End || pattern[minimumEnd] != '-' {
+		return element.End, element.Start
+	}
+	return minimumEnd, minimumEnd + 1
+}
+
+// isAcceptableEscape is upstream's test for a member allowEscape excuses: its source starts with a
+// backslash and is not merely backslashes in front of the character it denotes.
+//
+// `́`, `\x41` and `\n` pass. `\\` and `\è` do not, because the character is written out after
+// the backslash, and neither does `\👍` for either of its halves, which is why the value compared is
+// the whole character's.
+func isAcceptableEscape(source string, value uint32) bool {
+	if !strings.HasPrefix(source, `\`) {
+		return false
+	}
+	last, width := utf8.DecodeLastRuneInString(source)
+	prefix := source[:len(source)-width]
+	if prefix != "" && strings.Trim(prefix, `\`) == "" && uint32(last) == value {
+		return false
+	}
+	return true
 }
 
 // misleadingSequenceFindings runs every detector over one run of adjacent characters.
@@ -524,11 +644,17 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 			start: from.start, end: to.end, message: message})
 	}
 
+	// An escaped member takes part in nothing, except as the base a combining mark attaches to: the
+	// mark's own spelling is what allowEscape asks about, as upstream's combiningClass reads its
+	// previous member from the unfiltered run.
 	for index := 1; index < len(sequence); index++ {
 		previous, current := sequence[index-1], sequence[index]
 
-		if isCombiningCharacter(current.value) && !isCombiningCharacter(previous.value) {
+		if !current.escaped && isCombiningCharacter(current.value) && !isCombiningCharacter(previous.value) {
 			report(previous, current, messageMisleadingCombiningClass)
+		}
+		if previous.escaped || current.escaped {
+			continue
 		}
 		if isRegionalIndicatorSymbol(previous.value) && isRegionalIndicatorSymbol(current.value) {
 			report(previous, current, messageMisleadingRegionalIndicator)
@@ -551,6 +677,9 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 		if sequence[index].value != zeroWidthJoiner {
 			continue
 		}
+		if sequence[index-1].escaped || sequence[index].escaped || sequence[index+1].escaped {
+			continue
+		}
 		if sequence[index-1].value == zeroWidthJoiner || sequence[index+1].value == zeroWidthJoiner {
 			continue
 		}
@@ -569,7 +698,7 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 
 	for index := 1; index < len(sequence); index++ {
 		previous, current := sequence[index-1], sequence[index]
-		if !isSurrogatePair(previous.value, current.value) {
+		if previous.escaped || current.escaped || !isSurrogatePair(previous.value, current.value) {
 			continue
 		}
 		// Which of the two messages fires is decided by spelling rather than by value. When either

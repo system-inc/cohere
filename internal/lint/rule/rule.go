@@ -550,6 +550,20 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// NodeText is a node's own source text, from its first token to its end, without the leading trivia
+// node.Pos() includes: what a reader sees as the node, and what a message or a fix quotes.
+//
+// One home for the slice of TokenRange that three rules each wrote privately (no-implicit-coercion,
+// prefer-exponentiation-operator, valid-typeof), so the next rule reaches for this instead of a fourth copy.
+//
+// A method on the context, reading the context's own file, rather than a function taking a file: the
+// type-reach guard counts text read out of any other file as descending into an imported body, so the
+// only spelling offered is the one that cannot (internal/guard/type_reach_test.go).
+func (c Context) NodeText(node *ast.Node) string {
+	span := TokenRange(c.SourceFile, node)
+	return c.SourceFile.Text()[span.Pos():span.End()]
+}
+
 // The fix helpers come in two families, and picking the wrong one is the most common way a correct
 // rule produces a wrong edit.
 //

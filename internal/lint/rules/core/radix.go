@@ -1,10 +1,55 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
+
+// RadixMode is upstream's deprecated option, which names a mode the rule no longer has.
+//
+// Kept as a string rather than dropped at decode time so a config reads back as what was written.
+// Nothing in this file branches on it, which is upstream's own behavior: see "The option is
+// deprecated and does nothing" on Radix.
+type RadixMode string
+
+const (
+	// RadixAlways once meant "always require a radix", which is what the rule now always does.
+	RadixAlways RadixMode = "always"
+
+	// RadixAsNeeded once meant "report a radix of 10 as redundant". At 10.8.1 it reports exactly
+	// what RadixAlways does.
+	RadixAsNeeded RadixMode = "as-needed"
+)
+
+// DecodeRadixOptions turns the configured value into the rule's options.
+//
+// Upstream's schema is one optional element, `{enum: ["always", "as-needed"]}`, so a config writes
+// `["error", "as-needed"]` and what arrives here is the bare JSON string. Anything the enum refuses
+// is refused here too: another string, a number, an object, and `null`, which unmarshals into a Go
+// string as the empty one and is caught by the same switch.
+//
+// A bare severity decodes to the zero mode. The rule ignores the mode either way, so there is no
+// default to get wrong.
+func DecodeRadixOptions(raw []byte) (any, error) {
+	if len(raw) == 0 {
+		return RadixMode(""), nil
+	}
+
+	var configured string
+	if json.Unmarshal(raw, &configured) == nil {
+		switch mode := RadixMode(configured); mode {
+		case RadixAlways, RadixAsNeeded:
+			return mode, nil
+		}
+	}
+	return RadixMode(""), fmt.Errorf("radix takes \"always\" or \"as-needed\", got %s",
+		strings.TrimSpace(string(raw)))
+}
 
 var messageRadixMissingParameters = rule.Message{
 	Id: "missingParameters",
@@ -93,10 +138,13 @@ var messageRadixAddRadixParameter10 = rule.Message{
 //
 // # The option is deprecated and does nothing
 //
-// `meta.schema` still accepts `"always"` or `"as-needed"`, and the rule body never reads
-// `context.options`. Upstream's corpus proves it: `parseInt("10", 8)` appears as a passing case
-// under BOTH values, and so does `parseInt("10", foo)`. So no decoder is registered here, which
-// makes an option in the config an error rather than a silent no-op.
+// `meta.schema` still accepts `"always"` or `"as-needed"`, marked `// deprecated` in
+// eslint/lib/rules/radix.js at 10.8.1, and `create` never reads `context.options`. So the two values
+// behave identically there, and identically to no option at all. Upstream's corpus states it row by
+// row: `parseInt("10", 10)` is clean under `"as-needed"`, where older releases reported a redundant
+// radix, and `parseInt("10")` reports `missingRadix` under `"as-needed"` as it does under
+// `"always"`. Both values are accepted here by `DecodeRadixOptions` and ignored the same way, since
+// refusing them would stop a whole run over a config ESLint accepts.
 var Radix = rule.Rule{
 	Name: "radix",
 

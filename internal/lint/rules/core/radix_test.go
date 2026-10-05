@@ -308,24 +308,78 @@ func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
 	}
 }
 
-// The rule takes no options, and upstream's own corpus is what says its schema is vestigial.
+// The deprecated option is accepted under both values and changes nothing, which is upstream's own
+// behavior at 10.8.1: its schema still takes "always" or "as-needed" and its rule body never reads
+// context.options.
 //
-// meta.schema still accepts "always" or "as-needed" and the rule body never reads context.options.
-// Upstream proves it by shipping `parseInt("10", 8)` as a PASSING case under both values, and
-// `parseInt("10", foo)` likewise. So no decoder is registered, which turns an option written in the
-// config into a loud error rather than a silent no-op.
+// These are upstream's optioned rows, each run under no option and under both values. The two that
+// matter most are the ones an older reading of "as-needed" would get wrong: `parseInt("10", 10)` is
+// clean under it, where earlier releases reported a redundant radix, and `parseInt("10")` still
+// reports, where those releases let a missing radix pass.
 //
-// Asserted through the rule with options handed to it, since the registration carries no decoder and
-// nothing else in the suite would notice a decoder appearing later.
+// The options go through DecodeRadixOptions rather than being built by hand, so a decoder that
+// refused a value or decoded it into something the rule reacted to would fail here.
 func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
 	t.Parallel()
 
-	for _, sourceText := range []string{`parseInt("10", 8);`, `parseInt("10", foo);`} {
-		t.Run(sourceText, func(t *testing.T) {
+	cases := []struct {
+		sourceText string
+		messages   []string
+	}{
+		{`parseInt("10", 10);`, nil},
+		{`parseInt("10", 8);`, nil},
+		{`parseInt("10", foo);`, nil},
+		{`parseInt();`, []string{"missingParameters"}},
+		{`parseInt("10");`, []string{"missingRadix"}},
+		{`parseInt("10", 1);`, []string{"invalidRadix"}},
+		{`Number.parseInt();`, []string{"missingParameters"}},
+	}
+
+	for _, raw := range []string{"", `"always"`, `"as-needed"`} {
+		options, err := DecodeRadixOptions([]byte(raw))
+		if err != nil {
+			t.Fatalf("the decoder refused %q: %v", raw, err)
+		}
+		for _, testCase := range cases {
+			t.Run(raw+" "+testCase.sourceText, func(t *testing.T) {
+				t.Parallel()
+				rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, Radix, radixFile,
+					testCase.sourceText, options), testCase.messages...)
+			})
+		}
+	}
+}
+
+// The decoder refuses everything upstream's schema refuses, `{enum: ["always", "as-needed"]}`.
+//
+// `null` is the case worth naming: it unmarshals into a Go string as the empty one without an
+// error, so it is the enum check rather than the JSON decode that turns it away. A list is refused
+// because the config layer hands Decode one element, never the list around it.
+func TestDecodeRadixOptionsRefusesWhatTheSchemaRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		`"never"`, `"Always"`, `"as_needed"`, `""`, `null`, `10`, `true`, `{}`,
+		`{"mode": "always"}`, `["always"]`,
+	} {
+		t.Run(raw, func(t *testing.T) {
 			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Radix, radixFile, sourceText))
+			if _, err := DecodeRadixOptions([]byte(raw)); err == nil {
+				t.Errorf("expected %s to be refused, it was accepted", raw)
+			}
 		})
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, Radix, radixFile,
-		`parseInt("10");`), "missingRadix")
+
+	for raw, want := range map[string]RadixMode{`"always"`: RadixAlways, `"as-needed"`: RadixAsNeeded} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+			decoded, err := DecodeRadixOptions([]byte(raw))
+			if err != nil {
+				t.Fatalf("expected %s to be accepted, got %v", raw, err)
+			}
+			if decoded != want {
+				t.Errorf("expected %s to decode to %q, got %#v", raw, want, decoded)
+			}
+		})
+	}
 }

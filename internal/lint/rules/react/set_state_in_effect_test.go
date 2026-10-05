@@ -333,6 +333,20 @@ func TestSetStateInEffectPointsAtTheSetterCall(t *testing.T) {
 			source:   "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const f = () => {\n    setState(1);\n  };\n  useEffect(() => {\n    f();\n  });\n  return state;\n}\n",
 			wantText: "f",
 		},
+		// A comment above the call is trivia, not the call. TanStack Query's utils.tsx writes
+		// `// eslint-disable-next-line react-hooks/set-state-in-effect` there, and the finding used
+		// to start at the comment, one line above the setter, so the suppression for the next line
+		// missed it (#zx5xvtg item 8). A block comment on the same line is skipped the same way.
+		{
+			name:     "callUnderALineComment",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    // a note about the next line\n    setState(1);\n  });\n  return state;\n}\n",
+			wantText: "setState",
+		},
+		{
+			name:     "callAfterABlockComment",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    /* first */ setState(1);\n  });\n  return state;\n}\n",
+			wantText: "setState",
+		},
 	}
 
 	for _, testCase := range cases {

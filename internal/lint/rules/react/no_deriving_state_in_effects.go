@@ -164,6 +164,10 @@ func analyzeDerivedComputationsSubject(ctx rule.Context, function *high_level_in
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
 	reportDerivedComputationsInEffects(ctx, function)
 }
 

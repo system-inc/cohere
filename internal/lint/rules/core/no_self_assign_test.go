@@ -32,6 +32,15 @@ func TestNoSelfAssignFires(t *testing.T) {
 		{"a static computed key against a dotted one", "export function run() { o.b = o['b']; }\n", 1},
 		{"a dotted key against a static computed one", "export function run() { o['b'] = o.b; }\n", 1},
 		{"a numeric computed key", "export function run() { o[0] = o[0]; }\n", 1},
+		{"a regular expression key against its quoted spelling", "export function run() { o['/x/g'] = o[/x/g]; }\n", 1},
+		{"a null key against its dotted spelling", "export function run() { o[null] = o.null; }\n", 1},
+
+		// An identifier subscript read twice with nothing between is the same reference, which is
+		// upstream's answer and the one its docs give for `a[b] = a[b]`. Silent here once, on the
+		// theory that i might change between the reads; nothing in the statement can change it.
+		{"an identifier subscript", "export function run() { o[i] = o[i]; }\n", 1},
+		{"an identifier subscript inside a chain", "export function run() { o[i].b = o[i].b; }\n", 1},
+		{"a private name", "export class C { #p = 1; run() { this.#p = this.#p; } }\n", 1},
 
 		// Destructuring, compared positionally.
 		{"an array pattern", "export function run() { [a, b] = [a, b]; }\n", 2},
@@ -48,6 +57,7 @@ func TestNoSelfAssignFires(t *testing.T) {
 		{"an object pattern with the names reordered", "export function run() { ({ a, b } = { b, a }); }\n", 2},
 		{"an explicit property", "export function run() { ({ a: a } = { a: a }); }\n", 1},
 		{"a string key matching a shorthand", "export function run() { ({ a } = { 'a': a }); }\n", 1},
+		{"a computed template key", "export function run() { ({ 'a': b } = { [`a`]: b }); }\n", 1},
 
 		// Only properties after the last spread can be claimed, and these are after it.
 		{"a property after a spread", "export function run() { ({ a } = { ...b, a }); }\n", 1},
@@ -110,10 +120,20 @@ func TestNoSelfAssignStaysSilent(t *testing.T) {
 		{"a method with the same name", "export function run() { ({ a } = { a() {} }); }\n"},
 		{"a getter with the same name", "export function run() { ({ a } = { get a() { return 1; } }); }\n"},
 
-		// A dynamic key is the same reference only if the index has not changed, which nothing here
-		// can know. Silence is the only safe answer.
-		{"a dynamic computed key", "export function run() { o[i] = o[i]; }\n"},
-		{"a dynamic key on both sides of a chain", "export function run() { o[i].b = o[i].b; }\n"},
+		// A subscript that is an expression rather than a name is never compared, so it is silent
+		// even when written identically on both sides.
+		{"an expression subscript", "export function run() { o[i + 1] = o[i + 1]; }\n"},
+		{"an identifier subscript against a dotted key", "export function run() { o[b] = o.b; }\n"},
+
+		// A private name is not a string key, so it never meets the quoted spelling of its text.
+		{"a private name against its quoted text", "export class C { #p = 1; run() { this['#p'] = this.#p; } }\n"},
+		{"a quoted text against a private name", "export class C { #p = 1; run() { this.#p = this['#p']; } }\n"},
+
+		// A destructuring default is a fallback, taken only when the element is missing.
+		{"a default in an object pattern", "export function run() { ({ a = 1 } = { a }); }\n"},
+		{"a default in an array pattern", "export function run() { [a = 1] = [a]; }\n"},
+		{"a default that names its own target", "export function run() { [a = a] = [b]; }\n"},
+		{"a default under a property", "export function run() { ({ b: a = a } = o); }\n"},
 
 		// A call is evaluated twice, so the two sides are not the same reference even though they
 		// are written the same way.
@@ -132,6 +152,71 @@ func TestNoSelfAssignStaysSilent(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText))
+		})
+	}
+}
+
+// decodedNoSelfAssign runs the registered decoder over raw option JSON, the way the config layer does
+func decodedNoSelfAssign(t *testing.T, raw string) any {
+	t.Helper()
+	var input []byte
+	if raw != "" {
+		input = []byte(raw)
+	}
+	decoded, err := DecodeNoSelfAssignOptions(input)
+	if err != nil {
+		t.Fatalf("decoding %q: %v", raw, err)
+	}
+	return decoded
+}
+
+// TestNoSelfAssignPropsOption holds the one option to upstream's default and its off switch.
+//
+// The default is true, so the interesting inputs are the ones that must keep it true: no options,
+// a bare severity, and an empty object, which a zero-value decode would quietly turn off.
+func TestNoSelfAssignPropsOption(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		options    string
+		sourceText string
+		wantCount  int
+	}{
+		{"a member under a bare severity", "", "export function run() { o.b = o.b; }\n", 1},
+		{"a member under an empty object", "{}", "export function run() { o.b = o.b; }\n", 1},
+		{"a member with props on", `{"props": true}`, "export function run() { o.b = o.b; }\n", 1},
+		{"a member with props off", `{"props": false}`, "export function run() { o.b = o.b; }\n", 0},
+		{"a subscript with props off", `{"props": false}`, "export function run() { o[i] = o[i]; }\n", 0},
+		{"a member inside a pattern with props off", `{"props": false}`, "export function run() { [o.b] = [o.b]; }\n", 0},
+
+		// Props only gates the member half: a name assigned to itself reports either way.
+		{"a name with props off", `{"props": false}`, "export function run() { a = a; }\n", 1},
+		{"a pattern with props off", `{"props": false}`, "export function run() { [a, o.b] = [a, o.b]; }\n", 1},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			expected := make([]string, testCase.wantCount)
+			for index := range expected {
+				expected[index] = "selfAssignment"
+			}
+			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoSelfAssign, selfAssignFile,
+				selfAssignDeclarations+testCase.sourceText, decodedNoSelfAssign(t, testCase.options)), expected...)
+		})
+	}
+}
+
+// TestNoSelfAssignRefusesUnknownOptions holds the decoder to upstream's `additionalProperties: false`.
+func TestNoSelfAssignRefusesUnknownOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{`{"prop": false}`, `{"Props": false}`, `{"props": "no"}`, `false`} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeNoSelfAssignOptions([]byte(raw)); err == nil {
+				t.Errorf("decoded %s, expected it refused", raw)
+			}
 		})
 	}
 }

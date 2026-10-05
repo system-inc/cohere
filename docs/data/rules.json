@@ -9415,6 +9415,9 @@
             "origin": "core",
             "upstreamName": "no-invalid-regexp",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "invalidRegexp"
             ],
@@ -9737,6 +9740,9 @@
             "origin": "core",
             "upstreamName": "no-misleading-character-class",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "combiningClass",
                 "emojiModifier",
@@ -10581,6 +10587,9 @@
             "origin": "core",
             "upstreamName": "no-self-assign",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "selfAssignment"
             ],
@@ -12406,6 +12415,9 @@
             "origin": "core",
             "upstreamName": "radix",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "invalidRadix",
                 "missingParameters",
@@ -14973,7 +14985,10 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "valid-typeof",
-            "typeAware": false,
+            "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "invalidTypeofValue"
             ],

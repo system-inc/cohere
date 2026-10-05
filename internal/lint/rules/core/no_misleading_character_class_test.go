@@ -1,8 +1,10 @@
 package core
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -242,22 +244,19 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 	}
 }
 
-// The option this port does not implement, asserted rather than assumed.
+// allowEscape, both ways round.
 //
-// Upstream takes `allowEscape`, which silences a sequence when any of its members was written with a
-// backslash. This port has no option surface and takes the documented default `false`, the same
-// choice `no-invalid-regexp` made for the same reason: nothing in this repository sets it.
-//
-// A port with no surface lands on one branch or the other, and the default-option corpus cannot tell
-// which, because it never exercises the option. These are upstream's `allowEscape: true` cases, and
-// they split cleanly: its *pass* list under that option must report here, because the option is off,
-// and its *fail* list under that option must report here too, because those fail even with it on.
-// Both directions are pinned, so adding the option later flips this test visibly instead of quietly
-// changing what the rule means.
-func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
+// These are upstream's `allowEscape: true` cases, and they split cleanly. Its pass list under the
+// option reports with the option off and is clean with it on, so each one pins both directions. Its
+// fail list reports either way, because what excuses a member is its own spelling: a combining mark
+// written out after an escaped base, `\\` or `\è` which are only backslashes in front of the
+// character itself, and `\👍` whose halves are both written out.
+func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
 	t.Parallel()
 
-	// Clean upstream only when `allowEscape` is on. Every one reports here.
+	allowEscape := NoMisleadingCharacterClassOptions{AllowEscape: true}
+
+	// Clean upstream only when `allowEscape` is on.
 	cleanOnlyWithTheOption := []struct {
 		sourceText string
 		wantIds    []string
@@ -276,15 +275,22 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 	}
 
 	for _, testCase := range cleanOnlyWithTheOption {
-		t.Run(testCase.sourceText, func(t *testing.T) {
+		t.Run("off "+testCase.sourceText, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
+		t.Run("on "+testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+					testCase.sourceText, allowEscape))
+		})
 	}
 
-	// Reported upstream even with the option on, so the option is not what decides these.
+	// Reported upstream even with the option on. With it on, each finding also points where ESLint's
+	// does, which for every one of these is the class's whole body.
 	reportedEitherWay := []struct {
 		sourceText string
 		wantIds    []string
@@ -301,12 +307,79 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 	}
 
 	for _, testCase := range reportedEitherWay {
-		t.Run(testCase.sourceText, func(t *testing.T) {
+		t.Run("off "+testCase.sourceText, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
+		t.Run("on "+testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass,
+				misleadingCharacterClassFile, testCase.sourceText, allowEscape)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			body := testCase.sourceText[strings.Index(testCase.sourceText, "[")+1 : strings.LastIndex(testCase.sourceText, "]")]
+			for _, diagnostic := range result.Diagnostics {
+				if got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; got != body {
+					t.Fatalf("points at %q, wanted %q", got, body)
+				}
+			}
+		})
+	}
+
+	// A pattern that reached the call through a name has no source text of its own, so nothing in
+	// it counts as escaped and it reports at the argument, as upstream's corpus has it.
+	t.Run("a pattern held in a name", func(t *testing.T) {
+		t.Parallel()
+		sourceText := "const pattern = \"[\\x41\\u0301]\"; RegExp(pattern);"
+		result := rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			sourceText, allowEscape)
+		rule_testing.ExpectFindings(t, result, combining)
+		if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != "pattern" {
+			t.Fatalf("points at %q, wanted the argument", got)
+		}
+	})
+
+	// A range's minimum is spelled on its own, apart from the range: escaped, it excuses the mark it
+	// is, and written out, it does not, whatever the maximum's spelling.
+	for _, testCase := range []struct {
+		sourceText string
+		wantIds    []string
+	}{
+		{"/[A\\u0300-\u036F]/u", []string{}},
+		{"/[A\u0300-\\u036F]/u", []string{combining}},
+	} {
+		t.Run("range "+testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+					testCase.sourceText, allowEscape), testCase.wantIds...)
+		})
+	}
+}
+
+// The option decodes under upstream's spelling and nothing else.
+func TestNoMisleadingCharacterClassDecodesItsOption(t *testing.T) {
+	t.Parallel()
+
+	decode := rule.DecodeOptionsInto[NoMisleadingCharacterClassOptions]()
+	for raw, want := range map[string]NoMisleadingCharacterClassOptions{
+		`{}`:                    {},
+		`{"allowEscape":false}`: {},
+		`{"allowEscape":true}`:  {AllowEscape: true},
+	} {
+		decoded, err := decode([]byte(raw))
+		if err != nil {
+			t.Fatalf("decoding %s: %v", raw, err)
+		}
+		if decoded != any(want) {
+			t.Fatalf("decoding %s gave %+v, wanted %+v", raw, decoded, want)
+		}
+	}
+	for _, raw := range []string{`{"allowescape":true}`, `{"allowEscapes":true}`, `{"allowEscape":"yes"}`} {
+		if _, err := decode([]byte(raw)); err == nil {
+			t.Fatalf("decoding %s was accepted", raw)
+		}
 	}
 }
 
@@ -326,6 +399,9 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+					sourceText, NoMisleadingCharacterClassOptions{AllowEscape: true}))
 		})
 	}
 }
@@ -367,6 +443,13 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 		// mutation widening that cap to three digits survived every other case in this file.
 		{"var r = new RegExp(\"[\\40 \\\\ufe0f]\")", []string{" \\\\ufe0f"}},
 		{"var r = new RegExp(\"\\770[ \\\\ufe0f]\")", []string{" \\\\ufe0f"}},
+		// A range's minimum ends the run, so the pair before it points at the pair and not on into the
+		// range.
+		{`var r = /[\uD83D\uDC4D-\uffff]/`, []string{`\uD83D\uDC4D`}},
+		// Without the flag a join reaching into an astral character stops where it starts, which is
+		// ESLint's span moved from UTF-16 halves onto bytes: the `a`, the joiner, and the high half of
+		// 👩, which has no bytes of its own.
+		{"var r = /[a\u200d👩]/", []string{"a\u200d", "👩"}},
 	}
 
 	for _, testCase := range cases {

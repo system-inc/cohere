@@ -291,12 +291,6 @@ func noImplicitCoercionOperandText(ctx rule.Context, node *ast.Node) string {
 	return source
 }
 
-// noImplicitCoercionSourceText reads a node's own text without leading trivia.
-func noImplicitCoercionSourceText(ctx rule.Context, node *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[span.Pos():node.End()]
-}
-
 // noImplicitCoercionResolvesToTheGlobalBoolean answers whether `Boolean` at this point is the
 // global one.
 //
@@ -570,7 +564,7 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 				// `undefined !== -1` is true, which would invert the membership test.
 				comparison = ">= 0"
 			}
-			recommendation := noImplicitCoercionSourceText(ctx, call) + " " + comparison
+			recommendation := ctx.NodeText(call) + " " + comparison
 			noImplicitCoercionReport(ctx, node, recommendation, false, false)
 		}
 	}
@@ -615,7 +609,7 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 		if *settings.String && !noImplicitCoercionAllows(settings, "+") &&
 			noImplicitCoercionIsEmptyString(right) &&
 			!noImplicitCoercionIsAlready(ctx, left, checker.TypeFlagsStringLike) {
-			code := noImplicitCoercionSourceText(ctx, left)
+			code := ctx.NodeText(left)
 			noImplicitCoercionReport(ctx, node, code+" = String("+code+")", true, false)
 		}
 		return

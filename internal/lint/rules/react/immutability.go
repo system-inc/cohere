@@ -213,6 +213,10 @@ func immutabilityAnalyzeCompilationUnit(ctx rule.Context, function *high_level_i
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunction)
 	for _, finding := range immutabilitySweepFunction(ctx, function) {
 		immutabilityReport(ctx, function, finding)
 	}

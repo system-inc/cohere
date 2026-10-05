@@ -82,6 +82,41 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 	})
 }
 
+// AsCompilationUnit returns the lowering a rule should analyze a component or hook through: the
+// function lowered on its own, through the rule's own entry (ForFunction or
+// ForFunctionWithoutManualMemoization).
+//
+// The compiler rules lower the outermost function on each branch and, when that is not a component
+// or hook, look for one among the functions nested in its lowering. A unit found that way was then
+// analyzed as a NESTED function, with the function around it as its enclosing builder, so a variable
+// that function declared became a capture: a local of the component, as far as the analysis could
+// tell. React Compiler compiles such a component as a unit of its own, and its HIR builder resolves
+// any binding outside the unit as it resolves a module-level one (`resolveIdentifier` asks the unit's
+// parent scope, and Babel's `getBinding` walks every enclosing scope).
+//
+// Measured on TanStack Query's tests, a `Page` declared inside an `it(...)` callback: React Compiler
+// compiles it, and writing `isRefetch = true` from its onClick handler or `result = query` from its
+// effect, where both variables belong to the test, raises nothing. cohere reported 21 immutability
+// findings on that shape, every one of them reading the test's variable as the component's own
+// (#zx5xvtg item 8).
+//
+// For a unit already lowered on its own this is the same cached lowering, so a top-level component or
+// hook is unaffected. A component nested in a unit is not reached here at all: it is part of its
+// parent's graph, as upstream lowers it.
+func AsCompilationUnit(
+	ctx rule.Context,
+	function *Function,
+	lower func(rule.Context, *ast.Node) *Function,
+) *Function {
+	if function == nil || function.Node == nil {
+		return function
+	}
+	if standalone := lower(ctx, function.Node); standalone != nil {
+		return standalone
+	}
+	return function
+}
+
 // ForFunctionWithoutManualMemoization is ForFunction with `useMemo` and `useCallback` erased and
 // the resulting immediately-invoked calls inlined, which is the graph upstream's validators read.
 //

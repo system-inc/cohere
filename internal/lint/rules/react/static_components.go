@@ -281,6 +281,10 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunction)
 
 	// The OUTERMOST component or hook is the compilation unit, and the walk stops here. A function
 	// nested inside it is not a second subject: upstream lowers it into this graph and analyses it

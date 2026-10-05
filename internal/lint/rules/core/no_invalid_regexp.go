@@ -20,9 +20,57 @@ var messageInvalidRegexp = rule.Message{
 
 // validRegExpFlags are the flags the language defines. A flag outside this set is a SyntaxError
 // rather than a no-op, which is why an unknown one is worth reporting rather than ignoring.
-var validRegExpFlags = map[byte]bool{
+var validRegExpFlags = map[rune]bool{
 	'd': true, 'g': true, 'i': true, 'm': true,
 	's': true, 'u': true, 'v': true, 'y': true,
+}
+
+// NoInvalidRegexpOptions is the whole option surface. ESLint's schema is one object holding an
+// `allowConstructorFlags` array of unique strings and `additionalProperties: false`.
+type NoInvalidRegexpOptions struct {
+	// AllowConstructorFlags names extra flag characters a constructor call may carry. Each string
+	// contributes every character in it, as upstream joins them before reading.
+	AllowConstructorFlags []string `json:"allowConstructorFlags"`
+}
+
+// DecodeNoInvalidRegexpOptions decodes the option object strictly and holds the schema's
+// `uniqueItems`, which the generic decoder has no way to know about. A repeated string allows
+// nothing a single one does not, but upstream refuses the config outright, and a config cohere loads
+// where ESLint would not is a config that only works in one of them.
+func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
+	decoded, err := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
+	if err != nil {
+		return NoInvalidRegexpOptions{}, err
+	}
+	options, _ := decoded.(NoInvalidRegexpOptions)
+
+	seen := make(map[string]bool, len(options.AllowConstructorFlags))
+	for _, flags := range options.AllowConstructorFlags {
+		if seen[flags] {
+			return NoInvalidRegexpOptions{}, fmt.Errorf("allowConstructorFlags lists %q more than once, and its items must be unique", flags)
+		}
+		seen[flags] = true
+	}
+	return options, nil
+}
+
+// allowedConstructorFlags is the set of extra flags the options license, as upstream builds it: every
+// character of every string, less the flags the language already defines. Dropping those is what
+// keeps an allowed `u` from being struck twice, which would let `uu` through.
+func allowedConstructorFlags(options any) map[rune]bool {
+	allowed := map[rune]bool{}
+	parsed, isParsed := rule.OptionsAs[NoInvalidRegexpOptions](options)
+	if !isParsed {
+		return allowed
+	}
+	for _, flags := range parsed.AllowConstructorFlags {
+		for _, flag := range flags {
+			if !validRegExpFlags[flag] {
+				allowed[flag] = true
+			}
+		}
+	}
+	return allowed
 }
 
 // NoInvalidRegexp flags a RegExp constructor whose pattern or flags cannot be parsed.
@@ -34,6 +82,7 @@ var validRegExpFlags = map[byte]bool{
 //	invalid: new RegExp('.', 'z')
 //	invalid: new RegExp('.', 'ii')
 //	invalid: new RegExp('.', 'uv')
+//	valid:   new RegExp('.', 'a')             // with allowConstructorFlags: ["a"]
 //
 // Only a string literal is checked. `new RegExp(pattern)` where pattern is a variable could be
 // anything at runtime, and reporting it would flag correct code; that is a deliberate narrowing
@@ -59,23 +108,21 @@ var validRegExpFlags = map[byte]bool{
 // ones. Silence is the honest answer when cohere cannot parse what it is asked about. The full answer
 // is an ECMAScript pattern validator in place of the engine (#4bgr3h2 tracks it).
 //
-// # The option we deliberately do not implement
+// # allowConstructorFlags
 //
-// Upstream takes `allowConstructorFlags`, a case-sensitive list of flag characters that stop being
-// errors in a constructor call. With `["a"]`, `new RegExp('.', 'a')` becomes clean. It is threaded
-// through the flag walk rather than applied afterwards, because oxc's own comment notes the regex
-// engine cannot take the option.
+// Upstream's one option names flag characters a constructor call may carry beyond the language's
+// own, for an engine that defines extra ones. With `{"allowConstructorFlags": ["a"]}`,
+// `new RegExp('.', 'a')` is clean and `new RegExp('.', 'aa')` still reports, as a duplicate. The
+// allowed flags are threaded through the flag walk exactly as the language's are, struck once each,
+// so a second copy is the same defect a second `g` is.
 //
-// **This port has no option surface and takes the default empty allow-list**, so every flag outside
-// `validRegExpFlags` reports. Nothing in this repository configures the option, and a rule reading a
-// value nobody sets is the inert shape this tool exists to catch. If a consumer needs it, it gets
-// built then, against a real requirement.
-//
-// Matching the default is asserted rather than assumed, because a port with no option surface lands
-// on one branch or the other and a fixture pair cannot tell which: the corpus only ever exercises
-// the default. `new RegExp('.', 'a')` reports here and `new RegExp('.', 'i')` does not, which is
-// upstream's behavior with an empty allow-list. Missing surface is wrong later; a mismatched default
-// would be wrong now.
+// Upstream's reading is followed to the character, because each step is observable in its corpus.
+// The strings are joined and read character by character, so `["az"]` allows both `a` and `z`. The
+// match is case-sensitive, so allowing `a` leaves `A` unknown. A flag the language already defines
+// is dropped from the list, so allowing `u` does not license a second `u` and does not lift the rule
+// that `u` and `v` cannot meet. With nothing configured the list is empty and every flag outside
+// `validRegExpFlags` reports. The schema's `uniqueItems` is held at decode, so `["a", "a"]` is refused
+// as upstream refuses it.
 var NoInvalidRegexp = rule.Rule{
 	Name: "no-invalid-regexp",
 
@@ -83,6 +130,8 @@ var NoInvalidRegexp = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		allowedFlags := allowedConstructorFlags(options)
+
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
 			callee = ast.SkipParentheses(callee)
 			if callee == nil || callee.Kind != ast.KindIdentifier {
@@ -114,7 +163,7 @@ var NoInvalidRegexp = rule.Rule{
 			}
 
 			if flags != nil {
-				if message := invalidFlagsMessage(*flags); message != "" {
+				if message := invalidFlagsMessage(*flags, allowedFlags); message != "" {
 					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 					return
 				}
@@ -162,24 +211,33 @@ var NoInvalidRegexp = rule.Rule{
 
 // invalidFlagsMessage reports why a flags string is not accepted, or the empty string when it is.
 //
-// The order matters and follows the language rather than convenience: each valid flag is struck
-// once, so what remains is either a duplicate or an unknown one. Checking `u` and `v` together
-// first is what makes `uv` report as mutually exclusive rather than as two fine flags.
-func invalidFlagsMessage(flags string) string {
-	remaining := flags
-	for flag := range validRegExpFlags {
-		remaining = strings.Replace(remaining, string(flag), "", 1)
+// The order matters and follows the language rather than convenience: each known flag, the
+// language's or one the options allow, is struck once, so what remains is either a duplicate or an
+// unknown one. Checking `u` and `v` together first is what makes `uv` report as mutually exclusive
+// rather than as two fine flags. The walk is by character rather than byte because an allowed flag
+// is whatever character the config names, and upstream reads them as characters.
+func invalidFlagsMessage(flags string, allowed map[rune]bool) string {
+	known := func(flag rune) bool { return validRegExpFlags[flag] || allowed[flag] }
+
+	struck := map[rune]bool{}
+	var remaining []rune
+	for _, flag := range flags {
+		if known(flag) && !struck[flag] {
+			struck[flag] = true
+			continue
+		}
+		remaining = append(remaining, flag)
 	}
 
 	if strings.Contains(flags, "u") && strings.Contains(flags, "v") {
 		return fmt.Sprintf("Invalid regular expression flags: %s. The u and v flags cannot both be set", flags)
 	}
-	for index := 0; index < len(remaining); index++ {
-		if validRegExpFlags[remaining[index]] {
-			return fmt.Sprintf("Invalid regular expression flags: %s. Duplicate flag %q", flags, remaining[index])
+	for _, flag := range remaining {
+		if known(flag) {
+			return fmt.Sprintf("Invalid regular expression flags: %s. Duplicate flag %q", flags, flag)
 		}
 	}
-	if remaining != "" {
+	if len(remaining) > 0 {
 		return fmt.Sprintf("Invalid regular expression flags: %s. Unknown flag %q", flags, remaining[0])
 	}
 	return ""
