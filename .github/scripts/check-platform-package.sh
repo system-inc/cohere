@@ -102,9 +102,10 @@ status=$(run "$directory" version.log --version)
 expect "--version runs and names the platform" 0 "$status" version.log "platform:"
 
 # A clean tree passes, and the same run again replays from the cache. The replay says so under --verbose:
-# a default run prints its findings and one footer line (#ytqqv8v).
+# a default run prints its findings and one footer line (#ytqqv8v). Both runs pass --verbose, since the
+# run cache keys on the arguments and a run printed another way is a record of its own.
 directory=$(project clean)
-status=$(run "$directory" clean.log --no-fix)
+status=$(run "$directory" clean.log --no-fix --verbose)
 expect "a clean tree passes" 0 "$status" clean.log
 start=$(milliseconds)
 status=$(run "$directory" replay.log --no-fix --verbose)
