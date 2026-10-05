@@ -148,6 +148,13 @@ jobs:
                   # desk machine). 30 minutes is room for a three-core runner, and still a ceiling.
                   go test -timeout 30m ./command/... ./internal/...
 
+                  # The website's data, checked against the lint tests themselves. -check recaptures every
+                  # example by rerunning ./internal/lint/... with capture on, which the run above can't
+                  # stand in for, because capture changes what the tests record (#d7vx76v). Measured on the
+                  # desk machine at load 151: 85 seconds, 2.6 GB peak resident. GOFLAGS carries the same
+                  # per-package ceiling into the go test it runs, and only go test takes -timeout.
+                  GOFLAGS=-timeout=30m go run ./internal/docsdata/tools/generate -check
+
             - name: Import the signing certificate
               # Skipped when the secret is absent, so a fork or a contributor without credentials
               # still gets a working staged release. What it must never do is appear to sign and
