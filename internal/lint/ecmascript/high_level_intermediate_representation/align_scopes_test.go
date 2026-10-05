@@ -1,7 +1,6 @@
 package high_level_intermediate_representation
 
 import (
-	"os"
 	"sort"
 	"testing"
 )
@@ -116,9 +115,7 @@ func widenedTableFrom(scopes *ReactiveScopes, aligned *AlignedScopes) *ReactiveS
 func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	functions, scopesBefore, scopesAfter := 0, 0, 0
 	fullPre, fullMergeOnly, fullAligned := 0, 0, 0
 	scopePre, scopeMergeOnly, scopeAligned := 0, 0, 0
@@ -234,9 +231,7 @@ func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 func TestAlignMustRunBeforeTheMerge(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	naiveFull, naiveScope, naiveUnions := 0, 0, 0
 	upstreamFull, upstreamScope, upstreamUnions := 0, 0, 0
 
@@ -573,9 +568,7 @@ func TestAlignDeclinesAPlaceReadOutsideItsScope(t *testing.T) {
 func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	branchReuse, nonBranchReuse, branchesWithFallthrough := 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -626,9 +619,7 @@ func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
 func TestAlignReDerivesMemberRanges(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	members, differing, wider, narrower := 0, 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -676,9 +667,7 @@ func TestAlignReDerivesMemberRanges(t *testing.T) {
 func TestAlignPreservesScopeWidthAndMembership(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	oneNarrow, oneWide, manyNarrow, manyWide := 0, 0, 0, 0
 	var widths []int
 
@@ -732,9 +721,7 @@ func TestAlignPreservesScopeWidthAndMembership(t *testing.T) {
 func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	sharedStarts, widestStart, coincidentPairs := 0, 0, 0
 	alignedDiffering, unalignedDiffering := 0, 0
 
@@ -816,9 +803,7 @@ func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
 func TestReactReversePostorderClosesFallthroughSelfNesting(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	withScopes, withoutScopes := 0, 0
 
 	// The whole corpus, deliberately: this is a graph invariant rather than a React-domain metric.
@@ -862,9 +847,7 @@ func TestAlignGapsAreDeclared(t *testing.T) {
 func TestAlignIsASingleSweep(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	blocksOverall, blocksWithScopes, visits, functionsWithoutScopes := 0, 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -907,9 +890,7 @@ func TestAlignIsASingleSweep(t *testing.T) {
 func TestAlignIsDeterministic(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	compared := 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {

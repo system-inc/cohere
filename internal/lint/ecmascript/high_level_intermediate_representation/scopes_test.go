@@ -578,9 +578,7 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 func TestScopeWidthAndMembershipAgree(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	functions, scopes, members, widths, sizes, _, _, _, _, _, widthOneMulti := corpusScopeStats(t, 400)
 
@@ -645,9 +643,7 @@ func TestScopeWidthAndMembershipAgree(t *testing.T) {
 func TestScopeRangesSatisfyUpstreamsInvariant(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	functions, scopes, _, _, _, invalidHulls, emptyHulls, pastMax, someUnset, allUnset, _ :=
 		corpusScopeStats(t, 400)
@@ -840,9 +836,7 @@ func TestScopeGapsAreDeclared(t *testing.T) {
 func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	var files []string
 	filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {

@@ -60,6 +60,30 @@ const (
 	pinnedCorpusCommit  = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
 )
 
+// fastTierVariable is set by `cohere-dev test --fast`, the edit loop, which leaves the corpus walks to the
+// landing gate (#nxgt2ca). A test that walks the corpus reaches it through skipWithoutCorpus or
+// pinnedCorpusFiles, so a new one is left out of the fast tier without anyone listing it. Go's test cache
+// keys on the variable, since a test reads it, so a fast run's result never answers for a full one.
+const fastTierVariable = "COHERE_FAST_TIER"
+
+// skipCorpusWalkInFastTier skips a corpus walk under the fast tier, saying so.
+func skipCorpusWalkInFastTier(t *testing.T) {
+	t.Helper()
+	if os.Getenv(fastTierVariable) != "" {
+		t.Skip("a corpus walk, left to the landing gate by cohere-dev test --fast")
+	}
+}
+
+// skipWithoutCorpus skips a test that walks the live corpus when the fast tier runs it, or when the corpus
+// is not on this machine.
+func skipWithoutCorpus(t *testing.T) {
+	t.Helper()
+	skipCorpusWalkInFastTier(t)
+	if _, err := os.Stat(corpusRoot); err != nil {
+		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
+	}
+}
+
 // pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
 // sorted, with each one's contents at that commit.
 //
@@ -68,6 +92,7 @@ const (
 // because each of those would otherwise measure a different corpus and still report a number.
 func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	t.Helper()
+	skipCorpusWalkInFastTier(t)
 
 	pinnedCorpus.Lock()
 	read := pinnedCorpus.byCount[count]
@@ -171,9 +196,7 @@ func readPinnedCorpus(count int) (paths []string, contents map[string]string, sk
 func TestLowerRealCodebase(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	var files []string
 	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
@@ -278,9 +301,7 @@ func TestLowerRealCodebase(t *testing.T) {
 func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	path := filepath.Join(corpusRoot, "style", "ColorConverter.ts")
 	contents, err := os.ReadFile(path)

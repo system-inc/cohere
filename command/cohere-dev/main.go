@@ -2,6 +2,7 @@
 //
 //	go run ./command/cohere-dev test ./...            every package, through a machine-wide slot
 //	go run ./command/cohere-dev test ./internal/edit  one package, at once
+//	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
 //
 // A whole-module run builds and links seventy-odd test binaries on every core the machine has, and
 // several members starting one together made the machine crawl for all of them. So a run naming ./...
@@ -34,7 +35,7 @@ const defaultSlots = 1
 
 func main() {
 	if len(os.Args) < 2 || os.Args[1] != "test" {
-		fmt.Fprintln(os.Stderr, "usage: cohere-dev test [go test flags] [packages]")
+		fmt.Fprintln(os.Stderr, "usage: cohere-dev test [go test flags] [packages] | cohere-dev test --fast [go test flags]")
 		os.Exit(2)
 	}
 	os.Exit(test(os.Args[2:]))
@@ -42,6 +43,9 @@ func main() {
 
 // test runs go test with the arguments given, through a slot when it names the whole module.
 func test(arguments []string) int {
+	if len(arguments) > 0 && arguments[0] == "--fast" {
+		return fastTest(arguments[1:])
+	}
 	if !wholeModule(arguments) {
 		return goTest(arguments)
 	}

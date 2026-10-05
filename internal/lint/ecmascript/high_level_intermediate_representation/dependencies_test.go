@@ -560,9 +560,7 @@ func TestDependenciesHandleANilFunction(t *testing.T) {
 func TestDependencyDistributionIsReal(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	var files []string
 	filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {

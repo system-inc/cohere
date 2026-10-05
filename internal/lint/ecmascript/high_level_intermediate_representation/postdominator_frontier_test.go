@@ -21,6 +21,8 @@ import (
 // be equal, frontier order included, since the reactivity pass reads that order.
 func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 	t.Parallel()
+	// Its count below needs the pinned corpus beside the hand-written functions, so it is a corpus walk.
+	skipCorpusWalkInFastTier(t)
 
 	sources := map[string]string{
 		"Shapes.tsx": strings.Join([]string{

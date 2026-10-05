@@ -1143,9 +1143,7 @@ func TestDisjointGapsAreDeclared(t *testing.T) {
 func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 
 	var files []string
 	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {

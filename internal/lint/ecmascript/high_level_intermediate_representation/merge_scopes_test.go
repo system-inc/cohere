@@ -1,7 +1,6 @@
 package high_level_intermediate_representation
 
 import (
-	"os"
 	"sort"
 	"testing"
 )
@@ -507,9 +506,7 @@ func countNonNestedPairs(ranges map[ScopeId]MutableRange) int {
 func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	functions, before, after, unions, nonNestedBefore, nonNestedAfter,
 		widthOneMultiAfter, maxWidthBefore, maxWidthAfter, _, _ := mergeCorpusStats(t, 400)
 
@@ -561,9 +558,7 @@ func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
 func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	var oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore int
 	var oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter int
 
@@ -652,9 +647,7 @@ func classify(width, members int, oneNarrow, oneWide, manyNarrow, manyWide *int)
 func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	_, _, _, _, _, _, _, _, _, nestingBefore, nestingAfter := mergeCorpusStats(t, 400)
 
 	blocksAlone := 0
@@ -689,9 +682,7 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	withoutGate, withGate, candidates, typed, total := 0, 0, 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -811,9 +802,7 @@ func unionsSkippingFunctionOperands(function *Function, scopes *ReactiveScopes) 
 func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	functions, violations := 0, 0
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		functions++
@@ -860,9 +849,7 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 func TestMergeIsDeterministic(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	functions, mismatches, merges := 0, 0, 0
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		functions++
@@ -903,9 +890,7 @@ func TestMergeIsDeterministic(t *testing.T) {
 func TestMergeSortComparatorReachability(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	startPositions, sharedStarts, endPositions, sharedEnds, widestEndGroup := 0, 0, 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -986,9 +971,7 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 	}
 
 	// The corpus half: the measurement that explains the survivor.
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	skipWithoutCorpus(t)
 	onlyTerminal, total := 0, 0
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		fromInstruction, fromTerminal := map[ScopeId]bool{}, map[ScopeId]bool{}
