@@ -98,3 +98,24 @@ func TestABuildListsFromDiscoverysListingsAsFromDisk(t *testing.T) {
 		t.Fatalf("control: a listing emptied of src/nested named %v, so the build did not read it", staleOurs)
 	}
 }
+
+// Listing answers for a directory that was listed, by either separator, and says plainly when one was not,
+// so a caller reads that one from disk rather than taking it for empty.
+func TestListingAnswersForWhatWasListedAndOnlyThat(t *testing.T) {
+	t.Parallel()
+	directory := writeProject(t, map[string]string{"a.ts": "export const a = 1;\n", "sub/b.ts": "export const b = 1;\n"})
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listings := program.NewDirectoryListings()
+	listings.Add(directory, entries)
+
+	got, listed := listings.Listing(directory + string(filepath.Separator))
+	if !listed || len(got) != 2 || got[0].Name() != "a.ts" || got[1].Name() != "sub" || !got[1].IsDir() {
+		t.Fatalf("the listed directory answered %v, %t", got, listed)
+	}
+	if got, listed := listings.Listing(filepath.Join(directory, "sub")); listed || got != nil {
+		t.Fatalf("a directory nobody listed answered %v, %t, as if it were listed", got, listed)
+	}
+}

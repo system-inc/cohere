@@ -46,11 +46,15 @@ func (l *DirectoryListings) Len() int {
 	return len(l.entries)
 }
 
-// listing is a directory's entries, and whether it was listed.
-func (l *DirectoryListings) listing(directory string) ([]os.DirEntry, bool) {
+// Listing is a directory's entries as os.ReadDir returned them, sorted by name, and whether it was listed.
+// The directory is an absolute path, slash or platform separated. An entry's Type() needs no stat, except a
+// symbolic link's target; entry.Info() stats again. A directory that was not listed is not empty: read it
+// from disk. The format walk reads discovery's listings through this (#g3046x5), as the build does through
+// listingFS.
+func (l *DirectoryListings) Listing(directory string) ([]os.DirEntry, bool) {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	entries, listed := l.entries[path.Clean(directory)]
+	entries, listed := l.entries[path.Clean(filepath.ToSlash(directory))]
 	return entries, listed
 }
 
@@ -61,7 +65,7 @@ type listingFS struct {
 }
 
 func (l *listingFS) GetAccessibleEntries(directory string) vfs.Entries {
-	entries, listed := l.listings.listing(directory)
+	entries, listed := l.listings.Listing(directory)
 	if !listed {
 		return l.FS.GetAccessibleEntries(directory)
 	}
