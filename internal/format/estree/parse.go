@@ -17,9 +17,9 @@ import (
 // Prettier is given a file path, so JSX is decided by the extension, the way typescript-estree decides
 // it for a known file type: .tsx parses with JSX and .ts without. A hashbang becomes a line comment,
 // upstream's replaceHashbang, before parsing; the caller keeps the original text for printing.
-func ParseTypeScript(fileName string, text string) (*Node, []*Node, error) {
+func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node, error) {
 	sourceFile := ParseSourceFile(fileName, ReplaceHashbang(text))
-	program, comments, err := Convert(sourceFile)
+	program, comments, err := Convert(sourceFile, nodes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,8 +41,8 @@ func ParseTypeScript(fileName string, text string) (*Node, []*Node, error) {
 // or a file Babel would reject, and either way the file is refused rather than printed as TypeScript.
 //
 // The tree is typescript-estree's with Babel's one postprocess difference: see ConvertForBabel.
-func ParseJavaScript(fileName string, text string) (*Node, []*Node, error) {
-	program, comments, err := ConvertForBabel(ParseSourceFile(fileName, ReplaceHashbang(text)))
+func ParseJavaScript(fileName string, text string, nodes *Arena) (*Node, []*Node, error) {
+	program, comments, err := ConvertForBabel(ParseSourceFile(fileName, ReplaceHashbang(text)), nodes)
 	if err != nil {
 		return nil, nil, err
 	}

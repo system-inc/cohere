@@ -3,19 +3,17 @@ package micromark
 import (
 	"sync"
 	"unicode/utf16"
-
-	"github.com/system-inc/cohere/internal/format/arena"
 )
 
 // Parse tokenizes markdown into events, the way mdast-util-from-markdown drives micromark:
 // postprocess(parse(options).document().write(preprocess()(value, encoding, true))).
 //
-// source is UTF-16 code units. Every point in the result counts them. The tokens come from tokens, which may
-// be nil; the events are valid until it is Reset.
+// source is UTF-16 code units. Every point in the result counts them. The tokens and tokenizers come from
+// memory, which may be nil; the events are valid until it is Reset.
 //
 // constructs is the defaults combined with the extensions (Combine), made once rather than per parse.
-func Parse(source []uint16, constructs *FullConstructs, tokens *arena.Arena[Token]) []Event {
-	parser := &ParseContext{Constructs: constructs, Lazy: map[int]bool{}, tokens: tokens}
+func Parse(source []uint16, constructs *FullConstructs, memory *Memory) []Event {
+	parser := &ParseContext{Constructs: constructs, Lazy: map[int]bool{}, memory: memory}
 	return postprocess(parser.create(ContentTypeDocument, nil).Write(preprocess(source)))
 }
 
@@ -84,6 +82,10 @@ func combineExtensions(extensions []*Extension) *Extension {
 		// Codes and names carry no `add`, so upstream's constructs() puts every one before the existing.
 		all.AttentionMarkers = append(append([]Code(nil), extension.AttentionMarkers...), all.AttentionMarkers...)
 		all.Disable = append(append([]string(nil), extension.Disable...), all.Disable...)
+	}
+
+	for _, record := range []*ConstructRecord{all.Document, all.ContentInitial, all.FlowInitial, all.Flow, all.String, all.Text} {
+		record.combine()
 	}
 
 	return all

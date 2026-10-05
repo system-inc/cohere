@@ -1,6 +1,9 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -20,7 +23,42 @@ type NoConstantConditionOptions struct {
 	// The default matches ESLint's and this tree's configuration. `while(true)` is a deliberate idiom
 	// rather than a mistake, so the default exempts it while still catching `while(1)` and
 	// `while(a || true)`, which are not idioms and are usually accidents.
-	CheckLoops string `json:"checkLoops"`
+	CheckLoops NoConstantConditionCheckLoops `json:"checkLoops"`
+}
+
+// NoConstantConditionCheckLoops is the `checkLoops` value, in the three-string spelling.
+type NoConstantConditionCheckLoops string
+
+// UnmarshalJSON reads every value upstream's schema accepts and refuses the rest.
+//
+// The schema is `enum: ["all", "allExceptWhileTrue", "none", true, false]`, and upstream maps the
+// two booleans onto the strings before anything reads them: true is "all" and false is "none". The
+// booleans are the option's older spelling, and ESLint 10.8.1 still accepts them (#d21war2). An
+// unlisted string is refused rather than reaching the rule, where it would match no case and check
+// every loop.
+func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error {
+	// `null` decodes into a bool as false without an error, which would read it as "none".
+	if string(raw) == "null" {
+		return fmt.Errorf("checkLoops is null, which upstream's schema refuses")
+	}
+	var enabled bool
+	if err := json.Unmarshal(raw, &enabled); err == nil {
+		*checkLoops = "none"
+		if enabled {
+			*checkLoops = "all"
+		}
+		return nil
+	}
+	var spelling string
+	if err := json.Unmarshal(raw, &spelling); err != nil {
+		return fmt.Errorf(`checkLoops is %s, which is neither a string nor a boolean`, raw)
+	}
+	switch spelling {
+	case "all", "allExceptWhileTrue", "none":
+		*checkLoops = NoConstantConditionCheckLoops(spelling)
+		return nil
+	}
+	return fmt.Errorf(`checkLoops is %q, which is not "all", "allExceptWhileTrue", "none", true or false`, spelling)
 }
 
 // NoConstantCondition flags a condition whose value cannot vary.
@@ -49,7 +87,7 @@ type NoConstantConditionOptions struct {
 var NoConstantCondition = rule.Rule{
 	Name: "no-constant-condition",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		checkLoops := "allExceptWhileTrue"
+		checkLoops := NoConstantConditionCheckLoops("allExceptWhileTrue")
 		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
 		}

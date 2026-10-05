@@ -41,6 +41,17 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
 
+		// Adamic's soundness rules (#drbrp8c), built ahead of the set that carries them. cohere:adamic and
+		// the re-composed cohere:typescript land through @system_cohere_lint_sets under the set-change
+		// gate; until then nothing enables these. Each entry leaves when cohere:adamic does.
+		"adamic/invariant-mutable":      "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/no-definite-assignment": "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/no-optional-widening":   "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/no-type-predicate":      "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/no-unchecked-cast":      "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/nominal-class":          "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+		"adamic/single-spread":          "built ahead of cohere:adamic, which lands through @system_cohere_lint_sets (#drbrp8c)",
+
 		// Kirk decided every suppression must carry a stated reason, and asked for the port to land
 		// registered rather than enabled. Dry-run on the ahra tree with the rule switched on through
 		// a scratch copy of CohereSettings.json (`--no-fix --lint`): 337 findings over 166 files,

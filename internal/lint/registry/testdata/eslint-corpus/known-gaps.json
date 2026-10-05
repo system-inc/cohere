@@ -189,20 +189,6 @@
         "e1c30b5db8d3": "span",
         "fb871a4ad88a": "span"
     },
-    "grouped-accessor-pairs": {
-        "0e8a4c91f4cc": "options",
-        "2efeb49191a6": "options",
-        "33742f475a83": "options",
-        "51ff1e96dd1c": "options",
-        "675822bfdd84": "options",
-        "7cf6598660f8": "options",
-        "86c31c3aa1c0": "options",
-        "a0ebe6ab6751": "options",
-        "a39bfdce6a19": "options",
-        "cf185f2d01b7": "options",
-        "e768110449a5": "options",
-        "f02218d63bad": "options"
-    },
     "id-denylist": {
         "234cf205a0b5": "globals",
         "5c971dffc1cf": "globals",
@@ -259,26 +245,20 @@
         "ed91c8e881c9": "missing"
     },
     "no-constant-condition": {
-        "2c4c5ea4e40c": "options",
-        "34b1090cb0f0": "options",
-        "39822d4fc237": "options",
+        "2c4c5ea4e40c": "extra",
         "45d384e06d52": "extra",
-        "6597b79072cd": "options",
-        "6798fb11a107": "options",
+        "6597b79072cd": "extra",
         "6bd0ef30161d": "extra",
         "6f716042d2be": "span",
         "72051d426c72": "extra",
         "89bc0b173d8f": "extra",
         "8b4c4201dc6d": "extra",
         "8bf5b599ce51": "globals",
-        "906f3f2d13f8": "options",
         "91aefad648de": "extra",
         "b543f3934199": "extra",
         "b6500b96a804": "extra",
         "cff3e5e4ae83": "extra",
-        "eae6310eb90a": "missing",
-        "ebb07b140f47": "options",
-        "f74a3cf857c2": "options"
+        "eae6310eb90a": "missing"
     },
     "no-control-regex": {
         "03e54d9a79ac": "missing",

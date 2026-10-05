@@ -21,5 +21,20 @@
     { "name": "storage", "definition": "Browser storage goes through its service." },
     { "name": "tailwind", "definition": "Tailwind class conventions." },
     { "name": "toolchain", "definition": "Compiler, language mode and package settings every target must carry." }
+  ],
+  "namespaces": [
+    {
+      "name": "adamic",
+      "definition": "The soundness holes tsc leaves open and Adamic closes. Each name is Adamic's own, from adamic docs/0.1.md, so one rule has one name in both projects; the list is closed, and a name joins it there first.",
+      "names": [
+        { "name": "invariant-mutable", "definition": "A mutable location (an element, a mutable property, a map value) is not seen through a wider type." },
+        { "name": "no-definite-assignment", "definition": "No definite assignment assertion, `field!: T`, which reads undefined as T." },
+        { "name": "no-optional-widening", "definition": "A value is not seen as a type with an optional property its own type does not declare." },
+        { "name": "no-type-predicate", "definition": "No written type predicate, which the checker trusts and never verifies." },
+        { "name": "no-unchecked-cast", "definition": "No cast the runtime cannot check; an upcast and a checked downcast to a union member are allowed." },
+        { "name": "nominal-class", "definition": "A class type accepts only instances of that class, with identical type arguments." },
+        { "name": "single-spread", "definition": "An object literal spreads at most once, as its first member." }
+      ]
+    }
   ]
 }

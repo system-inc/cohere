@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -370,6 +371,94 @@ func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
 				}
 			}()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+		})
+	}
+}
+
+// TestNoChildrenPropAllowFunctions runs upstream's twelve rows that pass `allowFunctions`, through
+// the registered decoder, plus the controls that pin what the option changes.
+//
+// Eight clean: a function as the `children` prop, in JSX and in a props object, in each of the four
+// function spellings. Eight reporting: the same functions passed the other way, nested as the only
+// child or as createElement's third argument. Upstream's messages for those are `nestFunction` and
+// `passFunctionAsArgs`, and they point at the whole element and the whole call.
+func TestNoChildrenPropAllowFunctions(t *testing.T) {
+	t.Parallel()
+
+	allowed, err := rule.DecodeOptionsInto[NoChildrenPropOptions]()([]byte(`{"allowFunctions": true}`))
+	if err != nil {
+		t.Fatalf("decoding allowFunctions: %v", err)
+	}
+	functions := []string{"() => {}", "function() {}", "async function() {}", "function* () {}"}
+
+	for _, function := range functions {
+		clean := []string{
+			"<MyComponent children={" + function + "} />;",
+			"React.createElement(MyComponent, {children: " + function + "});",
+		}
+		for _, sourceText := range clean {
+			t.Run(sourceText, func(t *testing.T) {
+				t.Parallel()
+				rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed))
+				// The control: without the option the same source reports, so the option is what
+				// made it clean.
+				rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+			})
+		}
+
+		reporting := []struct {
+			sourceText string
+			wantId     string
+			wantSpan   string
+		}{
+			{"<MyComponent>{" + function + "}</MyComponent>;", "nestFunction", "<MyComponent>{" + function + "}</MyComponent>"},
+			{"React.createElement(MyComponent, {}, " + function + ");", "passFunctionAsArgs", "React.createElement(MyComponent, {}, " + function + ")"},
+		}
+		for _, testCase := range reporting {
+			t.Run(testCase.sourceText, func(t *testing.T) {
+				t.Parallel()
+				result := rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, testCase.sourceText, allowed)
+				rule_testing.ExpectFindings(t, result, testCase.wantId)
+				diagnostic := result.Diagnostics[0]
+				if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
+					t.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
+				}
+				// Without the option, a function passed this way is ordinary children.
+				rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText))
+			})
+		}
+	}
+
+	// Under the option a non-function children prop still reports, and a function child with
+	// company is not the one-child shape.
+	stillReporting := []string{
+		`<MyComponent children="Children" />;`,
+		`React.createElement(MyComponent, {children: "Children"});`,
+	}
+	for _, sourceText := range stillReporting {
+		t.Run(sourceText+" under allowFunctions", func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed), "noChildrenProp")
+		})
+	}
+	// Measured against the installed build under the option, beyond upstream's rows: parentheses,
+	// which ESTree does not materialize, and a method or getter, whose ESTree value is a function.
+	t.Run("a parenthesized function nested as the only child under allowFunctions", func(t *testing.T) {
+		t.Parallel()
+		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile,
+			"<MyComponent>{(() => {})}</MyComponent>;", allowed), "nestFunction")
+	})
+	for _, sourceText := range []string{
+		"<MyComponent>text {() => {}}</MyComponent>;",
+		"React.createElement(MyComponent, {}, 'a', () => {});",
+		"React.createElement(MyComponent, null, () => {});",
+		"<MyComponent children={(() => {})} />;",
+		"React.createElement(MyComponent, {children() {}});",
+		"React.createElement(MyComponent, {get children() { return 1 }});",
+	} {
+		t.Run(sourceText+" under allowFunctions", func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed))
 		})
 	}
 }

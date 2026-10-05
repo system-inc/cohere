@@ -1,6 +1,8 @@
 package react
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -12,6 +14,12 @@ var messageJsxNoDuplicateProps = rule.Message{
 		"props object by assigning each attribute in order, so every earlier copy is " +
 		"overwritten and only the last one survives. The discarded values look like they are " +
 		"being passed and are not. Remove one of them, or rename them so each prop is distinct.",
+}
+
+// JsxNoDuplicatePropsOptions configures the rule, as upstream's single options object.
+type JsxNoDuplicatePropsOptions struct {
+	// IgnoreCase compares names lowercased, so `<App A a />` reports. Off by default.
+	IgnoreCase bool `json:"ignoreCase"`
 }
 
 // JsxNoDuplicateProps flags a JSX element that writes the same prop name twice.
@@ -29,12 +37,11 @@ var messageJsxNoDuplicateProps = rule.Message{
 // # Where the two upstreams disagree, and which one this follows
 //
 // **The option surface.** ESLint carries an `ignoreCase` boolean that lowercases every name before
-// comparing, so `<App foo Foo />` reports under it. oxc implements none of it, and says so in its
-// own doc comment rather than leaving it as an omission: props are case-sensitive in JSX, so two
-// spellings that differ in case are two different props and neither overwrites the other. This rule
-// takes no options for the same reason. Four of the twelve upstream clean cases exist only to pin
-// this, so a port that lowercased names would fail a third of the clean corpus rather than sliding
-// through.
+// comparing, so `<App foo Foo />` reports under it. oxc implements none of it, on the reasoning that
+// props are case-sensitive in JSX. This rule takes it, because ESLint's schema accepts it and an
+// accepted option is an implemented one (#d21war2): off, the default, `<App A a />` is clean, which
+// four of upstream's twelve clean cases pin; on, it reports, which three of upstream's failing cases
+// pin. A namespaced name is still declined under it, as upstream's `a:b` clean case says.
 //
 // **Where the finding points.** ESLint reports the whole `JSXAttribute`, initializer included. oxc
 // reports the two *names*, passing `with_labels([span1, span2])` where `span1` is the earlier
@@ -93,6 +100,9 @@ var JsxNoDuplicateProps = rule.Rule{
 	// match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-no-duplicate-props",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// An unconfigured rule gets the zero value, which is upstream's case-sensitive default.
+		settings, _ := rule.OptionsAs[JsxNoDuplicatePropsOptions](options)
+
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
 			if attributes == nil {
@@ -115,6 +125,9 @@ var JsxNoDuplicateProps = rule.Rule{
 				name, named := jsx.AttributeName(property)
 				if !named {
 					continue
+				}
+				if settings.IgnoreCase {
+					name = strings.ToLower(name)
 				}
 				nameNode := property.AsJsxAttribute().Name()
 				if earlier, duplicated := seen[name]; duplicated {

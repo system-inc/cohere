@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -306,7 +307,7 @@ func printCoverage(out io.Writer, timings *program.Timings) {
 // loader, and a number for either would be a guess presented as a measurement. What the loads and the
 // disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
 // line says so.
-func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration) {
+func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
 	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {
@@ -329,6 +330,9 @@ func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration 
 	fmt.Fprintf(out, "  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
 		"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
 		"and the loader's own work together)\n", formatMilliseconds(timing.Program))
+	// The count every later phase runs at, said where a reader timing the run looks: by default one per core
+	// up to 12, where the measured wall stops improving (program.defaultCheckerCount, #xwv641q).
+	fmt.Fprintf(out, "  checkers: %d, on %d cores\n", checkers, runtime.GOMAXPROCS(0))
 }
 
 // describeDiskCalls lists each kind of filesystem call that happened, with its count and summed time.

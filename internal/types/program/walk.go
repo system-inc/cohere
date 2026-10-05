@@ -530,13 +530,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				if recording && replayed == nil {
 					if entry, eligible := recordableEntry(sourceFile, keys,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, visited, silenced); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil, visited, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
 					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil); eligible {
 						reuse.keep(entry)
 					}
 				}
@@ -1310,7 +1310,7 @@ func bareRuleName(name string) string {
 
 // housePlugins are the plugins that are ours, whose every rule cohere runs, so a name under one that
 // cohere doesn't know is a typo or a stale prefix rather than a rule it hasn't ported.
-var housePlugins = map[string]bool{"base": true, "nexus": true, "structure": true}
+var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, "structure": true}
 
 // pluginOf is a rule name's plugin, everything before its last `/`, empty for a core rule:
 // `@typescript-eslint/no-x` is `@typescript-eslint`, `@next/next/no-x` is `@next/next`.

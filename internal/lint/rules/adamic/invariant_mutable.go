@@ -1,0 +1,107 @@
+package adamic
+
+import (
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking/flow"
+	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
+)
+
+// invariantMutableText is the rule's message, whose wording lives in `policy/messages/invariant-mutable.json`.
+var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutableWidening")
+
+/*
+ * InvariantMutable reports a value seen through a wider type at a place that type lets you write (#drbrp8c).
+ *
+ *     invalid: const animals: Animal[] = dogs;             animals.push(cat) puts a cat in dogs
+ *     invalid: const pen: { pet: Animal } = kennel;         pen.pet = cat does the same
+ *     invalid: const animals: Map<string, Animal> = dogs;   animals.set('Tom', cat)
+ *     valid:   const animals: readonly Animal[] = dogs;     nothing can be written through it
+ *     valid:   const pen: { pet: Animal } = { pet: rex };   the literal is held by nobody else
+ *
+ * # The hole
+ *
+ * tsc relates a mutable location covariantly: an element of `Dog[]` is accepted where an element of
+ * `Animal[]` is wanted, because reading one is safe. Writing one is not, and tsc lets the wider name
+ * write. Each shape above is accepted by tsc 6.0.3 under strict and fails on Node with `dog.bark is not
+ * a function` (probes h03, h04, h13, h19, h20 on #drbrp8c). Adamic's rule: a mutable location is
+ * invariant and a `readonly` one is covariant, which is what tsc already does for `readonly T[]`.
+ *
+ * # How
+ *
+ * flow.Listeners finds every place a value goes into a typed slot, and flow.Walk pairs the value's parts
+ * with the slot's. At every pair the target marks mutable, the two types must be identical, by the
+ * checker's own identity relation: mutual assignability is not enough, since `{ x }` and `{ x; y?: number }`
+ * are mutually assignable and that is exactly no-optional-widening's hole. Identity also catches a literal
+ * widened in a mutable slot (`{ kind: 'Circle' }` into `{ kind: string }`) and a mutable callback slot.
+ *
+ * A class instance is nominal-class's: it requires identical type arguments, which covers every mutable
+ * part, so this rule does not descend into one and the two rules never report one hole twice.
+ *
+ * # No fix
+ *
+ * Every repair changes a type (add `readonly`, or copy), so none preserves meaning, and the edit engine
+ * applies only fixes that do.
+ */
+var InvariantMutable = rule.Rule{
+	Name:             "adamic/invariant-mutable",
+	NeedsTypeChecker: true,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+			return nil
+		}
+		typeChecker := ctx.TypeChecker
+		return flow.Listeners(ctx, func(site flow.Site) {
+			found, wrong := flow.Walk(typeChecker, site, func(pair flow.Pair) (bool, bool) {
+				if isClassInstance(pair.Target) {
+					return false, false
+				}
+				if !pair.Mutable {
+					return false, true
+				}
+				return !checker.Checker_isTypeIdenticalTo(typeChecker, pair.Source, pair.Target), true
+			})
+			if !wrong {
+				return
+			}
+			ctx.ReportNode(site.Node, rule.Message{
+				Id: "mutableWidening",
+				Description: invariantMutableText.Render(map[string]string{
+					"source":     typeChecker.TypeToString(site.Source),
+					"target":     typeChecker.TypeToString(site.Target),
+					"slot":       slotText(ctx.SourceFile, site.Node, found.Path),
+					"sourcePart": typeChecker.TypeToString(found.Source),
+					"targetPart": typeChecker.TypeToString(found.Target),
+				}),
+			})
+		})
+	},
+}
+
+// slotText names the mutable slot as a reader would reach it from the expression: `dogs[]`,
+// `kennel.pet`, `dogs<Map value>`. A long or multi-line expression is named `value` instead.
+func slotText(sourceFile *ast.SourceFile, node *ast.Node, path []flow.Step) string {
+	textRange := rule.TokenRange(sourceFile, node)
+	expression := sourceFile.Text()[textRange.Pos():textRange.End()]
+	if len(expression) > 40 || strings.ContainsAny(expression, "\n\r") {
+		expression = "value"
+	}
+	return expression + flow.PathText(path)
+}
+
+// isClassInstance is the instance side of a class, generic or not: `Box<Dog>`, `Shelter`. The class's
+// own constructor type (`typeof Shelter`) carries the class's symbol too, and is not one.
+func isClassInstance(t *checker.Type) bool {
+	if t == nil || t.Flags()&checker.TypeFlagsObject == 0 {
+		return false
+	}
+	if t.ObjectFlags()&checker.ObjectFlagsClass != 0 {
+		return true
+	}
+	return t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil &&
+		t.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
+}

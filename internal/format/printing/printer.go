@@ -59,6 +59,11 @@ type Printer[N Node[N]] struct {
 	// VisitorKeys is upstream's getVisitorKeys: the child properties of a node, in upstream's order.
 	VisitorKeys func(node N) []string
 
+	// MayHoldEmbed, when set, says whether a tree could hold a node Embed answers for. A tree that cannot
+	// skips the embed walk, which visits every node through the path and was 7.6M of the JavaScript
+	// printer's allocations on ahra (#fyw36kf). It may answer true for a tree with none; never false for one.
+	MayHoldEmbed func(root N) bool
+
 	Embed                Embed[N]
 	EmbedVisitorKeys     func(node N) []string
 	Preprocess           func(ast N, options *Options[N]) N
@@ -275,6 +280,11 @@ func printEmbeddedLanguages[N Node[N]](path *AstPath[N], print PrintFunc, option
 	if printer.Embed == nil {
 		return
 	}
+	if printer.MayHoldEmbed != nil {
+		if root, isNode := asNode[N](path.Value()); isNode && !printer.MayHoldEmbed(root) {
+			return
+		}
+	}
 	visitorKeys := printer.EmbedVisitorKeys
 	if visitorKeys == nil {
 		visitorKeys = printer.VisitorKeys
@@ -287,7 +297,11 @@ func printEmbeddedLanguages[N Node[N]](path *AstPath[N], print PrintFunc, option
 	}
 	var calls []pending
 
+	// Each key is boxed once for the path's names, rather than on every node that has it, and the callback
+	// Call takes is made once, rather than once per key of every node.
+	boxedKeys := map[string]any{}
 	var recurse func(*AstPath[N], int, any)
+	recurseInto := func(inner *AstPath[N]) struct{} { recurse(inner, 0, nil); return struct{}{} }
 	recurse = func(current *AstPath[N], _ int, _ any) {
 		value := current.Value()
 		node, isNode := asNode[N](value)
@@ -295,10 +309,15 @@ func printEmbeddedLanguages[N Node[N]](path *AstPath[N], print PrintFunc, option
 			return
 		}
 		for _, key := range visitorKeys(node) {
+			boxedKey, known := boxedKeys[key]
+			if !known {
+				boxedKey = key
+				boxedKeys[key] = boxedKey
+			}
 			if isSlice(node.Field(key)) {
-				current.Each(recurse, key)
+				current.Each(recurse, boxedKey)
 			} else {
-				Call(current, func(inner *AstPath[N]) struct{} { recurse(inner, 0, nil); return struct{}{} }, key)
+				Call(current, recurseInto, boxedKey)
 			}
 		}
 		if result := printer.Embed(current, options); result != nil {

@@ -750,8 +750,33 @@ func (g *Graph) Workers() int {
 //
 // Memory is the trade and it is real: 37% more allocated between 4 and 16. That is affordable on a
 // developer machine and worth watching if this ever runs somewhere small.
+//
+// And it stops at checkerCeiling, where the whole run's wall stops improving. Measured 2026-10-05 on this
+// 16-core machine (#xwv641q): a cold ahra run, pinned at 802d78bb, on cache's interleaved pairs, medians
+// of 4 rounds at load about 4 to 8:
+//
+//	checkers   wall    user     sys     allocated   objects
+//	       8   2.23s   16.58s   3.77s   10.15 GB    112.8M
+//	      10   2.02s   18.03s   4.12s   10.29 GB    113.3M
+//	      12   1.93s   18.75s   4.22s   10.37 GB    113.6M
+//	      14   1.94s   18.94s   4.24s   10.49 GB    113.9M
+//	      16   1.92s   19.28s   4.24s   10.64 GB    114.4M
+//
+// Past 12 a checker buys no wall and costs CPU and memory, and a profile pair put that cost in the runtime
+// acquiring memory (madvise, page zeroing), not in checkers repeating each other's types. A machine with
+// 12 cores or fewer, most laptops, runs one per core as before; whether their knee sits lower is
+// unmeasured.
 func defaultCheckerCount() int {
-	return max(runtime.GOMAXPROCS(0), 1)
+	return checkerCountFor(runtime.GOMAXPROCS(0))
+}
+
+// checkerCeiling is the most checkers a build asks for unasked. See defaultCheckerCount.
+const checkerCeiling = 12
+
+// checkerCountFor is the default checker count for a machine with this many cores: one per core, from one
+// to checkerCeiling.
+func checkerCountFor(cores int) int {
+	return min(max(cores, 1), checkerCeiling)
 }
 
 // toPath normalizes a file name the way the compiler keys its file table, so a lookup by path finds

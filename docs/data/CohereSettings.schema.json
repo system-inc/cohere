@@ -413,6 +413,27 @@
                 "accessor-pairs": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "adamic/invariant-mutable": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/no-definite-assignment": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/no-optional-widening": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/no-type-predicate": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/no-unchecked-cast": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/nominal-class": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "adamic/single-spread": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "array-callback-return": {
                     "$ref": "#/$defs/ruleSetting"
                 },

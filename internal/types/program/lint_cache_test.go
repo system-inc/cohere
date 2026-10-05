@@ -43,6 +43,11 @@ func sampleLintCache() *program.LintCache {
 					"no-empty":       {"Hub in /project/source/hub.ts": 2, "Other in /project/source/other.ts": 1},
 					"await-thenable": {"Hub in /project/source/hub.ts": 3},
 				},
+				// A count, a zero pair and a skip, so an encoder that dropped any part or the zero pair could not match.
+				Adamic: &program.AdamicRecord{
+					Counts:  []program.AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 2}, {Rule: "adamic/single-spread"}},
+					Skipped: []string{"adamic/nominal-class"},
+				},
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -68,6 +73,9 @@ func sampleLintCache() *program.LintCache {
 				Rules:        []string{"no-debugger", "no-empty"},
 				VisitedNodes: 8,
 				Findings:     nil,
+				// Measured with nothing to count: empty, not nil, and a round trip that turned it nil would make a
+				// readiness run miss this file forever.
+				Adamic: &program.AdamicRecord{},
 			},
 		},
 	}
@@ -160,6 +168,9 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got.Notes, want.Notes) {
 			t.Errorf("entry %d Notes: %v against %v", index, got.Notes, want.Notes)
+		}
+		if !reflect.DeepEqual(got.Adamic, want.Adamic) || want.Adamic == nil {
+			t.Errorf("entry %d Adamic: %+v against %+v", index, got.Adamic, want.Adamic)
 		}
 		if len(got.Findings) != len(want.Findings) {
 			t.Fatalf("entry %d findings: %d back from %d", index, len(got.Findings), len(want.Findings))
@@ -353,7 +364,7 @@ func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
 		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
-		"Notes": {},
+		"Notes": {}, "Adamic": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

@@ -146,10 +146,10 @@ else
     echo "ok   Ugly.ts was formatted"
 fi
 
-# A CRLF file is named with the .gitattributes fix, which --verbose prints.
+# A CRLF file is named with the .gitattributes fix, on its own finding in the default output (#dr78rt8).
 directory=$(project crlf)
 printf 'export const crlf = 1;\r\n' > "$directory/Crlf.ts"
-status=$(run "$directory" crlf.log --no-fix --format --verbose)
+status=$(run "$directory" crlf.log --no-fix --format)
 expect "a CRLF file is reported, with the fix" 1 "$status" crlf.log "text=auto eol=lf"
 
 # The installed binary is checked against the dispatcher's SHA256SUMS before it runs. It passes once, so

@@ -1,6 +1,8 @@
 package react
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -65,18 +67,28 @@ var messageJsxIdentifierNotDefined = rule.Message{
 // optional: `<img />` and `<x-gif />` resolve to no symbol either, exactly like the undeclared
 // components. Nothing in the type graph separates an intrinsic element from a typo.
 //
-// # The globals option is not portable and the divergence is stated
+// # Globals, and allowGlobals
 //
-// Upstream's second tester block is one pair over the same source, `let x = <A.B />;`, passing
-// under `globals: {A: "readonly"}` and failing without it. `cohere` has no globals surface at all,
-// so there is nothing to configure and the pass half of that pair cannot be expressed. Only the
-// fail half is carried below. An ambient declaration is the equivalent our tree does have, and it
-// is covered by a case of our own rather than by pretending upstream's option exists.
+// Upstream walks the scope chain from the tag outward and, in a module, stops at the module scope
+// unless `allowGlobals` is set. So by default a tag naming something only the global scope declares
+// reports in a module: a configured global, or a lib declaration such as `<Map />`. ESLint's flat
+// config reads every file as a module except a `.cjs` one, which is commonjs and reaches the global
+// scope with or without the option. All three measured against the installed build (#d21war2).
+//
+// The checker answers a wider question than the walk does, since `GetSymbolAtLocation` finds a
+// global as readily as a local. So a resolved symbol counts as in scope only when one of its
+// declarations is in this file; an import counts, because its symbol is the alias the import
+// declares here. Under `allowGlobals`, or in a `.cjs` file, any resolved symbol counts. Before
+// #d21war2 every resolved symbol counted, which was `allowGlobals` on in every file.
 var JsxNoUndef = rule.Rule{
 	Name:             "react/jsx-no-undef",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// An unconfigured rule gets the zero value, which is upstream's `allowGlobals: false`.
+		settings, _ := rule.OptionsAs[JsxNoUndefOptions](options)
+		stopsAtModuleScope := !settings.AllowGlobals && !strings.HasSuffix(ctx.SourceFile.FileName(), ".cjs")
+
 		check := func(node *ast.Node) {
 			tagName, _ := jsx.ElementParts(node)
 			reference := resolvableJsxReference(tagName)
@@ -87,7 +99,9 @@ var JsxNoUndef = rule.Rule{
 				return
 			}
 			if symbol := ctx.TypeChecker.GetSymbolAtLocation(reference); symbol != nil {
-				return
+				if !stopsAtModuleScope || jsxNoUndefDeclaredInFile(symbol, ctx.SourceFile) {
+					return
+				}
 			}
 			ctx.ReportNode(reference, messageJsxIdentifierNotDefined)
 		}
@@ -97,6 +111,27 @@ var JsxNoUndef = rule.Rule{
 			ast.KindJsxSelfClosingElement: check,
 		}
 	},
+}
+
+// JsxNoUndefOptions configures the rule, as upstream's single options object.
+type JsxNoUndefOptions struct {
+	// AllowGlobals lets a tag in a module resolve to a global-scope declaration. Off by default.
+	AllowGlobals bool `json:"allowGlobals"`
+}
+
+// jsxNoUndefDeclaredInFile reports whether a symbol has a declaration in this file, which is what
+// upstream's walk reaches when it stops at the module scope.
+//
+// A `declare global` member declared here counts too. That reads as a global, and it was measured
+// rather than assumed: typescript-eslint's scope manager puts it in the file's own scopes, so
+// `declare global { var G: any } export {}; <G />;` is clean under the default at 10.8.1.
+func jsxNoUndefDeclaredInFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
+	for _, declaration := range symbol.Declarations {
+		if ast.GetSourceFileOfNode(declaration) == sourceFile {
+			return true
+		}
+	}
+	return false
 }
 
 // resolvableJsxReference returns the identifier a JSX tag name asks scope to resolve, or nil when

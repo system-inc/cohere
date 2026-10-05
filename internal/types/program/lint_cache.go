@@ -2,6 +2,7 @@ package program
 
 import (
 	"crypto/sha256"
+	"sort"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -130,6 +131,75 @@ type LintCacheEntry struct {
 	// Findings is what the cacheable rules reported. Empty is a real answer: it means the rules ran
 	// and found nothing, which is exactly the case worth caching since most files are clean.
 	Findings []LintCacheFinding
+
+	// Adamic is what the cacheable cohere:adamic rules measured on this file for Adamic readiness, nil when
+	// the run that produced the entry did not measure readiness. Nil is not "ready": a run that measures
+	// readiness misses on it (FindingsReuse.lookup), since replaying it would read every unmeasured file as
+	// having no findings, which is the silent clean this cache must never produce (#drbrp8c).
+	Adamic *AdamicRecord
+}
+
+// AdamicRecord is one file's Adamic readiness measurement, kept per rule so an entry whose type-aware rules
+// ran again can be merged rule by rule (refreshClasses), as its findings are.
+//
+// Measure-only findings are counts, never LintCacheFindings: they cannot be printed, cannot fail a run and
+// carry no fixes, so nothing about them needs replaying beyond how many there were.
+type AdamicRecord struct {
+	// Counts is every cacheable cohere:adamic rule that ran on the file with how many findings it had at the
+	// set's own options, before suppression, sorted by rule. A rule that found nothing has a zero pair, so a
+	// rule that ran clean and one that did not run can be told apart.
+	Counts []AdamicCount
+
+	// Skipped is the cacheable cohere:adamic rules that skipped the file, sorted. A skip leaves the file
+	// unmeasured, not ready.
+	Skipped []string
+}
+
+// AdamicCount is one rule's measure-only finding count on one file.
+type AdamicCount struct {
+	Rule     string
+	Findings int32
+}
+
+// adamicOf is the part of a record that the named rules produced, nil when the record is nil. A record that
+// keeps nothing is empty, not nil: the file was measured and those rules simply do not apply.
+func adamicOf(record *AdamicRecord, names map[string]bool) *AdamicRecord {
+	if record == nil {
+		return nil
+	}
+	kept := &AdamicRecord{}
+	for _, count := range record.Counts {
+		if names[count.Rule] {
+			kept.Counts = append(kept.Counts, count)
+		}
+	}
+	for _, name := range record.Skipped {
+		if names[name] {
+			kept.Skipped = append(kept.Skipped, name)
+		}
+	}
+	return kept
+}
+
+// mergeAdamic is two records of disjoint rules as one, sorted, nil when either is nil: a merge with an
+// unmeasured half is unmeasured.
+func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
+	if first == nil || second == nil {
+		return nil
+	}
+	merged := &AdamicRecord{
+		Counts:  append(append([]AdamicCount{}, first.Counts...), second.Counts...),
+		Skipped: append(append([]string{}, first.Skipped...), second.Skipped...),
+	}
+	sort.Slice(merged.Counts, func(left, right int) bool { return merged.Counts[left].Rule < merged.Counts[right].Rule })
+	sort.Strings(merged.Skipped)
+	if len(merged.Counts) == 0 {
+		merged.Counts = nil
+	}
+	if len(merged.Skipped) == 0 {
+		merged.Skipped = nil
+	}
+	return merged
 }
 
 // LintCacheFinding is one finding, flattened.
@@ -216,6 +286,10 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 9: entries carry what the cacheable cohere:adamic rules measured for Adamic readiness. A version 8 entry has
+// no record, and one read as nil-but-current would be indistinguishable from an entry recorded by a run that
+// did not measure.
+//
 // 8: entries carry their cacheable rules' notes. A version 7 entry has none, and replaying it would count
 // none where a walk counts some.
 //
@@ -235,7 +309,7 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // The encoding itself is no longer this version's business. The cache is the findings section of the
 // cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
 // shape moves cacheTableVersion. This one moves when what an entry means changes.
-const lintCacheVersion = 8
+const lintCacheVersion = 9
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //

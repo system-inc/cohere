@@ -9,15 +9,13 @@ import (
 //
 // from sets the point before the first character; later lines are indented with defineSkip.
 func createTokenizer(parser *ParseContext, initialize *InitialConstruct, from *Point) *TokenizeContext {
-	context := &TokenizeContext{
-		Previous:       CodeEof,
-		ContainerState: &ContainerState{},
-		Parser:         parser,
-		columnStart:    map[int]int{},
-		consumed:       true,
-		initialize:     initialize,
-		point:          Point{bufferIndex: -1, index: 0, Line: 1, Column: 1, Offset: 0},
-	}
+	context := parser.memory.tokenizer()
+	context.Previous = CodeEof
+	context.ContainerState = &context.initialContainerState
+	context.Parser = parser
+	context.consumed = true
+	context.initialize = initialize
+	context.point = Point{bufferIndex: -1, index: 0, Line: 1, Column: 1, Offset: 0}
 	if from != nil {
 		if from.Line != 0 {
 			context.point.Line = from.Line
@@ -28,6 +26,20 @@ func createTokenizer(parser *ParseContext, initialize *InitialConstruct, from *P
 		context.point.Offset = from.Offset
 	}
 
+	context.initialSelf = Self{TokenizeContext: context}
+	context.state = initialize.Tokenize(&context.initialSelf, context.effects)
+
+	if initialize.ResolveAll != nil {
+		context.resolveAllConstructs = append(context.resolveAllConstructs, resolvable{initialize: initialize})
+	}
+
+	return context
+}
+
+// newTokenizeContext is a tokenizer with only its effects and its column map, which a Memory keeps
+// across parses (#vbjv3d6).
+func newTokenizeContext() *TokenizeContext {
+	context := &TokenizeContext{columnStart: map[int]int{}}
 	context.effects = &Effects{
 		Attempt:   context.constructFactory(context.onSuccessfulConstruct, false),
 		Check:     context.constructFactory(context.onSuccessfulCheck, false),
@@ -36,14 +48,15 @@ func createTokenizer(parser *ParseContext, initialize *InitialConstruct, from *P
 		Exit:      context.exit,
 		Interrupt: context.constructFactory(context.onSuccessfulCheck, true),
 	}
-
-	context.state = initialize.Tokenize(&Self{TokenizeContext: context}, context.effects)
-
-	if initialize.ResolveAll != nil {
-		context.resolveAllConstructs = append(context.resolveAllConstructs, resolvable{initialize: initialize})
-	}
-
 	return context
+}
+
+// release zeroes the tokenizer for its next parse, keeping its effects, its column map, cleared, and its
+// stack's array, which no other slice shares (restore copies into it).
+func (context *TokenizeContext) release() {
+	clear(context.columnStart)
+	clear(context.stack[:cap(context.stack)])
+	*context = TokenizeContext{columnStart: context.columnStart, effects: context.effects, stack: context.stack[:0]}
 }
 
 // Write feeds chunks to the tokenizer. Upstream's context.write: events come back once the last chunk is
@@ -165,7 +178,7 @@ func (context *TokenizeContext) consume(code Code) {
 
 func (context *TokenizeContext) enter(tokenType string, token *Token) *Token {
 	if token == nil {
-		token = context.Parser.tokens.New(Token{})
+		token = context.Parser.memory.tokens().New(Token{})
 	}
 	token.Type = tokenType
 	token.Start = context.Now()
@@ -206,8 +219,9 @@ func (context *TokenizeContext) onSuccessfulCheck(_ *Construct, info *storeInfo)
 // success and in whether constructs see `interrupt: true`.
 func (context *TokenizeContext) constructFactory(onReturn func(*Construct, *storeInfo), interrupt bool) func(Constructs, State, State) State {
 	return func(constructs Constructs, returnState State, bogusState State) State {
-		run := &attempt{context: context, onReturn: onReturn, interrupt: interrupt, returnState: returnState, bogusState: bogusState}
-		run.ok, run.nok, run.start = run.succeed, run.fail, run.startPending
+		run := context.Parser.memory.attempt()
+		run.context, run.onReturn, run.interrupt = context, onReturn, interrupt
+		run.returnState, run.bogusState = returnState, bogusState
 
 		switch typed := constructs.(type) {
 		case ConstructList:
@@ -224,8 +238,9 @@ func (context *TokenizeContext) constructFactory(onReturn func(*Construct, *stor
 }
 
 // attempt is one call of an attempt, check or interrupt. Upstream keeps its state in a closure's
-// variables; here it is one struct, and its three states are made once per call, so trying a construct
-// allocates no closure of its own (#93dpede).
+// variables; here it is one struct, and its states are bound once per struct (newAttempt), so trying a
+// construct allocates no closure of its own (#93dpede). A Memory reuses the struct, bound states and
+// all, in later parses (#vbjv3d6).
 type attempt struct {
 	context                 *TokenizeContext
 	onReturn                func(*Construct, *storeInfo)
@@ -242,8 +257,25 @@ type attempt struct {
 	pending *Construct
 	// single holds a lone construct as a list, without allocating one.
 	single [1]*Construct
+	// record is the record startRecord reads, the one handleMapOfConstructs was given.
+	record *ConstructRecord
+	// self is what the current construct tokenizes with. A construct's states are done with it once
+	// they return ok or nok, before the next construct of this attempt starts and sets it again.
+	self Self
 
-	ok, nok, start State
+	ok, nok, start, startMap State
+}
+
+// newAttempt is an attempt with its states bound and every other field zero.
+func newAttempt() *attempt {
+	run := &attempt{}
+	run.ok, run.nok, run.start, run.startMap = run.succeed, run.fail, run.startPending, run.startRecord
+	return run
+}
+
+// release zeroes the attempt for its next parse, keeping its bound states.
+func (run *attempt) release() {
+	*run = attempt{ok: run.ok, nok: run.nok, start: run.start, startMap: run.startMap}
 }
 
 func (run *attempt) handleListOfConstructs(list []*Construct) State {
@@ -261,14 +293,13 @@ func (run *attempt) handleListOfConstructs(list []*Construct) State {
 }
 
 func (run *attempt) handleMapOfConstructs(record *ConstructRecord) State {
-	return func(code Code) State {
-		var list []*Construct
-		if code != CodeEof {
-			list = append(list, record.ByCode[code]...)
-			list = append(list, record.Null...)
-		}
-		return run.handleListOfConstructs(list)(code)
-	}
+	run.record = record
+	return run.startMap
+}
+
+// startRecord is handleMapOfConstructs' start: the constructs for the code, then those for every code.
+func (run *attempt) startRecord(code Code) State {
+	return run.handleListOfConstructs(run.record.constructsAt(code))(code)
 }
 
 func (run *attempt) handleConstruct(construct *Construct) State {
@@ -289,12 +320,8 @@ func (run *attempt) startPending(code Code) State {
 		return run.nok(code)
 	}
 
-	self := &Self{TokenizeContext: context}
-	if run.interrupt {
-		self.isView = true
-		self.viewInterrupt = true
-	}
-	return construct.Tokenize(self, context.effects, run.ok, run.nok)(code)
+	run.self = Self{TokenizeContext: context, isView: run.interrupt, viewInterrupt: run.interrupt}
+	return construct.Tokenize(&run.self, context.effects, run.ok, run.nok)(code)
 }
 
 func (run *attempt) succeed(code Code) State {
@@ -369,7 +396,9 @@ func (info *storeInfo) restore() {
 	context.Previous = info.previous
 	context.CurrentConstruct = info.currentConstruct
 	context.Events = context.Events[:info.from]
-	context.stack = info.stack
+	// Copied into the stack's own array rather than taking the saved copy's: that copy has no room past
+	// its length, so the next enter would reallocate it, after every attempt that fails (#vbjv3d6).
+	context.stack = append(context.stack[:0], info.stack...)
 	context.accountForPotentialSkip()
 }
 

@@ -82,3 +82,51 @@ func TestALongerCategoryWinsOverItsPrefix(t *testing.T) {
 		t.Errorf("react-hook-no-any-type: %+v, %v; want the category react-hook", got, err)
 	}
 }
+
+// TestAClosedNamespaceAcceptsOnlyItsList: an adamic name on the list reads as the namespace's, one off the
+// list is refused by name, and a namespace with no closed list still reads by the scheme. The refusal is
+// the guard: without it a misspelled adamic rule would publish because nothing judged it.
+func TestAClosedNamespaceAcceptsOnlyItsList(t *testing.T) {
+	t.Parallel()
+	if got, err := Naming.ParseRuleName("adamic", "invariant-mutable"); err != nil || got.Category != "adamic" || got.Object != "invariant-mutable" {
+		t.Errorf("adamic/invariant-mutable: %+v, %v; want the namespace as its category and the name as its object", got, err)
+	}
+	if _, err := Naming.ParseRuleName("adamic", "invariant-mutables"); err == nil || !strings.Contains(err.Error(), "closed list") {
+		t.Errorf("adamic/invariant-mutables: %v; want a refusal naming the closed list", err)
+	}
+	if _, err := Naming.ParseRuleName("adamic", "correctness-no-any"); err == nil {
+		t.Error("adamic/correctness-no-any fits the scheme but not the list, and loaded: the list must win in its namespace")
+	}
+	if got, err := Naming.ParseRuleName("nexus", "consistency-no-print"); err != nil || got.Verb != "no" {
+		t.Errorf("nexus/consistency-no-print: %+v, %v; want the scheme's reading", got, err)
+	}
+}
+
+// TestTheLoaderRefusesAMisreadNamespace: each one-place change to a closed namespace that would misread is
+// refused, as the verbs' and categories' are.
+func TestTheLoaderRefusesAMisreadNamespace(t *testing.T) {
+	t.Parallel()
+	const withNamespace = `{"about": "a", "verbs": [{"name": "no", "definition": "d"}], "categories": [{"name": "consistency", "definition": "d"}], "namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}]}`
+	if _, err := loadRuleNaming([]byte(withNamespace)); err != nil {
+		t.Fatalf("a file with one closed namespace is refused (%v), so no refusal below would mean anything", err)
+	}
+	for _, refused := range []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"an empty name list", `[{"name": "single-spread", "definition": "d"}]`, `[]`},
+		{"a duplicate name", `{"name": "single-spread", "definition": "d"}`, `{"name": "single-spread", "definition": "d"}, {"name": "single-spread", "definition": "e"}`},
+		{"a name with no definition", `{"name": "single-spread", "definition": "d"}`, `{"name": "single-spread", "definition": ""}`},
+		{"a name that is not kebab case", `"name": "single-spread"`, `"name": "singleSpread"`},
+		{"a namespace with no definition", `"name": "adamic", "definition": "d"`, `"name": "adamic", "definition": ""`},
+		{"a namespace named twice", `"namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}]`, `"namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}, {"name": "adamic", "definition": "d", "names": [{"name": "nominal-class", "definition": "d"}]}]`},
+	} {
+		if !strings.Contains(withNamespace, refused.old) {
+			t.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
+		}
+		if _, err := loadRuleNaming([]byte(strings.Replace(withNamespace, refused.old, refused.new, 1))); err == nil {
+			t.Errorf("%s loaded", refused.name)
+		}
+	}
+}

@@ -117,6 +117,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 11: findings entries carry their Adamic readiness record.
+//
 // 10: recorded runs carry the summary a replay renders its footer from.
 //
 // 9: run inputs carry ExistenceOnly, for a directory the run only asked whether it exists.
@@ -135,7 +137,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 10
+const cacheTableVersion = 11
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -243,6 +245,10 @@ type lintCacheWireEntry struct {
 	DesignFingerprint [sha256.Size]byte
 
 	Notes []lintCacheWireNote
+
+	// Adamic is the entry's readiness record as it is, nil and empty kept apart: gob sends a pointer to an empty
+	// struct and leaves a nil one out.
+	Adamic *AdamicRecord
 }
 
 // lintCacheWireNote is one rule's count of one note key in one file. Notes are a sorted slice on the wire
@@ -410,6 +416,8 @@ func (c *LintCache) wire() *lintCacheWire {
 			DesignFingerprint: entry.DesignFingerprint,
 
 			Notes: wireNotes(entry.Notes),
+
+			Adamic: entry.Adamic,
 		})
 	}
 	return wire
@@ -444,6 +452,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 			DesignFingerprint: stored.DesignFingerprint,
 
 			Notes: ruleNotes(stored.Notes),
+
+			Adamic: stored.Adamic,
 		}
 		var err error
 		if entry.Rules, err = list(stored.Rules); err != nil {
@@ -744,6 +754,14 @@ func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity
 			len(entry.TypedRules), len(entry.ShapedRules), len(entry.DesignRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
 		for _, finding := range entry.Findings {
 			fmt.Fprintf(out, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
+		}
+		if entry.Adamic != nil {
+			fmt.Fprintf(out, "    adamic: %d rules measured, %d skipped\n", len(entry.Adamic.Counts), len(entry.Adamic.Skipped))
+			for _, count := range entry.Adamic.Counts {
+				if count.Findings > 0 {
+					fmt.Fprintf(out, "      %s: %d\n", count.Rule, count.Findings)
+				}
+			}
 		}
 	}
 }

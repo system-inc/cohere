@@ -107,13 +107,18 @@ func upstreamEvents(t *testing.T, inputs []string) [][]string {
 }
 
 // portEvents describes the Go port's events the way the oracle describes upstream's.
-func portEvents(input string) (described []string) {
+func portEvents(input string) []string {
+	return portEventsFrom(input, nil)
+}
+
+// portEventsFrom is portEvents with the parse taking its tokens and tokenizers from memory.
+func portEventsFrom(input string, memory *Memory) (described []string) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			described = []string{fmt.Sprintf("panic: %v", recovered)}
 		}
 	}()
-	events := Parse(SourceUnits(input), MarkdownConstructs(), nil)
+	events := Parse(SourceUnits(input), MarkdownConstructs(), memory)
 	for _, event := range events {
 		kind := "exit"
 		if event.Enter {

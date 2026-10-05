@@ -1562,3 +1562,42 @@ func TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText(t *testing.T) {
 		})
 	}
 }
+
+// TestNoInvalidHtmlAttributeOptions pins the option's three spellings and its refusals, measured
+// against the installed build (7.37.5) on the same source: `["rel"]` and no option report twice,
+// and `[]` reports nothing, because upstream keeps an empty array over its default.
+func TestNoInvalidHtmlAttributeOptions(t *testing.T) {
+	t.Parallel()
+
+	const source = `<a rel="bogus" />; React.createElement("a", {rel: "bogus"});`
+	cases := []struct {
+		raw       string
+		wantCount int
+	}{
+		{``, 2},
+		{`["rel"]`, 2},
+		{`[]`, 0},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
+			decoded, err := DecodeNoInvalidHtmlAttributeOptions([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("decoding %q: %v", testCase.raw, err)
+			}
+			result := rule_testing.RunWithOptions(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source, decoded)
+			if len(result.Diagnostics) != testCase.wantCount {
+				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+			}
+		})
+	}
+
+	for _, raw := range []string{`["rel", "rel"]`, `["href"]`, `"rel"`, `{}`, `null`} {
+		t.Run(raw+" is refused", func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeNoInvalidHtmlAttributeOptions([]byte(raw)); err == nil {
+				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+			}
+		})
+	}
+}

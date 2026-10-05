@@ -106,6 +106,7 @@ var namespaceOrigins = map[string]string{
 	"base":                              "house",
 	"structure":                         "house",
 	"nexus":                             "house",
+	"adamic":                            "house",
 }
 
 // houseOrigin is the origin of a rule this organization wrote rather than ported.
@@ -152,7 +153,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 			row.UpstreamName = name
 		} else {
 			// A house rule whose name does not fit the scheme refuses the build, so it cannot publish.
-			parsed, err := policy.Naming.ParseHouseRuleName(name[strings.LastIndex(name, "/")+1:])
+			parsed, err := policy.Naming.ParseRuleName(row.Namespace, name[strings.LastIndex(name, "/")+1:])
 			if err != nil {
 				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
 			}
@@ -214,7 +215,7 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			TypeAware:    entry.TypeAware,
 		}
 		if entry.Origin == houseOrigin {
-			parsed, err := policy.Naming.ParseHouseRuleName(leaf)
+			parsed, err := policy.Naming.ParseRuleName(swiftNamespace, leaf)
 			if err != nil {
 				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, err)
 			}

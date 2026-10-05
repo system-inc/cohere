@@ -383,6 +383,24 @@ func TestNoRestrictedImportsIsSilentWithNoConfiguration(t *testing.T) {
 	rule_testing.ExpectFindings(t, configured, "path", "path", "path")
 }
 
+// TestNoRestrictedImportsEmptyObjectRestrictsNothing pins `[{}]`, and the divergence it keeps.
+//
+// Kept divergence, ruled on #e06zm4b (#d21war2). ESLint 10.8.1's Linter, measured, reports
+// `import b from "undefined"` under `[{}]` and nothing else: its runtime reads the empty object as a
+// path entry and keys it by the name it does not have. Here `[{}]` restricts nothing, so the
+// module named `undefined` is clean too, and this test fails if that ever drifts back.
+func TestNoRestrictedImportsEmptyObjectRestrictsNothing(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{}]`))
+	if err != nil {
+		t.Fatalf("decoding [{}]: %v", err)
+	}
+	result := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		`import a from "foo"; import b from "undefined"; import c from "";`, decoded)
+	rule_testing.ExpectClean(t, result)
+}
+
 // TestNoRestrictedImportsChecksImportEquals covers the one arm upstream's corpus does not reach.
 //
 // Upstream added a `TSImportEqualsDeclaration` listener and wrote no case for it, so these
@@ -458,6 +476,9 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
 		{"patterns as bare strings", `[{"patterns":["foo/*","!foo/bar"]}]`, false},
 		{"a lookahead regex", `[{"patterns":[{"regex":"foo/(?!bar)"}]}]`, false},
 		{"no options at all", ``, false},
+		{"the empty object form", `[{}]`, false},
+		{"the empty object beside a path, which upstream's schema refuses", `[{},"fs"]`, true},
+		{"a path object with no name, which upstream's schema refuses", `[{"message":"nope"}]`, true},
 	}
 	for _, testCase := range cases {
 		_, err := DecodeNoRestrictedImportsOptions([]byte(testCase.configured))

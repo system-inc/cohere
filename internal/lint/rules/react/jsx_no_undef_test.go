@@ -3,6 +3,7 @@ package react
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -18,9 +19,8 @@ const jsxNoUndefFile = "/repository/source/JsxNoUndef.tsx"
 // cases, and the snapshot reports 8 diagnostics against those 8 fail inputs, so exactly one finding
 // per input and no per-input recovery was needed. Block 2 is a second tester that is not
 // snapshotted and carries one pair over `let x = <A.B />;`, distinguished only by a `globals`
-// option. Its fail half is below; its pass half is the one case in this corpus that cannot be
-// expressed here, because `cohere` has no globals surface for it to configure. That is stated in
-// the rule's doc comment rather than quietly dropped.
+// option. Its fail half is below. Its pass half is expressed in TestJsxNoUndefAllowGlobals, with a
+// global declared by a script file standing in for ESLint's `globals`.
 //
 // Every string was decoded from the extractor's `-dump` output and then checked byte against byte
 // into the Rust source by script before any Go was written. All 22 matched, which is worth stating
@@ -200,6 +200,56 @@ func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.reported {
 				t.Fatalf("finding covers %q, want %q", reported, testCase.reported)
+			}
+		})
+	}
+}
+
+// TestJsxNoUndefAllowGlobals pins upstream's `allowGlobals` and the default it implies.
+//
+// ESLint's `globals` is a declaration in the global scope, so a script `.d.ts` declaring `Text`
+// stands in for it. Every row was measured against the installed build (eslint-plugin-react 7.37.5,
+// ESLint 10.8.1, typescript-eslint's parser) with `globals: {Text: true}`: in a module the default
+// reports a tag naming only a global, a lib global included, and `allowGlobals: true` lets it
+// resolve. An import, and a `declare global` member declared in the same file, both count as in
+// scope under the default.
+func TestJsxNoUndefAllowGlobals(t *testing.T) {
+	t.Parallel()
+
+	const globals = "/repository/source/globals.d.ts"
+	allowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": true}`))
+	if err != nil {
+		t.Fatalf("decoding allowGlobals: %v", err)
+	}
+	disallowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": false}`))
+	if err != nil {
+		t.Fatalf("decoding allowGlobals false: %v", err)
+	}
+
+	cases := []struct {
+		name       string
+		sourceText string
+		options    any
+		wantCount  int
+	}{
+		{"a global under the default", "export {}; var React: any; React.render(<Text />);", nil, 1},
+		{"a global under allowGlobals false", "export {}; var React: any; React.render(<Text />);", disallowed, 1},
+		{"a global under allowGlobals", "export {}; var React: any; React.render(<Text />);", allowed, 0},
+		{"a lib global under the default", "export {}; <Map />;", nil, 1},
+		{"a lib global under allowGlobals", "export {}; <Map />;", allowed, 0},
+		{"an import under allowGlobals false", "import Text from './globals'; <Text />;", disallowed, 0},
+		{"a declare global member in the same file", "declare global { var G: any } export {}; <G />;", nil, 0},
+		{"an undeclared name under allowGlobals", "export {}; <Missing />;", allowed, 1},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(t, JsxNoUndef, map[string]string{
+				globals:        "declare var Text: any;\n",
+				jsxNoUndefFile: testCase.sourceText,
+			}, jsxNoUndefFile, testCase.options)
+			if len(result.Diagnostics) != testCase.wantCount {
+				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}

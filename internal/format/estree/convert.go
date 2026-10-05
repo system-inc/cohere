@@ -48,12 +48,15 @@ type Converter struct {
 	// typeCastCommentEnds are the ends of the file's type cast comments, in order, when converting
 	// for the babel parser (ConvertForBabel). Nil converts for typescript.
 	typeCastCommentEnds []int
+
+	// nodes is where the tree's nodes come from, or nil for the heap.
+	nodes *Arena
 }
 
 // ConvertForBabel is Convert for a file Prettier would parse with babel (see ParseJavaScript). The
 // one difference in the tree is postprocess's: Babel keeps a parenthesized expression as a node
 // when a type cast comment, `/** @type {T} */ (value)`, comes right before it.
-func ConvertForBabel(sourceFile *ast.SourceFile) (*Node, []*Node, error) {
+func ConvertForBabel(sourceFile *ast.SourceFile, nodes *Arena) (*Node, []*Node, error) {
 	// postprocess merges nestled JSDoc comments before it looks for casts, so this does too.
 	ends := []int{}
 	for _, comment := range mergeNestledJsdocComments(collectComments(sourceFile)) {
@@ -61,7 +64,7 @@ func ConvertForBabel(sourceFile *ast.SourceFile) (*Node, []*Node, error) {
 			ends = append(ends, LocEnd(comment))
 		}
 	}
-	return convert(sourceFile, ends)
+	return convert(sourceFile, ends, nodes)
 }
 
 // followsTypeCastComment is postprocess's test for keeping a ParenthesizedExpression: the last type
@@ -89,16 +92,16 @@ var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
 // Convert parses nothing: it converts a parsed source file, and returns the Program with its comments.
 //
 // The file must have parsed without diagnostics. Upstream throws the first parse diagnostic before
-// converting, and so does this.
-func Convert(sourceFile *ast.SourceFile) (program *Node, comments []*Node, err error) {
-	return convert(sourceFile, nil)
+// converting, and so does this. The tree's nodes come from nodes, or the heap when it is nil.
+func Convert(sourceFile *ast.SourceFile, nodes *Arena) (program *Node, comments []*Node, err error) {
+	return convert(sourceFile, nil, nodes)
 }
 
-func convert(sourceFile *ast.SourceFile, typeCastCommentEnds []int) (program *Node, comments []*Node, err error) {
+func convert(sourceFile *ast.SourceFile, typeCastCommentEnds []int, nodes *Arena) (program *Node, comments []*Node, err error) {
 	if diagnostics := sourceFile.Diagnostics(); len(diagnostics) > 0 {
 		return nil, nil, fmt.Errorf("parse error at %d: %s", diagnostics[0].Pos(), diagnostics[0].String())
 	}
-	converter := &Converter{sourceFile: sourceFile, text: sourceFile.Text(), typeCastCommentEnds: typeCastCommentEnds}
+	converter := &Converter{sourceFile: sourceFile, text: sourceFile.Text(), typeCastCommentEnds: typeCastCommentEnds, nodes: nodes}
 	converter.scan = scanner.NewScanner()
 	converter.scan.SetText(converter.text)
 
@@ -154,12 +157,12 @@ func (converter *Converter) firstToken(node *ast.Node) token {
 // createNode is upstream's createNode: the range defaults to the TypeScript node's.
 func (converter *Converter) createNode(node *ast.Node, nodeType string, keysAndValues ...any) *Node {
 	nodeRange := converter.getRange(node)
-	return New(nodeType, nodeRange[0], nodeRange[1], keysAndValues...)
+	return converter.nodes.node(nodeType, nodeRange[0], nodeRange[1], keysAndValues)
 }
 
 // createNodeWithRange is createNode with an explicit range, upstream's `range: [...]` in the data.
-func createNodeWithRange(nodeType string, nodeRange [2]int, keysAndValues ...any) *Node {
-	return New(nodeType, nodeRange[0], nodeRange[1], keysAndValues...)
+func (converter *Converter) createNodeWithRange(nodeType string, nodeRange [2]int, keysAndValues ...any) *Node {
+	return converter.nodes.node(nodeType, nodeRange[0], nodeRange[1], keysAndValues)
 }
 
 // fixParentLocation is upstream's fixParentLocation.
@@ -392,7 +395,7 @@ func (converter *Converter) convertTypeArguments(node *ast.Node) *Node {
 		return nil
 	}
 	greaterThan := converter.tokenAt(list.End())
-	return createNodeWithRange("TSTypeParameterInstantiation", [2]int{list.Pos() - 1, greaterThan.end},
+	return converter.createNodeWithRange("TSTypeParameterInstantiation", [2]int{list.Pos() - 1, greaterThan.end},
 		"params", converter.convertChildren(list.Nodes, nil))
 }
 
@@ -403,7 +406,7 @@ func (converter *Converter) convertTypeParameters(node *ast.Node) *Node {
 		return nil
 	}
 	greaterThan := converter.tokenAt(list.End())
-	return createNodeWithRange("TSTypeParameterDeclaration", [2]int{list.Pos() - 1, greaterThan.end},
+	return converter.createNodeWithRange("TSTypeParameterDeclaration", [2]int{list.Pos() - 1, greaterThan.end},
 		"params", converter.convertChildren(list.Nodes, nil))
 }
 
@@ -460,9 +463,9 @@ func (converter *Converter) convertJSXNamespaceOrIdentifier(node *ast.Node) *Nod
 	text := converter.getText(node)
 	if colon := strings.Index(text, ":"); colon > 0 {
 		nodeRange := converter.getRange(node)
-		return createNodeWithRange("JSXNamespacedName", nodeRange,
-			"name", createNodeWithRange("JSXIdentifier", [2]int{nodeRange[0] + colon + 1, nodeRange[1]}, "name", text[colon+1:]),
-			"namespace", createNodeWithRange("JSXIdentifier", [2]int{nodeRange[0], nodeRange[0] + colon}, "name", text[:colon]))
+		return converter.createNodeWithRange("JSXNamespacedName", nodeRange,
+			"name", converter.createNodeWithRange("JSXIdentifier", [2]int{nodeRange[0] + colon + 1, nodeRange[1]}, "name", text[colon+1:]),
+			"namespace", converter.createNodeWithRange("JSXIdentifier", [2]int{nodeRange[0], nodeRange[0] + colon}, "name", text[:colon]))
 	}
 	return converter.convertJSXIdentifier(node)
 }
@@ -528,7 +531,7 @@ func (converter *Converter) fixExports(node *ast.Node, result *Node) *Node {
 	result.Range[0] = varToken.start
 
 	if declarationIsDefault {
-		return createNodeWithRange("ExportDefaultDeclaration", [2]int{converter.getStart(exportKeyword), result.Range[1]},
+		return converter.createNodeWithRange("ExportDefaultDeclaration", [2]int{converter.getStart(exportKeyword), result.Range[1]},
 			"declaration", result,
 			"exportKind", "value")
 	}
@@ -539,7 +542,7 @@ func (converter *Converter) fixExports(node *ast.Node, result *Node) *Node {
 	if isType || isDeclare {
 		exportKind = "type"
 	}
-	return createNodeWithRange("ExportNamedDeclaration", [2]int{converter.getStart(exportKeyword), result.Range[1]},
+	return converter.createNodeWithRange("ExportNamedDeclaration", [2]int{converter.getStart(exportKeyword), result.Range[1]},
 		"attributes", []*Node{},
 		"declaration", result,
 		"exportKind", exportKind,
@@ -589,8 +592,8 @@ var keywordTypeNames = map[ast.Kind]string{
 }
 
 // identifier builds upstream's Identifier object literal.
-func identifierNode(nodeRange [2]int, name string) *Node {
-	return createNodeWithRange("Identifier", nodeRange,
+func (converter *Converter) identifierNode(nodeRange [2]int, name string) *Node {
+	return converter.createNodeWithRange("Identifier", nodeRange,
 		"decorators", []*Node{},
 		"name", name,
 		"optional", false,
@@ -605,7 +608,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		// sets every file's external module indicator, so the Program is always a module here.
 		sourceFile := node.AsSourceFile()
 		sourceType := "module"
-		return createNodeWithRange("Program", [2]int{converter.getStart(node), sourceFile.EndOfFileToken.End()},
+		return converter.createNodeWithRange("Program", [2]int{converter.getStart(node), sourceFile.EndOfFileToken.End()},
 			"body", converter.convertBodyExpressions(sourceFile.Statements.Nodes, node),
 			"comments", nil,
 			"sourceType", sourceType,
@@ -619,7 +622,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		if isThisInTypeQuery(node) {
 			return converter.createNode(node, "ThisExpression")
 		}
-		return identifierNode(converter.getRange(node), node.Text())
+		return converter.identifierNode(converter.getRange(node), node.Text())
 
 	case ast.KindPrivateIdentifier:
 		return converter.createNode(node, "PrivateIdentifier", "name", node.Text()[1:])
@@ -1067,7 +1070,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 
 	case ast.KindImportClause:
 		local := converter.convertChild(node.Name(), nil)
-		return createNodeWithRange("ImportDefaultSpecifier", local.Range, "local", local)
+		return converter.createNodeWithRange("ImportDefaultSpecifier", local.Range, "local", local)
 
 	case ast.KindExportDeclaration:
 		export := node.AsExportDeclaration()
@@ -1225,7 +1228,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		meta := node.AsMetaProperty()
 		first := converter.firstToken(node)
 		return converter.createNode(node, "MetaProperty",
-			"meta", identifierNode([2]int{first.start, first.end}, scanner.TokenToString(meta.KeywordToken)),
+			"meta", converter.identifierNode([2]int{first.start, first.end}, scanner.TokenToString(meta.KeywordToken)),
 			"property", converter.convertChild(meta.Name(), nil))
 
 	case ast.KindDecorator:
@@ -1251,7 +1254,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		nodeRange := converter.getRange(node)
 		rawValue := converter.text[nodeRange[0]:nodeRange[1]]
 		bigint := strings.ReplaceAll(rawValue[:len(rawValue)-1], "_", "")
-		return createNodeWithRange("Literal", nodeRange,
+		return converter.createNodeWithRange("Literal", nodeRange,
 			"bigint", bigintString(bigint),
 			"raw", rawValue,
 			"value", nil)
@@ -1295,7 +1298,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		return converter.createNode(node, "JSXElement",
 			"children", []*Node{},
 			"closingElement", nil,
-			"openingElement", createNodeWithRange("JSXOpeningElement", converter.getRange(node),
+			"openingElement", converter.createNodeWithRange("JSXOpeningElement", converter.getRange(node),
 				"attributes", converter.convertChildren(element.Attributes.AsJsxAttributes().Properties.Nodes, nil),
 				"name", converter.convertJSXTagName(element.TagName, node),
 				"selfClosing", true,
@@ -1324,7 +1327,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		if jsxExpression.Expression != nil {
 			expression = converter.convertChild(jsxExpression.Expression, nil)
 		} else {
-			expression = createNodeWithRange("JSXEmptyExpression", [2]int{converter.getStart(node) + 1, node.End() - 1})
+			expression = converter.createNodeWithRange("JSXEmptyExpression", [2]int{converter.getStart(node) + 1, node.End() - 1})
 		}
 		if jsxExpression.DotDotDotToken != nil {
 			return converter.createNode(node, "JSXSpreadChild", "expression", expression)
@@ -1340,7 +1343,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 	case ast.KindJsxText:
 		start, end := node.Pos(), node.End()
 		text := converter.text[start:end]
-		return createNodeWithRange("JSXText", [2]int{start, end},
+		return converter.createNodeWithRange("JSXText", [2]int{start, end},
 			"raw", text,
 			"value", unescapeStringLiteralText(text))
 
@@ -1464,7 +1467,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		// Under babel, Prettier keeps Babel's ParenthesizedExpression after a Closure-style type cast
 		// comment (parse/postprocess/index.js); typescript-estree never makes one.
 		if start := converter.getStart(node); converter.followsTypeCastComment(start) {
-			return createNodeWithRange("ParenthesizedExpression", converter.getRange(node),
+			return converter.createNodeWithRange("ParenthesizedExpression", converter.getRange(node),
 				"expression", converter.convertChild(node.Expression(), parent))
 		}
 		return converter.convertChild(node.Expression(), parent)
@@ -1552,7 +1555,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		}
 		members := interfaceDeclaration.Members
 		result := converter.createNode(node, "TSInterfaceDeclaration",
-			"body", createNodeWithRange("TSInterfaceBody", [2]int{members.Pos() - 1, node.End()},
+			"body", converter.createNodeWithRange("TSInterfaceBody", [2]int{members.Pos() - 1, node.End()},
 				"body", converter.convertChildren(members.Nodes, nil)),
 			"declare", hasModifier(ast.KindDeclareKeyword, node),
 			"extends", interfaceExtends,
@@ -1580,7 +1583,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		enum := node.AsEnumDeclaration()
 		members := converter.convertChildren(enum.Members.Nodes, nil)
 		result := converter.createNode(node, "TSEnumDeclaration",
-			"body", createNodeWithRange("TSEnumBody", [2]int{enum.Members.Pos() - 1, node.End()}, "members", members),
+			"body", converter.createNodeWithRange("TSEnumBody", [2]int{enum.Members.Pos() - 1, node.End()}, "members", members),
 			"const", hasModifier(ast.KindConstKeyword, node),
 			"declare", hasModifier(ast.KindDeclareKeyword, node),
 			"id", converter.convertChild(node.Name(), nil))
@@ -1751,7 +1754,7 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 	if node.Kind == ast.KindMethodDeclaration {
 		asterisk = node.AsMethodDeclaration().AsteriskToken != nil
 	}
-	method := createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
+	method := converter.createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
 		"async", hasModifier(ast.KindAsyncKeyword, node),
 		"body", converter.convertChild(body, nil),
 		"declare", false,
@@ -1822,7 +1825,7 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 	if body == nil {
 		functionType = "TSEmptyBodyFunctionExpression"
 	}
-	constructor := createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
+	constructor := converter.createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
 		"async", false,
 		"body", converter.convertChild(body, nil),
 		"declare", false,
@@ -1838,11 +1841,11 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 
 	var constructorKey *Node
 	if constructorToken.kind == ast.KindStringLiteral {
-		constructorKey = createNodeWithRange("Literal", [2]int{constructorToken.start, constructorToken.end},
+		constructorKey = converter.createNodeWithRange("Literal", [2]int{constructorToken.start, constructorToken.end},
 			"raw", converter.text[constructorToken.start:constructorToken.end],
 			"value", "constructor")
 	} else {
-		constructorKey = identifierNode([2]int{constructorToken.start, constructorToken.end}, "constructor")
+		constructorKey = converter.identifierNode([2]int{constructorToken.start, constructorToken.end}, "constructor")
 	}
 
 	isStatic := hasModifier(ast.KindStaticKeyword, node)
@@ -1917,7 +1920,7 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 			"value", converter.convertChild(node.Name(), nil))
 	}
 	if element.Initializer != nil {
-		result.Set("value", createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), element.Initializer.End()},
+		result.Set("value", converter.createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), element.Initializer.End()},
 			"decorators", []*Node{},
 			"left", converter.convertChild(node.Name(), nil),
 			"optional", false,
@@ -1942,7 +1945,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 		result = parameter
 	case declaration.Initializer != nil:
 		parameter = converter.convertChild(node.Name(), nil)
-		result = createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), declaration.Initializer.End()},
+		result = converter.createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), declaration.Initializer.End()},
 			"decorators", []*Node{},
 			"left", parameter,
 			"optional", false,
@@ -2016,7 +2019,7 @@ func (converter *Converter) convertClass(node *ast.Node) *Node {
 	}
 	result := converter.createNode(node, classType,
 		"abstract", hasModifier(ast.KindAbstractKeyword, node),
-		"body", createNodeWithRange("ClassBody", [2]int{classLike.Members.Pos() - 1, node.End()},
+		"body", converter.createNodeWithRange("ClassBody", [2]int{classLike.Members.Pos() - 1, node.End()},
 			"body", converter.convertChildren(members, nil)),
 		"declare", hasModifier(ast.KindDeclareKeyword, node),
 		"decorators", converter.convertChildren(decorators(node), nil),
@@ -2118,10 +2121,10 @@ func (converter *Converter) convertImportType(node *ast.Node) *Node {
 		if withOrAssert.kind == ast.KindAssertKeyword {
 			withOrAssertName = "assert"
 		}
-		options = createNodeWithRange("ObjectExpression", [2]int{openBrace.start, closeBrace.end},
-			"properties", []*Node{createNodeWithRange("Property", [2]int{withOrAssert.start, importType.Attributes.End()},
+		options = converter.createNodeWithRange("ObjectExpression", [2]int{openBrace.start, closeBrace.end},
+			"properties", []*Node{converter.createNodeWithRange("Property", [2]int{withOrAssert.start, importType.Attributes.End()},
 				"computed", false,
-				"key", identifierNode([2]int{withOrAssert.start, withOrAssert.end}, withOrAssertName),
+				"key", converter.identifierNode([2]int{withOrAssert.start, withOrAssert.end}, withOrAssertName),
 				"kind", "init",
 				"method", false,
 				"optional", false,
@@ -2131,7 +2134,7 @@ func (converter *Converter) convertImportType(node *ast.Node) *Node {
 
 	argument := converter.convertChild(importType.Argument, nil)
 	typeArguments := converter.convertTypeArguments(node)
-	result := createNodeWithRange("TSImportType", nodeRange,
+	result := converter.createNodeWithRange("TSImportType", nodeRange,
 		"options", options,
 		"qualifier", converter.convertChild(importType.Qualifier, nil),
 		"source", argument.Child("literal"),
@@ -2169,13 +2172,13 @@ func (converter *Converter) convertModuleDeclaration(node *ast.Node) *Node {
 		result.Set("id", converter.convertChild(node.Name(), nil))
 	default:
 		innermost := node
-		name := identifierNode([2]int{converter.getStart(node.Name()), node.Name().End()}, node.Name().Text())
+		name := converter.identifierNode([2]int{converter.getStart(node.Name()), node.Name().End()}, node.Name().Text())
 		for innermost.Body() != nil && innermost.Body().Kind == ast.KindModuleDeclaration && innermost.Body().Name() != nil {
 			innermost = innermost.Body()
 			isDeclare = isDeclare || hasModifier(ast.KindDeclareKeyword, innermost)
 			nextName := innermost.Name()
-			right := identifierNode([2]int{converter.getStart(nextName), nextName.End()}, nextName.Text())
-			name = createNodeWithRange("TSQualifiedName", [2]int{name.Range[0], right.Range[1]},
+			right := converter.identifierNode([2]int{converter.getStart(nextName), nextName.End()}, nextName.Text())
+			name = converter.createNodeWithRange("TSQualifiedName", [2]int{name.Range[0], right.Range[1]},
 				"left", name,
 				"right", right)
 		}
