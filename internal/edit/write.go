@@ -91,6 +91,15 @@ func reasonOf(diagnostics []*ast.Diagnostic) string {
 	return reason
 }
 
+// seedFor reports whether seed is the tree parseText would build for text: the same bytes, the script kind
+// this file's extension gives the guard, and a name that is a declaration file exactly when this one is.
+// Those are all the parser reads besides the module-indicator options, which set a property of the file and
+// no node or diagnostic, so the seed's parse diagnostics are the guard's.
+func seedFor(fileName string, text string, seed *ast.SourceFile) bool {
+	return seed != nil && TypeScriptParsable(fileName) && seed.Text() == text && seed.ScriptKind == guardScriptKind(fileName) &&
+		tspath.IsDeclarationFileName(seed.FileName()) == tspath.IsDeclarationFileName(fileName)
+}
+
 // verdictOf is parsesWithTree's answer for a tree in hand.
 func verdictOf(sourceFile *ast.SourceFile) (bool, string, *ast.SourceFile) {
 	diagnostics := sourceFile.Diagnostics()

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -93,7 +94,11 @@ func applyProposedFixes(
 		speculation = early.speculation
 		speculation.narrow(speculationWorkers())
 	} else {
-		speculation = speculateFormat(formatCandidates, transform, maxPasses)
+		var programs programOffer
+		if graph != nil {
+			programs.offer(graph.Program)
+		}
+		speculation = speculateFormat(formatCandidates, transform, maxPasses, &programs)
 	}
 
 	var result program.Result
@@ -667,12 +672,18 @@ type formatSpeculation struct {
 // after the walk, which writes it. A file the walk then proposes a fix for, or whose bytes are not
 // the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
 // have computed, and everything else is computed as it always was.
-func speculateFormat(candidates []string, transform edit.Transform, maxPasses int) *formatSpeculation {
-	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers())
+//
+// A TypeScript file is formatted from the program's own tree where the program has one of exactly the bytes read,
+// already bound, rather than parsed twice more, once by the fix engine's guard and once by the printer (#dk2502g).
+// programs is where the program arrives once it is built, or nil. Every other file goes first, so the program
+// has the time to be built while they are formatted, and a TypeScript file reached before then is parsed, as
+// before: nothing waits for the program.
+func speculateFormat(candidates []string, transform edit.Transform, maxPasses int, programs *programOffer) *formatSpeculation {
+	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers(), programs)
 }
 
 // speculateFormatOn is speculateFormat on a given number of workers.
-func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int) *formatSpeculation {
+func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int, programs *programOffer) *formatSpeculation {
 	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
 		stopped: make(chan struct{})}
 	speculation.limit.Store(int32(workers))
@@ -682,7 +693,14 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 	}
 	next := make(chan string, len(candidates))
 	for _, fileName := range candidates {
-		next <- fileName
+		if !edit.TypeScriptParsable(fileName) {
+			next <- fileName
+		}
+	}
+	for _, fileName := range candidates {
+		if edit.TypeScriptParsable(fileName) {
+			next <- fileName
+		}
 	}
 	close(next)
 	var mutex sync.Mutex
@@ -712,7 +730,7 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 					}
 					return refuseToRelint("", "")
 				}
-				result, err := edit.CheckFile(fileName, unproposed, transform, maxPasses)
+				result, err := edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maxPasses)
 				// Only an unchanged result is final this early. A changed one is left to the path after the
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
 				// the printer changed comes back changed rather than refused, and keeping it would report a
@@ -732,6 +750,43 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 		close(speculation.done)
 	}()
 	return speculation
+}
+
+// programOffer is where a speculation finds the program once it is built. Its zero value has none, and so does
+// a nil one.
+type programOffer struct {
+	program atomic.Pointer[compiler.Program]
+}
+
+// offer hands the speculation the program, once it is built.
+func (programs *programOffer) offer(program *compiler.Program) {
+	if programs != nil && program != nil {
+		programs.program.Store(program)
+	}
+}
+
+// boundTreeOf is the program's tree of fileName if the program is in and has bound that file, or nil.
+//
+// Bound, because the binder writes node flags the formatter's converter reads (binder.go sets
+// NodeFlagsThisNodeOrAnySubNodesHasError and NodeFlagsExportContext on nodes, and estree reads Let, Const,
+// Using and Reparsed off the same word), and the checkers bind on their own goroutines while this pass runs.
+// isBound is an atomic stored once the binder is done with the file, so a file that reads bound here has had
+// every flag written before any is read. A file not yet bound is not waited for: it is parsed, as before.
+//
+// The tree is not yet known to be of the bytes the speculation reads; edit.CheckFileSeeded compares them.
+func (programs *programOffer) boundTreeOf(fileName string) *ast.SourceFile {
+	if programs == nil {
+		return nil
+	}
+	program := programs.program.Load()
+	if program == nil {
+		return nil
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil || !sourceFile.IsBound() {
+		return nil
+	}
+	return sourceFile
 }
 
 // speculationWorkers is how many files speculateFormat formats at once: a quarter of the cores, and none
