@@ -28,7 +28,8 @@ func init() {
 		rule.Registration{Rule: NoDuplicateHead},
 		rule.Registration{Rule: NoDocumentImportInPage},
 		rule.Registration{Rule: NoHeadElement},
-		rule.Registration{Rule: NoHtmlLinkForPages},
+		// DecodeAt because its pages directories are paths, anchored to the config's directory.
+		rule.Registration{Rule: NoHtmlLinkForPages, DecodeAt: decodeNoHtmlLinkForPagesOptions},
 		rule.Registration{Rule: NoHeadImportInDocument},
 		rule.Registration{Rule: NoImgElement},
 		rule.Registration{Rule: NoLocationAssignRelativeDestination},

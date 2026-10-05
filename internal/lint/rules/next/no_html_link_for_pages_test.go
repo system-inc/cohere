@@ -1,279 +1,576 @@
 package next
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// The upstream corpus, copied byte for byte from oxc's tester block and verified mechanically
-// against the extractor's dump rather than by reading. One tester block, 21 pass and 6 fail, and
-// the snapshot carries 6 diagnostics against 6 fail inputs, so every failing case reports exactly
-// once.
-var upstreamPassCases = []string{
-	"<a href='https://example.com'>External Link</a>",
-	"<a href='http://example.com'>External Link</a>",
-	"<a href='mailto:contact@example.com'>Email</a>",
-	"<a href='tel:+1234567890'>Phone</a>",
-	"<a href='ftp://example.com'>FTP</a>",
-	"<a href='file://path/to/file'>File</a>",
-	"<a href='#section'>Jump to section</a>",
-	"<a href='#'>Empty hash</a>",
-	"<a href='//example.com'>Protocol-relative</a>",
-	"<a>No href</a>",
-	"<div href='/about'>Not an anchor</div>",
-	"<Link href='/about'>About</Link>",
-	"<a href=\"/about\" target=\"_blank\">About</a>",
-	"<a target=\"_blank\" href=\"/about\">About</a>",
-	"<a href=\"/about\" target=\"_blank\" rel=\"noopener noreferrer\">About</a>",
-	"<a href=\"/static-file.csv\" download>Download CSV</a>",
-	"<a href=\"/report.pdf\" download=\"report.pdf\">Download Report</a>",
-	"<a download href=\"/data.json\">Download JSON</a>",
-	"<a href={dynamicLink}>Dynamic</a>",
-	"<a href={`/user/${userId}`}>User Profile</a>",
-	"<a href={getUrl()}>Dynamic URL</a>",
+// Every expectation in this file was measured against the installed @next/eslint-plugin-next 16.3.1,
+// run through ESLint 10.8.1's Linter with its working directory at a fixture tree laid out the same
+// way, one fresh tree per case so the plugin's process-wide directory caches could not carry between
+// them. Where upstream throws instead of answering, the row says so and pins what the port does.
+
+// htmlLinkRow is one anchor and the hrefs it reports, once per matching route, as upstream names them.
+type htmlLinkRow struct {
+	element string
+	reports []string
 }
 
-var upstreamFailCases = []string{
-	"<a href='/about'>About</a>",
-	"<a href='/contact/us'>Contact Us</a>",
-	"<a href='about'>About</a>",
-	"<a href='../contact'>Contact</a>",
-	"<a href='./about'>About</a>",
-	"<a href='/'>Home</a>",
+// htmlLinkRowsSource puts each row's element on a line of its own, from the third line on, so a
+// finding's line says which row it belongs to.
+func htmlLinkRowsSource(rows []htmlLinkRow) string {
+	var source strings.Builder
+	source.WriteString("export const C = () => (\n<>\n")
+	for _, row := range rows {
+		source.WriteString(row.element + "\n")
+	}
+	source.WriteString("</>\n);\n")
+	return source.String()
 }
 
-// A JSX fragment cannot stand alone as a source file, so every case is wrapped the same way. The
-// wrapper is a plain arrow returning the element, which adds no anchors of its own.
-func htmlLinkSource(element string) string {
-	return "export const C = () => (" + element + ");"
-}
-
-func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
-	t.Parallel()
-
-	for _, element := range upstreamFailCases {
-		t.Run(element, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
-			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
-		})
+// expectHtmlLinkRows checks every row's findings by line: how many, and that each carries the message
+// for the href it names.
+func expectHtmlLinkRows(t *testing.T, result rule_testing.Result, rows []htmlLinkRow) {
+	t.Helper()
+	text := result.SourceFile.Text()
+	got := make(map[int][]string, len(rows))
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Message.Id != messageNoHtmlLinkForPages.Id {
+			t.Errorf("a finding carries message id %q, want %q", diagnostic.Message.Id, messageNoHtmlLinkForPages.Id)
+		}
+		line := strings.Count(text[:diagnostic.Range.Pos()], "\n") - 2
+		got[line] = append(got[line], diagnostic.Message.Description)
+	}
+	for index, row := range rows {
+		want := make([]string, 0, len(row.reports))
+		for _, hrefPath := range row.reports {
+			want = append(want, noHtmlLinkForPagesMessage(hrefPath).Description)
+		}
+		if !slices.Equal(got[index], want) {
+			t.Errorf("%s: reports %q, want %q", row.element, got[index], want)
+		}
+		delete(got, index)
+	}
+	for line, descriptions := range got {
+		t.Errorf("findings on line %d, which holds no row: %q", line, descriptions)
 	}
 }
 
-func TestNoHtmlLinkForPagesIsSilentOnTheUpstreamCorpus(t *testing.T) {
+// htmlLinkTree is a fixture tree: every named file, plus the subject at the root.
+func htmlLinkTree(rows []htmlLinkRow, paths ...string) map[string]string {
+	files := map[string]string{"foo.tsx": htmlLinkRowsSource(rows)}
+	for _, path := range paths {
+		files[path] = "export {};"
+	}
+	return files
+}
+
+// runHtmlLinkTree runs the rule on a tree with no option set.
+func runHtmlLinkTree(t *testing.T, rows []htmlLinkRow, paths ...string) {
+	t.Helper()
+	result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx")
+	expectHtmlLinkRows(t, result, rows)
+}
+
+// runHtmlLinkTreeWithOption runs the rule on a tree on disk, with its option decoded as a config at the
+// tree's root would decode it. option is the JSON written, with `{root}` standing for the tree's
+// absolute directory.
+func runHtmlLinkTreeWithOption(t *testing.T, rows []htmlLinkRow, option string, paths ...string) {
+	t.Helper()
+	result := rule_testing.RunTypedFilesWithOptionsFor(t, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx", func(directory string) any {
+		quoted, _ := json.Marshal(directory)
+		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
+		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
+		if err != nil {
+			t.Fatalf("decoding %s: %v", raw, err)
+		}
+		return decoded
+	})
+	expectHtmlLinkRows(t, result, rows)
+}
+
+// upstreamRows are the anchors @next's own test file writes, with the hrefs its rows assert and three
+// more measured on the same trees. Upstream asserts only the first finding of each; the counts here are
+// every finding, measured.
+func upstreamRows(home, dynamic, deepDynamic, profile, list, intercepted []string) []htmlLinkRow {
+	return []htmlLinkRow{
+		{`<Link href='/'>Homepage</Link>`, nil},
+		{`<a>Homepage</a>`, nil},
+		{`<a href='#heading'>Homepage</a>`, nil},
+		{`<a href='https://google.com/'>Homepage</a>`, nil},
+		{`<a href='/static-file.csv' download>Download</a>`, nil},
+		{`<a target="_blank" href='/new-tab'>New Tab</a>`, nil},
+		{`<a href='/presentation.pdf'>View PDF</a>`, nil},
+		{`<a href='/'>Homepage</a>`, home},
+		{`<a href='/list/foo/bar'>Homepage</a>`, prefix("/list/foo/bar/", deepDynamic)},
+		{`<a href='/list/foo/'>Homepage</a>`, prefix("/list/foo/", dynamic)},
+		{`<a href='/list/lorem-ipsum/'>Homepage</a>`, prefix("/list/lorem-ipsum/", dynamic)},
+		{`<a href='/photo/1/'>Photo</a>`, intercepted},
+		{`<a href='/profile'>Profile</a>`, profile},
+		{`<a href='/list'>List</a>`, list},
+	}
+}
+
+// prefix repeats one href once per entry of counts, which is how the rows spell a repeated finding.
+func prefix(hrefPath string, counts []string) []string {
+	repeated := make([]string, len(counts))
+	for index := range counts {
+		repeated[index] = hrefPath
+	}
+	return repeated
+}
+
+// The trees are upstream's fixture directories, test/unit/eslint-plugin-next at the 16.3.1 tag, file
+// for file. Their contents are never read, only their names.
+var (
+	withCustomPagesDirectory = []string{"custom-pages/index.jsx", "custom-pages/[profile]/index.tsx", "custom-pages/list/[foo]/[id].jsx"}
+	withAppDirectory         = []string{
+		"app/page.jsx", "app/[profile]/page.tsx", "app/@modal/default.tsx", "app/@modal/(..)photo/page.tsx",
+		"app/@modal/(..)photo/[id]/page.tsx", "app/list/[foo]/[id].tsx", "app/photo/[id]/page.tsx",
+	}
+	withoutPagesDirectory = []string{"index.jsx"}
+)
+
+func TestNoHtmlLinkForPagesReplaysUpstreamRows(t *testing.T) {
 	t.Parallel()
 
-	for _, element := range upstreamPassCases {
+	two, three := []string{"x", "x"}, []string{"x", "x", "x"}
+
+	// 'valid link element', 'valid anchor element', ..., 'invalid static route' and 'invalid dynamic
+	// route', with the custom pages directory written absolute, as upstream writes it. `/list/foo/`
+	// matches both `[profile]/` and `list/[foo]/[id]`, so it reports twice.
+	t.Run("custom pages directory", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, upstreamRows([]string{"/"}, two, two, []string{"/profile/"}, []string{"/list/"}, []string{"/photo/1/"}),
+			`"{root}/custom-pages"`, withCustomPagesDirectory...)
+	})
+
+	// 'valid link element with multiple directories'. The second directory sits inside the first and
+	// is walked again from its own root, so `list/[foo]/[id]` is also the route `/[foo]/[id]`.
+	t.Run("multiple custom pages directories", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, upstreamRows([]string{"/"}, three, three, prefix("/profile/", two), prefix("/list/", two), prefix("/photo/1/", two)),
+			`["{root}/custom-pages", "{root}/custom-pages/list"]`, withCustomPagesDirectory...)
+	})
+
+	// Every 'with appDir' row, the intercepted routes among them. `/` reports twice: `page.jsx` is
+	// `^/$`, and `[profile]/page.tsx` is `/[profile]`, whose wildcard matches the empty segment. A
+	// static app route never matches, because app routes have no trailing slash and hrefs gain one;
+	// `/list` reports only through `[profile]`.
+	t.Run("app directory", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, upstreamRows(prefix("/", two), two, two, []string{"/profile/"}, prefix("/list/", two), prefix("/photo/1/", two)),
+			withAppDirectory...)
+	})
+
+	// 'prints warning when there are no "pages" or "app" directories': upstream warns once and
+	// returns an empty visitor, so nothing reports. cohere has no warning channel for a rule; see
+	// the ruling on #d21war2.
+	t.Run("no pages or app directory", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, upstreamRows(nil, nil, nil, nil, nil, nil), withoutPagesDirectory...)
+	})
+}
+
+// upstream's 'does not print warning ... with rootDir in context settings' row is not replayed: it
+// sets `settings.next.rootDir`, and cohere carries no shared settings. The root here is the project
+// root, which is the row's own default.
+
+func TestNoHtmlLinkForPagesReadsThePagesDirectory(t *testing.T) {
+	t.Parallel()
+
+	rows := []htmlLinkRow{
+		{`<a href="/">x</a>`, []string{"/"}},
+		{`<a href="/about">x</a>`, []string{"/about/"}},
+		{`<a href="/about/">x</a>`, []string{"/about/"}},
+		// A relative href is not a route this project defines, under any page tree.
+		{`<a href="about">x</a>`, nil},
+		{`<a href="./about">x</a>`, nil},
+		// The query, the fragment and a trailing index.html come off before matching, and the
+		// message names the href as normalized.
+		{`<a href="/about?x=1">x</a>`, []string{"/about/"}},
+		{`<a href="/about#h">x</a>`, []string{"/about/"}},
+		{`<a href="/about/index.html">x</a>`, []string{"/about/"}},
+		{`<a href="/index.html">x</a>`, []string{"/"}},
+		{`<a href="/blog">x</a>`, []string{"/blog/"}},
+		// An index file is two routes, `/blog/` and `/blog/index`, and `[slug]` matches it too.
+		{`<a href="/blog/index">x</a>`, []string{"/blog/index/", "/blog/index/"}},
+		{`<a href="/blog/post">x</a>`, []string{"/blog/post/"}},
+		// The dynamic wildcard refuses a dot between two characters, and crosses slashes.
+		{`<a href="/blog/post.html">x</a>`, nil},
+		{`<a href="/blog/a/b">x</a>`, []string{"/blog/a/b/"}},
+		{`<a href="/docs/a/b">x</a>`, []string{"/docs/a/b/"}},
+		{`<a href="/docs/a.b">x</a>`, nil},
+		{`<a href="/docs">x</a>`, nil},
+		// No file is special: `_app`, an API route and a declaration file are routes too.
+		{`<a href="/_app">x</a>`, []string{"/_app/"}},
+		{`<a href="/api/x">x</a>`, []string{"/api/x/"}},
+		{`<a href="/a.d">x</a>`, []string{"/a.d/"}},
+		// Only .js, .jsx, .ts and .tsx are pages.
+		{`<a href="/readme">x</a>`, nil},
+		{`<a href="/x">x</a>`, nil},
+		{`<a href="/q">x</a>`, []string{"/q/"}},
+		{`<a href="/r">x</a>`, []string{"/r/"}},
+		{`<a href="/s">x</a>`, []string{"/s/"}},
+		{`<a href="https://x.com/about">x</a>`, nil},
+		{`<a href="//x/about">x</a>`, nil},
+		{`<a href="">x</a>`, nil},
+		{`<a href="#h">x</a>`, nil},
+		{`<a href="?x=1">x</a>`, nil},
+		{`<a href="/nothing">x</a>`, nil},
+		{`<a href="/About">x</a>`, nil},
+	}
+	runHtmlLinkTree(t, rows,
+		"pages/index.tsx", "pages/about.tsx", "pages/blog/index.tsx", "pages/blog/[slug].tsx", "pages/docs/[...all].tsx",
+		"pages/a.d.ts", "pages/_app.tsx", "pages/api/x.ts", "pages/readme.md", "pages/x.mjs", "pages/q.jsx", "pages/r.js", "pages/s.ts")
+}
+
+func TestNoHtmlLinkForPagesReadsTheAppDirectory(t *testing.T) {
+	t.Parallel()
+
+	// Only `/` matches a static app route. The rest are app routes with no trailing slash, against
+	// hrefs that always gain one, and they hold upstream's other app quirks unobservable: a nested
+	// `layout` and `index` are routes, a group and a slot drop out, a top-level `layout` does not.
+	t.Run("static routes", func(t *testing.T) {
+		t.Parallel()
+		rows := []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}
+		for _, href := range []string{"/about", "/about/", "/about/layout", "/about/index", "/layout", "/loading", "/g", "/(group)/g", "/s", "/@slot/s", "/r", "/x/thing", "/x"} {
+			rows = append(rows, htmlLinkRow{`<a href="` + href + `">x</a>`, nil})
+		}
+		runHtmlLinkTree(t, rows,
+			"app/page.tsx", "app/layout.tsx", "app/loading.tsx", "app/about/page.tsx", "app/about/layout.tsx", "app/about/index.tsx",
+			"app/(group)/g/page.tsx", "app/@slot/s/page.tsx", "app/r/route.ts", "app/x/thing.tsx")
+	})
+
+	t.Run("a dynamic route", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{
+			{`<a href="/">x</a>`, []string{"/"}},
+			{`<a href="/about">x</a>`, []string{"/about/"}},
+			{`<a href="/a/b">x</a>`, []string{"/a/b/"}},
+			{`<a href="/a.b">x</a>`, nil},
+			{`<a href="/a/b.c">x</a>`, nil},
+			{`<a href="about">x</a>`, nil},
+		}, "app/[id]/page.tsx")
+	})
+}
+
+func TestNoHtmlLinkForPagesReportsOncePerRoute(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pages and app both define the root", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/", "/"}}}, "app/page.tsx", "pages/index.tsx")
+	})
+
+	// The two pages directories' routes are de-duplicated together, so `/` from both is one route;
+	// `src/app` adds the second.
+	t.Run("root and src directories", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{
+			{`<a href="/">x</a>`, []string{"/", "/"}},
+			{`<a href="/only">x</a>`, []string{"/only/"}},
+		}, "pages/index.tsx", "src/pages/index.tsx", "src/pages/only.tsx", "src/app/page.tsx")
+	})
+}
+
+func TestNoHtmlLinkForPagesCompilesRouteNamesAsUpstreamDoes(t *testing.T) {
+	t.Parallel()
+
+	// One greedy wildcard from the first `[` to the last `]`.
+	t.Run("two dynamic segments", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{
+			{`<a href="/list/a/b">x</a>`, []string{"/list/a/b/"}},
+			{`<a href="/list/a">x</a>`, []string{"/list/a/"}},
+			{`<a href="/list/">x</a>`, nil},
+			{`<a href="/z/1/mid/2">x</a>`, []string{"/z/1/mid/2/"}},
+			{`<a href="/z/1/x/2">x</a>`, []string{"/z/1/x/2/"}},
+			{`<a href="/z/1/2/3/mid">x</a>`, []string{"/z/1/2/3/mid/"}},
+		}, "pages/list/[foo]/[id].tsx", "pages/z/[a]/mid/[b].tsx")
+	})
+
+	// A page name is a pattern, not a literal.
+	t.Run("pattern characters in a page name", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{
+			{`<a href="/a+b">x</a>`, nil},
+			{`<a href="/aab">x</a>`, []string{"/aab/"}},
+			{`<a href="/ab">x</a>`, []string{"/ab/"}},
+			{`<a href="/c.d">x</a>`, []string{"/c.d/"}},
+			{`<a href="/cxd">x</a>`, []string{"/cxd/"}},
+			{`<a href="/e$f">x</a>`, nil},
+		}, "pages/a+b.tsx", "pages/c.d.tsx", "pages/e$f.tsx")
+	})
+
+	// Divergence, kept: upstream's `new RegExp` throws on `^/c(d/$`, so ESLint fails to load the
+	// rule and reports nothing in any file. Here the one route that cannot compile is dropped.
+	t.Run("a page name that is not a pattern", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/ok">x</a>`, []string{"/ok/"}}}, "pages/c(d.tsx", "pages/ok.tsx")
+	})
+
+	// An entry is judged by its name before its kind.
+	t.Run("a directory named like a page", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{
+			{`<a href="/x">x</a>`, []string{"/x/"}},
+			{`<a href="/x.tsx/inner">x</a>`, nil},
+		}, "pages/x.tsx/inner.tsx")
+	})
+}
+
+func TestNoHtmlLinkForPagesFindsNoDirectory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no pages or app directory", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, "lib/a.tsx")
+	})
+
+	// Divergence, kept: a file named `pages` passes upstream's existsSync and then readdirSync throws
+	// ENOTDIR, so the rule fails to load. Here it is not a directory and is not found.
+	t.Run("a file named pages", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, "pages", "app/page.tsx")
+	})
+
+	// A harness with no program has no disk to read, which is the no-directory case. Checked by row
+	// rather than with ExpectClean, which would offer the site this source as the rule's clean
+	// example, silent only because nothing was read.
+	t.Run("no program", func(t *testing.T) {
+		t.Parallel()
+		rows := []htmlLinkRow{{`<a href="/">x</a>`, nil}}
+		expectHtmlLinkRows(t, rule_testing.Run(t, NoHtmlLinkForPages, "pages/index.tsx", htmlLinkRowsSource(rows)), rows)
+	})
+}
+
+// The clean examples the site shows, each beside the page it would otherwise name.
+func TestNoHtmlLinkForPagesIsSilentBesideAPage(t *testing.T) {
+	t.Parallel()
+
+	for _, element := range []string{
+		`<a href="/about" target="_blank">About</a>`,
+		`<a href="/contact">Contact</a>`,
+		`<Link href="/about">About</Link>`,
+	} {
 		t.Run(element, func(t *testing.T) {
 			t.Parallel()
-			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
+			source := "export const C = () => (" + element + ");"
+			result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
 			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
 
-// Cases upstream does not write, each from reading our code rather than from a neighbouring rule.
-func TestNoHtmlLinkForPagesReportsCasesUpstreamDoesNotWrite(t *testing.T) {
+func TestNoHtmlLinkForPagesReadsTheAnchorAsUpstreamDoes(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name    string
-		element string
+	runHtmlLinkTree(t, []htmlLinkRow{
+		{`<a href="/about">x</a>`, []string{"/about/"}},
+		{`<a href="/about" />`, []string{"/about/"}},
+		{`<Link href="/about">x</Link>`, nil},
+		{`<A href="/about">x</A>`, nil},
+		{`<a.b href="/about">x</a.b>`, nil},
+		{`<a>x</a>`, nil},
+		// Only a plain string `_blank` exempts, and only on an attribute spelled `target`.
+		{`<a target="_blank" href="/about">x</a>`, nil},
+		{`<a href="/about" target={"_blank"}>x</a>`, []string{"/about/"}},
+		{`<a href="/about" target="_self">x</a>`, []string{"/about/"}},
+		{`<a href="/about" TARGET="_blank">x</a>`, []string{"/about/"}},
+		// Only a plain string href is read, and the first one.
+		{`<a href={"/about"}>x</a>`, nil},
+		{`<a HREF="/about">x</a>`, nil},
+		{`<a href="/about" href="/nothing">x</a>`, []string{"/about/"}},
+		{`<a href="/nothing" href="/about">x</a>`, nil},
+		// download exempts by presence, whatever its value.
+		{`<a href="/about" download>x</a>`, nil},
+		{`<a href="/about" download={false}>x</a>`, nil},
+		{`<a {...p} href="/about">x</a>`, []string{"/about/"}},
+		// Divergence, kept: upstream throws reading `.value.value` of an attribute with no value,
+		// and ESLint reports nothing for the file. A bare href has no route to match; a bare target
+		// is not `_blank`.
+		{`<a href>x</a>`, nil},
+		{`<a href="/about" target>x</a>`, []string{"/about/"}},
+		// Divergence, not this rule's: ESLint's parser decodes HTML entities in a JSX attribute string
+		// and reports `/about/` here, while jsx.StringAttributeValue hands every rule the text as
+		// written. Pinned so a decoding fix on the shelf shows up here as a changed row.
+		{`<a href="&#47;about">x</a>`, nil},
+	}, "pages/about.tsx")
+}
+
+func TestNoHtmlLinkForPagesFollowsSymbolicLinksAsNodeLists(t *testing.T) {
+	t.Parallel()
+
+	// A link to a page file is a page, judged by its name. A link to a directory is not walked,
+	// because Node's dirent reports the link and not the directory.
+	rows := []htmlLinkRow{
+		{`<a href="/link">x</a>`, []string{"/link/"}},
+		{`<a href="/dirlink/deep">x</a>`, nil},
+	}
+	result := rule_testing.RunTypedFilesWithSetup(t, NoHtmlLinkForPages, htmlLinkTree(rows, "real/linked.tsx", "pages/index.tsx", "realdir/deep.tsx"), "foo.tsx", func(directory string) {
+		if err := os.Symlink(filepath.Join("..", "real", "linked.tsx"), filepath.Join(directory, "pages", "link.tsx")); err != nil {
+			t.Fatalf("linking the page file: %v", err)
+		}
+		if err := os.Symlink(filepath.Join("..", "realdir"), filepath.Join(directory, "pages", "dirlink")); err != nil {
+			t.Fatalf("linking the directory: %v", err)
+		}
+	})
+	expectHtmlLinkRows(t, result, rows)
+}
+
+func TestNoHtmlLinkForPagesTakesPagesDirectories(t *testing.T) {
+	t.Parallel()
+
+	// An empty list is truthy upstream, so it names no pages directory, and the app directory still
+	// counts.
+	t.Run("an empty list with an app directory", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `[]`, "pages/index.tsx", "app/page.tsx")
+	})
+	t.Run("an empty list alone", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `[]`, "pages/index.tsx")
+	})
+
+	// An empty string is falsy upstream, so it is the default.
+	t.Run("an empty string", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `""`, "pages/index.tsx")
+	})
+
+	t.Run("a directory that does not exist", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `"nope"`, "pages/index.tsx")
+	})
+
+	// The option replaces the pages directories and never the app directories.
+	t.Run("a custom directory beside pages and app", func(t *testing.T) {
+		t.Parallel()
+		runHtmlLinkTreeWithOption(t, []htmlLinkRow{
+			{`<a href="/">x</a>`, []string{"/"}},
+			{`<a href="/about">x</a>`, []string{"/about/"}},
+		}, `"custom"`, "custom/about.tsx", "pages/index.tsx", "app/page.tsx")
+	})
+}
+
+// Divergence, kept and ruled on #d21war2: a relative pages directory resolves against the config
+// file's directory, where upstream resolves it against the process's working directory. Pinned with
+// the config one level below the root, the only place the two readings part: `custom` there is
+// `sub/custom`, where ESLint started at the root would read the root's `custom`.
+func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(t *testing.T) {
+	t.Parallel()
+
+	rows := []htmlLinkRow{
+		{`<a href="/sub-page">x</a>`, []string{"/sub-page/"}},
+		{`<a href="/root-page">x</a>`, nil},
+	}
+	files := htmlLinkTree(rows, "sub/custom/sub-page.tsx", "custom/root-page.tsx")
+	result := rule_testing.RunTypedFilesWithOptionsFor(t, NoHtmlLinkForPages, files, "foo.tsx", func(directory string) any {
+		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(`"custom"`), rule.OptionsBase{ConfigDirectory: filepath.Join(directory, "sub"), ProjectRoot: directory})
+		if err != nil {
+			t.Fatalf("decoding: %v", err)
+		}
+		return decoded
+	})
+	expectHtmlLinkRows(t, result, rows)
+}
+
+func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(t *testing.T) {
+	t.Parallel()
+
+	base := rule.OptionsBase{ConfigDirectory: "/project/config", ProjectRoot: "/project"}
+	accepted := []struct {
+		raw  string
+		want NoHtmlLinkForPagesOptions
 	}{
-		{
-			// A self-closing anchor never produces a JsxOpeningElement, so a rule listening only
-			// to the paired form is silent on it. oxc anchors on JSXOpeningElement, which its
-			// parser produces for both forms; our parser does not, so both listeners are required
-			// and this case is what holds them there.
-			name:    "self closing anchor",
-			element: `<a href="/about" />`,
-		},
-		{
-			// `target` set to anything other than _blank does not exempt. Upstream compares the
-			// literal exactly, so only the one value is special.
-			name:    "target set to something other than blank",
-			element: `<a href="/about" target="_self">About</a>`,
-		},
-		{
-			// A `target` written as an expression cannot be read as a string literal, so the
-			// exemption does not apply and the anchor reports. This pins the direction: an
-			// unreadable target is not treated as possibly-_blank.
-			name:    "target written as an expression",
-			element: `<a href="/about" target={windowTarget}>About</a>`,
-		},
-		{
-			// The scheme test reads the text before the first slash. A path segment containing a
-			// colon after the first slash therefore does not exempt, because only the first
-			// segment is examined.
-			name:    "colon in a later path segment",
-			element: `<a href="/about:us">About</a>`,
-		},
-		{
-			// A query-only href has no slash and no colon, so the first segment is the whole
-			// string and it reports. Upstream writes no such case and this is where its shape test
-			// lands.
-			name:    "query only href",
-			element: `<a href="?page=2">Next</a>`,
-		},
-		{
-			// Attribute names are matched case-sensitively, so an uppercase TARGET does not
-			// exempt and the anchor reports. Pinned against the release binary, which reports
-			// here. A case-insensitive matcher would silence this, and a mutation sweep found
-			// nothing else in the corpus could tell the two matchers apart.
-			name:    "uppercase target does not exempt",
-			element: `<a href="/about" TARGET="_blank">About</a>`,
-		},
-		{
-			// Same for the download exemption, and also pinned against the release binary.
-			name:    "uppercase download does not exempt",
-			element: `<a href="/about" DOWNLOAD>About</a>`,
-		},
+		{``, NoHtmlLinkForPagesOptions{}},
+		{`""`, NoHtmlLinkForPagesOptions{}},
+		{`"pages"`, NoHtmlLinkForPagesOptions{Configured: true, PagesDirectories: []string{"/project/config/pages"}}},
+		{`"/elsewhere/pages"`, NoHtmlLinkForPagesOptions{Configured: true, PagesDirectories: []string{"/elsewhere/pages"}}},
+		{`[]`, NoHtmlLinkForPagesOptions{Configured: true, PagesDirectories: []string{}}},
+		{`["a", "../b", ""]`, NoHtmlLinkForPagesOptions{Configured: true, PagesDirectories: []string{"/project/config/a", "/project/b", ""}}},
+	}
+	for _, testCase := range accepted {
+		t.Run("accepts "+testCase.raw, func(t *testing.T) {
+			t.Parallel()
+			var raw []byte
+			if testCase.raw != "" {
+				raw = []byte(testCase.raw)
+			}
+			decoded, err := decodeNoHtmlLinkForPagesOptions(raw, base)
+			if err != nil {
+				t.Fatalf("refused: %v", err)
+			}
+			got := decoded.(NoHtmlLinkForPagesOptions)
+			if got.Configured != testCase.want.Configured || !slices.Equal(got.PagesDirectories, testCase.want.PagesDirectories) {
+				t.Errorf("decoded %+v, want %+v", got, testCase.want)
+			}
+		})
 	}
 
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
+	refused := []struct {
+		raw  string
+		base rule.OptionsBase
+		want string
+	}{
+		{`{}`, base, "expected a pages directory or a list of them"},
+		{`3`, base, "expected a pages directory or a list of them"},
+		{`true`, base, "expected a pages directory or a list of them"},
+		{`["a", 3]`, base, "element 2 of the pages directory list is 3"},
+		{`["a", null]`, base, "element 2 of the pages directory list is null"},
+		{`["a", "a"]`, base, `names "a" twice`},
+		{`"pages"`, rule.OptionsBase{}, "is relative and the config's directory is not known"},
+	}
+	for _, testCase := range refused {
+		t.Run("refuses "+testCase.raw, func(t *testing.T) {
 			t.Parallel()
-			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
-			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+			_, err := decodeNoHtmlLinkForPagesOptions([]byte(testCase.raw), testCase.base)
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Errorf("error %v, want one containing %q", err, testCase.want)
+			}
 		})
 	}
 }
 
-func TestNoHtmlLinkForPagesIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name    string
-		element string
-	}{
-		{
-			// A member-expression tag is a component reference and never emits an HTML anchor, so
-			// comparing the text alone would report code that renders no <a>. Pinned against the
-			// release binary, which is silent here.
-			name:    "member expression tag named a",
-			element: `<Foo.a href="/about">About</Foo.a>`,
-		},
-		{
-			// Upstream compares the tag name case-sensitively, so a capitalised component named A
-			// is not the HTML element. Also pinned against the release binary.
-			name:    "capitalised component",
-			element: `<A href="/about">About</A>`,
-		},
-		{
-			// An unlisted scheme declines through the colon test rather than by being named, which
-			// is the only thing that test does that the explicit prefix checks do not.
-			name:    "unlisted scheme",
-			element: `<a href="data:text/plain,hi">Data</a>`,
-		},
-		{
-			// No slash at all, and a colon in what is therefore the whole first segment. Upstream
-			// declines this and it is the shape most likely to be read as a relative path.
-			name:    "scheme like href with no slash",
-			element: `<a href="custom:thing">Thing</a>`,
-		},
-		{
-			// An empty href declines explicitly rather than falling through the shape test, which
-			// would otherwise call it internal.
-			name:    "empty href",
-			element: `<a href="">Empty</a>`,
-		},
-		{
-			// An element that spreads its attributes offers no href to read. The shelf helper
-			// declines a spread rather than treating it as absent, and either way the answer is
-			// silence, so this pins that a spread cannot be guessed at.
-			name:    "spread attributes",
-			element: `<a {...linkProperties}>Spread</a>`,
-		},
-		{
-			// The download exemption is presence rather than value, so a bare attribute with no
-			// initializer exempts. Upstream writes this too, but with the attribute after the
-			// href; this writes it on a relative href, where the exemption is the only thing
-			// standing between the input and a finding.
-			name:    "bare download on a relative href",
-			element: `<a href="about" download>About</a>`,
-		},
-		{
-			// The href name is matched case-sensitively too, so an uppercase HREF is not read as
-			// an href at all and the anchor has no route to judge. Pinned against the release
-			// binary, which is silent here. This is the opposite direction from the two uppercase
-			// cases above: there the exemption failed to apply and the anchor reported, here the
-			// href itself goes unseen and the anchor does not.
-			name:    "uppercase href is not an href",
-			element: `<a HREF="/about">About</a>`,
-		},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
-			rule_testing.ExpectClean(t, result)
-		})
-	}
-}
-
-// The finding points at the opening element and not at the whole element, which is what upstream's
-// snapshot underlines: `<a href='/about'>` is seventeen characters and the snapshot's label is
-// seventeen wide. A rule reporting the JsxElement instead would pass every assertion above.
+// The finding points at the opening element, which is what upstream reports: column 25 to the end
+// of `<a href='/about'>` in a measured row, and the whole element when it closes itself.
 func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name     string
-		element  string
-		reported string
-	}{
-		{
-			name:     "paired element reports the opening tag alone",
-			element:  `<a href='/about'>About</a>`,
-			reported: `<a href='/about'>`,
-		},
-		{
-			name:     "self closing element reports the whole element",
-			element:  `<a href='/about' />`,
-			reported: `<a href='/about' />`,
-		},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
+	for _, testCase := range []struct{ element, reported string }{
+		{`<a href='/about'>About</a>`, `<a href='/about'>`},
+		{`<a href='/about' />`, `<a href='/about' />`},
+	} {
+		t.Run(testCase.element, func(t *testing.T) {
 			t.Parallel()
-			source := htmlLinkSource(testCase.element)
-			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", source)
+			source := "export const C = () => (" + testCase.element + ");"
+			result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
 			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
-
 			diagnostic := result.Diagnostics[0]
-			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
-			if reported != testCase.reported {
+			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != testCase.reported {
 				t.Errorf("finding points at %q, want %q", reported, testCase.reported)
 			}
 		})
 	}
 }
 
-// The message the finding carries is asserted whole rather than by substring, because a substring
-// predicate is weaker than the property it guards.
-//
-// This rule interpolates nothing, so there is no rendered text distinct from the declared message
-// and no format verb that could be mismatched. What the assertion holds instead is that the finding
-// carries the message this rule declares and not a neighbour's: the package reports several
-// different raw elements through the same shape, and a report site handed the wrong message value
-// satisfies an identifier assertion whenever the two identifiers happen to match.
-func TestNoHtmlLinkForPagesCarriesItsOwnMessage(t *testing.T) {
+// The message is asserted whole, with the href interpolated as upstream interpolates it, normalized.
+func TestNoHtmlLinkForPagesNamesTheRouteInItsMessage(t *testing.T) {
 	t.Parallel()
 
-	result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(`<a href='/about'>About</a>`))
-	rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
-
-	wantDescription := "This is a raw <a> element pointing at an internal route. Use `Link` from " +
-		"`next/link`, which navigates on the client and prefetches the destination. A plain <a> " +
-		"does a full document load instead, so the application is torn down and rebuilt and every " +
-		"piece of in-memory state goes with it."
-	if got := result.Diagnostics[0].Message.Description; got != wantDescription {
-		t.Errorf("description is %q, want %q", got, wantDescription)
-	}
-	if got := result.Diagnostics[0].Message.Id; got != "noHtmlLinkForPages" {
-		t.Errorf("message id is %q, want %q", got, "noHtmlLinkForPages")
+	want := "This is a raw <a> element navigating to `/about/`, a route this project's pages or app " +
+		"directory defines. Use `Link` from `next/link`, which navigates on the client and prefetches " +
+		"the destination. A plain <a> does a full document load instead, so the application is torn " +
+		"down and rebuilt and every piece of in-memory state goes with it."
+	if got := noHtmlLinkForPagesMessage("/about/").Description; got != want {
+		t.Errorf("description is %q, want %q", got, want)
 	}
 }
