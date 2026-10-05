@@ -725,8 +725,9 @@ func writeLintReport(out io.Writer, report lintReport) {
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	fmt.Fprintf(accountOutput(invocationOutput(out)),
-		"lint: %d findings — %d rules over %d files, %d nodes visited, %s%s\n",
-		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, report.WalkCost,
+		"lint: %d findings — %d rules over %d files, %d nodes visited%s, %s%s\n",
+		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
+		report.WalkCost,
 		replayedFromCache(report.Result),
 	)
 
@@ -878,6 +879,15 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
 			entry.Name, strings.Join(entry.Details, ", "))
 	}
+}
+
+// nodesReplayedClause is the lint line's account of the nodes the cache answered for, which this run did not
+// walk: ", 2,360,633 more covered by replay". Empty when the walk covered every node itself.
+func nodesReplayedClause(coverage program.Coverage) string {
+	if coverage.NodesReplayed == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d more covered by replay", coverage.NodesReplayed)
 }
 
 // replayedFromCache says how much of a verdict was remembered rather than walked, so a reader can always

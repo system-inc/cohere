@@ -34,8 +34,13 @@ type Coverage struct {
 	// FilesWalked is how many files the rules actually visited.
 	FilesWalked int
 
-	// NodesVisited is how many AST nodes the traversal touched, across every file.
+	// NodesVisited is how many AST nodes this walk touched, across every file.
 	NodesVisited int
+
+	// NodesReplayed is how many nodes the replayed files' recorded walks visited, which this walk did not touch:
+	// a file whose every rule replayed, or whose walked rules listened to nothing. A count that added these to
+	// NodesVisited said "2,372,633 nodes visited" on an edit run that walked a few hundred files (#kdee854).
+	NodesReplayed int
 
 	// RulesRun is how many rules ran: were offered at least one file, here or in a replayed verdict.
 	//
@@ -153,6 +158,12 @@ type Coverage struct {
 	UnrunRuleReferences map[string]int
 }
 
+// NodesCovered is every node the verdict covers: the ones this walk touched and the ones replayed files'
+// recorded walks did. It is what a walk with no cache would report as NodesVisited.
+func (c Coverage) NodesCovered() int {
+	return c.NodesVisited + c.NodesReplayed
+}
+
 // Result is the findings of one walk, and the coverage that produced them.
 type Result struct {
 	Diagnostics []rule.Diagnostic
@@ -238,7 +249,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
 	offeredCounts := make(map[string]int, len(rules))
-	nodesVisited := 0
+	nodesVisited, nodesReplayed := 0, 0
 	suppressed := suppressionTally{}
 	filesIgnored := 0
 	scopedOff := map[string]int{}
@@ -296,7 +307,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localListening := make(map[string]int, len(rules))
 			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
-			localNodes := 0
+			localNodes, localNodesReplayed := 0, 0
 			localSuppressed := suppressionTally{}
 			localIgnored := 0
 			localScopedOff := map[string]int{}
@@ -425,7 +436,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 							replayedRecord = replayedAdamic(entry, hits)
 						}
 						if len(walkRules) == 0 {
-							localNodes += entry.VisitedNodes
+							localNodesReplayed += entry.VisitedNodes
 							if len(replayedNotes) > 0 {
 								localNotes[sourceFile.FileName()] = replayedNotes
 							}
@@ -532,11 +543,11 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					recording = false
 				}
 
-				// A replayed file counts the nodes its full walk visited. The walk counts nodes only when
-				// some rule listens, so the uncacheable rules alone could count none and change the
-				// coverage line.
-				if replayed != nil {
-					localNodes += replayed.VisitedNodes
+				// The walk counts nodes only when some rule listens, so a replayed file whose walked rules listened
+				// to nothing visited none, and its recorded walk's count stands, as replayed. One that was walked
+				// visited every node, which is the same count, walked.
+				if replayed != nil && visited == 0 {
+					localNodesReplayed += replayed.VisitedNodes
 				} else {
 					localNodes += visited
 				}
@@ -610,6 +621,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				reportingCounts[name] += count
 			}
 			nodesVisited += localNodes
+			nodesReplayed += localNodesReplayed
 			suppressed.add(localSuppressed)
 			filesIgnored += localIgnored
 			for name, count := range localScopedOff {
@@ -672,6 +684,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
 			NodesVisited:   nodesVisited,
+			NodesReplayed:  nodesReplayed,
 			RulesRun:       rulesOffered(offeredCounts),
 			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
