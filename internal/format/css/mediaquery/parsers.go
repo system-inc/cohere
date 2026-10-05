@@ -122,7 +122,10 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 			break
 		}
 
-		mediaFeature += string(character)
+		// The byte itself, as text: string(character) made it a rune, so each byte of a character outside ASCII
+		// became a character of its own, and a no-break space before a feature read as "\u00c2\u00a0", which is
+		// not whitespace (found by @system_adamic's stream P2).
+		mediaFeature += stringNormalized[i : i+1]
 	}
 
 	// Forming a media feature node
