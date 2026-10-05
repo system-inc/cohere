@@ -106,6 +106,9 @@ func Checker_isUnwrappedReturnTypeUndefinedVoidOrAny(recv *checker.Checker, fn *
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 
+//go:linkname Checker_isReadonlySymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isReadonlySymbol
+func Checker_isReadonlySymbol(recv *checker.Checker, symbol *ast.Symbol) bool
+
 //go:linkname Checker_resolveAlias github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).resolveAlias
 func Checker_resolveAlias(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
@@ -189,6 +192,9 @@ func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (s
 
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
+
+//go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
+func Checker_isTypeIdenticalTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 
 //go:linkname Checker_isTypeAssignableTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeAssignableTo
 func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool

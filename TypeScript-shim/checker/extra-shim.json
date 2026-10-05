@@ -30,6 +30,8 @@
 			"getBaseTypeOfLiteralType",
 			"getWidenedType",
 			"isTypeAssignableTo",
+			"isTypeIdenticalTo",
+			"isReadonlySymbol",
 			"isTypeStrictSubtypeOf",
 			"functionHasImplicitReturn",
 			"isUnwrappedReturnTypeUndefinedVoidOrAny",

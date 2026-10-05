@@ -24,6 +24,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 
+	_ "github.com/system-inc/cohere/internal/lint/rules/adamic"
 	_ "github.com/system-inc/cohere/internal/lint/rules/base"
 	_ "github.com/system-inc/cohere/internal/lint/rules/boundaries"
 	_ "github.com/system-inc/cohere/internal/lint/rules/core"

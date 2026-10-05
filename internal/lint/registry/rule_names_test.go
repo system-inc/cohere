@@ -47,6 +47,9 @@ func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 	// tree's own, both of which are correct bare.
 	knownNamespaces := map[string]bool{
 		"@typescript-eslint": true,
+		// Adamic's soundness rules (#drbrp8c), named by Adamic's own list in policy/RuleNaming.json, so
+		// one rule has one name in both projects.
+		"adamic": true,
 		// `base` is api-phi-health's own lint layer, the same kind of namespace as structure and
 		// nexus below: rules this organization wrote rather than ported from a plugin. It is not an
 		// ESLint plugin prefix, so nothing translates it on the way out.

@@ -25,6 +25,18 @@ type RuleNaming struct {
 	About      string           `json:"about"`
 	Verbs      []RuleNamingWord `json:"verbs"`
 	Categories []RuleNamingWord `json:"categories"`
+
+	// Namespaces are the namespaces whose rules are named by a closed list rather than by the scheme:
+	// `adamic/invariant-mutable` keeps Adamic's own name, so one rule has one name across both projects,
+	// and the guard still covers it because a name outside the list is refused.
+	Namespaces []RuleNamingNamespace `json:"namespaces"`
+}
+
+// RuleNamingNamespace is one namespace named by a closed list, and the sentence saying what belongs in it.
+type RuleNamingNamespace struct {
+	Name       string           `json:"name"`
+	Definition string           `json:"definition"`
+	Names      []RuleNamingWord `json:"names"`
 }
 
 // HouseRuleName is a house rule's name after its namespace, split into the scheme's three parts.
@@ -56,10 +68,27 @@ func loadRuleNaming(data []byte) (RuleNaming, error) {
 	if err := decoder.Decode(&naming); err != nil {
 		return RuleNaming{}, err
 	}
-	for _, list := range []struct {
+	lists := []struct {
 		label string
 		words []RuleNamingWord
-	}{{"verbs", naming.Verbs}, {"categories", naming.Categories}} {
+	}{{"verbs", naming.Verbs}, {"categories", naming.Categories}}
+	namespaces := make([]RuleNamingWord, 0, len(naming.Namespaces))
+	for _, namespace := range naming.Namespaces {
+		namespaces = append(namespaces, RuleNamingWord{Name: namespace.Name, Definition: namespace.Definition})
+		lists = append(lists, struct {
+			label string
+			words []RuleNamingWord
+		}{"namespaces: " + namespace.Name, namespace.Names})
+	}
+	// Checked as a list of its own, so a namespace named twice is refused the way a duplicate verb is. An
+	// empty list is fine: a file with no closed namespace names every rule by the scheme.
+	if len(namespaces) > 0 {
+		lists = append(lists, struct {
+			label string
+			words []RuleNamingWord
+		}{"namespaces", namespaces})
+	}
+	for _, list := range lists {
 		if len(list.words) == 0 {
 			return RuleNaming{}, fmt.Errorf("%s is empty, so no name could fit", list.label)
 		}
@@ -106,6 +135,24 @@ func (naming RuleNaming) ParseHouseRuleName(leaf string) (HouseRuleName, error) 
 		return HouseRuleName{}, fmt.Errorf("%q has the category %q, and what follows is not a verb from the closed list and an object", leaf, category)
 	}
 	return HouseRuleName{}, fmt.Errorf("%q does not begin with a category from the closed list", leaf)
+}
+
+// ParseRuleName judges a house rule's name in its namespace: against the closed list when the namespace
+// has one, and by the scheme otherwise. A closed name reads as the namespace for its category and the
+// whole name for its object, since it was never built from a verb.
+func (naming RuleNaming) ParseRuleName(namespace string, leaf string) (HouseRuleName, error) {
+	for _, closed := range naming.Namespaces {
+		if closed.Name != namespace {
+			continue
+		}
+		for _, name := range closed.Names {
+			if name.Name == leaf {
+				return HouseRuleName{Category: closed.Name, Object: leaf}, nil
+			}
+		}
+		return HouseRuleName{}, fmt.Errorf("%q is not in the %s namespace's closed list in RuleNaming.json", leaf, closed.Name)
+	}
+	return naming.ParseHouseRuleName(leaf)
 }
 
 // isKebabWord is one or more lowercase words of letters and digits joined by single dashes.

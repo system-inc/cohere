@@ -194,7 +194,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 484 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 491 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -332,6 +332,18 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `@typescript-eslint/unbound-method`
 - `@typescript-eslint/unified-signatures`
 - `@typescript-eslint/use-unknown-in-catch-callback-variable`
+
+</details>
+
+<details><summary><code>adamic</code>, 7 rules</summary>
+
+- `adamic/invariant-mutable`
+- `adamic/no-definite-assignment`
+- `adamic/no-optional-widening`
+- `adamic/no-type-predicate`
+- `adamic/no-unchecked-cast`
+- `adamic/nominal-class`
+- `adamic/single-spread`
 
 </details>
 

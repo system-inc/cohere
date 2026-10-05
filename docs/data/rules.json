@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 538,
+    "count": 545,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -4166,6 +4166,62 @@
                     "severity": "error"
                 }
             ]
+        },
+        {
+            "name": "adamic/invariant-mutable",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": true
+        },
+        {
+            "name": "adamic/no-definite-assignment",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": false
+        },
+        {
+            "name": "adamic/no-optional-widening",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": true
+        },
+        {
+            "name": "adamic/no-type-predicate",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": false
+        },
+        {
+            "name": "adamic/no-unchecked-cast",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": true
+        },
+        {
+            "name": "adamic/nominal-class",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": true
+        },
+        {
+            "name": "adamic/single-spread",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": false
         },
         {
             "name": "array-callback-return",
