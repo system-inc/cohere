@@ -18,8 +18,44 @@ type Violation struct {
 	Expected string
 }
 
+// Error names the element the way a config author counts them, the first after the severity being
+// element 1, and the path inside it: `element 1 at allow[1].from: upstream's schema expects ...`.
 func (violation *Violation) Error() string {
-	return fmt.Sprintf("at %s, upstream's schema expects %s", violation.Path, violation.Expected)
+	where := violation.Path
+	if rest, isElement := strings.CutPrefix(violation.Path, "["); isElement {
+		if closing := strings.Index(rest, "]"); closing > 0 {
+			if index, err := strconv.Atoi(rest[:closing]); err == nil {
+				where = "element " + strconv.Itoa(index+1)
+				if inner := strings.TrimPrefix(rest[closing+1:], "."); inner != "" {
+					where += " at " + inner
+				}
+			}
+		}
+	}
+	return fmt.Sprintf("%s: upstream's schema, which ESLint validates against, expects %s", where, violation.Expected)
+}
+
+// Extension is a shape cohere accepts on purpose beyond upstream's schema: one key of one option
+// element, removed before the element is checked and left for the rule's own decoder to read.
+type Extension struct {
+	Rule string
+	// Element counts as a config author does: 1 is the first element after the severity.
+	Element int
+	Key     string
+	Reason  string
+}
+
+// Extensions are every shape cohere accepts that upstream's schema refuses. Each is a decision, so the
+// list's length is asserted exactly (TestExtensionsAreExactlyTheDeclaredOnes) and adding one means
+// changing that number on purpose (#pd2chkx condition 6).
+var Extensions = []Extension{
+	{
+		Rule:    "boundaries/dependencies",
+		Element: 1,
+		Key:     "elements",
+		Reason: "upstream reads its element descriptors from settings[\"boundaries/elements\"] beside the rule, " +
+			"and cohere's config carries no per-plugin settings, so they are written in the rule's own options",
+	},
 }
 
 // Check validates a rule's option elements, the list after the severity, against upstream's schema. A
@@ -29,7 +65,38 @@ func Check(ruleName string, elements []json.RawMessage) error {
 	if err != nil || !found {
 		return err
 	}
-	return schema.Validate(elements)
+	return schema.Validate(withoutExtensions(ruleName, elements))
+}
+
+// withoutExtensions removes each declared extension key from its element, leaving the rest to be
+// checked as upstream wrote its schema.
+func withoutExtensions(ruleName string, elements []json.RawMessage) []json.RawMessage {
+	var stripped []json.RawMessage
+	for _, extension := range Extensions {
+		if extension.Rule != ruleName || extension.Element < 1 || extension.Element > len(elements) {
+			continue
+		}
+		var object map[string]json.RawMessage
+		if json.Unmarshal(elements[extension.Element-1], &object) != nil {
+			continue
+		}
+		if _, present := object[extension.Key]; !present {
+			continue
+		}
+		delete(object, extension.Key)
+		encoded, err := json.Marshal(object)
+		if err != nil {
+			continue
+		}
+		if stripped == nil {
+			stripped = append([]json.RawMessage(nil), elements...)
+		}
+		stripped[extension.Element-1] = encoded
+	}
+	if stripped == nil {
+		return elements
+	}
+	return stripped
 }
 
 // Validate checks an option list against the schema and returns its first Violation, or nil.

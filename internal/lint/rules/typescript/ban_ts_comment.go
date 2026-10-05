@@ -3,13 +3,13 @@ package typescript
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -259,9 +259,11 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 		}
 
 		if setting.Kind == BanTsCommentDescriptionFormat && setting.DescriptionFormat != nil {
-			if !setting.DescriptionFormat.MatchString(description) {
+			// A match that overruns esregexp's time bound counts as a match, so a pathological pattern
+			// is silent rather than reporting every description.
+			if !setting.DescriptionFormat.TestOrTimeout(description) {
 				ctx.ReportRange(contentRange, messageBanTsCommentDescriptionFormat(
-					directive, setting.DescriptionFormat.String()))
+					directive, setting.DescriptionFormat.Source()))
 			}
 		}
 	}
@@ -446,7 +448,10 @@ type BanTsCommentSetting struct {
 	// DescriptionFormat is read only when Kind is BanTsCommentDescriptionFormat, and it may be nil
 	// there: upstream's `DescriptionFormat(Option<Regex>)` holds `None` for
 	// `{ "descriptionFormat": null }`, which then applies the length check alone.
-	DescriptionFormat *regexp.Regexp
+	//
+	// Compiled as JavaScript compiles it, because upstream builds it with `new RegExp(descriptionFormat)`:
+	// a pattern with a lookahead is one ESLint accepts and Go's regexp cannot compile.
+	DescriptionFormat *esregexp.RegExp
 }
 
 // BanTsCommentOptions configures which directives report and what an acceptable description is.
@@ -535,11 +540,13 @@ type banTsCommentRawOptions struct {
 // per-key defaults for anything absent.
 //
 // A hand-written decoder rather than `rule.DecodeOptionsInto` because four of the five keys are
-// polymorphic and none of the five defaults is a Go zero value. An unrecognized shape falls back to
-// the default rather than disabling the key: upstream refuses such a configuration outright, and
-// there is no error channel reaching a user here, so keeping the documented behavior beats going
-// quiet on a typo. The one exception is a key inside the object form that upstream's schema does
-// not declare, which is refused like an unknown key anywhere else in a rule's options (#4a4yse4).
+// polymorphic and none of the five defaults is a Go zero value. A value upstream refuses is refused
+// here too, naming the key: an unrecognized string, a type the key does not take, and a pattern
+// JavaScript cannot compile. This decoder once kept the default instead, on the reasoning that no
+// error reached a user from here; a decoder's error now reaches the user as a config refusal naming
+// the rule, so the fallback only hid a typo (ruled on #pd2chkx). The config layer checks the shape
+// against typescript-eslint's schema before this runs, so the first two refusals are this
+// decoder's own guard for a caller that reaches it directly.
 func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
 	if err != nil {
@@ -574,21 +581,12 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 }
 
 // settingOrDefaultBanTsComment reads one directive's wire value, keeping the default when it is
-// absent or a shape this key does not accept.
+// absent and refusing a value upstream refuses.
 //
-// This is upstream's hand-written `Deserialize for DirectiveConfig`, which accepts a boolean, the
-// exact string `allow-with-description`, or an object carrying `descriptionFormat`. Anything else
-// is an error there and the default here, for the reason on the decoder.
-//
-// An unparseable regex is also the default rather than a panic. Upstream refuses the whole config
-// at load time, which it can because it has an error channel to a user; the honest equivalent here
-// is to keep the documented behavior rather than to compile a pattern that would match nothing.
-//
-// An object that does not decode is the error: a key other than `descriptionFormat`, which
-// typescript-eslint's schema refuses (`additionalProperties: false`), or a value that is not a
-// string. Strict decoding cannot fall back here
-// the way the other shapes do: an object refused for a misspelled key would silently become the
-// default, which drops the whole setting where the old lenient decode dropped only the key.
+// It accepts what typescript-eslint's schema accepts: a boolean, the exact string
+// `allow-with-description`, or an object whose only key is `descriptionFormat`, a string. Anything
+// else is refused, and so is a descriptionFormat `new RegExp` would throw on, which fails ESLint's
+// config load when the rule is created.
 func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSetting) (BanTsCommentSetting, error) {
 	if len(raw) == 0 {
 		return fallback, nil
@@ -604,7 +602,7 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		if asString == "allow-with-description" {
 			return BanTsCommentSetting{Kind: BanTsCommentRequireDescription}, nil
 		}
-		return fallback, nil
+		return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
 	}
 
 	var asObject struct {
@@ -617,9 +615,9 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		if asObject.DescriptionFormat == nil {
 			return BanTsCommentSetting{Kind: BanTsCommentDescriptionFormat}, nil
 		}
-		compiled, compileError := regexp.Compile(*asObject.DescriptionFormat)
+		compiled, compileError := esregexp.Compile(*asObject.DescriptionFormat, "")
 		if compileError != nil {
-			return fallback, nil
+			return fallback, fmt.Errorf("descriptionFormat %q is not a pattern JavaScript can compile: %w", *asObject.DescriptionFormat, compileError)
 		}
 		return BanTsCommentSetting{
 			Kind:              BanTsCommentDescriptionFormat,
@@ -627,5 +625,5 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		}, nil
 	}
 
-	return fallback, nil
+	return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
 }

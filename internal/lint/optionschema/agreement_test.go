@@ -204,3 +204,74 @@ func TestSchemasCoverEveryPortedRule(t *testing.T) {
 		}
 	}
 }
+
+// A bare severity is an empty option list, which the config layer does not check because no upstream
+// schema refuses it. This holds that true for every embedded schema.
+func TestEverySchemaAcceptsTheBareSeverity(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range RuleNames() {
+		schema, found, err := For(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if found {
+			if violation := schema.Validate(nil); violation != nil {
+				t.Errorf("%s refuses the bare severity: %v", name, violation)
+			}
+		}
+	}
+}
+
+// The extension list is a set of decisions, so its size is a bare equality: adding one is a change to
+// this number, made on purpose (#pd2chkx condition 6).
+func TestExtensionsAreExactlyTheDeclaredOnes(t *testing.T) {
+	t.Parallel()
+
+	if len(Extensions) != 1 {
+		t.Fatalf("there are %d extensions, and exactly 1 is declared", len(Extensions))
+	}
+	for _, extension := range Extensions {
+		if extension.Reason == "" {
+			t.Errorf("%s's extension %q carries no reason", extension.Rule, extension.Key)
+		}
+		if _, found, _ := For(extension.Rule); !found {
+			t.Errorf("%s has an extension and no schema", extension.Rule)
+		}
+	}
+}
+
+// boundaries/dependencies' elements load through its extension, are refused without it, and the rest of
+// the element is still checked.
+func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(t *testing.T) {
+	t.Parallel()
+
+	withElements := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[{"type":"api","pattern":"api/**"}]}`)}
+	if err := Check("boundaries/dependencies", withElements); err != nil {
+		t.Errorf("elements are refused: %v", err)
+	}
+	schema, _, _ := For("boundaries/dependencies")
+	if err := schema.Validate(withElements); err == nil {
+		t.Errorf("upstream's schema accepts elements without the extension, so the extension is not needed")
+	}
+	otherKey := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[],"notAnUpstreamKey":true}`)}
+	if err := Check("boundaries/dependencies", otherKey); err == nil {
+		t.Errorf("a key outside the extension is accepted")
+	}
+}
+
+// A refusal names the element as a config author counts it, the path inside it, and what upstream
+// expected (#pd2chkx condition 8).
+func TestARefusalNamesTheElementThePathAndTheExpectation(t *testing.T) {
+	t.Parallel()
+
+	err := Check("@typescript-eslint/no-deprecated", []json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)})
+	if err == nil {
+		t.Fatal("a mis-cased from is accepted")
+	}
+	for _, want := range []string{"element 1 at allow[0]", "upstream's schema, which ESLint validates against, expects"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal %q does not say %q", err, want)
+		}
+	}
+}

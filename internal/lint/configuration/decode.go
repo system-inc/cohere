@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/optionschema"
 )
 
 // Decoder turns a rule's raw JSON options into the typed value that rule expects.
@@ -126,6 +128,22 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 			return nil, nil
 		}
 		return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+	}
+
+	// A ported rule's options are also checked against upstream's own schema, so cohere accepts
+	// exactly the shapes ESLint accepts (#pd2chkx). A Go decoder reads what its types let it: an
+	// unknown enum string fell back to a default, a duplicate stayed a duplicate, and an entry missing
+	// a required key decoded and was then dropped, all shapes ESLint refuses. One check here covers
+	// every decoder.
+	//
+	// It runs after the decoder, so a shape both refuse keeps the decoder's message, which knows the
+	// rule (an extra element is named by its text, an unknown key by the rule's own words); the
+	// schema's refusal is for what the decoder let through. A bare severity is not checked, since no
+	// upstream schema refuses an empty list (TestEverySchemaAcceptsTheBareSeverity).
+	if len(elements) > 0 {
+		if err := optionschema.Check(ruleName, elements); err != nil {
+			return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+		}
 	}
 	return decoded, nil
 }
