@@ -3,6 +3,7 @@ package adamic
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/checking/flow"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -102,10 +103,10 @@ var NoOptionalWidening = rule.Rule{
 				Id: "optionalWidening",
 				Description: noOptionalWideningText.Render(map[string]string{
 					"slot":         slotText(ctx.SourceFile, site.Node, found.Path),
-					"source":       typeChecker.TypeToString(found.Source),
-					"target":       typeChecker.TypeToString(found.Target),
-					"property":     missing.Name,
-					"propertyType": typeChecker.TypeToString(checker.Checker_getTypeOfSymbol(typeChecker, missing)),
+					"source":       type_checking.StableTypeText(typeChecker, found.Source),
+					"target":       type_checking.StableTypeText(typeChecker, found.Target),
+					"property":     type_checking.StablePropertyName(missing.Name),
+					"propertyType": type_checking.StableTypeText(typeChecker, checker.Checker_getTypeOfSymbol(typeChecker, missing)),
 				}),
 			})
 		})

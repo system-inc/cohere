@@ -219,35 +219,100 @@ var ConsistentTypeImports = rule.Rule{
 					return
 				}
 
-				if settings.DisallowTypeAnnotations {
-					reportImportTypeAnnotations(ctx, sourceFile)
-				}
+				declarations := imports.Declarations(sourceFile)
+				judgesValueImports := settings.Prefer != ConsistentTypeImportsPreferNoTypeImports &&
+					consistentTypeImportsHasValueImport(declarations)
+				facts := consistentTypeImportsScan(ctx, sourceFile, settings.DisallowTypeAnnotations,
+					judgesValueImports, declarations)
 
 				switch settings.Prefer {
 				case ConsistentTypeImportsPreferNoTypeImports:
-					reportTypeKeywordsToRemove(ctx, sourceFile)
+					reportTypeKeywordsToRemove(ctx, declarations)
 				default:
-					reportImportsUsedOnlyAsTypes(ctx, sourceFile, settings.FixStyle)
+					if judgesValueImports {
+						reportImportsUsedOnlyAsTypes(ctx, sourceFile, declarations, facts, settings.FixStyle)
+					}
 				}
 			},
 		}
 	},
 }
 
-// reportImportTypeAnnotations flags every `import('m')` written inside a type.
+// consistentTypeImportsFacts is what the type-imports judgment reads about a file, gathered in one
+// walk. Nil maps when the file has no value import to judge.
+type consistentTypeImportsFacts struct {
+	// byText indexes the identifiers spelled like an imported local name. See
+	// consistentTypeImportsLocalNames.
+	byText map[string][]*ast.Node
+	// metadataRoots are the identifiers decorator metadata emits as runtime references. See
+	// markDecoratorMetadataRoots.
+	metadataRoots map[*ast.Node]bool
+	// jsxValueNames are the bindings this file's JSX uses as values. See
+	// consistentTypeImportsJsxValueNames.
+	jsxValueNames map[string]bool
+}
+
+// consistentTypeImportsScan walks the file once, reporting every `import('m')` written inside a type
+// when reportImportTypes is set, and gathering the facts the type-imports judgment reads when
+// gatherFacts is set.
 //
-// A whole-file walk rather than a listener on the kind, because the rule already owns a
+// One walk rather than four. Each of those questions used to walk the whole file on its own, and
+// together they made this rule 153ms of rule CPU on a cold ahra run, among the costliest rules that
+// visit once per file (#fcac58b). The questions are independent per node, so one visit answers all
+// of them.
+//
+// A whole-file walk rather than a listener on `KindImportType`, because the rule already owns a
 // `KindSourceFile` listener for the parts that must gather before they judge, and splitting one
 // judgment across two anchors makes the ordering of findings depend on the walk rather than on the
-// source. Findings come out in source order either way, which is what the corpus asserts.
-func reportImportTypeAnnotations(ctx rule.Context, sourceFile *ast.SourceFile) {
+// source. The `import()` findings come out in source order, ahead of the declarations' findings,
+// which is what the corpus asserts.
+func consistentTypeImportsScan(
+	ctx rule.Context,
+	sourceFile *ast.SourceFile,
+	reportImportTypes bool,
+	gatherFacts bool,
+	declarations []*ast.Node,
+) consistentTypeImportsFacts {
+	if !reportImportTypes && !gatherFacts {
+		return consistentTypeImportsFacts{}
+	}
+
+	var wanted map[string]bool
+	var byText map[string][]*ast.Node
+	var metadataRoots map[*ast.Node]bool
+	var metadata decoratorMetadataSettings
+	if gatherFacts {
+		wanted = consistentTypeImportsLocalNames(declarations)
+		byText = make(map[string][]*ast.Node, len(wanted))
+		metadataRoots = map[*ast.Node]bool{}
+		metadata = decoratorMetadataSettingsOf(ctx)
+	}
+	hasJsx := false
+	hasFragment := false
+
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
 			return
 		}
-		if current.Kind == ast.KindImportType {
+		if reportImportTypes && current.Kind == ast.KindImportType {
 			ctx.ReportNode(current, messageConsistentTypeImportsNoImportTypeAnnotations)
+		}
+		if gatherFacts {
+			switch current.Kind {
+			case ast.KindIdentifier:
+				if text := current.Text(); wanted[text] {
+					byText[text] = append(byText[text], current)
+				}
+			case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
+				hasJsx = true
+			case ast.KindJsxFragment:
+				hasJsx = true
+				hasFragment = true
+			}
+			if metadata.enabled {
+				markDecoratorMetadataRoots(current, metadataRoots, metadata)
+			}
 		}
 		current.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
@@ -255,6 +320,28 @@ func reportImportTypeAnnotations(ctx rule.Context, sourceFile *ast.SourceFile) {
 		})
 	}
 	visit(sourceFile.AsNode())
+
+	if !gatherFacts {
+		return consistentTypeImportsFacts{}
+	}
+	return consistentTypeImportsFacts{
+		byText:        byText,
+		metadataRoots: metadataRoots,
+		jsxValueNames: consistentTypeImportsJsxValueNames(ctx, hasJsx, hasFragment),
+	}
+}
+
+// consistentTypeImportsHasValueImport reports whether any declaration could report under
+// `prefer: type-imports`: one that binds something and is not already `import type`. A file with
+// none pays nothing for the facts.
+func consistentTypeImportsHasValueImport(declarations []*ast.Node) bool {
+	for _, statement := range declarations {
+		clause := statement.AsImportDeclaration().ImportClause
+		if clause != nil && !clause.AsImportClause().IsTypeOnly() {
+			return true
+		}
+	}
+	return false
 }
 
 // reportTypeKeywordsToRemove implements `prefer: no-type-imports`.
@@ -266,10 +353,11 @@ func reportImportTypeAnnotations(ctx rule.Context, sourceFile *ast.SourceFile) {
 //
 // Nothing about references is consulted here. The setting says the keyword is unwanted wherever it
 // appears, so a type-only import of a name used only as a type still reports.
-func reportTypeKeywordsToRemove(ctx rule.Context, sourceFile *ast.SourceFile) {
-	// Every import declaration, including those inside an ambient module body, the way upstream
-	// visits ImportDeclaration wherever it sits.
-	for _, statement := range imports.Declarations(sourceFile) {
+//
+// declarations is every import declaration, including those inside an ambient module body, the way
+// upstream visits ImportDeclaration wherever it sits.
+func reportTypeKeywordsToRemove(ctx rule.Context, declarations []*ast.Node) {
+	for _, statement := range declarations {
 		clause := statement.AsImportDeclaration().ImportClause
 		if clause == nil {
 			continue
@@ -298,15 +386,17 @@ func reportTypeKeywordsToRemove(ctx rule.Context, sourceFile *ast.SourceFile) {
 // against the named specifiers: `import A, {} from 'foo'` has one specifier and one type-only name,
 // so it takes the whole-declaration message, which is what the corpus's `import A, {} from 'foo'`
 // case asserts.
-func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, fixStyle ConsistentTypeImportsFixStyle) {
-	// Built once and only when an import that could report actually exists, so a file with no
-	// value imports at all pays nothing for the index.
-	var byText map[string][]*ast.Node
-	var metadataRoots map[*ast.Node]bool
-	var jsxValueNames map[string]bool
-
-	// Every import declaration, including those inside an ambient module body (#7g5r6vt).
-	for _, statement := range imports.Declarations(sourceFile) {
+//
+// declarations is every import declaration, including those inside an ambient module body
+// (#7g5r6vt), and facts is consistentTypeImportsScan's answer for the file.
+func reportImportsUsedOnlyAsTypes(
+	ctx rule.Context,
+	sourceFile *ast.SourceFile,
+	declarations []*ast.Node,
+	facts consistentTypeImportsFacts,
+	fixStyle ConsistentTypeImportsFixStyle,
+) {
+	for _, statement := range declarations {
 		declaration := statement.AsImportDeclaration()
 		clause := declaration.ImportClause
 		if clause == nil {
@@ -317,12 +407,6 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 		if clause.AsImportClause().IsTypeOnly() {
 			// Already what the rule is asking for.
 			continue
-		}
-
-		if byText == nil {
-			byText = consistentTypeImportsIdentifiers(sourceFile)
-			metadataRoots = decoratorMetadataRoots(ctx, sourceFile)
-			jsxValueNames = consistentTypeImportsJsxValueNames(ctx, sourceFile)
 		}
 
 		bindings := imports.BindingsOf(statement)
@@ -336,7 +420,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 				return
 			}
 			specifierCount++
-			if jsxValueNames[local.Text()] {
+			if facts.jsxValueNames[local.Text()] {
 				// Every JSX element in the file is a value reference to the JSX factory, so the
 				// binding it names is a value use. See consistentTypeImportsJsxValueNames.
 				return
@@ -344,7 +428,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 			if alreadyTypeOnly {
 				return
 			}
-			if isReferencedOnlyAsType(ctx, byText, metadataRoots, local) {
+			if isReferencedOnlyAsType(ctx, facts.byText, facts.metadataRoots, local) {
 				typeOnlyNames = append(typeOnlyNames, local.Text())
 				typeOnlySpecifiers[specifier] = true
 			}
@@ -405,27 +489,10 @@ func reportConsistentTypeImportsWithFix(ctx rule.Context, node *ast.Node, messag
 // was never judged at all, so `import React from 'react'` used only in types in a file with no JSX
 // was silent where ESLint reports it, a parity gap phi web found. The binding is a value use exactly
 // when the file has JSX, under any import form, and a renamed import is not the pragma.
-func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.SourceFile) map[string]bool {
-	hasJsx := false
-	hasFragment := false
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil || hasFragment {
-			return
-		}
-		switch current.Kind {
-		case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
-			hasJsx = true
-		case ast.KindJsxFragment:
-			hasJsx = true
-			hasFragment = true
-		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-	visit(sourceFile.AsNode())
+//
+// hasJsx and hasFragment are whether the file holds any JSX element or fragment, and any fragment,
+// from consistentTypeImportsScan's walk.
+func consistentTypeImportsJsxValueNames(ctx rule.Context, hasJsx bool, hasFragment bool) map[string]bool {
 	if !hasJsx {
 		return nil
 	}
@@ -446,35 +513,40 @@ func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.Source
 	return names
 }
 
-// consistentTypeImportsIdentifiers indexes a file's identifiers by their text, once.
+// consistentTypeImportsLocalNames is every local name a value import declaration binds, which is
+// every name `isReferencedOnlyAsType` can be asked about. A declaration already written
+// `import type` is never judged, so its names are left out.
 //
-// Written as an index rather than as a walk per imported name because the naive shape re-walks the
-// whole tree for every specifier in every import statement, and a file with twenty imports then
-// visits every node twenty times. Measured on the ahra tree at 3,407 files: the per-name walk cost
-// 667ms and 2.9% of all rule time, which is the same shape as the rule that was 64.5% of a morning
-// because it rebuilt a map per file.
-//
-// Keyed by text because an identifier spelled differently cannot resolve to this import, so the text
-// is an exact pre-filter on a question that would otherwise cost a checker call per identifier. The
-// filter is not a discrimination: symbol identity below already implies it.
-func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile) map[string][]*ast.Node {
-	byText := map[string][]*ast.Node{}
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil {
-			return
+// The scan indexes identifiers by text rather than walking the file per imported name, because the
+// naive shape re-walks the whole tree for every specifier in every import statement: measured on the
+// ahra tree at 3,407 files, the per-name walk cost 667ms and 2.9% of all rule time. Keyed by text
+// because an identifier spelled differently cannot resolve to this import, so the text is an exact
+// pre-filter on a question that would otherwise cost a checker call per identifier; symbol identity
+// below already implies it. Only these texts are kept: indexing every identifier cost 37 MB in 477K
+// objects on a cold ahra run (#942rdnn), nearly all of it slices for names no import binds.
+func consistentTypeImportsLocalNames(declarations []*ast.Node) map[string]bool {
+	names := map[string]bool{}
+	for _, statement := range declarations {
+		clause := statement.AsImportDeclaration().ImportClause
+		if clause == nil || clause.AsImportClause().IsTypeOnly() {
+			continue
 		}
-		if current.Kind == ast.KindIdentifier {
-			text := current.Text()
-			byText[text] = append(byText[text], current)
+		bindings := imports.BindingsOf(statement)
+		if bindings.Default != nil {
+			names[bindings.Default.Text()] = true
 		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
+		if bindings.Namespace != nil {
+			if name := bindings.Namespace.Name(); name != nil {
+				names[name.Text()] = true
+			}
+		}
+		for _, named := range bindings.Named {
+			if name := named.Name(); name != nil {
+				names[name.Text()] = true
+			}
+		}
 	}
-	visit(sourceFile.AsNode())
-	return byText
+	return names
 }
 
 // isReferencedOnlyAsType answers the rule's single question for one imported name.
@@ -511,7 +583,8 @@ func isReferencedOnlyAsType(
 	return found
 }
 
-// decoratorMetadataRoots names the identifiers that decorator metadata turns into runtime references.
+// markDecoratorMetadataRoots names the identifiers that decorator metadata turns into runtime references,
+// for one node of consistentTypeImportsScan's walk.
 //
 // Under `emitDecoratorMetadata`, TypeScript serializes the types of a decorated declaration into
 // `design:paramtypes`, `design:type` and `design:returntype`, and a type that names a class is
@@ -526,67 +599,65 @@ func isReferencedOnlyAsType(
 // reports. The answer is one identifier per serialized type: the first identifier of the entity
 // name the checker extracts, which is the only part of the type the emitted code references.
 //
-// Empty when the option is off, which is the whole gate: without metadata no type position reaches
-// run time.
-func decoratorMetadataRoots(ctx rule.Context, sourceFile *ast.SourceFile) map[*ast.Node]bool {
-	roots := map[*ast.Node]bool{}
-	options := ctx.Program.Options()
-	if !options.EmitDecoratorMetadata.IsTrue() {
-		return roots
+// The walk asks only when the option is on, which is the whole gate: without metadata no type position
+// reaches run time.
+func markDecoratorMetadataRoots(current *ast.Node, roots map[*ast.Node]bool, metadata decoratorMetadataSettings) {
+	if !ast.CanHaveDecorators(current) || !ast.HasDecorators(current) || current.Modifiers() == nil ||
+		!ast.NodeCanBeDecorated(metadata.legacyDecorators, current, current.Parent, current.Parent.Parent) {
+		return
 	}
-	legacyDecorators := options.ExperimentalDecorators.IsTrue()
-	strictNullChecks := type_checking.IsStrictCompilerOptionEnabled(options, options.StrictNullChecks)
-
 	mark := func(typeNode *ast.Node) {
-		entityName := decoratorMetadataEntityName(typeNode, strictNullChecks)
+		entityName := decoratorMetadataEntityName(typeNode, metadata.strictNullChecks)
 		if entityName != nil && ast.IsEntityName(entityName) {
 			roots[ast.GetFirstIdentifier(entityName)] = true
 		}
 	}
-
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil {
-			return
-		}
-		if ast.CanHaveDecorators(current) && ast.HasDecorators(current) && current.Modifiers() != nil &&
-			ast.NodeCanBeDecorated(legacyDecorators, current, current.Parent, current.Parent.Parent) {
-			switch current.Kind {
-			case ast.KindClassDeclaration:
-				if constructor := ast.GetFirstConstructorWithBody(current); constructor != nil {
-					for _, parameter := range constructor.Parameters() {
-						mark(decoratorMetadataParameterType(parameter))
-					}
-				}
-			case ast.KindGetAccessor, ast.KindSetAccessor:
-				annotation := decoratorMetadataAccessorType(current)
-				if annotation == nil {
-					annotation = decoratorMetadataAccessorType(decoratorMetadataOtherAccessor(current))
-				}
-				mark(annotation)
-			case ast.KindMethodDeclaration:
-				for _, parameter := range current.Parameters() {
-					mark(decoratorMetadataParameterType(parameter))
-				}
-				mark(current.Type())
-			case ast.KindPropertyDeclaration:
-				mark(current.Type())
-			case ast.KindParameter:
-				// A decorated parameter serializes its whole signature, siblings and return included.
-				signature := current.Parent
-				for _, parameter := range signature.Parameters() {
-					mark(decoratorMetadataParameterType(parameter))
-				}
-				mark(signature.Type())
+	switch current.Kind {
+	case ast.KindClassDeclaration:
+		if constructor := ast.GetFirstConstructorWithBody(current); constructor != nil {
+			for _, parameter := range constructor.Parameters() {
+				mark(decoratorMetadataParameterType(parameter))
 			}
 		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
+	case ast.KindGetAccessor, ast.KindSetAccessor:
+		annotation := decoratorMetadataAccessorType(current)
+		if annotation == nil {
+			annotation = decoratorMetadataAccessorType(decoratorMetadataOtherAccessor(current))
+		}
+		mark(annotation)
+	case ast.KindMethodDeclaration:
+		for _, parameter := range current.Parameters() {
+			mark(decoratorMetadataParameterType(parameter))
+		}
+		mark(current.Type())
+	case ast.KindPropertyDeclaration:
+		mark(current.Type())
+	case ast.KindParameter:
+		// A decorated parameter serializes its whole signature, siblings and return included.
+		signature := current.Parent
+		for _, parameter := range signature.Parameters() {
+			mark(decoratorMetadataParameterType(parameter))
+		}
+		mark(signature.Type())
 	}
-	visit(sourceFile.AsNode())
-	return roots
+}
+
+// decoratorMetadataSettings is what markDecoratorMetadataRoots reads from the compiler options,
+// read once per file.
+type decoratorMetadataSettings struct {
+	enabled          bool
+	legacyDecorators bool
+	strictNullChecks bool
+}
+
+// decoratorMetadataSettingsOf reads the options that decide whether and how metadata is emitted.
+func decoratorMetadataSettingsOf(ctx rule.Context) decoratorMetadataSettings {
+	options := ctx.Program.Options()
+	return decoratorMetadataSettings{
+		enabled:          options.EmitDecoratorMetadata.IsTrue(),
+		legacyDecorators: options.ExperimentalDecorators.IsTrue(),
+		strictNullChecks: type_checking.IsStrictCompilerOptionEnabled(options, options.StrictNullChecks),
+	}
 }
 
 // decoratorMetadataEntityName is the checker's `getEntityNameForDecoratorMetadata`.

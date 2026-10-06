@@ -479,8 +479,8 @@ func findSetStateCall(
 		// A phi joining a ref-derived operand is ref-derived. Upstream does the same, and it is
 		// what carries the exemption across an `if` that assigns from a ref on one path.
 		for _, phi := range block.Phis {
-			for _, operand := range phi.Operands {
-				if refDerived[operand.Identifier] {
+			for _, entry := range phi.Operands {
+				if refDerived[entry.Place.Identifier] {
 					refDerived[phi.Place.Identifier] = true
 					break
 				}

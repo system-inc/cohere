@@ -173,7 +173,7 @@ func VerifySSA(function *Function) []SSAViolation {
 		// PREDECESSOR's exit rather than by the phi's own block. See the file comment.
 		for _, phi := range block.Phis {
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
-				operand := phi.Operands[predecessorId]
+				operand := phi.Operands.At(predecessorId)
 				predecessor, ok := function.Block(predecessorId)
 				if !ok {
 					continue

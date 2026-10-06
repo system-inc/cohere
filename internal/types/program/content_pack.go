@@ -235,6 +235,20 @@ func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole 
 	return unsafe.String(&view[0], len(view)), true
 }
 
+// readIdentity is the stat the program's copy of path was served or read under, when the pack has one: an entry
+// it served, or a file it read whole after a stat. See Graph.ReadUnchanged.
+func (p *ContentPack) readIdentity(path string) (fileIdentity, bool) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if added, read := p.added[path]; read {
+		return added.identity, true
+	}
+	if p.used[path] {
+		return p.entries[path].identity, true
+	}
+	return fileIdentity{}, false
+}
+
 // noteRead records a file read from disk, keepable when it was statted before the read and read whole.
 func (p *ContentPack) noteRead(path string, identity fileIdentity, keepable bool, contents string) {
 	p.mutex.Lock()

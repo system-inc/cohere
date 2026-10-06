@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// sharedReaderRules are the rules that read class surfaces through ClassLiteralReaderFor.
+// sharedReaderRules are the rules that read class surfaces through ClassLiteralSurfaces.ReaderFor.
 var sharedReaderRules = []rule.Rule{
 	EnforceCanonicalClasses, EnforceConsistentClassOrder, EnforceConsistentImportantPosition,
 	EnforceConsistentVariableSyntax, EnforceConsistentVariantOrder, EnforceShorthandClasses,

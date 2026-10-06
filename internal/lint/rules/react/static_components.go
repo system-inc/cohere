@@ -173,8 +173,8 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 		// operand, and the choice of which span to keep is arbitrary in both, since a value merged
 		// from two dynamic paths has two equally true creation sites.
 		for _, phi := range block.Phis {
-			for _, operand := range phi.Operands {
-				if creator, ok := dynamic[operand.Identifier]; ok {
+			for _, entry := range phi.Operands {
+				if creator, ok := dynamic[entry.Place.Identifier]; ok {
 					dynamic[phi.Place.Identifier] = creator
 					break
 				}

@@ -135,129 +135,73 @@ var NoConstAssign = rule.Rule{
 	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// Each constant declaration on the shared walk, reading the writes to its names from the
+		// file's identifier index.
+		//
+		// This listened on `KindVariableDeclarationList` once before and walked the whole file from
+		// each one, which is quadratic in how many constants a file declares: 881ms and 37.4% of all
+		// rule time on the ahra tree. It then gathered every constant in one walk from the file node
+		// and matched the writes in a second, still 86ms of rule CPU on a cold ahra run (#fcac58b).
+		// The index is built once per file for every rule that asks, so each name's writes are read
+		// from the few identifiers spelled like it, and the rule walks nothing itself.
+		//
+		// The anchors already judged, because a constant declared twice in one scope (a parse that
+		// recovers from the error) is one symbol whose anchor both declarations name.
+		judged := map[*ast.Node]bool{}
 		return rule.Listeners{
-			// One walk of the file, not one per declarator.
-			//
-			// This listened on `KindVariableDeclarationList` and walked the whole file from each
-			// one, which is quadratic in how many constants a file declares. Measured on the ahra
-			// tree it cost 881ms and 37.4% of all rule time while visiting fewer nodes than a rule
-			// costing 47ms, so the cost was the repetition rather than the work. Same shape as the
-			// theme-value rule that rebuilt its map per file.
-			//
-			// `KindSourceFile` fires before its children, so the constants are gathered in one pass
-			// and the writes are matched in a second. Two traversals total, whatever the file holds.
-			ast.KindSourceFile: func(node *ast.Node) {
+			ast.KindVariableDeclarationList: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one.
 				if ctx.TypeChecker == nil {
 					return
 				}
-
-				sourceFile := ctx.SourceFile
-				if sourceFile == nil {
+				// The flags live on the declaration list rather than on the individual declarator,
+				// which is why this reads the list. See the constant-binding note above for why the
+				// mask is `NodeFlagsConstant` and not `NodeFlagsAwaitUsing`.
+				if node.Flags&ast.NodeFlagsConstant == 0 {
 					return
 				}
-
-				// Every constant binding in the file, mapped from its declarator so the write side
-				// can compare declaration identity without re-deriving anything.
-				constantBindings := map[string][]*ast.Node{}
-				var gather func(*ast.Node)
-				gather = func(current *ast.Node) {
-					if current == nil {
-						return
-					}
-					// The flags live on the declaration list rather than on the individual
-					// declarator, which is why this reads the list. See the constant-binding note
-					// above for why the mask is `NodeFlagsConstant` and not `NodeFlagsAwaitUsing`.
-					if current.Kind == ast.KindVariableDeclarationList &&
-						current.Flags&ast.NodeFlagsConstant != 0 {
-						for _, declaration := range current.AsVariableDeclarationList().Declarations.Nodes {
-							// Every name the list binds, which for a destructuring pattern is
-							// several and nested arbitrarily deep. `const [a, b, ...[c, ...d]] = x`
-							// binds `d` two rest elements down, and upstream fails on exactly that.
-							forEachBoundName(declaration.AsVariableDeclaration().Name(),
-								func(boundName *ast.Node) {
-									if boundName != nil && boundName.Kind == ast.KindIdentifier {
-										constantBindings[boundName.Text()] = append(
-											constantBindings[boundName.Text()], declaration)
-									}
-								})
+				for _, declaration := range node.AsVariableDeclarationList().Declarations.Nodes {
+					// Every name the list binds, which for a destructuring pattern is several and
+					// nested arbitrarily deep. `const [a, b, ...[c, ...d]] = x` binds `d` two rest
+					// elements down, and upstream fails on exactly that.
+					forEachBoundName(declaration.AsVariableDeclaration().Name(), func(boundName *ast.Node) {
+						if boundName != nil && boundName.Kind == ast.KindIdentifier {
+							reportConstWrites(ctx, boundName, judged)
 						}
-					}
-					current.ForEachChild(func(child *ast.Node) bool {
-						gather(child)
-						return false
 					})
 				}
-				gather(node)
-
-				if len(constantBindings) == 0 {
-					return
-				}
-				reportConstWrites(ctx, sourceFile, constantBindings)
 			},
 		}
 	},
 }
 
-// reportConstWritesTo walks the file reporting every write that binds to one declarator.
+// reportConstWrites reports every write in the file that binds to one constant's name.
 //
 // The whole file rather than any bounded subtree. A write can sit before the declaration, after it,
 // or nested inside a function several scopes down, and all three are the same binding. Upstream has
 // a failing case for the write coming first (`x = 123; const x = 1;`) and notes that reporting it
 // aligns with ESLint. Anchoring the search on the file and the match on symbol identity is what
 // makes the position of the write irrelevant.
-func reportConstWrites(ctx rule.Context, sourceFile *ast.SourceFile,
-	constantBindings map[string][]*ast.Node) {
+func reportConstWrites(ctx rule.Context, boundName *ast.Node, judged map[*ast.Node]bool) {
+	// Resolved through the checker rather than taken as the declarator node directly, so that both
+	// sides of the comparison are answers to the same question: asking the AST for one side and the
+	// checker for the other compares two things that happen to agree today.
+	anchor := declarationAnchoredAt(ctx, boundName)
+	if anchor == nil || judged[anchor] {
+		return
+	}
+	judged[anchor] = true
 
-	// Anchors resolved once per name rather than once per walk. Resolved through the checker rather
-	// than taken as the declarator node directly, so that both sides of the later comparison are
-	// answers to the same question: asking the AST for one side and the checker for the other
-	// compares two things that happen to agree today.
-	//
-	// A name can have several declarators when a file declares the same constant in two scopes, so
-	// this keeps every anchor and the write matches against any of them.
-	anchors := map[string][]*ast.Node{}
-	for name, declarations := range constantBindings {
-		for _, declaration := range declarations {
-			forEachBoundName(declaration.AsVariableDeclaration().Name(), func(boundName *ast.Node) {
-				if boundName == nil || boundName.Kind != ast.KindIdentifier ||
-					boundName.Text() != name {
-					return
-				}
-				if anchor := declarationAnchoredAt(ctx, boundName); anchor != nil {
-					anchors[name] = append(anchors[name], anchor)
-				}
-			})
+	// The declarator's own name needs no exclusion. It is an identifier whose text matches and which
+	// resolves to this very declaration, and `WritesToBinding` declines it: a declaration name's
+	// parent is the declarator, which is not an assignment. The structural test runs first because it
+	// is far cheaper than a checker call.
+	for _, occurrence := range reference.IdentifiersNamed(ctx, boundName.Text()) {
+		if reference.WritesToBinding(occurrence) && resolvesToDeclaration(ctx, occurrence, anchor) {
+			ctx.ReportNode(occurrence, messageNoConstAssign)
 		}
 	}
-
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		if current == nil {
-			return
-		}
-		// The declarator's own name needs no exclusion. It is an identifier whose text matches and
-		// which resolves to this very declaration, and `IsWriteAccess` declines it: a declaration
-		// name's parent is the declarator, which is not an assignment.
-		//
-		// The map lookup is a pre-filter rather than a discrimination, since symbol identity already
-		// implies it. It is here because it is far cheaper than a checker call and this walk visits
-		// every identifier in the file.
-		if current.Kind == ast.KindIdentifier && reference.WritesToBinding(current) {
-			for _, anchor := range anchors[current.Text()] {
-				if resolvesToDeclaration(ctx, current, anchor) {
-					ctx.ReportNode(current, messageNoConstAssign)
-					break
-				}
-			}
-		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-	visit(sourceFile.AsNode())
 }
 
 // forEachBoundName calls back with every identifier a binding name introduces.

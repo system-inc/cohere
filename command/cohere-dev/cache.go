@@ -18,7 +18,7 @@ import (
 //
 // Go trims its cache only of entries unused for five days. The house writes far faster than that: on
 // 2026-10-05 the cache went from cleared at 09:01 to 200 GB by 11:30, and had been 347 GB with the disk at
-// 99% before. The launcher's trim (dispatch.BoundDefaultGoCache) ran every few minutes all morning and
+// 99% before. The launcher's trim, since removed (#cpxc2d7), ran every few minutes all morning and
 // removed almost nothing, because it spares every entry used in the last 90 minutes, and nearly all of a
 // cache that grows by a hundred gigabytes an hour was used in the last 90 minutes. It has to spare them:
 // Go reads an entry some time after finding it, and refreshes an entry's time at most once an hour, so a
@@ -33,7 +33,8 @@ import (
 // It waits for the pool to be empty holding nothing, and takes every token in one step only then, so it
 // never keeps a token idle while another runs: taken one at a time with a wait for each, it held half the
 // pool idle for minutes behind a land gate (2026-10-05 15:55). The trim itself takes seconds. A pool that
-// is never empty for cacheTrimPatience is left alone, and the next look tries again.
+// is never empty for cacheTrimPatience is left alone, and the next look tries again. A quiet window, opened
+// with `cohere-dev quiet on`, switches the trim off while it holds (quiet.go).
 
 // cacheCapVariable sets the Go build cache's cap, in gigabytes, a fraction allowed.
 const cacheCapVariable = "COHERE_DEV_CACHE_GB"
@@ -134,10 +135,24 @@ func trimCache() int {
 	}
 	defer unlockFile(lock)
 
+	// A quiet window holds off even the measuring, which walks every entry (quiet.go).
+	holds, quietLine := quietHolds(directory, time.Now())
+	if holds {
+		recordCacheLook(directory, "not looked at: "+quietLine)
+		return 0
+	}
+	if quietLine != "" {
+		recordCacheLook(directory, quietLine)
+	}
+
 	cache, err := goCacheDirectory()
 	if err != nil {
 		recordCacheLook(directory, err.Error())
 		return 1
+	}
+	if err := poolGuards(cache); err != nil {
+		recordCacheLook(directory, err.Error())
+		return 2
 	}
 	// Measured first, removing nothing, so a cache under its cap costs no one a token.
 	measured, err := gocache.Trim(cache, gocache.Limit{Cap: math.MaxInt64}, time.Now())
@@ -165,6 +180,12 @@ func trimCache() int {
 	if err != nil {
 		recordCacheLook(directory, "holding the pool to trim: "+err.Error())
 		return 1
+	}
+	// A window opened while the trim waited for an empty pool holds too: the wait can be minutes.
+	if holds, quietLine := quietHolds(directory, time.Now()); holds {
+		release()
+		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: %s", gigabytes(measured.Before), gigabytes(capBytes), quietLine))
+		return 0
 	}
 	started := time.Now()
 	trimmed, err := gocache.Trim(cache, gocache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare}, started)
@@ -237,6 +258,30 @@ func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 		held = append(held, lock)
 	}
 	return held, nil
+}
+
+// poolGuards refuses a cache outside the user cache directory the pool lives in. Holding the pool keeps out
+// the builds that draw from it, and those are the builds whose cache sits beside it: Go puts its default
+// cache in the same user cache directory. A run with `HOME` pointed at a scratch directory and the live
+// `GOCACHE` passed through held a scratch pool, empty, at once, and trimmed the live cache from 112.9 GB to
+// 30 GB under every real gate, its log in the scratch home (2026-10-06 04:44, #d0x1fhp). The pool no longer
+// follows `HOME` (poolHome), and this is the guard behind that.
+func poolGuards(cache string) error {
+	home, err := poolHome()
+	if err != nil {
+		return fmt.Errorf("not trimmed: %w", err)
+	}
+	root := userCacheDirectoryIn(home)
+	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
+	resolvedCache, cacheErr := filepath.EvalSymlinks(cache)
+	if rootErr == nil && cacheErr == nil {
+		if relative, err := filepath.Rel(resolvedRoot, resolvedCache); err == nil && relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return nil
+		}
+	}
+	return fmt.Errorf("not trimmed: the Go build cache %s is outside %s, the user cache directory this pool lives in, "+
+		"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it", cache, root)
 }
 
 // goCacheDirectory is the cache a plain go command here uses: GOCACHE when it is set, Go's default

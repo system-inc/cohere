@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/checking/flow"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -76,18 +77,19 @@ var InvariantMutable = rule.Rule{
 			return !walker.IsAssignable(pair.Target, pair.Source), true
 		}
 		return walker.Listeners(func(site flow.Site) {
-			found, wrong := walker.Walk(site, judge)
+			// Object intersections are this rule's to pair, and no other's (#b9a0wgy).
+			found, wrong := walker.WalkWith(site, judge, flow.WalkOptions{ObjectIntersections: true})
 			if !wrong {
 				return
 			}
 			ctx.ReportNode(site.Node, rule.Message{
 				Id: "mutableWidening",
 				Description: invariantMutableText.Render(map[string]string{
-					"source":     typeChecker.TypeToString(site.Source),
-					"target":     typeChecker.TypeToString(site.Target),
+					"source":     type_checking.StableTypeText(typeChecker, site.Source),
+					"target":     type_checking.StableTypeText(typeChecker, site.Target),
 					"slot":       slotText(ctx.SourceFile, site.Node, found.Path),
-					"sourcePart": typeChecker.TypeToString(found.Source),
-					"targetPart": typeChecker.TypeToString(found.Target),
+					"sourcePart": type_checking.StableTypeText(typeChecker, found.Source),
+					"targetPart": type_checking.StableTypeText(typeChecker, found.Target),
 				}),
 			})
 		})

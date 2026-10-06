@@ -16,10 +16,10 @@ import (
 // format walk holds them back until the program claims them (formatfiles.Enumeration.Adamic).
 func init() {
 	print := func(fileName string, text string, options formatoptions.Options) (string, error) {
-		return javascript.Format(fileName, text, options, TextToDoc(options, "typescript"))
+		return javascript.Format(fileName, text, options, TextToDoc(options, "typescript", nil))
 	}
 	printParsed := func(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options) (string, error) {
-		return javascript.FormatParsed(fileName, text, parsed, options, TextToDoc(options, "typescript"))
+		return javascript.FormatParsed(fileName, text, parsed, options, TextToDoc(options, "typescript", nil))
 	}
 	Register(".ts", print)
 	Register(".tsx", print)
