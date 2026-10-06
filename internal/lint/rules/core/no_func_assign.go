@@ -93,25 +93,32 @@ var NoFuncAssign = rule.Rule{
 	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// Once per file, from the file node, rather than once per function. Each function used to walk
-		// the whole file for writes to its name, so a file of two hundred functions was walked two
-		// hundred times, which made this simple rule one of the tree's slowest (177ms on ahra). Every
-		// name is anchored first and the file is then walked once against all of them, which reports
-		// the same writes: an identifier resolves to one declaration, so it matches at most one anchor.
+		// Each function on the shared walk, reading the writes to its name from the file's identifier
+		// index. Each function used to walk the whole file for writes to its name, which made this
+		// simple rule one of the tree's slowest (177ms on ahra); then the file was walked twice from
+		// the file node, once for the names and once for the writes, still 76ms of rule CPU on a cold
+		// ahra run (#fcac58b). The index is built once per file for every rule that asks, so a name's
+		// writes are read from the few identifiers spelled like it.
+		//
+		// The anchors already judged, because overloads of one function share one declaration, and
+		// judging it once per overload would report each write once per overload.
+		judged := map[*ast.Node]bool{}
+		check := func(node *ast.Node) {
+			// The engine hands every rule a nil checker when the program could not be built, and
+			// this rule can answer nothing without one.
+			if ctx.TypeChecker == nil {
+				return
+			}
+			reportWritesToFunctionName(ctx, node, judged)
+		}
 		return rule.Listeners{
-			ast.KindSourceFile: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built, and
-				// this rule can answer nothing without one.
-				if ctx.TypeChecker == nil {
-					return
-				}
-				reportWritesToFunctionNames(ctx, node)
-			},
+			ast.KindFunctionDeclaration: check,
+			ast.KindFunctionExpression:  check,
 		}
 	},
 }
 
-// reportWritesToFunctionNames reports every write to a name a function in the file declares.
+// reportWritesToFunctionName reports every write to the name a function declares.
 //
 // Both kinds of function anchor, and they behave differently on purpose. A declaration's name is
 // visible to the enclosing scope, so a write anywhere in the file can reach it. A function
@@ -125,53 +132,29 @@ var NoFuncAssign = rule.Rule{
 // `foo` pass case asserts. An anonymous function expression declares no name either, so
 // `var foo = function() { foo = bar; };` writes to the variable, and upstream leaves it too.
 //
-// The whole file is searched, not each function's subtree. A write can sit before the declaration
+// The whole file is searched, not the function's subtree. A write can sit before the declaration
 // (`foo = bar; function foo() {}`), after it, or inside it, and hoisting makes all three the same
 // binding. Anchoring the search on the file and the match on the symbol is what makes the position of
-// the write irrelevant.
-func reportWritesToFunctionNames(ctx rule.Context, sourceFile *ast.Node) {
-	anchors := map[*ast.Node]bool{}
-	// The anchored names as text, so the second walk can decline nearly every identifier without a
-	// checker call. A pre-filter and not a discrimination: symbol identity already implies it, since an
-	// identifier spelled differently cannot resolve to one of these declarations.
-	anchoredNames := map[string]bool{}
-
-	var anchorFunctions func(*ast.Node)
-	anchorFunctions = func(current *ast.Node) {
-		if current.Kind == ast.KindFunctionDeclaration || current.Kind == ast.KindFunctionExpression {
-			if name := current.Name(); name != nil && name.Kind == ast.KindIdentifier {
-				if declaration := declarationAnchoredAt(ctx, name); declaration != nil {
-					anchors[declaration] = true
-					anchoredNames[name.Text()] = true
-				}
-			}
-		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			anchorFunctions(child)
-			return false
-		})
-	}
-	anchorFunctions(sourceFile)
-	if len(anchors) == 0 {
+// the write irrelevant. An identifier resolves to one declaration, so each write is reported by at
+// most one function.
+func reportWritesToFunctionName(ctx rule.Context, function *ast.Node, judged map[*ast.Node]bool) {
+	name := function.Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
 		return
 	}
-
-	var visit func(*ast.Node)
-	visit = func(current *ast.Node) {
-		// A function's own name needs no exclusion here. It is an identifier whose text matches and
-		// which resolves to its declaration, so only the structural half declines it, and that is
-		// enough: the climb from a function name reaches the function itself, which is not an
-		// assignment. The text test runs first because it is far cheaper than either half.
-		if current.Kind == ast.KindIdentifier &&
-			anchoredNames[current.Text()] &&
-			reference.WritesToBinding(current) &&
-			anchors[resolvedDeclarationOf(ctx, current)] {
-			ctx.ReportNode(current, messageNoFuncAssign)
-		}
-		current.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
+	declaration := declarationAnchoredAt(ctx, name)
+	if declaration == nil || judged[declaration] {
+		return
 	}
-	visit(sourceFile)
+	judged[declaration] = true
+
+	// A function's own name needs no exclusion here. It is an identifier whose text matches and which
+	// resolves to its declaration, so only the structural half declines it, and that is enough: the
+	// climb from a function name reaches the function itself, which is not an assignment. The
+	// structural test runs first because it is far cheaper than the checker.
+	for _, occurrence := range reference.IdentifiersNamed(ctx, name.Text()) {
+		if reference.WritesToBinding(occurrence) && resolvedDeclarationOf(ctx, occurrence) == declaration {
+			ctx.ReportNode(occurrence, messageNoFuncAssign)
+		}
+	}
 }
