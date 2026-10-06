@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf16"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The CST oracle: the fork's own eemeli/yaml, run by Node, parsing each input with
@@ -25,21 +27,12 @@ import (
 // An input can also be fed in chunks, parse(chunk, true) per chunk and parse('', false) to finish, which
 // drives the lexer's incomplete-input paths (setNext and the buffer it keeps).
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from.
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml/dist/parse/parser.js.
 func forkRoot(t *testing.T) string {
 	t.Helper()
-	if root := os.Getenv("COHERE_PRETTIER_FORK"); root != "" {
-		return root
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home directory to find the Prettier fork in")
-	}
-	root := filepath.Join(home, "Projects", "system", "prettier")
-	if _, err := os.Stat(filepath.Join(root, "node_modules", "yaml", "dist", "parse", "parser.js")); err != nil {
-		t.Skipf("the Prettier fork is not at %s; set COHERE_PRETTIER_FORK", root)
-	}
-	return root
+	corpus.Resolve(t, "prettier-fork:node_modules/yaml/dist/parse/parser.js")
+	return corpus.PrettierFork.Root(t)
 }
 
 const oracleScript = `

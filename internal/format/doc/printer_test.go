@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 /*
@@ -315,13 +316,10 @@ func boundaryCases() ([]*spec, []Options) {
 	return specs, options
 }
 
-// TestPrintAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_ROOT names the fork.
+// TestPrintAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
 func TestPrintAgreesWithUpstream(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")
-	}
+	root := corpus.PrettierFork.Root(t)
 	const count = 5000
 	random := rand.New(rand.NewSource(20261001))
 	cases := make([]printCase, count)
