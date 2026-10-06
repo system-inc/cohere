@@ -150,6 +150,10 @@ func trimCache() int {
 		recordCacheLook(directory, err.Error())
 		return 1
 	}
+	if err := poolGuards(cache); err != nil {
+		recordCacheLook(directory, err.Error())
+		return 2
+	}
 	// Measured first, removing nothing, so a cache under its cap costs no one a token.
 	measured, err := gocache.Trim(cache, gocache.Limit{Cap: math.MaxInt64}, time.Now())
 	if err != nil {
@@ -254,6 +258,30 @@ func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 		held = append(held, lock)
 	}
 	return held, nil
+}
+
+// poolGuards refuses a cache outside the user cache directory the pool lives in. Holding the pool keeps out
+// the builds that draw from it, and those are the builds whose cache sits beside it: Go puts its default
+// cache in the same user cache directory. A run with `HOME` pointed at a scratch directory and the live
+// `GOCACHE` passed through held a scratch pool, empty, at once, and trimmed the live cache from 112.9 GB to
+// 30 GB under every real gate, its log in the scratch home (2026-10-06 04:44, #d0x1fhp). The pool no longer
+// follows `HOME` (poolHome), and this is the guard behind that.
+func poolGuards(cache string) error {
+	home, err := poolHome()
+	if err != nil {
+		return fmt.Errorf("not trimmed: %w", err)
+	}
+	root := userCacheDirectoryIn(home)
+	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
+	resolvedCache, cacheErr := filepath.EvalSymlinks(cache)
+	if rootErr == nil && cacheErr == nil {
+		if relative, err := filepath.Rel(resolvedRoot, resolvedCache); err == nil && relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return nil
+		}
+	}
+	return fmt.Errorf("not trimmed: the Go build cache %s is outside %s, the user cache directory this pool lives in, "+
+		"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it", cache, root)
 }
 
 // goCacheDirectory is the cache a plain go command here uses: GOCACHE when it is set, Go's default

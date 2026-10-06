@@ -82,7 +82,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	}
 	home := privatePool(t)
 	environment := append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=1")
+		homeVariable+"="+home, tokensVariable+"=1")
 
 	run := func(arguments ...string) (string, error) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
@@ -152,10 +152,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(t *testing.T) {
 	bin := t.TempDir()
 	order := filepath.Join(bin, "order")
 	home := privatePool(t)
-	slots := filepath.Join(home, "cache", "cohere", "test-slots")
-	if runtime.GOOS == "darwin" {
-		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
-	}
+	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	tickets := func() int {
 		entries, _ := os.ReadDir(queueDirectory(slots))
 		count := 0
@@ -185,7 +182,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(t *testing.T) {
 	for index, name := range []string{"A", "B", "C", "D", "E"} {
 		command := exec.Command(wrapper, "test", "./...")
 		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
+			homeVariable+"="+home, tokensVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
 		if err := command.Start(); err != nil {
 			t.Fatal(err)
 		}
@@ -250,7 +247,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
 		t.Helper()
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), nicenessVariable+"=19")
+			homeVariable+"="+home, nicenessVariable+"=19")
 		output, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("cohere-dev test %v: %v\n%s", arguments, err, output)
@@ -299,7 +296,7 @@ func outsideThePool(environment []string) []string {
 	kept := make([]string, 0, len(environment))
 	for _, variable := range environment {
 		if !strings.HasPrefix(variable, heldTokenVariable+"=") && !strings.HasPrefix(variable, "GOMAXPROCS=") &&
-			!strings.HasPrefix(variable, "GOFLAGS=") {
+			!strings.HasPrefix(variable, "GOFLAGS=") && !strings.HasPrefix(variable, homeVariable+"=") {
 			kept = append(kept, variable)
 		}
 	}
@@ -346,7 +343,7 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 	start := func(name string, environment []string, arguments ...string) *exec.Cmd {
 		command := exec.Command(wrapper, arguments...)
 		command.Env = append(environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=2", packagesVariable+"=4", threadsVariable+"=3",
+			homeVariable+"="+home, tokensVariable+"=2", packagesVariable+"=4", threadsVariable+"=3",
 			"COHERE_DEV_TEST_RUN="+name)
 		if err := command.Start(); err != nil {
 			t.Fatal(err)
@@ -419,16 +416,17 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(t *testing.T) {
 		t.Fatalf("building: %v\n%s", err, output)
 	}
 	home := t.TempDir()
-	slots := filepath.Join(home, "cache", "cohere", "test-slots")
-	if runtime.GOOS == "darwin" {
-		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
-	}
+	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	if err := os.MkdirAll(slots, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// A Go build cache of ten 1 KB entries three hours old, and one written a minute ago.
-	cache := t.TempDir()
+	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
+	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +462,7 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(t *testing.T) {
 	}
 	// A cap of 6 KB, so the trim brings 11 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
-	environment := append(outsideThePool(os.Environ()), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(t),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
 
 	// A run holds a token, so the trim must wait for it before it touches the cache.
@@ -519,10 +517,7 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(t *testing.T) {
 func privatePool(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
-	slots := filepath.Join(home, "cache", "cohere", "test-slots")
-	if runtime.GOOS == "darwin" {
-		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
-	}
+	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	if err := os.MkdirAll(slots, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -544,14 +539,15 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(t *testing.T) {
 		t.Fatalf("building: %v\n%s", err, output)
 	}
 	home := t.TempDir()
-	slots := filepath.Join(home, "cache", "cohere", "test-slots")
-	if runtime.GOOS == "darwin" {
-		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
-	}
+	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	if err := os.MkdirAll(slots, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cache := t.TempDir()
+	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
+	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +577,7 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(t *testing.T) {
 	first.release()
 
 	trim := exec.Command(wrapper, trimCacheVerb)
-	trim.Env = append(outsideThePool(os.Environ()), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(t),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	if err := trim.Start(); err != nil {
 		t.Fatal(err)
