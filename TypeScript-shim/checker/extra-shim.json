@@ -39,7 +39,8 @@
 			"unwrapReturnType",
 			"maybeTypeOfKind",
 			"getSignatureFromDeclaration",
-			"getTypeOfAccessors"
+			"getTypeOfAccessors",
+			"getNonMissingTypeOfSymbol"
 		]
 	},
 	"ExtraFields": {

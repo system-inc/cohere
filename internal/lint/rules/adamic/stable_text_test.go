@@ -62,7 +62,7 @@ func relationMessages(t *testing.T, files map[string]string, anotherFirst bool) 
 
 // TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst: the two relation rules name the same types in
 // the same words whether the checker normalized another file's literals first or not, which at GOMAXPROCS=16 is
-// a matter of scheduling (#dq881as). TypeToString printed `extra?: undefined` first in one and last in the other.
+// a matter of scheduling (#dq881as). TypeToString printed `extra?: never` first in one and last in the other.
 // The fixture is held to that: each rule must report in both orders, or the comparison proves nothing.
 func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(t *testing.T) {
 	t.Parallel()
@@ -100,7 +100,8 @@ export const columns: () => Column[] = function() {
 func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(t *testing.T) {
 	t.Parallel()
 	alone, afterAnother := relationMessages(t, nestedTextFiles, false), relationMessages(t, nestedTextFiles, true)
-	const column = "id: string; note: string; extra?: undefined; }"
+	// Under Adamic's exactOptionalPropertyTypes a synthesized member is missing-only, and prints `never` (#sp4xwtj).
+	const column = "id: string; note: string; extra?: never; }"
 	for _, ruleName := range []string{InvariantMutable.Name, NoOptionalWidening.Name} {
 		if alone[ruleName] == "" || afterAnother[ruleName] == "" {
 			t.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
@@ -111,5 +112,38 @@ func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(t *testing.T) {
 		if !strings.Contains(alone[ruleName], column) {
 			t.Errorf("%s doesn't print the column's own members in their written order, then the borrowed one (%q):\n  %s", ruleName, column, alone[ruleName])
 		}
+	}
+}
+
+// TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays: an optional member prints the type TypeScript's
+// own printer starts from (#sp4xwtj). Under Adamic's options, exactOptionalPropertyTypes, `y?: number` prints as
+// written, where 632001cb printed the missing marker as `y?: number | undefined`, and a written `| undefined` is kept,
+// since there it is a different type. Without the option the two are one type, and it prints with `| undefined`.
+func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(t *testing.T) {
+	t.Parallel()
+	withoutExactOptional := strings.Replace(adamicConfiguration, `"exactOptionalPropertyTypes": true,`, "", 1)
+	if withoutExactOptional == adamicConfiguration {
+		t.Fatal("Adamic's configuration no longer sets exactOptionalPropertyTypes where this test removes it")
+	}
+	cases := []struct {
+		name, configuration, written, printed string
+	}{
+		{"exact, written number", adamicConfiguration, "y?: number", "y?: number; }"},
+		{"exact, written number or undefined", adamicConfiguration, "y?: number | undefined", "y?: number | undefined; }"},
+		{"not exact, written number", withoutExactOptional, "y?: number", "y?: number | undefined; }"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			messages := relationMessages(t, map[string]string{
+				"tsconfig.json": testCase.configuration,
+				"Another.ts":    "export {};\n",
+				"Case.ts":       "declare const narrow: { x: number }; function draw(point: { x: number; " + testCase.written + " }): void {} draw(narrow);\n",
+			}, false)
+			message := messages[NoOptionalWidening.Name]
+			if want := "seen here as '{ x: number; " + testCase.printed + "'"; !strings.Contains(message, want) {
+				t.Errorf("with %s written, want %q in:\n  %s", testCase.written, want, message)
+			}
+		})
 	}
 }
