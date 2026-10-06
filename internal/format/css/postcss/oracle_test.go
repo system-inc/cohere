@@ -14,6 +14,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -237,7 +238,7 @@ var parseFixtures = []parseFixture{
 
 // TestParseAgreesWithPostcss is the parser's acceptance test: for every .css file in the corpora, and
 // every inline fixture, the Go tree must equal postcss's, field for field and in creation order, and a
-// refusal must be a refusal on both sides with the same CssSyntaxError. Off unless COHERE_PRETTIER_ROOT
+// refusal must be a refusal on both sides with the same CssSyntaxError. Off unless COHERE_PRETTIER_FORK
 // names the fork (whose node_modules hold postcss 8.5.16) and COHERE_CSS_CORPORA lists files or
 // directories to walk (colon-separated, node_modules and .git skipped).
 //
@@ -249,11 +250,11 @@ var parseFixtures = []parseFixture{
 // corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 func TestParseAgreesWithPostcss(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_CSS_CORPORA to compare the parser against postcss")
+	if corpora == "" {
+		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input struct {
 		Name string `json:"name"`

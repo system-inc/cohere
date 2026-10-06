@@ -14,6 +14,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -206,7 +207,7 @@ var mediaQueryFixtures = []mediaQueryFixture{
 // TestParseAgreesWithPostcssMediaQueryParser is the parser's acceptance test: for the params of every
 // @media and @custom-media in the corpus, and every inline fixture, the Go tree must equal the
 // library's, property for property, and a throw must be a refusal here with the same message. Off
-// unless COHERE_PRETTIER_ROOT names the fork (whose node_modules hold postcss-media-query-parser 0.2.3
+// unless COHERE_PRETTIER_FORK names the fork (whose node_modules hold postcss-media-query-parser 0.2.3
 // and postcss) and COHERE_CSS_CORPORA lists .css files or directories to walk (colon-separated,
 // node_modules skipped).
 //
@@ -215,11 +216,11 @@ var mediaQueryFixtures = []mediaQueryFixture{
 // corpus that reaches nothing, would otherwise read as agreement.
 func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_CSS_CORPORA to compare the parser against postcss-media-query-parser")
+	if corpora == "" {
+		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-media-query-parser")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input struct {
 		Name   string `json:"name"`

@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
 )
 
@@ -32,21 +33,12 @@ import (
 // the same depth-first order, and a node's srcToken is written as that number with its type and offset.
 // A number is written as its IEEE 754 bits, so -0, the infinities and every last bit compare exactly.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from.
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml/dist/compose/composer.js.
 func forkRoot(t *testing.T) string {
 	t.Helper()
-	if root := os.Getenv("COHERE_PRETTIER_FORK"); root != "" {
-		return root
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home directory to find the Prettier fork in")
-	}
-	root := filepath.Join(home, "Projects", "system", "prettier")
-	if _, err := os.Stat(filepath.Join(root, "node_modules", "yaml", "dist", "compose", "composer.js")); err != nil {
-		t.Skipf("the Prettier fork is not at %s; set COHERE_PRETTIER_FORK", root)
-	}
-	return root
+	corpus.Resolve(t, "prettier-fork:node_modules/yaml/dist/compose/composer.js")
+	return corpus.PrettierFork.Root(t)
 }
 
 const oracleScript = `

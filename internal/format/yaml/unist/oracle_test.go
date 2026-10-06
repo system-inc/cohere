@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The parse oracle: Node runs yaml-unist-parser's parse(text, { uniqueKeys: false }) from the fork's
@@ -25,21 +27,12 @@ import (
 // the other, and every Parent is the node upstream's _parent is. Where upstream throws, Parse must fail
 // with the same name and message, and for a YAMLSyntaxError the same position.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from.
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
 func forkRoot(t testing.TB) string {
 	t.Helper()
-	if root := os.Getenv("COHERE_PRETTIER_FORK"); root != "" {
-		return root
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home directory to find the Prettier fork in")
-	}
-	root := filepath.Join(home, "Projects", "system", "prettier")
-	if _, err := os.Stat(filepath.Join(root, "node_modules", "yaml-unist-parser")); err != nil {
-		t.Skipf("the Prettier fork is not at %s; set COHERE_PRETTIER_FORK", root)
-	}
-	return root
+	corpus.Resolve(t, "prettier-fork:node_modules/yaml-unist-parser")
+	return corpus.PrettierFork.Root(t)
 }
 
 const oracleScript = `

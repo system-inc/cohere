@@ -98,11 +98,14 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(t *testing.T)
 		if start < 0 {
 			t.Fatalf("--explain printed no explanation:\n%s", output)
 		}
-		// The run's own cache line and footer follow the explanation, and differ warm and cold by design.
+		// The run's own cache line and footer follow the explanation, and differ warm and cold by design. So does
+		// the memory line, which states the ceiling as half the memory available as the run starts: under load
+		// that moved between the two runs, 37 GB warm against 36 GB cold, and failed a land on 2026-10-05.
+		// None of the three says anything about a directive.
 		var kept []string
 		for _, line := range strings.Split(output[start:], "\n") {
 			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "cache:") || strings.HasPrefix(trimmed, "✓") || strings.HasPrefix(trimmed, "✗") {
+			if strings.HasPrefix(trimmed, "cache:") || strings.HasPrefix(trimmed, "memory:") || strings.HasPrefix(trimmed, "✓") || strings.HasPrefix(trimmed, "✗") {
 				continue
 			}
 			kept = append(kept, line)
