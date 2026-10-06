@@ -31,7 +31,12 @@ var mdastPrinter = &printing.Printer[*Node]{
 	VisitorKeys: func(node *Node) []string { return visitorKeys[node.NodeType] },
 	Embed:       embed,
 	Preprocess: func(ast *Node, options *options) *Node {
-		return preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
+		ast = preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
+		// The print cache is made once preprocess returns, and most of the nodes it prints, the sentences,
+		// words and whitespace, are only made here. The arena holds every node of the tree from both,
+		// so its count, read now, presizes the cache without a walk (#4bq8vyn).
+		options.NodeCount = settingsOf(options).nodes.Len()
+		return ast
 	},
 	HasPrettierIgnore:    hasPrettierIgnore,
 	PrintPrettierIgnored: printPrettierIgnored,

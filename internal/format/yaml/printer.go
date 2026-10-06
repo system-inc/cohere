@@ -111,24 +111,25 @@ func PrintDoc(root *unist.Node, text string, options formatoptions.Options, text
 // PrintFile is Print for a named file. The name is upstream's options.filepath: a .prettierrc,
 // .stylelintrc or .lintstagedrc is printed as JSON when textToDoc can format it as JSON.
 func PrintFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
-	return printFile(fileName, root, text, options, "preserve", textToDoc)
+	return printFile(fileName, root, text, options, "preserve", textToDoc, 0)
 }
 
 // PrintDocFile is PrintDoc for a named file.
 func PrintDocFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
-	return printDocFile(fileName, root, text, options, "preserve", textToDoc)
+	return printDocFile(fileName, root, text, options, "preserve", textToDoc, 0)
 }
 
 // printFile is PrintFile with proseWrap given. None of our repositories sets it, and formatoptions.Options
-// does not carry it, so only the tests reach always and never.
-func printFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+// does not carry it, so only the tests reach always and never. nodeCount is how many nodes the tree holds,
+// zero when unknown, for printing.Options.NodeCount.
+func printFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc, nodeCount int) (string, error) {
 	// src/main/core.js, coreFormat: a file that is empty or only whitespace formats to "" without being
 	// printed. The doc entry has no such check, as upstream's textToDoc has none.
 	if trim(text) == "" {
 		return "", nil
 	}
 
-	document, err := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc)
+	document, err := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc, nodeCount)
 	if err != nil {
 		return "", err
 	}
@@ -147,7 +148,7 @@ func printFile(fileName string, root *unist.Node, text string, prettierOptions f
 	return formatted, nil
 }
 
-func printDocFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (document doc.Doc, err error) {
+func printDocFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc, nodeCount int) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("yaml: %v", recovered)
@@ -168,6 +169,7 @@ func printDocFile(fileName string, root *unist.Node, text string, prettierOption
 		},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
+		NodeCount:                  nodeCount,
 	}
 	// No comments: parser-yaml.js deletes root.comments, because the printer prints them itself.
 	return printing.PrintAstToDoc(root, nil, printOptions)
