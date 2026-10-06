@@ -8,7 +8,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/gitignore"
@@ -140,6 +142,19 @@ const (
 // block or else the house's, and zero config's from cohere:typescript (#bfxz13m). A `.prettierignore` in
 // root is refused, since cohere no longer reads it and the walk would skip less than the project believes.
 func Enumerate(root string, handles func(fileName string) bool) (Enumeration, error) {
+	return EnumerateListed(root, handles, nil)
+}
+
+// EnumerateListed is Enumerate reading directories from listing, listings already read, where it holds them,
+// rather than from the disk: each listed directory's entries, their types, and whether it holds a `.git` or a
+// `.gitignore`. A directory it does not hold is read from the disk, and a nil listing reads everything there,
+// so the Enumeration is the one Enumerate makes from the same tree.
+//
+// A bare run's format walk ahead passes discovery's listings (#g3046x5). Walking the disk, it lstat'd every
+// entry and twice more per directory, and each of those syscalls handed it back to a run queue full of the
+// program's loaders, so it finished about 370ms into a cold ahra run and the early format pass began there.
+// Read from the listings it finishes in tens of milliseconds.
+func EnumerateListed(root string, handles func(fileName string) bool, listing gitignore.Listing) (Enumeration, error) {
 	enumeration := Enumeration{
 		Root:               root,
 		IgnoredByLayer:     map[string]int{},
@@ -159,6 +174,9 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 	matcher, err := gitignore.New(root)
 	if err != nil {
 		return enumeration, err
+	}
+	if listing != nil {
+		matcher = matcher.WithListing(listing)
 	}
 	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
 	if information, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && information.IsDir() {
@@ -188,7 +206,11 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 	// through its directory's matcher, which holds every ignore file from the root down to it.
 	scopes := map[string]*gitignore.Matcher{"": matcher}
 
-	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	walk := filepath.Walk
+	if listing != nil {
+		walk = func(root string, walkFn filepath.WalkFunc) error { return walkListed(root, listing, walkFn) }
+	}
+	walkError := walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -211,7 +233,7 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 			// paths, so nothing in .gitignore or the ignore lists mentions it. Tonight a whole-tree
 			// run wrote a line into libraries/structure, and the change was correct and still
 			// unrequested. A formatter should not edit a repository nobody asked it to touch.
-			if relative != "." && HasOwnRepository(path) {
+			if relative != "." && hasOwnRepositoryListed(path, listing) {
 				enumeration.NestedRepositories = append(enumeration.NestedRepositories, relative)
 				return filepath.SkipDir
 			}
@@ -288,6 +310,128 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 	}
 
 	return enumeration, nil
+}
+
+// walkListed is filepath.Walk reading each directory from listing where it holds one, and from the disk
+// otherwise. It is Walk's own order of calls: a directory is read
+// before walkFn is told of it, with the read's error, and its entries go by name, as os.ReadDir sorts a
+// listing. A listed entry's FileInfo is its listing's, the type an lstat gives (so a symbolic link is never a
+// directory) and nothing else, where Walk lstats each entry; the walk's callback reads only the name and type.
+func walkListed(root string, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
+	information, err := os.Lstat(root)
+	if err != nil {
+		err = walkFn(root, nil, err)
+	} else {
+		err = walkListedFrom(root, information, listing, walkFn)
+	}
+	if err == filepath.SkipDir || err == filepath.SkipAll {
+		return nil
+	}
+	return err
+}
+
+func walkListedFrom(path string, information os.FileInfo, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
+	if !information.IsDir() {
+		return walkFn(path, information, nil)
+	}
+	var entries []os.FileInfo
+	var readError error
+	if listed, ok := listedEntries(path, listing); ok {
+		entries = listed
+	} else {
+		entries, readError = lstatEntries(path)
+	}
+	if err := walkFn(path, information, readError); readError != nil || err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if err := walkListedFrom(filepath.Join(path, entry.Name()), entry, listing, walkFn); err != nil {
+			if !entry.IsDir() || err != filepath.SkipDir {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// listedEntries is a listed directory's entries as FileInfo, by name, and whether listing holds it. A listing
+// from os.ReadDir, discovery's, is already sorted, which is checked rather than assumed: Walk's order is part of
+// the Enumeration (Files, Directories and IgnoreFiles keep it), so one that is not sorted is sorted here.
+func listedEntries(directory string, listing gitignore.Listing) ([]os.FileInfo, bool) {
+	if listing == nil {
+		return nil, false
+	}
+	entries, listed := listing(directory)
+	if !listed {
+		return nil, false
+	}
+	information := make([]os.FileInfo, len(entries))
+	for index, entry := range entries {
+		information[index] = listedInformation{entry}
+	}
+	byName := func(left, right int) bool { return information[left].Name() < information[right].Name() }
+	if !sort.SliceIsSorted(information, byName) {
+		sort.Slice(information, byName)
+	}
+	return information, true
+}
+
+// lstatEntries is what filepath.Walk reads of a directory it holds no listing for: the names, sorted, each
+// lstat'd. An entry gone between the two is nil, and skipped, where Walk tells its callback of the error, which
+// this walk's callback ignores.
+func lstatEntries(directory string) ([]os.FileInfo, error) {
+	opened, err := os.Open(directory)
+	if err != nil {
+		return nil, err
+	}
+	names, err := opened.Readdirnames(-1)
+	opened.Close()
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	information := make([]os.FileInfo, len(names))
+	for index, name := range names {
+		information[index], _ = os.Lstat(filepath.Join(directory, name))
+	}
+	return information, nil
+}
+
+// listedInformation is a listed entry as the walk's callback reads it: its name, whether it is a directory and
+// its type bits. Size and modification time are not in a listing, so both are zero, and Enumerate's callback
+// must never read them: from Walk it would get the true values and from a listed walk zero, silently.
+type listedInformation struct {
+	entry os.DirEntry
+}
+
+func (information listedInformation) Name() string       { return information.entry.Name() }
+func (information listedInformation) Size() int64        { return 0 }
+func (information listedInformation) Mode() os.FileMode  { return information.entry.Type() }
+func (information listedInformation) ModTime() time.Time { return time.Time{} }
+func (information listedInformation) IsDir() bool        { return information.entry.IsDir() }
+func (information listedInformation) Sys() any           { return nil }
+
+// hasOwnRepositoryListed is HasOwnRepository, answered false from a listing of directory that shows no `.git`,
+// as the stat would then fail. A `.git` the listing names, or a directory it does not hold, is asked of the disk.
+func hasOwnRepositoryListed(directory string, listing gitignore.Listing) bool {
+	if listing != nil {
+		if entries, listed := listing(directory); listed {
+			present := false
+			for _, entry := range entries {
+				if entry.Name() == ".git" {
+					present = true
+					break
+				}
+			}
+			if !present {
+				return false
+			}
+		}
+	}
+	return HasOwnRepository(directory)
 }
 
 // repositoryBoundaryBetween reports whether a repository of its own begins at root or between root and

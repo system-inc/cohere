@@ -42,6 +42,47 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(t *testing.T) {
 	}
 }
 
+// The same moment, seen by the format walk: a bare run's walk ahead reads discovery's listings (#g3046x5), so a
+// file created after discovery listed its directory is not in that run's format universe. The run is never
+// recorded, since the clock started before the listing, so the next run walks again, finds the file and formats
+// it, rather than replaying a verdict that never saw it.
+func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(t *testing.T) {
+	t.Parallel()
+	fixture := newRunCacheFixture(t, buildCohere(t))
+	formatting := func(environment ...string) string {
+		t.Helper()
+		command := exec.Command(fixture.binary, verboseArguments(nil)...)
+		command.Dir = fixture.root
+		command.Env = append(append([]string{"HOME=" + fixture.home}, environment...), withoutHome(os.Environ())...)
+		output, err := command.CombinedOutput()
+		if _, isExit := err.(*exec.ExitError); err != nil && !isExit {
+			t.Fatalf("running cohere: %v\n%s", err, output)
+		}
+		return string(output)
+	}
+	// The fixture's JSON is written unformatted, and a run that writes is never recorded: the first run formats
+	// it, the second records, the third replays.
+	formatting()
+	formatting()
+	if output := formatting(); !isRunCacheReplay(output) {
+		t.Fatalf("an unchanged, formatted tree did not replay, so nothing below can show a change was noticed:\n%s", output)
+	}
+
+	late := filepath.Join(fixture.root, "docs", "late.md")
+	unformatted := "#   Late\n\n\n\nA paragraph.\n"
+	formatting("COHERE_TEST_CREATE_AFTER_DISCOVERY="+late, "COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT="+unformatted)
+	if contents, err := os.ReadFile(late); err != nil || string(contents) == "" {
+		t.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
+	}
+
+	if output := formatting(); isRunCacheReplay(output) {
+		t.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s", output)
+	}
+	if contents, _ := os.ReadFile(late); string(contents) == unformatted {
+		t.Errorf("the file created after discovery's listing was never formatted:\n%s", contents)
+	}
+}
+
 // withoutHome is the environment without its HOME, which a fixture sets for itself.
 func withoutHome(environment []string) []string {
 	kept := make([]string, 0, len(environment))

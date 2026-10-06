@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -337,14 +338,29 @@ var aheadFormatWalk *formatWalkAhead
 // takes the result through enumerateFormatTree. It is the same call the fix phase would make, on the same
 // engine and root, only earlier, so the enumeration is the one it would have made: the tree is not written
 // between the two, since nothing writes before the fix phase does.
-func startFormatWalkAhead(engine formatEngine, root string) {
+//
+// listing, when not nil, is directory listings discovery already read, and an engine that can walk from them
+// does (#g3046x5): the walk then finishes in tens of milliseconds instead of about 370ms on a cold ahra run,
+// and the early format pass that waits on it starts that much sooner. The listings are a moment older than a
+// walk of the disk would be, which the run cache's clock already covers, since it starts before discovery
+// lists anything (see startRunCacheClock).
+func startFormatWalkAhead(engine formatEngine, root string, listing gitignore.Listing) {
 	ahead := &formatWalkAhead{engine: engine, root: root, done: make(chan struct{})}
 	go func() {
 		defer close(ahead.done)
-		ahead.enumeration, ahead.err = engine.Enumerate(root)
+		if listed, ok := engine.(listedEnumerator); ok && listing != nil {
+			ahead.enumeration, ahead.err = listed.EnumerateListed(root, listing)
+		} else {
+			ahead.enumeration, ahead.err = engine.Enumerate(root)
+		}
 		ahead.enumeration = withoutYieldedDirectories(ahead.enumeration)
 	}()
 	aheadFormatWalk = ahead
+}
+
+// listedEnumerator is an engine whose walk can read listings already read (native.Resolving).
+type listedEnumerator interface {
+	EnumerateListed(root string, listing gitignore.Listing) (formatfiles.Enumeration, error)
 }
 
 // enumerateFormatTree is engine.Enumerate(root), taken from the walk begun ahead when that walk was of the same

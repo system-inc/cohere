@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/system-inc/cohere/internal/edit"
 )
@@ -32,6 +35,12 @@ type earlyFormat struct {
 	scope       formatScope
 	speculation *formatSpeculation
 
+	// narrowing guards speculation's arrival against the fix phase's narrowing of it. The walk can begin before
+	// this pass has a speculation, since it no longer waits for the scope (#g3046x5), so the share the fix phase
+	// asks for is kept here and applied when the speculation starts. Zero until the fix phase asks.
+	narrowing sync.Mutex
+	narrowTo  int
+
 	// programs is where the graph's program arrives once it is built, for the speculation to format TypeScript
 	// from its trees (speculateFormat).
 	programs programOffer
@@ -43,16 +52,48 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 	early := &earlyFormat{record: record, formatting: newFormatClock(), lineEndings: &crlfFiles{}, ready: make(chan struct{})}
 	go func() {
 		defer close(early.ready)
+		// A test instrument: hold the pass this long before it enumerates, so its scope is ready only after the
+		// walk is done, as a cold run's often was. See TestALateEarlyFormatScopeFindsWhatAPromptOneDoes.
+		if held, err := time.ParseDuration(os.Getenv("COHERE_TEST_LATE_EARLY_FORMAT")); err == nil {
+			time.Sleep(held)
+		}
 		early.universe, early.err = enumerateFormatUniverse(engine, root)
 		if early.err != nil {
-			early.speculation = speculateFormatOn(nil, nil, maxPasses, 0, nil)
+			early.started(speculateFormatOn(nil, nil, maxPasses, 0, nil))
 			return
 		}
 		early.scope = unformattedScopeOf(engine, record, early.universe)
 		transform := early.lineEndings.observing(early.transform(engine))
-		early.speculation = speculateFormatOn(early.scope.formatCandidates(), transform, maxPasses, earlyFormatWorkers(), &early.programs)
+		early.started(speculateFormatOn(early.scope.formatCandidates(), transform, maxPasses, earlyFormatWorkers(), &early.programs))
 	}()
 	return early
+}
+
+// started keeps the pass's speculation, narrowed at once if the fix phase has already asked.
+func (early *earlyFormat) started(speculation *formatSpeculation) {
+	early.narrowing.Lock()
+	defer early.narrowing.Unlock()
+	early.speculation = speculation
+	if early.narrowTo > 0 {
+		speculation.narrow(early.narrowTo)
+	}
+}
+
+// narrow gives the speculation its share of the cores once the walk begins: now if it is running, and as it
+// starts if not.
+func (early *earlyFormat) narrow(workers int) {
+	early.narrowing.Lock()
+	defer early.narrowing.Unlock()
+	early.narrowTo = workers
+	if early.speculation != nil {
+		early.speculation.narrow(workers)
+	}
+}
+
+// speculationOf waits for the pass and returns its speculation.
+func (early *earlyFormat) speculationOf() *formatSpeculation {
+	<-early.ready
+	return early.speculation
 }
 
 // transform is the fix phase's format transform over this pass's scope, built the same way.

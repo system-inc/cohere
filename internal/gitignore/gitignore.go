@@ -97,6 +97,41 @@ type Matcher struct {
 
 	// excludedBy is the rule that excluded this directory or one above it. It decides every path below.
 	excludedBy *rule
+
+	// listing, when set, answers Enter's questions about a `.git` or a `.gitignore` a directory does not
+	// hold, from a listing already read. See WithListing.
+	listing Listing
+}
+
+// Listing is a directory's entries as os.ReadDir returned them, and whether the directory was listed, for an
+// absolute path. A directory not listed is not empty: it is read from the disk.
+type Listing func(directory string) ([]os.DirEntry, bool)
+
+// WithListing returns the matcher, and every matcher Enter makes from it, answering from listing where a
+// listed directory shows it holds no `.git` or no `.gitignore`, as an lstat of either would then fail. One
+// the listing names is still asked of the disk, so what is read is read as before. The format walk passes
+// discovery's listings (#g3046x5), which spares two lstats per directory entered.
+func (matcher *Matcher) WithListing(listing Listing) *Matcher {
+	listed := *matcher
+	listed.listing = listing
+	return &listed
+}
+
+// listedAbsent reports whether a listing of directory, an absolute path, shows it holds no entry called name.
+func (matcher *Matcher) listedAbsent(directory string, name string) bool {
+	if matcher.listing == nil {
+		return false
+	}
+	entries, listed := matcher.listing(directory)
+	if !listed {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Name() == name {
+			return false
+		}
+	}
+	return true
 }
 
 // New reads a repository's root `.gitignore` and, when `.git` is a directory, its info/exclude.
@@ -168,8 +203,11 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 	entered.files = entered.files[:len(entered.files):len(entered.files)]
 	for _, name := range strings.Split(remainder, "/") {
 		child := joinRelative(entered.directory, name)
-		if _, err := os.Lstat(filepath.Join(matcher.root, filepath.FromSlash(child), ".git")); err == nil {
-			return nil, fmt.Errorf("gitignore: %s %w", filepath.Join(matcher.root, filepath.FromSlash(child)), ErrNestedRepository)
+		childDirectory := filepath.Join(matcher.root, filepath.FromSlash(child))
+		if matcher.listedAbsent(childDirectory, ".git") {
+			// Not there, as the lstat would have found.
+		} else if _, err := os.Lstat(filepath.Join(childDirectory, ".git")); err == nil {
+			return nil, fmt.Errorf("gitignore: %s %w", childDirectory, ErrNestedRepository)
 		}
 		entered.directory = child
 		if entered.excludedBy != nil {
@@ -177,6 +215,11 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 		}
 		if decided := entered.decide(child, path.Base(child), true, len(entered.files)); decided != nil && !decided.negated {
 			entered.excludedBy = decided
+			continue
+		}
+		if matcher.listedAbsent(childDirectory, IgnoreFileName) {
+			// No `.gitignore`, which readTreeFile reads as no rules.
+			entered.files = append(entered.files, nil)
 			continue
 		}
 		rules, err := readTreeFile(matcher.root, child)

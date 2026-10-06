@@ -66,7 +66,7 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(t *testing.T) {
 	}
 
 	engine := &countingEngine{Resolving: resolving}
-	startFormatWalkAhead(engine, root)
+	startFormatWalkAhead(engine, root, nil)
 	taken, err := enumerateFormatTree(engine, root)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(t *testing.T) {
 		t.Errorf("a second call took the same walk again (%d walks)", engine.walks)
 	}
 
-	startFormatWalkAhead(engine, root)
+	startFormatWalkAhead(engine, root, nil)
 	// Waited for, so the counts below never race the walk's goroutine.
 	<-aheadFormatWalk.done
 	other := &countingEngine{Resolving: resolving}

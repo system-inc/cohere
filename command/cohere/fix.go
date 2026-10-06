@@ -46,8 +46,7 @@ func applyProposedFixes(
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
 	rules []rule.Rule,
-	transform edit.Transform,
-	formatCandidates []string,
+	formatPlan func() (edit.Transform, []string),
 	writable formatScope,
 	repositoryRoot string,
 	maxPasses int,
@@ -80,8 +79,25 @@ func applyProposedFixes(
 	if early != nil {
 		lineEndings = early.lineEndings
 	}
-	if transform != nil {
-		transform = lineEndings.observing(transform)
+	// The transform and the candidates come from the format scope. Without an early pass they are needed now, to
+	// start the speculation. With one, the speculation is already running from the early pass's own scope, and the
+	// walk needs neither, so they are taken only once the walk is done: on a cold ahra run the scope was ready
+	// 36 to 51ms after the graph, and the walk used to wait for it (#g3046x5).
+	var transform edit.Transform
+	var formatCandidates []string
+	planTaken := false
+	takePlan := func() {
+		if planTaken {
+			return
+		}
+		planTaken = true
+		transform, formatCandidates = formatPlan()
+		if transform != nil {
+			transform = lineEndings.observing(transform)
+		}
+	}
+	if early == nil {
+		takePlan()
 	}
 
 	// The format pass starts now, beside the walk and the type check, rather than after them (#679s763).
@@ -92,8 +108,7 @@ func applyProposedFixes(
 	if early != nil {
 		// Begun during the graph build on every idle core; the walk wants the cores now, so it keeps the share it
 		// always had. See startEarlyFormat.
-		speculation = early.speculation
-		speculation.narrow(speculationWorkers())
+		early.narrow(speculationWorkers())
 	} else {
 		var programs programOffer
 		if graph != nil {
@@ -106,11 +121,20 @@ func applyProposedFixes(
 	if len(projectFiles) > 0 {
 		walked, err := graph.Walk(ctx, projectFiles, rules)
 		if err != nil {
+			if early != nil {
+				speculation = early.speculationOf()
+			}
 			speculation.wait()
 			return edit.Summary{}, program.Result{}, nil, fmt.Errorf("collecting proposals: %w", err)
 		}
+		// Before anything the walk prints, so the scope's own notes come where they always came.
+		takePlan()
 		reportForeignCheckers(graph, walked, len(projectFiles))
 		result = walked
+	}
+	takePlan()
+	if early != nil {
+		speculation = early.speculationOf()
 	}
 	if graph != nil && graph.FusedCheck != nil {
 		speculation.stop()

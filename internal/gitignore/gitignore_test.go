@@ -192,3 +192,67 @@ func TestAskingOutsideTheMatchersDirectoryPanics(t *testing.T) {
 	}()
 	matcher.Ignored("a/b", false)
 }
+
+// A matcher given a listing answers from it only what the listing shows is absent (#g3046x5): a directory
+// whose listing holds no `.gitignore` or `.git` is entered without asking the disk, and one whose listing
+// names either is read from the disk as before. The disk here disagrees with the listing on purpose, so each
+// answer shows which of the two was read.
+func TestAListingAnswersOnlyForWhatItShowsAbsent(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"source/.gitignore":     "generated/\n",
+		"vendor/.git/HEAD":      "ref: refs/heads/main\n",
+		"plain/.gitignore":      "built/\n",
+		"plain/deep/.gitignore": "x/\n",
+		"unlisted/.gitignore":   "cache/\n",
+	})
+	listings := map[string][]os.DirEntry{}
+	for _, directory := range []string{"source", "vendor", "plain"} {
+		entries, err := os.ReadDir(filepath.Join(root, directory))
+		if err != nil {
+			t.Fatal(err)
+		}
+		listings[filepath.Join(root, directory)] = entries
+	}
+	// source's listing and vendor's are read before a `.gitignore` and a `.git` the disk holds: the listing
+	// shows neither.
+	listings[filepath.Join(root, "source")] = nil
+	listings[filepath.Join(root, "vendor")] = nil
+	listings[filepath.Join(root, "plain", "deep")] = nil
+	plain, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := plain.WithListing(func(directory string) ([]os.DirEntry, bool) {
+		entries, present := listings[directory]
+		return entries, present
+	})
+
+	if ignored, _ := decide(t, plain, "source/generated", true); !ignored {
+		t.Fatal("the fixture's source/.gitignore does not ignore source/generated on disk")
+	}
+	if ignored, _ := decide(t, listed, "source/generated", true); ignored {
+		t.Error("a listing showing source holds no .gitignore was not read: its patterns were applied")
+	}
+	if _, err := plain.Enter("vendor"); !errors.Is(err, ErrNestedRepository) {
+		t.Fatalf("the fixture's vendor is not refused on disk: %v", err)
+	}
+	if _, err := listed.Enter("vendor"); err != nil {
+		t.Errorf("a listing showing vendor holds no .git was not read: %v", err)
+	}
+	// Named in its listing, or not listed at all: the disk is asked, as without a listing.
+	for _, path := range []string{"plain/built", "unlisted/cache"} {
+		if ignored, _ := decide(t, listed, path, true); !ignored {
+			t.Errorf("%s: a .gitignore the listing names, or in a directory it does not hold, was not read from the disk", path)
+		}
+	}
+	// A matcher Enter makes keeps the listing: plain/deep's `.gitignore` is on disk, and its listing shows none.
+	scope, err := listed.Enter("plain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ignored, _ := decide(t, scope, "plain/deep/x", true); ignored {
+		t.Error("a matcher Enter made dropped the listing: plain/deep/.gitignore was read from the disk")
+	}
+}

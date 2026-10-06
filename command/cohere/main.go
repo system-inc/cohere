@@ -23,6 +23,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -218,9 +219,14 @@ func run() error {
 			exitProcess(exitCode)
 		}
 		// A test instrument: a file created in the moment after discovery listed the tree and before anything else
-		// reads it. See TestAFileCreatedAfterDiscoveryIsNeverReplayedOver.
+		// reads it, holding COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT when that is set. See
+		// TestAFileCreatedAfterDiscoveryIsNeverReplayedOver and TestAFileCreatedAfterDiscoveryIsFormattedNextRun.
 		if created := os.Getenv("COHERE_TEST_CREATE_AFTER_DISCOVERY"); created != "" {
-			if err := os.WriteFile(created, []byte("export const late: number = \"x\";\n"), 0o644); err != nil {
+			text := "export const late: number = \"x\";\n"
+			if given, set := os.LookupEnv("COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT"); set {
+				text = given
+			}
+			if err := os.WriteFile(created, []byte(text), 0o644); err != nil {
 				return err
 			}
 		}
@@ -495,7 +501,12 @@ func run() error {
 	// walk ahead and the early format pass read the tree it names before the fix phase does.
 	repositoryRoot := writeRepositoryRoot(location.ArgumentBase, location.Root)
 	if formatter != nil && len(flag.Args()) == 0 {
-		startFormatWalkAhead(formatter, repositoryRoot)
+		// Walked from discovery's listings where it has them (#g3046x5), when discovery ran.
+		var listing gitignore.Listing
+		if discoveredListings != nil {
+			listing = discoveredListings.Listing
+		}
+		startFormatWalkAhead(formatter, repositoryRoot, listing)
 	}
 
 	// A bare run's format pass begins now, on the cores the graph build leaves idle, rather than with the walk
@@ -527,12 +538,18 @@ func run() error {
 	// project files empty, and every use below is on a path `--format-only` does not take.
 	var graph *program.Graph
 	var buildDuration, contentPackOpened time.Duration
+	// Read beside the build rather than after it, when the config needs nothing from the program. See
+	// lintConfigAhead.
+	var lintAhead *lintConfigAhead
 	if *formatOnly {
 		// The run cache records a run only once its inputs are declared. The format walk declares its own
 		// (declareFormatWalk), settings chain included, so there is nothing else to name: the run reads no
 		// tsconfig and no lint config.
 		declareRunCacheInputs()
 	} else {
+		if runFix || runLint {
+			lintAhead = startLintConfigAhead(location)
+		}
 		buildStart := time.Now()
 		contentPack := openContentPack(location.Root)
 		contentPackOpened = time.Since(buildStart)
@@ -692,7 +709,7 @@ func run() error {
 
 	// `--format-only` proposes no fixes, so it reads no rules and its verdict cannot hang on their config.
 	if (runFix && !*formatOnly) || runLint {
-		loaded, err := configureLint(graph, location)
+		loaded, err := configureLint(graph, location, lintAhead)
 		if err != nil {
 			return err
 		}
@@ -777,104 +794,119 @@ func run() error {
 		// what made css, markdown, json and yaml invisible: a tsconfig enumerates TypeScript by
 		// construction. Formatting is the only phase whose subject is not the program.
 		var scope formatScope
-		switch {
-		case formatter == nil && writeScope.Everything:
-			// Nothing will be formatted, so there is nothing to find. This used to ask git what changed on
-			// every bare run, which was about half of a cached replay, and every file it found then reported
-			// as not formatted because nobody asked: a cost and a count that were both about nothing.
-			description := "nothing, since formatting was not requested"
-			if formatLeftOut != "" {
-				description = "nothing: " + formatLeftOut
+		// Drawn on the main goroutine, but not always before the walk. A bare run's default scope is the early
+		// pass's, which is ready only once that pass has enumerated the whole format universe, and on a cold run
+		// that came 36 to 51ms after the graph, with the walk waiting on it at 6 to 9 busy cores (#g3046x5). The
+		// walk needs neither the scope nor that enumeration, so with an early pass the fix phase draws the scope
+		// after its walk, through formatPlan. Every other scope is drawn here, as it always was.
+		scopeDrawn := false
+		drawScope := func() {
+			if scopeDrawn {
+				return
 			}
-			scope = formatScope{index: map[string]struct{}{}, Description: description}
+			scopeDrawn = true
+			switch {
+			case formatter == nil && writeScope.Everything:
+				// Nothing will be formatted, so there is nothing to find. This used to ask git what changed on
+				// every bare run, which was about half of a cached replay, and every file it found then reported
+				// as not formatted because nobody asked: a cost and a count that were both about nothing.
+				description := "nothing, since formatting was not requested"
+				if formatLeftOut != "" {
+					description = "nothing: " + formatLeftOut
+				}
+				scope = formatScope{index: map[string]struct{}{}, Description: description}
 
-		case formatter == nil:
-			// No formatter, and paths were named. The scope keeps its type-graph narrowing so the fix
-			// phase's own reporting is unchanged.
-			//
-			// Narrowed against the whole program rather than against the named scope, because the format
-			// phase has its own universe: reporting the intersection with the scope instead made `7 changed
-			// files, 0 of them in the program` on a tree where three of them were.
-			wholeProgram := graph.ProjectFiles()
-			inProgram := make(map[string]struct{}, len(wholeProgram))
-			for _, sourceFile := range wholeProgram {
-				// Cleaned to the form the named paths have, which on Windows is the `\` the compiler's
-				// names do not use.
-				inProgram[filepath.Clean(sourceFile.FileName())] = struct{}{}
-			}
-			scope = writeScope.narrowTo(inProgram)
+			case formatter == nil:
+				// No formatter, and paths were named. The scope keeps its type-graph narrowing so the fix
+				// phase's own reporting is unchanged.
+				//
+				// Narrowed against the whole program rather than against the named scope, because the format
+				// phase has its own universe: reporting the intersection with the scope instead made `7 changed
+				// files, 0 of them in the program` on a tree where three of them were.
+				wholeProgram := graph.ProjectFiles()
+				inProgram := make(map[string]struct{}, len(wholeProgram))
+				for _, sourceFile := range wholeProgram {
+					// Cleaned to the form the named paths have, which on Windows is the `\` the compiler's
+					// names do not use.
+					inProgram[filepath.Clean(sourceFile.FileName())] = struct{}{}
+				}
+				scope = writeScope.narrowTo(inProgram)
 
-		case !writeScope.Everything && len(writeScope.FileNames) == 0:
-			// Named paths that hold no file, so the walk cannot affect the outcome. The scope already names
-			// where it looked, which is the honest thing to print here.
-			scope = writeScope
-
-		case !writeScope.Everything || *formatAll:
-			// A caller who named paths has already said which files this run is about, and formatting
-			// files they did not name would be a surprise in the one mode where they were explicit. It reads
-			// the write scope and not the check scope: the check scope becomes the whole tree past the
-			// closure limit, and keying on it sent a named run down to the default below, formatting every
-			// changed file in every submodule. It also comes before `--format-all`, because with paths
-			// stated, all of them is all of the stated paths.
-			//
-			// `--format-all` alone is the whole walk, asked for by name.
-			//
-			// The enumeration walks the tree through ignore layers, which are inputs the run cache does not
-			// observe. Declining here costs a miss in this configuration and never a stale hit.
-			scope = wholeTreeScope()
-			if !writeScope.Everything {
+			case !writeScope.Everything && len(writeScope.FileNames) == 0:
+				// Named paths that hold no file, so the walk cannot affect the outcome. The scope already names
+				// where it looked, which is the honest thing to print here.
 				scope = writeScope
-			}
-			declineRunCache("a formatter enumerated the tree")
-			enumeration, enumerateError := enumerateFormatTree(formatter, repositoryRoot)
-			if enumerateError != nil {
-				// A failed walk withholds formatting and says why, rather than falling back to a universe
-				// that would format the wrong set. Fixing still runs.
-				scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError), failure: enumerateError}
-			} else {
-				scope = scope.narrowToEnumeration(enumeration)
+
+			case !writeScope.Everything || *formatAll:
+				// A caller who named paths has already said which files this run is about, and formatting
+				// files they did not name would be a surprise in the one mode where they were explicit. It reads
+				// the write scope and not the check scope: the check scope becomes the whole tree past the
+				// closure limit, and keying on it sent a named run down to the default below, formatting every
+				// changed file in every submodule. It also comes before `--format-all`, because with paths
+				// stated, all of them is all of the stated paths.
+				//
+				// `--format-all` alone is the whole walk, asked for by name.
+				//
+				// The enumeration walks the tree through ignore layers, which are inputs the run cache does not
+				// observe. Declining here costs a miss in this configuration and never a stale hit.
+				scope = wholeTreeScope()
+				if !writeScope.Everything {
+					scope = writeScope
+				}
+				declineRunCache("a formatter enumerated the tree")
+				enumeration, enumerateError := enumerateFormatTree(formatter, repositoryRoot)
+				if enumerateError != nil {
+					// A failed walk withholds formatting and says why, rather than falling back to a universe
+					// that would format the wrong set. Fixing still runs.
+					scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError), failure: enumerateError}
+				} else {
+					scope = scope.narrowToEnumeration(enumeration)
+				}
+
+			default:
+				// What changed since cohere last looked: every file the formatter handles, here and in each
+				// declared submodule, whose bytes are not on record as formatted. Measured on ahra's 3,084
+				// formattable files, the native printers format the whole tree in about 10 seconds, which the
+				// first run with no record pays once; every run after formats what was edited.
+				//
+				// The walk declares what it read, so a run that only checks can be replayed (#13a63n3). The scope it
+				// draws also reads the format record, which changes nothing a replay could print wrongly: an entry is
+				// a proof that bytes are already formatted, so the record decides how much is formatted again, never
+				// what would change.
+				if early != nil {
+					scope, recordUniverse = early.formatScopeOf()
+				} else {
+					scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
+				}
 			}
 
-		default:
-			// What changed since cohere last looked: every file the formatter handles, here and in each
-			// declared submodule, whose bytes are not on record as formatted. Measured on ahra's 3,084
-			// formattable files, the native printers format the whole tree in about 10 seconds, which the
-			// first run with no record pays once; every run after formats what was edited.
-			//
-			// The walk declares what it read, so a run that only checks can be replayed (#13a63n3). The scope it
-			// draws also reads the format record, which changes nothing a replay could print wrongly: an entry is
-			// a proof that bytes are already formatted, so the record decides how much is formatted again, never
-			// what would change.
-			if early != nil {
-				scope, recordUniverse = early.formatScopeOf()
-			} else {
-				scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
+			// The Adamic `.a` files the program holds join the format scope now that there is a program to ask
+			// (#6mhafvb). The walk held every `.a` back, since one could as well be a static library, and the early
+			// pass never saw one. A held `.a` git ignores is checked and not formatted, and the run says so. A nested
+			// repository's drift check has no program to ask, so it reads none of a library's `.a` files: their
+			// drift is the library's own run to find, not this one's.
+			if formatter != nil {
+				held := adamicHeld(graph)
+				if graph == nil && len(scope.adamic) > 0 {
+					// The tsconfig is an input this run declared it never reads, so it is not replayed.
+					declineRunCache("the tsconfig says which .a files are source")
+					included, includedError := adamicIncluded(location.ConfigFileName)
+					if includedError != nil {
+						// Said rather than swallowed: the `.a` files stay out of the scope, and the reason is the run's.
+						fmt.Fprintf(os.Stderr, "⚠ the Adamic .a files were not formatted: reading the tsconfig to see which are source: %v\n", includedError)
+					}
+					held = included
+				}
+				var claimedAdamic []string
+				scope, claimedAdamic = scope.claimAdamic(held)
+				if recordUniverse != nil {
+					recordUniverse = slices.Concat(recordUniverse, claimedAdamic)
+				}
+				activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(os.Stderr, repositoryRoot, held)
 			}
 		}
-
-		// The Adamic `.a` files the program holds join the format scope now that there is a program to ask
-		// (#6mhafvb). The walk held every `.a` back, since one could as well be a static library, and the early
-		// pass never saw one. A held `.a` git ignores is checked and not formatted, and the run says so. A nested
-		// repository's drift check has no program to ask, so it reads none of a library's `.a` files: their
-		// drift is the library's own run to find, not this one's.
-		if formatter != nil {
-			held := adamicHeld(graph)
-			if graph == nil && len(scope.adamic) > 0 {
-				// The tsconfig is an input this run declared it never reads, so it is not replayed.
-				declineRunCache("the tsconfig says which .a files are source")
-				included, includedError := adamicIncluded(location.ConfigFileName)
-				if includedError != nil {
-					// Said rather than swallowed: the `.a` files stay out of the scope, and the reason is the run's.
-					fmt.Fprintf(os.Stderr, "⚠ the Adamic .a files were not formatted: reading the tsconfig to see which are source: %v\n", includedError)
-				}
-				held = included
-			}
-			var claimedAdamic []string
-			scope, claimedAdamic = scope.claimAdamic(held)
-			if recordUniverse != nil {
-				recordUniverse = slices.Concat(recordUniverse, claimedAdamic)
-			}
-			activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(os.Stderr, repositoryRoot, held)
+		if early == nil {
+			drawScope()
 		}
 
 		// The submodules this repository declares are read, never written: each file a run inside one
@@ -898,10 +930,14 @@ func run() error {
 		if early != nil {
 			formatting = early.formatting
 		}
+		formatPlan := func() (edit.Transform, []string) {
+			drawScope()
+			return formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
+				scope.formatCandidates()
+		}
 		fixSummary, fixWalk, lineEndings, err := applyProposedFixes(
 			ctx, graph, fixFiles, fixRules,
-			formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
-			scope.formatCandidates(),
+			formatPlan,
 			writeScope,
 			repositoryRoot,
 			*maxFixPasses,
@@ -1363,11 +1399,21 @@ func rebuildGraph(
 // both need before either runs: which rules apply to which files, with their options. One function
 // because the gate and the editor's save (stdin.go) must configure rules the same way, or a save would
 // write what the gate does not.
-func configureLint(graph *program.Graph, location projectLocation) (*configuration.Config, error) {
+//
+// ahead, when not nil, is the same config already read beside the graph build (lintConfigAhead), and its
+// load and settings check are taken from it rather than done again here.
+func configureLint(graph *program.Graph, location projectLocation, ahead *lintConfigAhead) (*configuration.Config, error) {
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	lintConfig, err := loadLintConfig(graph, location)
+	var lintConfig *configuration.Config
+	var err error
+	if ahead != nil {
+		<-ahead.done
+		lintConfig, err = ahead.config, ahead.loadError
+	} else {
+		lintConfig, err = loadLintConfig(graph, location)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
 	}
@@ -1387,11 +1433,18 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 		return nil, fmt.Errorf("validating the lint config: %w", err)
 	}
 	base := optionsBase(lintConfig, location.Root)
-	if err := registry.CheckSettings(base); err != nil {
-		return nil, fmt.Errorf("validating the lint config: %w", err)
+	if ahead != nil {
+		if ahead.settingsError != nil {
+			return nil, fmt.Errorf("validating the lint config: %w", ahead.settingsError)
+		}
+		graph.RuleOptions = ahead.options
+	} else {
+		if err := registry.CheckSettings(base); err != nil {
+			return nil, fmt.Errorf("validating the lint config: %w", err)
+		}
+		graph.RuleOptions = registry.OptionsAt(base)
 	}
 	graph.LintConfig = lintConfig
-	graph.RuleOptions = registry.OptionsAt(base)
 	graph.RegisteredRuleNames = registry.Names()
 	graph.Readiness = requestedReadiness()
 	return lintConfig, nil

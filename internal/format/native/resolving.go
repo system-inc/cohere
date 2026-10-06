@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/gitignore"
 )
 
 // Resolving formats each file with the options its own directory resolves to, the way
@@ -38,6 +39,12 @@ func (resolving *Resolving) Handles(fileName string) bool {
 // Enumerate walks a tree for the files a native printer handles.
 func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, error) {
 	return formatfiles.Enumerate(root, resolving.Handles)
+}
+
+// EnumerateListed is Enumerate reading directories from listing where it holds them. See
+// formatfiles.EnumerateListed.
+func (resolving *Resolving) EnumerateListed(root string, listing gitignore.Listing) (formatfiles.Enumeration, error) {
+	return formatfiles.EnumerateListed(root, resolving.Handles, listing)
 }
 
 // Format formats one file with the options its own directory resolves to.

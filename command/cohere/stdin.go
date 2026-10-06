@@ -153,7 +153,7 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 		return none, held, nil
 	}
 
-	if _, err := configureLint(graph, request.Location); err != nil {
+	if _, err := configureLint(graph, request.Location, nil); err != nil {
 		return nil, nil, err
 	}
 	rules := registry.All()

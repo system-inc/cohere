@@ -49,7 +49,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 			ConfigFileName:     filepath.Join(directory, "tsconfig.json"),
 			LintConfigFileName: filepath.Join(directory, "CohereSettings.json"),
 		}
-		if _, err := configureLint(graph, location); err != nil {
+		if _, err := configureLint(graph, location, nil); err != nil {
 			t.Fatal(err)
 		}
 		engine, err := native.NewResolving(directory)
@@ -66,7 +66,8 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 		defer func() { parallelFormatWorkers = previous }()
 
 		summary, _, _, err := applyProposedFixes(context.Background(), graph, graph.ProjectFiles(), registry.All(),
-			formatTransform(engine), enumeration.Files, wholeTreeScope(), graph.Config.GetCurrentDirectory(), 0, write, nil)
+			func() (edit.Transform, []string) { return formatTransform(engine), enumeration.Files }, wholeTreeScope(),
+			graph.Config.GetCurrentDirectory(), 0, write, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
