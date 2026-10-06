@@ -58,7 +58,7 @@ var NextNoPageState = rule.Rule{
 		// IsPageFile already requires a .tsx or .jsx suffix, so no file can satisfy it and fail the
 		// React test. A mutation sweep cannot kill the first half, which is what a check subsumed
 		// by the one beside it looks like from inside a green suite.
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || !fileContext.IsPageFile {
 			return nil
 		}

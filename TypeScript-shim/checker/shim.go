@@ -477,6 +477,7 @@ type extra_Checker struct {
 	getGlobalPromiseType                        func() *checker.Type
 	getGlobalPromiseTypeChecked                 func() *checker.Type
 	getGlobalPromiseLikeType                    func() *checker.Type
+	getGlobalAbstractModuleSourceType           func() *checker.Type
 	getGlobalPromiseConstructorSymbol           func() *ast.Symbol
 	getGlobalPromiseConstructorSymbolOrNil      func() *ast.Symbol
 	getGlobalOmitSymbol                         func() *ast.Symbol

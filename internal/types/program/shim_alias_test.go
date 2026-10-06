@@ -270,7 +270,7 @@ func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast
 
 	var subject *ast.SourceFile
 	for _, file := range graph.ProjectFiles() {
-		if filepath.Base(file.FileName()) == "Subject.ts" {
+		if filepath.Base(file.FileName().AsString()) == "Subject.ts" {
 			subject = file
 		}
 	}

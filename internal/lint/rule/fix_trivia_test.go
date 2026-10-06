@@ -121,7 +121,7 @@ func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.No
 
 	fileName := tspath.NormalizePath("/Fixture.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName, Path: tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTS)
 	if sourceFile == nil {
 		t.Fatalf("could not parse %q", source)
@@ -219,7 +219,7 @@ func parseNamedBinding(t *testing.T, source string, want string) (*ast.SourceFil
 
 	fileName := tspath.NormalizePath("/Fixture.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName, Path: tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTS)
 	if sourceFile == nil {
 		t.Fatalf("could not parse %q", source)

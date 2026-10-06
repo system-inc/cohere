@@ -9,6 +9,7 @@ import "github.com/microsoft/TypeScript/tsc/internal/core"
 import "github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 import "github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 import "github.com/microsoft/TypeScript/tsc/internal/tspath"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs"
 import _ "unsafe"
 
 type AlternateModeDiagnostics = tsoptions.AlternateModeDiagnostics
@@ -20,7 +21,17 @@ var CommandLineCompilerOptionsMap = tsoptions.CommandLineCompilerOptionsMap
 type CommandLineOption = tsoptions.CommandLineOption
 type CommandLineOptionKind = tsoptions.CommandLineOptionKind
 type CommandLineOptionNameMap = tsoptions.CommandLineOptionNameMap
+type CommandLineOptionPathKind = tsoptions.CommandLineOptionPathKind
 
+const CommandLineOptionPathKindConfigLocator = tsoptions.CommandLineOptionPathKindConfigLocator
+const CommandLineOptionPathKindDirectory = tsoptions.CommandLineOptionPathKindDirectory
+const CommandLineOptionPathKindFile = tsoptions.CommandLineOptionPathKindFile
+const CommandLineOptionPathKindFileOrDirectory = tsoptions.CommandLineOptionPathKindFileOrDirectory
+const CommandLineOptionPathKindFileSpec = tsoptions.CommandLineOptionPathKindFileSpec
+const CommandLineOptionPathKindNone = tsoptions.CommandLineOptionPathKindNone
+const CommandLineOptionPathKindPathPattern = tsoptions.CommandLineOptionPathKindPathPattern
+const CommandLineOptionPathKindResolvedPathPattern = tsoptions.CommandLineOptionPathKindResolvedPathPattern
+const CommandLineOptionPathKindSourceMapLocation = tsoptions.CommandLineOptionPathKindSourceMapLocation
 const CommandLineOptionTypeBoolean = tsoptions.CommandLineOptionTypeBoolean
 const CommandLineOptionTypeEnum = tsoptions.CommandLineOptionTypeEnum
 const CommandLineOptionTypeList = tsoptions.CommandLineOptionTypeList
@@ -45,10 +56,10 @@ var CompilerOptionsDidYouMeanDiagnostics = tsoptions.CompilerOptionsDidYouMeanDi
 type CompilerOptionsValue = tsoptions.CompilerOptionsValue
 
 //go:linkname ConvertOptionToAbsolutePath github.com/microsoft/TypeScript/tsc/internal/tsoptions.ConvertOptionToAbsolutePath
-func ConvertOptionToAbsolutePath(o string, v any, optionMap tsoptions.CommandLineOptionNameMap, cwd string) (any, bool)
+func ConvertOptionToAbsolutePath(o string, v any, optionMap tsoptions.CommandLineOptionNameMap, cwd tspath.RootedDirectoryPath) (any, bool)
 
 //go:linkname ConvertToTSConfig github.com/microsoft/TypeScript/tsc/internal/tsoptions.ConvertToTSConfig
-func ConvertToTSConfig(configParseResult *tsoptions.ParsedCommandLine, configFileName string) *tsoptions.TSConfig
+func ConvertToTSConfig(configParseResult *tsoptions.ParsedCommandLine, configFileName tspath.RootedFilePath) *tsoptions.TSConfig
 
 //go:linkname CreateDiagnosticAtReferenceSyntax github.com/microsoft/TypeScript/tsc/internal/tsoptions.CreateDiagnosticAtReferenceSyntax
 func CreateDiagnosticAtReferenceSyntax(config *tsoptions.ParsedCommandLine, index int, message *diagnostics.Message, args ...any) *ast.Diagnostic
@@ -85,10 +96,10 @@ func GetNameMapFromList(optDecls []*tsoptions.CommandLineOption) *tsoptions.Name
 func GetOptionsSyntaxByArrayElementValue(objectLiteral *ast.ObjectLiteralExpression, propKey string, elementValue string) *ast.Node
 
 //go:linkname GetParsedCommandLineOfConfigFile github.com/microsoft/TypeScript/tsc/internal/tsoptions.GetParsedCommandLineOfConfigFile
-func GetParsedCommandLineOfConfigFile(configFileName string, options *core.CompilerOptions, optionsRaw *collections.OrderedMap[string, any], sys tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
+func GetParsedCommandLineOfConfigFile(configFileName tspath.RootedFilePath, options *core.CompilerOptions, optionsRaw *collections.OrderedMap[string, any], fs vfs.FS, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
 
 //go:linkname GetParsedCommandLineOfConfigFilePath github.com/microsoft/TypeScript/tsc/internal/tsoptions.GetParsedCommandLineOfConfigFilePath
-func GetParsedCommandLineOfConfigFilePath(configFileName string, path tspath.Path, options *core.CompilerOptions, optionsRaw *collections.OrderedMap[string, any], sys tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
+func GetParsedCommandLineOfConfigFilePath(configFileName tspath.RootedFilePath, path tspath.PathKey, options *core.CompilerOptions, optionsRaw *collections.OrderedMap[string, any], fs vfs.FS, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
 
 //go:linkname GetSupportedExtensionsWithJsonIfResolveJsonModule github.com/microsoft/TypeScript/tsc/internal/tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule
 func GetSupportedExtensionsWithJsonIfResolveJsonModule(compilerOptions *core.CompilerOptions, supportedExtensions [][]string) [][]string
@@ -103,22 +114,22 @@ var Libs = tsoptions.Libs
 type NameMap = tsoptions.NameMap
 
 //go:linkname NewParsedCommandLine github.com/microsoft/TypeScript/tsc/internal/tsoptions.NewParsedCommandLine
-func NewParsedCommandLine(compilerOptions *core.CompilerOptions, rootFileNames []string, projectReferences []*core.ProjectReference, comparePathsOptions tspath.ComparePathsOptions) *tsoptions.ParsedCommandLine
+func NewParsedCommandLine(compilerOptions *core.CompilerOptions, rootFileNames []tspath.RootedFilePath, projectReferences []*core.ProjectReference, baseDirectory tspath.RootedDirectoryPath, caseSensitivity tspath.CaseSensitivity) *tsoptions.ParsedCommandLine
 
 //go:linkname NewTsconfigSourceFileFromFilePath github.com/microsoft/TypeScript/tsc/internal/tsoptions.NewTsconfigSourceFileFromFilePath
-func NewTsconfigSourceFileFromFilePath(configFileName string, configPath tspath.Path, configSourceText string) *tsoptions.TsConfigSourceFile
+func NewTsconfigSourceFileFromFilePath(configFileName tspath.RootedFilePath, configPath tspath.PathKey, configSourceText string) *tsoptions.TsConfigSourceFile
 
 var OptionsDeclarations = tsoptions.OptionsDeclarations
 var OptionsForBuild = tsoptions.OptionsForBuild
 
 //go:linkname ParseBuildCommandLine github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseBuildCommandLine
-func ParseBuildCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedBuildCommandLine
+func ParseBuildCommandLine(commandLine []string, fs vfs.FS, currentDirectory tspath.RootedDirectoryPath) *tsoptions.ParsedBuildCommandLine
 
 //go:linkname ParseBuildOptions github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseBuildOptions
 func ParseBuildOptions(key string, value any, allOptions *core.BuildOptions)
 
 //go:linkname ParseCommandLine github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseCommandLine
-func ParseCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedCommandLine
+func ParseCommandLine(commandLine []string, fs vfs.FS, currentDirectory tspath.RootedDirectoryPath) *tsoptions.ParsedCommandLine
 
 type ParseCommandLineWorkerDiagnostics = tsoptions.ParseCommandLineWorkerDiagnostics
 
@@ -126,12 +137,10 @@ type ParseCommandLineWorkerDiagnostics = tsoptions.ParseCommandLineWorkerDiagnos
 func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOptions)
 
 //go:linkname ParseConfigFileTextToJson github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseConfigFileTextToJson
-func ParseConfigFileTextToJson(fileName string, path tspath.Path, jsonText string) (any, []*ast.Diagnostic)
-
-type ParseConfigHost = tsoptions.ParseConfigHost
+func ParseConfigFileTextToJson(fileName tspath.RootedFilePath, path tspath.PathKey, jsonText string) (any, []*ast.Diagnostic)
 
 //go:linkname ParseExtendedConfig github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseExtendedConfig
-func ParseExtendedConfig(fileName string, path tspath.Path, resolutionStack []tspath.Path, host tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) *tsoptions.ExtendedConfigCacheEntry
+func ParseExtendedConfig(fileName tspath.RootedFilePath, path tspath.PathKey, resolutionStack []tspath.PathKey, fs vfs.FS, extendedConfigCache tsoptions.ExtendedConfigCache) *tsoptions.ExtendedConfigCacheEntry
 
 //go:linkname ParseListTypeOption github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseListTypeOption
 func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]any, []*ast.Diagnostic)
@@ -151,6 +160,14 @@ func ParseTypeAcquisition(key string, value any, allOptions *core.TypeAcquisitio
 type ParsedBuildCommandLine = tsoptions.ParsedBuildCommandLine
 type ParsedCommandLine = tsoptions.ParsedCommandLine
 type ParsedOptions = tsoptions.ParsedOptions
+
+//go:linkname PathValueAsString github.com/microsoft/TypeScript/tsc/internal/tsoptions.PathValueAsString
+func PathValueAsString(value any) (string, bool)
+
+//go:linkname PathValuesAsStrings github.com/microsoft/TypeScript/tsc/internal/tsoptions.PathValuesAsStrings
+func PathValuesAsStrings(value any) ([]string, bool)
+
+type RawCompilerOptions = tsoptions.RawCompilerOptions
 type SourceOutputAndProjectReference = tsoptions.SourceOutputAndProjectReference
 type TSConfig = tsoptions.TSConfig
 

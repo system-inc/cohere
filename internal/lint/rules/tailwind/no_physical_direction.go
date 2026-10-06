@@ -135,7 +135,7 @@ var NoPhysicalDirection = rule.Rule{
 		}
 		// An Adamic `.a` file is checked as the `.ts` it is (#kwt1htp).
 		fileName := ctx.SourceFile.FileName()
-		if !strings.HasSuffix(sourcename.TreatedAs(fileName), ".ts") && !strings.HasSuffix(fileName, ".tsx") {
+		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") && !strings.HasSuffix(fileName.AsString(), ".tsx") {
 			return nil
 		}
 

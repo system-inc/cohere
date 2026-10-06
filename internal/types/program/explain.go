@@ -84,11 +84,11 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 		return nil, fmt.Errorf("no rules to explain: none were given")
 	}
 
-	explanation := &Explanation{FileName: sourceFile.FileName()}
+	explanation := &Explanation{FileName: sourceFile.FileName().AsString()}
 
 	var resolution configuration.Resolved
 	if g.LintConfig != nil {
-		resolution = g.LintConfig.Resolve(sourceFile.FileName())
+		resolution = g.LintConfig.Resolve(sourceFile.FileName().AsString())
 		if resolution.Ignored {
 			explanation.FileIgnored = true
 			explanation.IgnoredBy = resolution.IgnoredBy

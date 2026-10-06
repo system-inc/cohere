@@ -65,7 +65,7 @@ var ReactHookRequireResultNaming = rule.Rule{
 	Name:       "structure/react-hook-require-result-naming",
 	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 

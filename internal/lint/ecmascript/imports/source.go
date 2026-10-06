@@ -101,7 +101,7 @@ func NormalizedFileName(sourceFile *ast.SourceFile) string {
 	if sourceFile == nil {
 		return ""
 	}
-	return strings.ReplaceAll(sourceFile.FileName(), "\\", "/")
+	return strings.ReplaceAll(sourceFile.FileName().AsString(), "\\", "/")
 }
 
 // SpecifierNode returns the string-literal specifier inside an import-shaped node, falling

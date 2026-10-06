@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -64,8 +65,8 @@ type listingFS struct {
 	listings *DirectoryListings
 }
 
-func (l *listingFS) GetAccessibleEntries(directory string) vfs.Entries {
-	entries, listed := l.listings.Listing(directory)
+func (l *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	entries, listed := l.listings.Listing(directory.AsString())
 	if !listed {
 		return l.FS.GetAccessibleEntries(directory)
 	}
@@ -90,7 +91,7 @@ func (l *listingFS) GetAccessibleEntries(directory string) vfs.Entries {
 			continue
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			if information := l.FS.Stat(directory + "/" + entry.Name()); information != nil {
+			if information := l.FS.Stat(tspath.RootedPath(directory.AsString() + "/" + entry.Name())); information != nil {
 				add(entry.Name(), information.Mode(), true)
 			}
 		}

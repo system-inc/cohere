@@ -58,7 +58,7 @@ func typeScriptImplicitReturns(t *testing.T, source string, strict bool) []strin
 	}
 	spans := []string{}
 	for _, sourceFile := range graph.ProjectFiles() {
-		if !strings.HasSuffix(sourceFile.FileName(), "/Case.ts") {
+		if !strings.HasSuffix(sourceFile.FileName().AsString(), "/Case.ts") {
 			continue
 		}
 		for _, diagnostic := range graph.Diagnostics(context.Background(), sourceFile) {

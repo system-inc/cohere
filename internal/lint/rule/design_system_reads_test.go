@@ -8,6 +8,7 @@ import (
 	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
@@ -26,10 +27,10 @@ func TestDesignSystemReadsAreKeptPerProgram(t *testing.T) {
 
 	firstRecorder := NewRecordingFS(osvfs.FS())
 	recordDesignSystemFS(first, firstRecorder)
-	firstRecorder.ReadFile(theme)
+	firstRecorder.ReadFile(tspath.RootedFilePath(theme))
 	secondRecorder := NewRecordingFS(osvfs.FS())
 	recordDesignSystemFS(second, secondRecorder)
-	secondRecorder.FileExists(filepath.Join(directory, "missing.css"))
+	secondRecorder.FileExists(tspath.RootedFilePath(filepath.Join(directory, "missing.css")))
 
 	reads, loaded := DesignSystemReads(first)
 	if !loaded || len(reads) != 1 || reads[0].Path != theme || !reads[0].Present {

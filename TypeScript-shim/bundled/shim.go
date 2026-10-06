@@ -3,6 +3,7 @@
 package bundled
 
 import "github.com/microsoft/TypeScript/tsc/internal/bundled"
+import "github.com/microsoft/TypeScript/tsc/internal/tspath"
 import "github.com/microsoft/TypeScript/tsc/internal/vfs"
 import _ "unsafe"
 
@@ -14,7 +15,7 @@ func IsBundled(path string) bool
 var LibNames = bundled.LibNames
 
 //go:linkname LibPath github.com/microsoft/TypeScript/tsc/internal/bundled.LibPath
-func LibPath() string
+func LibPath() tspath.RootedDirectoryPath
 
 //go:linkname TestingLibPath github.com/microsoft/TypeScript/tsc/internal/bundled.TestingLibPath
 func TestingLibPath() string

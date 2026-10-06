@@ -2,9 +2,11 @@ package program
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -52,15 +54,16 @@ func (s *StatSnapshot) note(path string, information os.FileInfo, err error) {
 	}
 }
 
-// answer is what the check found at path: present with its information, absent, or not statted at all. A path
-// asked with a trailing slash is answered as the one without, as the disk answers it (vfs's SplitPath removes the
-// separator before it stats), and as the recorder records it. Any other spelling the check did not stat, a doubled
-// separator or a dot segment, is not found here and goes to the disk.
+// answer is what the check found at path: present with its information, absent, or not statted at all. Any
+// spelling the check did not stat, a trailing slash, a doubled separator or a dot segment, is not found here and
+// goes to the disk.
 func (s *StatSnapshot) answer(path string) (information os.FileInfo, present bool, known bool) {
-	if s == nil {
+	// The disk refuses a name with a trailing slash, the root excepted: since typed file paths (#64159) a stat
+	// goes through io/fs, whose paths have none, where before the separator was removed first.
+	if s == nil || len(path) > 1 && strings.HasSuffix(path, "/") {
 		return nil, false, false
 	}
-	value, found := s.answers.Load(withoutTrailingSlash(path))
+	value, found := s.answers.Load(path)
 	if !found {
 		return nil, false, false
 	}
@@ -89,24 +92,24 @@ type checkedStatsFS struct {
 	answered *atomic.Int64
 }
 
-func (f *checkedStatsFS) FileExists(path string) bool {
-	if information, present, known := f.snapshot.answer(path); known {
+func (f *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
+	if information, present, known := f.snapshot.answer(path.AsString()); known {
 		f.answered.Add(1)
 		return present && !information.IsDir()
 	}
 	return f.FS.FileExists(path)
 }
 
-func (f *checkedStatsFS) DirectoryExists(path string) bool {
-	if information, present, known := f.snapshot.answer(path); known {
+func (f *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	if information, present, known := f.snapshot.answer(path.AsString()); known {
 		f.answered.Add(1)
 		return present && information.IsDir()
 	}
 	return f.FS.DirectoryExists(path)
 }
 
-func (f *checkedStatsFS) Stat(path string) vfs.FileInfo {
-	if information, present, known := f.snapshot.answer(path); known {
+func (f *checkedStatsFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	if information, present, known := f.snapshot.answer(path.AsString()); known {
 		f.answered.Add(1)
 		if !present {
 			return nil

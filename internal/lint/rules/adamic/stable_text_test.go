@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -41,8 +42,8 @@ func relationMessages(t *testing.T, files map[string]string, anotherFirst bool) 
 	if err != nil {
 		t.Fatalf("building: %v", err)
 	}
-	another := graph.Program.GetSourceFile(filepath.Join(directory, "Another.ts"))
-	caseFile := graph.Program.GetSourceFile(filepath.Join(directory, "Case.ts"))
+	another := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Another.ts")))
+	caseFile := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Case.ts")))
 	if another == nil || caseFile == nil {
 		t.Fatal("the fixture's files are not in the program")
 	}

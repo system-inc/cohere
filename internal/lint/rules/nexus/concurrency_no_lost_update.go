@@ -1294,7 +1294,7 @@ func (analysis *concurrencyNoLostUpdateRoot) computeStoreAccess(call *ast.Node) 
 		if sourceFile == nil {
 			return nil
 		}
-		owner = "function\x00" + sourceFile.FileName()
+		owner = ("function\x00" + sourceFile.FileName()).AsString()
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
 		nameNode := access.Name()

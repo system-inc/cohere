@@ -407,7 +407,7 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 		isCacheable[name] = true
 	}
 	entry := LintCacheEntry{
-		Path:               sourceFile.FileName(),
+		Path:               sourceFile.FileName().AsString(),
 		ContentHash:        keys.contentHash,
 		Rules:              keys.pure,
 		TypedRules:         keys.typed,

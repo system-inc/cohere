@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
@@ -274,7 +275,7 @@ func WritesSettings(settings map[string]json.RawMessage) bool {
 
 // loadConfiguredDesignSystem is upstream's resolution for a rule that named a location.
 func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
-	entryPoint, packageRoot, err := ConfiguredEntryPoint(projectRoot, location, fileSystem.FileExists)
+	entryPoint, packageRoot, err := ConfiguredEntryPoint(projectRoot, location, func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) })
 	if err != nil {
 		return DesignSystemResult{Err: err}
 	}
@@ -287,7 +288,7 @@ func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS
 		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
 	}
 	for _, stylesheet := range system.Stylesheets {
-		fileSystem.Stat(stylesheet)
+		fileSystem.Stat(tspath.RootedPath(stylesheet))
 	}
 	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
 }

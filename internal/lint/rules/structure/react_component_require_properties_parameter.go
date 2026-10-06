@@ -53,7 +53,7 @@ func messageRenameToProperties() rule.Message {
 var ReactComponentRequirePropertiesParameter = rule.Rule{
 	Name: "structure/react-component-require-properties-parameter",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 

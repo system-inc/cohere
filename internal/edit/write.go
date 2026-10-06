@@ -103,7 +103,7 @@ func reasonOf(diagnostics []*ast.Diagnostic) string {
 // no node or diagnostic, so the seed's parse diagnostics are the guard's.
 func seedFor(fileName string, text string, seed *ast.SourceFile) bool {
 	return seed != nil && TypeScriptParsable(fileName) && seed.Text() == text && seed.ScriptKind == guardScriptKind(fileName) &&
-		tspath.IsDeclarationFileName(seed.FileName()) == tspath.IsDeclarationFileName(fileName)
+		tspath.IsDeclarationFileName(seed.FileName().AsString()) == tspath.IsDeclarationFileName(fileName)
 }
 
 // verdictOf is parsesWithTree's answer for a tree in hand.
@@ -129,8 +129,8 @@ func parseText(fileName string, text string) *ast.SourceFile {
 	rooted = tspath.NormalizePath(rooted)
 
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: rooted,
-		Path:     tspath.Path(rooted),
+		FileName: tspath.RootedFilePath(rooted),
+		PathKey:  tspath.PathKey(rooted),
 	}, text, guardScriptKind(fileName))
 }
 

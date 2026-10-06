@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -23,12 +24,12 @@ type identityFS struct {
 	identities *readIdentities
 }
 
-func (f *identityFS) ReadFile(path string) (string, bool) {
-	identity, statted := statIdentity(path)
+func (f *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	identity, statted := statIdentity(path.AsString())
 	contents, ok := f.FS.ReadFile(path)
 	if statted && ok {
 		f.identities.mutex.Lock()
-		f.identities.byPath[path] = identity
+		f.identities.byPath[path.AsString()] = identity
 		f.identities.mutex.Unlock()
 	}
 	return contents, ok

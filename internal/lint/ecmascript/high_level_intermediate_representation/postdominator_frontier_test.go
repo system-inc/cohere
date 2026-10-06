@@ -58,8 +58,8 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			kind = core.ScriptKindTSX
 		}
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: "/" + name,
-			Path:     tspath.Path("/" + name),
+			FileName: tspath.RootedFilePath("/" + name),
+			PathKey:  tspath.PathKey("/" + name),
 		}, code, kind)
 		_, isHandWritten := handWritten[name]
 		if isHandWritten {

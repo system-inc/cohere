@@ -19,7 +19,7 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 		return held
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		if fileName := filepath.Clean(sourceFile.FileName()); sourcename.IsAdamic(fileName) {
+		if fileName := filepath.Clean(sourceFile.FileName().AsString()); sourcename.IsAdamic(fileName) {
 			held[fileName] = struct{}{}
 		}
 	}

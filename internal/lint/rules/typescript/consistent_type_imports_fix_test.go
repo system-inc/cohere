@@ -118,7 +118,7 @@ func consistentTypeImportsTypeErrors(t *testing.T, sources map[string]string) ma
 						// its fixture by the path the fixture named, as a suffix.
 						key := ""
 						for name := range sources {
-							if strings.HasSuffix(sourceFile.FileName(), name) {
+							if strings.HasSuffix(sourceFile.FileName().AsString(), name) {
 								key = name
 							}
 						}

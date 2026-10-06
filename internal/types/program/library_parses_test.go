@@ -31,7 +31,7 @@ func buildWithLibraryParses(t testing.TB, directory string, parses *program.Libr
 }
 
 func isBundledLibrary(sourceFile *ast.SourceFile) bool {
-	return strings.HasPrefix(sourceFile.FileName(), "bundled:///")
+	return strings.HasPrefix(sourceFile.FileName().AsString(), "bundled:///")
 }
 
 // Two programs built with one cache hold the same parse of every bundled lib file, and their own parses of
@@ -51,11 +51,11 @@ func TestLibraryParsesShareEachLibFileAcrossPrograms(t *testing.T) {
 
 	secondByName := map[string]*ast.SourceFile{}
 	for _, sourceFile := range second.SourceFiles() {
-		secondByName[sourceFile.FileName()] = sourceFile
+		secondByName[sourceFile.FileName().AsString()] = sourceFile
 	}
 	shared, libraries := 0, 0
 	for _, sourceFile := range first.SourceFiles() {
-		other, inBoth := secondByName[sourceFile.FileName()]
+		other, inBoth := secondByName[sourceFile.FileName().AsString()]
 		if !isBundledLibrary(sourceFile) {
 			if inBoth && other == sourceFile {
 				t.Errorf("%s, a project file, is one parse in two programs", sourceFile.FileName())
@@ -116,7 +116,7 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(t *testing.T) {
 			names := func(graph *program.Graph) []string {
 				fileNames := []string{}
 				for _, sourceFile := range graph.SourceFiles() {
-					fileNames = append(fileNames, sourceFile.FileName())
+					fileNames = append(fileNames, sourceFile.FileName().AsString())
 				}
 				slices.Sort(fileNames)
 				return fileNames

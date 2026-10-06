@@ -23,7 +23,7 @@ func (counter *countingRule) wrap(subject rule.Rule) rule.Rule {
 	run := subject.Run
 	subject.Run = func(ctx rule.Context, options any) rule.Listeners {
 		counter.mutex.Lock()
-		counter.ran[filepath.Base(ctx.SourceFile.FileName())]++
+		counter.ran[filepath.Base(ctx.SourceFile.FileName().AsString())]++
 		counter.mutex.Unlock()
 		return run(ctx, options)
 	}

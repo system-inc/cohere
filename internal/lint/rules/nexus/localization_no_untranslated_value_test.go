@@ -39,7 +39,7 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 	subjectPath := filepath.Join(directory, subjectRelativePath)
 	var subject *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
-		if sourceFile.FileName() == filepath.ToSlash(subjectPath) {
+		if sourceFile.FileName().AsString() == filepath.ToSlash(subjectPath) {
 			subject = sourceFile
 			break
 		}

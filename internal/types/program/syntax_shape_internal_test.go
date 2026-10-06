@@ -22,7 +22,7 @@ func syntaxOf(t *testing.T, text string) string {
 		t.Fatal(err)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		if filepath.Base(sourceFile.FileName()) == "lib.ts" {
+		if filepath.Base(sourceFile.FileName().AsString()) == "lib.ts" {
 			return elidedBodiesVersion(sourceFile)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 
 	"github.com/system-inc/cohere/internal/types/program"
@@ -50,16 +51,16 @@ func buildReport(t *testing.T, options program.Options) (files []string, ours []
 		return strings.TrimPrefix(filepath.ToSlash(fileName), filepath.ToSlash(root)+"/")
 	}
 	for _, sourceFile := range graph.SourceFiles() {
-		files = append(files, relative(sourceFile.FileName()))
+		files = append(files, relative(sourceFile.FileName().AsString()))
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		ours = append(ours, relative(sourceFile.FileName()))
+		ours = append(ours, relative(sourceFile.FileName().AsString()))
 	}
 	background := context.Background()
 	for _, diagnostic := range append(graph.AllDiagnostics(background), graph.ConfigDiagnostics(background)...) {
 		location := "(no file)"
 		if diagnostic.File() != nil {
-			location = fmt.Sprintf("%s@%d", relative(diagnostic.File().FileName()), diagnostic.Loc().Pos())
+			location = fmt.Sprintf("%s@%d", relative(diagnostic.File().FileName().AsString()), diagnostic.Loc().Pos())
 		}
 		diagnostics = append(diagnostics, fmt.Sprintf("%s TS%d", location, diagnostic.Code()))
 	}
@@ -180,7 +181,7 @@ func TestMemoryFSReadsBytesAsTheDiskDoes(t *testing.T) {
 			if err := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			fromDisk, diskOk := osvfs.FS().ReadFile(onDisk)
+			fromDisk, diskOk := osvfs.FS().ReadFile(tspath.RootedFilePath(onDisk))
 			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile("/fixture/a.ts")
 			if fromMemory != fromDisk || memoryOk != diskOk {
 				t.Fatalf("memory read %q (%v), the disk %q (%v)", fromMemory, memoryOk, fromDisk, diskOk)

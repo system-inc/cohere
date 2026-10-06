@@ -322,7 +322,7 @@ func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(t *testing.T) {
 	for _, testCase := range testCases {
 		source := "class C extends B { m() { " + testCase.callee + "('flex'); super.cn('flex'); } }"
 		fileName := tspath.NormalizePath("/Component.tsx")
-		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, Path: tspath.Path(fileName)}, source, core.ScriptKindTSX)
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)}, source, core.ScriptKindTSX)
 		var calls []*ast.Node
 		var walk func(node *ast.Node) bool
 		walk = func(node *ast.Node) bool {

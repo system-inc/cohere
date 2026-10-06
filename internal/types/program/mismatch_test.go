@@ -69,13 +69,13 @@ func TestProjectFilesGuardFiresOnMismatch(t *testing.T) {
 	}
 
 	// The defect: use the raw file name as a path key instead of canonicalizing it.
-	uncanonicalized := map[tspath.Path]struct{}{}
+	uncanonicalized := map[tspath.PathKey]struct{}{}
 	for _, fileName := range named {
-		uncanonicalized[tspath.Path(fileName)] = struct{}{}
+		uncanonicalized[tspath.PathKey(fileName)] = struct{}{}
 	}
 	matched := 0
 	for _, sourceFile := range graph.Program.GetSourceFiles() {
-		if _, isRoot := uncanonicalized[sourceFile.Path()]; isRoot {
+		if _, isRoot := uncanonicalized[sourceFile.PathKey()]; isRoot {
 			matched++
 		}
 	}

@@ -63,12 +63,12 @@ func typeDeclaredInFile(
 	cwd := program.GetCurrentDirectory()
 	if relativePath == "" {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
-			return strings.HasPrefix(f.FileName(), cwd)
+			return strings.HasPrefix(f.FileName().AsString(), cwd)
 		})
 	}
-	absPath := tspath.GetNormalizedAbsolutePath(relativePath, cwd)
+	absPath := tspath.GetNormalizedAbsolutePath(relativePath, tspath.RootedDirectoryPath(cwd))
 	return Some(declarationFiles, func(f *ast.SourceFile) bool {
-		return f.FileName() == absPath
+		return f.FileName().AsString() == absPath
 	})
 }
 

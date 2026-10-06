@@ -105,7 +105,7 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 func projectFileNames(files []*ast.SourceFile) map[string]bool {
 	names := make(map[string]bool, len(files))
 	for _, file := range files {
-		names[file.FileName()] = true
+		names[file.FileName().AsString()] = true
 	}
 	return names
 }
@@ -132,10 +132,10 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 		fileName := sourceFile.FileName()
 		line, _ := lineColumnOf(sourceFile.Text(), declaration.Pos())
 		if index == 0 {
-			firstFile = fileName
+			firstFile = fileName.AsString()
 			firstLine = line
 		}
-		if !inProject[fileName] {
+		if !inProject[fileName.AsString()] {
 			return firstFile, firstLine, fmt.Sprintf(
 				"%s is declared outside this project, at %s:%d — renaming a declaration we do not own would break every other consumer of that package",
 				symbol.Name, fileName, line,
@@ -167,7 +167,7 @@ func collectEdits(ctx context.Context, graph *program.Graph, files []*ast.Source
 				return false
 			}
 			if node.Kind == ast.KindIdentifier && node.Text() == plan.OldName {
-				if edit, matched := editFor(fileChecker, file, text, fileName, node, anchor, plan.NewName); matched {
+				if edit, matched := editFor(fileChecker, file, text, fileName.AsString(), node, anchor, plan.NewName); matched {
 					plan.Edits = append(plan.Edits, edit)
 				}
 			}
@@ -349,7 +349,7 @@ func findCollision(
 	}
 
 	for _, file := range files {
-		if !touched[file.FileName()] {
+		if !touched[file.FileName().AsString()] {
 			continue
 		}
 		fileChecker, release := graph.CheckerForFile(ctx, file)
@@ -415,7 +415,7 @@ func collectBlindness(files []*ast.SourceFile, plan *Plan) {
 				if node.Text() == plan.OldName {
 					line, column := lineColumnOf(text, tokenSpan(file, node).Pos())
 					plan.Blind = append(plan.Blind, Blindness{
-						FileName: fileName,
+						FileName: fileName.AsString(),
 						Line:     line,
 						Column:   column,
 						Text:     node.Text(),

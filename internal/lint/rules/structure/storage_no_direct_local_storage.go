@@ -62,7 +62,7 @@ func messageWindowLocalStorage() rule.Message {
 var StorageNoDirectLocalStorage = rule.Rule{
 	Name: "structure/storage-no-direct-local-storage",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if FileContextFor(ctx.SourceFile.FileName()).IsLocalStorageServiceFile {
+		if FileContextFor(ctx.SourceFile.FileName().AsString()).IsLocalStorageServiceFile {
 			// The service itself has to reach the real thing, or the rule forbids the thing it
 			// recommends.
 			return nil

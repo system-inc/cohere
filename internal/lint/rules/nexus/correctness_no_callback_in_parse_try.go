@@ -255,7 +255,7 @@ func correctnessNoCallbackInParseTryIsParseJsonOrThrow(ctx rule.Context, symbol 
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !strings.HasSuffix(file.FileName(), correctnessNoCallbackInParseTryJsonFileSuffix) {
+		if file == nil || !strings.HasSuffix(file.FileName().AsString(), correctnessNoCallbackInParseTryJsonFileSuffix) {
 			return false
 		}
 	}

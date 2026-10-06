@@ -26,15 +26,15 @@ func newOverlayFS(inner vfs.FS, overlay map[string]string) vfs.FS {
 	return &overlayFS{FS: inner, files: files}
 }
 
-func (overlay *overlayFS) FileExists(path string) bool {
-	if _, present := overlay.files[tspath.NormalizePath(path)]; present {
+func (overlay *overlayFS) FileExists(path tspath.RootedFilePath) bool {
+	if _, present := overlay.files[tspath.NormalizePath(path.AsString())]; present {
 		return true
 	}
 	return overlay.FS.FileExists(path)
 }
 
-func (overlay *overlayFS) ReadFile(path string) (string, bool) {
-	if contents, present := overlay.files[tspath.NormalizePath(path)]; present {
+func (overlay *overlayFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if contents, present := overlay.files[tspath.NormalizePath(path.AsString())]; present {
 		return contents, true
 	}
 	return overlay.FS.ReadFile(path)

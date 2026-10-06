@@ -32,7 +32,7 @@ func declarationsProbe(t *testing.T) (shared *ast.Symbol, first *ast.SourceFile,
 		t.Fatal(err)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		switch filepath.Base(sourceFile.FileName()) {
+		switch filepath.Base(sourceFile.FileName().AsString()) {
 		case "first.ts":
 			first = sourceFile
 		case "second.ts":
@@ -62,7 +62,7 @@ func TestDeclarationsInKeepsOnlyTheFilesOwn(t *testing.T) {
 	for _, sourceFile := range []*ast.SourceFile{first, second} {
 		own := rule.DeclarationsIn(sourceFile, shared)
 		if len(own) != 1 || ast.GetSourceFileOfNode(own[0]) != sourceFile {
-			t.Errorf("%s: kept %d declarations, want its own one", filepath.Base(sourceFile.FileName()), len(own))
+			t.Errorf("%s: kept %d declarations, want its own one", filepath.Base(sourceFile.FileName().AsString()), len(own))
 		}
 	}
 	if own := rule.DeclarationsIn(first, global); len(own) != 0 {

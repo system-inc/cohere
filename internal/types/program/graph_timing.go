@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -145,42 +146,42 @@ func (f *timingFS) start() (*diskCounters, time.Time) {
 	return f.current.Load(), time.Now()
 }
 
-func (f *timingFS) ReadFile(path string) (string, bool) {
+func (f *timingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	counters, started := f.start()
 	contents, ok := f.FS.ReadFile(path)
 	counters.add(diskRead, started)
 	return contents, ok
 }
 
-func (f *timingFS) FileExists(path string) bool {
+func (f *timingFS) FileExists(path tspath.RootedFilePath) bool {
 	counters, started := f.start()
 	exists := f.FS.FileExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (f *timingFS) DirectoryExists(path string) bool {
+func (f *timingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	counters, started := f.start()
 	exists := f.FS.DirectoryExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (f *timingFS) Stat(path string) vfs.FileInfo {
+func (f *timingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 	counters, started := f.start()
 	information := f.FS.Stat(path)
 	counters.add(diskStat, started)
 	return information
 }
 
-func (f *timingFS) GetAccessibleEntries(path string) vfs.Entries {
+func (f *timingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	counters, started := f.start()
 	entries := f.FS.GetAccessibleEntries(path)
 	counters.add(diskListing, started)
 	return entries
 }
 
-func (f *timingFS) Realpath(path string) string {
+func (f *timingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	counters, started := f.start()
 	resolved := f.FS.Realpath(path)
 	counters.add(diskRealpath, started)

@@ -292,7 +292,7 @@ func computedImportDirectories(file *ast.SourceFile) []string {
 				argument := call.Arguments.Nodes[0]
 				if argument.Kind == ast.KindTemplateExpression {
 					if prefix := templateHeadText(argument); prefix != "" {
-						if directory := resolveSpecifierDirectory(prefix, fileName); directory != "" {
+						if directory := resolveSpecifierDirectory(prefix, fileName.AsString()); directory != "" {
 							directories = append(directories, directory)
 						}
 					}

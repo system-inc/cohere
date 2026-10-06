@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -717,9 +718,9 @@ type countingFileSystem struct {
 	checks map[string]int
 }
 
-func (fileSystem *countingFileSystem) DirectoryExists(path string) bool {
+func (fileSystem *countingFileSystem) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	fileSystem.mutex.Lock()
-	fileSystem.checks[path]++
+	fileSystem.checks[path.AsString()]++
 	fileSystem.mutex.Unlock()
 	return fileSystem.FS.DirectoryExists(path)
 }

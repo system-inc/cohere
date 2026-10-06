@@ -14,7 +14,7 @@ func TestOfAnImportDeclaration(t *testing.T) {
 	t.Parallel()
 
 	text := "/* lead */ import { a, /* gap */ b } from 'm';\nconst c = 1;\n"
-	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/file.ts", Path: "/file.ts"}, text, core.ScriptKindTS)
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/file.ts", PathKey: "/file.ts"}, text, core.ScriptKindTS)
 	statement := sourceFile.Statements.Nodes[0]
 	list := Of(sourceFile, statement)
 

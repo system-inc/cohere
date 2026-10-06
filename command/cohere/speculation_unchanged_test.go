@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -71,7 +72,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 		t.Fatal(err)
 	}
 	// Bound, as the speculation requires of a tree before it takes one.
-	_, release := graph.Program.GetTypeCheckerForFile(t.Context(), graph.Program.GetSourceFile(unchanged))
+	_, release := graph.Program.GetTypeCheckerForFile(t.Context(), graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)))
 	release()
 
 	// The edit lands after the program's read: new bytes, and an mtime a second later, so no clock tick can
@@ -95,7 +96,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 	speculation.wait()
 
 	for _, fileName := range []string{unchanged, edited, marked} {
-		if sourceFile := graph.Program.GetSourceFile(fileName); sourceFile == nil || !sourceFile.IsBound() {
+		if sourceFile := graph.Program.GetSourceFile(tspath.RootedFilePath(fileName)); sourceFile == nil || !sourceFile.IsBound() {
 			t.Fatalf("%s is not bound, so the speculation never offered it the program's copy", filepath.Base(fileName))
 		}
 	}
@@ -103,7 +104,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 	if !kept || attempt.err != nil || attempt.result.Changed {
 		t.Fatalf("the unchanged file was not kept as formatted: kept %v, %+v", kept, attempt)
 	}
-	if unsafe.StringData(attempt.result.Text) != unsafe.StringData(graph.Program.GetSourceFile(unchanged).Text()) {
+	if unsafe.StringData(attempt.result.Text) != unsafe.StringData(graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)).Text()) {
 		t.Errorf("the unchanged file's result is not the program's copy, so it was read again")
 	}
 
@@ -111,7 +112,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 		t.Errorf("the edited file was formatted from %q, not from the bytes now on disk", read)
 	}
 	// The marked file is judged on its bytes on disk, mark and all, never on the program's copy without it.
-	if read, kept := speculation.read[marked]; kept && read == graph.Program.GetSourceFile(marked).Text() {
+	if read, kept := speculation.read[marked]; kept && read == graph.Program.GetSourceFile(tspath.RootedFilePath(marked)).Text() {
 		t.Errorf("the marked file was formatted from the program's copy, which is not the file's bytes")
 	}
 

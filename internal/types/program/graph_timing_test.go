@@ -44,7 +44,7 @@ func TestGraphTimingMeasuresTheBuildItTimes(t *testing.T) {
 	fileNames := func(graph *program.Graph) []string {
 		names := []string{}
 		for _, sourceFile := range graph.SourceFiles() {
-			names = append(names, sourceFile.FileName())
+			names = append(names, sourceFile.FileName().AsString())
 		}
 		slices.Sort(names)
 		return names

@@ -26,7 +26,7 @@ func TestTheLibFilesAreNotCheckedAndTheProjectsFilesAre(t *testing.T) {
 
 	libraries, checked := 0, 0
 	for _, sourceFile := range graph.SourceFiles() {
-		if !strings.HasPrefix(sourceFile.FileName(), "bundled:///") {
+		if !strings.HasPrefix(sourceFile.FileName().AsString(), "bundled:///") {
 			if graph.Program.SkipTypeChecking(sourceFile, false) {
 				t.Errorf("the project's own %s is not checked", sourceFile.FileName())
 			}
@@ -43,7 +43,7 @@ func TestTheLibFilesAreNotCheckedAndTheProjectsFilesAre(t *testing.T) {
 
 	found := false
 	for _, diagnostic := range graph.AllDiagnostics(context.Background()) {
-		if diagnostic.Code() == 2717 && diagnostic.File() != nil && strings.HasSuffix(diagnostic.File().FileName(), "globals.ts") {
+		if diagnostic.Code() == 2717 && diagnostic.File() != nil && strings.HasSuffix(diagnostic.File().FileName().AsString(), "globals.ts") {
 			found = true
 		}
 	}

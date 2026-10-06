@@ -67,9 +67,9 @@ func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureSt
 	signatureFingerprints := graph.SignatureFingerprints(signatures)
 	contentFingerprints := graph.TypeFingerprints()
 	for _, sourceFile := range graph.ProjectFiles() {
-		name := filepath.Base(sourceFile.FileName())
-		signatureSum := signatureFingerprints[sourceFile.Path()]
-		contentSum := contentFingerprints[sourceFile.Path()]
+		name := filepath.Base(sourceFile.FileName().AsString())
+		signatureSum := signatureFingerprints[sourceFile.PathKey()]
+		contentSum := contentFingerprints[sourceFile.PathKey()]
 		state.bySignature[name] = string(signatureSum[:])
 		state.byContent[name] = string(contentSum[:])
 	}
@@ -325,7 +325,7 @@ func TestOnlyAnEditedFileWithARealSignatureIsEmitted(t *testing.T) {
 	}
 	moved := graph.SignatureFingerprints(after)
 	for _, sourceFile := range graph.ProjectFiles() {
-		if filepath.Base(sourceFile.FileName()) == "a.ts" && moved[sourceFile.Path()] == before[sourceFile.Path()] {
+		if filepath.Base(sourceFile.FileName().AsString()) == "a.ts" && moved[sourceFile.PathKey()] == before[sourceFile.PathKey()] {
 			t.Error("a body edit to a file keyed on content did not reach its importer, so the importer would replay stale")
 		}
 	}

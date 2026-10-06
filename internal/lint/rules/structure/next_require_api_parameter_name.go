@@ -60,7 +60,7 @@ var nextApiFunctionNames = map[string]bool{
 var NextRequireApiParameterName = rule.Rule{
 	Name: "structure/next-require-api-parameter-name",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if !fileContext.IsPageFile && !fileContext.IsLayoutFile {
 			// Only the files Next calls these functions in. A helper module exporting a function
 			// named generateMetadata is not one the framework will ever call.

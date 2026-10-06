@@ -47,7 +47,7 @@ const effectCommentPrefix = "Effect to"
 var ReactHookRequireEffectComment = rule.Rule{
 	Name: "structure/react-hook-require-effect-comment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			// An effect outside a React file is not a component's effect. Declining here also skips
 			// the comment scan entirely on the majority of files.
 			return nil

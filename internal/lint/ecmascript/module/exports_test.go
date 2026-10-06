@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // firstStatement parses source text and returns its first statement.
@@ -14,7 +13,7 @@ func firstStatement(t *testing.T, sourceText string) *ast.Node {
 	t.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
-		Path:     tspath.Path("/repository/source/Thing.tsx"),
+		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil || file.Statements == nil || len(file.Statements.Nodes) == 0 {
 		t.Fatalf("no statement in %q", sourceText)

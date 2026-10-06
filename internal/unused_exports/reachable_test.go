@@ -166,7 +166,7 @@ func parse(t *testing.T, code string) *ast.SourceFile {
 	t.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/unused-fixture.ts",
-		Path:     "/unused-fixture.ts",
+		PathKey:  "/unused-fixture.ts",
 	}, code, core.ScriptKindTS)
 }
 

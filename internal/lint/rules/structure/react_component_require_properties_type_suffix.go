@@ -62,7 +62,7 @@ func messageUseTypeAliasSuffix() rule.Message {
 var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 	Name: "structure/react-component-require-properties-type-suffix",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 

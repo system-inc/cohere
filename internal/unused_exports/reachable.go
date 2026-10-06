@@ -164,7 +164,7 @@ func unreachableInRoot(root *ast.Node) []Unreachable {
 			}
 			reported = true
 			findings = append(findings, Unreachable{
-				FileName: sourceFile.FileName(),
+				FileName: sourceFile.FileName().AsString(),
 				Range: TextSpan{
 					Position: event.node.Pos(),
 					End:      event.node.End(),

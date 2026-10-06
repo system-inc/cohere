@@ -486,7 +486,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 
 	reported := map[string]int{}
 	for _, diagnostic := range result.Diagnostics {
-		reported[filepath.Base(diagnostic.SourceFile.FileName())]++
+		reported[filepath.Base(diagnostic.SourceFile.FileName().AsString())]++
 	}
 	for _, file := range []string{"main.ts", "other.ts"} {
 		if reported[file] != 1 {

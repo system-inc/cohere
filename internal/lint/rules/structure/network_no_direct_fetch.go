@@ -43,7 +43,7 @@ var NetworkNoDirectFetch = rule.Rule{
 
 		// The implementation is the one place the raw primitive is allowed, so it declines the file
 		// before any node is visited.
-		if FileContextFor(ctx.SourceFile.FileName()).IsNetworkServiceFile {
+		if FileContextFor(ctx.SourceFile.FileName().AsString()).IsNetworkServiceFile {
 			return nil
 		}
 

@@ -156,7 +156,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 
 		// Hoisted, unlike upstream, which asks this at every opening element. Same answer, asked
 		// once. Returning no listeners is this tree's spelling of upstream's `should_run`.
-		if nextjs.IsInApplicationDirectory(fileName) {
+		if nextjs.IsInApplicationDirectory(fileName.AsString()) {
 			return nil
 		}
 
@@ -179,7 +179,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 			if strategy == nil {
 				return
 			}
-			if nextjs.IsDocumentPage(fileName) {
+			if nextjs.IsDocumentPage(fileName.AsString()) {
 				return
 			}
 			ctx.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)

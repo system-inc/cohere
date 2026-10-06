@@ -103,7 +103,7 @@ func corpusFiles(t *testing.T, roots []string) []*ast.SourceFile {
 				return nil
 			}
 			fileName := tspath.NormalizePath(path)
-			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: fileName, Path: tspath.Path(fileName)},
+			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)},
 				string(contents), kind); sourceFile != nil {
 				files = append(files, sourceFile)
 			}

@@ -247,7 +247,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	// The derived rules' program fingerprints depend on each rule's options, so they are made on first ask, once
 	// per rule and options for the whole walk, and every worker shares them. See programFingerprintMemo.
 	programFingerprints := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
-	var fingerprints, shapeFingerprints map[tspath.Path][sha256.Size]byte
+	var fingerprints, shapeFingerprints map[tspath.PathKey][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
 		shapeFingerprints = fingerprints
@@ -362,7 +362,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
 				// should cost nothing at all rather than cost a checker and then be discarded.
-				selection, resolution := g.rulesFor(sourceFile.FileName(), rules, localSelections, localScopedOff, localUnconfigured)
+				selection, resolution := g.rulesFor(sourceFile.FileName().AsString(), rules, localSelections, localScopedOff, localUnconfigured)
 				if resolution.Ignored {
 					localIgnored++
 					return
@@ -407,14 +407,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						contentHash:      HashContent(sourceFile.Text()),
 						pure:             classes.pure,
 						typed:            classes.typed,
-						typeFingerprint:  fingerprints[sourceFile.Path()],
+						typeFingerprint:  fingerprints[sourceFile.PathKey()],
 						shaped:           classes.shaped,
-						shapeFingerprint: shapeFingerprints[sourceFile.Path()],
+						shapeFingerprint: shapeFingerprints[sourceFile.PathKey()],
 						design:           classes.design,
 						derived:          classes.derived,
 					}
 					keys.derivedFingerprint = derivedKey(classes, g.programFingerprints(selection, programFingerprints), keys.typeFingerprint)
-					if entry, found := reuse.lookup(sourceFile.FileName(), keys, sourceFile.Text()); found.pure {
+					if entry, found := reuse.lookup(sourceFile.FileName().AsString(), keys, sourceFile.Text()); found.pure {
 						replayed = &entry
 						hits = found
 						replays = make(map[string]bool, len(selection.applicable))
@@ -455,10 +455,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						if len(walkRules) == 0 && !entry.Directives {
 							localNodesReplayed += entry.VisitedNodes
 							if len(replayedNotes) > 0 {
-								localNotes[sourceFile.FileName()] = replayedNotes
+								localNotes[sourceFile.FileName().AsString()] = replayedNotes
 							}
 							if g.Readiness != nil {
-								localAdamic[sourceFile.FileName()] = replayedRecord
+								localAdamic[sourceFile.FileName().AsString()] = replayedRecord
 							}
 							return
 						}
@@ -551,7 +551,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					// Named rather than counted, and never swallowed. A file the linter could not
 					// process is not a file with nothing to report, and the whole coverage line exists
 					// to keep those two apart.
-					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName(), Cause: crashed})
+					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName().AsString(), Cause: crashed})
 					return
 				}
 
@@ -576,14 +576,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// part that is nil leaves the whole unmeasured.
 				walkedRecord := fileAdamic.record()
 				if g.Readiness != nil {
-					localAdamic[sourceFile.FileName()] = walkedRecord
+					localAdamic[sourceFile.FileName().AsString()] = walkedRecord
 					if replayed != nil {
-						localAdamic[sourceFile.FileName()] = mergeAdamic(replayedRecord, walkedRecord)
+						localAdamic[sourceFile.FileName().AsString()] = mergeAdamic(replayedRecord, walkedRecord)
 					}
 				}
 				// The walked rules' notes beside the replayed rules' notes: the two are disjoint by rule.
 				if allNotes := mergeNotes(replayedNotes, fileNotes); len(allNotes) > 0 {
-					localNotes[sourceFile.FileName()] = allNotes
+					localNotes[sourceFile.FileName().AsString()] = allNotes
 				}
 
 				if recording && replayed == nil {
@@ -856,7 +856,7 @@ func sortDiagnostics(diagnostics []rule.Diagnostic) {
 		if diagnostic.SourceFile == nil {
 			return ""
 		}
-		return diagnostic.SourceFile.FileName()
+		return diagnostic.SourceFile.FileName().AsString()
 	}
 	slices.SortStableFunc(diagnostics, func(first, second rule.Diagnostic) int {
 		return cmp.Or(
@@ -1228,7 +1228,7 @@ func (d *fileDispatcher) dispatchFile(
 		// rule nobody wired never reaches this line at all.
 		offeredCounts[subject.Name]++
 
-		slot.containment = ruleContainment{ruleName: subject.Name, fileName: sourceFile.FileName()}
+		slot.containment = ruleContainment{ruleName: subject.Name, fileName: sourceFile.FileName().AsString()}
 
 		// Branched rather than always passing a closure, which would allocate once per rule per file on
 		// every run to serve a flag most runs don't set.
@@ -1304,7 +1304,7 @@ func (d *fileDispatcher) dispatchFile(
 		}
 	}
 
-	silenced = tally(sourceFile.FileName(), directives, ranRule, resolution)
+	silenced = tally(sourceFile.FileName().AsString(), directives, ranRule, resolution)
 	silenced.directives = len(directives.Directives()) > 0 || len(directives.RuleReferences()) > 0
 	silenced.withheld = d.withheld
 	return visitedNodes, silenced, d.notes, ruleCrashes, readiness

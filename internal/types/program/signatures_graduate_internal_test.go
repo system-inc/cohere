@@ -50,7 +50,7 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(t *testi
 	ctx := context.Background()
 	shapes, _ := graph.Signatures(ctx, nil)
 	for _, sourceFile := range sources {
-		if entry := shapes[sourceFile.FileName()]; entry.Signature != entry.Version {
+		if entry := shapes[sourceFile.FileName().AsString()]; entry.Signature != entry.Version {
 			t.Fatalf("%s already has a real signature before graduating, so this proves nothing", sourceFile.FileName())
 		}
 	}
@@ -61,11 +61,11 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(t *testi
 	}
 	emitted, _ := graph.Signatures(ctx, RecordedRealSignatures(graph))
 	for _, sourceFile := range sources {
-		entry := shapes[sourceFile.FileName()]
+		entry := shapes[sourceFile.FileName().AsString()]
 		if entry.Signature == entry.Version || entry.Abandoned {
 			t.Errorf("%s did not graduate: %+v", sourceFile.FileName(), entry)
 		}
-		if want := emitted[sourceFile.FileName()]; entry != want {
+		if want := emitted[sourceFile.FileName().AsString()]; entry != want {
 			t.Errorf("%s graduated to %+v, and the up-front emit computes %+v", sourceFile.FileName(), entry, want)
 		}
 	}
@@ -87,7 +87,7 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(t *testin
 		beforeSignatureEmit = nil
 	})
 	beforeSignatureEmit = func(fileName string) {
-		if fileName == planted {
+		if fileName == planted.AsString() {
 			<-release
 		}
 	}
@@ -96,22 +96,22 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(t *testin
 	if elapsed := time.Since(started); elapsed > 5*time.Second {
 		t.Fatalf("graduating returned after %s, so the deadline did not stop it", elapsed)
 	}
-	if abandoned != planted || graduated != 1 {
+	if abandoned != planted.AsString() || graduated != 1 {
 		t.Fatalf("graduated %d and abandoned %q; want 1 and the planted %s", graduated, abandoned, planted)
 	}
-	if entry := shapes[before]; entry.Signature == entry.Version {
+	if entry := shapes[before.AsString()]; entry.Signature == entry.Version {
 		t.Errorf("the file before the planted one did not graduate: %+v", entry)
 	}
-	if entry := shapes[planted]; !entry.Abandoned || entry.Signature != entry.Version {
+	if entry := shapes[planted.AsString()]; !entry.Abandoned || entry.Signature != entry.Version {
 		t.Errorf("the planted file is not abandoned and content-keyed: %+v", entry)
 	}
-	if entry := shapes[after]; entry.Abandoned || entry.Signature != entry.Version {
+	if entry := shapes[after.AsString()]; entry.Abandoned || entry.Signature != entry.Version {
 		t.Errorf("the file after the planted one was touched: %+v", entry)
 	}
 
 	// The next run tries what was left, and never the abandoned file.
 	beforeSignatureEmit = func(fileName string) {
-		if fileName == planted {
+		if fileName == planted.AsString() {
 			t.Errorf("the abandoned %s was emitted again with its bytes unchanged", planted)
 		}
 	}
@@ -121,17 +121,17 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(t *testin
 
 	// Carried while its bytes are the same, and dropped once they change.
 	carried, _ := graph.Signatures(context.Background(), shapes)
-	if !carried[planted].Abandoned {
-		t.Errorf("the abandoned mark was dropped with the bytes unchanged: %+v", carried[planted])
+	if !carried[planted.AsString()].Abandoned {
+		t.Errorf("the abandoned mark was dropped with the bytes unchanged: %+v", carried[planted.AsString()])
 	}
 	edited := map[string]SignatureEntry{}
 	for name, entry := range shapes {
 		edited[name] = entry
 	}
-	edited[planted] = SignatureEntry{Version: "other bytes", Signature: "other bytes", Abandoned: true}
+	edited[planted.AsString()] = SignatureEntry{Version: "other bytes", Signature: "other bytes", Abandoned: true}
 	fresh, _ := graph.Signatures(context.Background(), edited)
-	if fresh[planted].Abandoned {
-		t.Errorf("the abandoned mark survived an edit to the file's bytes: %+v", fresh[planted])
+	if fresh[planted.AsString()].Abandoned {
+		t.Errorf("the abandoned mark survived an edit to the file's bytes: %+v", fresh[planted.AsString()])
 	}
 }
 
@@ -150,7 +150,7 @@ func TestGraduationLeavesAFileTheDeadlineCaughtEarlyForTheNextRun(t *testing.T) 
 		beforeSignatureEmit = nil
 	})
 	beforeSignatureEmit = func(fileName string) {
-		if fileName == caught {
+		if fileName == caught.AsString() {
 			<-release
 		}
 	}
@@ -158,7 +158,7 @@ func TestGraduationLeavesAFileTheDeadlineCaughtEarlyForTheNextRun(t *testing.T) 
 	if graduated != 1 || abandoned != "" {
 		t.Fatalf("graduated %d and abandoned %q; want 1 and none, since the caught emit ran for less than abandonAfter", graduated, abandoned)
 	}
-	if entry := shapes[caught]; entry.Abandoned || entry.Signature != entry.Version {
+	if entry := shapes[caught.AsString()]; entry.Abandoned || entry.Signature != entry.Version {
 		t.Errorf("the file caught early was not left as it was for the next run: %+v", entry)
 	}
 }

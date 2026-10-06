@@ -109,7 +109,7 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 	// fingerprint (#kdee854). See themeFingerprint.
 	ProgramFingerprint: themeFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsInLibrariesStructure {
+		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsInLibrariesStructure {
 			return nil
 		}
 		if ctx.Program == nil {
@@ -279,7 +279,7 @@ func themeValuesFromProgram(program rule.Program) map[string]map[string][]string
 	themes := map[string]map[string][]string{}
 
 	for _, sourceFile := range program.SourceFiles() {
-		if sourceFile == nil || !isThemeFileName(sourceFile.FileName()) {
+		if sourceFile == nil || !isThemeFileName(sourceFile.FileName().AsString()) {
 			continue
 		}
 		sourceFile.AsNode().ForEachChild(func(statement *ast.Node) bool {

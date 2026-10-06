@@ -265,7 +265,7 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 	// Pass two: every exported declaration, asked whether the index knows it.
 	for _, file := range files {
 		fileName := file.FileName()
-		if isRoot, _ := roots.IsRoot(fileName); isRoot {
+		if isRoot, _ := roots.IsRoot(fileName.AsString()); isRoot {
 			report.RootedFiles++
 			// A spared file's declarations are roots of the closure, not merely absent from the flat
 			// report. A `page.tsx` is loaded by the framework with no import anywhere, so everything
@@ -316,7 +316,7 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 
 				fileUnusedExports++
 				fileFindings = append(fileFindings, Unreferenced{
-					FileName:    fileName,
+					FileName:    fileName.AsString(),
 					Name:        name.Text(),
 					Kind:        declaration.kind,
 					Range:       TextSpan{Position: statement.Pos(), End: statement.End()},
@@ -337,7 +337,7 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 				}
 			}
 			report.Files = append(report.Files, FileUnused{
-				FileName:    fileName,
+				FileName:    fileName.AsString(),
 				Exports:     fileExports,
 				Intentional: intentional,
 			})

@@ -184,15 +184,15 @@ var correctnessRequireBlockingStandardStreamsDeclarationFileSuffixes = []string{
 // correctnessRequireBlockingStandardStreamsIndex is what the rule knows about the whole program.
 type correctnessRequireBlockingStandardStreamsIndex struct {
 	// imported holds every file some program file imports.
-	imported map[tspath.Path]bool
+	imported map[tspath.PathKey]bool
 	// canBlock holds every file whose code, or the code of a file it imports, transitively, may call
 	// `blockStandardStreams`: Nexus's declaring file, every file that reaches it, and every file that
 	// loads a module by a computed `import()` or `require()`, which may be anything.
-	canBlock map[tspath.Path]bool
+	canBlock map[tspath.PathKey]bool
 	// edges are each file's imports, of every kind, to files in the program.
-	edges map[tspath.Path][]tspath.Path
+	edges map[tspath.PathKey][]tspath.PathKey
 	// files are the program's files by path.
-	files map[tspath.Path]*ast.SourceFile
+	files map[tspath.PathKey]*ast.SourceFile
 }
 
 // correctnessRequireBlockingStandardStreamsCache holds one index per program, for the reason
@@ -232,7 +232,7 @@ func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program, 
 	index := correctnessRequireBlockingStandardStreamsIndexFor(program)
 	var imported []string
 	for path := range index.imported {
-		imported = append(imported, rule.FingerprintPath(program, index.files[path].FileName()))
+		imported = append(imported, rule.FingerprintPath(program, index.files[path].FileName().AsString()))
 	}
 	slices.Sort(imported)
 	hash := sha256.New()
@@ -250,20 +250,20 @@ func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program, 
 // the target of one, so a Nexus consumed as compiled code still seeds the closure.
 func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *correctnessRequireBlockingStandardStreamsIndex {
 	index := &correctnessRequireBlockingStandardStreamsIndex{
-		imported: map[tspath.Path]bool{},
-		canBlock: map[tspath.Path]bool{},
-		edges:    map[tspath.Path][]tspath.Path{},
-		files:    map[tspath.Path]*ast.SourceFile{},
+		imported: map[tspath.PathKey]bool{},
+		canBlock: map[tspath.PathKey]bool{},
+		edges:    map[tspath.PathKey][]tspath.PathKey{},
+		files:    map[tspath.PathKey]*ast.SourceFile{},
 	}
-	var seeds []tspath.Path
+	var seeds []tspath.PathKey
 	for _, sourceFile := range program.SourceFiles() {
 		if sourceFile == nil {
 			continue
 		}
-		index.files[sourceFile.Path()] = sourceFile
+		index.files[sourceFile.PathKey()] = sourceFile
 		for _, suffix := range correctnessRequireBlockingStandardStreamsDeclarationFileSuffixes {
-			if strings.HasSuffix(sourceFile.FileName(), suffix) {
-				seeds = append(seeds, sourceFile.Path())
+			if strings.HasSuffix(sourceFile.FileName().AsString(), suffix) {
+				seeds = append(seeds, sourceFile.PathKey())
 			}
 		}
 	}
@@ -281,11 +281,11 @@ func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *
 				return
 			}
 			target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
-			if target == nil || target == importer || index.files[target.Path()] == nil {
+			if target == nil || target == importer || index.files[target.PathKey()] == nil {
 				return
 			}
-			index.edges[importer.Path()] = append(index.edges[importer.Path()], target.Path())
-			index.imported[target.Path()] = true
+			index.edges[importer.PathKey()] = append(index.edges[importer.PathKey()], target.PathKey())
+			index.imported[target.PathKey()] = true
 		}
 		for _, statement := range importer.Statements.Nodes {
 			switch statement.Kind {
@@ -319,7 +319,7 @@ func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *
 				if arguments != nil && len(arguments.Nodes) > 0 && ast.IsStringLiteralLike(arguments.Nodes[0]) {
 					add(arguments.Nodes[0])
 				} else {
-					seeds = append(seeds, importer.Path())
+					seeds = append(seeds, importer.PathKey())
 				}
 			}
 			node.ForEachChild(visit)
@@ -328,13 +328,13 @@ func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *
 		importer.AsNode().ForEachChild(visit)
 	}
 
-	importers := map[tspath.Path][]tspath.Path{}
+	importers := map[tspath.PathKey][]tspath.PathKey{}
 	for from, targets := range index.edges {
 		for _, target := range targets {
 			importers[target] = append(importers[target], from)
 		}
 	}
-	queue := append([]tspath.Path(nil), seeds...)
+	queue := append([]tspath.PathKey(nil), seeds...)
 	for _, seed := range seeds {
 		index.canBlock[seed] = true
 	}
@@ -394,7 +394,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 	index := correctnessRequireBlockingStandardStreamsIndexFor(ctx.Program)
 	reason := correctnessRequireBlockingStandardStreamsShebang
 	if !strings.HasPrefix(sourceFile.Text(), "#!") {
-		if index.imported[sourceFile.Path()] {
+		if index.imported[sourceFile.PathKey()] {
 			return
 		}
 		reason = correctnessRequireBlockingStandardStreamsUnimported
@@ -402,10 +402,10 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 	analysis := &correctnessRequireBlockingStandardStreamsAnalysis{
 		ctx:              ctx,
 		index:            index,
-		ordered:          index.canBlock[sourceFile.Path()],
+		ordered:          index.canBlock[sourceFile.PathKey()],
 		functionMayBlock: map[*ast.Node]uint8{},
 	}
-	if analysis.ordered && analysis.importsBlockAtLoad(sourceFile.Path()) {
+	if analysis.ordered && analysis.importsBlockAtLoad(sourceFile.PathKey()) {
 		return
 	}
 
@@ -458,9 +458,9 @@ func correctnessRequireBlockingStandardStreamsHasCandidate(ctx rule.Context, sou
 // importsBlockAtLoad says whether a file this one imports, transitively, may block while it loads,
 // before this file's own body runs. Only a file that can reach the streams can, and only through a
 // call its top-level code makes.
-func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) importsBlockAtLoad(entry tspath.Path) bool {
-	seen := map[tspath.Path]bool{entry: true}
-	queue := []tspath.Path{entry}
+func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) importsBlockAtLoad(entry tspath.PathKey) bool {
+	seen := map[tspath.PathKey]bool{entry: true}
+	queue := []tspath.PathKey{entry}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
@@ -616,7 +616,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMa
 	if file == nil {
 		return true
 	}
-	if !analysis.index.canBlock[file.Path()] {
+	if !analysis.index.canBlock[file.PathKey()] {
 		// `require` is declared by `@types/node` and loads whatever it is handed.
 		return file.IsDeclarationFile && name.Text() == "require"
 	}
@@ -654,7 +654,7 @@ func correctnessRequireBlockingStandardStreamsIsNexusDeclaration(declaration *as
 	}
 	file := ast.GetSourceFileOfNode(declaration)
 	for _, suffix := range correctnessRequireBlockingStandardStreamsDeclarationFileSuffixes {
-		if file != nil && strings.HasSuffix(file.FileName(), suffix) {
+		if file != nil && strings.HasSuffix(file.FileName().AsString(), suffix) {
 			return true
 		}
 	}

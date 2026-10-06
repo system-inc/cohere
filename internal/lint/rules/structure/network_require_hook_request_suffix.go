@@ -69,7 +69,7 @@ var NetworkRequireHookRequestSuffix = rule.Rule{
 		// The file check reports at most once, against the first hook, even when several hooks are
 		// declared. The defect is the file's name, and reporting it once per hook would say the same
 		// thing three times about one rename.
-		if fileNeedsRequestSuffix(ctx.SourceFile.FileName()) {
+		if fileNeedsRequestSuffix(ctx.SourceFile.FileName().AsString()) {
 			ctx.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
 		}
 

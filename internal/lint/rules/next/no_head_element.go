@@ -45,7 +45,7 @@ var NoHeadElement = rule.Rule{
 		// Answering here rather than inside the listener means a file under an app directory
 		// registers no listener at all, which is also how upstream spells it: `should_run` is asked
 		// before the walk rather than at every element.
-		if nextjs.IsInApplicationDirectory(ctx.SourceFile.FileName()) {
+		if nextjs.IsInApplicationDirectory(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

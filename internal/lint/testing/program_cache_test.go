@@ -96,7 +96,7 @@ func TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads(t *testing
 	}
 	held := false
 	for _, sourceFile := range firstGraph.ProjectFiles() {
-		held = held || (sourceFile.FileName() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
+		held = held || (sourceFile.FileName().AsString() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
 	}
 	if !held {
 		t.Fatalf("the evicted graph no longer holds its own bound.ts under %s", first)

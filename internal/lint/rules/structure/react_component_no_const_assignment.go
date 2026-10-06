@@ -74,7 +74,7 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 var ReactComponentNoConstAssignment = rule.Rule{
 	Name: "structure/react-component-no-const-assignment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 

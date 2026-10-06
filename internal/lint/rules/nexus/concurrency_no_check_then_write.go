@@ -458,7 +458,7 @@ func (analysis *concurrencyNoCheckThenWriteLoop) isSharpToFile(call *ast.Node) b
 		return files
 	})
 	for _, declaration := range symbol.Declarations {
-		if declaration.Kind != ast.KindMethodSignature || !sharpFiles[ast.GetSourceFileOfNode(declaration).FileName()] {
+		if declaration.Kind != ast.KindMethodSignature || !sharpFiles[ast.GetSourceFileOfNode(declaration).FileName().AsString()] {
 			return false
 		}
 	}

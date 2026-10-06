@@ -525,7 +525,7 @@ func correctnessNoCallerDataMutationProcessStateOf(ctx rule.Context, parameter *
 			file := ast.GetSourceFileOfNode(declaration)
 			for _, tag := range correctnessNoCallerDataMutationProcessStateTags(file, declaration) {
 				if correctnessNoCallerDataMutationTagReason(file, tag) != "" {
-					return candidate.Name + " in " + file.FileName(), true
+					return candidate.Name + " in " + file.FileName().AsString(), true
 				}
 			}
 		}
@@ -625,7 +625,7 @@ func correctnessNoCallerDataMutationOutParameterOf(ctx rule.Context, parameter *
 			if contract.Parent != nil && contract.Parent.Name() != nil {
 				owner = contract.Parent.Name().Text() + "."
 			}
-			return owner + contract.Name().Text() + "(" + named + ") in " + file.FileName(), true
+			return owner + contract.Name().Text() + "(" + named + ") in " + file.FileName().AsString(), true
 		}
 	}
 	return "", false

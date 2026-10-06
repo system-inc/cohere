@@ -142,14 +142,14 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 		if ctx.Program == nil {
 			return nil
 		}
-		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName())
+		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName().AsString())
 		fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
 			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
 			return nil
 		}
 		if englishSourceFile == nil {
-			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName())
+			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName().AsString())
 			ctx.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
 			return nil
 		}

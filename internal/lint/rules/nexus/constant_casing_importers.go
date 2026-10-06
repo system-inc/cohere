@@ -28,7 +28,7 @@ type importedNames struct {
 // importerIndex is, for each file in the program, the names any other file imports from it, plus
 // the files that are alive without an importer.
 type importerIndex struct {
-	byPath map[tspath.Path]*importedNames
+	byPath map[tspath.PathKey]*importedNames
 	roots  *module_roots.Set
 }
 
@@ -69,13 +69,13 @@ func importerIndexFor(program rule.Program) *importerIndex {
 // dynamic, so an import form nobody enumerated here still lands in the index, as "everything". The
 // specific forms below only narrow that to named imports where the syntax says exactly which names.
 func buildImporterIndex(program rule.Program) *importerIndex {
-	index := &importerIndex{byPath: map[tspath.Path]*importedNames{}}
+	index := &importerIndex{byPath: map[tspath.PathKey]*importedNames{}}
 	var projectFiles []*ast.SourceFile
 	for _, importer := range program.SourceFiles() {
 		if importer == nil {
 			continue
 		}
-		if !strings.Contains(importer.FileName(), "/node_modules/") && !importer.IsDeclarationFile {
+		if !strings.Contains(importer.FileName().AsString(), "/node_modules/") && !importer.IsDeclarationFile {
 			projectFiles = append(projectFiles, importer)
 		}
 		for _, specifier := range importer.Imports() {
@@ -90,10 +90,10 @@ func buildImporterIndex(program rule.Program) *importerIndex {
 			if target == nil || target == importer {
 				continue
 			}
-			entry := index.byPath[target.Path()]
+			entry := index.byPath[target.PathKey()]
 			if entry == nil {
 				entry = &importedNames{names: map[string]bool{}}
-				index.byPath[target.Path()] = entry
+				index.byPath[target.PathKey()] = entry
 			}
 			recordImportedNames(entry, specifier)
 		}
@@ -194,10 +194,10 @@ func (index *importerIndex) provablyUnimported(sourceFile *ast.SourceFile, names
 	if index == nil || sourceFile == nil || len(names) == 0 {
 		return false
 	}
-	if isRoot, _ := index.roots.IsRoot(sourceFile.FileName()); isRoot {
+	if isRoot, _ := index.roots.IsRoot(sourceFile.FileName().AsString()); isRoot {
 		return false
 	}
-	entry := index.byPath[sourceFile.Path()]
+	entry := index.byPath[sourceFile.PathKey()]
 	if entry == nil {
 		return true
 	}

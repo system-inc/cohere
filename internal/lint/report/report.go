@@ -91,7 +91,7 @@ func fileNameOf(diagnostic rule.Diagnostic) string {
 	if diagnostic.SourceFile == nil {
 		return "<unknown>"
 	}
-	return diagnostic.SourceFile.FileName()
+	return diagnostic.SourceFile.FileName().AsString()
 }
 
 // positionOf converts a byte offset into the line and column a person can navigate to.

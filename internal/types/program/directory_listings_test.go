@@ -40,7 +40,7 @@ func listingsReport(t *testing.T, directory string, listings *program.DirectoryL
 		t.Fatalf("building: %v", err)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		ours = append(ours, sourceFile.FileName())
+		ours = append(ours, sourceFile.FileName().AsString())
 	}
 	slices.Sort(ours)
 	present, absent, _ = recorder.Inputs()

@@ -91,25 +91,25 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	contentKeyed := 0
 	for _, sourceFile := range projectFiles {
 		version := FileVersion(sourceFile.Text())
-		if recorded, found := previous[sourceFile.FileName()]; found && recorded.Version == version && recorded.Signature != "" {
+		if recorded, found := previous[sourceFile.FileName().AsString()]; found && recorded.Version == version && recorded.Signature != "" {
 			// A syntax of another definition is recomputed rather than carried: kept, it would differ from the
 			// next edit's and move the shape once for nothing. A syntax that is the version stands for a file
 			// whose whole text is its shape, and stays.
 			if recorded.Syntax == "" || recorded.Syntax != recorded.Version && !strings.HasPrefix(recorded.Syntax, syntaxDefinition) {
 				recorded.Syntax = elidedBodiesVersion(sourceFile)
 			}
-			signatures[sourceFile.FileName()] = recorded
+			signatures[sourceFile.FileName().AsString()] = recorded
 			continue
 		}
 		// A declaration file or a JSON module has no declaration output of its own. The compiler uses the
 		// version for both, and so does this. Its whole text is its shape, so its syntax is its version too.
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
-			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 			continue
 		}
 		// No real signature recorded, so none is computed: see the bound above. Its whole text is its shape.
-		if recorded, found := previous[sourceFile.FileName()]; !found || recorded.Signature == "" || recorded.Signature == recorded.Version {
-			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+		if recorded, found := previous[sourceFile.FileName().AsString()]; !found || recorded.Signature == "" || recorded.Signature == recorded.Version {
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 			contentKeyed++
 			continue
 		}
@@ -125,7 +125,7 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	g.Program.Emit(ctx, compiler.EmitOptions{
 		TargetSourceFiles: stale,
 		EmitOnly:          compiler.EmitOnlyBuilderSignature,
-		WriteFile: func(fileName string, text string, data *compiler.WriteFileData) error {
+		WriteFile: func(fileName tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {
 			if data == nil || data.SourceFile == nil {
 				return nil
 			}
@@ -136,7 +136,7 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 				Syntax:    elidedBodiesVersion(data.SourceFile),
 			}
 			mutex.Lock()
-			signatures[data.SourceFile.FileName()] = entry
+			signatures[data.SourceFile.FileName().AsString()] = entry
 			mutex.Unlock()
 			return nil
 		},
@@ -145,9 +145,9 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	// A file the emit did not write for has no signature to compare, so its version stands in, which
 	// can only over-invalidate.
 	for _, sourceFile := range stale {
-		if _, found := signatures[sourceFile.FileName()]; !found {
+		if _, found := signatures[sourceFile.FileName().AsString()]; !found {
 			version := FileVersion(sourceFile.Text())
-			signatures[sourceFile.FileName()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 		}
 	}
 	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
@@ -178,7 +178,7 @@ func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline ti
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
 			continue
 		}
-		entry, found := shapes[sourceFile.FileName()]
+		entry, found := shapes[sourceFile.FileName().AsString()]
 		if !found || entry.Signature != entry.Version || entry.Abandoned || entry.Version != FileVersion(sourceFile.Text()) {
 			continue
 		}
@@ -204,15 +204,15 @@ func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline ti
 		defer close(results)
 		for _, sourceFile := range candidates {
 			fileName := sourceFile.FileName()
-			inProgress.Store(&emitting{fileName: fileName, started: time.Now()})
+			inProgress.Store(&emitting{fileName: fileName.AsString(), started: time.Now()})
 			if hook != nil {
-				hook(fileName)
+				hook(fileName.AsString())
 			}
 			var entry *SignatureEntry
 			g.Program.Emit(context.Background(), compiler.EmitOptions{
 				TargetSourceFiles: []*ast.SourceFile{sourceFile},
 				EmitOnly:          compiler.EmitOnlyBuilderSignature,
-				WriteFile: func(_ string, text string, data *compiler.WriteFileData) error {
+				WriteFile: func(_ tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {
 					if data != nil && data.SourceFile != nil {
 						entry = &SignatureEntry{
 							Version:   FileVersion(data.SourceFile.Text()),
@@ -227,7 +227,7 @@ func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline ti
 			// A file the emit wrote nothing for keeps its version as its signature, as Signatures does, and is
 			// tried again next run.
 			if entry != nil {
-				results <- emitted{fileName, *entry}
+				results <- emitted{fileName.AsString(), *entry}
 			}
 		}
 	}()
@@ -279,7 +279,7 @@ func countContentKeyed(projectFiles []*ast.SourceFile, signatures map[string]Sig
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
 			continue
 		}
-		if entry := signatures[sourceFile.FileName()]; entry.Signature == entry.Version {
+		if entry := signatures[sourceFile.FileName().AsString()]; entry.Signature == entry.Version {
 			count++
 		}
 	}
@@ -454,21 +454,21 @@ func (g *Graph) SeedSignatures(previous map[string]SignatureEntry) map[string]Si
 	if buildInfo == nil || len(buildInfo.FileNames) != len(buildInfo.FileInfos) {
 		return seeded
 	}
-	directory := tspath.GetDirectoryPath(buildInfoFileName)
-	recorded := make(map[tspath.Path]SignatureEntry, len(buildInfo.FileNames))
+	directory := tspath.GetDirectoryPath(buildInfoFileName.AsString())
+	recorded := make(map[tspath.PathKey]SignatureEntry, len(buildInfo.FileNames))
 	for index, name := range buildInfo.FileNames {
 		info := buildInfo.FileInfos[index].GetFileInfo()
 		if info == nil || info.Signature() == "" || info.Signature() == info.Version() {
 			continue
 		}
-		recorded[g.pathFor(tspath.GetNormalizedAbsolutePath(name, directory))] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
+		recorded[g.pathFor(tspath.GetNormalizedAbsolutePath(string(name), tspath.RootedDirectoryPath(directory)))] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
 	}
 	for _, sourceFile := range g.ProjectFiles() {
-		if _, found := seeded[sourceFile.FileName()]; found {
+		if _, found := seeded[sourceFile.FileName().AsString()]; found {
 			continue
 		}
-		if entry, found := recorded[sourceFile.Path()]; found {
-			seeded[sourceFile.FileName()] = entry
+		if entry, found := recorded[sourceFile.PathKey()]; found {
+			seeded[sourceFile.FileName().AsString()] = entry
 		}
 	}
 	return seeded
@@ -497,9 +497,9 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 	builder.WriteString("\n")
 	if diagnostic.File() != sourceFile {
 		builder.WriteString(tspath.EnsurePathIsNonModuleName(tspath.GetRelativePathFromDirectory(
-			tspath.GetDirectoryPath(string(sourceFile.Path())),
-			string(diagnostic.File().Path()),
-			tspath.ComparePathsOptions{},
+			tspath.GetDirectoryPath(string(sourceFile.PathKey())),
+			string(diagnostic.File().PathKey()),
+			tspath.CaseInsensitive,
 		)))
 	}
 	if diagnostic.File() != nil {
@@ -532,33 +532,33 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 //
 // It is sound only for a rule that sees other files through types. A rule that reads an imported
 // declaration's syntax stays on TypeFingerprints.
-func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[tspath.Path][sha256.Size]byte {
+func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[tspath.PathKey][sha256.Size]byte {
 	projectFiles := g.ProjectFiles()
 	global, edges, contents, resolutions := g.typeGraph()
 
-	shapes := make(map[tspath.Path][sha256.Size]byte, len(projectFiles))
+	shapes := make(map[tspath.PathKey][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {
-		entry, found := signatures[sourceFile.FileName()]
+		entry, found := signatures[sourceFile.FileName().AsString()]
 		shape := entry.Signature + "\x00" + entry.Syntax
 		if !found || entry.Signature == "" || entry.Syntax == "" {
 			// No shape means the bytes stand in, as they would for a file never computed.
 			shape = "version " + FileVersion(sourceFile.Text())
 		}
 		// Where its imports resolve is part of what a file shows its importers; see TypeFingerprints.
-		shapes[sourceFile.Path()] = withResolutions(sha256.Sum256([]byte(shape)), resolutions[sourceFile.Path()])
+		shapes[sourceFile.PathKey()] = withResolutions(sha256.Sum256([]byte(shape)), resolutions[sourceFile.PathKey()])
 	}
 	components := fingerprintComponents(g.Anchor, projectFiles, edges, shapes, global)
 
-	fingerprints := make(map[tspath.Path][sha256.Size]byte, len(projectFiles))
+	fingerprints := make(map[tspath.PathKey][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {
 		hash := sha256.New()
-		component := components[sourceFile.Path()]
-		content := contents[sourceFile.Path()]
+		component := components[sourceFile.PathKey()]
+		content := contents[sourceFile.PathKey()]
 		hash.Write(component[:])
 		hash.Write(content[:])
 		var sum [sha256.Size]byte
 		copy(sum[:], hash.Sum(nil))
-		fingerprints[sourceFile.Path()] = sum
+		fingerprints[sourceFile.PathKey()] = sum
 	}
 	return fingerprints
 }

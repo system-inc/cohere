@@ -70,7 +70,7 @@ var NetworkNoForbiddenImport = rule.Rule{
 		// TanStack is allowed where it is configured: NetworkService's module, by where it lives. It
 		// once also exempted any Providers.tsx, after Structure's providers stopped importing
 		// TanStack, which left a hole the ban was meant to close.
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		isTanStackExempt := fileContext.IsNetworkServiceFile
 
 		return rule.Listeners{

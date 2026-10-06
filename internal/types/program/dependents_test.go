@@ -44,7 +44,7 @@ func buildFixtureGraph(t *testing.T, files map[string]string) *Graph {
 func fileNamed(t *testing.T, graph *Graph, suffix string) *ast.SourceFile {
 	t.Helper()
 	for _, sourceFile := range graph.ProjectFiles() {
-		if strings.HasSuffix(sourceFile.FileName(), suffix) {
+		if strings.HasSuffix(sourceFile.FileName().AsString(), suffix) {
 			return sourceFile
 		}
 	}
@@ -55,7 +55,7 @@ func fileNamed(t *testing.T, graph *Graph, suffix string) *ast.SourceFile {
 func closureNames(closure []*ast.SourceFile) []string {
 	names := make([]string, 0, len(closure))
 	for _, sourceFile := range closure {
-		names = append(names, filepath.Base(sourceFile.FileName()))
+		names = append(names, filepath.Base(sourceFile.FileName().AsString()))
 	}
 	return names
 }

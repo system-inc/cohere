@@ -97,7 +97,7 @@ var NoUselessEmptyExport = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				sourceFile := node.AsSourceFile()
-				if isDeclarationFileName(sourceFile.FileName()) {
+				if isDeclarationFileName(sourceFile.FileName().AsString()) {
 					return
 				}
 

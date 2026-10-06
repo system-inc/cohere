@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -63,7 +64,7 @@ func (recording *RecordingFS) note(path string, present bool) {
 	}
 	read := FileRead{Path: path, Present: present}
 	if present {
-		if info := recording.underlying.Stat(path); info != nil {
+		if info := recording.underlying.Stat(tspath.RootedPath(path)); info != nil {
 			read.Size = info.Size()
 			read.ModifiedNanoseconds = info.ModTime().UnixNano()
 		}
@@ -75,61 +76,61 @@ func (recording *RecordingFS) refuse(method string, path string) {
 	panic(fmt.Sprintf("a recording file system refuses %s(%s): its reader must not write", method, path))
 }
 
-func (recording *RecordingFS) UseCaseSensitiveFileNames() bool {
-	return recording.underlying.UseCaseSensitiveFileNames()
+func (recording *RecordingFS) CaseSensitivity() tspath.CaseSensitivity {
+	return recording.underlying.CaseSensitivity()
 }
 
-func (recording *RecordingFS) FileExists(path string) bool {
+func (recording *RecordingFS) FileExists(path tspath.RootedFilePath) bool {
 	exists := recording.underlying.FileExists(path)
-	recording.note(path, exists)
+	recording.note(path.AsString(), exists)
 	return exists
 }
 
-func (recording *RecordingFS) ReadFile(path string) (string, bool) {
+func (recording *RecordingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	contents, ok := recording.underlying.ReadFile(path)
-	recording.note(path, ok)
+	recording.note(path.AsString(), ok)
 	return contents, ok
 }
 
-func (recording *RecordingFS) WriteFile(path string, data string) error {
-	recording.refuse("WriteFile", path)
+func (recording *RecordingFS) WriteFile(path tspath.RootedFilePath, data string) error {
+	recording.refuse("WriteFile", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) AppendFile(path string, data string) error {
-	recording.refuse("AppendFile", path)
+func (recording *RecordingFS) AppendFile(path tspath.RootedFilePath, data string) error {
+	recording.refuse("AppendFile", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) Remove(path string) error {
-	recording.refuse("Remove", path)
+func (recording *RecordingFS) Remove(path tspath.RootedPath) error {
+	recording.refuse("Remove", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) Chtimes(path string, accessTime time.Time, modificationTime time.Time) error {
-	recording.refuse("Chtimes", path)
+func (recording *RecordingFS) Chtimes(path tspath.RootedPath, accessTime time.Time, modificationTime time.Time) error {
+	recording.refuse("Chtimes", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) DirectoryExists(path string) bool {
+func (recording *RecordingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	exists := recording.underlying.DirectoryExists(path)
-	recording.note(path, exists)
+	recording.note(path.AsString(), exists)
 	return exists
 }
 
-func (recording *RecordingFS) GetAccessibleEntries(path string) vfs.Entries {
+func (recording *RecordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := recording.underlying.GetAccessibleEntries(path)
-	recording.note(path, len(entries.Files) > 0 || len(entries.Directories) > 0 || recording.underlying.DirectoryExists(path))
+	recording.note(path.AsString(), len(entries.Files) > 0 || len(entries.Directories) > 0 || recording.underlying.DirectoryExists(path))
 	return entries
 }
 
-func (recording *RecordingFS) Stat(path string) vfs.FileInfo {
+func (recording *RecordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 	info := recording.underlying.Stat(path)
-	recording.note(path, info != nil)
+	recording.note(path.AsString(), info != nil)
 	return info
 }
 
-func (recording *RecordingFS) Realpath(path string) string {
-	recording.note(path, recording.underlying.FileExists(path) || recording.underlying.DirectoryExists(path))
-	return recording.underlying.Realpath(path)
+func (recording *RecordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	recording.note(path.AsString(), recording.underlying.FileExists(tspath.RootedFilePath(path)) || recording.underlying.DirectoryExists(tspath.RootedDirectoryPath(path)))
+	return tspath.RootedPath(recording.underlying.Realpath(path).AsString())
 }

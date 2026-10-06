@@ -86,7 +86,7 @@ var ImportNoForbiddenSource = rule.Rule{
 		if ctx.SourceFile == nil {
 			return nil
 		}
-		fileName := strings.ReplaceAll(ctx.SourceFile.FileName(), `\`, "/")
+		fileName := strings.ReplaceAll(ctx.SourceFile.FileName().AsString(), `\`, "/")
 		report := func(specifierNode *ast.Node, source string) {
 			for _, forbidden := range forbiddenSources {
 				if source != forbidden.Specifier {

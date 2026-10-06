@@ -160,20 +160,6 @@ func (g *Graph) Retired() bool {
 	return g.retired.Load()
 }
 
-// configHost adapts a filesystem and a working directory to what tsconfig parsing wants.
-//
-// tsoptions.ParseConfigHost is two methods, and typescript-go's own `execute` package satisfies it
-// with a much larger System interface it happens to already have. We do not have that interface and
-// do not want it: the rest of System is process concerns — stdout, exit codes, the clock — that
-// belong to a CLI rather than to a type graph.
-type configHost struct {
-	fs               vfs.FS
-	currentDirectory string
-}
-
-func (h *configHost) FS() vfs.FS                  { return h.fs }
-func (h *configHost) GetCurrentDirectory() string { return h.currentDirectory }
-
 // Options controls how a graph is built.
 type Options struct {
 	// ConfigFileName is the tsconfig to build from. Relative paths resolve against CurrentDirectory.
@@ -299,7 +285,7 @@ func (g *Graph) yield(yielded map[string]struct{}) {
 	}
 	kept := g.projectFiles[:0:0]
 	for _, sourceFile := range g.projectFiles {
-		if _, isYielded := yielded[filepath.Clean(filepath.FromSlash(sourceFile.FileName()))]; isYielded {
+		if _, isYielded := yielded[filepath.Clean(filepath.FromSlash(sourceFile.FileName().AsString()))]; isYielded {
 			g.YieldedFiles++
 			continue
 		}
@@ -314,7 +300,7 @@ func (g *Graph) timedVerify(options Options) (rootsVerdict, []string) {
 	inspect := inspectRootOnDisk
 	if options.FileSystem != nil {
 		inspect = func(fileName string) rootState {
-			if options.FileSystem.FileExists(fileName) {
+			if options.FileSystem.FileExists(tspath.RootedFilePath(fileName)) {
 				return rootReadable
 			}
 			return rootAbsent
@@ -382,17 +368,17 @@ func classifyMissingRoots(missing []string, inspect func(string) rootState) root
 // verifyProjectFiles matches the config's files to the program's, keeps the matches for ProjectFiles,
 // and says what any missing ones mean.
 func (g *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
-	rootPaths := make(map[tspath.Path]string, len(g.Config.FileNames()))
+	rootPaths := make(map[tspath.PathKey]string, len(g.Config.FileNames()))
 	for _, fileName := range g.Config.FileNames() {
-		rootPaths[toPath(fileName, g.Config.GetCurrentDirectory(), g.Config.UseCaseSensitiveFileNames())] = fileName
+		rootPaths[toPath(fileName.AsString(), g.Anchor.Root(), g.Config.CaseSensitivity())] = fileName.AsString()
 	}
 
 	files := make([]*ast.SourceFile, 0, len(rootPaths))
-	loaded := make(map[tspath.Path]struct{}, len(rootPaths))
+	loaded := make(map[tspath.PathKey]struct{}, len(rootPaths))
 	for _, sourceFile := range g.Program.GetSourceFiles() {
-		if _, isRoot := rootPaths[sourceFile.Path()]; isRoot {
+		if _, isRoot := rootPaths[sourceFile.PathKey()]; isRoot {
 			files = append(files, sourceFile)
-			loaded[sourceFile.Path()] = struct{}{}
+			loaded[sourceFile.PathKey()] = struct{}{}
 		}
 	}
 	g.projectFiles = files
@@ -498,16 +484,14 @@ func buildOnce(options Options) (*Graph, error) {
 		fileSystem = newOverlayFS(fileSystem, options.Overlay)
 	}
 
-	host := &configHost{fs: fileSystem, currentDirectory: currentDirectory}
-
 	configStarted := time.Now()
-	if !fileSystem.FileExists(configFileName) {
+	if !fileSystem.FileExists(tspath.RootedFilePath(configFileName)) {
 		return nil, fmt.Errorf("no tsconfig at %s", configFileName)
 	}
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(configFileName, &core.CompilerOptions{}, nil, host, nil)
+	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
 	if len(configErrors) > 0 {
 		return nil, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configErrors))
 	}
@@ -542,13 +526,15 @@ func buildOnce(options Options) (*Graph, error) {
 
 	libraryPath := options.LibraryPath
 	if libraryPath == "" {
-		libraryPath = bundled.LibPath()
+		libraryPath = bundled.LibPath().AsString()
 	}
 	// The last three arguments arrived with the move to `microsoft/TypeScript`. Nil is correct for all
 	// three here: the extended-config cache only pays off across repeated parses of the same `extends`
 	// chain within one process, `trace` is nil-guarded upstream and we have nowhere to route compiler
-	// tracing, and the content mapper serves the language server rather than a one-shot check.
-	compilerHost := compiler.NewCachedFSCompilerHost(currentDirectory, fileSystem, libraryPath, nil, nil, nil)
+	// tracing, and the content mapper serves the language server rather than a one-shot check. The host
+	// takes no current directory: since typed file paths (#64159) every name it is given is rooted, and
+	// the program answers GetCurrentDirectory with its config's directory.
+	compilerHost := compiler.NewCachedFSCompilerHost(fileSystem, tspath.RootedDirectoryPath(libraryPath), nil, nil, nil)
 
 	singleThreaded := core.TSUnknown
 	if options.SingleThreaded {
@@ -854,8 +840,8 @@ func checkerCountFor(cores int) int {
 
 // toPath normalizes a file name the way the compiler keys its file table, so a lookup by path finds
 // the file the compiler stored rather than a near-miss that differs only in case or separators.
-func toPath(fileName string, currentDirectory string, useCaseSensitiveFileNames bool) tspath.Path {
-	return tspath.ToPath(fileName, currentDirectory, useCaseSensitiveFileNames)
+func toPath(fileName string, currentDirectory string, caseSensitivity tspath.CaseSensitivity) tspath.PathKey {
+	return caseSensitivity.PathKey(tspath.RootedPath(tspath.GetNormalizedAbsolutePath(fileName, tspath.RootedDirectoryPath(currentDirectory))))
 }
 
 // joinDiagnostics turns compiler diagnostics into one error, capped so a config with a hundred

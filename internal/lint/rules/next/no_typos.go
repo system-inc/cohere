@@ -110,7 +110,7 @@ var NoTypos = rule.Rule{
 	// `/` boundary, so a prefixed name matches nothing and runs on no files while every test passes.
 	Name: "@next/next/no-typos",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !nextjs.IsInPagesDirectory(ctx.SourceFile.FileName()) {
+		if !nextjs.IsInPagesDirectory(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

@@ -1,6 +1,7 @@
 package program
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +68,7 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(t *testing.T) {
 			// The plain file first: a guard that refused everything would pass every case below.
 			for _, name := range []string{"Plain.ts", "Utf8Mark.ts", "Utf16.ts", "SameLength.ts"} {
 				path := filepath.Join(directory, name)
-				sourceFile := graph.Program.GetSourceFile(path)
+				sourceFile := graph.Program.GetSourceFile(tspath.RootedFilePath(path))
 				if sourceFile == nil {
 					t.Fatalf("%s is not in the program", name)
 				}

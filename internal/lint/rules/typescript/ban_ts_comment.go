@@ -146,7 +146,7 @@ var BanTsComment = rule.Rule{
 			return nil
 		}
 		// See "A JavaScript file is still declined" above.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName()) {
+		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // parseSource builds a source file the way the harness does, so the predicate is tested against a
@@ -15,7 +14,7 @@ func parseSource(t *testing.T, sourceText string) *ast.SourceFile {
 	t.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/app/Component.tsx",
-		Path:     tspath.Path("/repository/app/Component.tsx"),
+		PathKey:  "/repository/app/Component.tsx",
 	}, sourceText, core.ScriptKindTSX)
 }
 

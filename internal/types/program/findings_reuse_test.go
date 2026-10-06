@@ -42,7 +42,7 @@ func findingsReuseRules(t *testing.T) []rule.Rule {
 func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 	keys := make([]string, len(diagnostics))
 	for index, diagnostic := range diagnostics {
-		keys[index] = fmt.Sprintf("%s|%s|%d-%d|%s|%s", filepath.Base(diagnostic.SourceFile.FileName()), diagnostic.RuleName,
+		keys[index] = fmt.Sprintf("%s|%s|%d-%d|%s|%s", filepath.Base(diagnostic.SourceFile.FileName().AsString()), diagnostic.RuleName,
 			diagnostic.Range.Pos(), diagnostic.Range.End(), diagnostic.Message.Id, diagnostic.Message.Description)
 	}
 	return keys
@@ -105,7 +105,7 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 	}
 	fixable := false
 	for _, diagnostic := range plain.Diagnostics {
-		if filepath.Base(diagnostic.SourceFile.FileName()) == "d.ts" && len(diagnostic.Fixes) > 0 {
+		if filepath.Base(diagnostic.SourceFile.FileName().AsString()) == "d.ts" && len(diagnostic.Fixes) > 0 {
 			fixable = true
 		}
 	}

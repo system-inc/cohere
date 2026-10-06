@@ -36,7 +36,7 @@ func expectEachFixParses(t *testing.T, subject *ast.SourceFile, diagnostics []ru
 		}
 		fileName := sourceFile.FileName()
 		source := sourceFile.Text()
-		if parses, _ := edit.Parses(fileName, source); !parses {
+		if parses, _ := edit.Parses(fileName.AsString(), source); !parses {
 			continue
 		}
 
@@ -60,7 +60,7 @@ func expectEachFixParses(t *testing.T, subject *ast.SourceFile, diagnostics []ru
 		if !applicable {
 			continue
 		}
-		if parses, reason := edit.Parses(fileName, fixed); !parses {
+		if parses, reason := edit.Parses(fileName.AsString(), fixed); !parses {
 			t.Errorf("%s proposes a fix that does not parse (%s). The source after it:\n%s",
 				diagnostic.RuleName, reason, fixed)
 		}

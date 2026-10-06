@@ -64,7 +64,7 @@ func exportOriginAnswers(t *testing.T, files map[string]string) (exports map[str
 	}
 	var main *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
-		if filepath.Base(sourceFile.FileName()) == "main.ts" {
+		if filepath.Base(sourceFile.FileName().AsString()) == "main.ts" {
 			main = sourceFile
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -146,69 +147,69 @@ type recordingFS struct {
 // depended says whether the answer depended on more than existence: a read, a listing or a stat.
 func (f *recordingFS) noteAnswer(path string, positive bool, depended bool) {
 	if !positive {
-		positive = f.FS.Stat(path) != nil
+		positive = f.FS.Stat(tspath.RootedPath(path)) != nil
 	}
 	f.recorder.note(path, positive, depended)
 }
 
-func (f *recordingFS) FileExists(path string) bool {
+func (f *recordingFS) FileExists(path tspath.RootedFilePath) bool {
 	exists := f.FS.FileExists(path)
-	f.noteAnswer(path, exists, false)
+	f.noteAnswer(path.AsString(), exists, false)
 	return exists
 }
 
-func (f *recordingFS) ReadFile(path string) (string, bool) {
+func (f *recordingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	contents, ok := f.FS.ReadFile(path)
-	f.noteAnswer(path, ok, true)
+	f.noteAnswer(path.AsString(), ok, true)
 	return contents, ok
 }
 
-func (f *recordingFS) DirectoryExists(path string) bool {
+func (f *recordingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	exists := f.FS.DirectoryExists(path)
-	f.noteAnswer(path, exists, false)
+	f.noteAnswer(path.AsString(), exists, false)
 	return exists
 }
 
 // GetAccessibleEntries is a directory listing, and a listing's answer changes when an entry is added.
 // Recording the directory means its mtime is watched, which is what catches a file added beside the
 // ones the build read.
-func (f *recordingFS) GetAccessibleEntries(path string) vfs.Entries {
+func (f *recordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := f.FS.GetAccessibleEntries(path)
-	f.noteAnswer(path, f.FS.DirectoryExists(path), true)
+	f.noteAnswer(path.AsString(), f.FS.DirectoryExists(path), true)
 	return entries
 }
 
-func (f *recordingFS) Stat(path string) vfs.FileInfo {
+func (f *recordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 	information := f.FS.Stat(path)
-	f.noteAnswer(path, information != nil, true)
+	f.noteAnswer(path.AsString(), information != nil, true)
 	return information
 }
 
-func (f *recordingFS) Realpath(path string) string {
+func (f *recordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	resolved := f.FS.Realpath(path)
 	// Realpath answers for a missing path too, by returning it unchanged, so existence is asked
 	// rather than assumed. A probe recorded as present that is not would fail the record outright.
-	f.noteAnswer(path, false, false)
+	f.noteAnswer(path.AsString(), false, false)
 	return resolved
 }
 
-func (f *recordingFS) WriteFile(path string, data string) error {
-	f.markWritten(path)
+func (f *recordingFS) WriteFile(path tspath.RootedFilePath, data string) error {
+	f.markWritten(path.AsString())
 	return f.FS.WriteFile(path, data)
 }
 
-func (f *recordingFS) AppendFile(path string, data string) error {
-	f.markWritten(path)
+func (f *recordingFS) AppendFile(path tspath.RootedFilePath, data string) error {
+	f.markWritten(path.AsString())
 	return f.FS.AppendFile(path, data)
 }
 
-func (f *recordingFS) Remove(path string) error {
-	f.markWritten(path)
+func (f *recordingFS) Remove(path tspath.RootedPath) error {
+	f.markWritten(path.AsString())
 	return f.FS.Remove(path)
 }
 
-func (f *recordingFS) Chtimes(path string, accessTime time.Time, modifiedTime time.Time) error {
-	f.markWritten(path)
+func (f *recordingFS) Chtimes(path tspath.RootedPath, accessTime time.Time, modifiedTime time.Time) error {
+	f.markWritten(path.AsString())
 	return f.FS.Chtimes(path, accessTime, modifiedTime)
 }
 

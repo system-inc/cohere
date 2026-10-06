@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // These fixtures did not exist before the lift.
@@ -22,7 +21,7 @@ func firstElement(t *testing.T, sourceText string) *ast.Node {
 	t.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
-		Path:     tspath.Path("/repository/source/Thing.tsx"),
+		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil {
 		t.Fatal("the parser returned no source file")

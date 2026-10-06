@@ -433,7 +433,7 @@ func GetElementOrPropertyAccessName(node *ast.Node) *ast.Node
 func GetElementsOfBindingOrAssignmentPattern(name *ast.Node) []*ast.Node
 
 //go:linkname GetEmitModuleFormatOfFileWorker github.com/microsoft/TypeScript/tsc/internal/ast.GetEmitModuleFormatOfFileWorker
-func GetEmitModuleFormatOfFileWorker(fileName string, options *core.CompilerOptions, sourceFileMetaData ast.SourceFileMetaData) core.ModuleKind
+func GetEmitModuleFormatOfFileWorker(fileName tspath.RootedFilePath, options *core.CompilerOptions, sourceFileMetaData ast.SourceFileMetaData) core.ModuleKind
 
 //go:linkname GetEnclosingBlockScopeContainer github.com/microsoft/TypeScript/tsc/internal/ast.GetEnclosingBlockScopeContainer
 func GetEnclosingBlockScopeContainer(node *ast.Node) *ast.Node
@@ -451,7 +451,7 @@ func GetExtendsHeritageClauseElements(node *ast.Node) []*ast.HeritageClauseEleme
 func GetExternalModuleImportEqualsDeclarationExpression(node *ast.Node) *ast.Node
 
 //go:linkname GetExternalModuleIndicatorOptions github.com/microsoft/TypeScript/tsc/internal/ast.GetExternalModuleIndicatorOptions
-func GetExternalModuleIndicatorOptions(fileName string, options *core.CompilerOptions, metadata ast.SourceFileMetaData) ast.ExternalModuleIndicatorOptions
+func GetExternalModuleIndicatorOptions(fileName tspath.RootedFilePath, options *core.CompilerOptions, metadata ast.SourceFileMetaData) ast.ExternalModuleIndicatorOptions
 
 //go:linkname GetExternalModuleName github.com/microsoft/TypeScript/tsc/internal/ast.GetExternalModuleName
 func GetExternalModuleName(node *ast.Node) *ast.Expression
@@ -484,10 +484,10 @@ func GetImmediatelyInvokedFunctionExpression(fn *ast.Node) *ast.Node
 func GetImplementsHeritageClauseElements(node *ast.Node) []*ast.HeritageClauseElement
 
 //go:linkname GetImpliedNodeFormatForEmitWorker github.com/microsoft/TypeScript/tsc/internal/ast.GetImpliedNodeFormatForEmitWorker
-func GetImpliedNodeFormatForEmitWorker(fileName string, emitModuleKind core.ModuleKind, sourceFileMetaData ast.SourceFileMetaData) core.ResolutionMode
+func GetImpliedNodeFormatForEmitWorker(fileName tspath.RootedFilePath, emitModuleKind core.ModuleKind, sourceFileMetaData ast.SourceFileMetaData) core.ResolutionMode
 
 //go:linkname GetImpliedNodeFormatForFile github.com/microsoft/TypeScript/tsc/internal/ast.GetImpliedNodeFormatForFile
-func GetImpliedNodeFormatForFile(path string, packageJsonType string) core.ModuleKind
+func GetImpliedNodeFormatForFile(fileName tspath.RootedFilePath, packageJsonType string) core.ModuleKind
 
 //go:linkname GetImportAttributes github.com/microsoft/TypeScript/tsc/internal/ast.GetImportAttributes
 func GetImportAttributes(node *ast.Node) *ast.Node
@@ -1230,6 +1230,9 @@ func IsImportDeclaration(node *ast.Node) bool
 //go:linkname IsImportDeclarationOrJSImportDeclaration github.com/microsoft/TypeScript/tsc/internal/ast.IsImportDeclarationOrJSImportDeclaration
 func IsImportDeclarationOrJSImportDeclaration(node *ast.Node) bool
 
+//go:linkname IsImportDeferMetaProperty github.com/microsoft/TypeScript/tsc/internal/ast.IsImportDeferMetaProperty
+func IsImportDeferMetaProperty(node *ast.Node) bool
+
 //go:linkname IsImportEqualsDeclaration github.com/microsoft/TypeScript/tsc/internal/ast.IsImportEqualsDeclaration
 func IsImportEqualsDeclaration(node *ast.Node) bool
 
@@ -1245,8 +1248,14 @@ func IsImportOrExportSpecifier(node *ast.Node) bool
 //go:linkname IsImportOrImportEqualsDeclaration github.com/microsoft/TypeScript/tsc/internal/ast.IsImportOrImportEqualsDeclaration
 func IsImportOrImportEqualsDeclaration(node *ast.Node) bool
 
+//go:linkname IsImportPhaseMetaProperty github.com/microsoft/TypeScript/tsc/internal/ast.IsImportPhaseMetaProperty
+func IsImportPhaseMetaProperty(node *ast.Node) bool
+
 //go:linkname IsImportPhaseModifierKind github.com/microsoft/TypeScript/tsc/internal/ast.IsImportPhaseModifierKind
 func IsImportPhaseModifierKind(kind ast.Kind) bool
+
+//go:linkname IsImportSourceMetaProperty github.com/microsoft/TypeScript/tsc/internal/ast.IsImportSourceMetaProperty
+func IsImportSourceMetaProperty(node *ast.Node) bool
 
 //go:linkname IsImportSpecifier github.com/microsoft/TypeScript/tsc/internal/ast.IsImportSpecifier
 func IsImportSpecifier(node *ast.Node) bool
@@ -1916,6 +1925,12 @@ func IsSourceFile(node *ast.Node) bool
 
 //go:linkname IsSourceFileJS github.com/microsoft/TypeScript/tsc/internal/ast.IsSourceFileJS
 func IsSourceFileJS(file *ast.SourceFile) bool
+
+//go:linkname IsSourcePhaseImport github.com/microsoft/TypeScript/tsc/internal/ast.IsSourcePhaseImport
+func IsSourcePhaseImport(node *ast.Node) bool
+
+//go:linkname IsSourcePhaseImportCall github.com/microsoft/TypeScript/tsc/internal/ast.IsSourcePhaseImportCall
+func IsSourcePhaseImportCall(node *ast.Node) bool
 
 //go:linkname IsSpreadAssignment github.com/microsoft/TypeScript/tsc/internal/ast.IsSpreadAssignment
 func IsSpreadAssignment(node *ast.Node) bool
@@ -2625,6 +2640,7 @@ const KindSingleLineCommentTrivia = ast.KindSingleLineCommentTrivia
 const KindSlashEqualsToken = ast.KindSlashEqualsToken
 const KindSlashToken = ast.KindSlashToken
 const KindSourceFile = ast.KindSourceFile
+const KindSourceKeyword = ast.KindSourceKeyword
 const KindSpreadAssignment = ast.KindSpreadAssignment
 const KindSpreadElement = ast.KindSpreadElement
 const KindStaticKeyword = ast.KindStaticKeyword
@@ -2843,7 +2859,7 @@ func NewFlowReduceLabelData(target *ast.FlowLabel, antecedents *ast.FlowList) *a
 func NewFlowSwitchClauseData(switchStatement *ast.Node, clauseStart int, clauseEnd int) *ast.Node
 
 //go:linkname NewHasFileName github.com/microsoft/TypeScript/tsc/internal/ast.NewHasFileName
-func NewHasFileName(fileName string, path tspath.Path) ast.HasFileName
+func NewHasFileName(fileName tspath.RootedFilePath, path tspath.PathKey) ast.HasFileName
 
 //go:linkname NewNodeFactory github.com/microsoft/TypeScript/tsc/internal/ast.NewNodeFactory
 func NewNodeFactory(hooks ast.NodeFactoryHooks) *ast.NodeFactory
@@ -3134,7 +3150,7 @@ type ShorthandPropertyAssignment = ast.ShorthandPropertyAssignment
 type ShorthandPropertyAssignmentNode = ast.ShorthandPropertyAssignmentNode
 
 //go:linkname ShouldTransformImportCall github.com/microsoft/TypeScript/tsc/internal/ast.ShouldTransformImportCall
-func ShouldTransformImportCall(fileName string, options *core.CompilerOptions, impliedNodeFormatForEmit core.ModuleKind) bool
+func ShouldTransformImportCall(fileName tspath.RootedFilePath, options *core.CompilerOptions, impliedNodeFormatForEmit core.ModuleKind) bool
 
 type SignatureDeclaration = ast.SignatureDeclaration
 

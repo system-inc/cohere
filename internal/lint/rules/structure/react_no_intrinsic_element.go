@@ -30,7 +30,7 @@ func messageNoHorizontalRuleElement() rule.Message {
 var ReactElementNoAnchor = rule.Rule{
 	Name: "structure/react-element-no-anchor",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if fileContext.IsLinkComponentFile {
 			return nil
 		}
@@ -46,7 +46,7 @@ var ReactElementNoAnchor = rule.Rule{
 var ReactElementNoHorizontalRule = rule.Rule{
 	Name: "structure/react-element-no-horizontal-rule",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if fileContext.IsHorizontalRuleComponentFile {
 			return nil
 		}

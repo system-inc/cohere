@@ -56,6 +56,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
@@ -207,7 +208,7 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 	// probed and missed is recorded absent, so creating one invalidates, and each probe of the
 	// package walk is recorded the same way. It is reached through a rule.RecordingFS, which also keeps
 	// the read set the findings cache keys the Tailwind rules on.
-	fileExists := fileSystem.FileExists
+	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 
 	entryPoint := FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
@@ -237,7 +238,7 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 	// present input with its signature, which is all the cache needs: it re-signs the file on the
 	// next run and misses when the file moved.
 	for _, stylesheet := range system.Stylesheets {
-		fileSystem.Stat(stylesheet)
+		fileSystem.Stat(tspath.RootedPath(stylesheet))
 	}
 	// The descriptor table is built here, on the counted path, rather than lazily on first use. A
 	// second build path would not be visible to TestDesignSystemIsBuiltOncePerProgram, and an
@@ -253,7 +254,7 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 // program was built without a config file, which is what the in-memory test harnesses do.
 func projectRootOf(program rule.Program) string {
 	if options := program.Options(); options != nil && options.ConfigFilePath != "" {
-		return filepath.Dir(options.ConfigFilePath)
+		return filepath.Dir(options.ConfigFilePath.AsString())
 	}
 	return program.GetCurrentDirectory()
 }

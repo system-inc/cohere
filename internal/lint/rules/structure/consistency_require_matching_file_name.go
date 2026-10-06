@@ -190,7 +190,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 		// harness alike, so a fold here could never change anything. Measured rather than assumed:
 		// a probe rule run on `C:\repository\source\Button.tsx` read `C:/repository/source/Button.tsx`,
 		// and a mutation deleting the fold survived a fixture written to catch it.
-		fileName := path.Base(ctx.SourceFile.FileName())
+		fileName := path.Base(ctx.SourceFile.FileName().AsString())
 		fileBaseName, isComponentFile := componentFileBaseName(fileName)
 		if !isComponentFile || isNextJsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
 			return nil

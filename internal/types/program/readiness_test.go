@@ -60,7 +60,7 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(t *testing.T) {
 		{Name: "test-set-enabled", Run: eachConstant("enabled", false)},
 		{Name: "test-set-off", Run: eachConstant("off", true)},
 		{Name: "test-set-skips", Run: func(ctx rule.Context, options any) rule.Listeners {
-			if filepath.Base(ctx.SourceFile.FileName()) == "b.ts" {
+			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "b.ts" {
 				ctx.Skip("b.ts lacks what this rule needs")
 				return nil
 			}

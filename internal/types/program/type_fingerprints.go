@@ -40,9 +40,9 @@ import (
 // already in the program, moves no edge and no file in the global component: a package.json's "types"
 // changing is enough. Without its resolutions in its hash, the importers of that re-exporter kept their
 // key while the types they see changed (#9bjjk4a, found answering @system_cohere_lint).
-func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
+func (g *Graph) TypeFingerprints() map[tspath.PathKey][sha256.Size]byte {
 	global, edges, contents, resolutions := g.typeGraph()
-	members := make(map[tspath.Path][sha256.Size]byte, len(resolutions))
+	members := make(map[tspath.PathKey][sha256.Size]byte, len(resolutions))
 	for path, resolved := range resolutions {
 		members[path] = withResolutions(contents[path], resolved)
 	}
@@ -52,9 +52,9 @@ func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
 // typeGraphParts is typeGraph's answer.
 type typeGraphParts struct {
 	global      [sha256.Size]byte
-	edges       map[tspath.Path][]tspath.Path
-	contents    map[tspath.Path][sha256.Size]byte
-	resolutions map[tspath.Path][sha256.Size]byte
+	edges       map[tspath.PathKey][]tspath.PathKey
+	contents    map[tspath.PathKey][sha256.Size]byte
+	resolutions map[tspath.PathKey][sha256.Size]byte
 }
 
 // typeGraph is what every fingerprint is built over: the global component, hashing every file that can
@@ -63,7 +63,7 @@ type typeGraphParts struct {
 //
 // Computed once per graph. A walk keyed on both fingerprints asked for it twice, about 45ms each on ahra
 // and all of it before the first worker starts (#zqsdzbq). The callers only read what it returns.
-func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte, map[tspath.Path][sha256.Size]byte) {
+func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
 	g.typeGraphOnce.Do(func() {
 		parts := &g.typeGraphParts
 		parts.global, parts.edges, parts.contents, parts.resolutions = g.computeTypeGraph()
@@ -71,26 +71,26 @@ func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, m
 	return g.typeGraphParts.global, g.typeGraphParts.edges, g.typeGraphParts.contents, g.typeGraphParts.resolutions
 }
 
-func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte, map[tspath.Path][sha256.Size]byte) {
+func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
 	allFiles := g.Program.GetSourceFiles()
 	projectFiles := g.ProjectFiles()
 
 	contents, beyond := hashContentsInParallel(allFiles)
 
-	isProject := make(map[tspath.Path]bool, len(projectFiles))
+	isProject := make(map[tspath.PathKey]bool, len(projectFiles))
 	for _, sourceFile := range projectFiles {
-		isProject[sourceFile.Path()] = true
+		isProject[sourceFile.PathKey()] = true
 	}
 
 	global := sha256.New()
-	globalPaths := make([]tspath.Path, 0, len(allFiles))
+	globalPaths := make([]tspath.PathKey, 0, len(allFiles))
 	for _, sourceFile := range allFiles {
-		if !isProject[sourceFile.Path()] || beyond[sourceFile.Path()] {
-			globalPaths = append(globalPaths, sourceFile.Path())
+		if !isProject[sourceFile.PathKey()] || beyond[sourceFile.PathKey()] {
+			globalPaths = append(globalPaths, sourceFile.PathKey())
 		}
 	}
 	// By the anchored path, in sort and in hash, so every spelling of the root hashes alike (#547dhjz).
-	stable := make(map[tspath.Path]string, len(globalPaths))
+	stable := make(map[tspath.PathKey]string, len(globalPaths))
 	for _, path := range globalPaths {
 		stable[path] = g.Anchor.Stable(string(path))
 	}
@@ -104,7 +104,7 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.
 	var globalSum [sha256.Size]byte
 	copy(globalSum[:], global.Sum(nil))
 
-	edges := make(map[tspath.Path][]tspath.Path, len(projectFiles))
+	edges := make(map[tspath.PathKey][]tspath.PathKey, len(projectFiles))
 	for fromPath, resolutions := range g.Program.GetResolvedModules() {
 		if !isProject[fromPath] {
 			continue
@@ -113,7 +113,7 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.
 			if resolution == nil || resolution.ResolvedFileName == "" {
 				continue
 			}
-			toward := g.pathFor(resolution.ResolvedFileName)
+			toward := g.pathFor(resolution.ResolvedFileName.AsString())
 			if isProject[toward] && toward != fromPath {
 				edges[fromPath] = append(edges[fromPath], toward)
 			}
@@ -125,8 +125,8 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.
 // resolutionSums hashes, for each project file, every module specifier and type reference it wrote and the
 // file each resolved to, or that it resolved to nothing. Sorted, so the order the compiler resolved in cannot
 // move it.
-func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][sha256.Size]byte {
-	entries := make(map[tspath.Path][]string, len(isProject))
+func (g *Graph) resolutionSums(isProject map[tspath.PathKey]bool) map[tspath.PathKey][sha256.Size]byte {
+	entries := make(map[tspath.PathKey][]string, len(isProject))
 	for fromPath, resolutions := range g.Program.GetResolvedModules() {
 		if !isProject[fromPath] {
 			continue
@@ -134,7 +134,7 @@ func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][
 		for key, resolution := range resolutions {
 			target := ""
 			if resolution != nil {
-				target = g.Anchor.Stable(resolution.ResolvedFileName)
+				target = g.Anchor.Stable(resolution.ResolvedFileName.AsString())
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}
@@ -146,12 +146,12 @@ func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][
 		for key, reference := range references {
 			target := ""
 			if reference != nil {
-				target = g.Anchor.Stable(reference.ResolvedFileName)
+				target = g.Anchor.Stable(reference.ResolvedFileName.AsString())
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}
 	}
-	sums := make(map[tspath.Path][sha256.Size]byte, len(isProject))
+	sums := make(map[tspath.PathKey][sha256.Size]byte, len(isProject))
 	for path := range isProject {
 		lines := entries[path]
 		sort.Strings(lines)
@@ -187,7 +187,7 @@ func reachesBeyondItsImports(sourceFile *ast.SourceFile) bool {
 //
 // It also answers reachesBeyondItsImports for each file in the same pass, since that reads the same text, and
 // asked one file at a time after the hashing it cost about 11ms on ahra on the path to the first walk worker.
-func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.Path][sha256.Size]byte, map[tspath.Path]bool) {
+func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey]bool) {
 	sums := make([][sha256.Size]byte, len(files))
 	reaches := make([]bool, len(files))
 	workers := runtime.NumCPU()
@@ -203,12 +203,12 @@ func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.Path][sha256.Si
 		}()
 	}
 	waitGroup.Wait()
-	contents := make(map[tspath.Path][sha256.Size]byte, len(files))
-	beyond := make(map[tspath.Path]bool, len(files))
+	contents := make(map[tspath.PathKey][sha256.Size]byte, len(files))
+	beyond := make(map[tspath.PathKey]bool, len(files))
 	for index, sourceFile := range files {
-		contents[sourceFile.Path()] = sums[index]
+		contents[sourceFile.PathKey()] = sums[index]
 		if reaches[index] {
-			beyond[sourceFile.Path()] = true
+			beyond[sourceFile.PathKey()] = true
 		}
 	}
 	return contents, beyond
@@ -218,20 +218,20 @@ func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.Path][sha256.Si
 // strongly connected component after every component it reaches, so a component's hash can include its
 // dependencies' finished hashes in one pass. A component's hash covers the global component, its
 // members' anchored paths and contents in order, and its dependencies' hashes in order; every member gets it.
-func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, edges map[tspath.Path][]tspath.Path,
-	contents map[tspath.Path][sha256.Size]byte, global [sha256.Size]byte) map[tspath.Path][sha256.Size]byte {
+func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, edges map[tspath.PathKey][]tspath.PathKey,
+	contents map[tspath.PathKey][sha256.Size]byte, global [sha256.Size]byte) map[tspath.PathKey][sha256.Size]byte {
 
 	index := 0
-	indices := make(map[tspath.Path]int, len(projectFiles))
-	lowlinks := make(map[tspath.Path]int, len(projectFiles))
-	onStack := make(map[tspath.Path]bool, len(projectFiles))
-	stack := []tspath.Path{}
-	componentOf := make(map[tspath.Path]int, len(projectFiles))
+	indices := make(map[tspath.PathKey]int, len(projectFiles))
+	lowlinks := make(map[tspath.PathKey]int, len(projectFiles))
+	onStack := make(map[tspath.PathKey]bool, len(projectFiles))
+	stack := []tspath.PathKey{}
+	componentOf := make(map[tspath.PathKey]int, len(projectFiles))
 	componentSums := [][sha256.Size]byte{}
-	fingerprints := make(map[tspath.Path][sha256.Size]byte, len(projectFiles))
+	fingerprints := make(map[tspath.PathKey][sha256.Size]byte, len(projectFiles))
 
-	var connect func(path tspath.Path)
-	connect = func(path tspath.Path) {
+	var connect func(path tspath.PathKey)
+	connect = func(path tspath.PathKey) {
 		indices[path], lowlinks[path] = index, index
 		index++
 		stack = append(stack, path)
@@ -249,7 +249,7 @@ func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, ed
 			return
 		}
 
-		members := []tspath.Path{}
+		members := []tspath.PathKey{}
 		for {
 			top := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
@@ -260,7 +260,7 @@ func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, ed
 			}
 		}
 		// By the anchored path, in sort and in hash, so every spelling of the root hashes alike (#547dhjz).
-		stableMembers := make(map[tspath.Path]string, len(members))
+		stableMembers := make(map[tspath.PathKey]string, len(members))
 		for _, member := range members {
 			stableMembers[member] = anchor.Stable(string(member))
 		}
@@ -304,8 +304,8 @@ func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, ed
 	}
 
 	for _, sourceFile := range projectFiles {
-		if _, visited := indices[sourceFile.Path()]; !visited {
-			connect(sourceFile.Path())
+		if _, visited := indices[sourceFile.PathKey()]; !visited {
+			connect(sourceFile.PathKey())
 		}
 	}
 	return fingerprints

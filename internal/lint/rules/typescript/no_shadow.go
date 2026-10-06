@@ -1111,7 +1111,7 @@ func bindingIsAnIndexSignatureParameter(declaration *ast.Node) bool {
 // class, an enum and a namespace. A declaration inside a `declare namespace` without its own `declare`
 // is not one, and still reports; measured on the installed rule.
 func bindingIsDeclaredInADefinitionFile(ctx rule.Context, binding shadowBinding) bool {
-	fileName := strings.ToLower(ctx.SourceFile.FileName())
+	fileName := strings.ToLower(ctx.SourceFile.FileName().AsString())
 	if !strings.HasSuffix(fileName, ".d.ts") && !strings.HasSuffix(fileName, ".d.cts") &&
 		!strings.HasSuffix(fileName, ".d.mts") {
 		return false

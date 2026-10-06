@@ -134,7 +134,7 @@ func (r *TypeDiagnosticsReuse) ReplayedAmong(files []*ast.SourceFile) int {
 	defer r.mutex.Unlock()
 	count := 0
 	for _, sourceFile := range files {
-		if _, replayed := r.replayedFiles[sourceFile.FileName()]; replayed {
+		if _, replayed := r.replayedFiles[sourceFile.FileName().AsString()]; replayed {
 			count++
 		}
 	}
@@ -197,13 +197,13 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	entries := make(map[string]TypesEntry, len(projectFiles))
 	replayedFiles := map[string]struct{}{}
 	for _, sourceFile := range projectFiles {
-		entry, found := stored.Entries[sourceFile.FileName()]
-		if found && entry.Fingerprint == fingerprints[sourceFile.Path()] {
+		entry, found := stored.Entries[sourceFile.FileName().AsString()]
+		if found && entry.Fingerprint == fingerprints[sourceFile.PathKey()] {
 			for _, diagnostic := range entry.Diagnostics {
 				replayed = append(replayed, diagnostic.diagnostic(sourceFile))
 			}
-			entries[sourceFile.FileName()] = entry
-			replayedFiles[sourceFile.FileName()] = struct{}{}
+			entries[sourceFile.FileName().AsString()] = entry
+			replayedFiles[sourceFile.FileName().AsString()] = struct{}{}
 			continue
 		}
 		toCheck = append(toCheck, sourceFile)
@@ -217,8 +217,8 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	semantic := replayed
 	for index, sourceFile := range toCheck {
 		semantic = append(semantic, checked[index]...)
-		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.Path()], checked[index]); keepable {
-			entries[sourceFile.FileName()] = entry
+		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.PathKey()], checked[index]); keepable {
+			entries[sourceFile.FileName().AsString()] = entry
 		}
 	}
 
@@ -253,8 +253,8 @@ func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, par
 	}
 	entries := make(map[string]TypesEntry, len(g.ProjectFiles()))
 	for _, sourceFile := range g.ProjectFiles() {
-		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.Path()], byFile[sourceFile]); keepable {
-			entries[sourceFile.FileName()] = entry
+		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.PathKey()], byFile[sourceFile]); keepable {
+			entries[sourceFile.FileName().AsString()] = entry
 		}
 	}
 	reuse.mutex.Lock()

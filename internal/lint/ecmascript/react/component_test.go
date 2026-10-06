@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // firstNodeOfKind parses source text and returns the first node of the given kind.
@@ -14,7 +13,7 @@ func firstNodeOfKind(t *testing.T, sourceText string, kinds ...ast.Kind) *ast.No
 	t.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
-		Path:     tspath.Path("/repository/source/Thing.tsx"),
+		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil {
 		t.Fatal("the parser returned no source file")

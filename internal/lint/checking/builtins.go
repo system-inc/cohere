@@ -15,10 +15,11 @@ import (
 )
 
 func ComparePaths(a string, b string, program rule.Program) int {
-	return tspath.ComparePaths(a, b, tspath.ComparePathsOptions{
-		CurrentDirectory:          program.GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: program.UseCaseSensitiveFileNames(),
-	})
+	caseSensitivity := tspath.CaseInsensitive
+	if program.UseCaseSensitiveFileNames() {
+		caseSensitivity = tspath.CaseSensitive
+	}
+	return tspath.ComparePaths(a, b, caseSensitivity)
 }
 
 func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool {
@@ -26,7 +27,7 @@ func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool
 		return false
 	}
 
-	if program.IsSourceFileDefaultLibrary(file.Path()) {
+	if program.IsSourceFileDefaultLibrary(file.PathKey()) {
 		return true
 	}
 
@@ -52,7 +53,7 @@ func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool
 	}
 
 	return Some(libs, func(lib string) bool {
-		return ComparePaths(file.FileName(), lib, program) == 0
+		return ComparePaths(file.FileName().AsString(), lib, program) == 0
 	})
 }
 

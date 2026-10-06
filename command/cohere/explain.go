@@ -107,13 +107,13 @@ func findExplainSubject(files []*ast.SourceFile, named string) *ast.SourceFile {
 	wanted := filepath.ToSlash(named)
 
 	for _, candidate := range files {
-		name := filepath.ToSlash(candidate.FileName())
+		name := filepath.ToSlash(candidate.FileName().AsString())
 		if name == wanted {
 			return candidate
 		}
 	}
 	for _, candidate := range files {
-		name := filepath.ToSlash(candidate.FileName())
+		name := filepath.ToSlash(candidate.FileName().AsString())
 		if strings.HasSuffix(name, "/"+wanted) {
 			return candidate
 		}

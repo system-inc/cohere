@@ -10,6 +10,7 @@ import "github.com/microsoft/TypeScript/tsc/internal/contentmapper"
 import "github.com/microsoft/TypeScript/tsc/internal/core"
 import "github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 import "github.com/microsoft/TypeScript/tsc/internal/tsoptions"
+import "github.com/microsoft/TypeScript/tsc/internal/tspath"
 import "github.com/microsoft/TypeScript/tsc/internal/vfs"
 import _ "unsafe"
 
@@ -56,10 +57,10 @@ func HandleNoEmitOptions(ctx context.Context, program compiler.ProgramLike, file
 type LibFile = compiler.LibFile
 
 //go:linkname NewCachedFSCompilerHost github.com/microsoft/TypeScript/tsc/internal/compiler.NewCachedFSCompilerHost
-func NewCachedFSCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
+func NewCachedFSCompilerHost(fs vfs.FS, defaultLibraryPath tspath.RootedDirectoryPath, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
 
 //go:linkname NewCompilerHost github.com/microsoft/TypeScript/tsc/internal/compiler.NewCompilerHost
-func NewCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
+func NewCompilerHost(fs vfs.FS, defaultLibraryPath tspath.RootedDirectoryPath, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
 
 //go:linkname NewProgram github.com/microsoft/TypeScript/tsc/internal/compiler.NewProgram
 func NewProgram(opts compiler.ProgramOptions) *compiler.Program

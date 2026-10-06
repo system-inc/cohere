@@ -139,7 +139,7 @@ var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
 			return nil
 		}
 		graph := correctnessNoImportCycleLoadTimeReadGraphFor(ctx)
-		if _, inCycle := graph.component[ctx.SourceFile.Path()]; !inCycle {
+		if _, inCycle := graph.component[ctx.SourceFile.PathKey()]; !inCycle {
 			return nil
 		}
 		return rule.Listeners{
@@ -154,11 +154,11 @@ var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
 // files inside a cycle.
 type correctnessNoImportCycleLoadTimeReadGraph struct {
 	// component numbers each file's strongly connected component. A file in no cycle is absent.
-	component map[tspath.Path]int
+	component map[tspath.PathKey]int
 	// edges are the runtime edges between files of the same component, for naming the cycle.
-	edges map[tspath.Path][]tspath.Path
+	edges map[tspath.PathKey][]tspath.PathKey
 	// fileNames spells each path the way the program does, for the message.
-	fileNames map[tspath.Path]string
+	fileNames map[tspath.PathKey]string
 }
 
 // correctnessNoImportCycleLoadTimeReadCache holds one graph per program, for the reason
@@ -191,7 +191,7 @@ func correctnessNoImportCycleLoadTimeReadGraphFor(ctx rule.Context) *correctness
 // file it resolves to.
 type correctnessNoImportCycleLoadTimeReadCandidate struct {
 	statement *ast.Node
-	target    tspath.Path
+	target    tspath.PathKey
 }
 
 // correctnessNoImportCycleLoadTimeReadBuildGraph builds the graph in two passes.
@@ -202,13 +202,13 @@ type correctnessNoImportCycleLoadTimeReadCandidate struct {
 // the survivors. Only a file in a cycle of the first pass is ever handed to the checker.
 func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeChecker *checker.Checker) *correctnessNoImportCycleLoadTimeReadGraph {
 	graph := &correctnessNoImportCycleLoadTimeReadGraph{
-		component: map[tspath.Path]int{},
-		edges:     map[tspath.Path][]tspath.Path{},
-		fileNames: map[tspath.Path]string{},
+		component: map[tspath.PathKey]int{},
+		edges:     map[tspath.PathKey][]tspath.PathKey{},
+		fileNames: map[tspath.PathKey]string{},
 	}
 	syntactic := correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program)
 
-	verified := map[tspath.Path][]tspath.Path{}
+	verified := map[tspath.PathKey][]tspath.PathKey{}
 	for _, importerPath := range syntactic.paths {
 		importerComponent, inCycle := syntactic.superset[importerPath]
 		if !inCycle {
@@ -228,7 +228,7 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		}
 	}
 
-	graph.component = correctnessNoImportCycleLoadTimeReadComponents(syntactic.paths, func(from tspath.Path) []tspath.Path {
+	graph.component = correctnessNoImportCycleLoadTimeReadComponents(syntactic.paths, func(from tspath.PathKey) []tspath.PathKey {
 		return verified[from]
 	})
 	for from, targets := range verified {
@@ -241,7 +241,7 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		}
 	}
 	for filePath := range graph.component {
-		graph.fileNames[filePath] = syntactic.byPath[filePath].FileName()
+		graph.fileNames[filePath] = syntactic.byPath[filePath].FileName().AsString()
 	}
 	return graph
 }
@@ -250,11 +250,11 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 // re-export not written `type`, resolved to a project file, and the cycles they make. No checker is
 // asked, so the program fingerprint can read it too.
 type correctnessNoImportCycleLoadTimeReadSyntacticGraph struct {
-	paths      []tspath.Path
-	byPath     map[tspath.Path]*ast.SourceFile
-	candidates map[tspath.Path][]correctnessNoImportCycleLoadTimeReadCandidate
+	paths      []tspath.PathKey
+	byPath     map[tspath.PathKey]*ast.SourceFile
+	candidates map[tspath.PathKey][]correctnessNoImportCycleLoadTimeReadCandidate
 	// superset numbers each file in a cycle of this graph by its strongly connected component.
-	superset map[tspath.Path]int
+	superset map[tspath.PathKey]int
 }
 
 // correctnessNoImportCycleLoadTimeReadSyntacticCache holds one syntactic graph per program, shared by the
@@ -278,18 +278,18 @@ func correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program rule.Program)
 }
 
 func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Program) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
-	byPath := map[tspath.Path]*ast.SourceFile{}
-	var paths []tspath.Path
+	byPath := map[tspath.PathKey]*ast.SourceFile{}
+	var paths []tspath.PathKey
 	for _, sourceFile := range program.SourceFiles() {
-		if sourceFile == nil || sourceFile.IsDeclarationFile || strings.Contains(sourceFile.FileName(), "/node_modules/") {
+		if sourceFile == nil || sourceFile.IsDeclarationFile || strings.Contains(sourceFile.FileName().AsString(), "/node_modules/") {
 			continue
 		}
-		byPath[sourceFile.Path()] = sourceFile
-		paths = append(paths, sourceFile.Path())
+		byPath[sourceFile.PathKey()] = sourceFile
+		paths = append(paths, sourceFile.PathKey())
 	}
 	sort.Slice(paths, func(left int, right int) bool { return paths[left] < paths[right] })
 
-	candidates := map[tspath.Path][]correctnessNoImportCycleLoadTimeReadCandidate{}
+	candidates := map[tspath.PathKey][]correctnessNoImportCycleLoadTimeReadCandidate{}
 	for _, importerPath := range paths {
 		importer := byPath[importerPath]
 		for _, statement := range importer.Statements.Nodes {
@@ -318,15 +318,15 @@ func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Progra
 				continue
 			}
 			target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
-			if target == nil || target == importer || byPath[target.Path()] == nil || correctnessNoImportCycleLoadTimeReadIsServerActions(target) {
+			if target == nil || target == importer || byPath[target.PathKey()] == nil || correctnessNoImportCycleLoadTimeReadIsServerActions(target) {
 				continue
 			}
-			candidates[importerPath] = append(candidates[importerPath], correctnessNoImportCycleLoadTimeReadCandidate{statement: statement, target: target.Path()})
+			candidates[importerPath] = append(candidates[importerPath], correctnessNoImportCycleLoadTimeReadCandidate{statement: statement, target: target.PathKey()})
 		}
 	}
 
-	superset := correctnessNoImportCycleLoadTimeReadComponents(paths, func(from tspath.Path) []tspath.Path {
-		var targets []tspath.Path
+	superset := correctnessNoImportCycleLoadTimeReadComponents(paths, func(from tspath.PathKey) []tspath.PathKey {
+		var targets []tspath.PathKey
 		for _, candidate := range candidates[from] {
 			targets = append(targets, candidate.target)
 		}
@@ -357,8 +357,8 @@ func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program, _ any
 		}
 		for _, candidate := range candidates {
 			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; targetInCycle && targetComponent == component {
-				edges = append(edges, rule.FingerprintPath(program, syntactic.byPath[from].FileName())+"\x00"+
-					rule.FingerprintPath(program, syntactic.byPath[candidate.target].FileName()))
+				edges = append(edges, rule.FingerprintPath(program, syntactic.byPath[from].FileName().AsString())+"\x00"+
+					rule.FingerprintPath(program, syntactic.byPath[candidate.target].FileName().AsString()))
 			}
 		}
 	}
@@ -562,7 +562,7 @@ type correctnessNoImportCycleLoadTimeReadImportBinding struct {
 }
 
 func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *correctnessNoImportCycleLoadTimeReadGraph) {
-	readerPath := ctx.SourceFile.Path()
+	readerPath := ctx.SourceFile.PathKey()
 	bindingsByName := map[string][]correctnessNoImportCycleLoadTimeReadImportBinding{}
 	for _, statement := range ctx.SourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindImportDeclaration {
@@ -609,18 +609,18 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *corre
 				return
 			}
 			declaringFile := ast.GetSourceFileOfNode(declaration)
-			if declaringFile == nil || declaringFile.Path() == readerPath {
+			if declaringFile == nil || declaringFile.PathKey() == readerPath {
 				return
 			}
-			if declaringComponent, inCycle := graph.component[declaringFile.Path()]; !inCycle || declaringComponent != graph.component[readerPath] {
+			if declaringComponent, inCycle := graph.component[declaringFile.PathKey()]; !inCycle || declaringComponent != graph.component[readerPath] {
 				return
 			}
 			ctx.ReportNode(read, rule.Message{
 				Id: correctnessNoImportCycleLoadTimeReadId,
 				Description: correctnessNoImportCycleLoadTimeReadText.Render(map[string]string{
 					"name":  target.Name,
-					"file":  path.Base(declaringFile.FileName()),
-					"cycle": graph.cycleThrough(readerPath, declaringFile.Path()),
+					"file":  path.Base(declaringFile.FileName().AsString()),
+					"cycle": graph.cycleThrough(readerPath, declaringFile.PathKey()),
 				}),
 			})
 			return
@@ -656,7 +656,7 @@ func correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(typeChecker *c
 
 // cycleThrough names one cycle through both files, `A.ts → B.ts → A.ts`, from the shortest path each
 // way between them.
-func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(reader tspath.Path, declaring tspath.Path) string {
+func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(reader tspath.PathKey, declaring tspath.PathKey) string {
 	there := graph.shortestPath(reader, declaring)
 	back := graph.shortestPath(declaring, reader)
 	if len(there) == 0 || len(back) == 0 {
@@ -670,14 +670,14 @@ func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(reader tspa
 }
 
 // shortestPath returns the files from one to the other along runtime edges, both ends included.
-func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(from tspath.Path, to tspath.Path) []tspath.Path {
-	previous := map[tspath.Path]tspath.Path{from: from}
-	queue := []tspath.Path{from}
+func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(from tspath.PathKey, to tspath.PathKey) []tspath.PathKey {
+	previous := map[tspath.PathKey]tspath.PathKey{from: from}
+	queue := []tspath.PathKey{from}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
 		if current == to {
-			var steps []tspath.Path
+			var steps []tspath.PathKey
 			for step := to; step != from; step = previous[step] {
 				steps = append(steps, step)
 			}
@@ -699,16 +699,16 @@ func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(from tspath
 
 // correctnessNoImportCycleLoadTimeReadComponents runs Tarjan's algorithm and numbers every strongly
 // connected component of two or more files. A file in no such component is left out.
-func correctnessNoImportCycleLoadTimeReadComponents(paths []tspath.Path, edgesOf func(from tspath.Path) []tspath.Path) map[tspath.Path]int {
-	index := map[tspath.Path]int{}
-	lowLink := map[tspath.Path]int{}
-	onStack := map[tspath.Path]bool{}
-	var stack []tspath.Path
-	components := map[tspath.Path]int{}
+func correctnessNoImportCycleLoadTimeReadComponents(paths []tspath.PathKey, edgesOf func(from tspath.PathKey) []tspath.PathKey) map[tspath.PathKey]int {
+	index := map[tspath.PathKey]int{}
+	lowLink := map[tspath.PathKey]int{}
+	onStack := map[tspath.PathKey]bool{}
+	var stack []tspath.PathKey
+	components := map[tspath.PathKey]int{}
 	nextIndex, nextComponent := 0, 0
 
-	var connect func(node tspath.Path)
-	connect = func(node tspath.Path) {
+	var connect func(node tspath.PathKey)
+	connect = func(node tspath.PathKey) {
 		index[node], lowLink[node] = nextIndex, nextIndex
 		nextIndex++
 		stack = append(stack, node)
@@ -724,7 +724,7 @@ func correctnessNoImportCycleLoadTimeReadComponents(paths []tspath.Path, edgesOf
 		if lowLink[node] != index[node] {
 			return
 		}
-		var members []tspath.Path
+		var members []tspath.PathKey
 		for {
 			member := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]

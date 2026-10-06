@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -155,7 +156,7 @@ func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings 
 func existingDirectories(fileSystem vfs.FS, directories []string) []string {
 	found := make([]string, 0, len(directories))
 	for _, directory := range directories {
-		if directory != "" && fileSystem.DirectoryExists(directory) {
+		if directory != "" && fileSystem.DirectoryExists(tspath.RootedDirectoryPath(directory)) {
 			found = append(found, directory)
 		}
 	}
@@ -179,7 +180,7 @@ var (
 // link whose target is missing is left out of the listing here and kept by Node, where it would push
 // a route for a page that cannot load; that is the one listing difference.
 func parseUrlForPages(fileSystem vfs.FS, urlPrefix string, directory string) []string {
-	entries := fileSystem.GetAccessibleEntries(directory)
+	entries := fileSystem.GetAccessibleEntries(tspath.RootedDirectoryPath(directory))
 	var urls []string
 	visit := func(name string, isDirectory bool) {
 		if pageFileExtension.MatchString(name) {
@@ -206,7 +207,7 @@ func parseUrlForPages(fileSystem vfs.FS, urlPrefix string, directory string) []s
 // `page` is the directory's own route and `layout` is no route, and below which every directory is
 // walked with parseUrlForPages, as upstream walks it.
 func parseUrlForAppDirectory(fileSystem vfs.FS, urlPrefix string, directory string) []string {
-	entries := fileSystem.GetAccessibleEntries(directory)
+	entries := fileSystem.GetAccessibleEntries(tspath.RootedDirectoryPath(directory))
 	var urls []string
 	visit := func(name string, isDirectory bool) {
 		if pageFileExtension.MatchString(name) {

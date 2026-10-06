@@ -159,7 +159,7 @@ func trailingCommaForConstraintRemoval(
 	if typeParameters == nil || len(typeParameters.Nodes) != 1 {
 		return ""
 	}
-	if !fileNeedsGenericArrowDisambiguation(ctx.SourceFile.FileName()) {
+	if !fileNeedsGenericArrowDisambiguation(ctx.SourceFile.FileName().AsString()) {
 		return ""
 	}
 

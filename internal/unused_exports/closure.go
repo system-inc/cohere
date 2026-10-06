@@ -266,7 +266,7 @@ func fileDeclarations(file *ast.SourceFile, text string) []declarationRecord {
 		records = append(records, declarationRecord{
 			symbol: symbol,
 			dead: DeadDeclaration{
-				FileName:    fileName,
+				FileName:    fileName.AsString(),
 				Name:        name.Text(),
 				Kind:        kind,
 				Range:       TextSpan{Position: span.Pos(), End: span.End()},

@@ -105,7 +105,7 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 		for _, diagnostic := range result.Diagnostics {
 			fileName := diagnostic.SourceFile.FileName()
 			described = append(described, fmt.Sprintf("%s %s %s/%s",
-				fileName[strings.LastIndexByte(fileName, '/')+1:], diagnostic.Message.Description,
+				fileName[strings.LastIndexByte(fileName.AsString(), '/')+1:], diagnostic.Message.Description,
 				diagnostic.RuleName, diagnostic.Message.Id))
 		}
 		return described

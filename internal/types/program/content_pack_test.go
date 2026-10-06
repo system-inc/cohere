@@ -11,6 +11,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
@@ -50,7 +51,7 @@ func (f *packFixture) run(names ...string) (map[string]string, int, int, int) {
 	fileSystem := pack.wrap(osvfs.FS())
 	read := map[string]string{}
 	for _, name := range names {
-		contents, ok := fileSystem.ReadFile(f.path(name))
+		contents, ok := fileSystem.ReadFile(tspath.RootedFilePath(f.path(name)))
 		if !ok {
 			f.t.Fatalf("%s could not be read", name)
 		}
@@ -212,7 +213,7 @@ func TestAContentPackTruncatedUnderItsMappingIsReadAround(t *testing.T) {
 	if err := os.Truncate(fixture.dataFile(), 0); err != nil {
 		t.Fatal(err)
 	}
-	contents, ok := pack.wrap(osvfs.FS()).ReadFile(fixture.path("a.ts"))
+	contents, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok || contents != strings.Repeat("export const a = 1;\n", 4096) {
 		t.Fatalf("a pack truncated under its mapping served %d bytes", len(contents))
 	}
@@ -270,7 +271,7 @@ func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	served, ok := pack.wrap(osvfs.FS()).ReadFile(fixture.path("a.ts"))
+	served, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok {
 		t.Fatal("the pack served nothing, so nothing below is about a served file")
 	}

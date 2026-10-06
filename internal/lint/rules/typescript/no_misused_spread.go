@@ -476,7 +476,7 @@ func noMisusedSpreadDecoratorIsOwnSource(ctx rule.Context, expression *ast.Node)
 func noMisusedSpreadIsOwnSource(declaration *ast.Node) bool {
 	sourceFile := ast.GetSourceFileOfNode(declaration)
 	return sourceFile != nil && !sourceFile.IsDeclarationFile && declaration.Flags&ast.NodeFlagsAmbient == 0 &&
-		!strings.Contains(sourceFile.FileName(), "/node_modules/")
+		!strings.Contains(sourceFile.FileName().AsString(), "/node_modules/")
 }
 
 // noMisusedSpreadAwaitSuggestion offers `await` before the spread argument.

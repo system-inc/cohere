@@ -98,7 +98,7 @@ type Program interface {
 	UseCaseSensitiveFileNames() bool
 
 	// ReadsDefaultLibrary.
-	IsSourceFileDefaultLibrary(path tspath.Path) bool
+	IsSourceFileDefaultLibrary(path tspath.PathKey) bool
 	DefaultLibraryPath() string
 
 	// ReadsModuleResolution for the file the rule was handed, ReadsOtherFiles for any other.
@@ -198,22 +198,22 @@ func (view *programView) Options() *core.CompilerOptions {
 
 func (view *programView) GetCurrentDirectory() string {
 	view.require(ReadsCompilerOptions, "GetCurrentDirectory")
-	return view.program.GetCurrentDirectory()
+	return view.program.GetCurrentDirectory().AsString()
 }
 
 func (view *programView) UseCaseSensitiveFileNames() bool {
 	view.require(ReadsCompilerOptions, "UseCaseSensitiveFileNames")
-	return view.program.Host().FS().UseCaseSensitiveFileNames()
+	return view.program.UseCaseSensitiveFileNames()
 }
 
-func (view *programView) IsSourceFileDefaultLibrary(path tspath.Path) bool {
+func (view *programView) IsSourceFileDefaultLibrary(path tspath.PathKey) bool {
 	view.require(ReadsDefaultLibrary, "IsSourceFileDefaultLibrary")
 	return view.program.IsSourceFileDefaultLibrary(path)
 }
 
 func (view *programView) DefaultLibraryPath() string {
 	view.require(ReadsDefaultLibrary, "DefaultLibraryPath")
-	return view.program.Host().DefaultLibraryPath()
+	return view.program.Host().DefaultLibraryPath().AsString()
 }
 
 func (view *programView) ResolveModule(file ast.HasFileName, specifier *ast.StringLiteralLike) ResolvedModule {
@@ -228,7 +228,7 @@ func (view *programView) ResolveModule(file ast.HasFileName, specifier *ast.Stri
 		return ResolvedModule{}
 	}
 	return ResolvedModule{
-		ResolvedFileName:        resolved.ResolvedFileName,
+		ResolvedFileName:        resolved.ResolvedFileName.AsString(),
 		IsExternalLibraryImport: resolved.IsExternalLibraryImport,
 		PackageName:             resolved.PackageId.Name,
 	}
@@ -236,7 +236,17 @@ func (view *programView) ResolveModule(file ast.HasFileName, specifier *ast.Stri
 
 func (view *programView) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
 	view.require(ReadsOtherFiles, "GetSourceFileForResolvedModule")
-	return view.program.GetSourceFileForResolvedModule(fileName)
+	// Upstream's own takes the compiler's resolved module, which a rule never holds (it holds this
+	// package's ResolvedModule). This is the lookup it made by name before typed file paths: the file,
+	// else the file a project reference redirects the name to.
+	name := tspath.RootedFilePath(fileName)
+	if file := view.program.GetSourceFile(name); file != nil {
+		return file
+	}
+	if redirect := view.program.GetParseFileRedirect(name); redirect != "" {
+		return view.program.GetSourceFile(redirect)
+	}
+	return nil
 }
 
 func (view *programView) SourceFiles() []*ast.SourceFile {
@@ -246,7 +256,7 @@ func (view *programView) SourceFiles() []*ast.SourceFile {
 
 func (view *programView) GetSourceFile(fileName string) *ast.SourceFile {
 	view.require(ReadsOtherFiles, "GetSourceFile")
-	return view.program.GetSourceFile(fileName)
+	return view.program.GetSourceFile(tspath.RootedFilePath(fileName))
 }
 
 func (view *programView) FS() vfs.FS {
@@ -285,10 +295,7 @@ func FingerprintPath(program Program, path string) string {
 	if inside, under := fingerprintPathUnder(directory, path, program.UseCaseSensitiveFileNames()); under {
 		return inside
 	}
-	return tspath.GetRelativePathFromDirectory(directory, path, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: program.UseCaseSensitiveFileNames(),
-		CurrentDirectory:          program.GetCurrentDirectory(),
-	})
+	return tspath.GetRelativePathFromDirectory(directory, path, caseSensitivity(program.UseCaseSensitiveFileNames()))
 }
 
 // fingerprintPathUnder is the part of path below directory, when path is a descendant and the bytes say so:
@@ -317,4 +324,12 @@ func fingerprintPathUnder(directory string, path string, caseSensitive bool) (st
 		return inside, true
 	}
 	return "", false
+}
+
+// caseSensitivity is a program's answer to UseCaseSensitiveFileNames as the CaseSensitivity tspath takes.
+func caseSensitivity(caseSensitive bool) tspath.CaseSensitivity {
+	if caseSensitive {
+		return tspath.CaseSensitive
+	}
+	return tspath.CaseInsensitive
 }

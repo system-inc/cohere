@@ -29,11 +29,10 @@ type ProjectConfig struct {
 func ReadProjectConfig(configFileName string) (ProjectConfig, error) {
 	configFileName = tspath.NormalizePath(configFileName)
 	fileSystem := cachedvfs.From(bundled.WrapFS(osvfs.FS()))
-	host := &configHost{fs: fileSystem, currentDirectory: tspath.GetDirectoryPath(configFileName)}
-	if !fileSystem.FileExists(configFileName) {
+	if !fileSystem.FileExists(tspath.RootedFilePath(configFileName)) {
 		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", configFileName)
 	}
-	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(configFileName, &core.CompilerOptions{}, nil, host, nil)
+	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
 	if len(configErrors) > 0 {
 		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configErrors))
 	}
@@ -45,10 +44,10 @@ func ReadProjectConfig(configFileName string) (ProjectConfig, error) {
 	}
 	read := ProjectConfig{}
 	for _, fileName := range config.FileNames() {
-		read.FileNames = append(read.FileNames, filepath.Clean(filepath.FromSlash(fileName)))
+		read.FileNames = append(read.FileNames, filepath.Clean(filepath.FromSlash(fileName.AsString())))
 	}
 	for _, reference := range config.ResolvedProjectReferencePaths() {
-		read.References = append(read.References, filepath.Clean(filepath.FromSlash(reference)))
+		read.References = append(read.References, filepath.Clean(filepath.FromSlash(reference.AsString())))
 	}
 	return read, nil
 }

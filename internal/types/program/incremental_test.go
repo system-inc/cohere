@@ -40,7 +40,7 @@ func messagesOf(diagnostics []*ast.Diagnostic) []string {
 	for _, diagnostic := range diagnostics {
 		name := ""
 		if file := diagnostic.File(); file != nil {
-			name = filepath.Base(file.FileName())
+			name = filepath.Base(file.FileName().AsString())
 		}
 		rendered = append(rendered, fmt.Sprintf("%s:%d:TS%d", name, diagnostic.Pos(), diagnostic.Code()))
 	}

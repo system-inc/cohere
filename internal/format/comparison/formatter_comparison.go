@@ -109,8 +109,8 @@ func FormatFile(fileName string, text string) (formatted string, ok bool, panick
 	fileName = tspath.NormalizePath(fileName)
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, text, scriptKind)
 	if sourceFile == nil {
 		return "", false, false, ""

@@ -193,10 +193,10 @@ var NoUnusedVars = rule.Rule{
 				// Recorded here so the next reader does not delete it believing it does nothing,
 				// and does not add a fixture believing it can be measured.
 				fileName := sourceFile.FileName()
-				if strings.HasSuffix(fileName, ".d.ts") ||
-					strings.HasSuffix(fileName, ".vue") ||
-					strings.HasSuffix(fileName, ".svelte") ||
-					strings.HasSuffix(fileName, ".astro") {
+				if strings.HasSuffix(fileName.AsString(), ".d.ts") ||
+					strings.HasSuffix(fileName.AsString(), ".vue") ||
+					strings.HasSuffix(fileName.AsString(), ".svelte") ||
+					strings.HasSuffix(fileName.AsString(), ".astro") {
 					return
 				}
 
@@ -1807,8 +1807,8 @@ func isJsxFactoryImportInJsxFile(candidate candidateBinding) bool {
 	if sourceFile == nil {
 		return false
 	}
-	return strings.HasSuffix(sourceFile.FileName(), ".tsx") ||
-		strings.HasSuffix(sourceFile.FileName(), ".jsx")
+	return strings.HasSuffix(sourceFile.FileName().AsString(), ".tsx") ||
+		strings.HasSuffix(sourceFile.FileName().AsString(), ".jsx")
 }
 
 // hasForInOrOfWriteWithLeadingReturn covers the same exemption for a binding declared apart from

@@ -337,7 +337,7 @@ func aliasesFromCompilerPaths(options *core.CompilerOptions, currentDirectory st
 	if options == nil || options.Paths.Size() == 0 {
 		return nil
 	}
-	basePath := options.GetPathsBasePath(currentDirectory)
+	basePath := options.GetPathsBasePath(tspath.RootedDirectoryPath(currentDirectory))
 
 	var aliases []PathAlias
 	for pattern, targets := range options.Paths.Entries() {
@@ -350,7 +350,7 @@ func aliasesFromCompilerPaths(options *core.CompilerOptions, currentDirectory st
 			continue
 		}
 
-		directory := tspath.NormalizePath(tspath.ResolvePath(normalizedPathText(basePath), targetDirectory))
+		directory := tspath.NormalizePath(tspath.ResolvePath(normalizedPathText(basePath.AsString()), targetDirectory))
 		relative, isInside := repositoryRelative(repositoryRoot, strings.TrimSuffix(directory, "/"))
 		if !isInside {
 			continue

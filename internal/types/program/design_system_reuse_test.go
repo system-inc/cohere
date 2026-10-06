@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -21,9 +22,9 @@ func designSystemRule(root string) rule.Rule {
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				fileSystem := ctx.Program.DesignSystemFS()
-				theme, _ := fileSystem.ReadFile(filepath.Join(root, "theme.css"))
+				theme, _ := fileSystem.ReadFile(tspath.RootedFilePath(filepath.Join(root, "theme.css")))
 				// Asked every time, not after the theme in an ||: a question never asked is not in the read set.
-				candidate := fileSystem.FileExists(filepath.Join(root, "candidate.css"))
+				candidate := fileSystem.FileExists(tspath.RootedFilePath(filepath.Join(root, "candidate.css")))
 				if strings.Contains(theme, "flag") || candidate {
 					ctx.ReportNode(node, rule.Message{Id: "flagged", Description: "the design system flags this"})
 				}

@@ -64,7 +64,7 @@ func builtinGlobalIsValue(typeChecker *checker.Checker, program rule.Program, na
 		default:
 			continue
 		}
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && program.IsSourceFileDefaultLibrary(file.Path()) {
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && program.IsSourceFileDefaultLibrary(file.PathKey()) {
 			return true
 		}
 	}
@@ -94,7 +94,7 @@ func isLibraryTypeGlobal(typeChecker *checker.Checker, program rule.Program, nam
 		default:
 			continue
 		}
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && program.IsSourceFileDefaultLibrary(file.Path()) {
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && program.IsSourceFileDefaultLibrary(file.PathKey()) {
 			return true
 		}
 	}

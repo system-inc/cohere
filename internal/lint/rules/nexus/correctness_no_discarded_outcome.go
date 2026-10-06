@@ -238,7 +238,7 @@ func correctnessNoDiscardedOutcomeAliasName(union *ast.Node) string {
 	}
 	name := declaration.Name().Text()
 	for _, known := range correctnessNoDiscardedOutcomeDeclarations {
-		if name == known.typeName && strings.HasSuffix(file.FileName(), known.fileSuffix) {
+		if name == known.typeName && strings.HasSuffix(file.FileName().AsString(), known.fileSuffix) {
 			return name
 		}
 	}

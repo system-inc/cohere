@@ -136,7 +136,7 @@ var NoThisAlias = rule.Rule{
 		// Declining the file rather than the node, matching upstream's `should_run`, which reads
 		// `ctx.source_type().is_typescript()`. Measured: the same `const self = this;` reports in a
 		// `.ts` file and is silent in a `.js` one.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName()) {
+		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

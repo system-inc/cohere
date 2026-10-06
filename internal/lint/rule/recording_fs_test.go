@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
@@ -27,11 +28,11 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
 	}
 	recording := NewRecordingFS(osvfs.FS())
 
-	recording.FileExists(project + "/source/theme.css")
-	recording.FileExists(project + "/app/globals.css")
-	recording.ReadFile(project + "/source/theme.css")
-	recording.Stat(project + "/missing.css")
-	recording.DirectoryExists(project + "/source")
+	recording.FileExists(tspath.RootedFilePath(project + "/source/theme.css"))
+	recording.FileExists(tspath.RootedFilePath(project + "/app/globals.css"))
+	recording.ReadFile(tspath.RootedFilePath(project + "/source/theme.css"))
+	recording.Stat(tspath.RootedPath(project + "/missing.css"))
+	recording.DirectoryExists(tspath.RootedDirectoryPath(project + "/source"))
 
 	got := []string{}
 	for _, read := range recording.Reads() {
@@ -72,9 +73,9 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
 	}
 
 	for name, write := range map[string]func(){
-		"WriteFile":  func() { recording.WriteFile(project+"/out.css", "") },
-		"AppendFile": func() { recording.AppendFile(project+"/out.css", "") },
-		"Remove":     func() { recording.Remove(project + "/source/theme.css") },
+		"WriteFile":  func() { recording.WriteFile(tspath.RootedFilePath(project+"/out.css"), "") },
+		"AppendFile": func() { recording.AppendFile(tspath.RootedFilePath(project+"/out.css"), "") },
+		"Remove":     func() { recording.Remove(tspath.RootedPath(project + "/source/theme.css")) },
 	} {
 		func() {
 			defer func() {

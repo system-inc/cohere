@@ -123,7 +123,7 @@ var NoPageCustomFont = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A property of the file, so it is asked once rather than at every element. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		inDocument := nextjs.IsDocumentFile(ctx.SourceFile.FileName())
+		inDocument := nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString())
 
 		// Collected once at rule entry rather than by a stateful visitor, because
 		// `export default CustomDocument;` may sit BELOW the JSX it exports and upstream's answer

@@ -59,7 +59,7 @@ var NextRequirePageDefaultExport = rule.Rule{
 	Name:       "structure/next-require-page-default-export",
 	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || !fileContext.IsPageFile {
 			return nil
 		}

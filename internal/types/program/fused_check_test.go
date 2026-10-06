@@ -108,7 +108,7 @@ func renderedFully(diagnostics []*ast.Diagnostic) []string {
 		for _, information := range diagnostic.RelatedInformation() {
 			name := ""
 			if file := information.File(); file != nil {
-				name = filepath.Base(file.FileName())
+				name = filepath.Base(file.FileName().AsString())
 			}
 			related += fmt.Sprintf(" [%s:%d:TS%d]", name, information.Pos(), information.Code())
 		}

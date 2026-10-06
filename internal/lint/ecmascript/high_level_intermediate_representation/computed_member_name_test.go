@@ -50,7 +50,7 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 			t.Parallel()
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.tsx",
-				Path:     "/test.tsx",
+				PathKey:  "/test.tsx",
 			}, testCase.sourceText, core.ScriptKindTSX)
 
 			// Every function-like node in the file, which is what the linter walks and what reached
@@ -85,7 +85,7 @@ func TestAComputedMemberNameLowersToNoName(t *testing.T) {
 
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
-		Path:     "/test.tsx",
+		PathKey:  "/test.tsx",
 	}, "class Holder { [Symbol.for('Foo')]() { return 1; } }", core.ScriptKindTSX)
 
 	var checked int

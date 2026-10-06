@@ -314,7 +314,7 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 	var sourceFile *ast.SourceFile
 	wanted := filepath.ToSlash(path)
 	for _, candidate := range projectFiles {
-		if filepath.ToSlash(candidate.FileName()) == wanted {
+		if filepath.ToSlash(candidate.FileName().AsString()) == wanted {
 			sourceFile = candidate
 		}
 	}
@@ -417,7 +417,7 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 	var sourceFile *ast.SourceFile
 	wanted := filepath.ToSlash(path)
 	for _, candidate := range graph.ProjectFiles() {
-		if filepath.ToSlash(candidate.FileName()) == wanted {
+		if filepath.ToSlash(candidate.FileName().AsString()) == wanted {
 			sourceFile = candidate
 		}
 	}

@@ -166,7 +166,7 @@ func applyProposedFixes(
 		// compiler names a file `C:/work/a.ts` and the walk `C:\work\a.ts` on Windows, and one file under
 		// both names was fixed under one and formatted under the other, from the text before its fixes.
 		// Clean converts the separators there and changes nothing elsewhere.
-		fileName := filepath.Clean(diagnostic.SourceFile.FileName())
+		fileName := filepath.Clean(diagnostic.SourceFile.FileName().AsString())
 		if !writable.Everything && !writable.includes(fileName) {
 			withheld[fileName] = struct{}{}
 			continue
@@ -239,7 +239,7 @@ func applyProposedFixes(
 	// linted is every file the walk ran the rules over, in the form the candidates are keyed by.
 	linted := make(map[string]bool, len(projectFiles))
 	for _, sourceFile := range projectFiles {
-		linted[filepath.Clean(sourceFile.FileName())] = true
+		linted[filepath.Clean(sourceFile.FileName().AsString())] = true
 	}
 
 	// propose is what a file's fixpoint asks for proposals. The first pass reuses the proposals already
@@ -528,9 +528,9 @@ func proposalsForText(
 	// The kind the program parsed the file as: an Adamic `.a` name is read as `.ts`, as the program reads it
 	// (#6mhafvb). Unknown, which the bare name gives, is a parser panic.
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: rooted,
-		Path:     tspath.Path(rooted),
-	}, text, core.GetScriptKindFromFileName(sourcename.TreatedAs(rooted)))
+		FileName: tspath.RootedFilePath(rooted),
+		PathKey:  tspath.PathKey(rooted),
+	}, text, core.GetScriptKindFromFileName(tspath.RootedFilePath(sourcename.TreatedAs(rooted))))
 	if sourceFile == nil {
 		return nil, fmt.Errorf("re-parsing %s produced nothing", fileName)
 	}
@@ -832,7 +832,7 @@ func (programs *programOffer) boundTreeOf(fileName string) *ast.SourceFile {
 	if program == nil {
 		return nil
 	}
-	sourceFile := program.GetSourceFile(fileName)
+	sourceFile := program.GetSourceFile(tspath.RootedFilePath(fileName))
 	if sourceFile == nil || !sourceFile.IsBound() {
 		return nil
 	}
@@ -881,7 +881,7 @@ func (speculation *formatSpeculation) keepable(byFileName map[string][]edit.Prop
 			continue
 		}
 		if attempt.err == nil && graph != nil && graph.Program != nil {
-			if sourceFile := graph.Program.GetSourceFile(fileName); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
+			if sourceFile := graph.Program.GetSourceFile(tspath.RootedFilePath(fileName)); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
 				continue
 			}
 		}

@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
 // The check's answers are the disk's answers (#kdee854). Every kind of path a build asks about, a file, a
 // directory, a symbolic link to either, a path with nothing there, each asked again with a trailing slash, is asked
 // of the answering layer and of the real disk, and the two must agree on whether a file exists, whether a directory
-// does, and what a stat says. The slashed spellings are answered as the unslashed ones, which holds only while the
-// disk drops a trailing separator before it stats, so this is what notices if it ever stops. A spelling the check
-// did not stat, with a doubled separator, goes to the disk.
+// does, and what a stat says. The disk stopped dropping a trailing separator with typed file paths (#64159), so a
+// slashed spelling finds nothing there, and the check leaves it to the disk, as it does a spelling with a doubled
+// separator.
 func TestTheCheckedStatsAnswerAsTheDiskDoes(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
@@ -56,13 +57,13 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(t *testing.T) {
 	paths := []string{file, directory, fileLink, directoryLink, absent}
 	for _, path := range paths {
 		for _, asked := range []string{path, path + "/", filepath.Dir(path) + "//" + filepath.Base(path)} {
-			if got, want := checked.FileExists(asked), disk.FileExists(asked); got != want {
+			if got, want := checked.FileExists(tspath.RootedFilePath(asked)), disk.FileExists(tspath.RootedFilePath(asked)); got != want {
 				t.Errorf("FileExists(%s): the check says %t, the disk %t", asked, got, want)
 			}
-			if got, want := checked.DirectoryExists(asked), disk.DirectoryExists(asked); got != want {
+			if got, want := checked.DirectoryExists(tspath.RootedDirectoryPath(asked)), disk.DirectoryExists(tspath.RootedDirectoryPath(asked)); got != want {
 				t.Errorf("DirectoryExists(%s): the check says %t, the disk %t", asked, got, want)
 			}
-			got, want := checked.Stat(asked), disk.Stat(asked)
+			got, want := checked.Stat(tspath.RootedPath(asked)), disk.Stat(tspath.RootedPath(asked))
 			switch {
 			case (got == nil) != (want == nil):
 				t.Errorf("Stat(%s): the check found something %t, the disk %t", asked, got != nil, want != nil)
@@ -72,9 +73,9 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(t *testing.T) {
 			}
 		}
 	}
-	// Three questions of each path in two spellings, and none in the spelling with a doubled separator, or the
-	// agreement above was the disk agreeing with itself.
-	if got, want := answered.Load(), int64(2*3*len(paths)); got != want {
-		t.Errorf("the check answered %d questions, want %d: one of each kind for each path, with and without a trailing slash", got, want)
+	// Three questions of each path as the check statted it, and none in the other spellings, or the agreement
+	// above was the disk agreeing with itself.
+	if got, want := answered.Load(), int64(3*len(paths)); got != want {
+		t.Errorf("the check answered %d questions, want %d: one of each kind for each path, as the check statted it", got, want)
 	}
 }

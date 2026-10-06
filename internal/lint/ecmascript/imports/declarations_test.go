@@ -7,14 +7,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 func parseDeclarationFile(t *testing.T, sourceText string) *ast.SourceFile {
 	t.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/shims.d.ts",
-		Path:     tspath.Path("/repository/source/shims.d.ts"),
+		PathKey:  "/repository/source/shims.d.ts",
 	}, sourceText, core.ScriptKindTS)
 	if file == nil {
 		t.Fatalf("no file parsed from %q", sourceText)

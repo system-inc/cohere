@@ -81,7 +81,7 @@ var NoStyledJsxInDocument = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Asked once rather than per element, because it is a property of the file. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName()) {
+		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

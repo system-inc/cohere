@@ -144,7 +144,7 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 	var sourceFile *ast.SourceFile
 	normalized := tspath.NormalizePath(path)
 	for _, projectFile := range graph.ProjectFiles() {
-		if projectFile.FileName() == normalized {
+		if projectFile.FileName().AsString() == normalized {
 			sourceFile = projectFile
 			break
 		}
@@ -163,7 +163,7 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 	}
 	var firstPass []edit.Proposal
 	for _, diagnostic := range walk.Diagnostics {
-		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 || diagnostic.SourceFile.FileName() != normalized {
+		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 || diagnostic.SourceFile.FileName().AsString() != normalized {
 			continue
 		}
 		for _, proposed := range diagnostic.Fixes {

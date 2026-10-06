@@ -118,7 +118,7 @@ var TripleSlashReference = rule.Rule{
 
 		// Upstream's `should_run` reads `ctx.source_type().is_typescript()`. A directive in a
 		// JavaScript file is silent there, so the gate is fidelity rather than an optimization.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName()) {
+		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

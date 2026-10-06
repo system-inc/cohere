@@ -44,7 +44,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 		t.Fatalf("loading the config: %v", err)
 	}
 
-	isA := func(ctx rule.Context) bool { return filepath.Base(ctx.SourceFile.FileName()) == "a.ts" }
+	isA := func(ctx rule.Context) bool { return filepath.Base(ctx.SourceFile.FileName().AsString()) == "a.ts" }
 	reportsEachConstant := func(ctx rule.Context) rule.Listeners {
 		return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 			ctx.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
@@ -77,7 +77,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 				return nil
 			}
 			return rule.Listeners{ast.KindFunctionDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "sawFunction", Description: "saw a function in " + filepath.Base(ctx.SourceFile.FileName())})
+				ctx.ReportNode(node, rule.Message{Id: "sawFunction", Description: "saw a function in " + filepath.Base(ctx.SourceFile.FileName().AsString())})
 			}}
 		},
 	}
@@ -95,7 +95,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 
 	reported := map[string][]string{}
 	for _, diagnostic := range result.Diagnostics {
-		file := filepath.Base(diagnostic.SourceFile.FileName())
+		file := filepath.Base(diagnostic.SourceFile.FileName().AsString())
 		reported[file] = append(reported[file], diagnostic.RuleName+": "+diagnostic.Message.Description)
 	}
 	want := map[string][]string{

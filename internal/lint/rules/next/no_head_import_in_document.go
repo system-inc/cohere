@@ -138,7 +138,7 @@ var NoHeadImportInDocument = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Every file that is not the document registers no listener at all rather than testing the
 		// path at every import, which is how upstream spells it too.
-		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName()) {
+		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

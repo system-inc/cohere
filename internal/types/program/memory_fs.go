@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -78,17 +79,17 @@ func containsName(names []string, name string) bool {
 // errMemoryFSReadOnly is every write's answer.
 var errMemoryFSReadOnly = errors.New("program: the memory filesystem is read-only")
 
-func (m *MemoryFS) UseCaseSensitiveFileNames() bool { return true }
+func (m *MemoryFS) CaseSensitivity() tspath.CaseSensitivity { return tspath.CaseSensitive }
 
-func (m *MemoryFS) FileExists(fileName string) bool {
-	_, exists := m.files[path.Clean(fileName)]
+func (m *MemoryFS) FileExists(fileName tspath.RootedFilePath) bool {
+	_, exists := m.files[path.Clean(fileName.AsString())]
 	return exists
 }
 
 // ReadFile answers as the disk does: a file's bytes decoded the way the real filesystem decodes them, so a
 // fixture's byte order mark or UTF-16 reaches the compiler as it would from a file.
-func (m *MemoryFS) ReadFile(fileName string) (string, bool) {
-	contents, exists := m.files[path.Clean(fileName)]
+func (m *MemoryFS) ReadFile(fileName tspath.RootedFilePath) (string, bool) {
+	contents, exists := m.files[path.Clean(fileName.AsString())]
 	if !exists {
 		return "", false
 	}
@@ -124,26 +125,28 @@ func decodeUtf16LikeDisk(s string, order binary.ByteOrder) string {
 	return string(utf16.Decode(ints))
 }
 
-func (m *MemoryFS) WriteFile(string, string) error             { return errMemoryFSReadOnly }
-func (m *MemoryFS) AppendFile(string, string) error            { return errMemoryFSReadOnly }
-func (m *MemoryFS) Remove(string) error                        { return errMemoryFSReadOnly }
-func (m *MemoryFS) Chtimes(string, time.Time, time.Time) error { return errMemoryFSReadOnly }
-func (m *MemoryFS) Realpath(fileName string) string            { return path.Clean(fileName) }
+func (m *MemoryFS) WriteFile(tspath.RootedFilePath, string) error         { return errMemoryFSReadOnly }
+func (m *MemoryFS) AppendFile(tspath.RootedFilePath, string) error        { return errMemoryFSReadOnly }
+func (m *MemoryFS) Remove(tspath.RootedPath) error                        { return errMemoryFSReadOnly }
+func (m *MemoryFS) Chtimes(tspath.RootedPath, time.Time, time.Time) error { return errMemoryFSReadOnly }
+func (m *MemoryFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
+	return tspath.RootedPath(path.Clean(fileName.AsString()))
+}
 
-func (m *MemoryFS) DirectoryExists(directory string) bool {
-	_, exists := m.directories[path.Clean(directory)]
+func (m *MemoryFS) DirectoryExists(directory tspath.RootedDirectoryPath) bool {
+	_, exists := m.directories[path.Clean(directory.AsString())]
 	return exists
 }
 
-func (m *MemoryFS) GetAccessibleEntries(directory string) vfs.Entries {
-	if entries, exists := m.directories[path.Clean(directory)]; exists {
+func (m *MemoryFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	if entries, exists := m.directories[path.Clean(directory.AsString())]; exists {
 		return *entries
 	}
 	return vfs.Entries{}
 }
 
-func (m *MemoryFS) Stat(name string) vfs.FileInfo {
-	name = path.Clean(name)
+func (m *MemoryFS) Stat(rooted tspath.RootedPath) vfs.FileInfo {
+	name := path.Clean(rooted.AsString())
 	if contents, exists := m.files[name]; exists {
 		return memoryFileInfo{name: path.Base(name), size: int64(len(contents))}
 	}

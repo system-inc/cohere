@@ -24,7 +24,7 @@ func resolveAnchor(
 ) (*ast.Symbol, *ast.Node, error) {
 	var target *ast.SourceFile
 	for _, file := range files {
-		if file.FileName() == at.FileName {
+		if file.FileName().AsString() == at.FileName {
 			target = file
 			break
 		}
@@ -164,7 +164,7 @@ func ResolveBareName(
 					symbols = append(symbols, symbol)
 					candidates = append(candidates, Candidate{
 						Name:     name,
-						FileName: fileName,
+						FileName: fileName.AsString(),
 						Line:     line,
 						Column:   column,
 						Kind:     declarationKindName(node.Parent),

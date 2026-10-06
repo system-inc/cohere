@@ -93,8 +93,8 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 	fileName = tspath.NormalizePath(fileName)
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, sourceText, scriptKind)
 	if sourceFile == nil {
 		t.Fatalf("could not parse %s", fileName)

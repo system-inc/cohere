@@ -27,10 +27,10 @@ func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]by
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
 		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if filepath.Base(ctx.SourceFile.FileName()) == "marker.ts" {
+			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "marker.ts" {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName()), new(int))
+			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
 			*count.(*int)++
 			marker := markerText(ctx.Program)
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
@@ -43,7 +43,7 @@ func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]by
 // markerText is marker.ts's text, trimmed, read through the program's file list.
 func markerText(program rule.Program) string {
 	for _, sourceFile := range program.SourceFiles() {
-		if filepath.Base(sourceFile.FileName()) == "marker.ts" {
+		if filepath.Base(sourceFile.FileName().AsString()) == "marker.ts" {
 			return strings.TrimSpace(sourceFile.Text())
 		}
 	}
@@ -211,10 +211,10 @@ func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, run
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
 		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if strings.HasSuffix(filepath.Base(ctx.SourceFile.FileName()), "-marker.ts") {
+			if strings.HasSuffix(filepath.Base(ctx.SourceFile.FileName().AsString()), "-marker.ts") {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName()), new(int))
+			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
 			*count.(*int)++
 			marker := namedMarkerText(ctx.Program, options.(string))
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
@@ -227,7 +227,7 @@ func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, run
 // namedMarkerText is the text of the file with that base name, trimmed, read through the program's file list.
 func namedMarkerText(program rule.Program, name string) string {
 	for _, sourceFile := range program.SourceFiles() {
-		if filepath.Base(sourceFile.FileName()) == name {
+		if filepath.Base(sourceFile.FileName().AsString()) == name {
 			return strings.TrimSpace(sourceFile.Text())
 		}
 	}

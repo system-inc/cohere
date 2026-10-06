@@ -43,7 +43,7 @@ func realSourceFiles(t *testing.T, limit int) []realSourceFile {
 		}
 		name := tspath.NormalizePath(path)
 		sourceFile := parser.ParseSourceFile(
-			ast.SourceFileParseOptions{FileName: name, Path: tspath.Path(name)}, string(data), scriptKind)
+			ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(name), PathKey: tspath.PathKey(name)}, string(data), scriptKind)
 		if sourceFile != nil {
 			files = append(files, realSourceFile{name: path, sourceFile: sourceFile})
 		}
@@ -63,7 +63,7 @@ func parseSourceForTest(t *testing.T, sourceText string) *ast.SourceFile {
 
 	name := tspath.NormalizePath("/repository/source/Thing.ts")
 	sourceFile := parser.ParseSourceFile(
-		ast.SourceFileParseOptions{FileName: name, Path: tspath.Path(name)}, sourceText, core.ScriptKindTS)
+		ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(name), PathKey: tspath.PathKey(name)}, sourceText, core.ScriptKindTS)
 	if sourceFile == nil {
 		t.Fatalf("could not parse the fixture")
 	}

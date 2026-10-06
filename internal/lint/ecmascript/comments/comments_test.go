@@ -18,8 +18,8 @@ func parseForComments(t *testing.T, sourceText string) *ast.SourceFile {
 
 	fileName := tspath.NormalizePath("/repository/source/Thing.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, sourceText, core.ScriptKindTS)
 	if sourceFile == nil {
 		t.Fatal("could not parse")

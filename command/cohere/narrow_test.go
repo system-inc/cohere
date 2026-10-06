@@ -43,7 +43,7 @@ func buildNarrowFixtureGraph(t *testing.T, files map[string]string) (*program.Gr
 func narrowedNames(files []*ast.SourceFile) string {
 	names := make([]string, 0, len(files))
 	for _, sourceFile := range files {
-		names = append(names, filepath.Base(sourceFile.FileName()))
+		names = append(names, filepath.Base(sourceFile.FileName().AsString()))
 	}
 	return strings.Join(names, " ")
 }

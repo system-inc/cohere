@@ -43,7 +43,7 @@ func ParseTypeScriptFrom(fileName string, text string, parsed *ast.SourceFile, n
 // treeIsFor reports whether parsed is the tree ParseTypeScript would build for text: see ParseTypeScriptFrom.
 func treeIsFor(fileName string, text string, parsed *ast.SourceFile) bool {
 	return parsed != nil && parsed.Text() == text && parsed.ScriptKind == scriptKindOf(fileName) && !strings.HasPrefix(text, "#!") &&
-		tspath.IsDeclarationFileName(parsed.FileName()) == tspath.IsDeclarationFileName(fileName)
+		tspath.IsDeclarationFileName(parsed.FileName().AsString()) == tspath.IsDeclarationFileName(fileName)
 }
 
 // convertTypeScript is the convert and postprocess half of ParseTypeScript, over a tree in hand.
@@ -103,7 +103,7 @@ func ParseSourceFile(fileName string, text string) *ast.SourceFile {
 		rooted = "/" + strings.TrimPrefix(rooted, "/")
 	}
 	rooted = tspath.NormalizePath(rooted)
-	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: rooted, Path: tspath.Path(rooted)}, text, scriptKindOf(fileName))
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(rooted), PathKey: tspath.PathKey(rooted)}, text, scriptKindOf(fileName))
 }
 
 // scriptKindOf is the script kind ParseSourceFile parses a file as, chosen by extension.

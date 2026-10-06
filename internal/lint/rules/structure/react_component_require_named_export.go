@@ -62,7 +62,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 			return nil
 		}
 
-		fileContext := FileContextFor(ctx.SourceFile.FileName())
+		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || fileContext.IsSpecialNextJsFile {
 			return nil
 		}

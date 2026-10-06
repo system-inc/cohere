@@ -75,7 +75,7 @@ var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
 		if ctx.SourceFile == nil {
 			return nil
 		}
-		if isNoHandBuiltDeclaredErrorExemptFile(ctx.SourceFile.FileName()) {
+		if isNoHandBuiltDeclaredErrorExemptFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

@@ -230,8 +230,8 @@ func TestLowerRealCodebase(t *testing.T) {
 			kind = core.ScriptKindTSX
 		}
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: path,
-			Path:     tspath.Path("/" + filepath.Base(path)),
+			FileName: tspath.RootedFilePath(path),
+			PathKey:  tspath.PathKey("/" + filepath.Base(path)),
 		}, string(contents), kind)
 
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
@@ -309,8 +309,8 @@ func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 			kind = core.ScriptKindTSX
 		}
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: "/" + path,
-			Path:     tspath.Path("/" + path),
+			FileName: tspath.RootedFilePath("/" + path),
+			PathKey:  tspath.PathKey("/" + path),
 		}, contents[path], kind)
 
 		var out strings.Builder

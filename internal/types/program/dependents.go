@@ -37,9 +37,9 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 	}
 
 	projectFiles := g.ProjectFiles()
-	byPath := make(map[tspath.Path]*ast.SourceFile, len(projectFiles))
+	byPath := make(map[tspath.PathKey]*ast.SourceFile, len(projectFiles))
 	for _, sourceFile := range projectFiles {
-		byPath[sourceFile.Path()] = sourceFile
+		byPath[sourceFile.PathKey()] = sourceFile
 	}
 
 	// Reversed once per call rather than cached, because a run builds one closure and the reversal is
@@ -49,7 +49,7 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 	// while a resolution names its target as an ordinary file name, and on a case-insensitive volume
 	// those differ in case alone. Comparing them raw produced a graph with almost no edges, which read
 	// as `every file reaches its whole closure in one hop` rather than as a broken map.
-	importers := make(map[tspath.Path][]tspath.Path, len(projectFiles))
+	importers := make(map[tspath.PathKey][]tspath.PathKey, len(projectFiles))
 	for fromPath, resolutions := range g.Program.GetResolvedModules() {
 		if _, ours := byPath[fromPath]; !ours {
 			continue
@@ -58,7 +58,7 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 			if resolution == nil || resolution.ResolvedFileName == "" {
 				continue
 			}
-			toward := g.pathFor(resolution.ResolvedFileName)
+			toward := g.pathFor(resolution.ResolvedFileName.AsString())
 			if _, ours := byPath[toward]; !ours {
 				continue
 			}
@@ -66,18 +66,18 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 		}
 	}
 
-	seen := make(map[tspath.Path]struct{}, len(seeds))
-	frontier := make([]tspath.Path, 0, len(seeds))
+	seen := make(map[tspath.PathKey]struct{}, len(seeds))
+	frontier := make([]tspath.PathKey, 0, len(seeds))
 	for _, seed := range seeds {
-		if _, already := seen[seed.Path()]; already {
+		if _, already := seen[seed.PathKey()]; already {
 			continue
 		}
-		seen[seed.Path()] = struct{}{}
-		frontier = append(frontier, seed.Path())
+		seen[seed.PathKey()] = struct{}{}
+		frontier = append(frontier, seed.PathKey())
 	}
 
 	for len(frontier) > 0 {
-		next := make([]tspath.Path, 0, len(frontier))
+		next := make([]tspath.PathKey, 0, len(frontier))
 		for _, current := range frontier {
 			for _, importer := range importers[current] {
 				if _, already := seen[importer]; already {
@@ -97,7 +97,7 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 	// in the sequence an unscoped run would and the two can be diffed directly.
 	closure := make([]*ast.SourceFile, 0, len(seen))
 	for _, sourceFile := range projectFiles {
-		if _, reaches := seen[sourceFile.Path()]; reaches {
+		if _, reaches := seen[sourceFile.PathKey()]; reaches {
 			closure = append(closure, sourceFile)
 		}
 	}
@@ -105,6 +105,6 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 }
 
 // pathFor normalises a file name the way the program keys its own maps.
-func (g *Graph) pathFor(fileName string) tspath.Path {
-	return toPath(fileName, g.Config.GetCurrentDirectory(), g.Config.UseCaseSensitiveFileNames())
+func (g *Graph) pathFor(fileName string) tspath.PathKey {
+	return toPath(fileName, g.Anchor.Root(), g.Config.CaseSensitivity())
 }

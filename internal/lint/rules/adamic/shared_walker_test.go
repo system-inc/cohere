@@ -68,7 +68,7 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(t *testing.T) {
 		}
 		findings := []string{}
 		for _, diagnostic := range result.Diagnostics {
-			findings = append(findings, fmt.Sprintf("%s %d-%d %s: %s", filepath.Base(diagnostic.SourceFile.FileName()),
+			findings = append(findings, fmt.Sprintf("%s %d-%d %s: %s", filepath.Base(diagnostic.SourceFile.FileName().AsString()),
 				diagnostic.Range.Pos(), diagnostic.Range.End(), diagnostic.RuleName, diagnostic.Message.Description))
 		}
 		sort.Strings(findings)

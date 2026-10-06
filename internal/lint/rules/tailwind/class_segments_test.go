@@ -130,7 +130,7 @@ func segmentsOf(t *testing.T, source string) ([]ClassSegment, string) {
 
 	fileName := tspath.NormalizePath("/Component.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName, Path: tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTSX)
 	if sourceFile == nil {
 		t.Fatalf("could not parse %s", source)

@@ -67,7 +67,7 @@ func (r *exportOriginResolver) requireShape(node *ast.Node) {
 		if body := ancestor.Body(); body != nil && node.Pos() >= body.Pos() && node.End() <= body.End() {
 			fileName := ""
 			if sourceFile != nil {
-				fileName = sourceFile.FileName()
+				fileName = sourceFile.FileName().AsString()
 			}
 			panic(fmt.Sprintf("rule.ExportNameIn read a %s at %s:%d, inside a function body in another file, which the shape fingerprint does not cover",
 				node.Kind, fileName, node.Pos()))

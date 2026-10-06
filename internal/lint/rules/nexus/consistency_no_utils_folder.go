@@ -40,8 +40,8 @@ var ConsistencyNoUtilsFolder = rule.Rule{
 		}
 
 		fileName := ctx.SourceFile.FileName()
-		hasUnderscoreUtils := containsPathSegment(fileName, "_utils")
-		hasUtils := containsPathSegment(fileName, "utils")
+		hasUnderscoreUtils := containsPathSegment(fileName.AsString(), "_utils")
+		hasUtils := containsPathSegment(fileName.AsString(), "utils")
 		if !hasUnderscoreUtils && !hasUtils {
 			// Declining costs one string scan. Listening would cost a walk of the whole file to
 			// learn the same thing.

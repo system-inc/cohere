@@ -344,7 +344,7 @@ func correctnessRequireResponseStatusCheckIsNetworkServiceMethod(symbol *ast.Sym
 		}
 		matched := false
 		for _, known := range correctnessRequireResponseStatusCheckNetworkServiceDeclarations {
-			if class.Name().Text() == known.className && strings.HasSuffix(file.FileName(), known.fileSuffix) {
+			if class.Name().Text() == known.className && strings.HasSuffix(file.FileName().AsString(), known.fileSuffix) {
 				matched = true
 			}
 		}

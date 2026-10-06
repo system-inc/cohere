@@ -37,7 +37,7 @@ func proposeFromRules(rules ...rule.Rule) Propose {
 		}
 
 		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: rooted, Path: tspath.Path(rooted),
+			FileName: tspath.RootedFilePath(rooted), PathKey: tspath.PathKey(rooted),
 		}, text, scriptKind)
 		if sourceFile == nil {
 			return nil, nil

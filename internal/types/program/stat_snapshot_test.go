@@ -51,7 +51,7 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(t *testing.T) {
 		}
 		var ours []string
 		for _, sourceFile := range graph.SourceFiles() {
-			if name := filepath.FromSlash(sourceFile.FileName()); strings.HasPrefix(name, root+string(filepath.Separator)) {
+			if name := filepath.FromSlash(sourceFile.FileName().AsString()); strings.HasPrefix(name, root+string(filepath.Separator)) {
 				ours = append(ours, name)
 			}
 		}

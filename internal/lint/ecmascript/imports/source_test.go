@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -22,7 +21,7 @@ func collect(t *testing.T, sourceText string) []string {
 	t.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.ts",
-		Path:     tspath.Path("/repository/source/Thing.ts"),
+		PathKey:  "/repository/source/Thing.ts",
 	}, sourceText, core.ScriptKindTS)
 	if file == nil {
 		t.Fatal("the parser returned no source file")
@@ -121,7 +120,7 @@ func TestSourceVisitorsBlameTheRightNode(t *testing.T) {
 	t.Parallel()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.ts",
-		Path:     tspath.Path("/repository/source/Thing.ts"),
+		PathKey:  "/repository/source/Thing.ts",
 	}, "import Thing from '@project/Thing';\n", core.ScriptKindTS)
 
 	var blamed *ast.Node
@@ -147,7 +146,7 @@ func TestSpecifierNodeReturnsTheSpecifier(t *testing.T) {
 	t.Parallel()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.ts",
-		Path:     tspath.Path("/repository/source/Thing.ts"),
+		PathKey:  "/repository/source/Thing.ts",
 	}, "import Thing from '@project/Thing';\n", core.ScriptKindTS)
 
 	statement := file.Statements.Nodes[0]

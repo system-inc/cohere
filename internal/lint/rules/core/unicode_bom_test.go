@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -303,7 +304,7 @@ func TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath(t *testing.T) {
 
 	read := func(path string) string {
 		t.Helper()
-		text, wasRead := osvfs.FS().ReadFile(path)
+		text, wasRead := osvfs.FS().ReadFile(tspath.RootedFilePath(path))
 		if !wasRead {
 			t.Fatalf("could not read %s", path)
 		}

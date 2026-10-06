@@ -15,7 +15,7 @@ func RecordedRealSignatures(g *Graph) map[string]SignatureEntry {
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
 			continue
 		}
-		recorded[sourceFile.FileName()] = SignatureEntry{Version: "recorded for other bytes", Signature: "a real signature, recorded for other bytes"}
+		recorded[sourceFile.FileName().AsString()] = SignatureEntry{Version: "recorded for other bytes", Signature: "a real signature, recorded for other bytes"}
 	}
 	return recorded
 }

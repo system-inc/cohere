@@ -19,8 +19,8 @@ func keysOf(t *testing.T, root string, name string) ([sha256.Size]byte, [sha256.
 	}
 	shapes, _ := graph.Signatures(context.Background(), program.RecordedRealSignatures(graph))
 	for _, sourceFile := range graph.ProjectFiles() {
-		if filepath.Base(sourceFile.FileName()) == name {
-			path := sourceFile.Path()
+		if filepath.Base(sourceFile.FileName().AsString()) == name {
+			path := sourceFile.PathKey()
 			return graph.TypeFingerprints()[path], graph.SignatureFingerprints(shapes)[path]
 		}
 	}

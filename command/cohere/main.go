@@ -828,7 +828,7 @@ func run() error {
 				for _, sourceFile := range wholeProgram {
 					// Cleaned to the form the named paths have, which on Windows is the `\` the compiler's
 					// names do not use.
-					inProgram[filepath.Clean(sourceFile.FileName())] = struct{}{}
+					inProgram[filepath.Clean(sourceFile.FileName().AsString())] = struct{}{}
 				}
 				scope = writeScope.narrowTo(inProgram)
 
@@ -1128,7 +1128,7 @@ func run() error {
 		for _, diagnostic := range typeDiagnostics {
 			printCompilerDiagnostic(diagnostic)
 			if file := diagnostic.File(); file != nil && !graph.IsOptionsDiagnostic(diagnostic) {
-				typeErrorFiles[file.FileName()] = true
+				typeErrorFiles[file.FileName().AsString()] = true
 			}
 		}
 		findings += len(typeDiagnostics)
@@ -1427,7 +1427,7 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 	wholeProgramFiles := graph.ProjectFiles()
 	projectFileNames := make([]string, 0, len(wholeProgramFiles))
 	for _, projectFile := range wholeProgramFiles {
-		projectFileNames = append(projectFileNames, projectFile.FileName())
+		projectFileNames = append(projectFileNames, projectFile.FileName().AsString())
 	}
 	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
 		return nil, fmt.Errorf("validating the lint config: %w", err)
@@ -1724,7 +1724,7 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *
 func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFileName string) string {
 	currentDirectory := ""
 	if graph.Config != nil {
-		currentDirectory = graph.Config.GetCurrentDirectory()
+		currentDirectory = graph.Anchor.Root()
 	}
 
 	// The lint config resolves against the graph's directory when there is one, and against the
@@ -1737,7 +1737,9 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 
 	candidates := append(configuration.SourcesOnDisk(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory))), graph.ConfigFileName)
 	if graph.Config != nil {
-		candidates = append(candidates, graph.Config.ExtendedSourceFiles()...)
+		for _, extended := range graph.Config.ExtendedSourceFiles() {
+			candidates = append(candidates, extended.AsString())
+		}
 	}
 
 	for _, candidate := range candidates {
@@ -1903,7 +1905,7 @@ func implementsConfiguredRule(configured string, implemented map[string]bool) bo
 func filterToScope(projectFiles []*ast.SourceFile, scope formatScope) []*ast.SourceFile {
 	kept := make([]*ast.SourceFile, 0, len(scope.FileNames))
 	for _, sourceFile := range projectFiles {
-		if scope.includes(filepath.Clean(sourceFile.FileName())) {
+		if scope.includes(filepath.Clean(sourceFile.FileName().AsString())) {
 			kept = append(kept, sourceFile)
 		}
 	}
@@ -1926,13 +1928,13 @@ func rescopeAfterRebuild(rebuilt []*ast.SourceFile, scoped []*ast.SourceFile, ev
 
 	wanted := make(map[string]bool, len(scoped))
 	for _, sourceFile := range scoped {
-		wanted[sourceFile.FileName()] = false
+		wanted[sourceFile.FileName().AsString()] = false
 	}
 
 	kept := make([]*ast.SourceFile, 0, len(scoped))
 	for _, sourceFile := range rebuilt {
-		if _, inScope := wanted[sourceFile.FileName()]; inScope {
-			wanted[sourceFile.FileName()] = true
+		if _, inScope := wanted[sourceFile.FileName().AsString()]; inScope {
+			wanted[sourceFile.FileName().AsString()] = true
 			kept = append(kept, sourceFile)
 		}
 	}

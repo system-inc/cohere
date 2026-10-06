@@ -15,6 +15,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -174,14 +175,14 @@ type contentPackFS struct {
 	pack *ContentPack
 }
 
-func (f *contentPackFS) ReadFile(path string) (string, bool) {
-	if contents, served := f.pack.serve(path); served {
+func (f *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if contents, served := f.pack.serve(path.AsString()); served {
 		return contents, true
 	}
 	// Stat first, so the key can only be older than the bytes read after it.
-	identity, statted := statIdentity(path)
+	identity, statted := statIdentity(path.AsString())
 	contents, ok := f.FS.ReadFile(path)
-	f.pack.noteRead(path, identity, statted && ok, contents)
+	f.pack.noteRead(path.AsString(), identity, statted && ok, contents)
 	return contents, ok
 }
 

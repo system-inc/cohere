@@ -64,7 +64,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 	t.Parallel()
 	fileName := tspath.NormalizePath("/Component.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName, Path: tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, sharedReaderSource, core.ScriptKindTSX)
 	if sourceFile == nil {
 		t.Fatal("could not parse the fixture")

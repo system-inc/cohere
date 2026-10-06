@@ -126,7 +126,7 @@ var NoExplicitAny = rule.Rule{
 
 		// Declining the file rather than the node, matching upstream's `should_run`. It is also the
 		// cheapest possible decline in a tree where one walk serves every rule.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName()) {
+		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

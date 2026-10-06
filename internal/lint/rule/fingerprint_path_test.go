@@ -20,10 +20,7 @@ func (program directoryProgram) UseCaseSensitiveFileNames() bool { return progra
 
 // tspathName is FingerprintPath's answer before it learned to slice: tspath's general relative path.
 func tspathName(program directoryProgram, path string) string {
-	return tspath.GetRelativePathFromDirectory(program.directory, path, tspath.ComparePathsOptions{
-		UseCaseSensitiveFileNames: program.caseSensitive,
-		CurrentDirectory:          program.directory,
-	})
+	return tspath.GetRelativePathFromDirectory(program.directory, path, caseSensitivity(program.caseSensitive))
 }
 
 // FingerprintPath slices a descendant's name rather than having tspath split and join it (#9prvp67), and a
@@ -79,7 +76,7 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 			return filepath.SkipDir
 		}
 		name := tspath.NormalizePath(filepath.ToSlash(path))
-		canonical := string(tspath.ToPath(name, "", false))
+		canonical := string(tspath.CaseInsensitive.PathKey(tspath.RootedPath(name)))
 		for _, probe := range []struct {
 			program directoryProgram
 			path    string

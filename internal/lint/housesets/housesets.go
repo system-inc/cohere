@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
 )
@@ -23,8 +24,8 @@ import (
 // FileSystem is what detection asks the disk, through the program's own filesystem, so the run cache
 // records each probe as an input and a stylesheet created later invalidates the verdict.
 type FileSystem interface {
-	FileExists(path string) bool
-	ReadFile(path string) (string, bool)
+	FileExists(path tspath.RootedFilePath) bool
+	ReadFile(path tspath.RootedFilePath) (string, bool)
 }
 
 // Detect reads which house sets fit which of the project's files.
@@ -44,16 +45,16 @@ func Detect(files []*ast.SourceFile, projectRoot string, fileSystem FileSystem, 
 			case isReactSpecifier(module):
 				react = true
 			case module == "next" || strings.HasPrefix(module, "next/"):
-				importsNext[file.FileName()] = true
+				importsNext[file.FileName().AsString()] = true
 			}
 		}
 		// JSX can only be written in a .tsx or .jsx file, so only those are asked, and the question is
 		// the parse's own subtree fact, which the file's nodes cache once computed.
-		if !react && isJsxFile(file.FileName()) {
+		if !react && isJsxFile(file.FileName().AsString()) {
 			react = file.AsNode().SubtreeFacts()&ast.SubtreeContainsJsx != 0
 		}
 		if react {
-			detection.ReactFiles[file.FileName()] = true
+			detection.ReactFiles[file.FileName().AsString()] = true
 		}
 	}
 
@@ -61,8 +62,8 @@ func Detect(files []*ast.SourceFile, projectRoot string, fileSystem FileSystem, 
 	// never imports next is just a directory.
 	if len(importsNext) > 0 {
 		for _, file := range files {
-			if importsNext[file.FileName()] || isNextConventionFile(projectRoot, file.FileName()) {
-				detection.NextFiles[file.FileName()] = true
+			if importsNext[file.FileName().AsString()] || isNextConventionFile(projectRoot, file.FileName().AsString()) {
+				detection.NextFiles[file.FileName().AsString()] = true
 			}
 		}
 	}
@@ -127,22 +128,23 @@ var tailwindConfigFiles = []string{
 // said where its stylesheet is, and upstream runs the rules there, on Tailwind's default theme when
 // the stylesheet is not found. Without one, the stylesheet is probed for where the rules probe.
 func detectTailwind(projectRoot string, fileSystem FileSystem, settings map[string]json.RawMessage, settingsDirectory string) (string, string) {
+	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	if location, named := tailwind.LocationInSettings(settings, settingsDirectory); named {
-		entryPoint, _, err := tailwind.ConfiguredEntryPoint(projectRoot, location, fileSystem.FileExists)
+		entryPoint, _, err := tailwind.ConfiguredEntryPoint(projectRoot, location, fileExists)
 		if err != nil {
 			return "", "the location settings[\"better-tailwindcss\"] name does not resolve (" + err.Error() + "), so its rules are skipped"
 		}
 		return entryPoint, ""
 	}
-	entryPoint := tailwind.FindEntryPoint(projectRoot, fileSystem.FileExists)
+	entryPoint := tailwind.FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
 		return "", "no Tailwind stylesheet at any of the places its rules look (app/globals.css and the others), so its rules are skipped"
 	}
-	if contents, read := fileSystem.ReadFile(entryPoint); read && tailwindImport.MatchString(contents) {
+	if contents, read := fileSystem.ReadFile(tspath.RootedFilePath(entryPoint)); read && tailwindImport.MatchString(contents) {
 		return entryPoint, ""
 	}
 	for _, name := range tailwindConfigFiles {
-		if fileSystem.FileExists(filepath.Join(projectRoot, name)) {
+		if fileExists(filepath.Join(projectRoot, name)) {
 			return entryPoint, ""
 		}
 	}

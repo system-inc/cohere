@@ -87,7 +87,7 @@ var JsxNoUndef = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's `allowGlobals: false`.
 		settings, _ := rule.OptionsAs[JsxNoUndefOptions](options)
-		stopsAtModuleScope := !settings.AllowGlobals && !strings.HasSuffix(ctx.SourceFile.FileName(), ".cjs")
+		stopsAtModuleScope := !settings.AllowGlobals && !strings.HasSuffix(ctx.SourceFile.FileName().AsString(), ".cjs")
 
 		check := func(node *ast.Node) {
 			tagName, _ := jsx.ElementParts(node)

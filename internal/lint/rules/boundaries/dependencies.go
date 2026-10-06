@@ -574,7 +574,7 @@ var Dependencies = rule.Rule{
 			return "", false
 		}
 
-		fromPath, inside := relative(ctx.SourceFile.FileName())
+		fromPath, inside := relative(ctx.SourceFile.FileName().AsString())
 		if !inside {
 			return nil
 		}

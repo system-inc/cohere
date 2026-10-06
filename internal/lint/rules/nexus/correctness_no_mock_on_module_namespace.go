@@ -107,7 +107,7 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 			// value of the same type, are questions for the checker.
 			return nil
 		}
-		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ctx.SourceFile.FileName(), ctx.Program.Options()) {
+		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ctx.SourceFile.FileName().AsString(), ctx.Program.Options()) {
 			return nil
 		}
 		return rule.Listeners{

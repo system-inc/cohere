@@ -73,7 +73,7 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 	}
 	if sourceFile := diagnostic.File(); sourceFile != nil {
 		line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Loc().Pos())
-		finding.Path, finding.Line, finding.Column = sourceFile.FileName(), line+1, character+1
+		finding.Path, finding.Line, finding.Column = sourceFile.FileName().AsString(), line+1, character+1
 	}
 	return finding
 }
@@ -89,9 +89,9 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) r
 	}
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
 		line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Range.Pos())
-		finding.Path, finding.Line, finding.Column = sourceFile.FileName(), line+1, character+1
+		finding.Path, finding.Line, finding.Column = sourceFile.FileName().AsString(), line+1, character+1
 		if lintConfig != nil {
-			if setting, named := lintConfig.Resolve(sourceFile.FileName()).Rules[diagnostic.RuleName]; named &&
+			if setting, named := lintConfig.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
 				setting.Severity == configuration.SeverityWarn {
 				finding.Severity = "warn"
 			}

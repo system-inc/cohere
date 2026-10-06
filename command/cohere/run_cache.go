@@ -1183,7 +1183,7 @@ func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]str
 	}
 	if graph.Config != nil {
 		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			if err := fileFact("extends", extended); err != nil {
+			if err := fileFact("extends", extended.AsString()); err != nil {
 				return nil, err
 			}
 		}

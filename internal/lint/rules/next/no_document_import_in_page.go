@@ -93,7 +93,7 @@ var NoDocumentImportInPage = rule.Rule{
 		// The document file is allowed to import the module it exists to implement, so it registers
 		// no listener at all rather than being filtered per import. Upstream spells this the same
 		// way, in `should_run`.
-		if nextjs.IsDocumentPage(ctx.SourceFile.FileName()) {
+		if nextjs.IsDocumentPage(ctx.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

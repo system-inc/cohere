@@ -321,7 +321,7 @@ func runTypedFiles(
 // file would still report findings and still look correct.
 func findSourceFile(files []*ast.SourceFile, wantPath string) *ast.SourceFile {
 	for _, candidate := range files {
-		if filepath.ToSlash(candidate.FileName()) == wantPath {
+		if filepath.ToSlash(candidate.FileName().AsString()) == wantPath {
 			return candidate
 		}
 	}

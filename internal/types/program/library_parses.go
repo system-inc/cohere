@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // LibraryParses is one parse of each bundled lib file, shared read-only by every program built with it
@@ -73,21 +74,21 @@ func (l *LibraryParses) Len() int {
 // sourceFile answers a bundled file from the cache, parsing it on first use. It reports false for a file
 // that is not bundled or cannot be read, which the caller loads the ordinary way.
 func (l *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func(string) (string, bool)) (*ast.SourceFile, bool) {
-	if !bundled.IsBundled(options.FileName) {
+	if !bundled.IsBundled(options.FileName.AsString()) {
 		return nil, false
 	}
 	l.mutex.Lock()
-	hash, hashed := l.hashes[options.FileName]
+	hash, hashed := l.hashes[options.FileName.AsString()]
 	l.mutex.Unlock()
 	var text string
 	if !hashed {
-		contents, ok := read(options.FileName)
+		contents, ok := read(options.FileName.AsString())
 		if !ok {
 			return nil, false
 		}
 		text, hash = contents, sha256.Sum256([]byte(contents))
 		l.mutex.Lock()
-		l.hashes[options.FileName] = hash
+		l.hashes[options.FileName.AsString()] = hash
 		l.mutex.Unlock()
 	}
 
@@ -102,7 +103,7 @@ func (l *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func
 
 	entry.once.Do(func() {
 		if text == "" {
-			contents, ok := read(options.FileName)
+			contents, ok := read(options.FileName.AsString())
 			if !ok {
 				return
 			}
@@ -121,7 +122,7 @@ type libraryParsesHost struct {
 }
 
 func (h *libraryParsesHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	if file, shared := h.parses.sourceFile(options, h.FS().ReadFile); shared {
+	if file, shared := h.parses.sourceFile(options, func(path string) (string, bool) { return h.FS().ReadFile(tspath.RootedFilePath(path)) }); shared {
 		return file
 	}
 	return h.CompilerHost.GetSourceFile(options)

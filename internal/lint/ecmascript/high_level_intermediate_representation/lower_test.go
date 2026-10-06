@@ -17,7 +17,7 @@ func lowerSource(t *testing.T, code string) *Function {
 	t.Helper()
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
-		Path:     "/test.tsx",
+		PathKey:  "/test.tsx",
 	}, code, core.ScriptKindTSX)
 
 	var root *ast.Node

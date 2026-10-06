@@ -20,8 +20,8 @@ func TestCommentRangeFactoryStaysUntouched(t *testing.T) {
 	text := "a /* one */ // two\n/* three */ b;"
 	fileName := tspath.NormalizePath("/repository/source/Thing.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path:     tspath.Path(fileName),
+		FileName: tspath.RootedFilePath(fileName),
+		PathKey:  tspath.PathKey(fileName),
 	}, text, core.ScriptKindTS)
 	if sourceFile == nil {
 		t.Fatal("could not parse")

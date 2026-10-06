@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -63,7 +64,7 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(t *tes
 	transformCounting := func(programs *programOffer, fromProgram *atomic.Int32) func(string, string, *ast.SourceFile) (string, error) {
 		return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 			if programs != nil && parsed != nil {
-				if program := programs.program.Load(); program != nil && parsed == program.GetSourceFile(fileName) {
+				if program := programs.program.Load(); program != nil && parsed == program.GetSourceFile(tspath.RootedFilePath(fileName)) {
 					fromProgram.Add(1)
 				}
 			}

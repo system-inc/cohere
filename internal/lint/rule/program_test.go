@@ -12,8 +12,8 @@ import (
 // fileNamed is a file a rule may ask about, by name.
 type fileNamed string
 
-func (name fileNamed) FileName() string  { return string(name) }
-func (name fileNamed) Path() tspath.Path { return tspath.Path(name) }
+func (name fileNamed) FileName() tspath.RootedFilePath { return tspath.RootedFilePath(name) }
+func (name fileNamed) PathKey() tspath.PathKey         { return tspath.PathKey(name) }
 
 // refusalOf calls one method and returns the view's refusal, or "" when the view let the call through.
 // A call the view admits reaches an empty program and may panic there, which is not a refusal.

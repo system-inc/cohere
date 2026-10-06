@@ -63,7 +63,7 @@ var hooksWithDependencies = map[string]bool{
 var ReactHookNoPropertiesInDependencies = rule.Rule{
 	Name: "structure/react-hook-no-properties-in-dependencies",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 

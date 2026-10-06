@@ -4,6 +4,7 @@ package core
 
 import "context"
 import "github.com/microsoft/TypeScript/tsc/internal/core"
+import "github.com/microsoft/TypeScript/tsc/internal/tspath"
 import "iter"
 import _ "unsafe"
 
@@ -47,7 +48,7 @@ type ECMALineStarts = core.ECMALineStarts
 var EmptyCompilerOptions = core.EmptyCompilerOptions
 
 //go:linkname EnsureScriptKindFromFileName github.com/microsoft/TypeScript/tsc/internal/core.EnsureScriptKindFromFileName
-func EnsureScriptKindFromFileName(fileName string) core.ScriptKind
+func EnsureScriptKindFromFileName(fileName tspath.RootedFilePath) core.ScriptKind
 
 var ExclusivelyPrefixedNodeCoreModules = core.ExclusivelyPrefixedNodeCoreModules
 
@@ -64,7 +65,7 @@ func GetNewLineKind(s string) core.NewLineKind
 func GetRequestID(ctx context.Context) string
 
 //go:linkname GetScriptKindFromFileName github.com/microsoft/TypeScript/tsc/internal/core.GetScriptKindFromFileName
-func GetScriptKindFromFileName(fileName string) core.ScriptKind
+func GetScriptKindFromFileName(fileName tspath.RootedFilePath) core.ScriptKind
 
 //go:linkname GetSpellingSuggestionForStrings github.com/microsoft/TypeScript/tsc/internal/core.GetSpellingSuggestionForStrings
 func GetSpellingSuggestionForStrings(name string, candidates iter.Seq[string]) string
@@ -162,10 +163,10 @@ const ResolutionModeESM = core.ResolutionModeESM
 const ResolutionModeNone = core.ResolutionModeNone
 
 //go:linkname ResolveConfigFileNameOfProjectReference github.com/microsoft/TypeScript/tsc/internal/core.ResolveConfigFileNameOfProjectReference
-func ResolveConfigFileNameOfProjectReference(path string) string
+func ResolveConfigFileNameOfProjectReference(path tspath.RootedPath) tspath.RootedFilePath
 
 //go:linkname ResolveProjectReferencePath github.com/microsoft/TypeScript/tsc/internal/core.ResolveProjectReferencePath
-func ResolveProjectReferencePath(ref *core.ProjectReference) string
+func ResolveProjectReferencePath(ref *core.ProjectReference) tspath.RootedFilePath
 
 type ScriptKind = core.ScriptKind
 
