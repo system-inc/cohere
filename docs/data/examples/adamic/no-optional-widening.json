@@ -10,7 +10,7 @@
                 "endLine": 1,
                 "endColumn": 106,
                 "messageId": "optionalWidening",
-                "message": "`narrow` is a '{ x: number; }', seen here as '{ x: number; y?: number; }', which adds the optional property `y` that '{ x: number; }' does not declare. A '{ x: number; }' can still carry a `y` of any type, since an earlier, wider value may have been seen as it, and tsc now gives that property the optional one's type: the value reads as a 'number | undefined' and holds something else. Declare `y` in the source's type, or build the value with the property named."
+                "message": "`narrow` is a '{ x: number; }', seen here as '{ x: number; y?: number | undefined; }', which adds the optional property `y` that '{ x: number; }' does not declare. A '{ x: number; }' can still carry a `y` of any type, since an earlier, wider value may have been seen as it, and tsc now gives that property the optional one's type: the value reads as a 'number | undefined' and holds something else. Declare `y` in the source's type, or build the value with the property named."
             }
         ]
     },
