@@ -81,7 +81,7 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(t *tes
 			t.Fatal(err)
 		}
 		var programs programOffer
-		programs.offer(graph.Program)
+		programs.offer(graph)
 		var fromProgram atomic.Int32
 
 		// The checkers bind every file while the pass reads them.
