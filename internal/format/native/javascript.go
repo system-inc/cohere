@@ -9,7 +9,7 @@ import (
 // javascript.FormatJavaScript describes.
 func init() {
 	print := func(fileName string, text string, options formatoptions.Options) (string, error) {
-		return javascript.FormatJavaScript(fileName, text, options, TextToDoc(options, "babel"))
+		return javascript.FormatJavaScript(fileName, text, options, TextToDoc(options, "babel", nil))
 	}
 	for _, extension := range []string{".js", ".mjs", ".cjs", ".jsx"} {
 		Register(extension, print)

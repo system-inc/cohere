@@ -3,6 +3,8 @@ package doc
 import (
 	"fmt"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/format/arena"
 )
 
 /*
@@ -293,7 +295,15 @@ func CleanDoc(document Doc) Doc {
 	if text, isText := document.(Text); isText {
 		return cleanDocFn(text)
 	}
-	cleaner := &docCleaner{}
+	return cleanDocInto(document, nil)
+}
+
+// cleanDocInto is CleanDoc with the concats it rebuilds cut from slab, which may be nil to allocate each.
+func cleanDocInto(document Doc, slab *arena.Slab[Doc]) Doc {
+	if text, isText := document.(Text); isText {
+		return cleanDocFn(text)
+	}
+	cleaner := &docCleaner{slab: slab}
 	cleaner.rec = cleaner.clean
 	return cleaner.clean(document)
 }
@@ -307,6 +317,8 @@ type docCleaner struct {
 	mapped map[Doc]Doc
 	buffer []Doc
 	rec    func(Doc) Doc
+	// slab is where the concats cleaning rebuilds come from, nil to allocate each (#v6ksqg3).
+	slab *arena.Slab[Doc]
 }
 
 func (cleaner *docCleaner) clean(document Doc) Doc {
@@ -348,7 +360,7 @@ func (cleaner *docCleaner) cleanConcat(document Doc, parts []Doc) Doc {
 	if !changed && isCleanConcat(parts) {
 		result = document
 	} else {
-		result = cleanParts(children)
+		result = cleanParts(children, cleaner.slab)
 	}
 	clear(children)
 	cleaner.buffer = cleaner.buffer[:start]
@@ -361,7 +373,7 @@ func cleanDocFn(document Doc) Doc {
 			// The doc itself: putting a slice back in an interface allocates.
 			return document
 		}
-		return cleanParts(parts)
+		return cleanParts(parts, nil)
 	}
 	switch typed := document.(type) {
 	case *Fill:
@@ -412,7 +424,9 @@ func cleanDocFn(document Doc) Doc {
 
 // cleanParts is cleanDocFn for a concat's parts: falsy parts dropped, a nested concat flattened one level,
 // and a text joined onto a text before it. The result is built at its final length.
-func cleanParts(parts []Doc) Doc {
+//
+// The result comes from slab, which may be nil to allocate it.
+func cleanParts(parts []Doc, slab *arena.Slab[Doc]) Doc {
 	size := 0
 	for _, part := range parts {
 		if nested, isArray := Parts(part); isArray && len(nested) > 0 {
@@ -421,7 +435,7 @@ func cleanParts(parts []Doc) Doc {
 			size++
 		}
 	}
-	cleaned := make(Concat, 0, size)
+	cleaned := Concat(slab.Make(size))
 	for _, part := range parts {
 		if isFalsy(part) {
 			continue
@@ -549,6 +563,13 @@ func IsEmptyDoc(document Doc) bool {
 // StripTrailingHardline is upstream's stripTrailingHardline.
 func StripTrailingHardline(document Doc) Doc {
 	return stripTrailingHardlineFromDoc(CleanDoc(document))
+}
+
+// StripTrailingHardlineWith is StripTrailingHardline with the concats cleaning rebuilds cut from slab, which
+// may be nil to allocate each (#v6ksqg3). The caller owns the slab's lifetime: the stripped doc reads it
+// until the doc is laid out.
+func StripTrailingHardlineWith(document Doc, slab *arena.Slab[Doc]) Doc {
+	return stripTrailingHardlineFromDoc(cleanDocInto(document, slab))
 }
 
 func stripTrailingHardlineFromParts(parts []Doc) []Doc {

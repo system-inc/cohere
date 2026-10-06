@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -49,6 +50,8 @@ var (
 	printers       = map[string]Print{}
 	parsedPrinters = map[string]PrintParsed{}
 	docPrinters    = map[string]PrintDoc{}
+	// rawDocPrinters are the doc entries registered with RegisterRawDoc.
+	rawDocPrinters = map[string]bool{}
 )
 
 // RegisterDoc routes an extension to a printer's doc entry, for embedding. A printer without one is
@@ -61,6 +64,16 @@ func RegisterDoc(extension string, printDoc PrintDoc) {
 		panic(fmt.Sprintf("native: %s is registered twice for embedding", extension))
 	}
 	docPrinters[extension] = printDoc
+}
+
+// RegisterRawDoc is RegisterDoc for a doc entry that returns its doc with the trailing hardline still on:
+// TextToDoc strips it, as upstream's textToDoc does, cutting the concats cleaning rebuilds from the
+// embedding format's slab when it has one (#v6ksqg3).
+func RegisterRawDoc(extension string, printDoc PrintDoc) {
+	RegisterDoc(extension, printDoc)
+	mutex.Lock()
+	defer mutex.Unlock()
+	rawDocPrinters[strings.ToLower(extension)] = true
 }
 
 // embeddedFileNames maps the parser names embeds ask for to a file name the registered printers route
@@ -99,7 +112,11 @@ var embeddedParsers = map[string]string{
 // own indentation, as upstream does. One with only a Print returns its formatted text as a single
 // text doc, which is laid out at the full width even when nested: that differs from upstream only on
 // a line within the nesting's indentation of the limit.
-func TextToDoc(options formatoptions.Options, parentParser string) printing.TextToDoc {
+//
+// docs is the embedding format's slab, which may be nil: a raw doc entry's stripped doc is cleaned into
+// it, so it must outlive the outer format's layout of every doc it returns (#v6ksqg3). Nested embeds
+// share it, since their docs end up in the same outer doc.
+func TextToDoc(options formatoptions.Options, parentParser string, docs *arena.Slab[doc.Doc]) printing.TextToDoc {
 	return func(text string, parserOrFile string) (doc.Doc, error) {
 		fileName, parser := parserOrFile, parserOrFile
 		if strings.Contains(parserOrFile, ".") {
@@ -109,10 +126,14 @@ func TextToDoc(options formatoptions.Options, parentParser string) printing.Text
 		}
 		extension := strings.ToLower(filepath.Ext(fileName))
 		mutex.RLock()
-		printDoc := docPrinters[extension]
+		printDoc, raw := docPrinters[extension], rawDocPrinters[extension]
 		mutex.RUnlock()
 		if printDoc != nil {
-			return printDoc(fileName, text, options, parser, parentParser, TextToDoc(options, parser))
+			printed, err := printDoc(fileName, text, options, parser, parentParser, TextToDoc(options, parser, docs))
+			if err != nil || !raw {
+				return printed, err
+			}
+			return doc.StripTrailingHardlineWith(printed, docs), nil
 		}
 		formatted, err := Formatter{Options: options}.Format(fileName, text)
 		if err != nil {
