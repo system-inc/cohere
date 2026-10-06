@@ -487,10 +487,6 @@ func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile, wanted map[str
 // consistentTypeImportsLocalNames is every local name a value import declaration binds, which is
 // every name `isReferencedOnlyAsType` can be asked about. A declaration already written
 // `import type` is never judged, so its names are left out.
-//
-// Read off the clause directly rather than through `imports.BindingsOf`, whose named list is a copy:
-// this runs once per file that has a value import, and the loop that judges the declarations calls
-// BindingsOf again anyway.
 func consistentTypeImportsLocalNames(declarations []*ast.Node) map[string]bool {
 	names := map[string]bool{}
 	for _, statement := range declarations {
@@ -498,26 +494,18 @@ func consistentTypeImportsLocalNames(declarations []*ast.Node) map[string]bool {
 		if clause == nil || clause.AsImportClause().IsTypeOnly() {
 			continue
 		}
-		importClause := clause.AsImportClause()
-		if name := importClause.Name(); name != nil {
-			names[name.Text()] = true
+		bindings := imports.BindingsOf(statement)
+		if bindings.Default != nil {
+			names[bindings.Default.Text()] = true
 		}
-		namedBindings := importClause.NamedBindings
-		if namedBindings == nil {
-			continue
-		}
-		switch namedBindings.Kind {
-		case ast.KindNamespaceImport:
-			if name := namedBindings.Name(); name != nil {
+		if bindings.Namespace != nil {
+			if name := bindings.Namespace.Name(); name != nil {
 				names[name.Text()] = true
 			}
-		case ast.KindNamedImports:
-			if elements := namedBindings.AsNamedImports().Elements; elements != nil {
-				for _, element := range elements.Nodes {
-					if name := element.Name(); name != nil {
-						names[name.Text()] = true
-					}
-				}
+		}
+		for _, named := range bindings.Named {
+			if name := named.Name(); name != nil {
+				names[name.Text()] = true
 			}
 		}
 	}
