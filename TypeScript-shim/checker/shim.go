@@ -268,7 +268,7 @@ type extra_Checker struct {
 	reverseMappedCache                          map[checker.ReverseMappedTypeKey]*checker.Type
 	reverseHomomorphicMappedCache               map[checker.ReverseMappedTypeKey]*checker.Type
 	iterationTypesCache                         map[checker.IterationTypesKey]checker.IterationTypes
-	markerTypes                                 collections.Set[*checker.Type]
+	markerTypes                                 map[*checker.Type][]*ast.Symbol
 	resolvingExplicitTypeOfSymbol               collections.Set[*ast.Symbol]
 	undefinedSymbol                             *ast.Symbol
 	argumentsSymbol                             *ast.Symbol
@@ -419,6 +419,10 @@ type extra_Checker struct {
 	typeResolutions                             []checker.TypeResolution
 	resolutionStart                             int
 	varianceStack                               []checker.VarianceStackEntry
+	varianceSerial                              uint64
+	varianceProvisional                         []checker.VarianceStackEntry
+	varianceRelationLog                         []checker.VarianceRelationEntry
+	varianceRestarts                            []*ast.Symbol
 	callResolutionStack                         []*ast.Node
 	apparentArgumentCount                       *int
 	lastGetCombinedNodeFlagsNode                *ast.Node
@@ -1467,6 +1471,7 @@ const VarianceFlagsUnreliable = checker.VarianceFlagsUnreliable
 const VarianceFlagsVarianceMask = checker.VarianceFlagsVarianceMask
 
 type VarianceLinks = checker.VarianceLinks
+type VarianceRelationEntry = checker.VarianceRelationEntry
 type VarianceStackEntry = checker.VarianceStackEntry
 type VerbosityContext = checker.VerbosityContext
 type WideningContext = checker.WideningContext
