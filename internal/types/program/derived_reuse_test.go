@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -349,5 +350,61 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(t *testing.T) {
 					ran(runs, "a.ts"), ran(runs, "b.ts"))
 			}
 		})
+	}
+}
+
+// A walk computes each derived rule's program fingerprint once for each set of options it gives the rule,
+// however many selections and workers ask (#s9k38p3). Six derived rules, no options, over three resolutions on
+// several workers: six computations. One per selection on each worker was 330 on an ahra edit run instead of
+// 6, about 1.85 GB of allocation (#f96cnry's profile).
+func TestAWalkComputesEachProgramFingerprintOnce(t *testing.T) {
+	t.Parallel()
+	files := map[string]string{
+		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+			`"include":["**/*.ts"]}`,
+	}
+	for _, directory := range []string{"a", "b", "c"} {
+		for _, name := range []string{"one", "two", "three"} {
+			files[directory+"/"+name+".ts"] = "export const " + name + " = 1;\n"
+		}
+	}
+	root := writeProject(t, files)
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if graph.Workers() < 2 {
+		t.Fatalf("the walk runs on %d worker, so no two workers ever ask for one fingerprint", graph.Workers())
+	}
+
+	var computations atomic.Int32
+	var rules []rule.Rule
+	settings := map[string]configuration.RuleSetting{}
+	for index := range 6 {
+		name := "test-derived-" + string(rune('a'+index))
+		rules = append(rules, rule.Rule{
+			Name:         name,
+			ProgramReads: rule.ReadsOtherFiles,
+			ProgramFingerprint: func(rule.Program, any) [sha256.Size]byte {
+				computations.Add(1)
+				return sha256.Sum256([]byte(name))
+			},
+			Run: func(ctx rule.Context, options any) rule.Listeners { return nil },
+		})
+		settings[name] = configuration.RuleSetting{Severity: configuration.SeverityError}
+	}
+	// Two overrides that change nothing but which resolution a file lands in, so the walk makes three
+	// selections on each worker that sees all three directories.
+	graph.LintConfig = &configuration.Config{Root: root, Rules: settings, Overrides: []configuration.Override{
+		{Files: []string{"b/**"}, Rules: map[string]configuration.RuleSetting{"test-derived-a": {Severity: configuration.SeverityError}}},
+		{Files: []string{"c/**"}, Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}}},
+	}}
+	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"computed-once"}), nil, program.PathAnchor{})
+	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules); err != nil {
+		t.Fatal(err)
+	}
+	if computations.Load() != 6 {
+		t.Fatalf("a walk of six derived rules over three resolutions on %d workers computed %d program fingerprints, want 6",
+			graph.Workers(), computations.Load())
 	}
 }
