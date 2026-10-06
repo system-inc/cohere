@@ -556,3 +556,28 @@ func TestRepositoryColorTokensReadAsColors(t *testing.T) {
 		t.Fatal("no design system loaded, so this test measured nothing")
 	}
 }
+
+// TestColorTokensReadAsColorsOnThePublicTheme is TestRepositoryColorTokensReadAsColors on the
+// independent theme, so it runs on every machine (#f598zk0): every `--color-*` key reads as a colour,
+// the framework palette's and the theme's own `--color-weird-*` alike.
+func TestColorTokensReadAsColorsOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	system := publicDesignSystem(t).System
+
+	checkedTokens, ownTokens := 0, 0
+	for _, key := range system.Theme().KeysInNamespaces([]string{"--color"}) {
+		if !valueIsColorIn("bg-"+key, "bg", system) {
+			t.Errorf("the public theme declares --color-%s and `bg-%s` does not read as a colour", key, key)
+		}
+		checkedTokens++
+		if strings.HasPrefix(key, "weird-") {
+			ownTokens++
+		}
+	}
+	// The theme's own keys are the ones no framework table could vouch for, so they must be among
+	// those checked, or the test proves only the palette.
+	if checkedTokens < 200 || ownTokens != 2 {
+		t.Fatalf("checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
+			checkedTokens, ownTokens)
+	}
+}

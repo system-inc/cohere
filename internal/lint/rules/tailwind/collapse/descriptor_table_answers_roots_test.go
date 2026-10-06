@@ -111,32 +111,33 @@ func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
 // passing while the pairs underneath it change.
 func TestWave3ValueDependentRootsReadByType(t *testing.T) {
 	t.Parallel()
-	system := loadWave1DesignSystem(t)
-	table := NewTable(system)
+	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
+		table := NewTable(system)
 
-	cases := []struct {
-		colorClass  string
-		otherClass  string
-		description string
-	}{
-		{"ring-amber-500", "ring-2", "a ring color against a ring width"},
-		{"text-amber-500", "text-2xl", "a text color against a font size"},
-		{"stroke-amber-500", "stroke-2", "a stroke color against a stroke width"},
-		{"shadow-amber-500", "shadow-lg", "a shadow color against a shadow size"},
-	}
+		cases := []struct {
+			colorClass  string
+			otherClass  string
+			description string
+		}{
+			{"ring-amber-500", "ring-2", "a ring color against a ring width"},
+			{"text-amber-500", "text-2xl", "a text color against a font size"},
+			{"stroke-amber-500", "stroke-2", "a stroke color against a stroke width"},
+			{"shadow-amber-500", "shadow-lg", "a shadow color against a shadow size"},
+		}
 
-	for _, testCase := range cases {
-		colorReading, colorFound := lookupClass(t, system, table, testCase.colorClass)
-		otherReading, otherFound := lookupClass(t, system, table, testCase.otherClass)
-		if !colorFound || !otherFound {
-			t.Errorf("%s: one side did not resolve (%v, %v)", testCase.description, colorFound, otherFound)
-			continue
+		for _, testCase := range cases {
+			colorReading, colorFound := lookupClass(t, system, table, testCase.colorClass)
+			otherReading, otherFound := lookupClass(t, system, table, testCase.otherClass)
+			if !colorFound || !otherFound {
+				t.Errorf("%s: one side did not resolve (%v, %v)", testCase.description, colorFound, otherFound)
+				continue
+			}
+			if readingsEqual(colorReading, otherReading) {
+				t.Errorf("%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
+					testCase.description, testCase.colorClass, testCase.otherClass, colorReading.Order, colorReading.Count)
+			}
 		}
-		if readingsEqual(colorReading, otherReading) {
-			t.Errorf("%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
-				testCase.description, testCase.colorClass, testCase.otherClass, colorReading.Order, colorReading.Count)
-		}
-	}
+	})
 }
 
 func lookupClass(t *testing.T, system *LoadedDesignSystem, table *Table, className string) (Reading, bool) {

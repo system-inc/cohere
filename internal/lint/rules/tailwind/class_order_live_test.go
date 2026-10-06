@@ -389,21 +389,22 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
 		},
 	}
 
-	designSystem := classOrderLiveRepositorySystem(t)
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			unranked, placeable := partitionUnranked(testCase.input, designSystem)
-			keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
-			if !resolved {
-				t.Fatalf("the rule could not place %q, so this case proves nothing", unplaceable)
-			}
-			ordered := append(unranked, sortClassesByKey(placeable, keys)...)
-			if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
-				t.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
-			}
-		})
-	}
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+				unranked, placeable := partitionUnranked(testCase.input, designSystem)
+				keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
+				if !resolved {
+					t.Fatalf("the rule could not place %q, so this case proves nothing", unplaceable)
+				}
+				ordered := append(unranked, sortClassesByKey(placeable, keys)...)
+				if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
+					t.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
+				}
+			})
+		}
+	})
 }
 
 // TestClassOrderLiveReadsTheRepositoryRatherThanATable is the control that the swap actually happened.
@@ -470,17 +471,18 @@ func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 // the author would be asked to make a change the engine does not agree with.
 func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	_, unplaceable, resolved := classOrderKeys(
-		[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
-	if resolved {
-		t.Fatal("a class outside the design system was placed, so the rule would sort a literal it " +
-			"does not understand")
-	}
-	if unplaceable != "ahralia-splash" {
-		t.Errorf("the decline should name the class that caused it, got %q", unplaceable)
-	}
+		_, unplaceable, resolved := classOrderKeys(
+			[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
+		if resolved {
+			t.Fatal("a class outside the design system was placed, so the rule would sort a literal it " +
+				"does not understand")
+		}
+		if unplaceable != "ahralia-splash" {
+			t.Errorf("the decline should name the class that caused it, got %q", unplaceable)
+		}
+	})
 }
 
 // TestClassOrderLiveVariantIndicesAreRanksWithinTheList is the mechanism test.
@@ -491,35 +493,36 @@ func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
 // computed for one list is meaningless in another.
 func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	maskOf := func(classes []string, target string) string {
-		keys, unplaceable, resolved := classOrderKeys(classes, designSystem.System, designSystem.Table)
-		if !resolved {
-			t.Fatalf("could not place %q", unplaceable)
+		maskOf := func(classes []string, target string) string {
+			keys, unplaceable, resolved := classOrderKeys(classes, designSystem.System, designSystem.Table)
+			if !resolved {
+				t.Fatalf("could not place %q", unplaceable)
+			}
+			key, placed := keys[target]
+			if !placed {
+				t.Fatalf("%q got no key", target)
+			}
+			if key.mask == nil {
+				return "0"
+			}
+			return key.mask.String()
 		}
-		key, placed := keys[target]
-		if !placed {
-			t.Fatalf("%q got no key", target)
-		}
-		if key.mask == nil {
-			return "0"
-		}
-		return key.mask.String()
-	}
 
-	narrow := maskOf([]string{"dark:flex", "hover:flex"}, "dark:flex")
-	wide := maskOf([]string{"dark:flex", "hover:flex", "group-hover:disabled:flex"}, "dark:flex")
+		narrow := maskOf([]string{"dark:flex", "hover:flex"}, "dark:flex")
+		wide := maskOf([]string{"dark:flex", "hover:flex", "group-hover:disabled:flex"}, "dark:flex")
 
-	if narrow == wide {
-		t.Errorf(
-			"`dark:flex` holds mask %s in both a two-class and a four-variant list; the index is "+
-				"supposed to be a rank within the population, so a pairwise comparator would be a "+
-				"valid shape after all and this port's central claim is wrong",
-			narrow,
-		)
-	}
-	t.Logf("`dark:flex` masks %s in the narrow list and %s in the wide one", narrow, wide)
+		if narrow == wide {
+			t.Errorf(
+				"`dark:flex` holds mask %s in both a two-class and a four-variant list; the index is "+
+					"supposed to be a rank within the population, so a pairwise comparator would be a "+
+					"valid shape after all and this port's central claim is wrong",
+				narrow,
+			)
+		}
+		t.Logf("`dark:flex` masks %s in the narrow list and %s in the wide one", narrow, wide)
+	})
 }
 
 // TestClassOrderLiveUnrankedLeadInSourceOrder pins the one dimension the engine has no opinion on.
@@ -534,31 +537,32 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 // and must not quietly turn into a test about two ranked classes.
 func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
-		if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
-			t.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
+			if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
+				t.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+			}
 		}
-	}
 
-	for _, testCase := range []struct {
-		input, unranked []string
-	}{
-		{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
-		{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
-		{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
-		{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
-	} {
-		unranked, placeable := partitionUnranked(testCase.input, designSystem)
-		// Source order between them, which is what makes `peer group` and `group peer` both legal.
-		if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
-			t.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
+		for _, testCase := range []struct {
+			input, unranked []string
+		}{
+			{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
+			{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
+			{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
+			{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
+		} {
+			unranked, placeable := partitionUnranked(testCase.input, designSystem)
+			// Source order between them, which is what makes `peer group` and `group peer` both legal.
+			if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
+				t.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
+			}
+			if len(placeable) != 2 {
+				t.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
+			}
 		}
-		if len(placeable) != 2 {
-			t.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
-		}
-	}
+	})
 }
 
 // TestClassOrderLiveDeclinesOnlyTheKnownBoundary names the one list the rule cannot order.
