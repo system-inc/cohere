@@ -235,6 +235,31 @@ func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole 
 	return unsafe.String(&view[0], len(view)), true
 }
 
+// ReadUnchanged reports whether the bytes the program holds for path are still the file's: the pack served or
+// read them under a stat, and a stat taken now matches it. It is the pack's own test for serving bytes, asked
+// again after the build, so a reader holding the program's copy need not read the file to compare it (#q6dey77).
+// A file the pack has no stat for, read whole or not at all, reads false, as does a nil pack: the caller reads
+// the disk, as it would have.
+func (p *ContentPack) ReadUnchanged(path string) bool {
+	if p == nil {
+		return false
+	}
+	p.mutex.Lock()
+	var identity fileIdentity
+	known := false
+	if added, read := p.added[path]; read {
+		identity, known = added.identity, true
+	} else if p.used[path] {
+		identity, known = p.entries[path].identity, true
+	}
+	p.mutex.Unlock()
+	if !known {
+		return false
+	}
+	current, statted := statIdentity(path)
+	return statted && current == identity
+}
+
 // noteRead records a file read from disk, keepable when it was statted before the read and read whole.
 func (p *ContentPack) noteRead(path string, identity fileIdentity, keepable bool, contents string) {
 	p.mutex.Lock()

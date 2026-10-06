@@ -237,9 +237,15 @@ func gate(worktree string, commit string) int {
 	})
 }
 
-// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p, so every landing
-// is gated the same way, whatever its caller's shell has set. A caller's -trimpath failed tests that find
-// their fixtures from their own source path, and the gate read that as the landing's fault (2026-10-05).
+// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p and -buildvcs=false,
+// so every landing is gated the same way, whatever its caller's shell has set. A caller's -trimpath failed
+// tests that find their fixtures from their own source path, and the gate read that as the landing's fault
+// (2026-10-05).
+//
+// -buildvcs=false because most worktrees are made with TypeScript a symlink to another checkout's, and git
+// status refuses that tree, so every go build a test runs failed "error obtaining VCS status": cache's land
+// at 04:15 on 2026-10-06, after a full gate. Callers used to pass it themselves, and the reduction to -p
+// dropped it. Nothing the gate runs reads its own stamp: a build with none says so (packaging's version.go).
 func gateEnvironment(budget []string) []string {
 	environment := make([]string, 0, len(budget))
 	for _, variable := range budget {
@@ -254,7 +260,7 @@ func gateEnvironment(budget []string) []string {
 				kept = append(kept, flag)
 			}
 		}
-		environment = append(environment, "GOFLAGS="+strings.Join(kept, " "))
+		environment = append(environment, "GOFLAGS="+strings.Join(append(kept, "-buildvcs=false"), " "))
 	}
 	return environment
 }
