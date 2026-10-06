@@ -190,6 +190,10 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 	waitingSince := time.Now()
 	announced := false
 	lastAhead := -1
+	// The holders as last printed, so a change of holder is printed again: a waiter that named only the first
+	// holder it saw went on naming it after it exited (lint_rules' land, a dead pid named while another held
+	// the lock, 2026-10-06).
+	lastHolders := ""
 	for {
 		ahead, waiting := 0, 0
 		if ticket != nil {
@@ -214,12 +218,20 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 				return held, nil
 			}
 		}
+		current := holders(directory, slots)
 		if !announced {
 			explain()
-			for _, holder := range holders(directory, slots) {
+			for _, holder := range current {
 				fmt.Fprintf(os.Stderr, "  %s\n", holder)
 			}
 			announced = true
+			lastHolders = strings.Join(current, "\n")
+		} else if joined := strings.Join(current, "\n"); joined != lastHolders && len(current) > 0 {
+			fmt.Fprintf(os.Stderr, "cohere-dev: the %s holders changed; now:\n", noun)
+			for _, holder := range current {
+				fmt.Fprintf(os.Stderr, "  %s\n", holder)
+			}
+			lastHolders = joined
 		}
 		if ticket != nil && ahead != lastAhead {
 			fmt.Fprintf(os.Stderr, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
@@ -281,6 +293,22 @@ func status() int {
 	waiting := waiters(directory)
 	fmt.Printf("line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {
+		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
+	}
+	// Land's one lock and its own line (land.go), so a stalled landing shows here beside the tokens.
+	land, err := landDirectory()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		return 1
+	}
+	holder := "free"
+	if held := heldBy(land, 1); held != "" {
+		holder = held
+	}
+	fmt.Printf("land lock: %s\n", holder)
+	landing := waiters(land)
+	fmt.Printf("land line: %d waiting\n", len(landing))
+	for place, waiter := range landing {
 		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
 	}
 	return 0
