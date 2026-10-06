@@ -12,6 +12,8 @@ import (
 	"testing"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // prettierParseScript is the oracle: the fork's own parse (parser "typescript", with the file path, so
@@ -48,7 +50,7 @@ process.stdin.on("end", async () => {
 
 // TestConvertAgreesWithPrettier is the converter's acceptance test: for every .ts and .tsx file in the
 // corpora, the Go tree and comment list must equal what the fork's own parse produces, property for
-// property. Off unless COHERE_PRETTIER_ROOT names the fork and COHERE_ESTREE_CORPORA lists repository
+// property. Off unless COHERE_PRETTIER_FORK names the fork and COHERE_ESTREE_CORPORA lists repository
 // roots (colon-separated; each is enumerated with git ls-files, so a nested repository is its own root).
 //
 // A file the fork cannot parse has no answer to match and is skipped, but counted, and the test fails
@@ -56,11 +58,11 @@ process.stdin.on("end", async () => {
 // perfect agreement.
 func TestConvertAgreesWithPrettier(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_ESTREE_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_ESTREE_CORPORA to compare the converter against the fork")
+	if corpora == "" {
+		t.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
 	}
+	root := corpus.PrettierFork.Root(t)
 	seen := map[string]bool{}
 	var files []string
 	for _, corpus := range strings.Split(corpora, ":") {

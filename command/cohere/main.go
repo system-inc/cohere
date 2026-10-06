@@ -556,7 +556,7 @@ func run() error {
 		graph = built
 		buildDuration = time.Since(buildStart)
 		if early != nil {
-			early.programs.offer(graph.Program)
+			early.programs.offer(graph)
 		}
 		// A test instrument: every file walked on a checker other than its own. See program.walkQueue.
 		graph.WalkOnForeignCheckers = os.Getenv("COHERE_TEST_FOREIGN_CHECKERS") != ""

@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
-// Every entry the fast tier leaves to the landing gate still costs more than fastBudgetCPUSeconds of CPU,
-// measured alone now. One that got cheap belongs back in the edit loop, and one that names nothing is
-// refused. Recorded costs of zero are refused too, so an entry cannot be added unmeasured. CPU is user plus
-// system time, which the load does not inflate the way it inflates wall, so the verdict is the same on a
-// quiet machine and a busy one; the wall is logged beside it and judges nothing.
+// Every entry the fast tier leaves to the landing gate was recorded above fastBudgetCPUSeconds of CPU, and
+// still costs more than fastEvictionCPUSeconds measured alone now. One that got cheap belongs back in the
+// edit loop, and one that names nothing is refused. An entry recorded at or under the budget is refused
+// too, so one cannot be added unmeasured or below the bar; that half judges a number in this file, which no
+// load moves. The live half judges CPU, user plus system time, against a bar a third lower, so the
+// scatter between runs cannot flip it; the wall is logged beside it and judges nothing. An entry whose cost
+// is a corpus skips naming the corpus's variable when it is unset, since its tests then skip and it would
+// read as free.
 //
 // It is itself the landing gate's: under the fast tier it skips, since measuring three entries costs
 // about 30s of CPU in an edit loop meant to be instant.
@@ -40,16 +43,23 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(t *testing.T) {
 			if entry.wallSeconds <= 0 || entry.cpuSeconds <= 0 || entry.reason == "" {
 				t.Fatalf("%s is listed without its measured wall, CPU or reason", entry.pattern)
 			}
+			if entry.cpuSeconds <= fastBudgetCPUSeconds {
+				t.Fatalf("%s is recorded at %.1fs of CPU, at or under the fast budget of %.0fs, so it belongs in the fast tier",
+					entry.pattern, entry.cpuSeconds, float64(fastBudgetCPUSeconds))
+			}
+			if entry.reads.Name != "" {
+				entry.reads.Root(t)
+			}
 			wall, cpu := measureTests(t, root, entry.pattern, nil)
 			if entry.skippedBy != "" {
 				fastWall, fastCPU := measureTests(t, root, entry.pattern, []string{entry.skippedBy + "=1"})
 				wall, cpu = wall-fastWall, cpu-fastCPU
 			}
 			t.Logf("%s: %.1fs wall, %.1fs CPU now (recorded %.1fs, %.1fs)", entry.pattern, wall, cpu, entry.wallSeconds, entry.cpuSeconds)
-			if cpu <= fastBudgetCPUSeconds {
-				t.Errorf("%s costs %.1fs of CPU alone (%.1fs of wall), at or under the fast budget of %.0fs of CPU, so "+
+			if cpu <= fastEvictionCPUSeconds {
+				t.Errorf("%s costs %.1fs of CPU alone (%.1fs of wall), at or under the eviction bar of %.0fs of CPU, so "+
 					"it belongs back in the fast tier: remove it from landingGateOnly", entry.pattern, cpu, wall,
-					float64(fastBudgetCPUSeconds))
+					float64(fastEvictionCPUSeconds))
 			}
 		})
 	}
