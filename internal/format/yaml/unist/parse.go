@@ -59,7 +59,10 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	lineCounter := cst.NewLineCounter()
 	context := newContext(units, lineCounter, nodes, memory)
 	parser := cst.NewParser(lineCounter.AddNewLine)
-	composer := compose.NewComposer(compose.UnistParserOptions())
+	parser.Tokens = &memory.tokens
+	composeOptions := compose.UnistParserOptions()
+	composeOptions.Nodes = &memory.composeNodes
+	composer := compose.NewComposer(composeOptions)
 	parsedDocuments := []*compose.Document{}
 	cstTokens := slices.Collect(parser.Parse(units, false))
 	for parsedDocument := range composer.Compose(cstTokens, true, len(units)) {

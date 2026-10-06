@@ -21,7 +21,7 @@ func nodeClass(tag *Tag, fallback string) string {
 const startColMsg = "All mapping items must start at the same column"
 
 func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	yamlMap := newCollection(nodeClass(tag, "YAMLMap"))
+	yamlMap := ctx.newCollection(nodeClass(tag, "YAMLMap"))
 	if ctx.atRoot {
 		ctx.atRoot = false
 	}
@@ -111,7 +111,7 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 				valueNode = composeEmptyNode(ctx, offset, sep, valueProps, onError)
 			}
 			offset = valueNode.Range[2]
-			pair := newPair(keyNode, valueNode)
+			pair := ctx.newPair(keyNode, valueNode)
 			if ctx.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
@@ -128,7 +128,7 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 					keyNode.Comment = valueProps.comment
 				}
 			}
-			pair := newPair(keyNode, nil)
+			pair := ctx.newPair(keyNode, nil)
 			if ctx.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
@@ -166,7 +166,7 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 }
 
 func resolveBlockSeq(ctx *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	seq := newCollection(nodeClass(tag, "YAMLSeq"))
+	seq := ctx.newCollection(nodeClass(tag, "YAMLSeq"))
 	if ctx.atRoot {
 		ctx.atRoot = false
 	}
@@ -235,7 +235,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 		fcName = "flow map"
 		fallback = "YAMLMap"
 	}
-	coll := newCollection(nodeClass(tag, fallback))
+	coll := ctx.newCollection(nodeClass(tag, fallback))
 	coll.Flow = true
 	atRoot := ctx.atRoot
 	if atRoot {
@@ -404,7 +404,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 					keyNode.Comment = valueProps.comment
 				}
 			}
-			pair := newPair(keyNode, valueNode)
+			pair := ctx.newPair(keyNode, valueNode)
 			if ctx.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
@@ -414,7 +414,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 				}
 				coll.Items = append(coll.Items, pair)
 			} else {
-				yamlMap := newCollection("YAMLMap")
+				yamlMap := ctx.newCollection("YAMLMap")
 				yamlMap.Flow = true
 				yamlMap.Items = append(yamlMap.Items, pair)
 				endRange := keyNode.Range

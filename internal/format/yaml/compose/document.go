@@ -3,9 +3,15 @@ package compose
 // Ported from eemeli/yaml 2.9.0, dist/doc/Document.js: the constructor as the composer calls it (no
 // value, so no createNode) and setSchema. The rest of the class is the document API and stringify.
 
+import "github.com/system-inc/cohere/internal/format/arena"
+
 // Options is the part of upstream's options composing reads, with the Document's defaults already
 // applied. UnistParserOptions is the configuration yaml-unist-parser composes with.
 type Options struct {
+	// Nodes is where a parse's scalars, pairs and collections come from, nil to allocate each (#v6ksqg3).
+	// A caller that sets it owns their lifetime: unist.Parse resets it once its tree is built, since no
+	// unist node keeps a compose node.
+	Nodes *arena.Arena[Node]
 	// KeepSourceTokens sets each node's srcToken.
 	KeepSourceTokens bool
 	// UniqueKeys reports duplicate map keys, comparing keys as upstream's default uniqueKeys does.
