@@ -3,7 +3,8 @@
 // module root:
 //
 //	go run ./internal/benchresults/tools/record -runs <runs.tsv> -engine <engine> -project <name> \
-//	  -project-commit <sha> -ceiling <load> -settle <seconds> -rounds <n> -edit <path>
+//	  -project-commit <sha> -idle-floor <percent> -settle <seconds> -rounds <n> -modes <Cold,Warm,...> \
+//	  -band <percent> [-stopped-early] [-edit <path>]
 //
 // The engine's commit and whether its tree was modified come from the binary's own build info, not from
 // its --version prose, so a binary that names no commit is refused rather than recorded as clean.
@@ -29,14 +30,21 @@ func main() {
 	engine := flag.String("engine", "", "the pinned engine binary every run used")
 	project := flag.String("project", "", "the project's name")
 	projectCommit := flag.String("project-commit", "", "the commit the copy was extracted at")
-	ceiling := flag.Float64("ceiling", 0, "the load ceiling")
+	idleFloor := flag.Float64("idle-floor", 0, "the share of all cores, in percent, idle before and after a quiet run")
 	settle := flag.Float64("settle", 0, "the settle seconds")
-	rounds := flag.Int("rounds", 0, "the rounds")
-	edit := flag.String("edit", "", "the file the Edit runs changed")
+	rounds := flag.Int("rounds", 0, "the rounds taken")
+	modes := flag.String("modes", "", "the measured modes, comma-separated: Cold, Warm, Edit, Idle")
+	band := flag.Float64("band", 0, "the early stop's agreement band, in percent")
+	stoppedEarly := flag.Bool("stopped-early", false, "the run stopped early because its quiet runs agreed")
+	edit := flag.String("edit", "", "the file the Edit runs changed, when Edit was measured")
 	out := flag.String("out", benchresults.Directory, "the directory to write the record to")
 	flag.Parse()
 
-	path, err := record(*runsPath, *engine, *project, *projectCommit, *ceiling, *settle, *rounds, *edit, *out)
+	measured := []benchresults.Mode{}
+	for _, mode := range strings.Split(*modes, ",") {
+		measured = append(measured, benchresults.Mode(mode))
+	}
+	path, err := record(*runsPath, *engine, *project, *projectCommit, *idleFloor, *settle, *rounds, measured, *band, *stoppedEarly, *edit, *out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "record: %v\n", err)
 		os.Exit(1)
@@ -44,7 +52,8 @@ func main() {
 	fmt.Printf("recorded %s\n", path)
 }
 
-func record(runsPath, engine, project, projectCommit string, ceiling, settle float64, rounds int, edit, out string) (string, error) {
+func record(runsPath, engine, project, projectCommit string, idleFloor, settle float64, rounds int, measured []benchresults.Mode,
+	band float64, stoppedEarly bool, edit, out string) (string, error) {
 	cohere, err := engineProvenance(engine)
 	if err != nil {
 		return "", err
@@ -63,12 +72,15 @@ func record(runsPath, engine, project, projectCommit string, ceiling, settle flo
 		Cohere:        cohere,
 		Project:       benchresults.Project{Name: project, Commit: projectCommit},
 		Machine:       machine,
-		LoadCeiling:   ceiling,
+		IdleFloor:     idleFloor,
 		SettleSeconds: settle,
 		Rounds:        rounds,
+		MeasuredModes: measured,
+		Band:          band,
+		StoppedEarly:  stoppedEarly,
 		Edit:          edit,
 		Runs:          runs,
-		Modes:         benchresults.Summarize(runs),
+		Modes:         benchresults.Summarize(measured, runs),
 	}
 	encoded, err := benchresults.Encode(result)
 	if err != nil {
@@ -167,39 +179,40 @@ func thisMachine() (benchresults.Machine, error) {
 }
 
 // readRuns reads quiet_machine.sh's runs table: mode, round, verdict_s, settled_s, engine_s, findings,
-// cache, load_before, load_after, quiet, exit, primes, tab-separated, with a header line the script prints
-// apart.
+// cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, tab-separated, with a header
+// line the script prints apart.
 func readRuns(path string) ([]benchresults.Run, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	modes := map[string]benchresults.Mode{"cold": benchresults.ModeCold, "warm": benchresults.ModeWarm, "edit": benchresults.ModeEdit}
+	modes := map[string]benchresults.Mode{"cold": benchresults.ModeCold, "warm": benchresults.ModeWarm, "edit": benchresults.ModeEdit,
+		"idle": benchresults.ModeIdle}
 	runs := []benchresults.Run{}
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
 		fields := strings.Split(scanner.Text(), "\t")
-		if len(fields) != 12 {
-			return nil, fmt.Errorf("%s:%d: %d fields, want 12", path, line, len(fields))
+		if len(fields) != 14 {
+			return nil, fmt.Errorf("%s:%d: %d fields, want 14", path, line, len(fields))
 		}
 		mode, found := modes[fields[0]]
 		if !found {
 			return nil, fmt.Errorf("%s:%d: no mode %q", path, line, fields[0])
 		}
-		if fields[9] != "quiet" && fields[9] != "loaded" {
-			return nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[9])
+		if fields[11] != "quiet" && fields[11] != "loaded" {
+			return nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[11])
 		}
 		numbers := map[int]float64{}
-		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 10, 11} {
+		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13} {
 			if numbers[index], err = strconv.ParseFloat(fields[index], 64); err != nil {
 				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, err)
 			}
 		}
 		runs = append(runs, benchresults.Run{
 			Mode: mode, Round: int(numbers[1]), VerdictSeconds: numbers[2], SettledSeconds: numbers[3],
-			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], Quiet: fields[9] == "quiet",
-			Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[10]), Primes: int(numbers[11]),
+			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], IdleBefore: numbers[9], IdleAfter: numbers[10],
+			Quiet: fields[11] == "quiet", Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[12]), Primes: int(numbers[13]),
 		})
 	}
 	return runs, scanner.Err()

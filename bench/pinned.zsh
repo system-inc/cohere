@@ -23,6 +23,10 @@ zmodload zsh/datetime
 fail() { print -u2 "$name: $*"; exit 1; }
 load() { sysctl -n vm.loadavg | awk '{print $2}'; }
 under_ceiling() { awk -v load=$1 -v ceiling=$ceiling 'BEGIN { exit !(load <= ceiling) }'; }
+# idle_over prints the share of all cores idle, in percent, over the next <seconds>. It is iostat's second
+# report, which covers that interval (the first covers the time since boot), read from the end of the line,
+# where the three load averages follow the cpu columns whatever disks are listed before them.
+idle_over() { iostat -c 2 -w $1 | tail -1 | awk '{ print $(NF - 3) }'; }
 # wait_for_quiet waits up to `settle` seconds for the load to reach the ceiling, and returns either way.
 wait_for_quiet() {
   (( settle > 0 )) || return 0
