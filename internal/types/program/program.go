@@ -68,6 +68,11 @@ type Graph struct {
 	// direction that looks like a cold cache rather than like a bug.
 	CompilerHost compiler.CompilerHost
 
+	// contentPack is the pack the program read its files through, and readIdentities the stats it read them
+	// under when there was none. See ReadUnchanged.
+	contentPack    *ContentPack
+	readIdentities *readIdentities
+
 	// LintConfig decides which rules apply to which files, and which files are not linted at all.
 	//
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
@@ -463,8 +468,13 @@ func buildOnce(options Options) (*Graph, error) {
 	if options.Listings != nil {
 		disk = &listingFS{FS: disk, listings: options.Listings}
 	}
+	// Without a pack, the program still records the stat each file was read under, so ReadUnchanged can answer.
+	var identities *readIdentities
 	if options.ContentPack != nil {
 		disk = options.ContentPack.wrap(disk)
+	} else {
+		identities = &readIdentities{byPath: map[string]fileIdentity{}}
+		disk = &identityFS{FS: disk, identities: identities}
 	}
 	var checkedAnswers atomic.Int64
 	if options.CheckedStats != nil {
@@ -618,7 +628,23 @@ func buildOnce(options Options) (*Graph, error) {
 		ConfigFileName: configFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),
+		contentPack:    options.ContentPack,
+		readIdentities: identities,
 	}, nil
+}
+
+// ReadUnchanged reports whether the program's copy of a file is still the file's: the program read it under a
+// stat, its content pack's or its own, and a stat taken now matches it (#q6dey77). A reader holding the
+// program's copy can then use it instead of reading the file again. False when the program has no stat for the
+// file, so the reader reads the disk, as it would have.
+func (g *Graph) ReadUnchanged(path string) bool {
+	if g == nil {
+		return false
+	}
+	if g.contentPack != nil {
+		return g.contentPack.ReadUnchanged(path)
+	}
+	return g.readIdentities.unchanged(path)
 }
 
 // SourceFiles is every file in the program, third-party declarations included.

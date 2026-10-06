@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // postcssScssParseScript is the scss oracle: postcss-scss 4.0.9's lib/scss-parse from the fork's
@@ -230,22 +232,15 @@ var scssParseFixtures = []parseFixture{
 }
 
 // TestParseSCSSAgreesWithPostcssScss is the scss parser's acceptance test, TestParseAgreesWithPostcss's
-// twin: every Prettier tests/format/scss/**/*.scss file under COHERE_PRETTIER_ROOT, the css-in-js
+// twin: every Prettier tests/format/scss/**/*.scss file under COHERE_PRETTIER_FORK, the css-in-js
 // templates of Prettier's styled-components and styled-jsx tests (built as Prettier's embed builds
 // them, @prettier-placeholder-N-id and all), and every inline fixture must parse to postcss-scss's tree
-// or be refused by both with the same error. Off unless COHERE_PRETTIER_ROOT names the fork.
+// or be refused by both with the same error. Off unless COHERE_PRETTIER_FORK names the fork.
 //
 // A .scss file postcss-scss refuses is counted, and the test fails if that passes a tenth of them.
 func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to compare the scss parser against postcss-scss")
-	}
-	if strings.HasPrefix(root, "~/") {
-		home, _ := os.UserHomeDir()
-		root = filepath.Join(home, root[2:])
-	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input struct {
 		Name string `json:"name"`

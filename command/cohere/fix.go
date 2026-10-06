@@ -97,7 +97,7 @@ func applyProposedFixes(
 	} else {
 		var programs programOffer
 		if graph != nil {
-			programs.offer(graph.Program)
+			programs.offer(graph)
 		}
 		speculation = speculateFormat(formatCandidates, transform, maxPasses, &programs)
 	}
@@ -733,7 +733,13 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 					}
 					return refuseToRelint("", "")
 				}
-				result, err := edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maxPasses)
+				var result edit.FileResult
+				var err error
+				if tree := programs.unchangedTreeOf(fileName); tree != nil {
+					result, err = edit.CheckTextSeeded(fileName, tree.Text(), tree, unproposed, transform, maxPasses)
+				} else {
+					result, err = edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maxPasses)
+				}
 				// Only an unchanged result is final this early. A changed one is left to the path after the
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
 				// the printer changed comes back changed rather than refused, and keeping it would report a
@@ -759,13 +765,30 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 // a nil one.
 type programOffer struct {
 	program atomic.Pointer[compiler.Program]
+	// graph is the graph the program was built in, set before the program, so a speculation that sees the
+	// program can ask the graph whether its copy of a file is still the file's.
+	graph atomic.Pointer[program.Graph]
 }
 
-// offer hands the speculation the program, once it is built.
-func (programs *programOffer) offer(program *compiler.Program) {
-	if programs != nil && program != nil {
-		programs.program.Store(program)
+// offer hands the speculation the graph's program, once it is built.
+func (programs *programOffer) offer(graph *program.Graph) {
+	if programs != nil && graph != nil && graph.Program != nil {
+		programs.graph.Store(graph)
+		programs.program.Store(graph.Program)
 	}
+}
+
+// unchangedTreeOf is boundTreeOf's tree when the program's copy of the file is still the file's, by the stat it
+// was read under: the speculation then formats the tree's own text and reads nothing (#q6dey77). Rereading every file to
+// compare it with the tree was 51 MB on a cold ahra run. A file changed on disk since the program read it has
+// another stat, so it is read as before, its bytes differ from the program's, and keepable discards the
+// attempt: an edit made after the walk read the file is still noticed.
+func (programs *programOffer) unchangedTreeOf(fileName string) *ast.SourceFile {
+	tree := programs.boundTreeOf(fileName)
+	if tree == nil || !programs.graph.Load().ReadUnchanged(fileName) {
+		return nil
+	}
+	return tree
 }
 
 // boundTreeOf is the program's tree of fileName if the program is in and has bound that file, or nil.
