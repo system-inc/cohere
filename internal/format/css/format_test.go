@@ -344,24 +344,12 @@ func stripIndentation(source string) string {
 }
 
 // Prettier's own CSS fixtures, tests/format/css in the fork, are the widest set of edge cases there is:
-// 157 files written to exercise the printer and parser. The fork's source tree is not part of this
-// repository, so the test runs when it is at COHERE_PRETTIER_FORK or ~/Projects/system/prettier, and
-// skips otherwise. Two kinds of file are set aside by name, each for a stated reason, and must still
-// behave as described; everything else must match the fork byte for byte.
+// 157 files written to exercise the printer and parser, vendored in testdata/prettier/css (#sycrdr6), so
+// the test runs on any machine. Two kinds of file are set aside by name, each for a stated reason, and
+// must still behave as described; everything else must match the fork byte for byte.
 func TestPrettierFixturesMatchTheFork(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_FORK")
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			t.Skip("no home directory to find the Prettier fork in")
-		}
-		root = filepath.Join(home, "Projects", "system", "prettier")
-	}
-	fixtures := filepath.Join(root, "tests", "format", "css")
-	if _, err := os.Stat(fixtures); err != nil {
-		t.Skipf("the Prettier fork's CSS fixtures are not at %s; set COHERE_PRETTIER_FORK", fixtures)
-	}
+	fixtures := filepath.Join("testdata", "prettier", "css")
 	var files []string
 	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
 		if err == nil && !entry.IsDir() && strings.HasSuffix(path, ".css") {
@@ -614,23 +602,12 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
 }
 
 // Prettier's own SCSS fixtures, tests/format/scss in the fork: 90 files written for the scss parser and
-// printer. Found as the CSS fixtures are (COHERE_PRETTIER_FORK or ~/Projects/system/prettier), skipped
-// when absent. Every file the fork formats must match byte for byte, and a file the fork refuses must be
-// refused here too. The one kind set aside is yaml front matter, which FormatSCSS refuses as Format does.
+// printer, vendored beside the CSS ones in testdata/prettier/scss. Every file the fork formats must match
+// byte for byte, and a file the fork refuses must be refused here too. The one kind set aside is yaml
+// front matter, which FormatSCSS refuses as Format does.
 func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_FORK")
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			t.Skip("no home directory to find the Prettier fork in")
-		}
-		root = filepath.Join(home, "Projects", "system", "prettier")
-	}
-	fixtures := filepath.Join(root, "tests", "format", "scss")
-	if _, err := os.Stat(fixtures); err != nil {
-		t.Skipf("the Prettier fork's SCSS fixtures are not at %s; set COHERE_PRETTIER_FORK", fixtures)
-	}
+	fixtures := filepath.Join("testdata", "prettier", "scss")
 	var files []string
 	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
 		if err == nil && !entry.IsDir() && strings.HasSuffix(path, ".scss") {
