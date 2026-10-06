@@ -115,6 +115,9 @@ func Checker_resolveAlias(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
+//go:linkname Checker_getNonMissingTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNonMissingTypeOfSymbol
+func Checker_getNonMissingTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
+
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
 func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
 

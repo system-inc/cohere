@@ -46,8 +46,14 @@ const jsx = <a.b a={a}>{a}</a.b>;
 					visit(node)
 					for name, want := range walked {
 						compared++
-						if got := reference.IdentifiersNamed(ctx, name); !slices.Equal(got, want) {
+						got := reference.IdentifiersNamed(ctx, name)
+						if !slices.Equal(got, want) {
 							mismatches = append(mismatches, name)
+						}
+						// The lists share one backing slice, so each is capped at its length: an
+						// append must copy rather than write over the next name's identifiers.
+						if cap(got) != len(got) {
+							mismatches = append(mismatches, name+" (uncapped)")
 						}
 					}
 					if got := reference.IdentifiersNamed(ctx, "absent"); got != nil {

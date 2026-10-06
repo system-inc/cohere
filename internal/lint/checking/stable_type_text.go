@@ -316,12 +316,18 @@ func memberHome(declaration *ast.Node) *ast.Node {
 }
 
 // member prints one property: `readonly name?: T`, or a method as `name(p: T): R`.
+//
+// An optional member's type is the one TypeScript's own printer starts from, without the missing type the `?` already
+// says (#sp4xwtj). Under exactOptionalPropertyTypes that is only the marker, so `y?: number` prints as written and a
+// written `y?: number | undefined` keeps its undefined, and a synthesized `y?:` member prints `never`, as TypeToString
+// prints it. Without the option the marker is undefined itself, `y?: number` and `y?: number | undefined` are one
+// type, and it prints `| undefined`: TypeToString drops it only where it reuses a written annotation.
 func (p *stableTypePrinter) member(property *ast.Symbol, depth int) string {
 	name := StablePropertyName(property.Name)
 	if property.Flags&ast.SymbolFlagsOptional != 0 {
 		name += "?"
 	}
-	propertyType := p.typeChecker.GetTypeOfSymbol(property)
+	propertyType := checker.Checker_getNonMissingTypeOfSymbol(p.typeChecker, property)
 	if property.Flags&ast.SymbolFlagsMethod != 0 {
 		if signatures := p.typeChecker.GetSignaturesOfType(propertyType, checker.SignatureKindCall); len(signatures) == 1 {
 			return name + p.signature(signatures[0], ": ", depth)

@@ -77,7 +77,8 @@ var InvariantMutable = rule.Rule{
 			return !walker.IsAssignable(pair.Target, pair.Source), true
 		}
 		return walker.Listeners(func(site flow.Site) {
-			found, wrong := walker.Walk(site, judge)
+			// Object intersections are this rule's to pair, and no other's (#b9a0wgy).
+			found, wrong := walker.WalkWith(site, judge, flow.WalkOptions{ObjectIntersections: true})
 			if !wrong {
 				return
 			}
