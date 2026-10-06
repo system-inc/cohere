@@ -625,9 +625,9 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 				if !split || replacement == predecessor {
 					continue
 				}
-				value := phi.Operands[predecessor]
-				delete(phi.Operands, predecessor)
-				phi.Operands[replacement] = value
+				value := phi.Operands.At(predecessor)
+				phi.Operands.Delete(predecessor)
+				phi.Operands.Set(replacement, value)
 				result.PhiOperandsRekeyed++
 			}
 		}

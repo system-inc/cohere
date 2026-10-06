@@ -136,10 +136,10 @@ func TestMergeLeavesTheGraphResolvable(t *testing.T) {
 				block.Id, target)
 		}
 		for _, phi := range block.Phis {
-			for predecessor := range phi.Operands {
-				if !held[predecessor] {
+			for _, entry := range phi.Operands {
+				if !held[entry.Predecessor] {
 					t.Errorf("the phi in block %d takes an operand from block %d, which was "+
-						"merged away", block.Id, predecessor)
+						"merged away", block.Id, entry.Predecessor)
 				}
 			}
 		}

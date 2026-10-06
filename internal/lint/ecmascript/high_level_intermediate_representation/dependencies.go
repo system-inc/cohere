@@ -1237,19 +1237,14 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 		}
 
 		// Phi operands are visited before the instructions, because a phi is conceptually evaluated
-		// on entry to the block. `Phi.Operands` is a Go map, so the ordered accessor is required:
-		// ranging it directly would make the output order vary between runs.
+		// on entry to the block, and in ascending predecessor order so the output order is the same
+		// between runs.
 		for _, phi := range block.Phis {
-			// `PhiOperandsInOrder` returns the PREDECESSOR block ids in sorted order, because
-			// `Phi.Operands` is a Go map and ranging it directly would vary between runs.
+			// `PhiOperandsInOrder` returns the PREDECESSOR block ids in sorted order, the order
+			// `Phi.Operands` keeps.
 			//
-			// # A mutation replacing this with a bare map range SURVIVES, and the reason is not
-			// that a fixture is missing
-			//
-			// The first reading assumed the sweep had found a test gap and a determinism fixture
-			// repeated forty times was written for it. It still survived, which is the signal that
-			// the HYPOTHESIS was wrong rather than the fixture weak, so the fixture was removed
-			// rather than strengthened.
+			// # The order cannot be observed here today, and the reason is not that a fixture is
+			// missing
 			//
 			// The real reason, measured: every phi in this tree sits OUTSIDE every reactive scope.
 			// On a fixture with a multi-operand phi carrying two distinct operand values, phis
@@ -1257,12 +1252,12 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 			// when the dependency stack is empty, so no phi operand currently reaches the output at
 			// all and their order cannot be observed.
 			//
-			// The ordered accessor is kept anyway, for the reason `Sets` sorts in `scopes.go`: the
-			// cost is one sort and the alternative is a latent nondeterminism that appears the day
-			// the scopes widen. This verdict EXPIRES the moment a scope contains a phi -- which
-			// `AlignReactiveScopes` widening a scope across a control-flow join would produce.
+			// The fixed order is kept anyway, for the reason `Sets` sorts in `scopes.go`: the
+			// alternative is a latent nondeterminism that appears the day the scopes widen. This
+			// verdict EXPIRES the moment a scope contains a phi -- which `AlignReactiveScopes`
+			// widening a scope across a control-flow join would produce.
 			for _, predecessor := range PhiOperandsInOrder(phi) {
-				c.visitDependency(c.temporaries.resolve(phi.Operands[predecessor]))
+				c.visitDependency(c.temporaries.resolve(phi.Operands.At(predecessor)))
 			}
 		}
 

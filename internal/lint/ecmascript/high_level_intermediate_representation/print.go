@@ -56,14 +56,14 @@ func printFunction(out *strings.Builder, function *Function, depth int) {
 		}
 		out.WriteString(":\n")
 
-		// Operands are read through PhiOperandsInOrder rather than by ranging the map. Go
-		// randomises map iteration, so printing them directly would make the same function render
-		// differently between runs, which TestLowerIsDeterministic exists to catch.
+		// Operands are read through PhiOperandsInOrder, ascending predecessor order, so the same
+		// function renders the same way between runs, which TestLowerIsDeterministic exists to
+		// catch.
 		for _, phi := range block.Phis {
 			operands := make([]string, 0, len(phi.Operands))
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
 				operands = append(operands, fmt.Sprintf("bb%d: %s",
-					predecessorId, function.PlaceString(phi.Operands[predecessorId])))
+					predecessorId, function.PlaceString(phi.Operands.At(predecessorId))))
 			}
 			fmt.Fprintf(out, "%s  %s = phi(%s)\n",
 				indent, function.PlaceString(phi.Place), strings.Join(operands, ", "))

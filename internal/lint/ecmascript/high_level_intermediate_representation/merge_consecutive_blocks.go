@@ -19,6 +19,8 @@
 // again and the markers sit where they sat before.
 package high_level_intermediate_representation
 
+import "slices"
+
 // MergeConsecutiveBlocks collapses each block into its predecessor where control always flows from
 // one to the other, and reports how many blocks were merged away.
 //
@@ -134,19 +136,20 @@ func MergeConsecutiveBlocks(function *Function) int {
 	function.Blocks = survivors
 
 	// A phi operand keyed by a block that no longer exists reads from an edge that is gone. Rekey
-	// to whatever the predecessor was merged into.
+	// to whatever the predecessor was merged into. The walk is over a copy, because rekeying
+	// deletes from and inserts into the sorted slice it would otherwise be ranging.
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
 		}
 		for _, phi := range block.Phis {
-			for predecessor, operand := range phi.Operands {
-				mapped := resolve(predecessor)
-				if mapped == predecessor {
+			for _, entry := range slices.Clone(phi.Operands) {
+				mapped := resolve(entry.Predecessor)
+				if mapped == entry.Predecessor {
 					continue
 				}
-				delete(phi.Operands, predecessor)
-				phi.Operands[mapped] = operand
+				phi.Operands.Delete(entry.Predecessor)
+				phi.Operands.Set(mapped, entry.Place)
 			}
 		}
 	}
@@ -185,8 +188,5 @@ func singlePhiOperand(phi *Phi) (Place, bool) {
 	if len(phi.Operands) != 1 {
 		return Place{}, false
 	}
-	for _, operand := range phi.Operands {
-		return operand, true
-	}
-	return Place{}, false
+	return phi.Operands[0].Place, true
 }

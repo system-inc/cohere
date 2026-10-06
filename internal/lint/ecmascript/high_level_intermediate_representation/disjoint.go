@@ -112,14 +112,14 @@
 // answer, it exhausts the stack -- the same silent-failure shape the ranges pass records for its own
 // termination, and the reason both are proven empirically rather than asserted.
 //
-// # Iteration order, and the map that would otherwise leak into the answer
+// # Iteration order
 //
-// `Phi.Operands` is a Go map with randomised iteration order, so it is read through
+// `Phi.Operands` is kept sorted by predecessor block id, and it is read through
 // `PhiOperandsInOrder` here exactly as `reactive.go` reads it. Union is order-INDEPENDENT in its
 // final partition -- the classes are the same whichever order the merges happen in -- but the chosen
 // REPRESENTATIVE is not, and the representative is what a consumer keys on. A pass whose answer is
-// stable but whose key is randomised produces a table that differs between runs, which is the shape
-// that makes a cache non-deterministic. Reading in sorted order removes it.
+// stable but whose key varies between runs produces a table that differs between runs, which is the
+// shape that makes a cache non-deterministic. Reading in a fixed order removes it.
 package high_level_intermediate_representation
 
 import (
@@ -371,15 +371,14 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 			if declaration, present := declarations[declarationOf(function, phi.Place.Identifier)]; present {
 				operands = append(operands, declaration)
 			}
-			// Read through PhiOperandsInOrder because `Phi.Operands` is a Go map.
+			// Read through PhiOperandsInOrder, ascending predecessor order, the order
+			// `Phi.Operands` keeps.
 			//
-			// # This is DEFENSIVE rather than load-bearing, and a mutation proved it
+			// # The order is DEFENSIVE rather than load-bearing
 			//
-			// Replacing this with a bare `range phi.Operands` SURVIVES the sweep, and it is a
-			// genuine equivalence rather than a fixture gap. The reason is a property of `Union`:
-			// the class representative is taken from `items[0]`, which is the phi, and every operand
-			// is adopted under that root regardless of the order they are offered in. So neither the
-			// partition nor the representative can depend on this loop's order.
+			// Neither the partition nor the representative depends on this loop's order, a property
+			// of `Union`: the class representative is taken from `items[0]`, which is the phi, and
+			// every operand is adopted under that root regardless of the order they are offered in.
 			//
 			// Verified directly rather than reasoned about: `Union([phi, decl, opA, opB])` and
 			// `Union([phi, decl, opB, opA])` produce the same class and the same root. The order
@@ -387,12 +386,11 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 			// `{3,2}` roots at 3, while `{3,2}` then `{1,2}` roots at 1 -- and that ordering is the
 			// block and instruction walk, which is deterministic already.
 			//
-			// Kept because it costs nothing, because it is what `reactive.go` does with the same
-			// map, and because the equivalence rests on `Union` keeping its current
-			// representative rule. A future change there would make this load-bearing again with
-			// nothing to announce it.
+			// A fixed order is kept because it is what `reactive.go` does too, and because the
+			// equivalence rests on `Union` keeping its current representative rule. A future change
+			// there would make the order load-bearing with nothing to announce it.
 			for _, blockId := range PhiOperandsInOrder(phi) {
-				operands = append(operands, phi.Operands[blockId].Identifier)
+				operands = append(operands, phi.Operands.At(blockId).Identifier)
 			}
 			scopeIdentifiers.Union(operands)
 		}

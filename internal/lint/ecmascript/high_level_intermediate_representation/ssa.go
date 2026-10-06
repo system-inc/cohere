@@ -63,8 +63,6 @@
 // reads `InstructionKind` yet and a reclassification no pass consumes is untested by construction.
 package high_level_intermediate_representation
 
-import "sort"
-
 // Construct converts a function to single static assignment form, in place, and recursively for
 // every nested function.
 //
@@ -433,15 +431,15 @@ func (b *ssaBuilder) addPhi(blockId BlockId, original Place, renamed Place) {
 		return
 	}
 
-	operands := make(map[BlockId]Place, len(block.Predecessors))
+	operands := make(PhiOperands, 0, len(block.Predecessors))
 	for _, predecessorId := range block.Predecessors {
 		lookup := original
-		operands[predecessorId] = Place{
+		operands.Set(predecessorId, Place{
 			Identifier: b.valueAt(&lookup, predecessorId),
 			Effect:     original.Effect,
 			Reactive:   original.Reactive,
 			Range:      original.Range,
-		}
+		})
 	}
 
 	block.Phis = append(block.Phis, &Phi{Place: renamed, Operands: operands})
@@ -483,17 +481,15 @@ func (b *ssaBuilder) renameReturns() {
 	}
 }
 
-// PhiOperandsInOrder returns a phi's operands keyed by predecessor, in ascending block order.
+// PhiOperandsInOrder returns a phi's predecessor block ids, in ascending block order.
 //
-// `Phi.Operands` is a map, and Go randomises map iteration deliberately. Any pass that prints,
-// hashes, or compares phis must read them through here, or the same input produces different output
-// between runs. `TestLowerIsDeterministic` in lower_corpus_test.go is what catches a caller that
-// forgets.
+// `Phi.Operands` is kept sorted by predecessor block id, so this is its predecessor ids in that
+// order, read straight off the slice. `TestLowerIsDeterministic` in lower_corpus_test.go is what
+// catches output that varies between runs.
 func PhiOperandsInOrder(phi *Phi) []BlockId {
 	blocks := make([]BlockId, 0, len(phi.Operands))
-	for blockId := range phi.Operands {
-		blocks = append(blocks, blockId)
+	for _, operand := range phi.Operands {
+		blocks = append(blocks, operand.Predecessor)
 	}
-	sort.Slice(blocks, func(i, j int) bool { return blocks[i] < blocks[j] })
 	return blocks
 }
