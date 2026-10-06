@@ -179,6 +179,27 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			func(fixture *runCacheFixture) {
 				fixture.write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			}},
+		// The two above under a config that names its sets, which is read on its own goroutine beside the graph
+		// build (lintConfigAhead) rather than after it. The read moved; the declaration of what it read did not,
+		// and these show the run cache still names the config and the base it extends on that path.
+		{"the lint config changed, on a config read ahead of the build", false,
+			func(fixture *runCacheFixture) {
+				fixture.write("CohereSettings.json", `{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+				fixture.requireConfigReadAhead()
+			},
+			func(fixture *runCacheFixture) {
+				fixture.write("CohereSettings.json", `{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+			}},
+		{"a base the lint config extends changed, on a config read ahead of the build", false,
+			func(fixture *runCacheFixture) {
+				// A base beside a set may configure only rules no set in the chain does, so it holds one of its own.
+				fixture.write("lint/base.json", `{"rules":{"no-console":"off"}}`)
+				fixture.write("CohereSettings.json", `{"extends":["cohere:react","./lint/base.json"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
+				fixture.requireConfigReadAhead()
+			},
+			func(fixture *runCacheFixture) {
+				fixture.write("lint/base.json", `{"rules":{"no-console":"error"}}`)
+			}},
 		{"the tsconfig changed", false, nil,
 			func(fixture *runCacheFixture) {
 				fixture.write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
@@ -503,6 +524,16 @@ func (fixture *runCacheFixture) write(name, contents string) {
 	}
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		fixture.t.Fatal(err)
+	}
+}
+
+// requireConfigReadAhead fails the scenario unless the fixture's lint config is one startLintConfigAhead reads
+// beside the build. A config that names no set is zero config, read after the build as it always was, so a
+// scenario meant for the ahead path would pass on the other one and prove nothing about it.
+func (fixture *runCacheFixture) requireConfigReadAhead() {
+	fixture.t.Helper()
+	if usesHouseSets(projectLocation{LintConfigFileName: filepath.Join(fixture.root, "CohereSettings.json")}) {
+		fixture.t.Fatal("the fixture's lint config is zero config, so it is read after the build, not ahead of it")
 	}
 }
 
