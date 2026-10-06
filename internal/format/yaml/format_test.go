@@ -131,7 +131,7 @@ func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bo
 	if tree.err != "" {
 		return "", fmt.Errorf("the parser failed: %s", tree.err)
 	}
-	formatted, err := printFile(fileName, tree.root, text, options, proseWrap, textToDoc)
+	formatted, err := printFile(fileName, tree.root, text, options, proseWrap, textToDoc, 0)
 	if err != nil {
 		return "", err
 	}

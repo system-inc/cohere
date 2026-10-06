@@ -46,6 +46,16 @@ func (arena *Arena[T]) New(value T) *T {
 	return slot
 }
 
+// Len is how many values the arena has handed out since it was made or Reset, zero for a nil arena. A tree
+// built from one arena has as many nodes as it, less any it built and dropped, which is the cheap count
+// printing.Options.NodeCount asks for (#4bq8vyn).
+func (arena *Arena[T]) Len() int {
+	if arena == nil {
+		return 0
+	}
+	return arena.chunk*chunkLength[T]() + arena.used
+}
+
 // Reset releases every value the arena has handed out, for the next user to reuse. Nothing may read a
 // value handed out before.
 func (arena *Arena[T]) Reset() {
