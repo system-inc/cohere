@@ -140,14 +140,14 @@
 // `Construct` in ssa.go is what makes them reaching definitions, and it also fills `Block.Phis`.
 // A pass that reasons about values should run it; a pass that only walks control flow need not.
 //
-// No type inference, no effect inference, no optimisation, and no rule. `Place.Effect` and
-// `Identifier.Type` exist, are threaded through lowering, and are left at their zero values -
-// `EffectUnknown` and nil. They are declared for the same reason `Phis` is: a pass that adds a
-// field mid-flight is a pass that invalidates every existing match.
+// No type inference, no effect inference, no optimisation, and no rule. `Place.Effect` is threaded
+// through lowering and left `EffectUnknown`. The IR carries no type: a pass that wants one asks the
+// checker through `Identifier.Node`.
 package high_level_intermediate_representation
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -402,23 +402,66 @@ func (k BlockKind) String() string {
 // Phi is a merge: the value of Place at the top of a block, given which predecessor control came
 // from.
 //
-// Operands is keyed by predecessor block, and there is exactly one entry per entry in the block's
-// Predecessors.
+// Operands holds one entry per entry in the block's Predecessors, kept sorted by predecessor block id,
+// so ranging it is deterministic and is the order `PhiOperandsInOrder` has always given.
 //
-// # Read the operands through PhiOperandsInOrder, never by ranging this map
-//
-// Go randomises map iteration deliberately, so ranging Operands directly makes the same function
-// print, hash, or compare differently between runs. `BasicBlock.Predecessors` is a slice precisely
-// because phi operands need a deterministic order, and a map cannot supply one. The ordered read is
-// `PhiOperandsInOrder`; the printer uses it and `TestLowerIsDeterministic` is what catches a caller
-// that forgets.
-//
-// The map is kept rather than replaced by a slice because the natural question at a phi is "what
-// came from THIS predecessor", which is a lookup, and every ordered walk already has the
-// predecessor list to hand.
+// It was a `map[BlockId]Place`, kept for the lookup "what came from THIS predecessor". A phi has two or
+// three operands, where a map's smallest allocation holds eight and a linear scan beats a hash, so the
+// map cost 41 MB over 533K phis on a cold ahra run for nothing a short sorted slice cannot answer
+// (#p4h0p54). The lookup is `Operands.At` or `Operands.Get`.
 type Phi struct {
 	Place    Place
-	Operands map[BlockId]Place
+	Operands PhiOperands
+}
+
+// PhiOperand is the value a phi takes when control arrives from Predecessor.
+type PhiOperand struct {
+	Predecessor BlockId
+	Place       Place
+}
+
+// PhiOperands is a phi's operands, sorted by predecessor block id with at most one entry each.
+type PhiOperands []PhiOperand
+
+// index is where predecessor's entry is, or where it would go, and whether it is there.
+func (operands PhiOperands) index(predecessor BlockId) (int, bool) {
+	for index, operand := range operands {
+		if operand.Predecessor >= predecessor {
+			return index, operand.Predecessor == predecessor
+		}
+	}
+	return len(operands), false
+}
+
+// Get is the operand from predecessor, and whether there is one.
+func (operands PhiOperands) Get(predecessor BlockId) (Place, bool) {
+	if index, found := operands.index(predecessor); found {
+		return operands[index].Place, true
+	}
+	return Place{}, false
+}
+
+// At is the operand from predecessor, or the zero Place when there is none, as the map's index was.
+func (operands PhiOperands) At(predecessor BlockId) Place {
+	place, _ := operands.Get(predecessor)
+	return place
+}
+
+// Set makes place the operand from predecessor, replacing one already there.
+func (operands *PhiOperands) Set(predecessor BlockId, place Place) {
+	index, found := operands.index(predecessor)
+	if found {
+		(*operands)[index].Place = place
+		return
+	}
+	*operands = slices.Insert(*operands, index, PhiOperand{Predecessor: predecessor, Place: place})
+}
+
+// Delete removes the operand from predecessor, if there is one.
+func (operands *PhiOperands) Delete(predecessor BlockId) {
+	if index, found := operands.index(predecessor); found {
+		*operands = slices.Delete(*operands, index, index+1)
+	}
 }
 
 // Instruction is one operation: a value computed and stored into an lvalue.
@@ -470,12 +513,6 @@ type Identifier struct {
 	// that by falling back to the defining instruction's Node, which is why Instruction keeps one
 	// too.
 	Node *ast.Node
-
-	// Type is left nil by lowering. Declared so a later inference pass adds no field.
-	Type any
-
-	// Scope is left nil by lowering. Reserved for reactive-scope construction, which may never run.
-	Scope any
 }
 
 // Place is a reference to a value at one point in the program, plus what this reference does to it.

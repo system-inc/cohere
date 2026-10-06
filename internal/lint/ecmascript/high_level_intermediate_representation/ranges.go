@@ -242,11 +242,9 @@ func RangeGaps() []RangeGap {
 // # Why a side table rather than a field on Identifier
 //
 // Upstream stores the range ON the identifier, `identifier.mutableRange`, and oxc does the same in
-// its `Environment`. This does not, and the reason is ownership rather than design preference:
-// `Identifier` lives in `high_level_intermediate_representation.go`, which is a shared file, and Stage 1 effect inference is being
-// built in this package at the same time as this. A pass that adds a field to a shared struct
-// mid-flight is a pass that conflicts with whatever else is editing it, and the package comment on
-// `Identifier.Type` already records that fields are declared up front precisely to avoid that.
+// its `Environment`. This does not, and the reason was ownership rather than design preference:
+// `Identifier` lives in `high_level_intermediate_representation.go`, which was a shared file while
+// Stage 1 effect inference was built in this package beside this pass.
 //
 // The cost is one indirection and one thing a caller must hold. The benefit is that this pass is
 // self-contained in one file, which is what makes it reviewable against upstream without reading
@@ -647,8 +645,7 @@ func MutationSites(function *Function) []MutationSite {
 // invariant untestable. An empty result is the passing answer.
 //
 // The returned ids are sorted, so a failure message is stable between runs. A map is the storage
-// and Go randomises its iteration, which is the same hazard `Phi.Operands` carries and which the
-// package has already been bitten by once.
+// and Go randomises its iteration, a hazard the package has already been bitten by once.
 func ValidateMutableRanges(ranges *MutableRanges) []IdentifierId {
 	if ranges == nil || ranges.ranges == nil {
 		return nil
@@ -802,9 +799,9 @@ const (
 // unconditionally. Collapsing them into one adjacency list would lose exactly those distinctions.
 //
 // Insertion order matters for the maps upstream (`FxIndexMap` in oxc, a JavaScript `Map` in React),
-// so this keeps an explicit key slice beside each map rather than ranging a Go map. `Phi.Operands`
-// being a Go map has already cost this package one defect, and a nondeterministic traversal order
-// here would produce a range table that differs between runs on any function with two edges.
+// so this keeps an explicit key slice beside each map rather than ranging a Go map. Ranging a Go
+// map for its order has already cost this package one defect, and a nondeterministic traversal
+// order here would produce a range table that differs between runs on any function with two edges.
 type aliasingNode struct {
 	id IdentifierId
 
@@ -1001,7 +998,7 @@ func (s *aliasingState) derivePhiImmutable(phi *Phi, seenBlocks map[BlockId]bool
 		if !seenBlocks[predecessor] {
 			return
 		}
-		operandKind, present := s.immutable[phi.Operands[predecessor].Identifier]
+		operandKind, present := s.immutable[phi.Operands.At(predecessor).Identifier]
 		if !present {
 			hasMutable = true
 			continue
@@ -1426,15 +1423,15 @@ func buildAliasingGraphWithContextKinds(function *Function, effects *AliasingEff
 			state.create(phi.Place, aliasingNodePhi)
 			operands := make([]Place, 0, len(phi.Operands))
 			for _, predecessor := range PhiOperandsInOrder(phi) {
-				operands = append(operands, phi.Operands[predecessor])
+				operands = append(operands, phi.Operands.At(predecessor))
 			}
 			state.recordFreezeSources(phi.Place.Identifier, operands)
 			state.derivePhiImmutable(phi, seenBlocks)
-			// Deterministic operand order. `Phi.Operands` is a Go map and ranging it directly would
-			// assign indices nondeterministically, which changes which edges a mutation can see and
-			// therefore produces a different range table between runs of the same input.
+			// Deterministic operand order, ascending predecessor id. Assigning indices in an order
+			// that varied would change which edges a mutation can see and therefore produce a
+			// different range table between runs of the same input.
 			for _, predecessor := range PhiOperandsInOrder(phi) {
-				operand := phi.Operands[predecessor]
+				operand := phi.Operands.At(predecessor)
 				if !seenBlocks[predecessor] {
 					// A back edge: the predecessor has not been walked yet, so the operand's node
 					// may not exist. Upstream defers these to the predecessor block and still

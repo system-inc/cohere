@@ -14,8 +14,8 @@ import (
 // # This diverges from upstream and the divergence is deliberate
 //
 // Upstream's guard is `isUseRefType(identifier) && path[0].property === 'current'`. The type half is
-// not expressible here -- `Identifier.Type` is nil throughout this IR, which is what
-// `DependencyGapTypeExclusions` records -- so only the property name is tested.
+// not expressible here -- the IR carries no type, which is what `DependencyGapTypeExclusions`
+// records -- so only the property name is tested.
 //
 // The cost is that a value named `current` on a non-ref object is truncated where upstream keeps the
 // path. That is the safe direction: the scope then depends on the whole object and invalidates more

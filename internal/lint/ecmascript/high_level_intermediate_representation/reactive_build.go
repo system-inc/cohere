@@ -933,7 +933,7 @@ func (c *reactiveContext) valueJoinPlace(continuation BlockId,
 	for _, phi := range block.Phis {
 		matches := true
 		for _, result := range results {
-			operand, ok := phi.Operands[result.block]
+			operand, ok := phi.Operands.Get(result.block)
 			if !ok || operand.Identifier != result.place.Identifier {
 				matches = false
 				break

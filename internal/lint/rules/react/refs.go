@@ -1168,8 +1168,8 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 
 		for _, phi := range block.Phis {
 			operandTypes := make([]*refsAccessType, 0, len(phi.Operands))
-			for _, operand := range phi.Operands {
-				operandTypes = append(operandTypes, env.get(operand.Identifier))
+			for _, entry := range phi.Operands {
+				operandTypes = append(operandTypes, env.get(entry.Place.Identifier))
 			}
 			env.set(phi.Place.Identifier, refsJoinMany(operandTypes, env.nextRefId))
 		}

@@ -394,11 +394,10 @@ func (unit *purityUnit) walk(function *high_level_intermediate_representation.Fu
 		// React: `let r = Math.random; if (c) { r = Date.now; } r();` reports, and the name it
 		// prints is whichever path the merge kept.
 		for _, phi := range block.Phis {
-			// `Operands` is a map keyed by predecessor block, so ranging it directly picks a
-			// nondeterministic operand. That is invisible in a rule whose phi merge only decides a
-			// boolean, which is why `static_components.go` can range it, and it is NOT invisible
-			// here: the operand chosen is the builtin the message NAMES. Measured on
-			// `let r = Math.random; if (c) { r = Date.now; } r();`, ranging the map produced
+			// Which operand wins is invisible in a rule whose phi merge only decides a boolean, as
+			// in `static_components.go`, and it is NOT invisible here: the operand chosen is the
+			// builtin the message NAMES. Measured on
+			// `let r = Math.random; if (c) { r = Date.now; } r();`, an unordered walk produced
 			// `Math.random` on some runs and `Date.now` on others, and React always says
 			// `Date.now`.
 			//
@@ -407,13 +406,13 @@ func (unit *purityUnit) walk(function *high_level_intermediate_representation.Fu
 			// that is the write that appears last in the source, which is what React prints.
 			var merged purityValue
 			var mergedFrom high_level_intermediate_representation.BlockId
-			for predecessor, operand := range phi.Operands {
-				incoming, ok := values[operand.Identifier]
+			for _, entry := range phi.Operands {
+				incoming, ok := values[entry.Place.Identifier]
 				if !ok || incoming.Kind == purityValueNothing {
 					continue
 				}
-				if merged.Kind == purityValueNothing || predecessor > mergedFrom {
-					merged, mergedFrom = incoming, predecessor
+				if merged.Kind == purityValueNothing || entry.Predecessor > mergedFrom {
+					merged, mergedFrom = incoming, entry.Predecessor
 				}
 			}
 			if merged.Kind != purityValueNothing {

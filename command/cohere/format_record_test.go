@@ -315,9 +315,13 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	// whenever another node edited it between builds, and the second build then discarded the record:
 	// the test failed about one run in three, measuring the tree's churn rather than the record's rule.
 	snapshot := sourceSnapshot(t)
-	// The three differ only in what the linker stamps, so every package compiles once and comes from the
-	// build cache for the other two, and the three links run at once: one after another they were most
-	// of this test's time (#nxgt2ca).
+	// The three differ only in what the linker stamps. The first builds alone, compiling every package,
+	// and the other two link at once from what it left in the build cache: one after another the links
+	// were most of this test's time (#nxgt2ca), and all three started together each compiled every
+	// package, since go does not share a compile in flight between processes: three times the work, beside
+	// the pool's budget (load 58 on 16 cores with two runs, #91m7c16). -trimpath keeps the snapshot's
+	// directory out of every package's cache key, so a run reuses what the last run compiled rather than
+	// compiling the whole program cold from a new directory each time.
 	stamps := []struct{ selfCommit, formatter string }{
 		{strings.Repeat("1", 40), "formatterA"},
 		{strings.Repeat("2", 40), "formatterA"},
@@ -325,20 +329,26 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	}
 	binaries := make([]string, len(stamps))
 	failures := make([]string, len(stamps))
-	var builds sync.WaitGroup
-	for index, stamp := range stamps {
+	build := func(index int) {
+		const packaging = "github.com/system-inc/cohere/internal/release/packaging"
+		stamp := stamps[index]
 		binaries[index] = filepath.Join(t.TempDir(), "cohere")
-		builds.Go(func() {
-			const packaging = "github.com/system-inc/cohere/internal/release/packaging"
-			build := exec.Command("go", "build", "-buildvcs=false", "-o", binaries[index],
-				"-ldflags=-X "+packaging+".selfCommit="+stamp.selfCommit+" -X "+packaging+".formatterIdentity="+stamp.formatter, "./command/cohere")
-			build.Dir = snapshot
-			if output, err := build.CombinedOutput(); err != nil {
-				failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, err, output)
-			}
-		})
+		command := exec.Command("go", "build", "-buildvcs=false", "-trimpath", "-o", binaries[index],
+			"-ldflags=-X "+packaging+".selfCommit="+stamp.selfCommit+" -X "+packaging+".formatterIdentity="+stamp.formatter, "./command/cohere")
+		command.Dir = snapshot
+		if output, err := command.CombinedOutput(); err != nil {
+			failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, err, output)
+		}
 	}
-	builds.Wait()
+	build(0)
+	if failures[0] != "" {
+		t.Fatal(failures[0])
+	}
+	var links sync.WaitGroup
+	for index := 1; index < len(stamps); index++ {
+		links.Go(func() { build(index) })
+	}
+	links.Wait()
 	for _, failure := range failures {
 		if failure != "" {
 			t.Fatal(failure)

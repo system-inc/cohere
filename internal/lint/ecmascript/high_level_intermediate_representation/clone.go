@@ -1,7 +1,10 @@
 // Copying a finished graph, so a pass that rewrites one can start from the shared lowering.
 package high_level_intermediate_representation
 
-import "maps"
+import (
+	"maps"
+	"slices"
+)
 
 // CloneFunction returns a function that shares no storage a pass can write with its argument.
 //
@@ -11,9 +14,8 @@ import "maps"
 // builder, reverse postorder and single-assignment construction a second time. A copy pays for the
 // finished tables only.
 //
-// What is shared and why: `*ast.Node` and the checker types reachable through `Identifier.Type` are
-// the program, which no pass writes. `Identifier.Scope` is shared as an opaque value, because no
-// pass writes it either; the reactive scopes live in their own side table. Everything else is copied,
+// What is shared and why: `*ast.Node` is the program, which no pass writes, and the reactive scopes
+// live in their own side table. Everything else is copied,
 // blocks, instructions, identifiers, phis and nested functions, and the instruction values and
 // terminals go through the same reflective copy the inliner uses, for the reason `deepCopyAny` gives.
 //
@@ -58,7 +60,7 @@ func CloneFunction(function *Function) *Function {
 			copied.Phis = make([]*Phi, len(block.Phis))
 			for index, phi := range block.Phis {
 				if phi != nil {
-					copied.Phis[index] = &Phi{Place: phi.Place, Operands: maps.Clone(phi.Operands)}
+					copied.Phis[index] = &Phi{Place: phi.Place, Operands: slices.Clone(phi.Operands)}
 				}
 			}
 		}

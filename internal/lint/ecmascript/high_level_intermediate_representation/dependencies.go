@@ -156,8 +156,8 @@ const (
 	// `isRefValueType`) and an object method (`Type::ObjectMethod`). Both are EXCLUSIONS, so their
 	// absence can only ADD dependencies, never drop one.
 	//
-	// `Identifier.Type` is declared `any` in this IR and left nil by lowering: measured over the
-	// corpus, 0 of 110,265 identifiers carry a type. So neither predicate is expressible. The
+	// This IR carries no type (measured when it still had an always-nil type field: 0 of 110,265
+	// identifiers over the corpus carried one). So neither predicate is expressible. The
 	// exposure was measured rather than estimated: 7 `ObjectMethod` instructions and 3 `.current`
 	// property loads across 4,766 loads in 677 functions. The object-method half is recoverable
 	// structurally -- an `ObjectMethod` INSTRUCTION is identifiable without types -- and is applied
@@ -960,8 +960,8 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 	// Upstream's `visitDependency` does the same, with the comment "ref.current access is not a
 	// valid dep", and truncates the path to empty. Its guard is
 	// `isUseRefType(identifier) && path[0].property === 'current'`, and the type half is not
-	// expressible here -- `Identifier.Type` is nil throughout, which is what
-	// `DependencyGapTypeExclusions` records.
+	// expressible here -- the IR carries no type, which is what `DependencyGapTypeExclusions`
+	// records.
 	//
 	// Taking the name half alone is a DIVERGENCE and is measured rather than assumed safe: a value
 	// named `current` on a non-ref object would be truncated where upstream keeps the path, which
@@ -1237,19 +1237,14 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 		}
 
 		// Phi operands are visited before the instructions, because a phi is conceptually evaluated
-		// on entry to the block. `Phi.Operands` is a Go map, so the ordered accessor is required:
-		// ranging it directly would make the output order vary between runs.
+		// on entry to the block, and in ascending predecessor order so the output order is the same
+		// between runs.
 		for _, phi := range block.Phis {
-			// `PhiOperandsInOrder` returns the PREDECESSOR block ids in sorted order, because
-			// `Phi.Operands` is a Go map and ranging it directly would vary between runs.
+			// `PhiOperandsInOrder` returns the PREDECESSOR block ids in sorted order, the order
+			// `Phi.Operands` keeps.
 			//
-			// # A mutation replacing this with a bare map range SURVIVES, and the reason is not
-			// that a fixture is missing
-			//
-			// The first reading assumed the sweep had found a test gap and a determinism fixture
-			// repeated forty times was written for it. It still survived, which is the signal that
-			// the HYPOTHESIS was wrong rather than the fixture weak, so the fixture was removed
-			// rather than strengthened.
+			// # The order cannot be observed here today, and the reason is not that a fixture is
+			// missing
 			//
 			// The real reason, measured: every phi in this tree sits OUTSIDE every reactive scope.
 			// On a fixture with a multi-operand phi carrying two distinct operand values, phis
@@ -1257,12 +1252,12 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 			// when the dependency stack is empty, so no phi operand currently reaches the output at
 			// all and their order cannot be observed.
 			//
-			// The ordered accessor is kept anyway, for the reason `Sets` sorts in `scopes.go`: the
-			// cost is one sort and the alternative is a latent nondeterminism that appears the day
-			// the scopes widen. This verdict EXPIRES the moment a scope contains a phi -- which
-			// `AlignReactiveScopes` widening a scope across a control-flow join would produce.
+			// The fixed order is kept anyway, for the reason `Sets` sorts in `scopes.go`: the
+			// alternative is a latent nondeterminism that appears the day the scopes widen. This
+			// verdict EXPIRES the moment a scope contains a phi -- which `AlignReactiveScopes`
+			// widening a scope across a control-flow join would produce.
 			for _, predecessor := range PhiOperandsInOrder(phi) {
-				c.visitDependency(c.temporaries.resolve(phi.Operands[predecessor]))
+				c.visitDependency(c.temporaries.resolve(phi.Operands.At(predecessor)))
 			}
 		}
 

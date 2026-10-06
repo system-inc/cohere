@@ -82,16 +82,16 @@ func EliminateRedundantPhis(function *Function) {
 func redundantPhiValue(phi *Phi) (IdentifierId, bool) {
 	var candidate IdentifierId
 	found := false
-	for _, operand := range phi.Operands {
-		if operand.Identifier == phi.Place.Identifier {
+	for _, entry := range phi.Operands {
+		if entry.Place.Identifier == phi.Place.Identifier {
 			continue
 		}
 		if !found {
-			candidate = operand.Identifier
+			candidate = entry.Place.Identifier
 			found = true
 			continue
 		}
-		if operand.Identifier != candidate {
+		if entry.Place.Identifier != candidate {
 			return 0, false
 		}
 	}
@@ -106,9 +106,8 @@ func applyRewrites(function *Function, resolve func(IdentifierId) IdentifierId) 
 	for _, block := range function.Blocks {
 		for _, phi := range block.Phis {
 			phi.Place.Identifier = resolve(phi.Place.Identifier)
-			for predecessorId, operand := range phi.Operands {
-				operand.Identifier = resolve(operand.Identifier)
-				phi.Operands[predecessorId] = operand
+			for index := range phi.Operands {
+				phi.Operands[index].Place.Identifier = resolve(phi.Operands[index].Place.Identifier)
 			}
 		}
 		for _, instructionId := range block.Instructions {
