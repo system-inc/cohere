@@ -64,17 +64,22 @@ func (arena *Arena[T]) Reset() {
 		if index == arena.chunk {
 			end = arena.used
 		}
-		released := arena.chunks[index][:end]
-		if poisonReleased {
-			for slot := range released {
-				released[slot] = arena.Poison
-			}
-			continue
-		}
-		// Cleared, so the strings and slices a released value held are not kept alive by the arena.
-		clear(released)
+		Release(arena.chunks[index][:end], arena.Poison)
 	}
 	arena.chunk, arena.used = 0, 0
+}
+
+// Release hands back values a caller keeps for its next use, as Reset does an arena's: cleared, so the
+// strings and slices they held are not kept alive, or under cohere_poison filled with poison, so a value
+// read after its release reads something no parse produces (#v6ksqg3).
+func Release[T any](values []T, poison T) {
+	if poisonReleased {
+		for index := range values {
+			values[index] = poison
+		}
+		return
+	}
+	clear(values)
 }
 
 // chunkLength is how many values of T fit in chunkBytes, at least 16.
