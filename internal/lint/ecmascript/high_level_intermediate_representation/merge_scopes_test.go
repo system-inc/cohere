@@ -674,8 +674,8 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 
 // TestMergeFunctionOperandSkipUpperBound bounds MergeGapPrimitiveOperandSkip.
 //
-// Upstream skips a primitive operand of a function expression or object method, and `Identifier.Type`
-// is nil here so the real gate cannot be asked. This measures the UPPER BOUND instead: skipping
+// Upstream skips a primitive operand of a function expression or object method, and the IR carries
+// no type, so the real gate cannot be asked. This measures the UPPER BOUND instead: skipping
 // every use-operand of every function expression, which is strictly more than the gate would skip.
 // The control is asserted in the same test, because a small delta from a probe that barely fires
 // would not be a useful bound.
@@ -683,7 +683,7 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	t.Parallel()
 
 	skipWithoutCorpus(t)
-	withoutGate, withGate, candidates, typed, total := 0, 0, 0, 0, 0
+	withoutGate, withGate, candidates := 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		withoutGate += MergeOverlappingReactiveScopes(function, scopes).Unions()
@@ -706,19 +706,10 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 				}
 			}
 		}
-		for _, identifier := range function.Identifiers {
-			if identifier == nil {
-				continue
-			}
-			total++
-			if identifier.Type != nil {
-				typed++
-			}
-		}
 	})
 
-	t.Logf("unions without the gate=%d, with it at its upper bound=%d; %d candidate operands; "+
-		"%d of %d identifiers carry a type", withoutGate, withGate, candidates, typed, total)
+	t.Logf("unions without the gate=%d, with it at its upper bound=%d; %d candidate operands",
+		withoutGate, withGate, candidates)
 
 	if candidates == 0 {
 		t.Fatal("no function-expression operands exist on this corpus, so the zero below is about " +
@@ -749,10 +740,6 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+
 			"size and the new one should be recorded", withoutGate, withGate,
 			withoutGate-withGate, knownGateDivergence)
-	}
-	if typed != 0 {
-		t.Log("identifiers now carry types, so the real Primitive gate can be asked and " +
-			"MergeGapPrimitiveOperandSkip can close")
 	}
 }
 

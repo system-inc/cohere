@@ -242,11 +242,9 @@ func RangeGaps() []RangeGap {
 // # Why a side table rather than a field on Identifier
 //
 // Upstream stores the range ON the identifier, `identifier.mutableRange`, and oxc does the same in
-// its `Environment`. This does not, and the reason is ownership rather than design preference:
-// `Identifier` lives in `high_level_intermediate_representation.go`, which is a shared file, and Stage 1 effect inference is being
-// built in this package at the same time as this. A pass that adds a field to a shared struct
-// mid-flight is a pass that conflicts with whatever else is editing it, and the package comment on
-// `Identifier.Type` already records that fields are declared up front precisely to avoid that.
+// its `Environment`. This does not, and the reason was ownership rather than design preference:
+// `Identifier` lives in `high_level_intermediate_representation.go`, which was a shared file while
+// Stage 1 effect inference was built in this package beside this pass.
 //
 // The cost is one indirection and one thing a caller must hold. The benefit is that this pass is
 // self-contained in one file, which is what makes it reviewable against upstream without reading

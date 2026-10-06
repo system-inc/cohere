@@ -353,10 +353,7 @@ func (b *ssaBuilder) useIn(blockId BlockId, place *Place) {
 // ask either.
 func (b *ssaBuilder) mint(original IdentifierId) IdentifierId {
 	source := b.function.Identifiers[original]
-	created := b.function.NewIdentifier(source.Name, source.Node, source.Declaration)
-	created.Type = source.Type
-	created.Scope = source.Scope
-	return created.Id
+	return b.function.NewIdentifier(source.Name, source.Node, source.Declaration).Id
 }
 
 // valueAt is Braun's lookup: which value does this binding hold on entry to this block.

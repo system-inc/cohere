@@ -156,8 +156,8 @@ const (
 	// `isRefValueType`) and an object method (`Type::ObjectMethod`). Both are EXCLUSIONS, so their
 	// absence can only ADD dependencies, never drop one.
 	//
-	// `Identifier.Type` is declared `any` in this IR and left nil by lowering: measured over the
-	// corpus, 0 of 110,265 identifiers carry a type. So neither predicate is expressible. The
+	// This IR carries no type (measured when it still had an always-nil type field: 0 of 110,265
+	// identifiers over the corpus carried one). So neither predicate is expressible. The
 	// exposure was measured rather than estimated: 7 `ObjectMethod` instructions and 3 `.current`
 	// property loads across 4,766 loads in 677 functions. The object-method half is recoverable
 	// structurally -- an `ObjectMethod` INSTRUCTION is identifiable without types -- and is applied
@@ -960,8 +960,8 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 	// Upstream's `visitDependency` does the same, with the comment "ref.current access is not a
 	// valid dep", and truncates the path to empty. Its guard is
 	// `isUseRefType(identifier) && path[0].property === 'current'`, and the type half is not
-	// expressible here -- `Identifier.Type` is nil throughout, which is what
-	// `DependencyGapTypeExclusions` records.
+	// expressible here -- the IR carries no type, which is what `DependencyGapTypeExclusions`
+	// records.
 	//
 	// Taking the name half alone is a DIVERGENCE and is measured rather than assumed safe: a value
 	// named `current` on a non-ref object would be truncated where upstream keeps the path, which
