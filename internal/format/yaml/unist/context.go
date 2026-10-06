@@ -49,16 +49,24 @@ type context struct {
 }
 
 func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node], memory *parseMemory) *context {
-	// Sized for about a node per eight units of text, so the map is not rebuilt as it grows.
-	positions := make(map[*Node]*position, len(text)/8)
-	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: positions, nodes: nodes, memory: memory}
+	if memory.positionsByNode == nil {
+		// Sized for about a node per eight units of text, so the map is not rebuilt as it grows. Later
+		// parses reuse it cleared, with the room it grew to.
+		memory.positionsByNode = make(map[*Node]*position, len(text)/8)
+	}
+	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: memory.positionsByNode, nodes: nodes, memory: memory}
 }
 
 // parseMemory is what one Parse uses only while it runs, kept for the next (#vbjv3d6): its point and
-// position objects, which Parse copies into each node's Position before it returns.
+// position objects, which Parse copies into each node's Position before it returns, and its tables: the
+// text as UTF-16 units, each unit's byte offset, and the nodes' positions (#v6ksqg3).
 type parseMemory struct {
 	points    arena.Arena[point]
 	positions arena.Arena[position]
+
+	units           []uint16
+	offsets         unitOffsets
+	positionsByNode map[*Node]*position
 }
 
 // parseMemories hold the memory of parses that have finished, one per caller at a time.
@@ -71,6 +79,11 @@ var parseMemories = sync.Pool{New: func() any {
 func (memory *parseMemory) reset() {
 	memory.points.Reset()
 	memory.positions.Reset()
+	// Under cohere_poison a released table reads a noncharacter and an offset past any text, so a parse that
+	// read one after its release prints wrong or stops. A cleared map answers nil, which stops it too.
+	arena.Release(memory.units, 0xFFFF)
+	arena.Release(memory.offsets, 1<<40)
+	clear(memory.positionsByNode)
 }
 
 // position is node.position.

@@ -46,6 +46,16 @@ func (arena *Arena[T]) New(value T) *T {
 	return slot
 }
 
+// Len is how many values the arena has handed out since it was made or Reset, zero for a nil arena. A tree
+// built from one arena has as many nodes as it, less any it built and dropped, which is the cheap count
+// printing.Options.NodeCount asks for (#4bq8vyn).
+func (arena *Arena[T]) Len() int {
+	if arena == nil {
+		return 0
+	}
+	return arena.chunk*chunkLength[T]() + arena.used
+}
+
 // Reset releases every value the arena has handed out, for the next user to reuse. Nothing may read a
 // value handed out before.
 func (arena *Arena[T]) Reset() {
@@ -54,17 +64,22 @@ func (arena *Arena[T]) Reset() {
 		if index == arena.chunk {
 			end = arena.used
 		}
-		released := arena.chunks[index][:end]
-		if poisonReleased {
-			for slot := range released {
-				released[slot] = arena.Poison
-			}
-			continue
-		}
-		// Cleared, so the strings and slices a released value held are not kept alive by the arena.
-		clear(released)
+		Release(arena.chunks[index][:end], arena.Poison)
 	}
 	arena.chunk, arena.used = 0, 0
+}
+
+// Release hands back values a caller keeps for its next use, as Reset does an arena's: cleared, so the
+// strings and slices they held are not kept alive, or under cohere_poison filled with poison, so a value
+// read after its release reads something no parse produces (#v6ksqg3).
+func Release[T any](values []T, poison T) {
+	if poisonReleased {
+		for index := range values {
+			values[index] = poison
+		}
+		return
+	}
+	clear(values)
 }
 
 // chunkLength is how many values of T fit in chunkBytes, at least 16.

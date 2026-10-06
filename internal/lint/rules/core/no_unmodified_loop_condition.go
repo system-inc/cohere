@@ -102,13 +102,20 @@ var NoUnmodifiedLoopCondition = rule.Rule{
 	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// The judgment is the whole file's, made once, at the first loop that has a condition. A file
+		// with none cannot report, and most files have none, so they never build the reference index.
+		judged := false
+		judge := func(node *ast.Node) {
+			if judged || ctx.TypeChecker == nil || unmodifiedLoopTestOf(node) == nil {
+				return
+			}
+			judged = true
+			reportUnmodifiedLoopConditions(ctx)
+		}
 		return rule.Listeners{
-			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
-					return
-				}
-				reportUnmodifiedLoopConditions(ctx)
-			},
+			ast.KindWhileStatement: judge,
+			ast.KindDoStatement:    judge,
+			ast.KindForStatement:   judge,
 		}
 	},
 }

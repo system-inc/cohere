@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/directives"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -175,7 +176,10 @@ func reportRequireDescription(ctx rule.Context, options RequireDescriptionOption
 			continue
 		}
 
-		kind, isDirective := requireDescriptionUpstreamKind(comment, interior, options.AdditionalDirectives, additional)
+		kind, isDirective := "", false
+		if requireDescriptionCouldBeUpstream(interior, options.AdditionalDirectives) {
+			kind, isDirective = requireDescriptionUpstreamKind(comment, interior, options.AdditionalDirectives, additional)
+		}
 		if !isDirective {
 			kind, isDirective = directives.Recognize(comment.Text)
 		}
@@ -194,14 +198,13 @@ func reportRequireDescription(ctx rule.Context, options RequireDescriptionOption
 // An unterminated block comment has no interior ESLint would ever see, since the file fails to
 // parse there, so it is declined rather than sliced into something shorter than it is.
 func requireDescriptionInterior(comment comments.Comment) (string, bool) {
-	text := comment.Text
 	if !comment.IsBlock {
-		return text[2:], true
+		return comment.Text[2:], true
 	}
-	if len(text) < 4 || !strings.HasSuffix(text, "*/") {
+	if len(comment.Text) < 4 || !strings.HasSuffix(comment.Text, "*/") {
 		return "", false
 	}
-	return text[2 : len(text)-2], true
+	return comment.Text[2 : len(comment.Text)-2], true
 }
 
 // jsWhitespace is JavaScript's `\s` (WhiteSpace plus LineTerminator), as a character class.
@@ -233,17 +236,39 @@ func requireDescriptionAdditionalPattern(additional []string) *regexp.Regexp {
 	return regexp.MustCompile(`^(` + strings.Join(quoted, "|") + `)(?:` + jsWhitespace + `|$)`)
 }
 
+// requireDescriptionCouldBeUpstream reports whether upstream's parser could read a directive here at all,
+// so the split and the patterns run only on comments that open with a directive word.
+//
+// Exact rather than a heuristic. Both patterns are anchored at the start of the text before the first
+// separator, trimmed, and that piece is a prefix of the interior, so a directive's word begins the
+// interior once its leading whitespace is gone. A comment opening any other way cannot match, and on a
+// real tree that is nearly every comment: before this, each one paid a regexp split, which allocates,
+// and a submatch search (#fcac58b).
+func requireDescriptionCouldBeUpstream(interior string, additional []string) bool {
+	head := strings.TrimLeftFunc(interior, text.IsWhitespace)
+	if strings.HasPrefix(head, "eslint") || strings.HasPrefix(head, "exported") ||
+		strings.HasPrefix(head, "global") {
+		return true
+	}
+	for _, directive := range additional {
+		if strings.HasPrefix(head, directive) {
+			return true
+		}
+	}
+	return false
+}
+
 // requireDescriptionUpstreamKind is upstream's `parseDirectiveComment`, returning the kind.
 func requireDescriptionUpstreamKind(
 	comment comments.Comment, interior string, additional []string, additionalPattern *regexp.Regexp,
 ) (string, bool) {
-	text := requireDescriptionTrim(requireDescriptionSeparator.Split(interior, 2)[0])
+	directiveText := text.TrimWhitespace(requireDescriptionSeparator.Split(interior, 2)[0])
 
 	kind := ""
-	if match := requireDescriptionDirective.FindStringSubmatch(text); match != nil {
+	if match := requireDescriptionDirective.FindStringSubmatch(directiveText); match != nil {
 		kind = match[1]
 	} else if additionalPattern != nil {
-		match := additionalPattern.FindStringSubmatch(text)
+		match := additionalPattern.FindStringSubmatch(directiveText)
 		if match == nil {
 			return "", false
 		}
@@ -282,16 +307,5 @@ func requireDescriptionUpstreamKind(
 // JavaScript would cut it, without the rest of the comment folded into it.
 func requireDescriptionHasDescription(interior string) bool {
 	pieces := requireDescriptionSeparator.Split(interior, 3)
-	return len(pieces) > 1 && requireDescriptionTrim(pieces[1]) != ""
-}
-
-// requireDescriptionTrim is JavaScript's `String.prototype.trim`, over the same set as jsWhitespace.
-func requireDescriptionTrim(text string) string {
-	return strings.TrimFunc(text, func(character rune) bool {
-		switch character {
-		case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-			return true
-		}
-		return character >= 0x2000 && character <= 0x200A
-	})
+	return len(pieces) > 1 && text.TrimWhitespace(pieces[1]) != ""
 }

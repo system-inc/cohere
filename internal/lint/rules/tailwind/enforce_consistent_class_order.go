@@ -201,14 +201,14 @@ var EnforceConsistentClassOrder = rule.Rule{
 			return declineListeners(ctx, "enforce-consistent-class-order", designSystem)
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		ordering := defaultClassOrderOptions()
 		if isConfigured {
 			ordering = classOrderOptionsFrom(configured)
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
