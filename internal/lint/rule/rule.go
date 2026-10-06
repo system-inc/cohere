@@ -332,8 +332,9 @@ type Rule struct {
 	// configuration gives the rule, with a Program viewed under the rule's own ProgramReads and the options as
 	// Run receives them, since an option can choose which data the rule reads: no-html-link-for-pages' pagesDir
 	// names the directory its routes come from (#s9k38p3). The options themselves need no hashing: every
-	// config file is in the findings cache's key. It may be called more than once a run, from several walk
-	// workers at once, so it must be safe for concurrent use.
+	// config file is in the findings cache's key. A walk calls it once for each set of options it gives the
+	// rule, on whichever worker asks first, while other rules' fingerprints may be computed on other workers,
+	// so it must be safe for concurrent use.
 	//
 	// It is a claim of completeness, and it decides soundness: anything the verdict reads outside the file and
 	// outside this hash replays a stale finding when it changes. So it is proven both ways for each rule, a

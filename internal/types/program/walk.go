@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -243,8 +244,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	// shapes, which the caller computes; without them the shape-keyed rules are keyed on the type
 	// fingerprint instead, which can only re-run them more often.
 	//
-	// The derived rules' program fingerprints depend on each rule's options, so they are made per selection
-	// instead. See programFingerprints.
+	// The derived rules' program fingerprints depend on each rule's options, so they are made on first ask, once
+	// per rule and options for the whole walk, and every worker shares them. See programFingerprintMemo.
+	programFingerprints := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
 	var fingerprints, shapeFingerprints map[tspath.Path][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
@@ -411,7 +413,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						design:           classes.design,
 						derived:          classes.derived,
 					}
-					keys.derivedFingerprint = derivedKey(classes, g.programFingerprints(selection), keys.typeFingerprint)
+					keys.derivedFingerprint = derivedKey(classes, g.programFingerprints(selection, programFingerprints), keys.typeFingerprint)
 					if entry, found := reuse.lookup(sourceFile.FileName(), keys, sourceFile.Text()); found.pure {
 						replayed = &entry
 						hits = found
@@ -1566,6 +1568,11 @@ type ruleSelection struct {
 	applicable []rule.Rule
 	options    map[string]any
 
+	// optionsKeys is each applicable rule's option elements as the config wrote them, joined, which is
+	// what the walk's program fingerprints are keyed on. One run decodes every option through one registry,
+	// so equal bytes are equal options. See programFingerprintMemo.
+	optionsKeys map[string]string
+
 	// scopedOff is the rules the configuration turned off here, and unconfigured the rules it never
 	// mentions. Both are counted for every file the selection serves.
 	scopedOff    []string
@@ -1585,8 +1592,8 @@ type ruleSelection struct {
 	// fileDispatcher.slotsFor.
 	slots []*ruleSlot
 
-	// programFingerprints is each derived rule's program fingerprint under this selection's options, made on
-	// first use. See Graph.programFingerprints.
+	// programFingerprints is each derived rule's program fingerprint under this selection's options, looked up
+	// in the walk's memo on first use. See Graph.programFingerprints.
 	programFingerprints map[string][sha256.Size]byte
 }
 
@@ -1627,7 +1634,7 @@ func (s *ruleSelection) classNames() *ruleClassNames {
 
 // selectRules makes the selection for one resolution.
 func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved) *ruleSelection {
-	selection := &ruleSelection{applicable: make([]rule.Rule, 0, len(rules)), options: map[string]any{}}
+	selection := &ruleSelection{applicable: make([]rule.Rule, 0, len(rules)), options: map[string]any{}, optionsKeys: map[string]string{}}
 	for _, subject := range rules {
 		status, _ := resolution.StatusOf(subject.Name)
 		if g.Readiness.Measures(subject.Name) {
@@ -1642,6 +1649,7 @@ func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved
 				if decoded != nil {
 					selection.options[subject.Name] = decoded
 				}
+				selection.optionsKeys[subject.Name] = optionsKey(g.Readiness.Options[subject.Name])
 				if selection.measureOnly == nil {
 					selection.measureOnly = map[string]bool{}
 				}
@@ -1664,7 +1672,8 @@ func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved
 			continue
 		}
 
-		decoded, err := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+		raw := resolution.RawOptionsFor(subject.Name)
+		decoded, err := g.RuleOptions.Decode(subject.Name, raw)
 		if err != nil {
 			selection.err = err
 			return selection
@@ -1672,9 +1681,21 @@ func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved
 		if decoded != nil {
 			selection.options[subject.Name] = decoded
 		}
+		selection.optionsKeys[subject.Name] = optionsKey(raw)
 		selection.applicable = append(selection.applicable, subject)
 	}
 	return selection
+}
+
+// optionsKey spells a rule's option elements as one string that no other list of elements shares: each
+// element's bytes, then a separator no JSON value contains.
+func optionsKey(elements []json.RawMessage) string {
+	var key strings.Builder
+	for _, element := range elements {
+		key.Write(element)
+		key.WriteByte(0)
+	}
+	return key.String()
 }
 
 // assignFilesToWorkers gives each worker the files of one checker, so no two workers ever want the same
@@ -1786,31 +1807,73 @@ func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) 
 	return queues[worker]
 }
 
-// programFingerprints is the selection's derived rules' program fingerprints, by name, each computed through a
-// Program viewed under the rule's own reads and with the options the selection decoded for it
-// (rule.ProgramFingerprint). An option can choose what a rule reads, so two selections giving one rule
-// different options can fingerprint it differently (#s9k38p3). Made once per selection, which is once per
-// distinct resolution on each worker, so a rule's fingerprint may be computed on several workers at once. A
-// fingerprint that panics is left out, which keys no file the selection serves: the rule's findings there
-// neither replay nor record this run.
-func (g *Graph) programFingerprints(selection *ruleSelection) map[string][sha256.Size]byte {
+// programFingerprints is the selection's derived rules' program fingerprints, by name, each the walk's one
+// fingerprint for that rule under the options the selection gives it (rule.ProgramFingerprint). An option can
+// choose what a rule reads, so two selections giving one rule different options can fingerprint it
+// differently (#s9k38p3). Gathered once per selection from the walk's memo, which computes each rule and
+// options pair once, whatever the number of selections or workers. A fingerprint that panics is left out,
+// which keys no file the selection serves: the rule's findings there neither replay nor record this run.
+func (g *Graph) programFingerprints(selection *ruleSelection, memo *programFingerprintMemo) map[string][sha256.Size]byte {
 	if selection.programFingerprints != nil {
 		return selection.programFingerprints
 	}
 	derived := selection.classNames().derivedRules
 	fingerprints := make(map[string][sha256.Size]byte, len(derived))
 	for _, subject := range derived {
-		func() {
-			defer func() {
-				if recover() != nil {
-					delete(fingerprints, subject.Name)
-				}
-			}()
-			fingerprints[subject.Name] = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject), selection.options[subject.Name])
-		}()
+		if fingerprint, usable := memo.fingerprint(g, subject, selection.options[subject.Name], selection.optionsKeys[subject.Name]); usable {
+			fingerprints[subject.Name] = fingerprint
+		}
 	}
 	selection.programFingerprints = fingerprints
 	return fingerprints
+}
+
+// programFingerprintMemo is one walk's program fingerprints, one for each rule and its options, shared by every
+// worker. A fingerprint depends on the rule and its options, never on the worker or the selection asking, and
+// computing one per selection on each worker was 330 computations on an ahra edit run instead of 6, about
+// 1.85 GB and most of its 24M mallocs (#f96cnry's profile).
+type programFingerprintMemo struct {
+	mutex   sync.Mutex
+	entries map[programFingerprintKey]*programFingerprintEntry
+}
+
+// programFingerprintKey names one fingerprint: the rule, and its option elements as optionsKey spells them.
+type programFingerprintKey struct {
+	rule    string
+	options string
+}
+
+// programFingerprintEntry is one fingerprint, computed by the first worker to ask while the rest wait on once.
+// usable is false when the fingerprint panicked.
+type programFingerprintEntry struct {
+	once        sync.Once
+	fingerprint [sha256.Size]byte
+	usable      bool
+}
+
+// fingerprint is subject's program fingerprint under options, computed once for the walk through a Program
+// viewed under the rule's own reads. optionsKey names the options; see ruleSelection.optionsKeys. The second
+// return is false when the fingerprint panicked, every time it is asked.
+func (memo *programFingerprintMemo) fingerprint(g *Graph, subject rule.Rule, options any, optionsKey string) ([sha256.Size]byte, bool) {
+	key := programFingerprintKey{rule: subject.Name, options: optionsKey}
+	memo.mutex.Lock()
+	entry, found := memo.entries[key]
+	if !found {
+		entry = &programFingerprintEntry{}
+		memo.entries[key] = entry
+	}
+	memo.mutex.Unlock()
+
+	entry.once.Do(func() {
+		defer func() {
+			if recover() != nil {
+				entry.usable = false
+			}
+		}()
+		entry.fingerprint = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject), options)
+		entry.usable = true
+	})
+	return entry.fingerprint, entry.usable
 }
 
 // derivedKey is a file's key for its derived rules: each one's name and program fingerprint, in the order they
