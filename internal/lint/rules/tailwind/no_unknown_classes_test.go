@@ -395,19 +395,21 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 // half alone.
 func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
 	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		system := designSystem.System
 
-	if classExistsIn("text-huge", system) {
-		t.Error("`text-huge` has root `text` and compiles to nothing, so the rule must report it")
-	}
-	if !classExistsIn("text-lg", system) {
-		t.Error("`text-lg` compiles, so reporting it would be a false positive on working code")
-	}
+		if classExistsIn("text-huge", system) {
+			t.Error("`text-huge` has root `text` and compiles to nothing, so the rule must report it")
+		}
+		if !classExistsIn("text-lg", system) {
+			t.Error("`text-lg` compiles, so reporting it would be a false positive on working code")
+		}
 
-	// An unknown root is still caught, which is the half that worked before this change.
-	if classExistsIn("txt-huge", system) {
-		t.Error("an unknown root must still be reported, or the rule catches nothing")
-	}
+		// An unknown root is still caught, which is the half that worked before this change.
+		if classExistsIn("txt-huge", system) {
+			t.Error("an unknown root must still be reported, or the rule catches nothing")
+		}
+	})
 }
 
 // TestExistenceComesFromTheRepositoryRatherThanATable is the measurement the swap exists for.

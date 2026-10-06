@@ -41,10 +41,6 @@ var goWhitespaceUnswept = map[string]int{
 	"internal/lint/ecmascript/dotnotation/dotnotation.go": 1,
 	"internal/lint/rules/typescript/no_deprecated.go":     1,
 	"internal/lint/rules/typescript/no_invalid_this.go":   1,
-
-	// format, @system_cohere_format's to sweep.
-	"internal/format/prettier/bundles.go": 1,
-	"internal/format/prettier/engine.go":  1,
 }
 
 // goWhitespaceSite is one unmarked reference to a Go whitespace function.

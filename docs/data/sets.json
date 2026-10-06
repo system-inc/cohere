@@ -164,7 +164,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 298,
+        "rulesOn": 299,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -955,6 +955,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-load-time-import-meta-path",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
                 "severity": "error"
             },
@@ -1664,6 +1668,20 @@
                 "rules": [
                     {
                         "name": "max-lines",
+                        "severity": "off"
+                    }
+                ]
+            },
+            {
+                "definedIn": "cohere:next",
+                "files": [
+                    "**/*.test.*",
+                    "**/eslint.config.*"
+                ],
+                "reason": "A test file or an ESLint config is run by Node or the test runner directly and never bundled, so a module-scope import.meta path is correct there (#ay7a8vx).",
+                "rules": [
+                    {
+                        "name": "nexus/correctness-no-load-time-import-meta-path",
                         "severity": "off"
                     }
                 ]

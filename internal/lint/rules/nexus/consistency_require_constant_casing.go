@@ -115,7 +115,12 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 	NeedsTypeChecker: true,
 	// Every other file's imports, for the drop-the-export advice: resolving another file's imports is
 	// a read of other files, which the view enforces, and a resolution, which the source guard sees.
-	ProgramReads: rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+	// The run's directory, which the fingerprint names files relative to.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+	// What a file's verdict reads beyond the file and its types is its own entry in the importer index
+	// and whether it is a root, so the index and the roots are the fingerprint (#f96cnry). See
+	// constantCasingFingerprint.
+	ProgramFingerprint: constantCasingFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
 		if settings, hasSettings := rule.OptionsAs[ConsistencyRequireConstantCasingOptions](options); hasSettings {

@@ -35,7 +35,7 @@ func TestAReadinessRunMissesAnEntryThatWasNeverMeasured(t *testing.T) {
 	t.Parallel()
 	reuse, keys := adamicFixtureReuse(t, adamicFixtureEntry(nil))
 	reuse.MeasureReadiness()
-	if _, hits := reuse.lookup("/project/a.ts", keys); hits.pure {
+	if _, hits := reuse.lookup("/project/a.ts", keys, ""); hits.pure {
 		t.Fatal("a readiness run replayed an entry recorded without readiness, so an unmeasured file would read as ready")
 	}
 	if reuse.Replayed() != 0 {
@@ -48,7 +48,7 @@ func TestAReadinessRunReplaysAMeasuredEntry(t *testing.T) {
 	record := &AdamicRecord{Counts: []AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 2}, {Rule: "adamic/single-spread"}}}
 	reuse, keys := adamicFixtureReuse(t, adamicFixtureEntry(record))
 	reuse.MeasureReadiness()
-	entry, hits := reuse.lookup("/project/a.ts", keys)
+	entry, hits := reuse.lookup("/project/a.ts", keys, "")
 	if !hits.pure || !hits.typed {
 		t.Fatalf("a measured entry under unchanged keys missed: %+v", hits)
 	}
@@ -62,7 +62,7 @@ func TestARunThatDoesNotMeasureReplaysEitherEntry(t *testing.T) {
 	t.Parallel()
 	for _, record := range []*AdamicRecord{nil, {Counts: []AdamicCount{{Rule: "adamic/single-spread", Findings: 1}}}} {
 		reuse, keys := adamicFixtureReuse(t, adamicFixtureEntry(record))
-		if _, hits := reuse.lookup("/project/a.ts", keys); !hits.pure {
+		if _, hits := reuse.lookup("/project/a.ts", keys, ""); !hits.pure {
 			t.Fatalf("a run without readiness missed an entry with record %+v", record)
 		}
 	}
@@ -80,7 +80,7 @@ func TestARefreshMergesTheReadinessRecordRuleByRule(t *testing.T) {
 	hits := classHits{pure: true, shaped: true, design: true}
 	walked := &AdamicRecord{Counts: []AdamicCount{{Rule: "adamic/invariant-mutable"}, {Rule: "adamic/uncacheable", Findings: 4}}}
 
-	refreshed, eligible := refreshClasses(old, keys, hits, nil, nil, nil, walked)
+	refreshed, eligible := refreshClasses(old, keys, hits, nil, nil, nil, walked, suppressionTally{})
 	if !eligible {
 		t.Fatal("a refresh with no fixes was refused")
 	}
@@ -90,7 +90,7 @@ func TestARefreshMergesTheReadinessRecordRuleByRule(t *testing.T) {
 			refreshed.Adamic, want)
 	}
 
-	if unmeasured, _ := refreshClasses(old, keys, hits, nil, nil, nil, nil); unmeasured.Adamic != nil {
+	if unmeasured, _ := refreshClasses(old, keys, hits, nil, nil, nil, nil, suppressionTally{}); unmeasured.Adamic != nil {
 		t.Fatalf("a refresh whose walk measured nothing kept a record, %+v, half of it stale", unmeasured.Adamic)
 	}
 }

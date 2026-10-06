@@ -210,36 +210,34 @@ func TestEveryGapRootIsDescribed(t *testing.T) {
 // this test.
 func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(t *testing.T) {
 	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].spelling)
-	if system == nil {
-		t.Skip("no design system loaded")
-	}
+	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
 
-	var checked int
-	for root, description := range GapRootDescriptions {
-		if !gapRootAcceptsModifierOnArbitrary(description) {
-			continue
+		var checked int
+		for root, description := range GapRootDescriptions {
+			if !gapRootAcceptsModifierOnArbitrary(description) {
+				continue
+			}
+
+			className := root + "-[#FD555E]/15"
+			candidates := ParseCandidate(className, system)
+			if len(candidates) == 0 {
+				continue
+			}
+			// Only where the root reads as itself; a spelling the parser splits differently is a
+			// different root's case.
+			if candidates[0].Root != root {
+				continue
+			}
+			checked++
+
+			if !ClassValueResolvesIn(&candidates[0], system) {
+				t.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
+			}
 		}
 
-		className := root + "-[#FD555E]/15"
-		candidates := ParseCandidate(className, system)
-		if len(candidates) == 0 {
-			continue
+		t.Logf("colour roots checked with an arbitrary value and an alpha: %d", checked)
+		if checked == 0 {
+			t.Fatal("no colour root was checked, so this test measured nothing")
 		}
-		// Only where the root reads as itself; a spelling the parser splits differently is a
-		// different root's case.
-		if candidates[0].Root != root {
-			continue
-		}
-		checked++
-
-		if !ClassValueResolvesIn(&candidates[0], system) {
-			t.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
-		}
-	}
-
-	t.Logf("colour roots checked with an arbitrary value and an alpha: %d", checked)
-	if checked == 0 {
-		t.Fatal("no colour root was checked, so this test measured nothing")
-	}
+	})
 }
