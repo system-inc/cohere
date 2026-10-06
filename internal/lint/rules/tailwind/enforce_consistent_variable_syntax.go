@@ -75,16 +75,16 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 			return nil
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		syntax := variableSyntaxShorthand
 		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Syntax == variableSyntaxVariable {
 				syntax = variableSyntaxVariable
 			}
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {

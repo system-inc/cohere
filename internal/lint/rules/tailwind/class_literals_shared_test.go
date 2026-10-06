@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// Thirteen rules read class surfaces through ClassLiteralReaderFor, and the saving is only worth
+// Thirteen rules read class surfaces through ClassLiteralSurfaces.ReaderFor, and the saving is only worth
 // having if sharing never changes a reading. These pin the three things that could: rules with the
 // same settings must share one reader per file, rules with different settings must never share one,
 // and a remembered reading must be the reading a fresh reader would make.
@@ -30,15 +30,15 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	twSettings.AttributePatterns = []string{"tw"}
 
 	cache := rule.NewFileCache()
-	first := ClassLiteralReaderFor(cache, DefaultClassLiteralSettings())
-	second := ClassLiteralReaderFor(cache, DefaultClassLiteralSettings())
+	first := ClassLiteralSurfacesFor(DefaultClassLiteralSettings()).ReaderFor(cache)
+	second := DefaultClassLiteralSurfaces().ReaderFor(cache)
 	if first != second {
 		t.Fatal("two rules with the same settings got two readers for one file, so each reads every node again")
 	}
 	if fills := cache.Fills()["tailwind.classValues:"+DefaultClassLiteralSettings().key()]; fills != 1 {
 		t.Fatalf("the shared reader was built %d times for one file, want 1", fills)
 	}
-	if ClassLiteralReaderFor(cache, twSettings) == first {
+	if ClassLiteralSurfacesFor(twSettings).ReaderFor(cache) == first {
 		t.Fatal("rules reading different attributes shared a reader, so one reads the other's surfaces")
 	}
 
@@ -51,7 +51,7 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	}
 
 	// A new file gets its own memo, and still the patterns compiled once for the run.
-	nextFile := ClassLiteralReaderFor(rule.NewFileCache(), DefaultClassLiteralSettings())
+	nextFile := DefaultClassLiteralSurfaces().ReaderFor(rule.NewFileCache())
 	if nextFile == first {
 		t.Fatal("two files shared a memo, so a node pointer from one could answer for the other")
 	}
@@ -76,7 +76,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 	// Both readers share one file's cache, as two rules configured differently would.
 	cache := rule.NewFileCache()
 	for _, settings := range []ClassLiteralSettings{DefaultClassLiteralSettings(), twSettings} {
-		bound := ClassLiteralReaderFor(cache, settings)
+		bound := ClassLiteralSurfacesFor(settings).ReaderFor(cache)
 		fresh := NewClassLiteralReader(settings)
 
 		read := 0
