@@ -309,7 +309,7 @@ func (c *comparison) node(path string, mine *Node, theirs *jsonNode) {
 // compareParse compares Parse's result for the text with the oracle's and returns the differences.
 func compareParse(text string, expected oracleResult) []string {
 	root, err := Parse(text, nil)
-	offsets := newUnitOffsets(text)
+	offsets := newUnitOffsets(text, nil)
 	if expected.Error != nil {
 		if err == nil {
 			return []string{fmt.Sprintf("upstream throws %s: %s; the port parses", expected.Error.Name, expected.Error.Message)}

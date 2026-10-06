@@ -64,12 +64,12 @@ var NoConcatenatedClasses = rule.Rule{
 			return nil
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		if configured, isConfigured := rule.OptionsAs[NoConcatenatedClassesOptions](options); isConfigured {
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, template := range reader.ClassTemplatesIn(node) {
