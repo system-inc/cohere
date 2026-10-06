@@ -18,7 +18,7 @@ import (
 //
 // Go trims its cache only of entries unused for five days. The house writes far faster than that: on
 // 2026-10-05 the cache went from cleared at 09:01 to 200 GB by 11:30, and had been 347 GB with the disk at
-// 99% before. The launcher's trim (dispatch.BoundDefaultGoCache) ran every few minutes all morning and
+// 99% before. The launcher's trim, since removed (#cpxc2d7), ran every few minutes all morning and
 // removed almost nothing, because it spares every entry used in the last 90 minutes, and nearly all of a
 // cache that grows by a hundred gigabytes an hour was used in the last 90 minutes. It has to spare them:
 // Go reads an entry some time after finding it, and refreshes an entry's time at most once an hour, so a
