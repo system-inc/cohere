@@ -12,17 +12,14 @@ import (
 // hardline as upstream's textToDoc strips it.
 func init() {
 	print := func(fileName string, text string, options formatoptions.Options) (string, error) {
-		return yaml.Format(fileName, text, options, TextToDoc(options, "yaml"))
+		return yaml.Format(fileName, text, options, TextToDoc(options, "yaml", nil))
 	}
+	// The doc entry is raw: TextToDoc strips its trailing hardline, into the embedding format's slab.
 	printDoc := func(_ string, text string, options formatoptions.Options, _ string, _ string, textToDoc printing.TextToDoc) (doc.Doc, error) {
-		printed, err := yaml.FormatDoc(text, options, textToDoc)
-		if err != nil {
-			return nil, err
-		}
-		return doc.StripTrailingHardline(printed), nil
+		return yaml.FormatDoc(text, options, textToDoc)
 	}
 	for _, extension := range []string{".yaml", ".yml"} {
 		Register(extension, print)
-		RegisterDoc(extension, printDoc)
+		RegisterRawDoc(extension, printDoc)
 	}
 }

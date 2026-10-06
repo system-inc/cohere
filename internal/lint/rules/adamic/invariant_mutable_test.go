@@ -89,6 +89,15 @@ const wide: Animal[] & { tag: string } = tagged;`, "tagged"},
 		"an intersection source": {animals + `
 declare const tagged: Dog[] & { tag: string };
 const all: Animal[] = tagged;`, "tagged"},
+		// #b9a0wgy: an intersection of objects, as either side; pen.pet = cat reaches kennel.
+		"an object intersection target": {animals + `
+interface Named { readonly label: string }
+const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' };
+const pen: { pet: Animal } & Named = kennel;`, "kennel"},
+		"an object intersection source": {animals + `
+interface Named { readonly label: string }
+const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' };
+const pen: { pet: Animal } = kennel;`, "kennel"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -136,7 +145,11 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a generic method seen under two receivers": `class Entity { name = ''; clone<T extends this>(): T { return this as T; } } class Session extends Entity { token = ''; } declare const session: Readonly<Session & object>; const wide: Readonly<Session> = session;`,
 		"a union member the parameter is not":       `class Tracked { name = ''; } function insert<Entity extends Tracked>(entity: Readonly<Entity> | readonly Entity[]): readonly Entity[] { const entities: readonly Entity[] = Array.isArray(entity) ? entity : [entity]; return entities; }`,
 		"a parameter narrowed to non-null":          `function keep<Value extends { items: string[] } | null>(value: Value, set: (next: Value) => void): void { if(value !== null) { set(value); } }`,
-		"an intersection with the same array":       animals + `declare const tagged: Animal[] & { readonly tag: 'kennel' }; const wide: Animal[] & { readonly tag: string } = tagged;`,
+		// #b9a0wgy's near-misses: a readonly member, and a brand, whose object member is a phantom.
+		"an object intersection with a readonly member": animals + `interface Named { readonly label: string } const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' }; const pen: { readonly pet: Animal } & Named = kennel;`,
+		"a class constructor's prototype":               `class Form { readonly kind = 'Form'; } type ClassType = (new () => object) & { prototype: object }; const resolve: () => typeof Form = () => Form; const wide: () => ClassType = resolve;`,
+		"a branded primitive":                           `declare const brand: unique symbol; type Slot = string & { readonly [brand]?: () => 'value' }; const text: Slot = 'Hello'; const wide: string & { readonly [brand]?: () => string } = text;`,
+		"an intersection with the same array":           animals + `declare const tagged: Animal[] & { readonly tag: 'kennel' }; const wide: Animal[] & { readonly tag: string } = tagged;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

@@ -82,7 +82,9 @@ const maximumDepth = 8
 //	                        source is assignable to, and passes when any one of them passes
 //	intersections           a target intersection pairs its array, tuple and container members with
 //	                        the source; a source one meeting such a target pairs its members of that
-//	                        kind assignable to the target alone
+//	                        kind assignable to the target alone. Under ObjectIntersections, a target's
+//	                        object members too, and an intersection source's properties, unless it
+//	                        has a primitive member
 //	type parameters         a target parameter whose constraint has a writable slot is one mutable
 //	                        slot, judged whole: its parts are no type the shim can build
 //
@@ -93,12 +95,28 @@ const maximumDepth = 8
 // A fresh site is judged at its top only. Its parts are sites of their own, so descending would report
 // one hole twice.
 func (w *Walker) Walk(site Site, judge Judge) (Pair, bool) {
+	return w.WalkWith(site, judge, WalkOptions{})
+}
+
+// WalkOptions widens one walk past what every rule's walk relates.
+type WalkOptions struct {
+	// ObjectIntersections pairs an intersection's object members and reads an intersection source's
+	// properties, as the walk does an object's (#b9a0wgy). invariant-mutable asks for it: `{ pet: Animal } &
+	// Named` written from `{ pet: Dog } & Named` is its hole, proven in Node. The other rules don't: an
+	// intersection's members read one at a time are no slot of theirs, and every member paired was about
+	// 2,900 false no-optional-widening findings per frontend (#53w68gt). An intersection with a primitive
+	// member (a brand) is never paired this way: its object member is a phantom.
+	ObjectIntersections bool
+}
+
+// WalkWith is Walk with options.
+func (w *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pair, bool) {
 	top := Pair{Source: site.Source, Target: site.Target}
 	if site.Fresh {
 		wrong, _ := judge(top)
 		return top, wrong
 	}
-	w.judge, w.newContainer = judge, site.NewContainer
+	w.judge, w.newContainer, w.objectIntersections = judge, site.NewContainer, options.ObjectIntersections
 	w.visited, w.path = w.visited[:0], w.path[:0]
 	if len(w.visitedSet) > 0 {
 		clear(w.visitedSet)
@@ -122,8 +140,9 @@ type Walker struct {
 	// judge and newContainer are the walk in progress's. newContainer is a site whose source container was
 	// just built: its own slots are read-only to the walk, since no other name can write into them. See
 	// Site.NewContainer.
-	judge        Judge
-	newContainer bool
+	judge               Judge
+	newContainer        bool
+	objectIntersections bool
 
 	// visited is the pairs this walk has met, in a slice while it is short and in visitedSet as well past
 	// visitedListLimit: most walks meet a handful, and a map made for each walk was a quarter of the rules'
@@ -266,8 +285,9 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	 * invariant-mutable. Measured on the four consumers, and left for their own ruling.
 	 */
 	if pair.Target.Flags()&checker.TypeFlagsIntersection != 0 {
+		objectMembers := w.objectIntersections && !hasPrimitiveMember(pair.Target)
 		for _, member := range pair.Target.Types() {
-			if !w.isSlotContainer(member) {
+			if !w.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
 				continue
 			}
 			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1); isWrong {
@@ -291,6 +311,17 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 		return w.typeParameterSlot(pair)
 	}
 	return w.parts(pair, depth)
+}
+
+// hasPrimitiveMember is an intersection with a member that is no object: `string & { readonly [brand]?: X }`,
+// whose object member is a phantom the value never holds.
+func hasPrimitiveMember(t *checker.Type) bool {
+	for _, member := range t.Types() {
+		if member.Flags()&(checker.TypeFlagsObject|checker.TypeFlagsTypeParameter|checker.TypeFlagsIntersection) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
@@ -451,7 +482,11 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		}
 		return Pair{}, false
 	}
-	if target.Flags()&checker.TypeFlagsObject == 0 || source.Flags()&checker.TypeFlagsObject == 0 {
+	// An intersection source is read property by property under ObjectIntersections, since a property
+	// lookup on an intersection finds it in whichever member holds it.
+	sourceIsObject := source.Flags()&checker.TypeFlagsObject != 0 ||
+		(w.objectIntersections && source.Flags()&checker.TypeFlagsIntersection != 0 && !hasPrimitiveMember(source))
+	if target.Flags()&checker.TypeFlagsObject == 0 || !sourceIsObject {
 		return Pair{}, false
 	}
 	targetSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindCall)
@@ -480,10 +515,18 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			}
 		}
 	}
+	// A class's `prototype` is not writable: assigning it throws in strict code before anything is stored,
+	// so a constructor's `prototype` is a read-only slot (Node probe on #b9a0wgy). Read-only, not skipped:
+	// nominal-class still judges what it holds, and skipping it dropped 24 of its api findings. The value decides it, the source:
+	// through an intersection target the walk meets `{ prototype: object }` alone, with no construct
+	// signature of its own. Every `() => typeof Entity` resolver was about 84 findings this way.
+	isConstructor := len(checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
+		len(checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindConstruct)) > 0
 	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, target) {
 		if property.Flags&ast.SymbolFlagsMethod != 0 {
 			continue
 		}
+		readonly := checker.Checker_isReadonlySymbol(w.typeChecker, property) || (isConstructor && property.Name == "prototype")
 		sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, source, property.Name)
 		if sourceProperty == nil {
 			continue
@@ -491,7 +534,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		if found, wrong := w.into(pair, Pair{
 			Source:  checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
 			Target:  checker.Checker_getTypeOfSymbol(w.typeChecker, property),
-			Mutable: ownSlotsShared && !checker.Checker_isReadonlySymbol(w.typeChecker, property),
+			Mutable: ownSlotsShared && !readonly,
 		}, Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
 			return found, true
 		}

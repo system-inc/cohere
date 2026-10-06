@@ -162,7 +162,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 // rather than replaced because it knows its host, as the oracle run standalone does not (a lone JSX
 // element in a tsx fence keeps no semicolon only when the printer knows its parent is markdown).
 func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellBack map[string]bool) printing.TextToDoc {
-	native := TextToDoc(options, "markdown")
+	native := TextToDoc(options, "markdown", nil)
 	return func(text string, parserOrFile string) (doc.Doc, error) {
 		if printed, err := native(text, parserOrFile); err == nil {
 			return printed, nil
