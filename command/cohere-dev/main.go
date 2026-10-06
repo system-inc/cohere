@@ -7,6 +7,7 @@
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
 //	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
+//	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
 //
 // Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
 // token's share of the cores (pool.go). A dozen members each running go on all sixteen cores held the machine
@@ -41,6 +42,8 @@ func main() {
 		os.Exit(status())
 	case trimCacheVerb:
 		os.Exit(trimCache())
+	case "quiet":
+		os.Exit(quiet(os.Args[2:]))
 	case "test", "build", "vet", "exec", "land":
 		os.Exit(run(os.Args[1], os.Args[2:]))
 	}
@@ -52,7 +55,8 @@ func usage() {
 		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
 		"       cohere-dev land\n"+
-		"       cohere-dev status")
+		"       cohere-dev status\n"+
+		"       cohere-dev quiet [on [--for <duration>] [why] | off]")
 	os.Exit(2)
 }
 

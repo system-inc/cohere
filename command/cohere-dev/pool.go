@@ -243,6 +243,7 @@ func status() int {
 		fmt.Printf("  token %d: %s\n", token, holder)
 	}
 	fmt.Println(cacheStatus(directory))
+	fmt.Println(quietStatus(directory, time.Now()))
 	waiting := waiters(directory)
 	fmt.Printf("line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {
