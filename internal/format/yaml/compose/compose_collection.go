@@ -177,18 +177,18 @@ func composeScalar(ctx *composeContext, token *cst.Token, tagToken *cst.Token, o
 	if tag.resolveScalar == nil {
 		// An inherited property found by knownTag: `tag.resolve(...)` throws a TypeError.
 		onError(errorSource, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
-		scalar = newScalar(unitsToString(value))
+		scalar = ctx.newScalar(unitsToString(value))
 	} else {
 		res, err := tag.resolveScalar(value, func(msg string) {
 			onError(errorSource, "TAG_RESOLVE_FAILED", msg, false)
 		}, ctx.options)
 		if err != nil {
 			onError(errorSource, "TAG_RESOLVE_FAILED", err.Error(), false)
-			scalar = newScalar(unitsToString(value))
+			scalar = ctx.newScalar(unitsToString(value))
 		} else if node, isNode := res.(*Node); isNode && IsScalar(node) {
 			scalar = node
 		} else {
-			scalar = newScalar(res)
+			scalar = ctx.newScalar(res)
 		}
 	}
 	scalar.Range = resolved.valueRange

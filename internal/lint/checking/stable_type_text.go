@@ -24,7 +24,7 @@ import (
  * another order from run to run on www-phi-health at GOMAXPROCS=16, while single-threaded runs agreed.
  *
  * The order here uses no type id and no checker history, all the way down:
- *   - an anonymous object's own members (declared inside the object, type literal or literal it came from) by
+ *   - an anonymous object's own members (declared directly in the literal, namespace or file it came from) by
  *     their position, then every other member (the synthesized ones) by name;
  *   - a union's and an intersection's members by their own printed text, null and undefined last, which is a
  *     total order: two members that print alike are interchangeable in the text;
@@ -269,9 +269,14 @@ func (p *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
 	return "{ " + strings.Join(parts, "; ") + "; }"
 }
 
-// members is an anonymous object's properties in their stable order: its own, declared inside the declaration it
-// came from, by position, then every other one by name. The others are the `name?: undefined` members that
+// members is an anonymous object's properties in their stable order: its own, declared directly in the declaration
+// it came from, by position, then every other one by name. The others are the `name?: undefined` members that
 // normalization adds, whose declaration is a sibling's, and which sibling is the checker's history.
+//
+// Own is where the declaration sits, not its place in the source (#ncz8caa). A borrowed sibling can sit in a literal
+// nested inside this one, inside its range but not among its members, and then whether it read as own was the
+// checker's history again, as a spread of a nested literal's member was on www-phi-health. memberHome is exact for
+// every container measured there: object literals, type literals, a class's static side, namespaces and files.
 func (p *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 	properties := slices.Clone(p.typeChecker.GetPropertiesOfType(t))
 	var container *ast.Node
@@ -279,15 +284,10 @@ func (p *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 		container = symbol.Declarations[0]
 	}
 	own := func(property *ast.Symbol) (int, bool) {
-		if container == nil || len(property.Declarations) == 0 {
+		if container == nil || len(property.Declarations) == 0 || memberHome(property.Declarations[0]) != container {
 			return 0, false
 		}
-		declaration := property.Declarations[0]
-		if ast.GetSourceFileOfNode(declaration) != ast.GetSourceFileOfNode(container) ||
-			declaration.Pos() < container.Pos() || declaration.End() > container.End() {
-			return 0, false
-		}
-		return declaration.Pos(), true
+		return property.Declarations[0].Pos(), true
 	}
 	slices.SortStableFunc(properties, func(a, b *ast.Symbol) int {
 		positionA, ownA := own(a)
@@ -305,13 +305,29 @@ func (p *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 	return properties
 }
 
+// memberHome is the declaration a member is declared directly in: its parent, or for a namespace's and a file's
+// statements the namespace or file around their block and variable statement.
+func memberHome(declaration *ast.Node) *ast.Node {
+	home := declaration.Parent
+	for home != nil && (home.Kind == ast.KindModuleBlock || home.Kind == ast.KindVariableStatement || home.Kind == ast.KindVariableDeclarationList) {
+		home = home.Parent
+	}
+	return home
+}
+
 // member prints one property: `readonly name?: T`, or a method as `name(p: T): R`.
+//
+// An optional member's type is the one TypeScript's own printer starts from, without the missing type the `?` already
+// says (#sp4xwtj). Under exactOptionalPropertyTypes that is only the marker, so `y?: number` prints as written and a
+// written `y?: number | undefined` keeps its undefined, and a synthesized `y?:` member prints `never`, as TypeToString
+// prints it. Without the option the marker is undefined itself, `y?: number` and `y?: number | undefined` are one
+// type, and it prints `| undefined`: TypeToString drops it only where it reuses a written annotation.
 func (p *stableTypePrinter) member(property *ast.Symbol, depth int) string {
 	name := StablePropertyName(property.Name)
 	if property.Flags&ast.SymbolFlagsOptional != 0 {
 		name += "?"
 	}
-	propertyType := p.typeChecker.GetTypeOfSymbol(property)
+	propertyType := checker.Checker_getNonMissingTypeOfSymbol(p.typeChecker, property)
 	if property.Flags&ast.SymbolFlagsMethod != 0 {
 		if signatures := p.typeChecker.GetSignaturesOfType(propertyType, checker.SignatureKindCall); len(signatures) == 1 {
 			return name + p.signature(signatures[0], ": ", depth)

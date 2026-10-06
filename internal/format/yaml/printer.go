@@ -512,12 +512,52 @@ func shouldPrintDocumentHeadEndMarker(path *astPath) bool {
 
 // printFlowScalarContent is upstream's printFlowScalarContent.
 func printFlowScalarContent(nodeType string, content string, settings *settings) doc.Doc {
+	if settings.proseWrap == "preserve" {
+		return printPreservedFlowScalarContent(content)
+	}
 	lineContents := getFlowScalarLineContents(nodeType, content, settings)
 	lines := make([]doc.Doc, len(lineContents))
 	for index, lineContentWords := range lineContents {
 		lines[index] = fillWords(lineContentWords)
 	}
 	return doc.Join(doc.Hardline, lines)
+}
+
+// printPreservedFlowScalarContent is printFlowScalarContent under proseWrap preserve, which every one of our
+// repositories uses, built in one pass (#v6ksqg3). The doc is the one the general path builds:
+// getFlowScalarLineContents splits the content on "\n", trims each line as it does (the first only at its
+// end, the last only at its start, a lone line not at all), and makes each line one word, or none when it
+// is empty; fillWords makes each a fill; doc.Join puts hardlines between them. Here the lines are cut and
+// trimmed in place and the joined concat is built directly, without the split, the trimmed copy and the
+// per-line word lists between.
+func printPreservedFlowScalarContent(content string) doc.Doc {
+	count := strings.Count(content, "\n") + 1
+	last := count - 1
+	joined := make(doc.Concat, 0, 2*count)
+	rest := content
+	for index := 0; index < count; index++ {
+		line, after, _ := strings.Cut(rest, "\n")
+		rest = after
+		switch {
+		case index == 0 && index == last:
+		case index != 0 && index != last:
+			line = trim(line)
+		case index == 0:
+			line = trimEnd(line)
+		default:
+			line = trimStart(line)
+		}
+		if index > 0 {
+			joined = append(joined, doc.Hardline)
+		}
+		// fillWords of one word, or of none: the same parts, with the same room.
+		if line == "" {
+			joined = append(joined, doc.NewFill(make([]doc.Doc, 0)))
+		} else {
+			joined = append(joined, doc.NewFill(append(make([]doc.Doc, 0, 2), doc.Text(line))))
+		}
+	}
+	return joined
 }
 
 // The remaining files of src/language-yaml, small enough to share this one.

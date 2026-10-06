@@ -10,6 +10,7 @@ package cst
 // every array spliced out is copied, so a later append to the remainder can never write into it.
 
 import (
+	"github.com/system-inc/cohere/internal/format/arena"
 	"iter"
 	"unicode/utf16"
 )
@@ -159,6 +160,10 @@ type Parser struct {
 	lexer     *Lexer
 	onNewLine func(offset int)
 
+	// Tokens is where the parse's tokens come from, nil to allocate each (#v6ksqg3). A caller that sets it
+	// owns the tokens' lifetime: unist.Parse resets it once the tree is built, since no node keeps a token.
+	Tokens *arena.Arena[Token]
+
 	// yield is the consumer of the running Parse iteration; stopped is set once it returns false.
 	yield   func(*Token) bool
 	stopped bool
@@ -224,7 +229,7 @@ func (parser *Parser) next(source []uint16) {
 	tokenType := TokenType(source)
 	if tokenType == "" {
 		message := "Not a YAML token: " + string(utf16.Decode(source))
-		parser.pop(&Token{Type: "error", Offset: parser.offset, Message: message, Source: source, indentAbsent: true})
+		parser.pop(parser.Tokens.New(Token{Type: "error", Offset: parser.offset, Message: message, Source: source, indentAbsent: true}))
 		parser.offset += len(source)
 	} else if tokenType == "scalar" {
 		parser.atNewLine = false
@@ -266,12 +271,12 @@ func (parser *Parser) end() {
 
 // sourceToken is upstream's sourceToken getter: a new token each time.
 func (parser *Parser) sourceToken() *Token {
-	return &Token{
+	return parser.Tokens.New(Token{
 		Type:   parser.tokenType,
 		Offset: parser.offset,
 		Indent: parser.indent,
 		Source: parser.source,
-	}
+	})
 }
 
 func (parser *Parser) step() {
@@ -280,12 +285,12 @@ func (parser *Parser) step() {
 		for len(parser.stack) > 0 {
 			parser.pop(nil)
 		}
-		parser.stack = append(parser.stack, &Token{
+		parser.stack = append(parser.stack, parser.Tokens.New(Token{
 			Type:         "doc-end",
 			Offset:       parser.offset,
 			Source:       parser.source,
 			indentAbsent: true,
-		})
+		}))
 		return
 	}
 	if top == nil {
@@ -338,7 +343,7 @@ func (parser *Parser) pop(errorToken *Token) {
 	if token == nil {
 		// should not happen
 		message := "Tried to pop an empty stack"
-		parser.emit(&Token{Type: "error", Offset: parser.offset, Source: []uint16{}, Message: message, indentAbsent: true})
+		parser.emit(parser.Tokens.New(Token{Type: "error", Offset: parser.offset, Source: []uint16{}, Message: message, indentAbsent: true}))
 	} else if len(parser.stack) == 0 {
 		parser.emit(token)
 	} else {
@@ -442,31 +447,31 @@ func everyCommentLessIndented(start []*Token, indent int) bool {
 func (parser *Parser) stream() {
 	switch parser.tokenType {
 	case "directive-line":
-		parser.emit(&Token{Type: "directive", Offset: parser.offset, Source: parser.source, indentAbsent: true})
+		parser.emit(parser.Tokens.New(Token{Type: "directive", Offset: parser.offset, Source: parser.source, indentAbsent: true}))
 		return
 	case "byte-order-mark", "space", "comment", "newline":
 		parser.emit(parser.sourceToken())
 		return
 	case "doc-mode", "doc-start":
-		doc := &Token{
+		doc := parser.Tokens.New(Token{
 			Type:         "document",
 			Offset:       parser.offset,
 			Start:        []*Token{},
 			indentAbsent: true,
-		}
+		})
 		if parser.tokenType == "doc-start" {
 			doc.Start = append(doc.Start, parser.sourceToken())
 		}
 		parser.stack = append(parser.stack, doc)
 		return
 	}
-	parser.emit(&Token{
+	parser.emit(parser.Tokens.New(Token{
 		Type:         "error",
 		Offset:       parser.offset,
 		Message:      "Unexpected " + parser.tokenType + " token in YAML stream",
 		Source:       parser.source,
 		indentAbsent: true,
-	})
+	}))
 }
 
 func (parser *Parser) document(doc *Token) {
@@ -491,13 +496,13 @@ func (parser *Parser) document(doc *Token) {
 	if bv != nil {
 		parser.stack = append(parser.stack, bv)
 	} else {
-		parser.emit(&Token{
+		parser.emit(parser.Tokens.New(Token{
 			Type:         "error",
 			Offset:       parser.offset,
 			Message:      "Unexpected " + parser.tokenType + " token in YAML document",
 			Source:       parser.source,
 			indentAbsent: true,
-		})
+		}))
 	}
 }
 
@@ -514,12 +519,12 @@ func (parser *Parser) scalar(scalar *Token) {
 		}
 		item := &CollectionItem{Start: start, Sep: sep}
 		item.setKey(scalar)
-		blockMap := &Token{
+		blockMap := parser.Tokens.New(Token{
 			Type:   "block-map",
 			Offset: scalar.Offset,
 			Indent: scalar.Indent,
 			Items:  []*CollectionItem{item},
-		}
+		})
 		parser.onKeyLine = true
 		parser.stack[len(parser.stack)-1] = blockMap
 	} else {
@@ -642,12 +647,12 @@ func (parser *Parser) blockMap(blockMap *Token) {
 				start = append(start, parser.sourceToken())
 				blockMap.Items = append(blockMap.Items, &CollectionItem{Start: start, ExplicitKey: true})
 			} else {
-				parser.stack = append(parser.stack, &Token{
+				parser.stack = append(parser.stack, parser.Tokens.New(Token{
 					Type:   "block-map",
 					Offset: parser.offset,
 					Indent: parser.indent,
 					Items:  []*CollectionItem{{Start: []*Token{parser.sourceToken()}, ExplicitKey: true}},
-				})
+				}))
 			}
 			parser.onKeyLine = true
 			return
@@ -661,12 +666,12 @@ func (parser *Parser) blockMap(blockMap *Token) {
 						start := getFirstKeyStartProps(&it.Start)
 						item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
 						item.setKey(nil)
-						parser.stack = append(parser.stack, &Token{
+						parser.stack = append(parser.stack, parser.Tokens.New(Token{
 							Type:   "block-map",
 							Offset: parser.offset,
 							Indent: parser.indent,
 							Items:  []*CollectionItem{item},
-						})
+						}))
 					}
 				} else if it.Value != nil {
 					item := &CollectionItem{Start: []*Token{}, Sep: []*Token{parser.sourceToken()}}
@@ -675,12 +680,12 @@ func (parser *Parser) blockMap(blockMap *Token) {
 				} else if includesToken(it.Sep, "map-value-ind") {
 					item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
 					item.setKey(nil)
-					parser.stack = append(parser.stack, &Token{
+					parser.stack = append(parser.stack, parser.Tokens.New(Token{
 						Type:   "block-map",
 						Offset: parser.offset,
 						Indent: parser.indent,
 						Items:  []*CollectionItem{item},
-					})
+					}))
 				} else if isFlowToken(it.Key) &&
 					!includesToken(it.Sep, "newline") {
 					start := getFirstKeyStartProps(&it.Start)
@@ -690,12 +695,12 @@ func (parser *Parser) blockMap(blockMap *Token) {
 					it.Sep = nil
 					item := &CollectionItem{Start: start, Sep: sep}
 					item.setKey(key)
-					parser.stack = append(parser.stack, &Token{
+					parser.stack = append(parser.stack, parser.Tokens.New(Token{
 						Type:   "block-map",
 						Offset: parser.offset,
 						Indent: parser.indent,
 						Items:  []*CollectionItem{item},
-					})
+					}))
 				} else if len(start) > 0 {
 					// Not actually at next item
 					// `it.sep.concat(start, this.sourceToken)`: a new array.
@@ -717,12 +722,12 @@ func (parser *Parser) blockMap(blockMap *Token) {
 				} else if includesToken(it.Sep, "map-value-ind") {
 					item := &CollectionItem{Start: []*Token{}, Sep: []*Token{parser.sourceToken()}}
 					item.setKey(nil)
-					parser.stack = append(parser.stack, &Token{
+					parser.stack = append(parser.stack, parser.Tokens.New(Token{
 						Type:   "block-map",
 						Offset: parser.offset,
 						Indent: parser.indent,
 						Items:  []*CollectionItem{item},
-					})
+					}))
 				} else {
 					it.Sep = append(it.Sep, parser.sourceToken())
 				}
@@ -751,13 +756,13 @@ func (parser *Parser) blockMap(blockMap *Token) {
 					if !it.ExplicitKey &&
 						it.Sep != nil &&
 						!includesToken(it.Sep, "newline") {
-						parser.pop(&Token{
+						parser.pop(parser.Tokens.New(Token{
 							Type:         "error",
 							Offset:       parser.offset,
 							Message:      "Unexpected block-seq-ind on same line with key",
 							Source:       parser.source,
 							indentAbsent: true,
-						})
+						}))
 						return
 					}
 				} else if atMapIndent {
@@ -920,12 +925,12 @@ func (parser *Parser) flowCollection(fc *Token) {
 			sep = append(sep, parser.sourceToken())
 			item := &CollectionItem{Start: start, Sep: sep}
 			item.setKey(fc)
-			blockMap := &Token{
+			blockMap := parser.Tokens.New(Token{
 				Type:   "block-map",
 				Offset: fc.Offset,
 				Indent: fc.Indent,
 				Items:  []*CollectionItem{item},
-			}
+			})
 			parser.onKeyLine = true
 			parser.stack[len(parser.stack)-1] = blockMap
 		} else {
@@ -942,12 +947,12 @@ func (parser *Parser) flowScalar(tokenType string) *Token {
 			nl = indexOf(parser.source, '\n', nl) + 1
 		}
 	}
-	return &Token{
+	return parser.Tokens.New(Token{
 		Type:   tokenType,
 		Offset: parser.offset,
 		Indent: parser.indent,
 		Source: parser.source,
-	}
+	})
 }
 
 // startBlockValue returns nil for upstream's null.
@@ -956,52 +961,52 @@ func (parser *Parser) startBlockValue(parent *Token) *Token {
 	case "alias", "scalar", "single-quoted-scalar", "double-quoted-scalar":
 		return parser.flowScalar(parser.tokenType)
 	case "block-scalar-header":
-		return &Token{
+		return parser.Tokens.New(Token{
 			Type:   "block-scalar",
 			Offset: parser.offset,
 			Indent: parser.indent,
 			Props:  []*Token{parser.sourceToken()},
 			Source: []uint16{},
-		}
+		})
 	case "flow-map-start", "flow-seq-start":
-		return &Token{
+		return parser.Tokens.New(Token{
 			Type:      "flow-collection",
 			Offset:    parser.offset,
 			Indent:    parser.indent,
 			FlowStart: parser.sourceToken(),
 			Items:     []*CollectionItem{},
 			End:       []*Token{},
-		}
+		})
 	case "seq-item-ind":
-		return &Token{
+		return parser.Tokens.New(Token{
 			Type:   "block-seq",
 			Offset: parser.offset,
 			Indent: parser.indent,
 			Items:  []*CollectionItem{{Start: []*Token{parser.sourceToken()}}},
-		}
+		})
 	case "explicit-key-ind":
 		parser.onKeyLine = true
 		prev := getPrevProps(parent)
 		start := getFirstKeyStartProps(prev)
 		start = append(start, parser.sourceToken())
-		return &Token{
+		return parser.Tokens.New(Token{
 			Type:   "block-map",
 			Offset: parser.offset,
 			Indent: parser.indent,
 			Items:  []*CollectionItem{{Start: start, ExplicitKey: true}},
-		}
+		})
 	case "map-value-ind":
 		parser.onKeyLine = true
 		prev := getPrevProps(parent)
 		start := getFirstKeyStartProps(prev)
 		item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
 		item.setKey(nil)
-		return &Token{
+		return parser.Tokens.New(Token{
 			Type:   "block-map",
 			Offset: parser.offset,
 			Indent: parser.indent,
 			Items:  []*CollectionItem{item},
-		}
+		})
 	}
 	return nil
 }
