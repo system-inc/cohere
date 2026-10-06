@@ -633,18 +633,37 @@ func buildOnce(options Options) (*Graph, error) {
 	}, nil
 }
 
-// ReadUnchanged reports whether the program's copy of a file is still the file's: the program read it under a
-// stat, its content pack's or its own, and a stat taken now matches it (#q6dey77). A reader holding the
-// program's copy can then use it instead of reading the file again. False when the program has no stat for the
-// file, so the reader reads the disk, as it would have.
-func (g *Graph) ReadUnchanged(path string) bool {
+/*
+ * ReadUnchanged reports whether text, the program's copy of a file, is the file's bytes now, so a reader can
+ * use it instead of reading the file again (#q6dey77). Exact, by three checks:
+ *   - the program read the file under a stat, its content pack's or its own, and a stat taken now matches it,
+ *     so the file holds the bytes the program read;
+ *   - those bytes were the program's copy exactly. The program reads through typescript-go's decodeBytes,
+ *     which drops a UTF-8 byte order mark and decodes UTF-16 behind its mark, and returns every other file
+ *     byte for byte. So the file must not start with a mark (#hkv1hgp). The recorded size must also be the
+ *     copy's length, which no dropped mark leaves true and which costs no read, so a marked file is turned
+ *     away before it is opened. The length alone isn't enough: UTF-16 heavy in characters that take three
+ *     bytes in UTF-8 can decode to exactly its own size.
+ * False on any doubt, so the reader reads the disk, as it would have.
+ */
+func (g *Graph) ReadUnchanged(path string, text string) bool {
 	if g == nil {
 		return false
 	}
+	var identity fileIdentity
+	var known bool
 	if g.contentPack != nil {
-		return g.contentPack.ReadUnchanged(path)
+		identity, known = g.contentPack.readIdentity(path)
+	} else {
+		identity, known = g.readIdentities.identity(path)
 	}
-	return g.readIdentities.unchanged(path)
+	if !known || identity.size != int64(len(text)) {
+		return false
+	}
+	if current, statted := statIdentity(path); !statted || current != identity {
+		return false
+	}
+	return !startsWithByteOrderMark(path)
 }
 
 // SourceFiles is every file in the program, third-party declarations included.

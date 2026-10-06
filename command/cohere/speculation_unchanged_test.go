@@ -50,6 +50,11 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 			t.Fatal(err)
 		}
 	}
+	// Unchanged too, but behind a UTF-8 byte order mark, which the program's copy has dropped (#hkv1hgp).
+	marked := filepath.Join(directory, "Marked.ts")
+	if err := os.WriteFile(marked, append([]byte{0xEF, 0xBB, 0xBF}, "export const beta = 1;\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
 		t.Fatal(err)
@@ -86,10 +91,10 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 	transform := func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		return formatter.FormatParsed(fileName, text, parsed)
 	}
-	speculation := speculateFormatOn([]string{unchanged, edited}, transform, 1, 2, &programs)
+	speculation := speculateFormatOn([]string{unchanged, edited, marked}, transform, 1, 2, &programs)
 	speculation.wait()
 
-	for _, fileName := range []string{unchanged, edited} {
+	for _, fileName := range []string{unchanged, edited, marked} {
 		if sourceFile := graph.Program.GetSourceFile(fileName); sourceFile == nil || !sourceFile.IsBound() {
 			t.Fatalf("%s is not bound, so the speculation never offered it the program's copy", filepath.Base(fileName))
 		}
@@ -105,6 +110,11 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(t *testing.T, w
 	if read := speculation.read[edited]; read != editedText {
 		t.Errorf("the edited file was formatted from %q, not from the bytes now on disk", read)
 	}
+	// The marked file is judged on its bytes on disk, mark and all, never on the program's copy without it.
+	if read, kept := speculation.read[marked]; kept && read == graph.Program.GetSourceFile(marked).Text() {
+		t.Errorf("the marked file was formatted from the program's copy, which is not the file's bytes")
+	}
+
 	keepable := speculation.keepable(nil, graph)
 	if _, has := keepable[edited]; has {
 		t.Errorf("the edited file's attempt was kept, pairing the walk's findings with formatting of other bytes")
