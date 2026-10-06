@@ -53,7 +53,23 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
 	findingsTree["source/shared.ts"] = "export async function load(): Promise<number> {\n    return 1;\n}\n"
 	typeErrorTree["source/shared.ts"] = findingsTree["source/shared.ts"]
 
-	roots := map[string]string{"type-aware findings": fixture(findingsTree), "type errors": fixture(typeErrorTree)}
+	// A file whose type diagnostics depend on what its checker checked before it (#tcbrgdx, from types' review):
+	// classVarianceResolveCircularity2 split across three files. tsgo single-threaded reports TS7022 at bar.ts:4:5
+	// when foo.ts or use.ts is checked before bar.ts, and nothing when bar.ts goes first, because a checker's
+	// diagnostics for a file include errors it recorded there while resolving other files. Which checker gets
+	// which file decides whether it trips here, so a pass is weak evidence; a failure is upstream's order effect
+	// in type resolution, not the walk's. anchor.ts gives the home run a line to compare.
+	historyTree := map[string]string{
+		"source/anchor.ts": "export const wrong: number = 'x';\n",
+		"source/bar.ts":    "import { Foo, callme } from './foo';\nexport class Bar<T> {\n    num!: number;\n    Value = callme(new Foo(this)).bar.num;\n    Field: number = callme(new Foo(this)).bar.num;\n}\n",
+		"source/foo.ts":    "import { Bar } from './bar';\nexport declare function callme(x: Foo<any>): Foo<any>;\nexport declare function callme(x: object): string;\nexport class Foo<T> {\n    bar!: Bar<T>;\n    constructor(bar: Bar<T>) {\n        this.bar = bar;\n    }\n}\n",
+		"source/use.ts":    "import { Foo } from './foo';\nimport { Bar } from './bar';\nexport function f(x: Foo<string>, y: Bar<number>): Foo<unknown> { return x; }\n",
+	}
+	for name, contents := range common {
+		historyTree[name] = contents
+	}
+
+	roots := map[string]string{"type-aware findings": fixture(findingsTree), "type errors": fixture(typeErrorTree), "check history": fixture(historyTree)}
 	for index, root := range filepath.SplitList(os.Getenv("COHERE_FOREIGN_TREES")) {
 		roots["tree "+string(rune('1'+index))+" "+filepath.Base(root)] = root
 	}
