@@ -59,9 +59,10 @@ func (options *TailwindLocationOptions) anchorAt(directory string) {
 // first, so its errors are its own, and the settings are merged after: the keys of them this rule
 // declares, overlaid by every key the element wrote. registry.CheckSettings has already refused a
 // settings key no rule reads and a value a rule would refuse, before any rule decodes.
-func decodeTailwindOptionsAt[Options any, Anchored interface {
+func decodeTailwindOptionsAt[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
+	compileClassLiterals()
 }]() func(raw []byte, base rule.OptionsBase) (any, error) {
 	var declared Options
 	keys := map[string]bool{}
@@ -106,7 +107,9 @@ func decodeTailwindOptionsAt[Options any, Anchored interface {
 		if anchor == "" {
 			anchor = base.ProjectRoot
 		}
-		Anchored(&decoded).anchorAt(anchor)
+		Settled(&decoded).anchorAt(anchor)
+		// Compiled here, once per configuration selection, rather than by the rule on every file.
+		Settled(&decoded).compileClassLiterals()
 		return decoded, nil
 	}
 }
@@ -176,9 +179,10 @@ var tailwindOptionKeys = map[string]map[string]bool{}
 
 // tailwindRegistration registers one better-tailwindcss rule with its options, recording the keys
 // those options declare for splitTailwindSettings.
-func tailwindRegistration[Options any, Anchored interface {
+func tailwindRegistration[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
+	compileClassLiterals()
 }](tailwindRule rule.Rule) rule.Registration {
 	var declared Options
 	keys := map[string]bool{}
@@ -186,7 +190,7 @@ func tailwindRegistration[Options any, Anchored interface {
 		keys[key] = true
 	}
 	tailwindOptionKeys[tailwindRule.Name] = keys
-	return rule.Registration{Rule: tailwindRule, DecodeAt: decodeTailwindOptionsAt[Options, Anchored]()}
+	return rule.Registration{Rule: tailwindRule, DecodeAt: decodeTailwindOptionsAt[Options, Settled]()}
 }
 
 // ErrTailwindNotInstalled is returned when no `tailwindcss` resolves from a configured `cwd`. Upstream

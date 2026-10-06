@@ -64,16 +64,16 @@ var NoUnnecessaryWhitespace = rule.Rule{
 			return nil
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		allowMultiline := true
 		if configured, isConfigured := rule.OptionsAs[NoUnnecessaryWhitespaceOptions](options); isConfigured {
 			if configured.AllowMultiline != nil {
 				allowMultiline = *configured.AllowMultiline
 			}
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, segment := range reader.ClassSegmentsIn(node) {

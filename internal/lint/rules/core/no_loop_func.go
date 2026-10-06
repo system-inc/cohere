@@ -174,17 +174,22 @@ var NoLoopFunc = rule.Rule{
 
 		// Every identifier in the file, grouped by the declaration it resolves to. Built once on
 		// the source file rather than per function: upstream reads it off eslint-scope's index,
-		// which is also built once.
+		// which is also built once. And built only when a function sits in a loop, since no other
+		// function can report: most files have none, and the index resolves every identifier.
 		var referencesByDeclaration map[*ast.Node][]*ast.Node
 
 		check := func(node *ast.Node) {
 			if ctx.TypeChecker == nil {
 				return
 			}
+			loopNode := loopFuncContainingLoop(node, skippedImmediatelyInvoked)
+			if loopNode == nil {
+				return
+			}
 			if referencesByDeclaration == nil {
 				referencesByDeclaration = loopFuncReferenceIndex(ctx)
 			}
-			checkLoopFunc(ctx, node, skippedImmediatelyInvoked, referencesByDeclaration)
+			checkLoopFunc(ctx, node, loopNode, skippedImmediatelyInvoked, referencesByDeclaration)
 		}
 
 		// Every kind whose ESTree counterpart is a FunctionExpression, which is what upstream's
@@ -201,18 +206,14 @@ var NoLoopFunc = rule.Rule{
 	},
 }
 
-// checkLoopFunc judges one function.
+// checkLoopFunc judges one function, which sits in loopNode.
 func checkLoopFunc(
 	ctx rule.Context,
 	node *ast.Node,
+	loopNode *ast.Node,
 	skippedImmediatelyInvoked map[*ast.Node]bool,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,
 ) {
-	loopNode := loopFuncContainingLoop(node, skippedImmediatelyInvoked)
-	if loopNode == nil {
-		return
-	}
-
 	escaping := loopFuncEscapingReferences(ctx, node)
 
 	// A function invoked where it is created cannot outlive the iteration. Upstream applies this
@@ -719,9 +720,18 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 // loopFuncReferenceIndex groups every identifier in the file by the declaration it resolves to.
 //
 // This replaces `variable.references`, which eslint-scope maintains and we do not have. Built once
-// per file and cached on the rule instance, because the alternative is resolving the whole file
-// again for every function in it.
+// per file, because the alternative is resolving the whole file again for every function in it, and
+// shared through the file cache with no-unmodified-loop-condition, which reads the same index. Two
+// rules each building it cost 29 MB in 394K objects on a cold ahra run (#942rdnn). Neither rule
+// writes to it.
 func loopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
+	return rule.Cached(ctx.FileCache, "core.loopFuncReferenceIndex", func() map[*ast.Node][]*ast.Node {
+		return buildLoopFuncReferenceIndex(ctx)
+	})
+}
+
+// buildLoopFuncReferenceIndex is loopFuncReferenceIndex's fill.
+func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
 	index := map[*ast.Node][]*ast.Node{}
 	var walk func(node *ast.Node)
 	walk = func(node *ast.Node) {
