@@ -46,9 +46,9 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 		{"a cousin", "/repository/app", "/repository/libraries/structure/Index.ts"},
 		{"the filesystem root as the directory", "/", "/repository/Paths.ts"},
 		{"a directory spelled with a trailing separator", "/repository/", "/repository/source/Paths.ts"},
-		{"a mixed-case directory over a canonical, lowercased path", "/Users/Kirk/Projects", "/users/kirk/projects/ahra/Paths.ts"},
-		{"a lowercased sibling that extends the directory's name", "/Users/Kirk", "/users/kirkland/Paths.ts"},
-		{"a non-ASCII directory", "/Users/Zo\u00eb", "/users/zo\u00eb/Paths.ts"},
+		{"a mixed-case directory over a canonical, lowercased path", "/Work/Repository", "/work/repository/ahra/Paths.ts"},
+		{"a lowercased sibling that extends the directory's name", "/Work/Repo", "/work/repository/Paths.ts"},
+		{"a non-ASCII directory", "/Work/Zo\u00eb", "/work/zo\u00eb/Paths.ts"},
 	}
 	for _, shape := range shapes {
 		for _, caseSensitive := range []bool{true, false} {
