@@ -10,7 +10,8 @@ import (
 
 // listedTree is a tree with everything the walk decides on: git's ignore files at two depths, the house list
 // and ignorePatterns, a nested clone and a submodule's gitlink, symbolic links to a file, a directory and
-// nothing, and a file of a type no engine formats.
+// nothing, a file of a type no engine formats, and Adamic `.a` files, one held back and one in an ignored
+// directory, so the hold-back and the ignore layer before it both decide something.
 func listedTree(t *testing.T) string {
 	t.Helper()
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
@@ -25,6 +26,8 @@ func listedTree(t *testing.T) string {
 		"source/deep/c.md":         "# c\n",
 		"source/deep/deeper/d.css": "a { b: c; }\n",
 		"dist/built.ts":            "export const built = 1;\n",
+		"dist/built.a":             "built\n",
+		"source/x.a":               "x\n",
 		"archived/old.md":          "# old\n",
 		"vendor/.git/HEAD":         "ref: refs/heads/main\n",
 		"vendor/theirs.ts":         "export const theirs = 1;\n",
@@ -97,7 +100,7 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(disk.Files) < 4 || disk.SymbolicLinks != 3 || len(disk.NestedRepositories) != 2 {
+	if len(disk.Files) < 4 || disk.SymbolicLinks != 3 || len(disk.NestedRepositories) != 2 || len(disk.Adamic) != 1 {
 		t.Fatalf("the fixture's walk is too thin to prove anything: %+v", disk)
 	}
 	listings := diskListings(t, root)
@@ -135,11 +138,12 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(t *testing.T) {
 	}
 
 	for name, mutant := range map[string]map[string][]os.DirEntry{
-		"a file dropped":       without(listings, filepath.Join(root, "source"), "b.ts"),
-		"a .gitignore dropped": without(listings, filepath.Join(root, "source"), ".gitignore"),
-		"a .git dropped":       without(listings, filepath.Join(root, "vendor"), ".git"),
-		"a gitlink dropped":    without(listings, filepath.Join(root, "library"), ".git"),
-		"a directory dropped":  without(listings, root, "source"),
+		"a file dropped":         without(listings, filepath.Join(root, "source"), "b.ts"),
+		"a .gitignore dropped":   without(listings, filepath.Join(root, "source"), ".gitignore"),
+		"a .git dropped":         without(listings, filepath.Join(root, "vendor"), ".git"),
+		"a gitlink dropped":      without(listings, filepath.Join(root, "library"), ".git"),
+		"a directory dropped":    without(listings, root, "source"),
+		"an Adamic file dropped": without(listings, filepath.Join(root, "source"), "x.a"),
 	} {
 		listed, err := EnumerateListed(root, handlesEveryLanguage, listingOf(mutant))
 		if err == nil && reflect.DeepEqual(listed, disk) {
