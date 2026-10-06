@@ -306,7 +306,8 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 	var jsxValueNames map[string]bool
 
 	// Every import declaration, including those inside an ambient module body (#7g5r6vt).
-	for _, statement := range imports.Declarations(sourceFile) {
+	declarations := imports.Declarations(sourceFile)
+	for _, statement := range declarations {
 		declaration := statement.AsImportDeclaration()
 		clause := declaration.ImportClause
 		if clause == nil {
@@ -320,7 +321,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 		}
 
 		if byText == nil {
-			byText = consistentTypeImportsIdentifiers(sourceFile)
+			byText = consistentTypeImportsIdentifiers(sourceFile, consistentTypeImportsLocalNames(declarations))
 			metadataRoots = decoratorMetadataRoots(ctx, sourceFile)
 			jsxValueNames = consistentTypeImportsJsxValueNames(ctx, sourceFile)
 		}
@@ -446,7 +447,8 @@ func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.Source
 	return names
 }
 
-// consistentTypeImportsIdentifiers indexes a file's identifiers by their text, once.
+// consistentTypeImportsIdentifiers indexes a file's identifiers by their text, once, keeping only
+// the texts some value import binds.
 //
 // Written as an index rather than as a walk per imported name because the naive shape re-walks the
 // whole tree for every specifier in every import statement, and a file with twenty imports then
@@ -457,16 +459,21 @@ func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.Source
 // Keyed by text because an identifier spelled differently cannot resolve to this import, so the text
 // is an exact pre-filter on a question that would otherwise cost a checker call per identifier. The
 // filter is not a discrimination: symbol identity below already implies it.
-func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile) map[string][]*ast.Node {
-	byText := map[string][]*ast.Node{}
+//
+// Only `wanted` texts are kept, because the index is only ever read at an imported local name.
+// Indexing every identifier in the file cost 37 MB in 477K objects on a cold ahra run (#942rdnn),
+// nearly all of it slices for names no import binds: locals, parameters, property names.
+func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile, wanted map[string]bool) map[string][]*ast.Node {
+	byText := make(map[string][]*ast.Node, len(wanted))
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
 			return
 		}
 		if current.Kind == ast.KindIdentifier {
-			text := current.Text()
-			byText[text] = append(byText[text], current)
+			if text := current.Text(); wanted[text] {
+				byText[text] = append(byText[text], current)
+			}
 		}
 		current.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
@@ -475,6 +482,46 @@ func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile) map[string][]*
 	}
 	visit(sourceFile.AsNode())
 	return byText
+}
+
+// consistentTypeImportsLocalNames is every local name a value import declaration binds, which is
+// every name `isReferencedOnlyAsType` can be asked about. A declaration already written
+// `import type` is never judged, so its names are left out.
+//
+// Read off the clause directly rather than through `imports.BindingsOf`, whose named list is a copy:
+// this runs once per file that has a value import, and the loop that judges the declarations calls
+// BindingsOf again anyway.
+func consistentTypeImportsLocalNames(declarations []*ast.Node) map[string]bool {
+	names := map[string]bool{}
+	for _, statement := range declarations {
+		clause := statement.AsImportDeclaration().ImportClause
+		if clause == nil || clause.AsImportClause().IsTypeOnly() {
+			continue
+		}
+		importClause := clause.AsImportClause()
+		if name := importClause.Name(); name != nil {
+			names[name.Text()] = true
+		}
+		namedBindings := importClause.NamedBindings
+		if namedBindings == nil {
+			continue
+		}
+		switch namedBindings.Kind {
+		case ast.KindNamespaceImport:
+			if name := namedBindings.Name(); name != nil {
+				names[name.Text()] = true
+			}
+		case ast.KindNamedImports:
+			if elements := namedBindings.AsNamedImports().Elements; elements != nil {
+				for _, element := range elements.Nodes {
+					if name := element.Name(); name != nil {
+						names[name.Text()] = true
+					}
+				}
+			}
+		}
+	}
+	return names
 }
 
 // isReferencedOnlyAsType answers the rule's single question for one imported name.
