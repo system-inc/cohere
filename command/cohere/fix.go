@@ -778,14 +778,14 @@ func (programs *programOffer) offer(graph *program.Graph) {
 	}
 }
 
-// unchangedTreeOf is boundTreeOf's tree when the program's copy of the file is still the file's, by the stat it
-// was read under: the speculation then formats the tree's own text and reads nothing (#q6dey77). Rereading every file to
+// unchangedTreeOf is boundTreeOf's tree when the program's copy of the file is the file's bytes, by the stat it
+// was read under and a file that starts with no byte order mark (Graph.ReadUnchanged): the speculation then formats the tree's own text and reads nothing (#q6dey77). Rereading every file to
 // compare it with the tree was 51 MB on a cold ahra run. A file changed on disk since the program read it has
 // another stat, so it is read as before, its bytes differ from the program's, and keepable discards the
 // attempt: an edit made after the walk read the file is still noticed.
 func (programs *programOffer) unchangedTreeOf(fileName string) *ast.SourceFile {
 	tree := programs.boundTreeOf(fileName)
-	if tree == nil || !programs.graph.Load().ReadUnchanged(fileName) {
+	if tree == nil || !programs.graph.Load().ReadUnchanged(fileName, tree.Text()) {
 		return nil
 	}
 	return tree

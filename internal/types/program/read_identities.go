@@ -1,6 +1,8 @@
 package program
 
 import (
+	"io"
+	"os"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -32,17 +34,39 @@ func (f *identityFS) ReadFile(path string) (string, bool) {
 	return contents, ok
 }
 
-// unchanged reports whether path has a recorded identity that a stat taken now still matches.
-func (r *readIdentities) unchanged(path string) bool {
+// identity is the stat path was read under, when one was recorded.
+func (r *readIdentities) identity(path string) (fileIdentity, bool) {
 	if r == nil {
-		return false
+		return fileIdentity{}, false
 	}
 	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	identity, known := r.byPath[path]
-	r.mutex.Unlock()
-	if !known {
-		return false
+	return identity, known
+}
+
+/*
+ * startsWithByteOrderMark reports whether the file's first bytes are one of the marks typescript-go's decodeBytes
+ * acts on (internal/vfs/internal/internal.go, copied as decodeLikeDisk): FF FE or FE FF, whose UTF-16 it decodes,
+ * or EF BB BF, which it drops. Any other file it returns byte for byte. A file that can't be opened or read
+ * counts as marked, so the caller reads the disk.
+ */
+func startsWithByteOrderMark(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return true
 	}
-	current, statted := statIdentity(path)
-	return statted && current == identity
+	defer file.Close()
+	var head [3]byte
+	count, err := io.ReadFull(file, head[:])
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return true
+	}
+	switch {
+	case count >= 2 && (head[0] == 0xFF && head[1] == 0xFE || head[0] == 0xFE && head[1] == 0xFF):
+		return true
+	case count == 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF:
+		return true
+	}
+	return false
 }
