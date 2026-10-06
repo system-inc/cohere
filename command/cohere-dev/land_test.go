@@ -237,7 +237,8 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(t *testing.T) {
 }
 
 // The gate runs the same for every landing, whatever the caller's shell sets: GOFLAGS carries only the pool's
-// -p. A caller's -trimpath once failed a land gate on tests that find their fixtures by their source path.
+// -p and -buildvcs=false. A caller's -trimpath once failed a land gate on tests that find their fixtures by
+// their source path.
 func TestTheLandGateIgnoresTheCallersGoFlags(t *testing.T) {
 	t.Parallel()
 	fixture := newLandFixture(t)
@@ -246,7 +247,46 @@ func TestTheLandGateIgnoresTheCallersGoFlags(t *testing.T) {
 		t.Fatalf("the landing failed: %v", err)
 	}
 	gates := fixture.gates()
-	if len(gates) != 2 || !strings.HasSuffix(gates[0], "flags=-p=2") {
-		t.Errorf("the gate ran with %q, want GOFLAGS of the pool's -p alone", gates)
+	if len(gates) != 2 || !strings.HasSuffix(gates[0], "flags=-p=2 -buildvcs=false") {
+		t.Errorf("the gate ran with %q, want GOFLAGS of the pool's -p and -buildvcs=false alone", gates)
+	}
+}
+
+// The gate builds Go in a worktree whose submodule is a symlink, as most of the house's are made. git status
+// refuses that tree, so a go build stamping VCS fails "error obtaining VCS status", and every test that
+// builds a binary failed: cache's land at 04:15 on 2026-10-06, after a full gate. This runs the real go, not
+// the fixture's stand-in, which is how the symlinked-submodule landing test above missed it.
+func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(t *testing.T) {
+	t.Parallel()
+	fixture := newLandFixture(t)
+	library := t.TempDir()
+	fixture.git(library, "init", "-q", "-b", "main")
+	fixture.commit(library, "first.txt")
+	for file, contents := range map[string]string{"go.mod": "module example.com/stamp\n\ngo 1.21\n", "main.go": "package main\n\nfunc main() {}\n"} {
+		if err := os.WriteFile(filepath.Join(fixture.repository, file), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fixture.git(fixture.repository, "add", "go.mod", "main.go")
+	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "a module, and library pinned")
+	a := fixture.worktree("a")
+	fixture.git(a, "merge", "-q", "--no-edit", "main")
+	os.RemoveAll(filepath.Join(a, "library"))
+	if err := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The real go, with whatever flags the caller's shell had, through the gate's environment.
+	caller := []string{"GOFLAGS=-trimpath -p=2", "GOWORK=off"}
+	for _, variable := range os.Environ() {
+		if !strings.HasPrefix(variable, "GOFLAGS=") && !strings.HasPrefix(variable, "GOWORK=") {
+			caller = append(caller, variable)
+		}
+	}
+	build := exec.Command("go", "build", "-o", filepath.Join(t.TempDir(), "stamp"), ".")
+	build.Dir, build.Env = a, gateEnvironment(caller)
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Errorf("the gate's go build failed in a worktree with a symlinked submodule (%v):\n%s", err, output)
 	}
 }
