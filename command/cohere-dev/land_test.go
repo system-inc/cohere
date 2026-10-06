@@ -38,7 +38,7 @@ func newLandFixture(t *testing.T) *landFixture {
 	}
 	home := privatePool(t)
 	fixture.environment = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=2",
+		homeVariable+"="+home, tokensVariable+"=2",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
 		"GIT_COMMITTER_EMAIL=test@example.com", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
 

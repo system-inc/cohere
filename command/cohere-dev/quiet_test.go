@@ -59,14 +59,15 @@ func newQuietTrimCase(t *testing.T) quietTrimCase {
 		t.Fatalf("building: %v\n%s", err, output)
 	}
 	home := t.TempDir()
-	slots := filepath.Join(home, "cache", "cohere", "test-slots")
-	if runtime.GOOS == "darwin" {
-		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
-	}
+	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	if err := os.MkdirAll(slots, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cache := t.TempDir()
+	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
+	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +84,7 @@ func newQuietTrimCase(t *testing.T) quietTrimCase {
 			t.Fatal(err)
 		}
 	}
-	environment := append(outsideThePool(os.Environ()), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(t),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	return quietTrimCase{wrapper: wrapper, slots: slots, cache: cache, environment: environment}
 }
