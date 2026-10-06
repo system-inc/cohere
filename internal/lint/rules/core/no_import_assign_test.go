@@ -224,6 +224,16 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 		{"an import inside a declare module block",
 			"declare module 'x' { import named from 'mod'; named = 0; }", []string{"named"}},
 
+		// An import inside a function or a bare block is a compile error (TS1232), and the parser
+		// recovers it as an ordinary import declaration. Upstream reports the write: measured on the
+		// installed ESLint 10 with @typescript-eslint/parser, both of these give "'x' is read-only."
+		// The rule judged only imports among a file's or a module block's statements until #fcac58b
+		// moved it onto the shared walk, which reaches these too, and that matches upstream (#q488ss2).
+		{"an import recovered inside a function",
+			"function f() { import x from 'y'; x = 1; }", []string{"x"}},
+		{"an import recovered inside a bare block",
+			"{ import x from 'y'; x = 1; }", []string{"x"}},
+
 		{"a shorthand destructuring target on a named import",
 			"import {named} from 'mod'; ({named} = foo)", []string{"named"}},
 		{"a shorthand destructuring target on a default import",
