@@ -4,6 +4,7 @@ package compiler
 
 import "context"
 import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/checker"
 import "github.com/microsoft/TypeScript/tsc/internal/compiler"
 import "github.com/microsoft/TypeScript/tsc/internal/contentmapper"
 import "github.com/microsoft/TypeScript/tsc/internal/core"
@@ -64,6 +65,10 @@ func NewCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath stri
 func NewProgram(opts compiler.ProgramOptions) *compiler.Program
 
 type Program = compiler.Program
+
+//go:linkname Program_getSemanticDiagnosticsWithChecker github.com/microsoft/TypeScript/tsc/internal/compiler.(*Program).getSemanticDiagnosticsWithChecker
+func Program_getSemanticDiagnosticsWithChecker(recv *compiler.Program, ctx context.Context, c *checker.Checker, sourceFile *ast.SourceFile) []*ast.Diagnostic
+
 type ProgramConfig = compiler.ProgramConfig
 type ProgramFactories = compiler.ProgramFactories
 type ProgramHosts = compiler.ProgramHosts
@@ -77,3 +82,6 @@ type SourceFileMayBeEmittedHost = compiler.SourceFileMayBeEmittedHost
 type SourceMapEmitResult = compiler.SourceMapEmitResult
 type WriteFile = compiler.WriteFile
 type WriteFileData = compiler.WriteFileData
+
+//go:linkname FilterAndSortDiagnostics github.com/microsoft/TypeScript/tsc/internal/compiler.filterAndSortDiagnostics
+func FilterAndSortDiagnostics(diags []*ast.Diagnostic) []*ast.Diagnostic

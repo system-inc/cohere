@@ -354,10 +354,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				}
 				sourceFile := files[index]
 
-				// The type check first, on the file's own checker, before this worker takes a checker for the
-				// rules: the check takes that lock itself. See FusedCheck.
+				// The type check first, on the checker the file is walked on, before this worker takes a checker
+				// for the rules: the check takes that lock itself. See FusedCheck.
 				if g.FusedCheck != nil {
-					g.FusedCheck.checkFile(ctx, g, sourceFile)
+					g.FusedCheck.checkFile(ctx, g, sourceFile, checkerFile)
 				}
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
