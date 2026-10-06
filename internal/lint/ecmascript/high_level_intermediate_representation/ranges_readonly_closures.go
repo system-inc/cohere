@@ -107,8 +107,8 @@ func refDerivedValues(function *Function) map[IdentifierId]bool {
 				continue
 			}
 			for _, phi := range block.Phis {
-				for _, operand := range phi.Operands {
-					mark(operand.Identifier, phi.Place.Identifier)
+				for _, entry := range phi.Operands {
+					mark(entry.Place.Identifier, phi.Place.Identifier)
 				}
 			}
 			for _, instructionId := range block.Instructions {

@@ -149,13 +149,12 @@
 // worklist. Keeping the same split means this file has no convergence test to get wrong, and the
 // pass that needs one already exists.
 //
-// # Phi operands are a Go map and nothing here reads them
+// # Nothing here reads phi operands
 //
-// `Phi.Operands` is `map[BlockId]Place` and ranging it is nondeterministic; `static_components.go`
-// has a latent nondeterminism from exactly that. This pass produces effects per INSTRUCTION and
-// never walks a phi, so the hazard does not arise. Every place this file emits comes from an
-// instruction's own operand list, which is a slice. `TestEffectsAreDeterministic` runs the pass
-// twice over the corpus and compares, so a later addition that does reach for a phi fails loudly.
+// This pass produces effects per INSTRUCTION and never walks a phi. Every place this file emits
+// comes from an instruction's own operand list, which is a slice. `TestEffectsAreDeterministic`
+// runs the pass twice over the corpus and compares, so a later addition that brings in an order
+// varying between runs fails loudly.
 package high_level_intermediate_representation
 
 import (

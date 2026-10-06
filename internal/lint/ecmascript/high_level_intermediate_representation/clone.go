@@ -1,7 +1,10 @@
 // Copying a finished graph, so a pass that rewrites one can start from the shared lowering.
 package high_level_intermediate_representation
 
-import "maps"
+import (
+	"maps"
+	"slices"
+)
 
 // CloneFunction returns a function that shares no storage a pass can write with its argument.
 //
@@ -57,7 +60,7 @@ func CloneFunction(function *Function) *Function {
 			copied.Phis = make([]*Phi, len(block.Phis))
 			for index, phi := range block.Phis {
 				if phi != nil {
-					copied.Phis[index] = &Phi{Place: phi.Place, Operands: maps.Clone(phi.Operands)}
+					copied.Phis[index] = &Phi{Place: phi.Place, Operands: slices.Clone(phi.Operands)}
 				}
 			}
 		}

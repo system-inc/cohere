@@ -124,14 +124,15 @@
 // stores and phis; what is lost is exactly the aliasing the effect block above also needs, so the
 // two gaps are the same gap and close together.
 //
-// # Iteration order, and the map that would otherwise leak into the answer
+// # Iteration order
 //
-// `Phi.Operands` is a Go map and its iteration order is randomised. Upstream BREAKS out of the
-// operand loop at the first reactive operand, so an order-dependent read of that loop is a real
-// hazard rather than a theoretical one. It does not change THIS pass's answer, because the result
-// is "was any operand reactive", which is order-independent - but the predecessor loop underneath
-// it is order-dependent in upstream's own code, and the fix is free: both loops read operands
-// through `PhiOperandsInOrder`, so the walk is deterministic whatever a later reader adds to it.
+// `Phi.Operands` is kept sorted by predecessor block id, so its order is fixed. Upstream BREAKS out
+// of the operand loop at the first reactive operand, so the order that loop reads operands in is
+// part of its behavior. It does not change THIS pass's answer, because the result is "was any
+// operand reactive", which is order-independent - but the predecessor loop underneath it is
+// order-dependent in upstream's own code, and both loops read operands through
+// `PhiOperandsInOrder`, ascending predecessor order, so the walk is deterministic whatever a later
+// reader adds to it.
 package high_level_intermediate_representation
 
 import (
@@ -301,14 +302,13 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[BlockId]bool) 
 			continue
 		}
 
-		// Read through PhiOperandsInOrder rather than ranging the map. The answer here does not
-		// depend on order, but the predecessor loop below does, and a deterministic walk costs
-		// nothing. See the package comment.
+		// Read through PhiOperandsInOrder, ascending predecessor order. The answer here does not
+		// depend on order, but the predecessor loop below does. See the package comment.
 		operandOrder := PhiOperandsInOrder(phi)
 
 		isPhiReactive := false
 		for _, predecessorId := range operandOrder {
-			if r.isReactive(phi.Operands[predecessorId].Identifier) {
+			if r.isReactive(phi.Operands.At(predecessorId).Identifier) {
 				isPhiReactive = true
 				break
 			}
@@ -1000,9 +1000,9 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 		for _, phi := range block.Phis {
 			r.setPlace(&phi.Place)
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
-				operand := phi.Operands[predecessorId]
+				operand := phi.Operands.At(predecessorId)
 				r.setPlace(&operand)
-				phi.Operands[predecessorId] = operand
+				phi.Operands.Set(predecessorId, operand)
 			}
 		}
 		for _, instructionId := range block.Instructions {

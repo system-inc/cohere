@@ -112,14 +112,15 @@ import (
 // reverse postorder. The bound is ten rounds, matching upstream's own. Measured on Kirk's tree,
 // every function settled in at most two rounds; see the test file.
 //
-// # Phi operands are a Go map, and nothing here may depend on their order
+// # Nothing here may depend on phi operand order
 //
-// `high_level_intermediate_representation.Phi.Operands` is `map[BlockId]Place`, so ranging it yields a nondeterministic order. A
-// sibling rule shipped a message that named a different builtin between runs for exactly this
-// reason. The join used here is commutative and associative, so the resulting KIND is
-// order-independent by construction; the reason set is a bitset union, which is likewise. The
-// message text is selected from the merged reason set by a fixed priority order and never from
-// "whichever operand arrived first", so no output of this rule can vary between runs.
+// `high_level_intermediate_representation.Phi.Operands` is sorted by predecessor block id, so ranging
+// it is deterministic, but the answer here does not rely on that. A sibling rule shipped a message
+// that named a different builtin between runs because an operand walk's order varied. The join used
+// here is commutative and associative, so the resulting KIND is order-independent by construction;
+// the reason set is a bitset union, which is likewise. The message text is selected from the merged
+// reason set by a fixed priority order and never from "whichever operand arrived first", so no
+// output of this rule can vary between runs.
 //
 // # The component gate is the whole rule for a third of the corpus
 //
@@ -376,8 +377,8 @@ const (
 // immutabilityAbstractValue is one value's kind plus the set of reasons that produced it.
 //
 // The reason set is a BITSET rather than a slice, so two sets that absorbed the same reasons in a
-// different order compare equal. That matters because phi operands arrive in Go-map order and a
-// slice-backed set would make the merged value depend on it.
+// different order compare equal. That keeps the merged value independent of the order phi operands
+// arrive in, which a slice-backed set would make it depend on.
 type immutabilityAbstractValue struct {
 	Kind    immutabilityValueKind
 	Reasons immutabilityReason
@@ -926,14 +927,14 @@ func immutabilityRunOneRound(ctx rule.Context, function *high_level_intermediate
 		}
 		state.insideLoop = loopBlocks[blockId]
 		for _, phi := range phiAt[high_level_intermediate_representation.InstructionId(instructionId)] {
-			// `Phi.Operands` is a Go map, so this ranges in a nondeterministic order. The join is
-			// commutative and associative and the reason set is a bitset union, so the merged
-			// result is order-independent by construction. Nothing here may read "the first
-			// operand".
+			// `Phi.Operands` ranges in ascending predecessor order, but the merge does not rely on
+			// it: the join is commutative and associative and the reason set is a bitset union, so
+			// the merged result is order-independent by construction. Nothing here may read "the
+			// first operand".
 			merged := immutabilityAbstractValue{Kind: immutabilityPrimitive}
 			first := true
-			for _, operand := range phi.Operands {
-				operandValue := state.kindOf(operand.Identifier)
+			for _, entry := range phi.Operands {
+				operandValue := state.kindOf(entry.Place.Identifier)
 				if first {
 					merged = operandValue
 					first = false

@@ -147,7 +147,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 			t.Skip("no join")
 		}
 		// Rewrite the first use in the join to one predecessor's definition.
-		operand := join.Phis[0].Operands[PhiOperandsInOrder(join.Phis[0])[0]]
+		operand := join.Phis[0].Operands.At(PhiOperandsInOrder(join.Phis[0])[0])
 		done := false
 		for _, id := range join.Instructions {
 			EachInstructionPlacePointer(fn.Instructions[id], func(p *Place, role PlaceRole) {
@@ -357,21 +357,17 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 	}
 }
 
-// TestPhiOperandsAreDeterministic pins the map-order hazard.
+// TestPhiOperandsAreDeterministic pins the operand order.
 //
-// Phi.Operands is a Go map and Go randomises its iteration order on purpose. Anything that prints
-// or compares phis must read them through PhiOperandsInOrder; this fails if that stops sorting.
+// Phi.Operands is kept sorted by predecessor block id whatever order operands are set in, and
+// PhiOperandsInOrder reads the ids in that order; this fails if either stops holding.
 func TestPhiOperandsAreDeterministic(t *testing.T) {
 	t.Parallel()
 
-	phi := &Phi{
-		Place: Place{Identifier: 9},
-		Operands: map[BlockId]Place{
-			7: {Identifier: 3},
-			2: {Identifier: 1},
-			5: {Identifier: 2},
-		},
-	}
+	phi := &Phi{Place: Place{Identifier: 9}}
+	phi.Operands.Set(7, Place{Identifier: 3})
+	phi.Operands.Set(2, Place{Identifier: 1})
+	phi.Operands.Set(5, Place{Identifier: 2})
 	want := []BlockId{2, 5, 7}
 	for attempt := 0; attempt < 50; attempt++ {
 		got := PhiOperandsInOrder(phi)
@@ -432,8 +428,8 @@ func TestConstructionIsIdempotent(t *testing.T) {
 			}
 			for _, phi := range block.Phis {
 				phis++
-				for _, operand := range phi.Operands {
-					if !defined[operand.Identifier] {
+				for _, entry := range phi.Operands {
+					if !defined[entry.Place.Identifier] {
 						stale++
 						break
 					}

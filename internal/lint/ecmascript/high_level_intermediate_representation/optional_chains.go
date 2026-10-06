@@ -106,8 +106,8 @@ func recordOptionalChainJoinPhis(function *Function, result *OptionalChainSidema
 			// after either arm claims a dependency the other arm never reads.
 			var resolved *ReactiveScopeDependency
 			conflict := false
-			for _, operand := range phi.Operands {
-				dependency, ok := result.TemporariesReadInOptional[operand.Identifier]
+			for _, entry := range phi.Operands {
+				dependency, ok := result.TemporariesReadInOptional[entry.Place.Identifier]
 				if !ok {
 					continue
 				}

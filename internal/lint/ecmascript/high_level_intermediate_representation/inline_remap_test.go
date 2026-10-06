@@ -139,7 +139,8 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
 			continue
 		}
 		for _, phi := range block.Phis {
-			for predecessor, operand := range phi.Operands {
+			for _, entry := range phi.Operands {
+				predecessor, operand := entry.Predecessor, entry.Place
 				phiOperandsSeen++
 				if !copiedBlocks[predecessor] {
 					t.Errorf("the phi in copied block %d takes an operand from block %d, which is "+

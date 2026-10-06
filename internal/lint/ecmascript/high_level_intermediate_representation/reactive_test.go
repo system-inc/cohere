@@ -33,9 +33,9 @@ const reactiveDeclarations = `declare module 'react' {
 
 // reactiveNames returns the names of every value marked reactive, deduplicated and sorted.
 //
-// Sorted because the walk reads `Phi.Operands`, a Go map, and an assertion over an unsorted result
-// would pass or fail depending on iteration order. That is not hypothetical in this tree: a rule
-// shipped whose message named a different builtin between runs.
+// Sorted so an assertion does not depend on the order the walk marks values in. An order that
+// varies between runs is not hypothetical in this tree: a rule shipped whose message named a
+// different builtin between runs.
 //
 // Temporaries are excluded because they have no source name to assert against, and their count is
 // an artifact of how an expression happened to be lowered rather than a fact about the program.

@@ -464,13 +464,10 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 		alternate.Terminal = &Goto{Block: join.Id}
 
 		selected := newPlace("selected")
-		join.Phis = []*Phi{{
-			Place: selected,
-			Operands: map[BlockId]Place{
-				consequent.Id: left,
-				alternate.Id:  right,
-			},
-		}}
+		selectedPhi := &Phi{Place: selected}
+		selectedPhi.Operands.Set(consequent.Id, left)
+		selectedPhi.Operands.Set(alternate.Id, right)
+		join.Phis = []*Phi{selectedPhi}
 		marker := &Instruction{
 			LValue: newPlace(""),
 			Value:  &FinishMemoize{ManualMemoId: 1, Value: selected},
@@ -786,8 +783,8 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 
 // TestEffectsAreDeterministic guards the hazard the package comment names.
 //
-// `Phi.Operands` is a Go map and this pass never reads one, so the result must be byte-identical
-// across runs. Written so that a later addition which does reach for a phi fails here rather than
+// This pass never reads a phi's operands, so the result must be byte-identical across runs. Written
+// so that a later addition which brings in an order varying between runs fails here rather than
 // producing a message that names a different value between runs, which is a defect this tree has
 // already shipped once in `static_components.go`.
 func TestEffectsAreDeterministic(t *testing.T) {

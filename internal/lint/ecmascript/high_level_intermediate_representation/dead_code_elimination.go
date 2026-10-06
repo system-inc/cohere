@@ -211,11 +211,10 @@ func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 				if !state.usedByIdOrName(function, phi.Place.Identifier) {
 					continue
 				}
-				// Read in predecessor order rather than by ranging the map: `high_level_intermediate_representation.go` requires it,
-				// because Go randomises map iteration and a pass that walks it directly makes the
-				// same function behave differently between runs.
+				// Read in ascending predecessor order, which is the order `Phi.Operands` keeps, so
+				// the same function behaves the same way between runs.
 				for _, predecessor := range PhiOperandsInOrder(phi) {
-					state.reference(function, phi.Operands[predecessor].Identifier)
+					state.reference(function, phi.Operands.At(predecessor).Identifier)
 				}
 			}
 		}
