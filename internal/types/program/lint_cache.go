@@ -145,11 +145,29 @@ type LintCacheEntry struct {
 	// and found nothing, which is exactly the case worth caching since most files are clean.
 	Findings []LintCacheFinding
 
+	// Directives is whether the file has a suppression directive, or names a rule in a disable or enable comment.
+	// A replay of such a file still reads its comments, so its directives are tallied and its unknown rule names
+	// reported as a walk's are.
+	Directives bool
+
+	// Withheld is the cacheable rules' findings a directive silenced, each as its rule and the directive's index
+	// (suppression.Index.SuppressedBy). A replay marks the directive applied for each one whose rule it replays,
+	// so a directive is used or unused exactly as a walk finds it. The bytes are the entry's, so the indices name
+	// the same directives (#kdee854).
+	Withheld []LintCacheWithheld
+
 	// Adamic is what the cacheable cohere:adamic rules measured on this file for Adamic readiness, nil when
 	// the run that produced the entry did not measure readiness. Nil is not "ready": a run that measures
 	// readiness misses on it (FindingsReuse.lookup), since replaying it would read every unmeasured file as
 	// having no findings, which is the silent clean this cache must never produce (#drbrp8c).
 	Adamic *AdamicRecord
+}
+
+// LintCacheWithheld is one cacheable rule's finding a directive silenced: the rule, and the directive's index among
+// the file's directives.
+type LintCacheWithheld struct {
+	RuleName  string
+	Directive int32
 }
 
 // AdamicRecord is one file's Adamic readiness measurement, kept per rule so an entry whose type-aware rules
@@ -299,6 +317,10 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 10: a file whose directives silenced something or went unused has an entry, which carries what its cacheable
+// rules' findings the directives withheld. A version 9 cache has no such file, and none of its entries says
+// whether its file has directives.
+//
 // 9: entries carry what the cacheable cohere:adamic rules measured for Adamic readiness. A version 8 entry has
 // no record, and one read as nil-but-current would be indistinguishable from an entry recorded by a run that
 // did not measure.
@@ -322,7 +344,7 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // The encoding itself is no longer this version's business. The cache is the findings section of the
 // cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
 // shape moves cacheTableVersion. This one moves when what an entry means changes.
-const lintCacheVersion = 9
+const lintCacheVersion = 10
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //

@@ -7,7 +7,9 @@ import (
 	"syscall"
 )
 
-// mapFile maps a file read-only for the life of the process, or returns nil.
+// mapFile maps a file read-only for the life of the process, or returns nil. Nothing unmaps it: the pack
+// serves strings over the mapping, and the compiler and the rules keep substrings of those as long as the
+// process runs. See the content pack's package comment.
 func mapFile(path string) []byte {
 	file, err := os.Open(path)
 	if err != nil {

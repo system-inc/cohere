@@ -400,7 +400,7 @@ func validateDerivedEffect(
 		for _, phi := range block.Phis {
 			aggregate := map[high_level_intermediate_representation.IdentifierId]bool{}
 			for _, predecessor := range high_level_intermediate_representation.PhiOperandsInOrder(phi) {
-				operand := phi.Operands[predecessor]
+				operand := phi.Operands.At(predecessor)
 				for _, dep := range values[operand.Identifier] {
 					aggregate[dep] = true
 				}

@@ -57,7 +57,7 @@ import (
 )
 
 func main() {
-	systems := flag.String("systems", "", "path to a JSON array of {name, path} naming the design systems to measure (default: systems.json next to this command)")
+	systems := flag.String("systems", "", "path to a JSON array of {name, path} naming the design systems to measure, each path a file or a corpus spelling such as ahra:app/_theme/styles/theme.css (default: systems.json next to this command)")
 	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "classorder_fixtures.json"), "where to write the fixture")
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
@@ -84,6 +84,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
 			os.Exit(1)
 		}
+		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			fmt.Fprintf(os.Stderr, "%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n", *output)
 			os.Exit(1)

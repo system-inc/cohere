@@ -38,10 +38,24 @@ import (
 //
 // # Why a damaged pack costs a read, never a byte
 //
-// Every entry carries a CRC-32C of its bytes, checked as it is copied out, and its bounds are checked
-// against the mapping. The copy runs with faults turned into panics, so a pack truncated in place under
-// the mapping is a read from disk rather than a crash. The index carries a checksum of itself. Anything
-// that fails is read from disk, counted, and the pack is rewritten without it.
+// Every entry carries a CRC-32C of its bytes, checked before it is served, and its bounds are checked
+// against the mapping. The check runs with faults turned into panics, so a pack truncated in place under
+// the mapping before an entry is served is a read from disk rather than a crash. The index carries a
+// checksum of itself. Anything that fails is read from disk, counted, and the pack is rewritten without it.
+//
+// # Why a served file is a view of the mapping, not a copy
+//
+// A served entry is a string over the mapped bytes (#kdee854, 1b): copying them was 76 MB and about 11,300
+// allocations on every ahra run that built a graph, and 8.5ms of serving. Three things make the view safe.
+// The mapping is never unmapped, so it outlives every string over it and every substring the compiler and
+// the rules cut from those. The bytes under it never change: the pack's writers append past a data file's
+// end or write a new generation and unlink the old, and an unlinked file stays whole under its mapping. And
+// it is mapped read-only, so nothing in the process can write through it.
+//
+// What none of that covers is another process truncating or rewriting a data file in place after an entry
+// was served. The bytes are then read by the compiler's and the rules' goroutines, where no fault can be
+// turned into a panic, so the run ends with a memory fault. That is loud and never a wrong answer, and the
+// pack lives in .cache/cohere, which only cohere writes, and only by appending and renaming.
 //
 // # Layout
 //
@@ -80,43 +94,6 @@ type contentPackEntry struct {
 type addedContent struct {
 	identity fileIdentity
 	contents string
-}
-
-// StatSnapshot holds the identity of every file the run cache's check statted, by path. A run the check could
-// not replay has just statted every input it recorded, and the content pack validates against those stats
-// rather than taking each again: about 18ms of a graph phase's 32ms of serving on ahra, at 12 workers (#kdee854).
-//
-// It is sound because nothing the run reads can be newer than its clock. The run-cache clock starts before the
-// check (startRunCacheClock), so a file changed after its stat here has a modification or change time past the
-// run's readSince, and RecordRunCache refuses to record that run: the next run reads the file afresh. Every
-// other cache keys on the bytes the pack actually served, so served bytes older than the disk are recorded as
-// exactly that. The run reports the tree as it stood at the check, and nothing replays it past a later change.
-type StatSnapshot struct {
-	identities sync.Map
-}
-
-// NewStatSnapshot returns an empty snapshot for a check to fill.
-func NewStatSnapshot() *StatSnapshot {
-	return &StatSnapshot{}
-}
-
-// note keeps a file's identity from a stat already taken, when this platform can read one from it.
-func (s *StatSnapshot) note(path string, information os.FileInfo) {
-	if identity, ok := identityFromInfo(information); ok {
-		s.identities.Store(path, identity)
-	}
-}
-
-// identityOf is the identity noted for path, if the check statted it.
-func (s *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
-	if s == nil {
-		return fileIdentity{}, false
-	}
-	identity, found := s.identities.Load(path)
-	if !found {
-		return fileIdentity{}, false
-	}
-	return identity.(fileIdentity), true
 }
 
 // ContentPack serves file bytes recorded by earlier runs and collects what this run read from disk, for
@@ -221,7 +198,7 @@ func (p *ContentPack) serve(path string) (string, bool) {
 	if !statted || identity != entry.identity {
 		return "", false
 	}
-	contents, whole := p.copyEntry(entry)
+	contents, whole := p.viewEntry(entry)
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	if !whole {
@@ -233,29 +210,43 @@ func (p *ContentPack) serve(path string) (string, bool) {
 	return contents, true
 }
 
-// copyEntry copies an entry's bytes out of the mapping and checks them, reporting false for anything out
-// of bounds, faulting or failing its checksum.
-func (p *ContentPack) copyEntry(entry contentPackEntry) (contents string, whole bool) {
+// viewEntry checks an entry's bytes in the mapping and returns them as a string over the mapping, reporting
+// false for anything out of bounds, faulting or failing its checksum. See the package comment for why the
+// view is safe to hand the compiler.
+func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole bool) {
 	if entry.offset < 0 || entry.length < 0 || entry.offset > int64(len(p.mapped))-entry.length {
 		return "", false
 	}
 	if entry.length == 0 {
 		return "", crc32.Checksum(nil, castagnoli) == entry.checksum
 	}
-	// A pack truncated in place under the mapping faults on the copy. Turned into a panic and recovered,
-	// it is a read from disk rather than the end of the process.
+	// A pack truncated in place under the mapping faults on the checksum, which reads every byte. Turned into
+	// a panic and recovered, it is a read from disk rather than the end of the process.
 	defer debug.SetPanicOnFault(debug.SetPanicOnFault(true))
 	defer func() {
 		if recover() != nil {
 			contents, whole = "", false
 		}
 	}()
-	buffer := make([]byte, entry.length)
-	copy(buffer, p.mapped[entry.offset:entry.offset+entry.length])
-	if crc32.Checksum(buffer, castagnoli) != entry.checksum {
+	view := p.mapped[entry.offset : entry.offset+entry.length]
+	if crc32.Checksum(view, castagnoli) != entry.checksum {
 		return "", false
 	}
-	return unsafe.String(&buffer[0], len(buffer)), true
+	return unsafe.String(&view[0], len(view)), true
+}
+
+// readIdentity is the stat the program's copy of path was served or read under, when the pack has one: an entry
+// it served, or a file it read whole after a stat. See Graph.ReadUnchanged.
+func (p *ContentPack) readIdentity(path string) (fileIdentity, bool) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if added, read := p.added[path]; read {
+		return added.identity, true
+	}
+	if p.used[path] {
+		return p.entries[path].identity, true
+	}
+	return fileIdentity{}, false
 }
 
 // noteRead records a file read from disk, keepable when it was statted before the read and read whole.
@@ -356,7 +347,7 @@ func (p *ContentPack) rewrite() error {
 			continue
 		}
 		entry := p.entries[path]
-		contents, whole := p.copyEntry(entry)
+		contents, whole := p.viewEntry(entry)
 		if !whole {
 			continue
 		}

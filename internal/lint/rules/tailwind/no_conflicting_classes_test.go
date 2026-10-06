@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -293,46 +294,47 @@ func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
 // during the migration.
 func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
 	t.Parallel()
-	designSystem := DesignSystemResult{System: unknownFixtureLiveSystem(t)}
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	// The real lookup.
-	left, canResolveLeft := resolveClassFactsIn("border-l-4", designSystem)
-	right, canResolveRight := resolveClassFactsIn("border-r-4", designSystem)
-	if !canResolveLeft || !canResolveRight {
-		t.Fatal("border-l-4 or border-r-4 did not resolve, so this control proves nothing")
-	}
-	leftProperties, rightProperties := left.Properties, right.Properties
+		// The real lookup.
+		left, canResolveLeft := resolveClassFactsIn("border-l-4", designSystem)
+		right, canResolveRight := resolveClassFactsIn("border-r-4", designSystem)
+		if !canResolveLeft || !canResolveRight {
+			t.Fatal("border-l-4 or border-r-4 did not resolve, so this control proves nothing")
+		}
+		leftProperties, rightProperties := left.Properties, right.Properties
 
-	if len(leftProperties) == 0 || len(rightProperties) == 0 {
-		t.Fatal("border-l-4 or border-r-4 resolved to no properties, so this control proves nothing")
-	}
+		if len(leftProperties) == 0 || len(rightProperties) == 0 {
+			t.Fatal("border-l-4 or border-r-4 resolved to no properties, so this control proves nothing")
+		}
 
-	if len(sharedProperties(leftProperties, rightProperties)) != 0 {
-		t.Errorf("border-l-4 declares %v and border-r-4 declares %v, which share a property. They "+
-			"are different edges and must not be reported as conflicting.", leftProperties, rightProperties)
-	}
+		if len(sharedProperties(leftProperties, rightProperties)) != 0 {
+			t.Errorf("border-l-4 declares %v and border-r-4 declares %v, which share a property. They "+
+				"are different edges and must not be reported as conflicting.", leftProperties, rightProperties)
+		}
 
-	// And the shortcut it guards against: taking the first segment gives both the same root. The
-	// root now comes from `parseCandidate` rather than a longest-prefix walk over a generated table,
-	// so this asserts the parser's answer rather than the walk's.
-	if root, _ := functionalRootIn("border-l-4", designSystem.System); root == "border" {
-		t.Error("the root lookup returned the shortest match rather than the longest, which gives " +
-			"every border edge the same properties")
-	}
+		// And the shortcut it guards against: taking the first segment gives both the same root. The
+		// root now comes from `parseCandidate` rather than a longest-prefix walk over a generated table,
+		// so this asserts the parser's answer rather than the walk's.
+		if root, _ := functionalRootIn("border-l-4", designSystem.System); root == "border" {
+			t.Error("the root lookup returned the shortest match rather than the longest, which gives " +
+				"every border edge the same properties")
+		}
 
-	// The lookup must also not let a shorter root match across a value boundary.
-	if root, _ := functionalRootIn("px-4", designSystem.System); root == "p" {
-		t.Error("`p` matched `px-4`, so padding and padding-inline would be conflated and `p-4 px-8` " +
-			"would report a conflict upstream does not report")
-	}
+		// The lookup must also not let a shorter root match across a value boundary.
+		if root, _ := functionalRootIn("px-4", designSystem.System); root == "p" {
+			t.Error("`p` matched `px-4`, so padding and padding-inline would be conflated and `p-4 px-8` " +
+				"would report a conflict upstream does not report")
+		}
 
-	// A root the shipped prefix walk got wrong on real code. `bg-linear-to-r` is root `bg-linear`,
-	// which sets `background-image`; the walk read root `bg` and answered `background-color`, a
-	// property the class does not declare and which collides with every real `bg-*` color class.
-	if root, isFunctional := functionalRootIn("bg-linear-to-r", designSystem.System); !isFunctional ||
-		root != "bg-linear" {
-		t.Errorf("bg-linear-to-r resolved to root %q, want bg-linear", root)
-	}
+		// A root the shipped prefix walk got wrong on real code. `bg-linear-to-r` is root `bg-linear`,
+		// which sets `background-image`; the walk read root `bg` and answered `background-color`, a
+		// property the class does not declare and which collides with every real `bg-*` color class.
+		if root, isFunctional := functionalRootIn("bg-linear-to-r", designSystem.System); !isFunctional ||
+			root != "bg-linear" {
+			t.Errorf("bg-linear-to-r resolved to root %q, want bg-linear", root)
+		}
+	})
 }
 
 // TestRepositoryUtilitiesAreCompiledRatherThanLookedUp pins the half of this rule that went live.
@@ -450,10 +452,9 @@ func TestConflictFixturesActuallyRan(t *testing.T) {
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
-			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
-				"package still reported ok. Either the search root is wrong or this machine has no "+
-				"Tailwind to test against; both need a human, and neither should read as a pass",
-			unknownFixtureSearchRoot,
+			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
+				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
+			vendored.TailwindPackageRoot(),
 		)
 	}
 

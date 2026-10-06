@@ -11,6 +11,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
 
@@ -20,21 +21,12 @@ import (
 // so JSON leaves it out and the loader sets Parent the way defineParents does. Offsets come back in
 // UTF-16 units and are converted to bytes against the text, the conversion layer 3 does once.
 
-// forkRoot is the Prettier fork whose node_modules the parser oracle imports from.
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
 func forkRoot(t testing.TB) string {
 	t.Helper()
-	if root := os.Getenv("COHERE_PRETTIER_FORK"); root != "" {
-		return root
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home directory to find the Prettier fork in")
-	}
-	root := filepath.Join(home, "Projects", "system", "prettier")
-	if _, err := os.Stat(filepath.Join(root, "node_modules", "yaml-unist-parser")); err != nil {
-		t.Skipf("the Prettier fork is not at %s; set COHERE_PRETTIER_FORK", root)
-	}
-	return root
+	corpus.Resolve(t, "prettier-fork:node_modules/yaml-unist-parser")
+	return corpus.PrettierFork.Root(t)
 }
 
 const parseScript = `

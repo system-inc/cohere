@@ -68,6 +68,11 @@ type Graph struct {
 	// direction that looks like a cold cache rather than like a bug.
 	CompilerHost compiler.CompilerHost
 
+	// contentPack is the pack the program read its files through, and readIdentities the stats it read them
+	// under when there was none. See ReadUnchanged.
+	contentPack    *ContentPack
+	readIdentities *readIdentities
+
 	// LintConfig decides which rules apply to which files, and which files are not linted at all.
 	//
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
@@ -230,6 +235,11 @@ type Options struct {
 	// them or reports their diagnostics here. Nil yields nothing. See ReadProjectConfig, and discovery's
 	// ownership in the command.
 	Yielded map[string]struct{}
+
+	// CheckedStats, when set, answers the build's existence checks and stats from what the run cache's check found
+	// at each path it statted this run, rather than asking the disk again. Beneath the input recorder, so a run
+	// cache still records every path the build asked about. Nil asks the disk. See StatSnapshot.
+	CheckedStats *StatSnapshot
 
 	// Listings, when set, serve the build's directory listings from ones already read, discovery's, rather
 	// than reading those directories again. Beneath the input recorder, so a run cache still records every
@@ -449,7 +459,8 @@ func buildOnce(options Options) (*Graph, error) {
 	// The input recorder wraps the real disk innermost: beneath the memoizing layer, so it sees each path
 	// about once, and beneath the lib overlay, so the embedded libs never reach it.
 	//
-	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read.
+	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read, and so
+	// are the run cache's check's answers, so a path they answer is still a path the recorder saw asked about.
 	var disk vfs.FS = osvfs.FS()
 	if options.FileSystem != nil {
 		disk = options.FileSystem
@@ -457,8 +468,17 @@ func buildOnce(options Options) (*Graph, error) {
 	if options.Listings != nil {
 		disk = &listingFS{FS: disk, listings: options.Listings}
 	}
+	// Without a pack, the program still records the stat each file was read under, so ReadUnchanged can answer.
+	var identities *readIdentities
 	if options.ContentPack != nil {
 		disk = options.ContentPack.wrap(disk)
+	} else {
+		identities = &readIdentities{byPath: map[string]fileIdentity{}}
+		disk = &identityFS{FS: disk, identities: identities}
+	}
+	var checkedAnswers atomic.Int64
+	if options.CheckedStats != nil {
+		disk = &checkedStatsFS{FS: disk, snapshot: options.CheckedStats, answered: &checkedAnswers}
 	}
 	if options.Inputs != nil {
 		disk = &recordingFS{FS: disk, recorder: options.Inputs}
@@ -590,6 +610,7 @@ func buildOnce(options Options) (*Graph, error) {
 			// so they are read rather than added.
 			options.Timing.PackServed, options.Timing.PackRead, _ = options.ContentPack.Counts()
 		}
+		options.Timing.CheckedAnswers += checkedAnswers.Load()
 	}
 	if builtProgram == nil {
 		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)
@@ -607,7 +628,42 @@ func buildOnce(options Options) (*Graph, error) {
 		ConfigFileName: configFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),
+		contentPack:    options.ContentPack,
+		readIdentities: identities,
 	}, nil
+}
+
+/*
+ * ReadUnchanged reports whether text, the program's copy of a file, is the file's bytes now, so a reader can
+ * use it instead of reading the file again (#q6dey77). Exact, by three checks:
+ *   - the program read the file under a stat, its content pack's or its own, and a stat taken now matches it,
+ *     so the file holds the bytes the program read;
+ *   - those bytes were the program's copy exactly. The program reads through typescript-go's decodeBytes,
+ *     which drops a UTF-8 byte order mark and decodes UTF-16 behind its mark, and returns every other file
+ *     byte for byte. So the file must not start with a mark (#hkv1hgp). The recorded size must also be the
+ *     copy's length, which no dropped mark leaves true and which costs no read, so a marked file is turned
+ *     away before it is opened. The length alone isn't enough: UTF-16 heavy in characters that take three
+ *     bytes in UTF-8 can decode to exactly its own size.
+ * False on any doubt, so the reader reads the disk, as it would have.
+ */
+func (g *Graph) ReadUnchanged(path string, text string) bool {
+	if g == nil {
+		return false
+	}
+	var identity fileIdentity
+	var known bool
+	if g.contentPack != nil {
+		identity, known = g.contentPack.readIdentity(path)
+	} else {
+		identity, known = g.readIdentities.identity(path)
+	}
+	if !known || identity.size != int64(len(text)) {
+		return false
+	}
+	if current, statted := statIdentity(path); !statted || current != identity {
+		return false
+	}
+	return !startsWithByteOrderMark(path)
 }
 
 // SourceFiles is every file in the program, third-party declarations included.

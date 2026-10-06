@@ -215,29 +215,27 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 // would stop being harmless.
 func TestNoClassReachesTheTextDropCell(t *testing.T) {
 	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
-	if system == nil {
-		t.Skip("no design system loaded")
-	}
+	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
 
-	keys := system.Theme().KeysInNamespaces([]string{"--drop"})
-	if len(keys) == 0 {
-		t.Skip("this theme declares no --drop keys, so there is nothing to reach the cell with")
-	}
-
-	var reachedText int
-	for _, key := range keys {
-		parsed := ParseCandidate("text-"+key, system)
-		if len(parsed) == 0 {
-			continue
+		keys := system.Theme().KeysInNamespaces([]string{"--drop"})
+		if len(keys) == 0 {
+			t.Fatal("this theme declares no --drop keys, and every theme over the framework's does, so nothing reached the cell and the test proves nothing")
 		}
-		if parsed[0].Root == "text" {
-			reachedText++
-			t.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
-		}
-	}
 
-	t.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
+		var reachedText int
+		for _, key := range keys {
+			parsed := ParseCandidate("text-"+key, system)
+			if len(parsed) == 0 {
+				continue
+			}
+			if parsed[0].Root == "text" {
+				reachedText++
+				t.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
+			}
+		}
+
+		t.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
+	})
 }
 
 // The Alpha and Themed axes, which are the same rows read through a modifier.

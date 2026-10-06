@@ -710,7 +710,7 @@ export function count(limit: number) {
 						phi.Place.Identifier)
 				}
 				for _, blockId := range PhiOperandsInOrder(phi) {
-					operand := phi.Operands[blockId].Identifier
+					operand := phi.Operands.At(blockId).Identifier
 					if set.RepresentativeOf(operand) != set.RepresentativeOf(phi.Place.Identifier) {
 						t.Errorf("phi %d and its operand %d must share a class",
 							phi.Place.Identifier, operand)
@@ -1045,10 +1045,10 @@ export function repeat(seed: number) {
 
 // TestDisjointIsDeterministic pins that the answer does not depend on Go's map iteration order.
 //
-// `Phi.Operands` is a Go map and `DisjointSet.parent` is one too. The PARTITION is order-independent
-// by construction, but the representative and the ordering of `Sets` are not, and a consumer keying
-// a table on the representative would get a different table per run. Repeated here rather than
-// argued, because a randomised map is exactly the input that makes a single run look stable.
+// `DisjointSet.parent` is a Go map. The PARTITION is order-independent by construction, but the
+// representative and the ordering of `Sets` are not, and a consumer keying a table on the
+// representative would get a different table per run. Repeated here rather than argued, because a
+// randomised map is exactly the input that makes a single run look stable.
 func TestDisjointIsDeterministic(t *testing.T) {
 	t.Parallel()
 
@@ -1146,7 +1146,7 @@ func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
 	skipWithoutCorpus(t)
 
 	var files []string
-	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}

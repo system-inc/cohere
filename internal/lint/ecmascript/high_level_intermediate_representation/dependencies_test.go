@@ -345,9 +345,8 @@ func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
 
 // TestDependencyCollectionIsDeterministic pins that two runs agree.
 //
-// The pass reads `Phi.Operands`, which is a Go map, and builds several maps of its own. Ranging any
-// of them directly would make the output order vary between runs -- invisible in every other test
-// and fatal to a cache keyed on this result.
+// The pass builds several maps of its own. Ranging any of them directly would make the output order
+// vary between runs -- invisible in every other test and fatal to a cache keyed on this result.
 func TestDependencyCollectionIsDeterministic(t *testing.T) {
 	t.Parallel()
 
@@ -563,7 +562,7 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 	skipWithoutCorpus(t)
 
 	var files []string
-	filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}

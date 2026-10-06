@@ -7,6 +7,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 type wave1Fixture struct {
@@ -198,14 +201,16 @@ func loadWave1Fixture(t *testing.T, name string) wave1Fixture {
 	return fixture
 }
 
+// loadWave1DesignSystem loads ahra's design system, which the wave fixtures were captured against: a skip
+// naming the variable when the corpus is unset, and a failure when it is set and does not load.
 func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
 	t.Helper()
 	system, err := LoadDesignSystem(LoadOptions{
-		EntryPoint:          "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
-		TailwindPackageRoot: "/Users/kirkouimet/Projects/ahra/node_modules/tailwindcss",
+		EntryPoint:          corpus.Resolve(t, "ahra:app/_theme/styles/theme.css"),
+		TailwindPackageRoot: vendored.TailwindPackageRoot(),
 	})
 	if err != nil {
-		t.Skipf("the ahra design system is not available here: %v", err)
+		t.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, err)
 	}
 	return system
 }

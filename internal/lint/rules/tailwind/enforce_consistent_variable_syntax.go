@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -74,16 +75,16 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 			return nil
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		syntax := variableSyntaxShorthand
 		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Syntax == variableSyntaxVariable {
 				syntax = variableSyntaxVariable
 			}
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
@@ -156,7 +157,7 @@ func rewriteVariableForm(base string, syntax string) (string, bool) {
 		case isArbitraryVariable(contents):
 			// `[var(--x)]` holds a call; its own parentheses carry the property name.
 			_, inner, trailing, hasInner := extractBalanced(contents, '(', ')')
-			if !hasInner || strings.TrimSpace(strings.ReplaceAll(trailing, "_", " ")) != "" {
+			if !hasInner || text.TrimWhitespace(strings.ReplaceAll(trailing, "_", " ")) != "" {
 				return "", false
 			}
 			return before + "(" + inner + ")" + after, true

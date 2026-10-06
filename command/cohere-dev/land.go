@@ -39,8 +39,20 @@ func land(arguments []string) int {
 		return 2
 	}
 	// Tracked changes would be left behind by a landing of commits. Untracked files are the worktree's own.
-	if changes, err := gitOutput(worktree, "status", "--porcelain", "--untracked-files=no"); err != nil || changes != "" {
+	// Submodules are checked apart (checkSubmodules): most worktrees are made with TypeScript a symlink to
+	// another checkout's, and git status refuses that outright, which used to read here as a dirty tree
+	// with no change named. A git that fails says so, as itself.
+	changes, err := gitOutput(worktree, "status", "--porcelain", "--untracked-files=no", "--ignore-submodules=all")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s's status: %v\n", worktree, err)
+		return 1
+	}
+	if changes != "" {
 		fmt.Fprintf(os.Stderr, "cohere-dev: land lands commits, and %s has changes that are not committed:\n%s\n", worktree, changes)
+		return 2
+	}
+	if err := checkSubmodules(worktree); err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 2
 	}
 	mainCheckout, err := checkoutOfMain(worktree)
@@ -78,6 +90,11 @@ func land(arguments []string) int {
 			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 			return 1
 		}
+		// The merge may have moved a pin, and the gate must build against what it lands.
+		if err := checkSubmodules(worktree); err != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: after merging main at %s: %v\n", shortCommit(mainCommit), err)
+			return 2
+		}
 		landing, _ := gitOutput(worktree, "rev-parse", "HEAD")
 		if code := gate(worktree, landing); code != 0 {
 			fmt.Fprintf(os.Stderr, "cohere-dev: the gate failed, so nothing landed; %s is merged with main at %s for you to fix\n",
@@ -101,6 +118,48 @@ func land(arguments []string) int {
 	}
 	fmt.Fprintf(os.Stderr, "cohere-dev: main moved outside land during each of %d gates, so nothing landed\n", landAttempts)
 	return 1
+}
+
+// checkSubmodules requires every submodule of the worktree to be checked out at the commit its tree
+// records, so the gate builds against what lands. The checkout may be the submodule itself, a linked
+// worktree of it, or a symlink to another checkout's, as most of the house's worktrees are made: whichever,
+// its head must be the pin.
+func checkSubmodules(worktree string) error {
+	staged, err := gitOutput(worktree, "ls-files", "--stage")
+	if err != nil {
+		return fmt.Errorf("listing %s's files: %w", worktree, err)
+	}
+	for _, line := range strings.Split(staged, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 || fields[0] != "160000" {
+			continue
+		}
+		pin, path := fields[1], strings.Join(fields[3:], " ")
+		directory := filepath.Join(worktree, path)
+		notCheckedOut := fmt.Errorf("%s's submodule %s is not checked out, so the gate could not build against its pin %s",
+			worktree, path, shortCommit(pin))
+		// An empty directory is a submodule never checked out, and git run in it answers for the repository
+		// around it, so its top level has to be the submodule's own path, symlinks resolved.
+		top, err := gitOutput(directory, "rev-parse", "--show-toplevel")
+		if err != nil {
+			return notCheckedOut
+		}
+		resolvedTop, topErr := filepath.EvalSymlinks(top)
+		resolvedDirectory, directoryErr := filepath.EvalSymlinks(directory)
+		if topErr != nil || directoryErr != nil || resolvedTop != resolvedDirectory {
+			return notCheckedOut
+		}
+		head, err := gitOutput(directory, "rev-parse", "HEAD")
+		if err != nil {
+			return fmt.Errorf("reading %s's head: %w", directory, err)
+		}
+		if head != pin {
+			return fmt.Errorf("%s's %s is at %s, and the tree being landed pins %s, so the gate would build against "+
+				"the wrong one: move it (git -C %s checkout --detach %s), or point it at a checkout that is, and land again",
+				worktree, path, shortCommit(head), shortCommit(pin), filepath.Join(worktree, path), pin)
+		}
+	}
+	return nil
 }
 
 // landDirectory holds the land lock and its line, beside the pool's.
@@ -153,7 +212,8 @@ func mergeMain(worktree string, mainCommit string) error {
 
 // gate runs the landing gate on the worktree through a pool token: go vet and the whole module's tests.
 func gate(worktree string, commit string) int {
-	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(environment []string) int {
+	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(budget []string) int {
+		environment := gateEnvironment(budget)
 		vet := exec.Command("go", "vet", "./...")
 		vet.Dir, vet.Env = worktree, environment
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
@@ -175,6 +235,34 @@ func gate(worktree string, commit string) int {
 		}
 		return 0
 	})
+}
+
+// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p and -buildvcs=false,
+// so every landing is gated the same way, whatever its caller's shell has set. A caller's -trimpath failed
+// tests that find their fixtures from their own source path, and the gate read that as the landing's fault
+// (2026-10-05).
+//
+// -buildvcs=false because most worktrees are made with TypeScript a symlink to another checkout's, and git
+// status refuses that tree, so every go build a test runs failed "error obtaining VCS status": cache's land
+// at 04:15 on 2026-10-06, after a full gate. Callers used to pass it themselves, and the reduction to -p
+// dropped it. Nothing the gate runs reads its own stamp: a build with none says so (packaging's version.go).
+func gateEnvironment(budget []string) []string {
+	environment := make([]string, 0, len(budget))
+	for _, variable := range budget {
+		value, isFlags := strings.CutPrefix(variable, "GOFLAGS=")
+		if !isFlags {
+			environment = append(environment, variable)
+			continue
+		}
+		kept := []string{}
+		for _, flag := range strings.Fields(value) {
+			if strings.HasPrefix(flag, "-p=") {
+				kept = append(kept, flag)
+			}
+		}
+		environment = append(environment, "GOFLAGS="+strings.Join(append(kept, "-buildvcs=false"), " "))
+	}
+	return environment
 }
 
 func exitCodeOf(err error) int {

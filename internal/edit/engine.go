@@ -411,6 +411,14 @@ func FixAndTransformText(fileName string, text string, propose Propose, transfor
 	return fixAndTransformText(fileName, text, nil, propose, transform, maxPasses)
 }
 
+// CheckTextSeeded is CheckFileSeeded on text the caller already holds, read from nothing: the caller has shown
+// the text is the file's, as the format speculation does when the program's copy still matches the file's
+// stat (#q6dey77). The seed is taken under the same test as CheckFileSeeded's, against this text.
+func CheckTextSeeded(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
+	maxPasses int) (FileResult, error) {
+	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
+}
+
 // fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
 func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
 	maxPasses int) (FileResult, error) {

@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 545,
+    "count": 546,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -7984,6 +7984,23 @@
             "swift": {
                 "verdict": "NotApplicable"
             }
+        },
+        {
+            "name": "nexus/correctness-no-load-time-import-meta-path",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": false,
+            "messageIds": [
+                "loadTimeImportMetaPath"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "nexus/correctness-no-mock-on-module-namespace",

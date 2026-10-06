@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // corpusRoot is a real TypeScript codebase to lower against.
@@ -29,9 +30,10 @@ import (
 // the test still passes. Real code was written by someone with no knowledge of this IR, which is
 // the only kind of input that can disagree with it.
 //
-// It is a path rather than vendored files because vendoring would freeze the corpus, and the value
-// here is precisely that the code keeps changing under the lowering. The cost is that the test
-// cannot run on a machine without the tree, so it SKIPS there. A skipping test proves nothing on
+// It is a checkout rather than vendored files because vendoring would freeze the corpus, and the value
+// here is precisely that the code keeps changing under the lowering. Structure is private, so the
+// checkout is the structure corpus (corpus.Structure, COHERE_CORPUS_STRUCTURE), and the test SKIPS where
+// it is not set, naming the variable, and the gate counts it as not covered (#sycrdr6). A skipping test proves nothing on
 // CI, and that is accepted deliberately: this test is a development instrument for finding the
 // constructs a hand-written suite forgot, and every defect it finds gets a hand-written test of its
 // own. Two such defects were found on the first run and both are pinned in lower_test.go.
@@ -41,10 +43,12 @@ import (
 // no `switch` written with a space after the keyword, and the grep used to confirm coverage was
 // itself wrong, so "no unsupported constructs" was measuring a corpus far narrower than intended.
 // Widening it is the cheap fix and it costs about a second.
-const corpusRoot = "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
+func corpusRoot(t testing.TB) string {
+	t.Helper()
+	return corpus.Structure.Path(t, "source")
+}
 
-// structureRepository is the repository corpusRoot sits in, and pinnedCorpusCommit is a commit in it
-// whose files can never change.
+// pinnedCorpusCommit is a commit in the structure corpus's repository whose files can never change.
 //
 // # Why one test reads a frozen corpus while the rest read the live one
 //
@@ -56,8 +60,7 @@ const corpusRoot = "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
 // both directions, 796 to 800 and then to 773. So it reads the same paths at this commit instead, and
 // its numbers move only when the analysis does.
 const (
-	structureRepository = "/Users/kirkouimet/Projects/ahra/libraries/structure"
-	pinnedCorpusCommit  = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
+	pinnedCorpusCommit = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
 )
 
 // fastTierVariable is set by `cohere-dev test --fast`, the edit loop, which leaves the corpus walks to the
@@ -74,21 +77,19 @@ func skipCorpusWalkInFastTier(t *testing.T) {
 	}
 }
 
-// skipWithoutCorpus skips a test that walks the live corpus when the fast tier runs it, or when the corpus
-// is not on this machine.
+// skipWithoutCorpus skips a test that walks the live corpus when the fast tier runs it, or when the
+// structure corpus is not set.
 func skipWithoutCorpus(t *testing.T) {
 	t.Helper()
 	skipCorpusWalkInFastTier(t)
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
+	corpusRoot(t)
 }
 
 // pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
 // sorted, with each one's contents at that commit.
 //
-// It skips when the repository is not on this machine, as the live tests do. It fails when the
-// repository is present and the commit or a file is not, and when fewer than count files come back,
+// It skips when the structure corpus is not set, as the live tests do. It fails when the corpus is set
+// and the commit or a file is not in it, and when fewer than count files come back,
 // because each of those would otherwise measure a different corpus and still report a number.
 func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	t.Helper()
@@ -102,10 +103,8 @@ func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	}
 	pinnedCorpus.Unlock()
 
-	read.once.Do(func() { read.paths, read.contents, read.skip, read.failure = readPinnedCorpus(count) })
-	if read.skip != "" {
-		t.Skip(read.skip)
-	}
+	repository := corpus.Structure.Root(t)
+	read.once.Do(func() { read.paths, read.contents, read.failure = readPinnedCorpus(repository, count) })
 	if read.failure != "" {
 		t.Fatal(read.failure)
 	}
@@ -126,23 +125,20 @@ type pinnedCorpusRead struct {
 	paths    []string
 	contents map[string]string
 
-	// skip or failure, when set, is what every caller reports instead: a test cannot skip or fail
-	// another test, so the read records the outcome and each caller acts on it.
-	skip    string
+	// failure, when set, is what every caller reports instead: a test cannot fail another test, so the
+	// read records the outcome and each caller acts on it. A corpus that is not set skips each caller
+	// before the read, through corpus.Structure.
 	failure string
 }
 
 // readPinnedCorpus lists the first count TypeScript paths at the pinned commit and reads them through
 // one `git cat-file --batch`.
-func readPinnedCorpus(count int) (paths []string, contents map[string]string, skip string, failure string) {
-	if _, err := os.Stat(structureRepository); err != nil {
-		return nil, nil, fmt.Sprintf("the corpus repository at %s is not present on this machine", structureRepository), ""
-	}
-	listing, err := exec.Command("git", "-C", structureRepository, "ls-tree", "-r", "--name-only",
+func readPinnedCorpus(repository string, count int) (paths []string, contents map[string]string, failure string) {
+	listing, err := exec.Command("git", "-C", repository, "ls-tree", "-r", "--name-only",
 		pinnedCorpusCommit, "--", "source").Output()
 	if err != nil {
-		return nil, nil, "", fmt.Sprintf("listing %s at %s: %v; the repository is here and the pinned commit is not",
-			structureRepository, pinnedCorpusCommit, err)
+		return nil, nil, fmt.Sprintf("listing %s at %s: %v; the repository is here and the pinned commit is not",
+			repository, pinnedCorpusCommit, err)
 	}
 	for _, line := range strings.Split(string(listing), "\n") {
 		if strings.HasSuffix(line, ".ts") || strings.HasSuffix(line, ".tsx") {
@@ -151,7 +147,7 @@ func readPinnedCorpus(count int) (paths []string, contents map[string]string, sk
 	}
 	sort.Strings(paths)
 	if len(paths) < count {
-		return nil, nil, "", fmt.Sprintf("the pinned corpus holds %d TypeScript files, want at least %d", len(paths), count)
+		return nil, nil, fmt.Sprintf("the pinned corpus holds %d TypeScript files, want at least %d", len(paths), count)
 	}
 	paths = paths[:count]
 
@@ -159,11 +155,11 @@ func readPinnedCorpus(count int) (paths []string, contents map[string]string, sk
 	for _, path := range paths {
 		request.WriteString(pinnedCorpusCommit + ":" + path + "\n")
 	}
-	batch := exec.Command("git", "-C", structureRepository, "cat-file", "--batch")
+	batch := exec.Command("git", "-C", repository, "cat-file", "--batch")
 	batch.Stdin = strings.NewReader(request.String())
 	output, err := batch.Output()
 	if err != nil {
-		return nil, nil, "", fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, err)
+		return nil, nil, fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, err)
 	}
 	// Each answer is "<object> blob <size>\n", the size in bytes of contents, then "\n".
 	contents = make(map[string]string, len(paths))
@@ -172,19 +168,19 @@ func readPinnedCorpus(count int) (paths []string, contents map[string]string, sk
 		header, err := reader.ReadString('\n')
 		fields := strings.Fields(header)
 		if err != nil || len(fields) != 3 || fields[1] != "blob" {
-			return nil, nil, "", fmt.Sprintf("reading %s at %s: git answered %q", path, pinnedCorpusCommit, strings.TrimSpace(header))
+			return nil, nil, fmt.Sprintf("reading %s at %s: git answered %q", path, pinnedCorpusCommit, strings.TrimSpace(header))
 		}
 		size, err := strconv.Atoi(fields[2])
 		if err != nil {
-			return nil, nil, "", fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
+			return nil, nil, fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
 		}
 		blob := make([]byte, size+1)
 		if _, err := io.ReadFull(reader, blob); err != nil || blob[size] != '\n' {
-			return nil, nil, "", fmt.Sprintf("reading %s at %s: the blob ended early", path, pinnedCorpusCommit)
+			return nil, nil, fmt.Sprintf("reading %s at %s: the blob ended early", path, pinnedCorpusCommit)
 		}
 		contents[path] = string(blob[:size])
 	}
-	return paths, contents, "", ""
+	return paths, contents, ""
 }
 
 // TestLowerRealCodebase lowers every function in a real TypeScript tree and checks the invariants.
@@ -199,7 +195,7 @@ func TestLowerRealCodebase(t *testing.T) {
 	skipWithoutCorpus(t)
 
 	var files []string
-	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -298,22 +294,24 @@ func TestLowerRealCodebase(t *testing.T) {
 // Nondeterminism here would be invisible in every other test and fatal to a golden-file suite
 // downstream. The usual source is map iteration order leaking into block or identifier numbering,
 // which this package avoids by allocating ids from counters rather than from map walks.
+//
+// The sample is read from the pinned corpus, whose files never change. It used to be a named file in the
+// live tree, style/ColorConverter.ts, which moved away and left the test skipping on every machine (#sycrdr6).
+// It is the first pinned file that lowers to something, so the comparison is never over nothing.
 func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 	t.Parallel()
 
-	skipWithoutCorpus(t)
+	paths, contents := pinnedCorpusFiles(t, 100)
 
-	path := filepath.Join(corpusRoot, "style", "ColorConverter.ts")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Skipf("the sample file is not present: %v", err)
-	}
-
-	printOnce := func() string {
+	printOnce := func(path string) string {
+		kind := core.ScriptKindTS
+		if strings.HasSuffix(path, ".tsx") {
+			kind = core.ScriptKindTSX
+		}
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: path,
-			Path:     tspath.Path("/ColorConverter.ts"),
-		}, string(contents), core.ScriptKindTS)
+			FileName: "/" + path,
+			Path:     tspath.Path("/" + path),
+		}, contents[path], kind)
 
 		var out strings.Builder
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
@@ -324,14 +322,22 @@ func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 		return out.String()
 	}
 
-	first := printOnce()
-	second := printOnce()
+	sample := ""
+	for _, path := range paths {
+		if printOnce(path) != "" {
+			sample = path
+			break
+		}
+	}
+	if sample == "" {
+		t.Fatalf("none of the %d pinned files lowers to anything, so there is no sample to compare", len(paths))
+	}
+	first := printOnce(sample)
+	second := printOnce(sample)
 	if first != second {
 		t.Error("lowering the same file twice produced different output; something depends on map order")
 	}
-	if len(first) == 0 {
-		t.Error("lowering the sample file produced nothing")
-	}
+	t.Logf("lowered %s twice, %d bytes each", sample, len(first))
 }
 
 // forEachFunctionLike calls visit for every function-like node in the tree, outermost first.

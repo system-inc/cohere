@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -347,41 +348,43 @@ func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
 // real code — the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
 func TestLongestRootWinsInCollapse(t *testing.T) {
 	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		system := designSystem.System
 
-	parts, canParse := splitCandidateIn("border-l", system)
-	if !canParse {
-		t.Fatal("border-l did not resolve to a root at all")
-	}
-	if parts.Root != "border-l" {
-		t.Errorf("border-l resolved to root %q with value %q, want root border-l and no value. "+
-			"Taking the shorter match is what silently stopped border-x being reported.",
-			parts.Root, parts.Value)
-	}
-	if parts.Value != "" {
-		t.Errorf("border-l carries value %q, want none", parts.Value)
-	}
+		parts, canParse := splitCandidateIn("border-l", system)
+		if !canParse {
+			t.Fatal("border-l did not resolve to a root at all")
+		}
+		if parts.Root != "border-l" {
+			t.Errorf("border-l resolved to root %q with value %q, want root border-l and no value. "+
+				"Taking the shorter match is what silently stopped border-x being reported.",
+				parts.Root, parts.Value)
+		}
+		if parts.Value != "" {
+			t.Errorf("border-l carries value %q, want none", parts.Value)
+		}
 
-	// And the value boundary: `p` must not claim `px-4`.
-	pxParts, canParsePx := splitCandidateIn("px-4", system)
-	if !canParsePx {
-		t.Fatal("px-4 did not resolve to a root")
-	}
-	if pxParts.Root != "px" {
-		t.Errorf("px-4 resolved to root %q, want px. A root matching across a value boundary would "+
-			"conflate padding with padding-inline.", pxParts.Root)
-	}
+		// And the value boundary: `p` must not claim `px-4`.
+		pxParts, canParsePx := splitCandidateIn("px-4", system)
+		if !canParsePx {
+			t.Fatal("px-4 did not resolve to a root")
+		}
+		if pxParts.Root != "px" {
+			t.Errorf("px-4 resolved to root %q, want px. A root matching across a value boundary would "+
+				"conflate padding with padding-inline.", pxParts.Root)
+		}
 
-	// A root the shipped prefix walk could not find, because it is longer than the one it settled on.
-	linearParts, canParseLinear := splitCandidateIn("bg-linear-to-b", system)
-	if !canParseLinear {
-		t.Fatal("bg-linear-to-b did not resolve to a root")
-	}
-	if linearParts.Root != "bg-linear" {
-		t.Errorf("bg-linear-to-b resolved to root %q, want bg-linear. The prefix walk read this as "+
-			"root bg with value linear-to-b, which buckets it with every other bg utility.",
-			linearParts.Root)
-	}
+		// A root the shipped prefix walk could not find, because it is longer than the one it settled on.
+		linearParts, canParseLinear := splitCandidateIn("bg-linear-to-b", system)
+		if !canParseLinear {
+			t.Fatal("bg-linear-to-b did not resolve to a root")
+		}
+		if linearParts.Root != "bg-linear" {
+			t.Errorf("bg-linear-to-b resolved to root %q, want bg-linear. The prefix walk read this as "+
+				"root bg with value linear-to-b, which buckets it with every other bg utility.",
+				linearParts.Root)
+		}
+	})
 }
 
 // TestSplitValueCarriesEverythingAfterTheRoot pins the two pieces a parsed value does not include.
@@ -394,55 +397,57 @@ func TestLongestRootWinsInCollapse(t *testing.T) {
 // modifier was dropped.
 func TestSplitValueCarriesEverythingAfterTheRoot(t *testing.T) {
 	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		system := designSystem.System
 
-	testCases := []struct {
-		className string
-		wantRoot  string
-		wantValue string
-		why       string
-	}{
-		{
-			className: "bg-black/20",
-			wantRoot:  "bg",
-			wantValue: "black/20",
-			why: "the modifier is a sibling field of the value, so dropping it makes bg-black/20 " +
-				"and bg-black/60 compare equal",
-		},
-		{
-			className: "-translate-x-1/2",
-			wantRoot:  "-translate-x",
-			wantValue: "1/2",
-			why: "a fraction is carried beside the value rather than inside it, because the slash " +
-				"is ambiguous and the parser refuses to guess",
-		},
-		{
-			className: "bg-emerald-500/[0.07]",
-			wantRoot:  "bg",
-			wantValue: "emerald-500/[0.07]",
-			why: "an ARBITRARY modifier is the only shape the modifier branch is reachable for, " +
-				"because a named one is mirrored into Fraction and taken by the branch above it",
-		},
-		{
-			className: "border-l",
-			wantRoot:  "border-l",
-			wantValue: "",
-			why:       "a root with nothing after it, which rebuildClass must not append a dash for",
-		},
-	}
+		testCases := []struct {
+			className string
+			wantRoot  string
+			wantValue string
+			why       string
+		}{
+			{
+				className: "bg-black/20",
+				wantRoot:  "bg",
+				wantValue: "black/20",
+				why: "the modifier is a sibling field of the value, so dropping it makes bg-black/20 " +
+					"and bg-black/60 compare equal",
+			},
+			{
+				className: "-translate-x-1/2",
+				wantRoot:  "-translate-x",
+				wantValue: "1/2",
+				why: "a fraction is carried beside the value rather than inside it, because the slash " +
+					"is ambiguous and the parser refuses to guess",
+			},
+			{
+				className: "bg-emerald-500/[0.07]",
+				wantRoot:  "bg",
+				wantValue: "emerald-500/[0.07]",
+				why: "an ARBITRARY modifier is the only shape the modifier branch is reachable for, " +
+					"because a named one is mirrored into Fraction and taken by the branch above it",
+			},
+			{
+				className: "border-l",
+				wantRoot:  "border-l",
+				wantValue: "",
+				why:       "a root with nothing after it, which rebuildClass must not append a dash for",
+			},
+		}
 
-	for _, testCase := range testCases {
-		parts, canParse := splitCandidateIn(testCase.className, system)
-		if !canParse {
-			t.Errorf("%s did not resolve to a root", testCase.className)
-			continue
+		for _, testCase := range testCases {
+			parts, canParse := splitCandidateIn(testCase.className, system)
+			if !canParse {
+				t.Errorf("%s did not resolve to a root", testCase.className)
+				continue
+			}
+			if parts.Root != testCase.wantRoot || parts.Value != testCase.wantValue {
+				t.Errorf("%s split to root %q value %q, want root %q value %q: %s",
+					testCase.className, parts.Root, parts.Value,
+					testCase.wantRoot, testCase.wantValue, testCase.why)
+			}
 		}
-		if parts.Root != testCase.wantRoot || parts.Value != testCase.wantValue {
-			t.Errorf("%s split to root %q value %q, want root %q value %q: %s",
-				testCase.className, parts.Root, parts.Value,
-				testCase.wantRoot, testCase.wantValue, testCase.why)
-		}
-	}
+	})
 }
 
 // TestRebuiltClassIsWritable pins that a suggested class can actually be typed into a class list.
@@ -456,29 +461,31 @@ func TestSplitValueCarriesEverythingAfterTheRoot(t *testing.T) {
 // from what was written, every one an arbitrary value carrying `_` or the `(--x)` shorthand.
 func TestRebuiltClassIsWritable(t *testing.T) {
 	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		system := designSystem.System
 
-	for _, className := range []string{
-		"grid-cols-[1fr_auto]",
-		"ring-(--color-content--2)",
-		"hover:bg-(--background--1)",
-		"px-4",
-		"bg-black/20",
-		"-translate-x-1/2",
-		"px-[3px]",
-		"px-4!",
-	} {
-		parts, canParse := splitCandidateIn(className, system)
-		if !canParse {
-			t.Errorf("%s did not resolve to a root", className)
-			continue
+		for _, className := range []string{
+			"grid-cols-[1fr_auto]",
+			"ring-(--color-content--2)",
+			"hover:bg-(--background--1)",
+			"px-4",
+			"bg-black/20",
+			"-translate-x-1/2",
+			"px-[3px]",
+			"px-4!",
+		} {
+			parts, canParse := splitCandidateIn(className, system)
+			if !canParse {
+				t.Errorf("%s did not resolve to a root", className)
+				continue
+			}
+			// Rebuilt around its own root, so the only thing that can differ is the spelling.
+			if rebuilt := rebuildClass(parts, parts.Root); rebuilt != className {
+				t.Errorf("%s rebuilds as %q, which is not the class the author wrote. A suggestion "+
+					"spelled this way cannot be pasted into a class attribute.", className, rebuilt)
+			}
 		}
-		// Rebuilt around its own root, so the only thing that can differ is the spelling.
-		if rebuilt := rebuildClass(parts, parts.Root); rebuilt != className {
-			t.Errorf("%s rebuilds as %q, which is not the class the author wrote. A suggestion "+
-				"spelled this way cannot be pasted into a class attribute.", className, rebuilt)
-		}
-	}
+	})
 }
 
 // TestCanonicalFixturesActuallyRan is what stops this file from going green on nothing.
@@ -492,10 +499,9 @@ func TestCanonicalFixturesActuallyRan(t *testing.T) {
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
-			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
-				"package still reported ok. Either the search root is wrong or this machine has no "+
-				"Tailwind to test against; both need a human, and neither should read as a pass",
-			unknownFixtureSearchRoot,
+			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
+				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
+			vendored.TailwindPackageRoot(),
 		)
 	}
 

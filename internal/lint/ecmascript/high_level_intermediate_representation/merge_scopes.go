@@ -52,12 +52,12 @@
 // opened inside it and has not closed -- a genuine interleaving that a range comparison cannot see,
 // because the two ranges may nest perfectly and still interleave through a use.
 //
-// # DIVERGENCE FROM React: the Primitive gate cannot fire, because Identifier.Type is nil
+// # DIVERGENCE FROM React: the Primitive gate cannot fire, because the IR carries no type
 //
 // `getOverlappingReactiveScopes` skips an operand of a `FunctionExpression` or `ObjectMethod` whose
-// `place.identifier.type.kind === 'Primitive'` (bundle line 32570). `Identifier.Type` is nil on
-// every identifier this lowering produces, exactly as `disjoint.go` records for `mayAllocate`, so
-// there is no primitive predicate to consult and the gate is unreachable rather than omitted.
+// `place.identifier.type.kind === 'Primitive'` (bundle line 32570). This IR carries no type, exactly
+// as `disjoint.go` records for `mayAllocate`, so there is no primitive predicate to consult and the
+// gate is unreachable rather than omitted.
 //
 // The direction of the error is stated rather than guessed. Not skipping means visiting operands
 // upstream skips, and visiting an operand can only ever ADD a union, so this errs toward merging
@@ -72,7 +72,7 @@
 //
 // A zero from a probe that never fires would be worthless, so the control is recorded beside it:
 // 1,701 function-expression use-operands are visited and are candidates for the skip.
-// `Identifier.Type` is nil on all 116,476 identifiers, which is why the real gate cannot be asked.
+// None of the 116,476 identifiers carries a type, which is why the real gate cannot be asked.
 // Recorded as `MergeGapPrimitiveOperandSkip` so a consumer can decline on it.
 // `TestMergeFunctionOperandSkipUpperBound` pins the bound together with its control.
 //
@@ -174,8 +174,7 @@ const (
 	// MergeGapPrimitiveOperandSkip is upstream's skip of a primitive operand of a function
 	// expression or object method.
 	//
-	// `Identifier.Type` is nil on every identifier this lowering produces, so there is no primitive
-	// predicate to consult. Not skipping visits operands upstream skips, and a visit can only add a
+	// This IR carries no type, so there is no primitive predicate to consult. Not skipping visits operands upstream skips, and a visit can only add a
 	// union, so this errs toward merging MORE than upstream rather than less. Skipping every
 	// function-expression operand, a strict superset of upstream's primitive-only skip, removes
 	// three of 118 unions on the measured corpus. The real divergence is therefore at most three.
@@ -423,7 +422,7 @@ func MergeOverlappingReactiveScopes(function *Function, scopes *ReactiveScopes) 
 			}
 			state.visitInstructionId(instruction.Order)
 			// Upstream skips a primitive operand of a FunctionExpression or ObjectMethod here.
-			// `Identifier.Type` is nil in this tree so that gate cannot be evaluated; see
+			// The IR carries no type, so that gate cannot be evaluated; see
 			// `MergeGapPrimitiveOperandSkip`.
 			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
 				state.visitPlace(instruction.Order, place, scopes, memberRanges)

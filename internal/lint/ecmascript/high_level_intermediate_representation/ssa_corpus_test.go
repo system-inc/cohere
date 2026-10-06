@@ -31,13 +31,7 @@ import (
 func TestSSAOverRealCodebase(t *testing.T) {
 	t.Parallel()
 
-	root := os.Getenv("SSA_CORPUS")
-	if root == "" {
-		root = corpusRoot
-	}
-	if _, err := os.Stat(root); err != nil {
-		t.Skip("no corpus")
-	}
+	root := corpusRoot(t)
 	var files []string
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {

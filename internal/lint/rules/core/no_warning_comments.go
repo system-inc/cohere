@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -93,7 +97,7 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 		return options, err
 	}
 	for index, decoration := range options.Decoration {
-		if len([]rune(decoration)) != 1 || strings.TrimSpace(decoration) == "" {
+		if len([]rune(decoration)) != 1 || text.TrimWhitespace(decoration) == "" {
 			return options, fmt.Errorf(
 				"no-warning-comments: decoration %d is %q, wanted exactly one non-whitespace "+
 					"character", index, decoration)
@@ -155,8 +159,8 @@ var NoWarningComments = rule.Rule{
 			location = NoWarningCommentsStart
 		}
 
-		matchers, matched := noWarningCommentsMatchers(terms, location, settings.Decoration)
-		if len(matchers) == 0 {
+		compiled := noWarningCommentsMatchers(terms, location, settings.Decoration)
+		if len(compiled.matchers) == 0 {
 			// No terms means nothing to look for, and upstream's empty `terms` array behaves the
 			// same way. Returning no listener keeps the cost at zero rather than walking every
 			// comment in the tree to compare against nothing.
@@ -165,7 +169,7 @@ var NoWarningComments = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				checkNoWarningComments(ctx, matchers, matched)
+				checkNoWarningComments(ctx, compiled)
 			},
 		}
 	},
@@ -184,24 +188,21 @@ var NoWarningComments = rule.Rule{
 var noWarningCommentsCache sync.Map
 
 // noWarningCommentsMatchers compiles the patterns for one configuration, or returns the cached set.
-//
-// The second return is the terms that compiled, aligned with the matchers, so the message can name
-// the term that matched rather than the term at the same index in the configured list. Those two
-// lists differ whenever a term fails to compile.
 func noWarningCommentsMatchers(
 	terms []string,
 	location NoWarningCommentsLocation,
 	decoration []string,
-) ([]*regexp.Regexp, []string) {
+) noWarningCommentsCompiled {
 	key := strings.Join(terms, "\x00") + "\x01" + string(location) + "\x01" +
 		strings.Join(decoration, "\x00")
 	if cached, found := noWarningCommentsCache.Load(key); found {
-		compiled := cached.(noWarningCommentsCompiled)
-		return compiled.matchers, compiled.terms
+		return cached.(noWarningCommentsCompiled)
 	}
 
+	skip, leadsAreExact := noWarningCommentsStartSkip(location, decoration)
 	matchers := make([]*regexp.Regexp, 0, len(terms))
 	matched := make([]string, 0, len(terms))
+	leads := make([]rune, 0, len(terms))
 	for _, term := range terms {
 		matcher, err := noWarningCommentsMatcherFor(term, location, decoration)
 		if err != nil {
@@ -212,18 +213,106 @@ func noWarningCommentsMatchers(
 		}
 		matchers = append(matchers, matcher)
 		matched = append(matched, term)
+		leads = append(leads, noWarningCommentsLeadOf(term, skip, leadsAreExact))
 	}
 
-	noWarningCommentsCache.Store(key, noWarningCommentsCompiled{
-		matchers: matchers, terms: matched,
-	})
-	return matchers, matched
+	compiled := noWarningCommentsCompiled{matchers: matchers, terms: matched, leads: leads, skip: skip}
+	noWarningCommentsCache.Store(key, compiled)
+	return compiled
 }
 
-// noWarningCommentsCompiled is one configuration's compiled patterns and the terms behind them.
+// noWarningCommentsCompiled is one configuration's compiled patterns and what they are checked with.
 type noWarningCommentsCompiled struct {
 	matchers []*regexp.Regexp
-	terms    []string
+
+	// terms are the terms that compiled, aligned with the matchers, so the message can name the term
+	// that matched rather than the term at the same index in the configured list. Those two lists
+	// differ whenever a term fails to compile.
+	terms []string
+
+	// leads are the character each matcher's match has to begin with once the skipped characters are
+	// passed, aligned with the matchers, or noWarningCommentsNoLead where that cannot be known without
+	// the pattern. See noWarningCommentsStartSkip.
+	leads []rune
+
+	// skip is the characters the Start prefix passes over, ASCII whitespace and the decoration.
+	skip []rune
+}
+
+// noWarningCommentsNoLead marks a matcher that is always run.
+const noWarningCommentsNoLead rune = -1
+
+// noWarningCommentsStartSkip is the set of characters the Start prefix `^[\s<decoration>]*` passes
+// over, and whether a term's first character then says exactly which comments its pattern can match.
+//
+// Every comment in a file meets every term's pattern, three by default, and nearly every comment
+// fails at its first character: the prefix is anchored, so a Start match has to begin, once the
+// skipped characters are passed, with the term's own first character, case folded. Checking that
+// character first runs the pattern only where it could match (#fcac58b).
+//
+// The check is exact only where the prefix is plain. Under Anywhere there is no anchor, so it never
+// applies. The class is case-insensitive like the rest of the pattern, so a decoration character with
+// a case fold of its own would skip its other case too; rather than mirror that, such a configuration
+// runs every pattern, and so does one with a `-` in it. `\s` is Go's, four ASCII control characters
+// and the space, the same class the pattern compiles (the gap from JavaScript's is #tez6dna's, and
+// moving it here would change findings). TestNoWarningCommentsLeadAnswersAsThePatternDoes holds the
+// check to the bare pattern across these shapes.
+func noWarningCommentsStartSkip(location NoWarningCommentsLocation, decoration []string) ([]rune, bool) {
+	if location != NoWarningCommentsStart {
+		return nil, false
+	}
+	skip := []rune{'\t', '\n', '\f', '\r', ' '}
+	for _, entry := range decoration {
+		for _, character := range entry {
+			// QuoteMeta leaves `-` alone, so between two decoration characters it spells a range
+			// in the class, and the pattern skips characters this set would not.
+			if character == '-' || unicode.SimpleFold(character) != character {
+				return nil, false
+			}
+			skip = append(skip, character)
+		}
+	}
+	return skip, true
+}
+
+// noWarningCommentsLeadOf is the character a term's Start match begins with, or noWarningCommentsNoLead.
+//
+// A term that begins with a skipped character has no single lead, since the prefix can stop short of
+// it, and an empty term matches every comment.
+func noWarningCommentsLeadOf(term string, skip []rune, leadsAreExact bool) rune {
+	if !leadsAreExact || term == "" {
+		return noWarningCommentsNoLead
+	}
+	lead, _ := utf8.DecodeRuneInString(term)
+	if slices.Contains(skip, lead) {
+		return noWarningCommentsNoLead
+	}
+	return lead
+}
+
+// noWarningCommentsFirstUnskipped is the first character of a comment past the skipped ones, as the
+// pattern reads it (an invalid byte is utf8.RuneError, in both), and false when nothing is left.
+func noWarningCommentsFirstUnskipped(value string, skip []rune) (rune, bool) {
+	for _, character := range value {
+		if !slices.Contains(skip, character) {
+			return character, true
+		}
+	}
+	return 0, false
+}
+
+// noWarningCommentsFoldEqual reports whether two characters match under the pattern's `(?i)`, which
+// matches a literal against every member of its simple case-folding orbit.
+func noWarningCommentsFoldEqual(first rune, second rune) bool {
+	if first == second {
+		return true
+	}
+	for folded := unicode.SimpleFold(first); folded != first; folded = unicode.SimpleFold(folded) {
+		if folded == second {
+			return true
+		}
+	}
+	return false
 }
 
 // checkNoWarningComments walks every comment in the file.
@@ -231,21 +320,30 @@ type noWarningCommentsCompiled struct {
 // One listener on the source file rather than a per-node one, because a comment is trivia and has
 // no node kind to anchor on. `comments.ForFile` caches one scan per file, so this is a read of an
 // already-built list.
-func checkNoWarningComments(ctx rule.Context, matchers []*regexp.Regexp, terms []string) {
+func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled) {
 	for _, comment := range comments.ForFile(ctx) {
 		value := noWarningCommentsValueOf(comment)
+		first, hasFirst := noWarningCommentsFirstUnskipped(value, compiled.skip)
 
-		// A directive comment configuring THIS rule is exempt, so `/* eslint
-		// no-warning-comments: "error" */` does not report itself. Upstream tests the directive
-		// shape and the rule's own name together, and both halves matter: an ordinary comment
-		// mentioning the rule name is not exempt.
-		if noWarningCommentsIsSelfDirective(value) {
-			continue
-		}
-
-		for index, matcher := range matchers {
+		// Asked only once a term has matched, since the exemption can only spare a finding.
+		selfDirectiveChecked := false
+		for index, matcher := range compiled.matchers {
+			if lead := compiled.leads[index]; lead != noWarningCommentsNoLead &&
+				(!hasFirst || !noWarningCommentsFoldEqual(lead, first)) {
+				continue
+			}
 			if !matcher.MatchString(value) {
 				continue
+			}
+			if !selfDirectiveChecked {
+				// A directive comment configuring THIS rule is exempt, so `/* eslint
+				// no-warning-comments: "error" */` does not report itself. Upstream tests the
+				// directive shape and the rule's own name together, and both halves matter: an
+				// ordinary comment mentioning the rule name is not exempt.
+				if noWarningCommentsIsSelfDirective(value) {
+					break
+				}
+				selfDirectiveChecked = true
 			}
 			ctx.ReportRange(comment.Range, rule.Message{
 				Id: "unexpectedComment",
@@ -255,7 +353,7 @@ func checkNoWarningComments(ctx rule.Context, matchers []*regexp.Regexp, terms [
 						"something was deferred, so it should be tracked somewhere that gets "+
 						"read rather than left where only the next editor of this file will "+
 						"find it.",
-					terms[index], noWarningCommentsQuote(value)),
+					compiled.terms[index], noWarningCommentsQuote(value)),
 			})
 		}
 	}
@@ -298,7 +396,7 @@ func noWarningCommentsIsSelfDirective(value string) bool {
 	if !noWarningCommentsSelfDirective.MatchString(value) {
 		return false
 	}
-	trimmed := strings.TrimSpace(value)
+	trimmed := text.TrimWhitespace(value)
 	for _, prefix := range noWarningCommentsDirectivePrefixes {
 		if trimmed == prefix {
 			return true
@@ -395,7 +493,7 @@ func noWarningCommentsIsWordCharacter(character byte) bool {
 func noWarningCommentsQuote(value string) string {
 	var quoted strings.Builder
 	truncated := false
-	for _, word := range strings.Fields(value) {
+	for _, word := range text.WhitespaceFields(value) {
 		candidate := word
 		if quoted.Len() > 0 {
 			candidate = quoted.String() + " " + word

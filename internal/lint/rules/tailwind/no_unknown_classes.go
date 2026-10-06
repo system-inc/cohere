@@ -96,14 +96,14 @@ var NoUnknownClasses = rule.Rule{
 			return declineListeners(ctx, "no-unknown-classes", designSystem)
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		var ignore []string
 		if isConfigured {
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 			ignore = configured.Ignore
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 		ignored := compileIgnorePatterns(ignore)
 
 		report := func(node *ast.Node) {

@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -122,6 +123,26 @@ type TailwindClassLiteralOptions struct {
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
+
+	// surfaces is these options compiled, set once by the decoder, so a rule asking on every file reads
+	// a pointer rather than rebuilding the settings and their key. Nil on options a test builds by hand,
+	// which compile on each ask instead.
+	surfaces *ClassLiteralSurfaces
+}
+
+// ClassLiteralSurfaces is these options compiled: the one shared by every decode that merged to the
+// same settings.
+func (options TailwindClassLiteralOptions) ClassLiteralSurfaces() *ClassLiteralSurfaces {
+	if options.surfaces != nil {
+		return options.surfaces
+	}
+	return ClassLiteralSurfacesFor(options.ClassLiteralSettings())
+}
+
+// compileClassLiterals compiles the options once, after the decoder has merged the settings into them.
+// Promoted onto every options struct that embeds TailwindClassLiteralOptions, so the decoder can call it.
+func (options *TailwindClassLiteralOptions) compileClassLiterals() {
+	options.surfaces = ClassLiteralSurfacesFor(options.ClassLiteralSettings())
 }
 
 // ClassLiteralSettings is the defaults with every kind these options write put in place of its own.
@@ -142,9 +163,9 @@ func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSe
 
 // ClassLiteralReader finds class-carrying strings in a file.
 //
-// Rules get one from ClassLiteralReaderFor, which compiles each distinct set of settings once per run
-// and hands every rule reading a file with those settings the same reader, so a node is read once
-// however many rules listen to it. NewClassLiteralReader builds an unshared one, for a harness.
+// Rules get one from ClassLiteralSurfaces.ReaderFor, whose surfaces compile each distinct set of
+// settings once per run and which hands every rule reading a file with those settings the same reader,
+// so a node is read once however many rules listen to it. NewClassLiteralReader builds an unshared one, for a harness.
 type ClassLiteralReader struct {
 	attributes  *namePatterns
 	calleeNames *namePatterns
@@ -210,8 +231,47 @@ func (patterns *namePatterns) matches(name string) bool {
 	return answer
 }
 
-// ClassLiteralReaderFor returns the reader for these settings in this file, shared through the file's
-// cache by every rule that reads with the same settings.
+// ClassLiteralSurfaces is one set of settings compiled for the run: the unbound reader each file binds,
+// and the file-cache key it binds under.
+//
+// The settings depend on the configuration and never on the file, yet every rule used to build them
+// on every file it read, the defaults and then their key: on an ahra cold run 17 MB in 193K objects
+// for the defaults and 24 MB in 263K for the keys (#y2nj5ex). Now a rule's decoder compiles them once
+// per configuration selection, and a rule reads a pointer.
+type ClassLiteralSurfaces struct {
+	compiled *ClassLiteralReader
+	cacheKey string
+}
+
+// compiledClassLiteralSurfaces holds the surfaces for each distinct settings key, for the life of the
+// process. Keyed by the settings' value, never by the options that asked, so every selection that
+// merges to the same settings shares one entry and one name memo. Each is never written after it is
+// stored, so the walk's workers share them freely, and the key is the whole input, so an entry cannot
+// go stale.
+var compiledClassLiteralSurfaces sync.Map
+
+// ClassLiteralSurfacesFor returns the compiled surfaces for these settings, compiling them on the first
+// ask for their value.
+func ClassLiteralSurfacesFor(settings ClassLiteralSettings) *ClassLiteralSurfaces {
+	key := settings.key()
+	if existing, isCompiled := compiledClassLiteralSurfaces.Load(key); isCompiled {
+		return existing.(*ClassLiteralSurfaces)
+	}
+	compiled, _ := compiledClassLiteralSurfaces.LoadOrStore(key, &ClassLiteralSurfaces{
+		compiled: NewClassLiteralReader(settings),
+		cacheKey: "tailwind.classValues:" + key,
+	})
+	return compiled.(*ClassLiteralSurfaces)
+}
+
+// DefaultClassLiteralSurfaces is DefaultClassLiteralSettings compiled, once for the process, for a rule
+// handed no options.
+var DefaultClassLiteralSurfaces = sync.OnceValue(func() *ClassLiteralSurfaces {
+	return ClassLiteralSurfacesFor(DefaultClassLiteralSettings())
+})
+
+// ReaderFor returns the reader for these surfaces in this file, shared through the file's cache by
+// every rule that reads with the same settings.
 //
 // Thirteen rules listen on the same three kinds, so before this each class surface was read thirteen
 // times per file, and each rule compiled its own copy of the variable patterns on every file:
@@ -223,27 +283,15 @@ func (patterns *namePatterns) matches(name string) bool {
 // the family's total is the honest number and one rule's row carries the shared reading.
 //
 // A nil cache yields a reader bound to nothing shared, which still memoizes within the one rule.
-func ClassLiteralReaderFor(cache *rule.FileCache, settings ClassLiteralSettings) *ClassLiteralReader {
-	key := settings.key()
-	return rule.Cached(cache, "tailwind.classValues:"+key, func() *ClassLiteralReader {
-		bound := *compiledClassLiteralReader(key, settings)
-		bound.values = map[*ast.Node]classValues{}
-		return &bound
-	})
+func (surfaces *ClassLiteralSurfaces) ReaderFor(cache *rule.FileCache) *ClassLiteralReader {
+	return rule.Cached(cache, surfaces.cacheKey, surfaces.bind)
 }
 
-// compiledClassLiteralReaders holds one compiled reader per distinct settings key, for the life of the
-// process. Each is never written after it is stored, so the walk's workers share them freely, and the
-// key is the whole input, so an entry cannot go stale.
-var compiledClassLiteralReaders sync.Map
-
-// compiledClassLiteralReader returns the compiled, unbound reader for these settings.
-func compiledClassLiteralReader(key string, settings ClassLiteralSettings) *ClassLiteralReader {
-	if existing, isCompiled := compiledClassLiteralReaders.Load(key); isCompiled {
-		return existing.(*ClassLiteralReader)
-	}
-	compiled, _ := compiledClassLiteralReaders.LoadOrStore(key, NewClassLiteralReader(settings))
-	return compiled.(*ClassLiteralReader)
+// bind is a copy of the compiled reader with a memo of its own, for one file.
+func (surfaces *ClassLiteralSurfaces) bind() *ClassLiteralReader {
+	bound := *surfaces.compiled
+	bound.values = map[*ast.Node]classValues{}
+	return &bound
 }
 
 // key is the settings as one string, every list kept in order and every name kept apart, so two
@@ -668,9 +716,9 @@ func classLiteralFrom(literal *ast.Node, origin ClassLiteralOrigin) ClassLiteral
 // Fragments containing `${` are dropped rather than treated as classes. A literal that survived to
 // here with a hole in it is only partly known at lint time, and reporting on the visible half would
 // produce findings the author cannot act on.
-func SplitClasses(text string) []string {
+func SplitClasses(classString string) []string {
 	var classes []string
-	for _, field := range strings.Fields(text) {
+	for _, field := range text.WhitespaceFields(classString) {
 		if strings.Contains(field, "${") {
 			continue
 		}

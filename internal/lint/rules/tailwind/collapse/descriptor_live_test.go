@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The live table is verified against the engine, not against itself.
@@ -20,10 +22,11 @@ import (
 // reason the table is. Reproduce it with:
 //
 //	node internal/lint/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs \
-//	    ~/Projects/connected/www-connected-app/app/_theme/styles/theme.css > /tmp/connected_fixtures.json
+//	    connected:app/_theme/styles/theme.css > /tmp/connected_fixtures.json
 //
-// The corpus repositories are read from disk. When one is missing the test skips rather than
-// passing, since a silent pass is what a broken lookup looks like.
+// The corpus repositories are read through internal/corpus. When one is unset the test skips naming
+// its variable rather than passing, since a silent pass is what a broken lookup looks like, and when
+// one is set but lacks its stylesheet or tailwindcss the test fails.
 
 // corpusRepositories are the design systems the port is measured on.
 //
@@ -31,31 +34,29 @@ import (
 // by a system whose theme differs, and a single repository would let a per-repository token pass as
 // a framework fact.
 var corpusRepositories = []struct {
-	name       string
-	entryPoint string
+	name     string
+	spelling string
 }{
-	{name: "ahra", entryPoint: filepath.Join(homeDirectory(), "Projects", "ahra", "app", "_theme", "styles", "theme.css")},
-	{name: "connected", entryPoint: filepath.Join(homeDirectory(), "Projects", "connected", "www-connected-app", "app", "_theme", "styles", "theme.css")},
+	{name: "ahra", spelling: "ahra:app/_theme/styles/theme.css"},
+	{name: "connected", spelling: "connected:app/_theme/styles/theme.css"},
 }
 
-func homeDirectory() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+// liveEntryPointFor resolves a corpus repository's stylesheet and the tailwindcss installed beside it: a
+// skip naming the variable when the corpus is unset, and a failure when it is set but lacks either.
+func liveEntryPointFor(t testing.TB, spelling string) (entryPoint, packageRoot string) {
+	t.Helper()
+	entryPoint = corpus.Resolve(t, spelling)
+	packageRoot = findTailwindPackageRootForTest(filepath.Dir(entryPoint))
+	if packageRoot == "" {
+		t.Fatalf("%s holds no installed tailwindcss reachable from %s", spelling, entryPoint)
 	}
-	return home
+	return entryPoint, packageRoot
 }
 
 // liveTableFor loads a repository's design system and builds its table, or skips.
-func liveTableFor(t *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
+func liveTableFor(t *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
 	t.Helper()
-	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		t.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(t, spelling)
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
 	if err != nil {
 		t.Fatalf("loading the design system at %s: %v", entryPoint, err)
@@ -99,7 +100,7 @@ func findTailwindPackageRootForTest(start string) string {
 func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
 	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
-	_, live := liveTableFor(t, corpusRepositories[0].entryPoint)
+	_, live := liveTableFor(t, corpusRepositories[0].spelling)
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
 		t.Fatalf("the fixtures are Tailwind %s and the live table is Tailwind %s", fixtures.TailwindVersion, live.TailwindVersion)
@@ -173,71 +174,79 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 	for _, repository := range corpusRepositories {
 		t.Run(repository.name, func(t *testing.T) {
 			t.Parallel()
-			system, table := liveTableFor(t, repository.entryPoint)
-
-			if len(table.Namespaces) == 0 {
-				t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
-			}
-			// Longest-first is the engine's precedence and a contract of the field.
-			for index := 1; index < len(table.Namespaces); index++ {
-				if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
-					t.Fatalf("namespaces are not longest-first at %d: %q before %q",
-						index, table.Namespaces[index-1], table.Namespaces[index])
-				}
-			}
-
-			// Every namespace the table names must actually hold keys from this theme, and every
-			// key must be one the theme reports. Otherwise the table's namespaces came from
-			// somewhere other than the repository.
-			for _, namespace := range table.Namespaces {
-				keys := table.KeysByNamespace[namespace]
-				if len(keys) == 0 {
-					t.Fatalf("namespace %q holds no keys", namespace)
-				}
-				fromTheme := map[string]bool{}
-				for _, key := range system.Theme().KeysInNamespaces([]string{namespace}) {
-					fromTheme[key] = true
-				}
-				for key := range keys {
-					if !fromTheme[key] {
-						t.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
-					}
-				}
-			}
-
-			// The repository's own contributions, by count rather than by name, so the assertion
-			// holds on a repository this test has never seen.
-			staticRoots, functionalRoots := 0, 0
-			// Each kind separately rather than a switch, because a root can be declared both ways:
-			// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root, and
-			// sixteen roots in this repository have that shape. A switch counted each such root once
-			// and checked only whichever kind happened to win.
-			for root, kinds := range system.utilityRoots {
-				if kinds[UtilityKindStatic] {
-					if _, found := table.Statics[root]; !found {
-						t.Errorf("static `@utility %s` is missing from the table's statics", root)
-					}
-					staticRoots++
-				}
-				if kinds[UtilityKindFunctional] {
-					descriptor, found := table.Descriptors[root]
-					if !found {
-						t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
-						continue
-					}
-					if !descriptor.PerDeclaration {
-						t.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
-					}
-					functionalRoots++
-				}
-			}
-			if staticRoots+functionalRoots == 0 {
-				t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
-			}
-			t.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
-				repository.name, len(table.Namespaces), staticRoots, functionalRoots)
+			system, table := liveTableFor(t, repository.spelling)
+			checkTableCarriesTheTheme(t, repository.name, system, table)
 		})
 	}
+}
+
+// checkTableCarriesTheTheme is the composition TestLiveTableCarriesTheRepositoryTheme asserts, shared with
+// its public twin: namespaces longest-first and drawn from the theme, and every `@utility` block composed
+// into the table, functional ones marked PerDeclaration.
+func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSystem, table *Table) {
+	t.Helper()
+
+	if len(table.Namespaces) == 0 {
+		t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
+	}
+	// Longest-first is the engine's precedence and a contract of the field.
+	for index := 1; index < len(table.Namespaces); index++ {
+		if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
+			t.Fatalf("namespaces are not longest-first at %d: %q before %q",
+				index, table.Namespaces[index-1], table.Namespaces[index])
+		}
+	}
+
+	// Every namespace the table names must actually hold keys from this theme, and every
+	// key must be one the theme reports. Otherwise the table's namespaces came from
+	// somewhere other than the repository.
+	for _, namespace := range table.Namespaces {
+		keys := table.KeysByNamespace[namespace]
+		if len(keys) == 0 {
+			t.Fatalf("namespace %q holds no keys", namespace)
+		}
+		fromTheme := map[string]bool{}
+		for _, key := range system.Theme().KeysInNamespaces([]string{namespace}) {
+			fromTheme[key] = true
+		}
+		for key := range keys {
+			if !fromTheme[key] {
+				t.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
+			}
+		}
+	}
+
+	// The repository's own contributions, by count rather than by name, so the assertion
+	// holds on a repository this test has never seen.
+	staticRoots, functionalRoots := 0, 0
+	// Each kind separately rather than a switch, because a root can be declared both ways:
+	// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root, and
+	// sixteen roots in this repository have that shape. A switch counted each such root once
+	// and checked only whichever kind happened to win.
+	for root, kinds := range system.utilityRoots {
+		if kinds[UtilityKindStatic] {
+			if _, found := table.Statics[root]; !found {
+				t.Errorf("static `@utility %s` is missing from the table's statics", root)
+			}
+			staticRoots++
+		}
+		if kinds[UtilityKindFunctional] {
+			descriptor, found := table.Descriptors[root]
+			if !found {
+				t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
+				continue
+			}
+			if !descriptor.PerDeclaration {
+				t.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
+			}
+			functionalRoots++
+		}
+	}
+	if staticRoots+functionalRoots == 0 {
+		t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
+	}
+	t.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
+		name, len(table.Namespaces), staticRoots, functionalRoots)
 }
 
 // TestLiveTableBaseHalfCarriesNoRepositoryTokens is the other side of the same claim.
@@ -279,7 +288,7 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
 	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	measured := testTable(t)
-	system, live := liveTableFor(t, corpusRepositories[0].entryPoint)
+	system, live := liveTableFor(t, corpusRepositories[0].spelling)
 
 	evaluator := system.Utilities()
 	if evaluator == nil {
@@ -340,14 +349,7 @@ func TestLiveTableIsNilWithoutADesignSystem(t *testing.T) {
 // the same counted path, once per program, so the question a reader has is whether adding it changed
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
-	entryPoint := corpusRepositories[0].entryPoint
-	if _, err := os.Stat(entryPoint); err != nil {
-		benchmark.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		benchmark.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
 	if err != nil {
 		benchmark.Fatalf("loading the design system: %v", err)
@@ -366,14 +368,7 @@ func BenchmarkNewTable(benchmark *testing.B) {
 //
 // Load plus table, which is what `loadDesignSystemForProgram` does once per program.
 func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
-	entryPoint := corpusRepositories[0].entryPoint
-	if _, err := os.Stat(entryPoint); err != nil {
-		benchmark.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		benchmark.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
 
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()

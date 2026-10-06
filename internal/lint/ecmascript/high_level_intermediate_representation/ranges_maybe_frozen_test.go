@@ -35,8 +35,8 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 					state.markImmutable(place.Identifier, kind)
 				}
 			}
-			phi := &Phi{Place: Place{Identifier: 3}, Operands: map[BlockId]Place{
-				1: {Identifier: 1}, 2: {Identifier: 2},
+			phi := &Phi{Place: Place{Identifier: 3}, Operands: PhiOperands{
+				{Predecessor: 1, Place: Place{Identifier: 1}}, {Predecessor: 2, Place: Place{Identifier: 2}},
 			}}
 			state.derivePhiImmutable(phi, map[BlockId]bool{1: true, 2: !testCase.unseen})
 			if got := state.immutable[3]; got != testCase.want {

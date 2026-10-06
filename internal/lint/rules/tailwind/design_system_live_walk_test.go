@@ -2,10 +2,10 @@ package tailwind
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -39,13 +39,6 @@ import (
 // Every helper is prefixed `liveWalk` for the reason design_system_test.go states: several agents
 // work in this package at once, and a helper whose name does not say which component owns it is a
 // collision waiting to happen.
-
-// liveWalkRepository is the tree this assertion runs against.
-//
-// The same absolute path the rest of the live suites in this package use, with the same skip when it
-// is absent. A machine without this checkout gets a skipped test rather than a failing one, because
-// what is under test is a property of the rules and not a property of the machine.
-const liveWalkRepository = "/Users/kirkouimet/Projects/ahra"
 
 // liveWalkRules is every rule in this package, as the shipped run registers them.
 //
@@ -92,10 +85,12 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
 // tailwindengine.BuildsSoFar moved by exactly one across the walk, which any parallel test building a
 // design system or evicting the cache's one slot would inflate.
+//
+// The tree is ahra, the corpus the rest of the live suites in this package read. Without it the test
+// skips naming the variable, because what is under test is a property of the rules and not of the
+// machine.
 func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
-	if _, err := os.Stat(liveWalkRepository); err != nil {
-		t.Skipf("no corpus repository at %s, so there is no real walk to measure", liveWalkRepository)
-	}
+	liveWalkRepository := corpus.Ahra.Root(t)
 
 	resetDesignSystemCacheForTest()
 

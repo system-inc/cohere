@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.
@@ -59,6 +60,72 @@ type formatScope struct {
 	// failure is why the scope holds nothing when the walk that should have drawn it failed. A run whose
 	// verdict is formatting alone must not read that empty scope as a clean tree.
 	failure error
+
+	// adamic is the walk's held-back Adamic `.a` files (formatfiles.Enumeration.Adamic): admitted by the
+	// ignore layers, and in no scope until the program claims them, since `.a` is also a static library's
+	// extension (#6mhafvb). See claimAdamic.
+	adamic []string
+
+	// adamicJoins is whether a claimed `.a` file joins the scope: true for a scope drawn from the walk, the
+	// default and `--format-all`, and false for named paths, which already hold the `.a` files named.
+	adamicJoins bool
+
+	// adamicUnrecorded, when set, is the default scope's own filter: of the `.a` files given, those whose
+	// bytes are not on record as formatted.
+	adamicUnrecorded func(files []string) []string
+}
+
+// claimAdamic is the scope once the program is built, and the `.a` files it claims (#6mhafvb). An Adamic file
+// is in the scope only when the program holds it and the walk admitted it: a scope drawn from the walk takes
+// each such file (the default scope, those not on record as formatted), and a named `.a` the program does not
+// hold, or the walk did not admit, leaves the named set, so a libfoo.a is never handed to the TypeScript
+// printer or the fix engine's parse guard. claimed is every `.a` file the program holds that the walk
+// admitted, for the format record to keep their entries.
+func (s formatScope) claimAdamic(held map[string]struct{}) (formatScope, []string) {
+	admitted := make(map[string]struct{}, len(s.adamic))
+	var claimed []string
+	for _, fileName := range s.adamic {
+		admitted[fileName] = struct{}{}
+		if _, isHeld := held[fileName]; isHeld {
+			claimed = append(claimed, fileName)
+		}
+	}
+	if s.Everything {
+		return s, claimed
+	}
+
+	fileNames := make([]string, 0, len(s.FileNames))
+	for _, fileName := range s.FileNames {
+		_, isHeld := held[fileName]
+		_, isAdmitted := admitted[fileName]
+		if sourcename.IsAdamic(fileName) && !(isHeld && isAdmitted) {
+			continue
+		}
+		fileNames = append(fileNames, fileName)
+	}
+	joining := 0
+	if s.adamicJoins {
+		joiners := claimed
+		if s.adamicUnrecorded != nil {
+			joiners = s.adamicUnrecorded(claimed)
+		}
+		fileNames = append(fileNames, joiners...)
+		joining = len(joiners)
+		sort.Strings(fileNames)
+	}
+	if len(fileNames) == len(s.FileNames) && joining == 0 {
+		return s, claimed
+	}
+
+	index := make(map[string]struct{}, len(fileNames))
+	for _, fileName := range fileNames {
+		index[fileName] = struct{}{}
+	}
+	s.FileNames, s.index = fileNames, index
+	if joining > 0 {
+		s.Description = fmt.Sprintf("%s · and %s the program holds", s.Description, counted(joining, "Adamic .a file", "Adamic .a files"))
+	}
+	return s, claimed
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the
@@ -186,11 +253,15 @@ func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) fo
 			FileNames:   enumeration.Files,
 			index:       index,
 			Description: describeEnumeration(enumeration, len(enumeration.Files)),
+			adamic:      enumeration.Adamic,
+			adamicJoins: true,
 		}
 	}
 
 	// A narrow scope keeps its own file set, which is the named set, and reports how much of it the
-	// formatter will actually see.
+	// formatter will actually see. A named `.a` file stays in it only if the walk admitted it and the
+	// program holds it (claimAdamic).
+	s.adamic = enumeration.Adamic
 	handled := make(map[string]struct{}, len(enumeration.Files))
 	for _, fileName := range enumeration.Files {
 		handled[fileName] = struct{}{}

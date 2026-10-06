@@ -6,6 +6,12 @@
 // Trim is Go's own trim with the age chosen by size instead of fixed: it removes the entries used least
 // recently until the cache is under a target, so what a build reaches for next survives and nothing has to
 // start cold.
+//
+// One caller trims a live cache: cohere-dev, which holds every token of the machine's pool while it does, so
+// no build it can see is reading what it removes. The launcher trimmed the default cache too, holding
+// nothing, and was removed: a second path deleting from the live cache without the pool's lock is how the
+// cache was trimmed under running gates on 2026-10-06 (#cpxc2d7, #d0x1fhp). TestOnlyCohereDevTrims holds it
+// to one.
 package gocache
 
 import (
@@ -40,14 +46,9 @@ type Limit struct {
 	Cap    int64
 	Target int64
 	// Spare is how recently used an entry may be and never be removed: InUseWindow for a trim that runs
-	// beside builds it cannot see, less for one that has kept them out (cohere-dev's, which holds every
-	// token of the pool while it trims).
+	// beside builds it cannot see, less for one that has kept them out, as cohere-dev's does by holding
+	// every token of the pool while it trims.
 	Spare time.Duration
-}
-
-// LimitFor caps a cache at the given size, trims it to three quarters of that, and spares InUseWindow.
-func LimitFor(capBytes int64) Limit {
-	return Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: InUseWindow}
 }
 
 // Trimmed is what one trim found and removed.

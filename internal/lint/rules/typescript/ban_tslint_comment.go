@@ -2,11 +2,11 @@ package typescript
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -174,7 +174,7 @@ func banTslintCommentInterior(comment comments.Comment) (string, bool) {
 // one separator, which is why a line comment renders with exactly one space after the slashes
 // however many the source had.
 func banTslintCommentRenderedText(interior string, isBlock bool) string {
-	trimmed := strings.TrimSpace(interior)
+	trimmed := text.TrimWhitespace(interior)
 	if isBlock {
 		return "/* " + trimmed + " */"
 	}

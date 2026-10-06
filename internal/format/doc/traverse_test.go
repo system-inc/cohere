@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 /*
@@ -187,13 +188,10 @@ func showDoc(document Doc) string {
 	panic(fmt.Sprintf("unknown doc %T", document))
 }
 
-// TestUtilitiesAgreeWithUpstream is the differential. Off unless COHERE_PRETTIER_ROOT names the fork.
+// TestUtilitiesAgreeWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
 func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")
-	}
+	root := corpus.PrettierFork.Root(t)
 	const count = 3000
 	random := rand.New(rand.NewSource(20261002))
 	cases := make([]printCase, count)

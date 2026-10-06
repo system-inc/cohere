@@ -2,11 +2,11 @@ package core
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -527,8 +527,8 @@ func arrayCallbackFunctionNameWithKind(ctx rule.Context, node *ast.Node) string 
 		return "arrow function"
 	}
 	if name := node.Name(); name != nil {
-		if text := strings.TrimSpace(name.Text()); text != "" {
-			return fmt.Sprintf("function '%s'", text)
+		if functionName := text.TrimWhitespace(name.Text()); functionName != "" {
+			return fmt.Sprintf("function '%s'", functionName)
 		}
 	}
 	_ = ctx

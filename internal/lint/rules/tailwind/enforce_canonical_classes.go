@@ -120,7 +120,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			return declineListeners(ctx, "enforce-canonical-classes", designSystem)
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		var ignore []string
 		collapse := canonicalCollapseOptions{logical: true}
 		if isConfigured {
@@ -131,11 +131,11 @@ var EnforceCanonicalClasses = rule.Rule{
 			if configured.Logical != nil {
 				collapse.logical = *configured.Logical
 			}
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 			ignore = configured.Ignore
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 		ignored := compileIgnorePatterns(ignore)
 
 		report := func(node *ast.Node) {

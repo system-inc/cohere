@@ -38,7 +38,7 @@ func formatWithProseWrap(fileName string, text string, options formatoptions.Opt
 	if err != nil {
 		return "", err
 	}
-	return printFile(fileName, root, text, options, proseWrap, textToDoc)
+	return printFile(fileName, root, text, options, proseWrap, textToDoc, nodes.Len())
 }
 
 // FormatDoc is the doc entry for YAML embedded in another language (markdown's front matter): parse and
@@ -54,7 +54,7 @@ func FormatDoc(text string, options formatoptions.Options, textToDoc printing.Te
 		return nil, err
 	}
 	// The doc holds only text, no node, so the tree is released once it is built.
-	return PrintDoc(root, text, options, textToDoc)
+	return printDocFile("", root, text, options, "preserve", textToDoc, nodes.Len())
 }
 
 // nodeArenas hold the node memory of YAML formats that have finished, for the next to reuse (#93dpede):

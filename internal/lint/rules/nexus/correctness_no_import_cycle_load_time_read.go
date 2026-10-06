@@ -1,7 +1,9 @@
 package nexus
 
 import (
+	"crypto/sha256"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -107,8 +109,8 @@ var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf("nexus/correctne
 // file asks, under a package lock, as `consistency-require-constant-casing` builds its importer index.
 // Resolving every import is cheap. The checker is asked about references only inside the cycles found
 // by the cheaper, syntactic graph, so the expensive half runs on a few dozen files rather than on the
-// program. The rule reads other files, so it declares `ReadsOtherFiles` and the findings cache never
-// replays it.
+// program. The rule reads other files, so it declares `ReadsOtherFiles`, and the findings cache replays
+// it on a file while its bytes, its type fingerprint and the program fingerprint hold (#n030v3r).
 //
 // # No fix
 //
@@ -122,8 +124,12 @@ var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
 	// and an import's binding from the declaration a chain of re-exports finally lands on.
 	NeedsTypeChecker: true,
 
-	// The graph reads every file's imports and their resolutions, this file's among them.
-	ProgramReads: rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+	// The graph reads every file's imports and their resolutions, this file's among them. The run's
+	// directory, which the fingerprint names files relative to.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution | rule.ReadsOtherFiles,
+
+	// See correctnessNoImportCycleLoadTimeReadFingerprint for why the syntactic cycles are enough.
+	ProgramFingerprint: correctnessNoImportCycleLoadTimeReadFingerprint,
 
 	// Only a file inside a runtime import cycle can hold a finding, and most files are in none.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
@@ -200,6 +206,78 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		edges:     map[tspath.Path][]tspath.Path{},
 		fileNames: map[tspath.Path]string{},
 	}
+	syntactic := correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program)
+
+	verified := map[tspath.Path][]tspath.Path{}
+	for _, importerPath := range syntactic.paths {
+		importerComponent, inCycle := syntactic.superset[importerPath]
+		if !inCycle {
+			continue
+		}
+		var referenced map[*ast.Symbol]bool
+		for _, candidate := range syntactic.candidates[importerPath] {
+			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; !targetInCycle || targetComponent != importerComponent {
+				continue
+			}
+			if referenced == nil {
+				referenced = correctnessNoImportCycleLoadTimeReadReferencedImports(typeChecker, syntactic.byPath[importerPath])
+			}
+			if correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(typeChecker, candidate.statement, referenced) {
+				verified[importerPath] = append(verified[importerPath], candidate.target)
+			}
+		}
+	}
+
+	graph.component = correctnessNoImportCycleLoadTimeReadComponents(syntactic.paths, func(from tspath.Path) []tspath.Path {
+		return verified[from]
+	})
+	for from, targets := range verified {
+		for _, target := range targets {
+			if graph.component[from] == graph.component[target] {
+				if _, inCycle := graph.component[from]; inCycle {
+					graph.edges[from] = append(graph.edges[from], target)
+				}
+			}
+		}
+	}
+	for filePath := range graph.component {
+		graph.fileNames[filePath] = syntactic.byPath[filePath].FileName()
+	}
+	return graph
+}
+
+// correctnessNoImportCycleLoadTimeReadSyntacticGraph is the first, syntactic pass: every import and
+// re-export not written `type`, resolved to a project file, and the cycles they make. No checker is
+// asked, so the program fingerprint can read it too.
+type correctnessNoImportCycleLoadTimeReadSyntacticGraph struct {
+	paths      []tspath.Path
+	byPath     map[tspath.Path]*ast.SourceFile
+	candidates map[tspath.Path][]correctnessNoImportCycleLoadTimeReadCandidate
+	// superset numbers each file in a cycle of this graph by its strongly connected component.
+	superset map[tspath.Path]int
+}
+
+// correctnessNoImportCycleLoadTimeReadSyntacticCache holds one syntactic graph per program, shared by the
+// graph build and the fingerprint, which the walk asks for before any file is visited.
+var correctnessNoImportCycleLoadTimeReadSyntacticCache struct {
+	sync.Mutex
+	program rule.ProgramIdentity
+	graph   *correctnessNoImportCycleLoadTimeReadSyntacticGraph
+}
+
+func correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program rule.Program) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
+	correctnessNoImportCycleLoadTimeReadSyntacticCache.Lock()
+	defer correctnessNoImportCycleLoadTimeReadSyntacticCache.Unlock()
+	if correctnessNoImportCycleLoadTimeReadSyntacticCache.program == program.Identity() && correctnessNoImportCycleLoadTimeReadSyntacticCache.graph != nil {
+		return correctnessNoImportCycleLoadTimeReadSyntacticCache.graph
+	}
+	graph := correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program)
+	correctnessNoImportCycleLoadTimeReadSyntacticCache.program = program.Identity()
+	correctnessNoImportCycleLoadTimeReadSyntacticCache.graph = graph
+	return graph
+}
+
+func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Program) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
 	byPath := map[tspath.Path]*ast.SourceFile{}
 	var paths []tspath.Path
 	for _, sourceFile := range program.SourceFiles() {
@@ -254,43 +332,45 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		}
 		return targets
 	})
+	return &correctnessNoImportCycleLoadTimeReadSyntacticGraph{paths: paths, byPath: byPath, candidates: candidates, superset: superset}
+}
 
-	verified := map[tspath.Path][]tspath.Path{}
-	for _, importerPath := range paths {
-		importerComponent, inCycle := superset[importerPath]
+// correctnessNoImportCycleLoadTimeReadFingerprint is the rule's program fingerprint (#n030v3r): the
+// syntactic graph's edges inside cycles, each named by its two files, in a stable order.
+//
+// A file's verdict depends only on the cycle through it: whether there is one, which files share it,
+// the runtime edges inside it, and the names the message spells. Every file on a cycle through a file
+// is reachable from it, so it lies in that file's import closure, whose bytes and resolutions the
+// file's type fingerprint already holds; that covers the checker's half, which edges survive elision
+// and which declaration a binding lands on. What this adds is the shape of the cycles themselves, so
+// an import that opens or closes a cycle anywhere moves it, and an edit that touches no cycle's
+// imports leaves it, and the findings replay. The rule takes no options, so none reach it.
+func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+	syntactic := correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program)
+	// The edges inside cycles are the whole shape: they name every file on a cycle, and which files share
+	// one is their strongly connected components.
+	var edges []string
+	for from, candidates := range syntactic.candidates {
+		component, inCycle := syntactic.superset[from]
 		if !inCycle {
 			continue
 		}
-		var referenced map[*ast.Symbol]bool
-		for _, candidate := range candidates[importerPath] {
-			if targetComponent, targetInCycle := superset[candidate.target]; !targetInCycle || targetComponent != importerComponent {
-				continue
-			}
-			if referenced == nil {
-				referenced = correctnessNoImportCycleLoadTimeReadReferencedImports(typeChecker, byPath[importerPath])
-			}
-			if correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(typeChecker, candidate.statement, referenced) {
-				verified[importerPath] = append(verified[importerPath], candidate.target)
+		for _, candidate := range candidates {
+			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; targetInCycle && targetComponent == component {
+				edges = append(edges, rule.FingerprintPath(program, syntactic.byPath[from].FileName())+"\x00"+
+					rule.FingerprintPath(program, syntactic.byPath[candidate.target].FileName()))
 			}
 		}
 	}
-
-	graph.component = correctnessNoImportCycleLoadTimeReadComponents(paths, func(from tspath.Path) []tspath.Path {
-		return verified[from]
-	})
-	for from, targets := range verified {
-		for _, target := range targets {
-			if graph.component[from] == graph.component[target] {
-				if _, inCycle := graph.component[from]; inCycle {
-					graph.edges[from] = append(graph.edges[from], target)
-				}
-			}
-		}
+	slices.Sort(edges)
+	hash := sha256.New()
+	for _, edge := range edges {
+		hash.Write([]byte(edge))
+		hash.Write([]byte{1})
 	}
-	for filePath := range graph.component {
-		graph.fileNames[filePath] = byPath[filePath].FileName()
-	}
-	return graph
+	var fingerprint [sha256.Size]byte
+	copy(fingerprint[:], hash.Sum(nil))
+	return fingerprint
 }
 
 // correctnessNoImportCycleLoadTimeReadIsServerActions reports whether a file opens with

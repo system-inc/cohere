@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
@@ -187,7 +188,7 @@ func physicalDirectionViolationsIn(classString string) []physicalDirectionViolat
 	}
 
 	var violations []physicalDirectionViolation
-	for _, token := range strings.Fields(classString) {
+	for _, token := range text.WhitespaceFields(classString) {
 		base, prefixes := splitVariantPrefixes(token)
 
 		// `rtl:` and `ltr:` are the author saying the physical side is deliberate.
@@ -285,8 +286,8 @@ func isDirectionAware(prefixes []string) bool {
 // token rather than a compile.
 var tailwindClassPattern = regexp.MustCompile(`^-?(?:[a-z]+:)*(?:[a-z]+-)?[a-z]+(?:-[a-z0-9.\[\]/]+)?$`)
 
-func looksLikeTailwindClasses(text string) bool {
-	for _, token := range strings.Fields(text) {
+func looksLikeTailwindClasses(classString string) bool {
+	for _, token := range text.WhitespaceFields(classString) {
 		if tailwindClassPattern.MatchString(token) {
 			return true
 		}

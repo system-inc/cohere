@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"math/rand"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 /*
@@ -79,13 +80,10 @@ process.stdin.on("end", () => {
 });
 `
 
-// TestTextAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_ROOT names the fork.
+// TestTextAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
 func TestTextAgreesWithUpstream(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")
-	}
+	root := corpus.PrettierFork.Root(t)
 	random := rand.New(rand.NewSource(20261003))
 	type pending struct {
 		text      string

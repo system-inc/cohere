@@ -701,6 +701,9 @@
                 "nexus/correctness-no-leaked-number-render": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/correctness-no-load-time-import-meta-path": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/correctness-no-mock-on-module-namespace": {
                     "$ref": "#/$defs/ruleSetting"
                 },

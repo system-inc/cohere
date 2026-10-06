@@ -36,6 +36,14 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(module, name), []byte(contents), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		// An hour old, so both builds see the same sources. Go caches a package directory's module index
+		// only once every file in it is two seconds old (modTimeCutoff in cmd/go/internal/modindex), so a
+		// first build within two seconds of the writes cached no index for them, the rebuild did, and the
+		// test read those three entries as recomputed work it had not trimmed.
+		hourAgo := time.Now().Add(-time.Hour)
+		if err := os.Chtimes(filepath.Join(module, name), hourAgo, hourAgo); err != nil {
+			t.Fatal(err)
+		}
 	}
 	build := func() {
 		t.Helper()

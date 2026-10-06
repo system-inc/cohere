@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The fast tier is the edit loop (#nxgt2ca, ruled by @system_cohere on Kirk's two-tier call):
@@ -25,10 +27,10 @@ import (
 // alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
 const fastTierVariable = "COHERE_FAST_TIER"
 
-// fastBudgetCPUSeconds is what an entry in landingGateOnly must still cost in CPU, user plus system,
-// measured alone with -count=1 and its test binary already built, to stay out of the fast tier. An entry at
-// or under it belongs back in the edit loop, and TestEveryLandingGateOnlyEntryStillEarnsItsPlace fails until
-// it is moved.
+// fastBudgetCPUSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
+// with -count=1 and its test binary already built, to join landingGateOnly. Anything at or under it stays
+// in the edit loop. TestEveryLandingGateOnlyEntryStillEarnsItsPlace holds every entry's recorded cost above
+// it.
 //
 // CPU and not wall, because wall moves with the machine's load and CPU does not (#1qbez1f). With a 2s wall
 // budget beside it, the registry's ESLint corpus passed two gates at 2.5s and 3.5s under load and failed the
@@ -37,10 +39,17 @@ const fastTierVariable = "COHERE_FAST_TIER"
 //
 // CPU is steadier than wall, not load-invariant. A heavily parallel package's CPU inflates under contention:
 // command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
-// crosscompile 36 to 41s against 26, while hir held at 29 to 31s at every load measured. Every change load
-// made tonight was upward, so a verdict at low load is the strict one, and every entry today clears 15 at
-// load about 10 and at load 166 alike.
+// crosscompile 36 to 41s against 26. Every change load made was upward, so a reading at low load is the
+// low one.
 const fastBudgetCPUSeconds = 15
+
+// fastEvictionCPUSeconds is what an entry, measured again now, must fall to before
+// TestEveryLandingGateOnlyEntryStillEarnsItsPlace sends it back to the edit loop: a third under the budget
+// to join, because a live measurement scatters and one threshold judged both ways flips on the scatter.
+// hir's corpus walks, a difference of two runs, read 14.9s in one of build's land runs, 18.5s at load 10
+// and 24.8s at load 13 to 50, all on 2026-10-05, and failed build's land at 14.9 against a single bar of
+// 15. Under 10 is a change in what the tests do, not in who else is running.
+const fastEvictionCPUSeconds = 10
 
 // landingGateEntry is one thing the fast tier leaves to the full gate.
 type landingGateEntry struct {
@@ -50,6 +59,11 @@ type landingGateEntry struct {
 	// skippedBy is the variable its tests read to leave themselves out, for an entry that is part of a
 	// package rather than all of it; empty for a whole package.
 	skippedBy string
+
+	// reads is the corpus its expensive tests read, for an entry whose cost is that corpus (internal/corpus);
+	// the zero Corpus for one that reads none. Without the corpus those tests skip and the entry costs
+	// nothing, which would read as an entry that got cheap.
+	reads corpus.Corpus
 
 	// wallSeconds and cpuSeconds are its cost measured alone with -count=1 on a quiet machine, when it was
 	// added; for part of a package, the package run in full less the package run in the fast tier.
@@ -79,9 +93,9 @@ var landingGateOnly = []landingGateEntry{
 	{
 		pattern:   "./internal/lint/ecmascript/high_level_intermediate_representation",
 		skippedBy: fastTierVariable,
-		// At load 80 to 100, so the wall is high: the package in full took 13.2s and 33.5s of CPU, in the fast
-		// tier 2.4s and 4.5s.
-		wallSeconds: 10.8, cpuSeconds: 29.0,
+		reads:     corpus.Structure,
+		// At load about 10: the package in full took 12.8s and 22.3s of CPU, in the fast tier 1.8s and 3.8s.
+		wallSeconds: 11.0, cpuSeconds: 18.5,
 		reason: "the corpus walks lower hundreds of real files, again in each of about 45 tests; the package's " +
 			"other tests stay in the fast tier",
 	},

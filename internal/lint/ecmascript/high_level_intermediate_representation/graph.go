@@ -10,6 +10,8 @@
 // They are re-established by calling Finalize, which any pass that restructures the graph must do.
 package high_level_intermediate_representation
 
+import "sync"
+
 // Finalize brings a freshly lowered function into the state every pass assumes.
 //
 // Order matters: reverse postorder first, because it drops unreachable blocks and the predecessor
@@ -51,7 +53,8 @@ func ReversePostorder(function *Function) {
 	if function == nil {
 		return
 	}
-	postorder := make([]*BasicBlock, 0, len(function.Blocks))
+	scratch := reversePostorderScratchPool.Get().(*reversePostorderScratch)
+	postorder := scratch.postorder[:0]
 
 	// The three sets are dense slices over block ids rather than maps, and the walk keeps its frames
 	// and their successors in two flat buffers rather than a frame and two slices per block. The
@@ -65,25 +68,25 @@ func ReversePostorder(function *Function) {
 			bound = int(id) + 1
 		}
 	}
-	visited := make([]bool, bound)
-	used := make([]bool, bound)
-	usedFallthroughs := make([]bool, bound)
+	visited := clearedFlags(scratch.visited, bound)
+	used := clearedFlags(scratch.used, bound)
+	usedFallthroughs := clearedFlags(scratch.usedFallthroughs, bound)
 	inRange := func(id BlockId) bool { return int(id) < bound }
 
-	type successor struct {
-		id     BlockId
-		isUsed bool
-	}
-	type frame struct {
-		block *BasicBlock
-		// successors are this frame's entries in the shared buffer, from start to end. A child's
-		// entries are appended after them and truncated away when the child is popped, so the
-		// buffer is a stack in step with the frames.
-		start, end, next int
-		ownsAppend       bool
-	}
-	var successors []successor
-	var real []BlockId
+	type successor = reversePostorderSuccessor
+	type frame = reversePostorderFrame
+	successors := scratch.successors[:0]
+	real := scratch.real[:0]
+	stack := scratch.stack[:0]
+	// The buffers go back to the pool however this returns, with every pointer they held cleared, so a
+	// pooled buffer never keeps a function's blocks alive.
+	defer func() {
+		clear(postorder[:cap(postorder)])
+		clear(stack[:cap(stack)])
+		scratch.postorder, scratch.successors, scratch.real, scratch.stack = postorder, successors, real, stack
+		scratch.visited, scratch.used, scratch.usedFallthroughs = visited, used, usedFallthroughs
+		reversePostorderScratchPool.Put(scratch)
+	}()
 	collect := func(next BlockId) { real = append(real, next) }
 	enter := func(id BlockId, isUsed bool) (frame, bool) {
 		if !inRange(id) {
@@ -122,7 +125,7 @@ func ReversePostorder(function *Function) {
 	if !ok {
 		return
 	}
-	stack := []frame{entry}
+	stack = append(stack, entry)
 
 	for len(stack) > 0 {
 		top := &stack[len(stack)-1]
@@ -165,6 +168,45 @@ func ReversePostorder(function *Function) {
 			delete(function.blocksById, id)
 		}
 	}
+}
+
+// reversePostorderSuccessor is one edge ReversePostorder will follow, and whether it is executable.
+type reversePostorderSuccessor struct {
+	id     BlockId
+	isUsed bool
+}
+
+// reversePostorderFrame is one block on ReversePostorder's walk stack.
+type reversePostorderFrame struct {
+	block *BasicBlock
+	// successors are this frame's entries in the shared buffer, from start to end. A child's entries
+	// are appended after them and truncated away when the child is popped, so the buffer is a stack in
+	// step with the frames.
+	start, end, next int
+	ownsAppend       bool
+}
+
+// reversePostorderScratch is ReversePostorder's working memory, kept between calls. It runs once per
+// lowered function, and its stack, its postorder and its three sets were 22 MB of a cold ahra run,
+// allocated and dropped every call (#p4h0p54). Only the ordered block list it returns needs to be new.
+type reversePostorderScratch struct {
+	postorder                       []*BasicBlock
+	visited, used, usedFallthroughs []bool
+	successors                      []reversePostorderSuccessor
+	real                            []BlockId
+	stack                           []reversePostorderFrame
+}
+
+var reversePostorderScratchPool = sync.Pool{New: func() any { return new(reversePostorderScratch) }}
+
+// clearedFlags is flags resized to length, all false, reusing its array when it is long enough.
+func clearedFlags(flags []bool, length int) []bool {
+	if cap(flags) < length {
+		return make([]bool, length)
+	}
+	flags = flags[:length]
+	clear(flags)
+	return flags
 }
 
 // MarkPredecessors recomputes every block's Predecessors from the real edges.

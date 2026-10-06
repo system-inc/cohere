@@ -14,6 +14,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -171,7 +172,7 @@ var parseFixtures = []parseFixture{
 // TestParseAgreesWithGraphqlJs is the parser's acceptance test: for every .graphql and .gql file in the
 // corpora, and every inline fixture, the Go tree and comment list must equal graphql-js's, property for
 // property, and a refusal must be a refusal on both sides with the same message. Off unless
-// COHERE_PRETTIER_ROOT names the fork (whose node_modules hold graphql 17.0.2) and COHERE_GRAPHQL_CORPORA
+// COHERE_PRETTIER_FORK names the fork (whose node_modules hold graphql 17.0.2) and COHERE_GRAPHQL_CORPORA
 // lists directories to walk (colon-separated, node_modules skipped).
 //
 // A corpus file graphql-js cannot parse is counted, and the test fails if that count passes a tenth of
@@ -179,11 +180,11 @@ var parseFixtures = []parseFixture{
 // fixtures each say which way graphql-js must go.
 func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_GRAPHQL_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
+	if corpora == "" {
+		t.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input struct {
 		Name string `json:"name"`

@@ -15,6 +15,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -135,7 +136,7 @@ var glueParseFixtures = []glueParseFixture{
 // TestParseAgreesWithPrettierCssParser is the glue's acceptance test: for every .css file in the
 // corpora, and every inline fixture, the Go tree must equal what the fork's parsers.css.parse returns,
 // key for key, Prettier's source.startOffset and endOffset included, and a refusal must be a refusal on
-// both sides. Off unless COHERE_PRETTIER_ROOT names the fork and COHERE_CSS_CORPORA lists files or
+// both sides. Off unless COHERE_PRETTIER_FORK names the fork and COHERE_CSS_CORPORA lists files or
 // directories to walk (colon-separated, node_modules skipped).
 //
 // On a text with a non-ASCII character, sourceIndex is left out on both sides: it is relative to a
@@ -147,11 +148,11 @@ var glueParseFixtures = []glueParseFixture{
 // say which way the fork must go.
 func TestParseAgreesWithPrettierCssParser(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_CSS_CORPORA to compare the parser glue against the fork")
+	if corpora == "" {
+		t.Skip("set COHERE_CSS_CORPORA to compare the parser glue against the fork")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input struct {
 		Name string `json:"name"`

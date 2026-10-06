@@ -658,7 +658,7 @@ func collectManualMemoPhiDependencies(block *BasicBlock, sidemap *manualMemoSide
 		var resolved *ManualMemoDependency
 		conflict := false
 		for _, predecessor := range PhiOperandsInOrder(phi) {
-			dependency, ok := sidemap.deps[phi.Operands[predecessor].Identifier]
+			dependency, ok := sidemap.deps[phi.Operands.At(predecessor).Identifier]
 			if !ok {
 				continue
 			}

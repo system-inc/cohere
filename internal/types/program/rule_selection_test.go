@@ -1,6 +1,10 @@
 package program
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
@@ -45,5 +49,65 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(t *testing.T
 	}
 	if len(selections) != 2 {
 		t.Fatalf("three files in two resolutions made %d selections", len(selections))
+	}
+}
+
+// Selections that give a derived rule different options fingerprint it apart, since an option can choose what
+// the rule reads, and the walk computes each rule and options pair once, however many selections and workers
+// ask (#s9k38p3). Sixteen workers, each with selections of its own as a walk's are, resolve three files: two
+// overrides give the rule red, so their selections differ and their options do not.
+func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(t *testing.T) {
+	t.Parallel()
+	setting := func(marker string) configuration.RuleSetting {
+		return configuration.RuleSetting{Severity: configuration.SeverityError, Options: []json.RawMessage{json.RawMessage(`"` + marker + `"`)}}
+	}
+	graph := &Graph{
+		LintConfig: &configuration.Config{
+			Rules: map[string]configuration.RuleSetting{"derived": setting("red")},
+			Overrides: []configuration.Override{
+				{Files: []string{"special/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("blue")}},
+				{Files: []string{"again/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("red")}},
+			},
+		},
+		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (any, error) {
+			var marker string
+			err := json.Unmarshal(raw, &marker)
+			return marker, err
+		}}},
+	}
+	var calls atomic.Int32
+	rules := []rule.Rule{{Name: "derived", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
+		calls.Add(1)
+		return sha256.Sum256([]byte(options.(string)))
+	}}}
+	memo := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
+
+	const workers = 16
+	var wait sync.WaitGroup
+	var failures sync.Map
+	for worker := range workers {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			selections := map[any]*ruleSelection{}
+			scopedOff, unconfigured := map[string]int{}, map[string]int{}
+			for file, want := range map[string]string{"source/a.ts": "red", "special/c.ts": "blue", "again/d.ts": "red"} {
+				selection, _ := graph.rulesFor(file, rules, selections, scopedOff, unconfigured)
+				if got := graph.programFingerprints(selection, memo)["derived"]; got != sha256.Sum256([]byte(want)) {
+					failures.Store(worker, file+" was not fingerprinted under "+want)
+				}
+			}
+			if len(selections) != 3 {
+				failures.Store(worker, "three files in three resolutions did not make three selections")
+			}
+		}()
+	}
+	wait.Wait()
+	failures.Range(func(worker, failure any) bool {
+		t.Errorf("worker %d: %s", worker, failure)
+		return true
+	})
+	if calls.Load() != 2 {
+		t.Fatalf("%d workers with 3 selections each over 2 options computed the fingerprint %d times, want once per options", workers, calls.Load())
 	}
 }

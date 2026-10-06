@@ -440,6 +440,11 @@ func unformattedScopeOf(engine formatEngine, record *formatRecord, universe form
 		recorded: func(fileName string, text string) bool {
 			return record.vouches(fileName, text, engine.OptionsFingerprint)
 		},
+		adamic:      universe.root.Adamic,
+		adamicJoins: true,
+		adamicUnrecorded: func(files []string) []string {
+			return record.unformatted(files, engine.OptionsFingerprint)
+		},
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
@@ -42,15 +43,12 @@ var widthCases = []string{
 
 // TestStringWidthAgreesWithUpstream measures the port against the fork's own getStringWidth.
 //
-// Off unless COHERE_PRETTIER_ROOT names the fork checkout, because it runs node. Then it checks the
+// Off unless COHERE_PRETTIER_FORK names the fork checkout, because it runs node. Then it checks the
 // curated cases and, when COHERE_FORMAT_CORPORA is also set, every distinct line containing a
 // non-ASCII byte in those repositories, which is the population that actually reaches the printer.
 func TestStringWidthAgreesWithUpstream(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")
-	}
+	root := corpus.PrettierFork.Root(t)
 
 	inputs := append([]string(nil), widthCases...)
 	seen := map[string]bool{}

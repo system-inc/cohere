@@ -328,14 +328,19 @@ type Rule struct {
 	// ProgramFingerprint, on a rule that declares ReadsOtherFiles, is a hash of exactly the program-wide data the
 	// rule's verdict on one file depends on beyond that file: the theme interfaces it indexes, the import graph's
 	// edges, the one file it reads. With it, the findings cache replays the rule on a file whose bytes are
-	// unchanged while this hash is too (#kdee854). It is called once per run, with a Program viewed under the
-	// rule's own ProgramReads.
+	// unchanged while this hash is too (#kdee854). It is called for each set of options the run's
+	// configuration gives the rule, with a Program viewed under the rule's own ProgramReads and the options as
+	// Run receives them, since an option can choose which data the rule reads: no-html-link-for-pages' pagesDir
+	// names the directory its routes come from (#s9k38p3). The options themselves need no hashing: every
+	// config file is in the findings cache's key. A walk calls it once for each set of options it gives the
+	// rule, on whichever worker asks first, while other rules' fingerprints may be computed on other workers,
+	// so it must be safe for concurrent use.
 	//
 	// It is a claim of completeness, and it decides soundness: anything the verdict reads outside the file and
 	// outside this hash replays a stale finding when it changes. So it is proven both ways for each rule, a
 	// planted change to the indexed data moving it and an edit elsewhere leaving it alone. A rule that declares
 	// ReadsOtherFiles without one is walked on every file, as before: the default is always the sound one.
-	ProgramFingerprint func(program Program) [sha256.Size]byte
+	ProgramFingerprint func(program Program, options any) [sha256.Size]byte
 
 	// TypeReach declares what a type-aware rule can see of the files its file imports, and so what its
 	// cached findings are keyed on. Contents, the default, keys them on the bytes of every file in the

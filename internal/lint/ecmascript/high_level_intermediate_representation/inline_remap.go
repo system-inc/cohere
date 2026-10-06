@@ -188,8 +188,9 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		})
 
 		for _, phi := range block.Phis {
-			operands := map[BlockId]Place{}
-			for predecessor, operand := range phi.Operands {
+			operands := make(PhiOperands, 0, len(phi.Operands))
+			for _, entry := range phi.Operands {
+				predecessor, operand := entry.Predecessor, entry.Place
 				mappedBlock, blockOk := remap.Blocks[predecessor]
 				if !blockOk {
 					mappedBlock = predecessor
@@ -197,7 +198,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 				if mapped, ok := remap.Identifiers[operand.Identifier]; ok {
 					operand.Identifier = mapped
 				}
-				operands[mappedBlock] = operand
+				operands.Set(mappedBlock, operand)
 			}
 			place := phi.Place
 			if mapped, ok := remap.Identifiers[place.Identifier]; ok {

@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -88,15 +90,47 @@ func positiveVariable(name string, fallback int) (int, error) {
 	return parsed, nil
 }
 
+// homeVariable names the home the pool hangs from in place of the account's own, so a test can have a pool of
+// its own. Nothing else moves the pool: it never follows `HOME` (poolHome).
+const homeVariable = "COHERE_DEV_HOME"
+
+// poolHome is the home the machine's pool hangs from: the account's own, from the system's user database,
+// never the `HOME` variable. A gate run with `HOME` set to a scratch directory, to leave its corpora unset,
+// and the go cache passed through, opened a pool of its own and so ran outside the machine's, and its trim
+// held that empty pool and trimmed the live cache under every real gate (2026-10-06 04:44, #d0x1fhp).
+func poolHome() (string, error) {
+	if home := os.Getenv(homeVariable); home != "" {
+		return home, nil
+	}
+	account, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("finding this account's home for the machine's pool: %w", err)
+	}
+	return account.HomeDir, nil
+}
+
+// userCacheDirectoryIn is the user cache directory under a home, where Go puts its default build cache. On
+// Linux it is ~/.cache whatever `XDG_CACHE_HOME` says, which moves Go's cache but not the pool, so a cache
+// moved that way is refused by the trim rather than trimmed (poolGuards).
+func userCacheDirectoryIn(home string) string {
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Caches")
+	case "windows":
+		return filepath.Join(home, "AppData", "Local")
+	}
+	return filepath.Join(home, ".cache")
+}
+
 // poolDirectory is where the tokens, their holders and the line live, one per machine user.
 func poolDirectory() (string, error) {
-	directory, err := os.UserCacheDir()
+	home, err := poolHome()
 	if err != nil {
 		return "", err
 	}
 	// The directory the whole-module slot used, so a checkout still on that wrapper and one on this pool take
 	// the same lock for slot 1 and never run at once on it.
-	directory = filepath.Join(directory, "cohere", "test-slots")
+	directory := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	return directory, os.MkdirAll(directory, 0o755)
 }
 
@@ -156,6 +190,10 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 	waitingSince := time.Now()
 	announced := false
 	lastAhead := -1
+	// The holders as last printed, so a change of holder is printed again: a waiter that named only the first
+	// holder it saw went on naming it after it exited (lint_rules' land, a dead pid named while another held
+	// the lock, 2026-10-06).
+	lastHolders := ""
 	for {
 		ahead, waiting := 0, 0
 		if ticket != nil {
@@ -180,12 +218,20 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 				return held, nil
 			}
 		}
+		current := holders(directory, slots)
 		if !announced {
 			explain()
-			for _, holder := range holders(directory, slots) {
+			for _, holder := range current {
 				fmt.Fprintf(os.Stderr, "  %s\n", holder)
 			}
 			announced = true
+			lastHolders = strings.Join(current, "\n")
+		} else if joined := strings.Join(current, "\n"); joined != lastHolders && len(current) > 0 {
+			fmt.Fprintf(os.Stderr, "cohere-dev: the %s holders changed; now:\n", noun)
+			for _, holder := range current {
+				fmt.Fprintf(os.Stderr, "  %s\n", holder)
+			}
+			lastHolders = joined
 		}
 		if ticket != nil && ahead != lastAhead {
 			fmt.Fprintf(os.Stderr, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
@@ -243,9 +289,26 @@ func status() int {
 		fmt.Printf("  token %d: %s\n", token, holder)
 	}
 	fmt.Println(cacheStatus(directory))
+	fmt.Println(quietStatus(directory, time.Now()))
 	waiting := waiters(directory)
 	fmt.Printf("line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {
+		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
+	}
+	// Land's one lock and its own line (land.go), so a stalled landing shows here beside the tokens.
+	land, err := landDirectory()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		return 1
+	}
+	holder := "free"
+	if held := heldBy(land, 1); held != "" {
+		holder = held
+	}
+	fmt.Printf("land lock: %s\n", holder)
+	landing := waiters(land)
+	fmt.Printf("land line: %d waiting\n", len(landing))
+	for place, waiter := range landing {
 		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
 	}
 	return 0

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
@@ -78,17 +79,17 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 		t.Fatalf("read %s: %v", path, err)
 	}
 
-	var corpus classOrderLiveCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
+	var fixture classOrderLiveCorpus
+	if err := json.Unmarshal(contents, &fixture); err != nil {
 		t.Fatalf("parse %s: %v", path, err)
 	}
-	if corpus.TailwindVersion != "4.3.3" {
+	if fixture.TailwindVersion != "4.3.3" {
 		t.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3",
-			corpus.TailwindVersion)
+			fixture.TailwindVersion)
 	}
 
 	var lists []classOrderLiveList
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.ClassOrder != nil && len(aCase.ClassOrder.Sorted) > 1 {
 			lists = append(lists, classOrderLiveList{
 				name:      aCase.Name,
@@ -117,10 +118,9 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 // classOrderLiveSystems builds one live design system per entry point the corpus names.
 //
 // Built from the repository on disk rather than from the fixture, which is the whole point of the
-// swap: the thing under test is the rule reading the repository in front of it. A missing entry point
-// skips that system's lists rather than failing, because the corpus records absolute paths from the
-// machine it was captured on, and a checkout that lacks one of the two repositories should still be
-// able to run the other's half.
+// swap: the thing under test is the rule reading the repository in front of it. The fixture spells each
+// entry point inside its corpus, so an unset corpus skips the test naming its variable, and a corpus
+// that is set but lacks the stylesheet fails.
 func classOrderLiveSystems(t *testing.T, lists []classOrderLiveList) map[string]DesignSystemResult {
 	t.Helper()
 
@@ -132,19 +132,16 @@ func classOrderLiveSystems(t *testing.T, lists []classOrderLiveList) map[string]
 		if _, built := systems[list.entryPath]; built {
 			continue
 		}
-		if _, err := os.Stat(list.entryPath); err != nil {
-			systems[list.entryPath] = DesignSystemResult{Err: err}
-			continue
-		}
-		packageRoot := findTailwindPackageRoot(filepath.Dir(list.entryPath), diskFileExists)
+		entryPoint := corpus.Resolve(t, list.entryPath)
+		packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 		if packageRoot == "" {
 			systems[list.entryPath] = DesignSystemResult{
-				Err: fmt.Errorf("no installed tailwindcss beside %s", list.entryPath),
+				Err: fmt.Errorf("no installed tailwindcss beside %s", entryPoint),
 			}
 			continue
 		}
 		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
-			EntryPoint:          list.entryPath,
+			EntryPoint:          entryPoint,
 			TailwindPackageRoot: packageRoot,
 		})
 		if err != nil {
@@ -277,9 +274,9 @@ func classOrderLiveReversed(classes []string) []string {
 // After the swap that must be zero, and it must be zero over a population that did not shrink, which
 // is what the placed-class floor below is for.
 //
-// The floor is a floor rather than an equality because the corpus records absolute paths from the
-// machine it was captured on. A checkout holding one of the two repositories measures half the corpus
-// and must still be able to prove the property on that half.
+// The floor is a floor rather than an equality so that a fixture gaining or losing a handful of classes
+// does not fail it. Both corpora, ahra and connected, must be set for this to run, and it skips naming
+// the variable when either is not.
 func TestClassOrderLiveMatchesTheEngineOverTheCorpus(t *testing.T) {
 	t.Parallel()
 	lists := classOrderLiveLoadCorpus(t)
@@ -392,21 +389,22 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
 		},
 	}
 
-	designSystem := classOrderLiveRepositorySystem(t)
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			unranked, placeable := partitionUnranked(testCase.input, designSystem)
-			keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
-			if !resolved {
-				t.Fatalf("the rule could not place %q, so this case proves nothing", unplaceable)
-			}
-			ordered := append(unranked, sortClassesByKey(placeable, keys)...)
-			if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
-				t.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
-			}
-		})
-	}
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+				unranked, placeable := partitionUnranked(testCase.input, designSystem)
+				keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
+				if !resolved {
+					t.Fatalf("the rule could not place %q, so this case proves nothing", unplaceable)
+				}
+				ordered := append(unranked, sortClassesByKey(placeable, keys)...)
+				if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
+					t.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
+				}
+			})
+		}
+	})
 }
 
 // TestClassOrderLiveReadsTheRepositoryRatherThanATable is the control that the swap actually happened.
@@ -443,21 +441,18 @@ func TestClassOrderLiveReadsTheRepositoryRatherThanATable(t *testing.T) {
 	}
 }
 
-// classOrderLiveRepositorySystem builds the design system for the repository the tests run in.
+// classOrderLiveRepositorySystem builds the design system of ahra, the corpus these tests were written
+// against.
 //
-// Skips rather than fails when the repository is not on disk, because these tests read an absolute
-// path recorded when the corpus was captured, and a checkout elsewhere should report "not measured"
-// rather than "broken".
+// Skips naming the variable when the corpus is unset, so a checkout elsewhere reports "not measured"
+// rather than "broken", and fails when it is set but lacks the stylesheet or its installed tailwindcss.
 func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 	t.Helper()
 
-	const entryPoint = "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css"
-	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("the corpus repository is not on this machine: %v", err)
-	}
+	entryPoint := corpus.Resolve(t, "ahra:app/_theme/styles/theme.css")
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss beside the corpus repository's stylesheet")
+		t.Fatalf("%s is set, but there is no installed tailwindcss beside %s", corpus.Ahra.Variable, entryPoint)
 	}
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
@@ -476,17 +471,18 @@ func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 // the author would be asked to make a change the engine does not agree with.
 func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	_, unplaceable, resolved := classOrderKeys(
-		[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
-	if resolved {
-		t.Fatal("a class outside the design system was placed, so the rule would sort a literal it " +
-			"does not understand")
-	}
-	if unplaceable != "ahralia-splash" {
-		t.Errorf("the decline should name the class that caused it, got %q", unplaceable)
-	}
+		_, unplaceable, resolved := classOrderKeys(
+			[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
+		if resolved {
+			t.Fatal("a class outside the design system was placed, so the rule would sort a literal it " +
+				"does not understand")
+		}
+		if unplaceable != "ahralia-splash" {
+			t.Errorf("the decline should name the class that caused it, got %q", unplaceable)
+		}
+	})
 }
 
 // TestClassOrderLiveVariantIndicesAreRanksWithinTheList is the mechanism test.
@@ -497,35 +493,36 @@ func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
 // computed for one list is meaningless in another.
 func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	maskOf := func(classes []string, target string) string {
-		keys, unplaceable, resolved := classOrderKeys(classes, designSystem.System, designSystem.Table)
-		if !resolved {
-			t.Fatalf("could not place %q", unplaceable)
+		maskOf := func(classes []string, target string) string {
+			keys, unplaceable, resolved := classOrderKeys(classes, designSystem.System, designSystem.Table)
+			if !resolved {
+				t.Fatalf("could not place %q", unplaceable)
+			}
+			key, placed := keys[target]
+			if !placed {
+				t.Fatalf("%q got no key", target)
+			}
+			if key.mask == nil {
+				return "0"
+			}
+			return key.mask.String()
 		}
-		key, placed := keys[target]
-		if !placed {
-			t.Fatalf("%q got no key", target)
-		}
-		if key.mask == nil {
-			return "0"
-		}
-		return key.mask.String()
-	}
 
-	narrow := maskOf([]string{"dark:flex", "hover:flex"}, "dark:flex")
-	wide := maskOf([]string{"dark:flex", "hover:flex", "group-hover:disabled:flex"}, "dark:flex")
+		narrow := maskOf([]string{"dark:flex", "hover:flex"}, "dark:flex")
+		wide := maskOf([]string{"dark:flex", "hover:flex", "group-hover:disabled:flex"}, "dark:flex")
 
-	if narrow == wide {
-		t.Errorf(
-			"`dark:flex` holds mask %s in both a two-class and a four-variant list; the index is "+
-				"supposed to be a rank within the population, so a pairwise comparator would be a "+
-				"valid shape after all and this port's central claim is wrong",
-			narrow,
-		)
-	}
-	t.Logf("`dark:flex` masks %s in the narrow list and %s in the wide one", narrow, wide)
+		if narrow == wide {
+			t.Errorf(
+				"`dark:flex` holds mask %s in both a two-class and a four-variant list; the index is "+
+					"supposed to be a rank within the population, so a pairwise comparator would be a "+
+					"valid shape after all and this port's central claim is wrong",
+				narrow,
+			)
+		}
+		t.Logf("`dark:flex` masks %s in the narrow list and %s in the wide one", narrow, wide)
+	})
 }
 
 // TestClassOrderLiveUnrankedLeadInSourceOrder pins the one dimension the engine has no opinion on.
@@ -540,31 +537,32 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 // and must not quietly turn into a test about two ranked classes.
 func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
-		if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
-			t.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
+			if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
+				t.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+			}
 		}
-	}
 
-	for _, testCase := range []struct {
-		input, unranked []string
-	}{
-		{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
-		{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
-		{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
-		{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
-	} {
-		unranked, placeable := partitionUnranked(testCase.input, designSystem)
-		// Source order between them, which is what makes `peer group` and `group peer` both legal.
-		if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
-			t.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
+		for _, testCase := range []struct {
+			input, unranked []string
+		}{
+			{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
+			{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
+			{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
+			{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
+		} {
+			unranked, placeable := partitionUnranked(testCase.input, designSystem)
+			// Source order between them, which is what makes `peer group` and `group peer` both legal.
+			if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
+				t.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
+			}
+			if len(placeable) != 2 {
+				t.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
+			}
 		}
-		if len(placeable) != 2 {
-			t.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
-		}
-	}
+	})
 }
 
 // TestClassOrderLiveDeclinesOnlyTheKnownBoundary names the one list the rule cannot order.

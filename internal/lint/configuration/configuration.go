@@ -460,6 +460,7 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 					setting.Options = inherited.Options
 				}
 				if !sameRuleSetting(setting, inherited) {
+					// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 					reason := strings.TrimSpace(layer.raw.Departures[name])
 					switch {
 					case reason != "":
@@ -489,8 +490,9 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 			switch {
 			case setting.Severity != SeverityOff:
 				delete(loaded.OffReasons, name)
+			// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 			case strings.TrimSpace(layer.raw.Reasons[name]) != "":
-				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: strings.TrimSpace(layer.raw.Reasons[name])}
+				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: strings.TrimSpace(layer.raw.Reasons[name])} // Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 			case departed[name]:
 				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: loaded.Departures[name].Reason}
 			case isInherited && inheritedIsReasoned:
@@ -514,7 +516,7 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 			override := Override{
 				Files:  rawOverride.Files,
 				Rules:  map[string]RuleSetting{},
-				Reason: strings.TrimSpace(rawOverride.Reason),
+				Reason: strings.TrimSpace(rawOverride.Reason), // Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 				File:   layer.path,
 			}
 			coversEverything := coversEveryFileOfItsKind(rawOverride.Files)
@@ -545,6 +547,7 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 				if sameRuleSetting(compared, inherited) {
 					continue
 				}
+				// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 				reason := strings.TrimSpace(layer.raw.Departures[name])
 				if reason == "" && !holdsToReasons {
 					continue
@@ -900,6 +903,7 @@ func checkReasons(layer configLayer) error {
 	}
 	sort.Strings(names)
 	for _, name := range names {
+		// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 		if strings.TrimSpace(layer.raw.Reasons[name]) == "" {
 			return fmt.Errorf("lint config %s names %q under \"reasons\" and gives no reason: say why the "+
 				"rule is off, in a sentence", layer.path, name)

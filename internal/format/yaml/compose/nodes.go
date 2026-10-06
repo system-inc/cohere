@@ -123,6 +123,20 @@ func newAlias(source string) *Node {
 	return &Node{Kind: KindAlias, Class: "Alias", Source: source, sourceSet: true}
 }
 
+// newScalar, newPair and newCollection on a context take the node from the parse's arena when the
+// options carry one (Options.Nodes), and allocate it otherwise (#v6ksqg3).
+func (ctx *composeContext) newScalar(value any) *Node {
+	return ctx.options.Nodes.New(Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value})
+}
+
+func (ctx *composeContext) newPair(key *Node, value *Node) *Node {
+	return ctx.options.Nodes.New(Node{Kind: KindPair, Class: "Pair", Key: key, Value: value})
+}
+
+func (ctx *composeContext) newCollection(class string) *Node {
+	return ctx.options.Nodes.New(collectionNode(class))
+}
+
 // newPair is `new Pair(key, value)`.
 func newPair(key *Node, value *Node) *Node {
 	return &Node{Kind: KindPair, Class: "Pair", Key: key, Value: value}
@@ -131,15 +145,21 @@ func newPair(key *Node, value *Node) *Node {
 // newCollection is `new NodeClass(schema)` for one of the four collection classes. YAMLOMap's and
 // YAMLSet's constructors set the tag to their own; items start as an empty array.
 func newCollection(class string) *Node {
+	node := collectionNode(class)
+	return &node
+}
+
+// collectionNode is the node newCollection makes, as a value.
+func collectionNode(class string) Node {
 	switch class {
 	case "YAMLMap":
-		return &Node{Kind: KindMap, Class: class, Items: []*Node{}}
+		return Node{Kind: KindMap, Class: class, Items: []*Node{}}
 	case "YAMLSet":
-		return &Node{Kind: KindMap, Class: class, Items: []*Node{}, Tag: setTagName}
+		return Node{Kind: KindMap, Class: class, Items: []*Node{}, Tag: setTagName}
 	case "YAMLSeq":
-		return &Node{Kind: KindSeq, Class: class, Items: []*Node{}}
+		return Node{Kind: KindSeq, Class: class, Items: []*Node{}}
 	case "YAMLOMap":
-		return &Node{Kind: KindSeq, Class: class, Items: []*Node{}, Tag: omapTagName}
+		return Node{Kind: KindSeq, Class: class, Items: []*Node{}, Tag: omapTagName}
 	}
 	panic("compose: unknown collection class " + class)
 }

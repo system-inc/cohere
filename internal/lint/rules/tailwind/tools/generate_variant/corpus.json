@@ -1,12 +1,12 @@
 [
     {
         "name": "ahra",
-        "path": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
-        "sourceRoot": "/Users/kirkouimet/Projects/ahra"
+        "path": "ahra:app/_theme/styles/theme.css",
+        "sourceRoot": "ahra:"
     },
     {
         "name": "www-connected-app",
-        "path": "/Users/kirkouimet/Projects/connected/www-connected-app/app/_theme/styles/theme.css",
-        "sourceRoot": "/Users/kirkouimet/Projects/connected/www-connected-app"
+        "path": "connected:app/_theme/styles/theme.css",
+        "sourceRoot": "connected:"
     }
 ]

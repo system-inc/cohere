@@ -1,11 +1,16 @@
 package nexus
 
 import (
+	"crypto/sha256"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
@@ -46,6 +51,20 @@ func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 		Description: localizationNoUntranslatedValueAmbiguousEnglishSiblingText.Render(map[string]string{
 			"first":  first,
 			"second": second,
+		}),
+	}
+}
+
+// localizationNoUntranslatedValueMissingEnglishSiblingText is the rule's `missingEnglishSibling`
+// message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
+var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingEnglishSibling")
+
+func messageMissingEnglishSibling(expected string, alternative string) rule.Message {
+	return rule.Message{
+		Id: "missingEnglishSibling",
+		Description: localizationNoUntranslatedValueMissingEnglishSiblingText.Render(map[string]string{
+			"expected":    expected,
+			"alternative": alternative,
 		}),
 	}
 }
@@ -92,17 +111,22 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 // so the sibling is looked up with the file's own extension first, then the other; both present is
 // reported, since which is English would be a guess (#kwt1htp).
 //
-// A file whose en.ts is not in the program is declined rather than reported on. That is the
-// conservative direction on purpose: the alternative is reporting every key in a locale file as
-// untranslatable because the comparison basis was missing, which is a wall of findings that says
-// nothing about the translations.
+// A file with neither English sibling in the program gets one finding at its start, naming the
+// siblings it looked for, and no per-key comparison. Declining it silently made a set whose en.ts
+// was missing or misnamed read as clean, which is the one result this rule exists to rule out
+// (#techtr1); reporting every key instead would be a wall of findings that says nothing about the
+// translations, since the comparison basis is what is missing.
 //
 // No fix. The repair is a translation, which a rule cannot write.
 var LocalizationNoUntranslatedValue = rule.Rule{
 	Name: "nexus/localization-no-untranslated-value",
 
-	// The English translation table, en.ts, which this file does not import.
-	ProgramReads: rule.ReadsOtherFiles,
+	// The English translation table, en.ts, which this file does not import, and the current directory the
+	// fingerprint names those tables against.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
+	// A file's verdict reads its own bytes and path and its directory's English tables, so every English
+	// table in the program is the fingerprint (#31ffaaa). See localizationNoUntranslatedValueFingerprint.
+	ProgramFingerprint: localizationNoUntranslatedValueFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
@@ -119,14 +143,14 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 			return nil
 		}
 		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName())
+		fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
-			fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
 			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
 			return nil
 		}
 		if englishSourceFile == nil {
-			// Declined silently, as the Nexus twin declines (#techtr1 makes a missing English sibling
-			// report in both engines, once the consumers are measured).
+			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName())
+			ctx.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
 			return nil
 		}
 		englishValues := map[string]string{}
@@ -176,7 +200,7 @@ func reportUntranslated(
 			return
 		}
 
-		if strings.TrimSpace(value) == "" && strings.TrimSpace(englishValue) != "" {
+		if text.TrimWhitespace(value) == "" && text.TrimWhitespace(englishValue) != "" {
 			ctx.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
 			return
 		}
@@ -372,17 +396,23 @@ func unwrapTypeAssertions(expression *ast.Node) *ast.Node {
 	return nil
 }
 
+// localeCodeStem is a translation file's name without its extension: a two- or three-letter language
+// code, then any region or script subtags (`zh-TW`, `pt-BR`, `zh_Hant`).
+//
+// Recognizing locale data by its own name, rather than by excluding names that are not, is what keeps a
+// helper that happens to sit in a translations directory out of the rule (#xt9hkse). The exclusion list
+// this replaced named index.ts, locales.ts and the *Translations, *TranslationsType and *Interface type
+// files, and a file it did not name was read as a locale: Structure's translations/TranslationTemplate.ts,
+// a type brand, drew missingEnglishSibling once a missing sibling reported. None of the old exclusions
+// can match this pattern. Measured against all 35 locales in the four consumers' sets, it keeps every one.
+var localeCodeStem = regexp.MustCompile(`^[a-z]{2,3}(?:[-_][A-Za-z0-9]+)*$`)
+
 // translationFileInformation decides whether a file is locale data this rule should read, returning
 // its locale code and the directory its en.ts sits in.
 //
-// Every exclusion here is load-bearing, and each one is a file that would otherwise be compared
-// against itself or against nothing:
-//
-//   - en.ts is the basis of the comparison, so every value in it is identical to English by
-//     definition and the rule would report the entire file.
-//   - index.ts and locales.ts are wiring rather than translations.
-//   - *Translations.ts, *TranslationsType.ts, and *Interface.ts are type declarations that happen to
-//     live in the same directory.
+// A locale file is one whose stem is a locale code, other than en: en.ts is the basis of the
+// comparison, so every value in it is identical to English by definition and the rule would report
+// the entire file.
 //
 // The directory match is on a whole path segment. Matching a bare substring would pull in a
 // directory named "translations-archive" and, worse, would silently start linting whatever a future
@@ -401,25 +431,89 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 	directory := fileName[:lastSlash]
 	baseName := fileName[lastSlash+1:]
 
-	switch sourcename.TreatedAs(baseName) {
-	case "en.ts", "index.ts", "locales.ts":
-		return "", "", false
-	}
-	if strings.HasSuffix(sourcename.TreatedAs(baseName), "Translations.ts") ||
-		strings.HasSuffix(sourcename.TreatedAs(baseName), "TranslationsType.ts") ||
-		strings.HasSuffix(sourcename.TreatedAs(baseName), "Interface.ts") {
+	localeCode := strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts")
+	if localeCode == "en" || !localeCodeStem.MatchString(localeCode) {
 		return "", "", false
 	}
 
-	// A whole path segment rather than a bare substring. Matching the substring would pull in a
-	// directory named "translations-archive" and, worse, would silently start linting whatever a
-	// future directory named that way holds.
-	if !imports.HasPathSegment(directory, "_translations") &&
-		!imports.HasPathSegment(directory, "translations") {
+	if !isTranslationsDirectory(directory) {
 		return "", "", false
 	}
 
-	return strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts"), directory, true
+	return localeCode, directory, true
+}
+
+// isTranslationsDirectory is whether a directory holds a translation set: one with a `translations` or
+// `_translations` path segment. The rule and its fingerprint both ask it, so the English tables the
+// fingerprint hashes are exactly the ones a locale file can read.
+//
+// A whole path segment rather than a bare substring. Matching the substring would pull in a directory
+// named "translations-archive" and, worse, would silently start linting whatever a future directory named
+// that way holds.
+func isTranslationsDirectory(directory string) bool {
+	return imports.HasPathSegment(directory, "_translations") || imports.HasPathSegment(directory, "translations")
+}
+
+// localizationNoUntranslatedValueFingerprints holds the fingerprint for one program. The walk asks for it
+// on every worker that serves a selection, and the answer scans every file the program holds, so it is
+// made once per program.
+var localizationNoUntranslatedValueFingerprints struct {
+	sync.Mutex
+	program     rule.ProgramIdentity
+	fingerprint [sha256.Size]byte
+	made        bool
+}
+
+// localizationNoUntranslatedValueFingerprint is the rule's program fingerprint (#31ffaaa): every English
+// table in the program, en.ts and en.a in a translations directory, each named relative to the current
+// directory and hashed by its text, sorted by name.
+//
+// A locale file's verdict reads, beyond its own bytes and path, which English tables sit in its directory
+// and what they hold. Both present report ambiguousEnglishSibling with their names, neither present
+// reports missingEnglishSibling, and one is read for its values. One value has to serve every file, and
+// each file reads its own directory's tables, so every table any locale file could read is in it.
+// Presence is in it as much as content: adding, deleting or renaming either name moves it. The text
+// stands in for a version, since the rule reads the text, so an edit to a comment in en.ts moves it too.
+// Nothing else outside the file reaches a verdict: recognizing locale data reads only the file's own name.
+// The rule takes no options, so none reach it.
+func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+	cache := &localizationNoUntranslatedValueFingerprints
+	cache.Lock()
+	defer cache.Unlock()
+	if cache.made && cache.program == program.Identity() {
+		return cache.fingerprint
+	}
+
+	type englishTable struct {
+		name string
+		text [sha256.Size]byte
+	}
+	var tables []englishTable
+	for _, sourceFile := range program.SourceFiles() {
+		fileName := imports.NormalizedFileName(sourceFile)
+		lastSlash := strings.LastIndex(fileName, "/")
+		if lastSlash < 0 {
+			continue
+		}
+		if baseName := fileName[lastSlash+1:]; baseName != "en.ts" && baseName != "en"+sourcename.AdamicExtension {
+			continue
+		}
+		if !isTranslationsDirectory(fileName[:lastSlash]) {
+			continue
+		}
+		tables = append(tables, englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))})
+	}
+	slices.SortFunc(tables, func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) })
+
+	hash := sha256.New()
+	for _, table := range tables {
+		hash.Write([]byte(table.name))
+		hash.Write([]byte{0})
+		hash.Write(table.text[:])
+	}
+	copy(cache.fingerprint[:], hash.Sum(nil))
+	cache.program, cache.made = program.Identity(), true
+	return cache.fingerprint
 }
 
 // englishSibling finds a translation file's English table: en with the file's own extension first,
@@ -427,14 +521,10 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 // (#kwt1htp). When both en.ts and en.a are in the program, which is English is a guess, so both names
 // come back for the rule to report and the file is not compared at all. Neither found returns nil.
 func englishSibling(program rule.Program, directory string, fileName string) (*ast.SourceFile, []string) {
-	extensions := []string{".ts", sourcename.AdamicExtension}
-	if sourcename.IsAdamic(fileName) {
-		extensions = []string{sourcename.AdamicExtension, ".ts"}
-	}
 	var found *ast.SourceFile
 	var names []string
-	for _, extension := range extensions {
-		name := directory + "/en" + extension
+	for _, baseName := range englishSiblingBaseNames(fileName) {
+		name := directory + "/" + baseName
 		if sourceFile := program.GetSourceFile(name); sourceFile != nil {
 			if found == nil {
 				found = sourceFile
@@ -446,4 +536,13 @@ func englishSibling(program rule.Program, directory string, fileName string) (*a
 		return nil, names
 	}
 	return found, nil
+}
+
+// englishSiblingBaseNames is the English table's base names in the order they are looked up: the
+// linted file's own extension first, then the other (#kwt1htp).
+func englishSiblingBaseNames(fileName string) []string {
+	if sourcename.IsAdamic(fileName) {
+		return []string{"en" + sourcename.AdamicExtension, "en.ts"}
+	}
+	return []string{"en.ts", "en" + sourcename.AdamicExtension}
 }

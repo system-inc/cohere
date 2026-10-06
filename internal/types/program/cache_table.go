@@ -117,6 +117,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 15: findings entries carry whether their file has directives, and the findings those directives withheld.
+//
 // 14: findings entries carry derived rules and their fingerprint (#kdee854).
 //
 // 13: a signature entry carries Abandoned, set on a file whose emit outran the post-verdict graduation, so it is
@@ -146,7 +148,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 14
+const cacheTableVersion = 15
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -258,6 +260,9 @@ type lintCacheWireEntry struct {
 	DerivedFingerprint [sha256.Size]byte
 
 	Notes []lintCacheWireNote
+
+	Directives bool
+	Withheld   []LintCacheWithheld
 
 	// Adamic is the entry's readiness record as it is, nil and empty kept apart: gob sends a pointer to an empty
 	// struct and leaves a nil one out.
@@ -433,6 +438,9 @@ func (c *LintCache) wire() *lintCacheWire {
 
 			Notes: wireNotes(entry.Notes),
 
+			Directives: entry.Directives,
+			Withheld:   entry.Withheld,
+
 			Adamic: entry.Adamic,
 		})
 	}
@@ -471,6 +479,9 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 			DerivedFingerprint: stored.DerivedFingerprint,
 
 			Notes: ruleNotes(stored.Notes),
+
+			Directives: stored.Directives,
+			Withheld:   stored.Withheld,
 
 			Adamic: stored.Adamic,
 		}
@@ -857,6 +868,9 @@ func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity
 			len(entry.TypedRules), len(entry.ShapedRules), len(entry.DesignRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
 		for _, finding := range entry.Findings {
 			fmt.Fprintf(out, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
+		}
+		for _, withheld := range entry.Withheld {
+			fmt.Fprintf(out, "    withheld by directive %d: %s\n", withheld.Directive, withheld.RuleName)
 		}
 		if entry.Adamic != nil {
 			fmt.Fprintf(out, "    adamic: %d rules measured, %d skipped\n", len(entry.Adamic.Counts), len(entry.Adamic.Skipped))

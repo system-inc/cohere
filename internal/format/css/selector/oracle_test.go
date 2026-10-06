@@ -18,6 +18,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -296,7 +297,7 @@ var selectorFixtures = []selectorFixture{
 // TestParseAgreesWithPostcssSelectorParser is the parser's acceptance test: for every selector
 // Prettier would parse in the corpus's .css files, and every inline fixture, the Go tree must equal
 // postcss-selector-parser 2.2.3's, property for property, and a refusal must be a refusal on both sides
-// with the same message. Off unless COHERE_PRETTIER_ROOT names the fork (whose node_modules hold the
+// with the same message. Off unless COHERE_PRETTIER_FORK names the fork (whose node_modules hold the
 // library and postcss) and COHERE_CSS_CORPORA lists .css files or directories to walk (colon-separated,
 // node_modules skipped).
 //
@@ -305,11 +306,11 @@ var selectorFixtures = []selectorFixture{
 // The inline fixtures each say which way the library must go.
 func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_CSS_CORPORA to compare the parser against postcss-selector-parser")
+	if corpora == "" {
+		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-selector-parser")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type input = oracleInput
 	var inputs []input
@@ -499,15 +500,12 @@ var randomSelectorPieces = []string{
 
 // TestParseAgreesOnRandomSelectors strings random fragments into selectors, most of them malformed in
 // some way, and requires the same tree or the same error from Go and the library on each. Off unless
-// COHERE_PRETTIER_ROOT names the fork; COHERE_SELECTOR_RANDOM sets the count (default 20000). The seed is
+// COHERE_PRETTIER_FORK names the fork; COHERE_SELECTOR_RANDOM sets the count (default 20000). The seed is
 // fixed, so a failure reproduces. A selector Go refuses with ErrLoopsForever is not sent to the library,
 // which would hang on it; the run's deadline catches one Go wrongly lets through.
 func TestParseAgreesOnRandomSelectors(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
-	if root == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT to compare the parser against postcss-selector-parser on random selectors")
-	}
+	root := corpus.PrettierFork.Root(t)
 	count := 20000
 	if value := os.Getenv("COHERE_SELECTOR_RANDOM"); value != "" {
 		if _, err := fmt.Sscan(value, &count); err != nil {

@@ -100,12 +100,12 @@ var NoConflictingClasses = rule.Rule{
 			return declineListeners(ctx, "no-conflicting-classes", designSystem)
 		}
 
-		settings := DefaultClassLiteralSettings()
+		surfaces := DefaultClassLiteralSurfaces()
 		if isConfigured {
-			settings = configured.ClassLiteralSettings()
+			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
+		reader := surfaces.ReaderFor(ctx.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {

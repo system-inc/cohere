@@ -42,20 +42,27 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 		}
 	}()
 
-	// A JavaScript string: UTF-16 units. An invalid UTF-8 byte is one U+FFFD, as newUnitOffsets counts.
-	units := utf16.Encode([]rune(text))
-	offsets := newUnitOffsets(text)
-
 	memory := parseMemories.Get().(*parseMemory)
 	defer func() {
 		memory.reset()
 		parseMemories.Put(memory)
 	}()
 
+	// A JavaScript string: UTF-16 units. An invalid UTF-8 byte is one U+FFFD, as newUnitOffsets counts.
+	// Both tables are the memory's, kept across parses: nothing past Parse reads either, since node values
+	// are copied out as strings and positions are converted into the nodes before Parse returns.
+	memory.units = appendUnits(memory.units[:0], text)
+	units := memory.units
+	memory.offsets = newUnitOffsets(text, memory.offsets[:0])
+	offsets := memory.offsets
+
 	lineCounter := cst.NewLineCounter()
 	context := newContext(units, lineCounter, nodes, memory)
 	parser := cst.NewParser(lineCounter.AddNewLine)
-	composer := compose.NewComposer(compose.UnistParserOptions())
+	parser.Tokens = &memory.tokens
+	composeOptions := compose.UnistParserOptions()
+	composeOptions.Nodes = &memory.composeNodes
+	composer := compose.NewComposer(composeOptions)
 	parsedDocuments := []*compose.Document{}
 	cstTokens := slices.Collect(parser.Parse(units, false))
 	for parsedDocument := range composer.Compose(cstTokens, true, len(units)) {
@@ -89,8 +96,9 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 // loader makes.
 type unitOffsets []int
 
-func newUnitOffsets(text string) unitOffsets {
-	offsets := make(unitOffsets, 0, len(text)+1)
+// newUnitOffsets appends text's offsets to offsets, which may be a table kept from an earlier parse.
+func newUnitOffsets(text string, offsets unitOffsets) unitOffsets {
+	offsets = slices.Grow(offsets, len(text)+1)
 	for index, character := range text {
 		offsets = append(offsets, index)
 		if character > 0xFFFF {
@@ -100,6 +108,16 @@ func newUnitOffsets(text string) unitOffsets {
 		}
 	}
 	return append(offsets, len(text))
+}
+
+// appendUnits appends text as UTF-16 units to units: utf16.Encode([]rune(text)), into a table kept from an
+// earlier parse. Ranging a string decodes an invalid byte to U+FFFD, as the conversion to runes does.
+func appendUnits(units []uint16, text string) []uint16 {
+	units = slices.Grow(units, len(text))
+	for _, character := range text {
+		units = utf16.AppendRune(units, character)
+	}
+	return units
 }
 
 // byteOffset is the unit's byte offset. Past the end of the text, each unit is one byte further.

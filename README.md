@@ -72,6 +72,17 @@ app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` i
 
 See [Output](#output) for what that line says, and for `--verbose` and `--json`.
 
+### Adamic's `.a` files
+
+A tsconfig that lists `".a"` in a top-level `"sourceExtensions"` makes its `.a` files TypeScript source
+under their own names: type-checked, linted and formatted exactly as the same files named `.ts`, and
+printed as `.a` everywhere. Imports name the extension, `import { area } from './geometry.a'`. The key is
+read by cohere's compiler, System, Inc.'s fork of TypeScript; `tsc` ignores it.
+
+`.a` is also a static library's extension, so cohere never reads a `.a` file a tsconfig doesn't claim: a
+`libfoo.a` beside your code is left alone. A claimed `.a` file that `.gitignore` ignores (C and C++
+templates list `*.a`) is checked and not formatted, and the run names it and says so in the footer.
+
 ## CohereSettings.json
 
 With no settings file, cohere applies the house stack, each set where the code shows it fits:
@@ -219,8 +230,8 @@ is left out, so a cold run shows no `cached` and a run with nothing changed no `
 
 Anything the run did not check is in the footer even when it passes, so a green line never hides a
 gap: `✓ 💎 2.4s (…) • 💅 formatting not checked`. The same goes for a phase that could not run, a rule
-that skipped every file, and a run narrowed to some of the files. A crash is in the footer too, and it
-never passes.
+that skipped every file, a run narrowed to some of the files, and an Adamic `.a` file git ignores. A crash
+is in the footer too, and it never passes.
 
 On a terminal the verdict and time are bold, what was found is red, and the parentheses are dim. A
 pipe, a file or `NO_COLOR` gets no color codes at all.
@@ -291,7 +302,10 @@ cohere keeps its cache in `.cache/cohere` at the project root, so a run reuses w
 already established. When your tsconfig sets `incremental`, it also keeps TypeScript's build information
 where the tsconfig says, and a `--no-fix` run leaves that file untouched. Add `.cache/` to your
 `.gitignore`. `--no-cache` reads nothing from those caches and writes nothing to them; use it when
-you suspect the cache, or to time a run from scratch.
+you suspect the cache, or to time a run from scratch. Leave the files in `.cache/cohere` to cohere: it
+reads source text straight from the ones it mapped, so a tool that truncated one in place while a run
+was reading it would end that run with a memory fault. Deleting the directory between runs is always
+safe.
 
 ## CI
 
