@@ -11,9 +11,8 @@ import "maps"
 // builder, reverse postorder and single-assignment construction a second time. A copy pays for the
 // finished tables only.
 //
-// What is shared and why: `*ast.Node` and the checker types reachable through `Identifier.Type` are
-// the program, which no pass writes. `Identifier.Scope` is shared as an opaque value, because no
-// pass writes it either; the reactive scopes live in their own side table. Everything else is copied,
+// What is shared and why: `*ast.Node` is the program, which no pass writes, and the reactive scopes
+// live in their own side table. Everything else is copied,
 // blocks, instructions, identifiers, phis and nested functions, and the instruction values and
 // terminals go through the same reflective copy the inliner uses, for the reason `deepCopyAny` gives.
 //

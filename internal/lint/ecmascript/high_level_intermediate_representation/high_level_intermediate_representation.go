@@ -140,10 +140,9 @@
 // `Construct` in ssa.go is what makes them reaching definitions, and it also fills `Block.Phis`.
 // A pass that reasons about values should run it; a pass that only walks control flow need not.
 //
-// No type inference, no effect inference, no optimisation, and no rule. `Place.Effect` and
-// `Identifier.Type` exist, are threaded through lowering, and are left at their zero values -
-// `EffectUnknown` and nil. They are declared for the same reason `Phis` is: a pass that adds a
-// field mid-flight is a pass that invalidates every existing match.
+// No type inference, no effect inference, no optimisation, and no rule. `Place.Effect` is threaded
+// through lowering and left `EffectUnknown`. The IR carries no type: a pass that wants one asks the
+// checker through `Identifier.Node`.
 package high_level_intermediate_representation
 
 import (
@@ -470,12 +469,6 @@ type Identifier struct {
 	// that by falling back to the defining instruction's Node, which is why Instruction keeps one
 	// too.
 	Node *ast.Node
-
-	// Type is left nil by lowering. Declared so a later inference pass adds no field.
-	Type any
-
-	// Scope is left nil by lowering. Reserved for reactive-scope construction, which may never run.
-	Scope any
 }
 
 // Place is a reference to a value at one point in the program, plus what this reference does to it.
