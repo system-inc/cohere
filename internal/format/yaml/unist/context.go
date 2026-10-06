@@ -67,18 +67,31 @@ type parseMemory struct {
 	units           []uint16
 	offsets         unitOffsets
 	positionsByNode map[*Node]*position
+
+	// tokens and composeNodes are the CST's tokens and the composer's scalars, pairs and collections.
+	// Both die with the parse: a unist node keeps neither, only strings and positions copied out of them
+	// (#v6ksqg3).
+	tokens       arena.Arena[cst.Token]
+	composeNodes arena.Arena[compose.Node]
 }
 
 // parseMemories hold the memory of parses that have finished, one per caller at a time.
 var parseMemories = sync.Pool{New: func() any {
 	released := point{line: 1 << 30, column: 1 << 30, offset: 1 << 30}
-	// A released position holds no points, so reading one through it stops the parse.
-	return &parseMemory{points: arena.Arena[point]{Poison: released}}
+	// A released position holds no points, so reading one through it stops the parse. A released token or
+	// compose node reads a type and class no parse makes.
+	return &parseMemory{
+		points:       arena.Arena[point]{Poison: released},
+		tokens:       arena.Arena[cst.Token]{Poison: cst.Token{Type: "released"}},
+		composeNodes: arena.Arena[compose.Node]{Poison: compose.Node{Kind: "released", Class: "released"}},
+	}
 }}
 
 func (memory *parseMemory) reset() {
 	memory.points.Reset()
 	memory.positions.Reset()
+	memory.tokens.Reset()
+	memory.composeNodes.Reset()
 	// Under cohere_poison a released table reads a noncharacter and an offset past any text, so a parse that
 	// read one after its release prints wrong or stops. A cleared map answers nil, which stops it too.
 	arena.Release(memory.units, 0xFFFF)
