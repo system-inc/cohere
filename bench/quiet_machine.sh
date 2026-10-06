@@ -54,6 +54,18 @@
 # directly with the verdict descriptor the launcher would have given it, so the early return is still
 # what is timed.
 #
+# Cold runs are bimodal on this Mac, and the slow mode follows idleness, so back-to-back runs understate it
+# (#g3046x5, 2026-10-06). In about half of quiet cold runs on ahra every file syscall costs about three times
+# as much from the process's first milliseconds: discovery's sys 0.5 to 0.95s against 0.2 to 0.3s, the
+# graph's 2.1 to 2.9s against 1.2 to 1.4s, about 0.1s of wall. It is set before the build and moved by
+# nothing in it: capping the build's concurrent reads at 12 or 8, or turning the early format pass off, left
+# its rate where it was. What moves it is how long the machine sat idle before the run. Chained cold runs at
+# 16 threads, gaps rotated, took it 2 of 6 times one second after the previous run exited, 2 of 5 at ten
+# seconds, and 5 of 5 at sixty. It also needs every core: at two threads the same discovery costs 0.05s of
+# sys, and under heavy load the mode never shows. So this benchmark, whose runs follow one another within
+# seconds, samples the fast mode more often than a developer who saves and checks after half a minute of
+# thought, and the cold median it reports is the better case.
+#
 # usage: quiet_machine.sh [options]
 #   --project DIR      the project to copy (default ~/Projects/ahra)
 #   --runs N           rounds, so N runs of each mode (default 5)
