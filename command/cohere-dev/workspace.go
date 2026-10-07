@@ -21,6 +21,10 @@ import (
 // so the land fixture's stand-in go doesn't answer for it. A module inside a submodule (a gitlink in the
 // index, by rule, never by name) is not gated: its tests are its upstream's. Everything gated runs in one
 // go invocation, so it shares the token's -p budget and Go's test cache, and the gate says what it covered.
+//
+// A module go.work doesn't name is refused rather than left out: a go.mod anywhere in the tree outside a
+// submodule must be one of go.work's uses, since a module missing from that list is a module no gate tests,
+// which is how the shims went untested.
 
 // workspaceModule is one module the gate covers: where it is, relative to the root, and its module path.
 type workspaceModule struct {
@@ -74,7 +78,59 @@ func readWorkspace(root string) (workspace, error) {
 		}
 		covered.gated = append(covered.gated, module)
 	}
+	if err := refuseUnlistedModules(root, work, links); err != nil {
+		return workspace{}, err
+	}
 	return covered, nil
+}
+
+// refuseUnlistedModules walks the tree for go.mod files and refuses any that go.work doesn't use and that
+// isn't inside a submodule, naming each with the use line that would list it. A testdata directory holds
+// fixtures, not modules, and a dot directory or .cache holds nothing the repository builds, so neither is
+// walked; nor is a submodule, whose modules are its upstream's.
+func refuseUnlistedModules(root string, work *modfile.WorkFile, links []string) error {
+	used := map[string]bool{}
+	for _, use := range work.Use {
+		used[filepath.ToSlash(filepath.Clean(use.Path))] = true
+	}
+	var unlisted []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if entry.IsDir() {
+			name := entry.Name()
+			if relative != "." && (name == "testdata" || strings.HasPrefix(name, ".") || insideAny(relative, links)) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() != "go.mod" {
+			return nil
+		}
+		directory := filepath.ToSlash(filepath.Dir(relative))
+		if !used[directory] {
+			unlisted = append(unlisted, directory)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(unlisted) == 0 {
+		return nil
+	}
+	var message strings.Builder
+	message.WriteString("go.work does not use every module in the tree, so a gate would leave these untested:")
+	for _, directory := range unlisted {
+		fmt.Fprintf(&message, "\n  %s/go.mod: add `./%s` to go.work's use", directory, directory)
+	}
+	return errors.New(message.String())
 }
 
 // patterns are the package patterns one go invocation from the root takes to cover every gated module: the
