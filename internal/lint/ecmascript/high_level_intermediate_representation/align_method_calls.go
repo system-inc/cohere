@@ -24,6 +24,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 )
@@ -115,7 +116,7 @@ func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[stat
 
 	rebuilt := &ReactiveScopes{
 		byIdentifier: make(map[static_single_assignment.IdentifierId]ScopeId, len(scopes.byIdentifier)),
-		ranges:       map[ScopeId]MutableRange{},
+		ranges:       map[ScopeId]mutation_aliasing.MutableRange{},
 		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
 

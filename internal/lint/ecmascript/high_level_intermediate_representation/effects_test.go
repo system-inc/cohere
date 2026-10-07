@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -99,7 +100,7 @@ func effectsOn(function *Function, table *AliasingEffects, name string) []string
 				continue
 			}
 			for _, effect := range table.Get(instruction.Id) {
-				if effect.Kind != AliasingEffectAssign || !effect.HasFrom {
+				if effect.Kind != mutation_aliasing.AliasingEffectAssign || !effect.HasFrom {
 					continue
 				}
 				if wanted[effect.From.Identifier] && !wanted[effect.Into.Identifier] {
@@ -178,7 +179,7 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 	}
 
 	effects := table.Get(instruction.Id)
-	has := func(kind AliasingEffectKind, from, into static_single_assignment.IdentifierId) bool {
+	has := func(kind mutation_aliasing.AliasingEffectKind, from, into static_single_assignment.IdentifierId) bool {
 		for _, effect := range effects {
 			if effect.Kind == kind && effect.HasFrom && effect.From.Identifier == from &&
 				effect.Into.Identifier == into {
@@ -187,9 +188,9 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 		}
 		return false
 	}
-	hasCreate := func(into static_single_assignment.IdentifierId, kind EffectValueKind) bool {
+	hasCreate := func(into static_single_assignment.IdentifierId, kind mutation_aliasing.EffectValueKind) bool {
 		for _, effect := range effects {
-			if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == into &&
+			if effect.Kind == mutation_aliasing.AliasingEffectCreate && effect.Into.Identifier == into &&
 				effect.Value == kind {
 				return true
 			}
@@ -201,15 +202,15 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 	eachDestructureBinding(destructure.LValue, func(place Place, rest bool) {
 		if rest {
 			rests++
-			if !hasCreate(place.Identifier, EffectValueMutable) ||
-				!has(AliasingEffectCapture, destructure.Value.Identifier, place.Identifier) {
+			if !hasCreate(place.Identifier, mutation_aliasing.EffectValueMutable) ||
+				!has(mutation_aliasing.AliasingEffectCapture, destructure.Value.Identifier, place.Identifier) {
 				t.Errorf("rest binding %d effects=%v, want Create Mutable and Capture from %d",
 					place.Identifier, effects, destructure.Value.Identifier)
 			}
 			return
 		}
 		ordinary++
-		if !has(AliasingEffectCreateFrom, destructure.Value.Identifier, place.Identifier) {
+		if !has(mutation_aliasing.AliasingEffectCreateFrom, destructure.Value.Identifier, place.Identifier) {
 			t.Errorf("ordinary binding %d effects=%v, want CreateFrom from %d",
 				place.Identifier, effects, destructure.Value.Identifier)
 		}
@@ -217,7 +218,7 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 	if ordinary != 2 || rests != 1 {
 		t.Fatalf("walked %d ordinary and %d rest bindings, want 2 and 1", ordinary, rests)
 	}
-	if !has(AliasingEffectAssign, destructure.Value.Identifier, instruction.LValue.Identifier) {
+	if !has(mutation_aliasing.AliasingEffectAssign, destructure.Value.Identifier, instruction.LValue.Identifier) {
 		t.Errorf("Destructure instruction effects=%v, want Assign from %d into %d", effects,
 			destructure.Value.Identifier, instruction.LValue.Identifier)
 	}
@@ -252,7 +253,7 @@ func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
 			effectsForInstruction(function, newCalleeProducers(function), start),
 			effectsForInstruction(function, newCalleeProducers(function), finish)...,
 		) {
-			if effect.Kind == AliasingEffectFreeze && effect.Into.Identifier == value.Identifier {
+			if effect.Kind == mutation_aliasing.AliasingEffectFreeze && effect.Into.Identifier == value.Identifier {
 				freezeCount++
 			}
 		}
@@ -332,7 +333,7 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 	checkMutation := func(function *Function, call *Instruction) {
 		table := InferAliasingEffects(function)
 		for _, effect := range table.Get(call.Id) {
-			if effect.Kind == AliasingEffectMutateTransitiveConditionally {
+			if effect.Kind == mutation_aliasing.AliasingEffectMutateTransitiveConditionally {
 				return
 			}
 		}
@@ -367,13 +368,13 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		relation   AliasingEffectKind
+		relation   mutation_aliasing.AliasingEffectKind
 		wantFrozen bool
 	}{
-		{name: "assign shares identity", relation: AliasingEffectAssign, wantFrozen: true},
-		{name: "create from copies kind", relation: AliasingEffectCreateFrom},
-		{name: "capture does not share identity", relation: AliasingEffectCapture},
-		{name: "maybe alias does not share identity", relation: AliasingEffectMaybeAlias},
+		{name: "assign shares identity", relation: mutation_aliasing.AliasingEffectAssign, wantFrozen: true},
+		{name: "create from copies kind", relation: mutation_aliasing.AliasingEffectCreateFrom},
+		{name: "capture does not share identity", relation: mutation_aliasing.AliasingEffectCapture},
+		{name: "maybe alias does not share identity", relation: mutation_aliasing.AliasingEffectMaybeAlias},
 	}
 
 	for _, testCase := range tests {
@@ -408,19 +409,16 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 			Finalize(function)
 
 			relationEffects := []AliasingEffect{}
-			if testCase.relation == AliasingEffectCapture ||
-				testCase.relation == AliasingEffectMaybeAlias {
-				relationEffects = append(relationEffects, create(alias, EffectValueMutable))
+			if testCase.relation == mutation_aliasing.AliasingEffectCapture ||
+				testCase.relation == mutation_aliasing.AliasingEffectMaybeAlias {
+				relationEffects = append(relationEffects, mutation_aliasing.CreateEffect(alias, mutation_aliasing.EffectValueMutable))
 			}
-			relationEffects = append(relationEffects, flow(testCase.relation, source, alias))
+			relationEffects = append(relationEffects, mutation_aliasing.FlowEffect(testCase.relation, source, alias))
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-				sourceInstruction.Id: {create(source, EffectValueMutable)},
+				sourceInstruction.Id: {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable)},
 				aliasInstruction.Id:  relationEffects,
 				freezeInstruction.Id: effectsForInstruction(function, newCalleeProducers(function), freezeInstruction),
-				callInstruction.Id: {
-					create(callResult, EffectValueMutable),
-					mutate(AliasingEffectMutateTransitiveConditionally, alias),
-				},
+				callInstruction.Id:   {mutation_aliasing.CreateEffect(callResult, mutation_aliasing.EffectValueMutable), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitiveConditionally, alias)},
 			}}
 
 			ranges := InferMutableRangesWithEffects(function, effects)
@@ -477,9 +475,9 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 		join.Terminal = &Return{Value: selected}
 		Finalize(function)
 
-		state, _ := buildAliasingGraph(function, InferAliasingEffects(function))
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
 		for name, place := range map[string]Place{"left": left, "right": right, "phi": selected} {
-			if !state.notMutable(place.Identifier) {
+			if aliasingGraph.Kind(place.Identifier) == mutation_aliasing.EffectValueMutable {
 				t.Errorf("Freeze(phi) left %s mutable", name)
 			}
 		}
@@ -511,8 +509,8 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 		block.Terminal = &Return{Value: alias}
 		Finalize(function)
 
-		state, _ := buildAliasingGraph(function, InferAliasingEffects(function))
-		if !state.notMutable(captured.Identifier) {
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
+		if aliasingGraph.Kind(captured.Identifier) == mutation_aliasing.EffectValueMutable {
 			t.Error("freezing a function alias did not recursively freeze its capture")
 		}
 	})
@@ -841,7 +839,7 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 
 	from := Place{Identifier: static_single_assignment.IdentifierId(1)}
 	into := Place{Identifier: static_single_assignment.IdentifierId(2)}
-	effects := []AliasingEffect{{Kind: AliasingEffectCapture, From: from, Into: into, HasFrom: true}}
+	effects := []AliasingEffect{{Kind: mutation_aliasing.AliasingEffectCapture, From: from, Into: into, HasFrom: true}}
 
 	withoutRanges := ProjectEffects(effects, nil, static_single_assignment.EvaluationOrder(5))
 	if withoutRanges[from.Identifier] != EffectRead {
@@ -849,8 +847,8 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 			withoutRanges[from.Identifier])
 	}
 
-	ranges := &MutableRanges{}
-	ranges.set(into.Identifier, MutableRange{Start: static_single_assignment.EvaluationOrder(1), End: static_single_assignment.EvaluationOrder(9)})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(into.Identifier, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(1), End: static_single_assignment.EvaluationOrder(9)})
 	withRanges := ProjectEffects(effects, ranges, static_single_assignment.EvaluationOrder(5))
 	if withRanges[from.Identifier] != EffectCapture {
 		t.Fatalf("a source flowing into a still-mutable target must be Capture, got %v",
@@ -984,7 +982,7 @@ func TestCaptureReceiverIsAliasedExactlyOnce(t *testing.T) {
 				continue
 			}
 			for _, effect := range table.Get(instruction.Id) {
-				if effect.Kind == AliasingEffectAlias {
+				if effect.Kind == mutation_aliasing.AliasingEffectAlias {
 					total++
 				}
 			}
@@ -1038,7 +1036,7 @@ function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); retur
 	mutatedProperty := false
 	mutatedAnything := false
 	for _, effect := range table.Get(call.Id) {
-		if effect.Kind != AliasingEffectMutateTransitiveConditionally {
+		if effect.Kind != mutation_aliasing.AliasingEffectMutateTransitiveConditionally {
 			continue
 		}
 		mutatedAnything = true

@@ -162,6 +162,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 )
@@ -213,7 +214,7 @@ func MergeGaps() []MergeGap {
 //
 // The zero value is an empty result and is ready to read.
 type MergedScopes struct {
-	ranges  map[ScopeId]MutableRange
+	ranges  map[ScopeId]mutation_aliasing.MutableRange
 	group   map[ScopeId]ScopeId
 	members map[ScopeId][]static_single_assignment.IdentifierId
 	order   []ScopeId
@@ -238,9 +239,9 @@ func (m *MergedScopes) GroupOf(scope ScopeId) ScopeId {
 // RangeOf returns a surviving scope's widened range, or the unset range for one that did not survive.
 //
 // Ask `GroupOf` first when holding a pre-merge id: a merged scope's range lives on its group.
-func (m *MergedScopes) RangeOf(scope ScopeId) MutableRange {
+func (m *MergedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	if m == nil || m.ranges == nil {
-		return MutableRange{}
+		return mutation_aliasing.MutableRange{}
 	}
 	return m.ranges[scope]
 }
@@ -384,7 +385,7 @@ type mergeSweepState struct {
 	activeScopes []ScopeId
 	starts       []scopesAtPosition
 	ends         []scopesAtPosition
-	rangeOf      func(ScopeId) MutableRange
+	rangeOf      func(ScopeId) mutation_aliasing.MutableRange
 
 	// visits counts instruction positions handled, for the termination test only.
 	visits int
@@ -612,7 +613,7 @@ func (s *mergeSweepState) visitInstructionId(id static_single_assignment.Evaluat
 // extra unions come from. A value read while its own scope is open but buried under a scope that
 // opened later means the two genuinely interleave, even when their ranges nest perfectly.
 func (s *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes,
-	memberRanges *MutableRanges) {
+	memberRanges *mutation_aliasing.MutableRanges) {
 	placeScope := activeScopeOf(id, place, scopes)
 	if placeScope == 0 {
 		return
@@ -664,7 +665,7 @@ func indexOfScope(stack []ScopeId, scope ScopeId) int {
 // refuses a scope whose start equals its end. See the doc comment above for the measurement.
 func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{
-		ranges:  map[ScopeId]MutableRange{},
+		ranges:  map[ScopeId]mutation_aliasing.MutableRange{},
 		group:   map[ScopeId]ScopeId{},
 		members: map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
@@ -751,13 +752,13 @@ func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 // the scope partition differs in 5 functions, which is only visible by comparing groups and ranges.
 // `TestAlignVoidsTheMergesComparatorVerdicts` runs that comparison with the unaligned table as its
 // control, where the two spellings still agree on every function.
-func sortByStartDescending(scopes []ScopeId, rangeOf func(ScopeId) MutableRange) {
+func sortByStartDescending(scopes []ScopeId, rangeOf func(ScopeId) mutation_aliasing.MutableRange) {
 	sort.SliceStable(scopes, func(i, j int) bool {
 		return rangeOf(scopes[i]).Start > rangeOf(scopes[j]).Start
 	})
 }
 
-func sortByEndDescending(scopes []ScopeId, rangeOf func(ScopeId) MutableRange) {
+func sortByEndDescending(scopes []ScopeId, rangeOf func(ScopeId) mutation_aliasing.MutableRange) {
 	sort.SliceStable(scopes, func(i, j int) bool {
 		return rangeOf(scopes[i]).End > rangeOf(scopes[j]).End
 	})

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
 // hoistableFor runs the whole pipeline and returns the analysis.
@@ -14,7 +15,7 @@ import (
 // Typed for the reason `scopesFor` is: a checker-less lowering never emits `StoreContext`, so
 // several assertions below would pass vacuously against a plain harness.
 func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, ScopeIdentity,
-	*MutableRanges, *HoistableAnalysis) {
+	*mutation_aliasing.MutableRanges, *HoistableAnalysis) {
 	t.Helper()
 	function, ranges := rangesFor(t, source)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)

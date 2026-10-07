@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -64,19 +65,19 @@ func TestScopeHullMatchesReact(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		ranges []MutableRange
-		want   MutableRange
+		ranges []mutation_aliasing.MutableRange
+		want   mutation_aliasing.MutableRange
 	}{
-		{"simpleHull", []MutableRange{{3, 5}, {1, 9}, {7, 8}}, MutableRange{1, 9}},
-		{"firstUnset", []MutableRange{{0, 0}, {4, 6}, {2, 9}}, MutableRange{2, 9}},
-		{"middleUnset", []MutableRange{{4, 6}, {0, 0}, {2, 9}}, MutableRange{2, 9}},
-		{"allUnset", []MutableRange{{0, 0}, {0, 0}}, MutableRange{0, 0}},
-		{"runOfUnsets", []MutableRange{{0, 0}, {0, 0}, {5, 7}}, MutableRange{5, 7}},
-		{"singleton", []MutableRange{{3, 7}}, MutableRange{3, 7}},
-		{"identicalRanges", []MutableRange{{2, 4}, {2, 4}}, MutableRange{2, 4}},
-		{"laterStartsHigher", []MutableRange{{2, 4}, {6, 9}}, MutableRange{2, 9}},
-		{"trailingUnsetOnly", []MutableRange{{2, 4}, {0, 0}}, MutableRange{2, 4}},
-		{"unsetEndOnlyGuard", []MutableRange{{5, 9}, {0, 0}, {0, 0}}, MutableRange{5, 9}},
+		{"simpleHull", []mutation_aliasing.MutableRange{{Start: 3, End: 5}, {Start: 1, End: 9}, {Start: 7, End: 8}}, mutation_aliasing.MutableRange{Start: 1, End: 9}},
+		{"firstUnset", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 4, End: 6}, {Start: 2, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
+		{"middleUnset", []mutation_aliasing.MutableRange{{Start: 4, End: 6}, {Start: 0, End: 0}, {Start: 2, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
+		{"allUnset", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 0, End: 0}},
+		{"runOfUnsets", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}, {Start: 5, End: 7}}, mutation_aliasing.MutableRange{Start: 5, End: 7}},
+		{"singleton", []mutation_aliasing.MutableRange{{Start: 3, End: 7}}, mutation_aliasing.MutableRange{Start: 3, End: 7}},
+		{"identicalRanges", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 2, End: 4}}, mutation_aliasing.MutableRange{Start: 2, End: 4}},
+		{"laterStartsHigher", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 6, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
+		{"trailingUnsetOnly", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 2, End: 4}},
+		{"unsetEndOnlyGuard", []mutation_aliasing.MutableRange{{Start: 5, End: 9}, {Start: 0, End: 0}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 5, End: 9}},
 	}
 
 	for _, testCase := range cases {
@@ -87,12 +88,12 @@ func TestScopeHullMatchesReact(t *testing.T) {
 			// merge arithmetic against React's, and a lowered input cannot be made to produce an
 			// arbitrary range table.
 			function := &Function{}
-			ranges := &MutableRanges{}
+			ranges := &mutation_aliasing.MutableRanges{}
 			var members []static_single_assignment.IdentifierId
 			for index, memberRange := range testCase.ranges {
 				id := static_single_assignment.IdentifierId(index + 1)
 				function.Identifiers = append(function.Identifiers, nil)
-				ranges.set(id, memberRange)
+				ranges.Set(id, memberRange)
 				members = append(members, id)
 			}
 			function.Identifiers = append(function.Identifiers, nil)
@@ -122,9 +123,9 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil}}
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{4, 6})
-	ranges.set(2, MutableRange{0, 0})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 4, End: 6})
+	ranges.Set(2, mutation_aliasing.MutableRange{Start: 0, End: 0})
 
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1, 2})
@@ -135,7 +136,7 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 		t.Fatal("the unset member dragged the hull's start to zero, which is a plain minimum " +
 			"rather than upstream's guarded merge; zero is the UNSET sentinel, not a position")
 	}
-	if got != (MutableRange{4, 6}) {
+	if got != (mutation_aliasing.MutableRange{Start: 4, End: 6}) {
 		t.Errorf("hull = [%d,%d), want [4,6)", got.Start, got.End)
 	}
 }
@@ -154,9 +155,9 @@ func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil, nil, nil}}
-	ranges := &MutableRanges{}
+	ranges := &mutation_aliasing.MutableRanges{}
 	for id := static_single_assignment.IdentifierId(1); id <= 5; id++ {
-		ranges.set(id, MutableRange{static_single_assignment.EvaluationOrder(id), static_single_assignment.EvaluationOrder(id) + 3})
+		ranges.Set(id, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(id), End: static_single_assignment.EvaluationOrder(id) + 3})
 	}
 
 	set := &DisjointSet{}
@@ -187,9 +188,9 @@ func TestScopeAbsentValueHasNoScope(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{1, 4})
-	ranges.set(2, MutableRange{2, 5})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 1, End: 4})
+	ranges.Set(2, mutation_aliasing.MutableRange{Start: 2, End: 5})
 
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1, 2})
@@ -213,9 +214,9 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{3, 5})
-	ranges.set(2, MutableRange{1, 9})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 3, End: 5})
+	ranges.Set(2, mutation_aliasing.MutableRange{Start: 1, End: 9})
 
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1, 2})
@@ -223,7 +224,7 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	rewritten := scopes.MemberRanges()
 
-	want := MutableRange{1, 9}
+	want := mutation_aliasing.MutableRange{Start: 1, End: 9}
 	for _, id := range []static_single_assignment.IdentifierId{1, 2} {
 		if got := rewritten.Get(id); got != want {
 			t.Errorf("value %d reports [%d,%d) after entanglement, want the hull [%d,%d)",
@@ -232,7 +233,7 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 	}
 
 	// The INPUT table is deliberately not modified, which is where this differs from upstream.
-	if got := ranges.Get(1); got != (MutableRange{3, 5}) {
+	if got := ranges.Get(1); got != (mutation_aliasing.MutableRange{Start: 3, End: 5}) {
 		t.Errorf("the input range table was mutated to [%d,%d); this pass must leave it alone so a "+
 			"caller can still see the pre-entanglement range", got.Start, got.End)
 	}
@@ -304,7 +305,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{}
-	ranges := &MutableRanges{}
+	ranges := &mutation_aliasing.MutableRanges{}
 	set := &DisjointSet{}
 
 	// 2,000 values in 200 classes of 10. Large enough that a quadratic or iterating implementation
@@ -316,7 +317,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 		for member := 0; member < perClass; member++ {
 			id := static_single_assignment.IdentifierId(class*perClass + member + 1)
 			function.Identifiers = append(function.Identifiers, nil)
-			ranges.set(id, MutableRange{static_single_assignment.EvaluationOrder(id), static_single_assignment.EvaluationOrder(id) + 2})
+			ranges.Set(id, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(id), End: static_single_assignment.EvaluationOrder(id) + 2})
 			members = append(members, id)
 		}
 		set.Union(members)
@@ -422,10 +423,10 @@ func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
 	t.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{1, 4})
-	ranges.set(2, MutableRange{2, 5})
-	ranges.set(3, MutableRange{3, 6})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 1, End: 4})
+	ranges.Set(2, mutation_aliasing.MutableRange{Start: 2, End: 5})
+	ranges.Set(3, mutation_aliasing.MutableRange{Start: 3, End: 6})
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1, 2, 3})
 
@@ -709,9 +710,9 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 	// Two values whose ranges are unset, unioned into one class. This is the shape an all-unset
 	// loop-carried class would take.
 	unsetA, unsetB := static_single_assignment.IdentifierId(1), static_single_assignment.IdentifierId(2)
-	handmade := &MutableRanges{}
-	handmade.set(unsetA, MutableRange{0, 0})
-	handmade.set(unsetB, MutableRange{0, 0})
+	handmade := &mutation_aliasing.MutableRanges{}
+	handmade.Set(unsetA, mutation_aliasing.MutableRange{Start: 0, End: 0})
+	handmade.Set(unsetB, mutation_aliasing.MutableRange{Start: 0, End: 0})
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 
@@ -734,9 +735,9 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 
 	// Two-sided: a valid hull over the same function must NOT be named, or the check above would
 	// pass for an implementation that condemns everything.
-	valid := &MutableRanges{}
-	valid.set(unsetA, MutableRange{1, 3})
-	valid.set(unsetB, MutableRange{2, 4})
+	valid := &mutation_aliasing.MutableRanges{}
+	valid.Set(unsetA, mutation_aliasing.MutableRange{Start: 1, End: 3})
+	valid.Set(unsetB, mutation_aliasing.MutableRange{Start: 2, End: 4})
 	validSet := &DisjointSet{}
 	validSet.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 	if named := ValidateScopes(function, AssignReactiveScopesWithSets(function, valid, validSet)); len(named) != 0 {
@@ -773,8 +774,8 @@ func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
 		}
 	`)
 
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{0, 5})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 0, End: 5})
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1})
 
@@ -806,8 +807,8 @@ func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
 			return <div>{items}</div>;
 		}
 	`)
-	ranges := &MutableRanges{}
-	ranges.set(1, MutableRange{5, 0})
+	ranges := &mutation_aliasing.MutableRanges{}
+	ranges.Set(1, mutation_aliasing.MutableRange{Start: 5, End: 0})
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{1})
 

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -22,7 +23,7 @@ import (
 // walked. That is the same denominator every measurement in this package uses, and it is stated here
 // because a number taken from a different walk is not comparable to the ones in these comments.
 func forEachCorpusFunction(t *testing.T, limit int,
-	visit func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes)) {
+	visit func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes)) {
 	t.Helper()
 
 	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
@@ -66,7 +67,7 @@ type nestingItem struct {
 }
 
 // scopeNestingItems turns a scope range table into nesting items.
-func scopeNestingItems(ranges map[ScopeId]MutableRange) []nestingItem {
+func scopeNestingItems(ranges map[ScopeId]mutation_aliasing.MutableRange) []nestingItem {
 	ids := make([]ScopeId, 0, len(ranges))
 	for id := range ranges {
 		ids = append(ids, id)

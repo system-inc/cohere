@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -649,15 +650,15 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		phiRange   MutableRange
+		phiRange   mutation_aliasing.MutableRange
 		firstOrder static_single_assignment.EvaluationOrder
 		want       bool
 	}{
-		{"unset range is rejected by the second term", MutableRange{0, 0}, 5, false},
-		{"exactly one wide is rejected by the first term", MutableRange{3, 4}, 1, false},
-		{"wider than one and ending after the block fires", MutableRange{3, 9}, 5, true},
-		{"wider than one but ending before the block does not", MutableRange{1, 3}, 5, false},
-		{"ending exactly at the first order does not fire", MutableRange{1, 5}, 5, false},
+		{"unset range is rejected by the second term", mutation_aliasing.MutableRange{Start: 0, End: 0}, 5, false},
+		{"exactly one wide is rejected by the first term", mutation_aliasing.MutableRange{Start: 3, End: 4}, 1, false},
+		{"wider than one and ending after the block fires", mutation_aliasing.MutableRange{Start: 3, End: 9}, 5, true},
+		{"wider than one but ending before the block does not", mutation_aliasing.MutableRange{Start: 1, End: 3}, 5, false},
+		{"ending exactly at the first order does not fire", mutation_aliasing.MutableRange{Start: 1, End: 5}, 5, false},
 	}
 
 	for _, test := range tests {
@@ -670,7 +671,7 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 			}
 			// The tidier spelling disagrees on the unset range, which is why upstream's is kept.
 			tidier := test.phiRange.End > test.phiRange.Start+1 && test.phiRange.End > test.firstOrder
-			if test.phiRange == (MutableRange{0, 0}) && tidier == got {
+			if test.phiRange == (mutation_aliasing.MutableRange{Start: 0, End: 0}) && tidier == got {
 				t.Log("note: on this input both spellings agree only because the second term rejects")
 			}
 		})
@@ -700,7 +701,7 @@ export function count(limit: number) {
 
 	var phis, fired int
 	for _, block := range function.Blocks {
-		firstOrder := blockFirstOrder(function, block)
+		firstOrder := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 		for _, phi := range block.Phis {
 			phis++
 			phiRange := ranges.Get(phi.Place.Identifier)
@@ -892,7 +893,7 @@ export function gather(limit: number) {
 					if identifier != nil && identifier.Name == test.binding {
 						phi = candidate.Place.Identifier
 						phiFound = true
-						phiBlockFirstOrder = blockFirstOrder(function, block)
+						phiBlockFirstOrder = mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 						break
 					}
 				}

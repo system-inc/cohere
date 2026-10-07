@@ -22,5 +22,6 @@ use (
 	./TypeScript-shim/vfs
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
+	./mutation_aliasing
 	./static_single_assignment
 )

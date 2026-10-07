@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
@@ -197,7 +198,7 @@ func TestReactiveVisitorCorpus(t *testing.T) {
 
 	converted, mismatched, treeInstructions, walkedTotal := 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 

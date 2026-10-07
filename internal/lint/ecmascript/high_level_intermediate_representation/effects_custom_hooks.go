@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -12,11 +13,11 @@ func customHookSignature(function *Function) effectSignature {
 		if sourceFile := ast.GetSourceFileOfNode(function.Node); sourceFile != nil {
 			firstLine, _, _ := strings.Cut(sourceFile.Text(), "\n")
 			if strings.Contains(firstLine, "@enableAssumeHooksFollowRulesOfReact:false") {
-				return effectSignature{Receiver: EffectRead, Rest: EffectConditionallyMutate, HasRest: true, Result: EffectValueMutable}
+				return effectSignature{Receiver: EffectRead, Rest: EffectConditionallyMutate, HasRest: true, Result: mutation_aliasing.EffectValueMutable}
 			}
 		}
 	}
-	return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}
+	return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: mutation_aliasing.EffectValueFrozen}
 }
 
 // calleeProducers is the table isModuleHookCall resolves a callee through: each value's producing

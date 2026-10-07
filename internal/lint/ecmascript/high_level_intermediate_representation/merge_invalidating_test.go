@@ -7,6 +7,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -216,7 +217,7 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	highestPerDeclaration := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 	recordedTable := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 

@@ -160,7 +160,10 @@
 // pass twice over the corpus and compares.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import (
+	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/static_single_assignment"
+)
 
 // AlignGap names an alignment rule this pass cannot apply, for a caller that needs to know.
 //
@@ -196,7 +199,7 @@ func AlignGaps() []AlignGap {
 //
 // The zero value is an empty result and is ready to read.
 type AlignedScopes struct {
-	ranges  map[ScopeId]MutableRange
+	ranges  map[ScopeId]mutation_aliasing.MutableRange
 	members map[ScopeId][]static_single_assignment.IdentifierId
 	order   []ScopeId
 	widened int
@@ -204,9 +207,9 @@ type AlignedScopes struct {
 }
 
 // RangeOf returns a scope's aligned range, or the unset range for a scope that does not exist.
-func (a *AlignedScopes) RangeOf(scope ScopeId) MutableRange {
+func (a *AlignedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	if a == nil || a.ranges == nil {
-		return MutableRange{}
+		return mutation_aliasing.MutableRange{}
 	}
 	return a.ranges[scope]
 }
@@ -253,15 +256,15 @@ func (a *AlignedScopes) Widened() int {
 // This is upstream's aliasing made explicit: every member of a scope reports that scope's WIDENED
 // range. See the doc comment on `AlignedScopes` for why this cannot be taken from
 // `ReactiveScopes.MemberRanges()` once this pass has run.
-func (a *AlignedScopes) MemberRanges() *MutableRanges {
-	result := &MutableRanges{}
+func (a *AlignedScopes) MemberRanges() *mutation_aliasing.MutableRanges {
+	result := &mutation_aliasing.MutableRanges{}
 	if a == nil {
 		return result
 	}
 	for _, scope := range a.order {
 		widened := a.ranges[scope]
 		for _, id := range a.members[scope] {
-			result.set(id, widened)
+			result.Set(id, widened)
 		}
 	}
 	return result
@@ -292,7 +295,7 @@ type alignSweepState struct {
 	activeSet          map[ScopeId]bool
 	seen               map[ScopeId]bool
 	valueBlockNodes    map[static_single_assignment.BlockId]*valueBlockNode
-	ranges             map[ScopeId]MutableRange
+	ranges             map[ScopeId]mutation_aliasing.MutableRange
 	scopes             *ReactiveScopes
 
 	visits int
@@ -320,7 +323,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 		activeSet:       map[ScopeId]bool{},
 		seen:            map[ScopeId]bool{},
 		valueBlockNodes: map[static_single_assignment.BlockId]*valueBlockNode{},
-		ranges:          map[ScopeId]MutableRange{},
+		ranges:          map[ScopeId]mutation_aliasing.MutableRange{},
 		scopes:          scopes,
 	}
 
@@ -328,7 +331,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 	for _, id := range live {
 		state.ranges[id] = scopes.RangeOf(id)
 	}
-	before := make(map[ScopeId]MutableRange, len(state.ranges))
+	before := make(map[ScopeId]mutation_aliasing.MutableRange, len(state.ranges))
 	for id, r := range state.ranges {
 		before[id] = r
 	}
@@ -381,7 +384,7 @@ func AlignThenMergeReactiveScopes(function *Function, scopes *ReactiveScopes) (*
 	// they are shared rather than copied, and the range table is the only new allocation.
 	widened := &ReactiveScopes{
 		byIdentifier: scopes.byIdentifier,
-		ranges:       make(map[ScopeId]MutableRange, scopes.Len()),
+		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Len()),
 		members:      scopes.members,
 		order:        scopes.order,
 	}

@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
@@ -13,7 +14,7 @@ import (
 // instruction sits at a known position.
 type alignCase struct {
 	// scope is the single scope's range before alignment.
-	scope MutableRange
+	scope mutation_aliasing.MutableRange
 	// terminalId is the evaluation order of the construct's terminal, which is the position the
 	// fallthrough pop minimises a start back to.
 	terminalId static_single_assignment.EvaluationOrder
@@ -48,7 +49,7 @@ func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
 	function.Identifiers = append(function.Identifiers, nil)
 	scopes := &ReactiveScopes{
 		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
-		ranges:       map[ScopeId]MutableRange{1: testCase.scope},
+		ranges:       map[ScopeId]mutation_aliasing.MutableRange{1: testCase.scope},
 		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:        []ScopeId{1},
 	}
@@ -127,7 +128,7 @@ func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
 		// The scope opens at the read and closes after the inner continuation, so it is still active
 		// at the goto and has not been retired by the activity filter.
-		ranges:  map[ScopeId]MutableRange{1: {21, 31}},
+		ranges:  map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 21, End: 31}},
 		members: map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:   []ScopeId{1},
 	}
@@ -200,7 +201,7 @@ func buildInnermostGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 	function.Identifiers = append(function.Identifiers, nil)
 	scopes := &ReactiveScopes{
 		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
-		ranges:       map[ScopeId]MutableRange{1: {7, 9}},
+		ranges:       map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 7, End: 9}},
 		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:        []ScopeId{1},
 	}

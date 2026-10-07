@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
@@ -354,7 +355,7 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	doubleEmitted, unmatchedGotos := 0, 0
 	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		// Bring the graph to the state the pipeline actually delivers before converting it.
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})

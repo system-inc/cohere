@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -440,7 +441,7 @@ func TestConstructionIsIdempotent(t *testing.T) {
 		return phis, stale
 	}
 
-	forEachCorpusFunction(t, 300, func(function *Function, ranges *MutableRanges,
+	forEachCorpusFunction(t, 300, func(function *Function, ranges *mutation_aliasing.MutableRanges,
 		scopes *ReactiveScopes) {
 		phis, stale := countStale(function)
 		firstPhis += phis

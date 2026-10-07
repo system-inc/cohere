@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -16,7 +17,7 @@ import (
 // as a global and never emits `StoreContext`, which is the one widening rule this pass can apply.
 // A plain harness would make `TestRangesWidenAStoreIntoACapturedBinding` pass vacuously; that is
 // measured rather than assumed, and the corpus probe that found it is recorded in the report.
-func rangesFor(t *testing.T, source string) (*Function, *MutableRanges) {
+func rangesFor(t *testing.T, source string) (*Function, *mutation_aliasing.MutableRanges) {
 	t.Helper()
 
 	var outermost *Function
@@ -57,10 +58,10 @@ func rangesFor(t *testing.T, source string) (*Function, *MutableRanges) {
 // Single-assignment form gives one binding several identifiers, so a name alone is ambiguous. The
 // last one is chosen because these tests ask about a value after its final write, which is the
 // question a consumer asks.
-func rangeOfName(t *testing.T, function *Function, name string) MutableRange {
+func rangeOfName(t *testing.T, function *Function, name string) mutation_aliasing.MutableRange {
 	t.Helper()
 	ranges := InferMutableRanges(function)
-	var best MutableRange
+	var best mutation_aliasing.MutableRange
 	var found bool
 	for _, identifier := range function.Identifiers {
 		if identifier == nil || identifier.Name != name {
@@ -113,7 +114,7 @@ export function f() {
 func TestRangesAreHalfOpen(t *testing.T) {
 	t.Parallel()
 
-	r := MutableRange{Start: 3, End: 6}
+	r := mutation_aliasing.MutableRange{Start: 3, End: 6}
 	for _, order := range []static_single_assignment.EvaluationOrder{3, 4, 5} {
 		if !r.Contains(order) {
 			t.Errorf("[3,6) should contain %d", order)
@@ -124,7 +125,7 @@ func TestRangesAreHalfOpen(t *testing.T) {
 			t.Errorf("[3,6) should not contain %d; the end is exclusive, which is React's inRange", order)
 		}
 	}
-	if (MutableRange{}).Contains(0) || (MutableRange{}).Contains(5) {
+	if (mutation_aliasing.MutableRange{}).Contains(0) || (mutation_aliasing.MutableRange{}).Contains(5) {
 		t.Error("the unset range must contain nothing, so a caller need not check IsSet first")
 	}
 }
@@ -146,7 +147,7 @@ func TestRangesSpanTheGapBetweenDisjointWrites(t *testing.T) {
 
 	// Written at 3, written again at 20, nothing between. Upstream's end is one past the last
 	// write.
-	r := MutableRange{Start: 3, End: 21}
+	r := mutation_aliasing.MutableRange{Start: 3, End: 21}
 
 	if !r.Contains(10) {
 		t.Error("an instruction in the GAP between two writes must be inside the range: upstream " +
@@ -167,13 +168,13 @@ func TestRangesSpanTheGapBetweenDisjointWrites(t *testing.T) {
 func TestRangesRejectAnInvalidInterval(t *testing.T) {
 	t.Parallel()
 
-	valid := []MutableRange{{}, {Start: 1, End: 2}, {Start: 5, End: 100}}
+	valid := []mutation_aliasing.MutableRange{{}, {Start: 1, End: 2}, {Start: 5, End: 100}}
 	for _, r := range valid {
 		if !r.IsValid() {
 			t.Errorf("[%d,%d) should be valid", r.Start, r.End)
 		}
 	}
-	invalid := []MutableRange{{Start: 3, End: 3}, {Start: 5, End: 2}, {Start: 4, End: 0}}
+	invalid := []mutation_aliasing.MutableRange{{Start: 3, End: 3}, {Start: 5, End: 2}, {Start: 4, End: 0}}
 	for _, r := range invalid {
 		if r.IsValid() {
 			t.Errorf("[%d,%d) should be invalid: upstream asserts (start==0 && end==0) || end>start",
@@ -203,7 +204,7 @@ export function f(c: boolean, items: number[]) {
 	if ranges.Len() == 0 {
 		t.Fatal("no value got a range over a function with a loop and a branch; this is inert")
 	}
-	if invalid := ValidateMutableRanges(ranges); len(invalid) != 0 {
+	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
 		t.Errorf("%d values carry an invalid range: %v", len(invalid), invalid)
 	}
 	_ = function
@@ -262,32 +263,6 @@ export function outer() {
 	if stores == 0 {
 		t.Fatal("no StoreContext was lowered, so this test measured nothing. That is what a " +
 			"checker-less harness produces, and it is why rangesFor asserts the checker is present")
-	}
-}
-
-// TestRangesPhiOpensBeforeItsBlockWhenWidened proves the phi branch works, by seeding the state
-// that only Stage 1 can produce today.
-//
-// `phiOpensBefore` is inert on this tree because its input is a widened `End` that only
-// `AliasingState.mutate` writes. The branch is kept live rather than deleted, so it needs a test
-// that does not depend on the missing input. Seeding the range by hand is what separates "this
-// branch is correct and waiting" from "this branch is untested".
-func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
-	t.Parallel()
-
-	if phiOpensBefore(MutableRange{}, 10) {
-		t.Error("an unset range must not open a phi early")
-	}
-	if phiOpensBefore(MutableRange{Start: 5, End: 10}, 10) {
-		t.Error("a range ending exactly at the block's first instruction is not mutated AFTER it; " +
-			"upstream's test is strictly greater")
-	}
-	if !phiOpensBefore(MutableRange{Start: 5, End: 11}, 10) {
-		t.Error("a range ending past the block's first instruction means the phi is mutated after " +
-			"creation, so it must open early. This is the branch Stage 1 will make reachable")
-	}
-	if phiOpensBefore(MutableRange{Start: 1, End: 99}, 0) {
-		t.Error("a block with no assigned order must not open a phi at a negative position")
 	}
 }
 
@@ -457,7 +432,7 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 
 			mutations := 0
 			for _, effect := range InferAliasingEffects(function).Get(call.Id) {
-				if effect.Kind == AliasingEffectMutate &&
+				if effect.Kind == mutation_aliasing.AliasingEffectMutate &&
 					effect.Into.Identifier == method.Receiver.Identifier {
 					mutations++
 				}
@@ -571,30 +546,30 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		edge        AliasingEffectKind
-		fromKind    EffectValueKind
-		intoKind    EffectValueKind
+		edge        mutation_aliasing.AliasingEffectKind
+		fromKind    mutation_aliasing.EffectValueKind
+		intoKind    mutation_aliasing.EffectValueKind
 		wantWidened bool
 	}{
-		{name: "alias frozen source", edge: AliasingEffectAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
-		{name: "alias primitive source", edge: AliasingEffectAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
-		{name: "alias frozen destination", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueFrozen},
-		{name: "alias mutable values", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias frozen source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
-		{name: "maybe-alias primitive source", edge: AliasingEffectMaybeAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias global source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueGlobal, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias mixed source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "alias mixed source", edge: AliasingEffectAlias, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "capture mixed source", edge: AliasingEffectCapture, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "capture global source", edge: AliasingEffectCapture, fromKind: EffectValueGlobal, intoKind: EffectValueMutable},
-		{name: "create-from mixed source", edge: AliasingEffectCreateFrom, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "assign mixed source", edge: AliasingEffectAssign, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "create-from frozen source", edge: AliasingEffectCreateFrom, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
-		{name: "create-from primitive source", edge: AliasingEffectCreateFrom, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
-		{name: "create-from mutable source", edge: AliasingEffectCreateFrom, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
-		{name: "assign frozen source", edge: AliasingEffectAssign, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
-		{name: "assign primitive source", edge: AliasingEffectAssign, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
-		{name: "assign mutable source", edge: AliasingEffectAssign, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "alias frozen source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "alias primitive source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "alias frozen destination", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueFrozen},
+		{name: "alias mutable values", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias frozen source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "maybe-alias primitive source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias global source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias mixed source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "alias mixed source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "capture mixed source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "capture global source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "create-from mixed source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "assign mixed source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "create-from frozen source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "create-from primitive source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "create-from mutable source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{name: "assign frozen source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "assign primitive source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
+		{name: "assign mutable source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
 	}
 
 	for _, testCase := range tests {
@@ -620,20 +595,14 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 			block.Terminal = &Return{Value: result}
 			Finalize(function)
 
-			mutationKind := AliasingEffectMutate
-			if testCase.edge == AliasingEffectCapture {
-				mutationKind = AliasingEffectMutateTransitive
+			mutationKind := mutation_aliasing.AliasingEffectMutate
+			if testCase.edge == mutation_aliasing.AliasingEffectCapture {
+				mutationKind = mutation_aliasing.AliasingEffectMutateTransitive
 			}
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-				fromInstruction.Id: {create(from, testCase.fromKind)},
-				edgeInstruction.Id: {
-					create(into, testCase.intoKind),
-					flow(testCase.edge, from, into),
-				},
-				mutationInstruction.Id: {
-					create(result, EffectValuePrimitive),
-					mutate(mutationKind, into),
-				},
+				fromInstruction.Id:     {mutation_aliasing.CreateEffect(from, testCase.fromKind)},
+				edgeInstruction.Id:     {mutation_aliasing.CreateEffect(into, testCase.intoKind), mutation_aliasing.FlowEffect(testCase.edge, from, into)},
+				mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutationKind, into)},
 			}}
 			ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -705,7 +674,8 @@ export function f(c: boolean) {
 	if second.Len() != first.Len() {
 		t.Fatalf("a second run produced %d ranges against %d", second.Len(), first.Len())
 	}
-	for id, want := range first.ranges {
+	for _, identifier := range function.Identifiers {
+		id, want := identifier.Id, first.Get(identifier.Id)
 		if got := second.Get(id); got != want {
 			t.Errorf("value %d moved from [%d,%d) to [%d,%d) on a second run",
 				id, want.Start, want.End, got.Start, got.End)
@@ -753,11 +723,11 @@ export function f() {
 func TestRangeGapsAreNamed(t *testing.T) {
 	t.Parallel()
 
-	gaps := RangeGaps()
+	gaps := mutation_aliasing.RangeGaps()
 	if len(gaps) != 1 {
 		t.Fatalf("expected exactly the one declared gap, got %d", len(gaps))
 	}
-	if gaps[0] != RangeGapLoopCarriedInversion {
+	if gaps[0] != mutation_aliasing.RangeGapLoopCarriedInversion {
 		t.Errorf("the declared gaps changed; if one was closed, update the package comment and the "+
 			"RangeGap constants together, got %v", gaps)
 	}
@@ -794,16 +764,10 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 	Finalize(function)
 
 	effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-		leafInstruction.Id: {create(leaf, EffectValueMutable)},
-		sourceInstruction.Id: {
-			create(source, EffectValueMutable),
-			flow(AliasingEffectCapture, leaf, source),
-		},
-		derivedInstruction.Id: {flow(AliasingEffectCreateFrom, source, derived)},
-		mutationInstruction.Id: {
-			create(result, EffectValuePrimitive),
-			mutate(AliasingEffectMutate, derived),
-		},
+		leafInstruction.Id:     {mutation_aliasing.CreateEffect(leaf, mutation_aliasing.EffectValueMutable)},
+		sourceInstruction.Id:   {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable), mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, leaf, source)},
+		derivedInstruction.Id:  {mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, source, derived)},
+		mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, derived)},
 	}}
 	ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -1023,18 +987,18 @@ export function f(p: number) {
 func TestRangeIsSetTreatsEitherFieldAsSet(t *testing.T) {
 	t.Parallel()
 
-	if (MutableRange{}).IsSet() {
+	if (mutation_aliasing.MutableRange{}).IsSet() {
 		t.Error("the zero range must not read as set")
 	}
-	if !(MutableRange{Start: 3, End: 4}).IsSet() {
+	if !(mutation_aliasing.MutableRange{Start: 3, End: 4}).IsSet() {
 		t.Error("a fully set range must read as set")
 	}
-	if !(MutableRange{Start: 0, End: 4}).IsSet() {
+	if !(mutation_aliasing.MutableRange{Start: 0, End: 4}).IsSet() {
 		t.Error("a range carrying only an END must read as set. Upstream's unset test is " +
 			"`start === 0 && end === 0`, both fields, and a spelling that reads only Start would " +
 			"report a value widened by Stage 1 as having no range at all")
 	}
-	if !(MutableRange{Start: 3, End: 0}).IsSet() {
+	if !(mutation_aliasing.MutableRange{Start: 3, End: 0}).IsSet() {
 		t.Error("a range carrying only a START must read as set")
 	}
 }
@@ -1061,12 +1025,12 @@ func TestBlockFirstOrderFallsBackToTheTerminal(t *testing.T) {
 		Terminal:     &Goto{Order: 99},
 	}
 	function.Instructions = []*Instruction{{Id: 0, Order: 7}}
-	if got := blockFirstOrder(function, withInstruction); got != 7 {
+	if got := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, withInstruction); got != 7 {
 		t.Errorf("a block with instructions must report its FIRST instruction's order, got %d", got)
 	}
 
 	empty := &BasicBlock{Id: 2, Terminal: &Goto{Order: 42}}
-	if got := blockFirstOrder(function, empty); got != 42 {
+	if got := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, empty); got != 42 {
 		t.Errorf("an empty block must fall back to its TERMINAL's order, which is upstream's "+
 			"`block.instructions.at(0)?.id ?? block.terminal.id`, got %d. Zero would read as "+
 			"unassigned and make phiOpensBefore decline every phi in a merge block", got)
@@ -1120,40 +1084,6 @@ export function f(o: {a: number}) {
 	}
 }
 
-// TestPhiOpensOneBeforeItsBlock pins the offset upstream uses.
-//
-// React writes `makeInstructionId(firstInstructionIdOfBlock - 1)`. The minus one is what puts the
-// merge point itself inside the range: a phi's value exists at the TOP of the block, before its
-// first instruction runs, so opening at the instruction would make `Contains` answer false at the
-// position the phi is definitionally live.
-//
-// Tested on the helper rather than through lowered source, because the branch only runs on a range
-// whose end Stage 1 widened. A mutation dropping the minus one survived every fixture over real
-// code for exactly that reason.
-func TestPhiOpensOneBeforeItsBlock(t *testing.T) {
-	t.Parallel()
-
-	widened := MutableRange{Start: 0, End: 20}
-	opened, moved := phiOpenedRange(widened, 10)
-	if !moved {
-		t.Fatal("a phi whose end is past its block's first instruction must open early")
-	}
-	if opened.Start != 9 {
-		t.Errorf("the phi opened at %d; upstream opens at the block's first instruction MINUS ONE, "+
-			"which is 9 here, so that the merge point itself is inside the range", opened.Start)
-	}
-	if !opened.Contains(9) || !opened.Contains(10) {
-		t.Error("both the merge point and the block's first instruction must be inside the range")
-	}
-
-	if _, moved := phiOpenedRange(MutableRange{Start: 5, End: 20}, 10); moved {
-		t.Error("a phi whose start is already set must not be reopened")
-	}
-	if _, moved := phiOpenedRange(MutableRange{}, 10); moved {
-		t.Error("an unset range must not open a phi early")
-	}
-}
-
 // TestRangesStayValidAcrossALoopBackEdge pins the one divergence Stage 2.5 introduces.
 //
 // A loop-carried value is defined at a HIGH evaluation order by the back-edge store, while the
@@ -1179,7 +1109,7 @@ export function f(items: number[][]) {
   return items;
 }
 `)
-	if invalid := ValidateMutableRanges(ranges); len(invalid) != 0 {
+	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
 		for _, id := range invalid {
 			r := ranges.Get(id)
 			t.Errorf("value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
@@ -1349,8 +1279,8 @@ export function f() {
 }
 `)
 	effects := InferAliasingEffects(function)
-	widened := &MutableRanges{}
-	widenRanges(function, effects, widened)
+	widened := &mutation_aliasing.MutableRanges{}
+	mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{}).Widen(widened)
 
 	// The count is what separates the faithful walk from one that ignores the index. It is asserted
 	// exactly rather than as a bound, because a bound would be satisfied by a walk that widened

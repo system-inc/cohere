@@ -71,7 +71,10 @@
 // rather than leaving it as an argument.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import (
+	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/static_single_assignment"
+)
 
 // ReactiveFunction is the tree form of a lowered function.
 //
@@ -134,7 +137,7 @@ type ReactiveLabel struct {
 // diffing against the source will see two types where this has one.
 type ReactiveScopeBlock struct {
 	Scope        ScopeId
-	Range        MutableRange
+	Range        mutation_aliasing.MutableRange
 	Instructions ReactiveBlock
 	// Pruned marks a scope whose memoization was discarded, by any of the four upstream passes that
 	// build a `PrunedScope`: `flattenReactiveLoopsHIR` and `flattenScopesWithHooksOrUseHIR` through

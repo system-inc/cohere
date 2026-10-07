@@ -88,6 +88,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"strconv"
 	"strings"
@@ -857,7 +858,7 @@ type dependencyCollector struct {
 	objectMethods          map[static_single_assignment.IdentifierId]bool
 	result                 *ScopeDependencies
 	// scopeRange answers a scope's final range, which `checkValidDependency` compares against.
-	scopeRange func(ScopeId) MutableRange
+	scopeRange func(ScopeId) mutation_aliasing.MutableRange
 	// hoistable is the per-scope set of accesses proven safe to read before the scope runs, from
 	// `CollectHoistablePropertyLoads`. Nil is a valid and meaningful value: it truncates every
 	// dependency path to its root, which is exactly what this pass did before that analysis existed.
@@ -1135,7 +1136,7 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 // The `ranges` argument must be the same table the scopes were assigned from. `Conflicts` on the
 // result reports hoistable entries that disagreed about an access type, which upstream raises on.
 func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveScopes,
-	identity ScopeIdentity, ranges *MutableRanges) *ScopeDependencies {
+	identity ScopeIdentity, ranges *mutation_aliasing.MutableRanges) *ScopeDependencies {
 	result := &ScopeDependencies{}
 	if function == nil || scopes == nil || identity == nil || ranges == nil {
 		return result
