@@ -135,8 +135,9 @@ func TestSpelledSplitsOnlyCorpusSpellings(t *testing.T) {
 
 // Resolve skips naming the variable when the corpus is unset, fails when it is set and the path is not in
 // it, and fails on a spelling that names no corpus whether the corpus is set or not. A path inside this
-// repository resolves with no corpus set, and an absolute path fails. Each runs in a child process, since
-// a skip and a failure end the test that meets them.
+// repository resolves with no corpus set, and an absolute path, or a relative one that climbs out of the
+// repository, fails. Each runs in a child process, since a skip and a failure end the test that meets
+// them.
 func TestResolveSkipsWhenUnsetAndFailsWhenWrong(t *testing.T) {
 	t.Parallel()
 	if probe := os.Getenv("COHERE_CORPUS_PROBE"); probe != "" {
@@ -166,6 +167,7 @@ func TestResolveSkipsWhenUnsetAndFailsWhenWrong(t *testing.T) {
 		"an absolute path":        {spelling: filepath.Join(root, "app", "styles", "theme.css"), value: root, want: "--- FAIL"},
 		"not in the repository":   {spelling: "app/styles/theme.css", want: "--- FAIL"},
 		"in the repository":       {spelling: "internal/corpus/corpus.go", want: "--- PASS"},
+		"out of the repository":   {spelling: "..", want: "--- FAIL"},
 	} {
 		output := runProbe(t, "TestResolveSkipsWhenUnsetAndFailsWhenWrong", testCase.spelling, testCase.value)
 		if !strings.Contains(output, testCase.want) {

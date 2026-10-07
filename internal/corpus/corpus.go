@@ -103,7 +103,8 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 //
 // A path relative to this repository's root, such as a public design system under testdata, resolves
 // too and never skips, which is how a fixture generated from a public theme records its entry point
-// (#f598zk0). An absolute path fails: it reads the same on no other machine.
+// (#f598zk0). An absolute path fails, and so does a relative one that climbs out of the repository:
+// neither reads the same on another machine.
 func Resolve(t testing.TB, spelling string) string {
 	t.Helper()
 	corpus, inside, spelled, err := Spelled(spelling)
@@ -120,6 +121,12 @@ func Resolve(t testing.TB, spelling string) string {
 			t.Fatal(err)
 		}
 		path := filepath.Join(root, filepath.FromSlash(spelling))
+		// A path that climbs out of the repository would let a fixture depend on a sibling checkout
+		// while looking portable, and read nothing on a machine without one.
+		if inside, err := filepath.Rel(root, path); err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+			t.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
+				"<corpus>:<path in it>, or give a path inside this repository", spelling)
+		}
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, err)
 		}
