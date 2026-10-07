@@ -86,6 +86,10 @@ var NominalClass = rule.Rule{
 			return true, false
 		}
 		return walker.Listeners(func(site flow.Site) {
+			if site.Spread {
+				// A spread into a literal is invariant-mutable's; see flow.Site.Spread.
+				return
+			}
 			handle = policy.MessageHandle{}
 			found, wrong := walker.Walk(site, judge)
 			if !wrong {

@@ -187,6 +187,99 @@ const open: { readonly kennel: { pet: Animal } } = yard;`, "yard"},
 	}
 }
 
+// TestInvariantMutableFiresWhereADestructuringAssignmentWidens: shape 2 of #gvzdft9, six-probes.tgz's s2. Each
+// target of an assignment pattern is a slot the value's part is put into, so `[animals] = [dogs]` is
+// `animals = dogs`; tsc 6.0.3 accepts it, and Node throws `dogs[1].bark is not a function`.
+func TestInvariantMutableFiresWhereADestructuringAssignmentWidens(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"an array pattern from a literal":  {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; [all] = [dogs];`, "dogs"},
+		"an array pattern from a tuple":    {animals + `declare const pair: [Dog[], number]; let all: Animal[] = []; [all] = pair;`, "pair"},
+		"an object pattern":                {animals + `declare const holder: { pets: Dog[] }; let all: Animal[] = []; ({ pets: all } = holder);`, "holder"},
+		"a shorthand in an object pattern": {animals + `declare const holder: { pets: Dog[] }; let pets: Animal[] = []; ({ pets } = holder);`, "holder"},
+		"a nested pattern":                 {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; [[all]] = [[dogs]];`, "dogs"},
+		"an object pattern from a literal": {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; ({ pets: all } = { pets: dogs });`, "dogs"},
+		// Contextually typed as the literal's own elements, so reported once, by the literal's finder.
+		"after a spread in a literal value": {animals + `const dogs: Dog[] = [rex]; declare const cats: Animal[][]; let all: Animal[] = []; [all] = [...cats, dogs];`, "dogs"},
+		"a nested pattern from a tuple":     {animals + `declare const pair: [Dog[]]; let all: Animal[] = []; [[all]] = [pair];`, "pair"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "mutableWidening")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough: shape 2's near-misses.
+func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		"the same type":     animals + `const dogs: Dog[] = [rex]; let same: Dog[] = []; [same] = [dogs];`,
+		"a readonly target": animals + `const dogs: Dog[] = [rex]; let view: readonly Animal[] = []; [view] = [dogs];`,
+		"a fresh element":   animals + `let all: Animal[] = []; [all] = [[rex]];`,
+		// A rest element is an array the pattern builds, no one else's.
+		"a rest element": animals + `const dogs: Dog[] = [rex]; let rest: Animal[] = []; [...rest] = dogs;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
+// TestInvariantMutableFiresWhereASpreadSharesAMutablePart: shape 3 of #gvzdft9, six-interface.tgz's s3 and s3b. A
+// spread copies the top level only, so what the copy's slots hold is the original's, and a wider view writes
+// into it; tsc 6.0.3 accepts it, and Node throws `bark is not a function`.
+func TestInvariantMutableFiresWhereASpreadSharesAMutablePart(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"an object spread":                 {animals + `const holder = { pets: [rex] }; const view: { pets: Animal[] } = { ...holder };`, "holder"},
+		"an array spread":                  {animals + `const pens: Dog[][] = [[rex]]; const all: Animal[][] = [...pens];`, "pens"},
+		"beside a property written after":  {animals + `const holder = { pets: [rex], name: 'kennel' }; const view: { pets: Animal[]; name: string } = { ...holder, name: 'yard' };`, "holder"},
+		"a readonly property still shares": {animals + `const holder = { pets: [rex] }; const view: { readonly pets: Animal[] } = { ...holder };`, "holder"},
+		// Fresh elements still hold what they were given: dogs is shared.
+		"a fresh mapped element holding a shared array":       {animals + `const dogs: Dog[] = [rex]; const names = ['a']; const all: { pets: Animal[] }[] = [...names.map((name) => ({ pets: dogs }))];`, "names.map((name) => ({ pets: dogs }))"},
+		"a map returning what someone holds":                  {animals + `const kennels: { pets: Dog[] }[] = [{ pets: [rex] }]; const all: { pets: Animal[] }[] = [...kennels.map((kennel) => kennel)];`, "kennels.map((kennel) => kennel)"},
+		"a map returning what someone holds, at its own slot": {`const kennels: { kind: 'dog' }[] = [{ kind: 'dog' }]; const all: { kind: string }[] = [...kennels.map((kennel) => kennel)];`, "kennels.map((kennel) => kennel)"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "mutableWidening")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable: shape 3's near-misses.
+func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		// s3c: written again after the spread, so the copy holds the later value.
+		"a property written after":   animals + `const holder = { pets: [rex] }; const view: { pets: Animal[] } = { ...holder, pets: [] };`,
+		"a later spread writing it":  animals + `const holder = { pets: [rex] }; const fresh: { pets: Animal[] } = { pets: [] }; const view: { pets: Animal[] } = { ...holder, ...fresh };`,
+		"a read-only array":          animals + `const holder = { pets: [rex] }; const view: { pets: readonly Animal[] } = { ...holder };`,
+		"the same type":              animals + `const holder: { pets: Animal[] } = { pets: [rex] }; const view: { pets: Animal[] } = { ...holder };`,
+		"a fresh spread":             animals + `const view: { pets: Animal[] } = { ...{ pets: [rex] } };`,
+		"an array spread of objects": animals + `const dogs: Dog[] = [rex]; const all: Animal[] = [...dogs];`,
+		// A map whose callback returns fresh literals builds its elements too: nobody else holds them.
+		"a spread of fresh mapped elements": `interface Row { section: 'doctrine' | 'soul' } const pages = ['a']; const rows: Row[] = [...pages.map((page) => ({ section: 'doctrine' as const }))];`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
 // TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
 func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
 	t.Parallel()
