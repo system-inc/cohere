@@ -66,10 +66,6 @@ type stableTypePrinter struct {
 	stack []*checker.Type
 }
 
-// internalName is typescript-go's name for a member keyed by a symbol, `\xfe@name@id`. The id is creation order,
-// so only the name is printed.
-var internalName = regexp.MustCompile(`^\x{FE}@([^@]*)@\d+$`)
-
 func (p *stableTypePrinter) print(t *checker.Type, depth int) string {
 	if t == nil {
 		return "unknown"
@@ -368,11 +364,19 @@ func (p *stableTypePrinter) signature(signature *checker.Signature, arrow string
 }
 
 // StablePropertyName prints a property's name as a member is written: bare when it's an identifier, quoted when
-// it isn't, and `[name]` for a member keyed by a symbol, whose internal name `\xfe@name@id` carries a creation-
-// order id that moves from run to run.
+// it isn't, and `[name]` for a member keyed by a symbol.
+//
+// typescript-go names a symbol-keyed member with the raw byte 0xFE, which is not UTF-8 so no identifier can hold
+// it: `\xfe@name@id` for a unique symbol (getESSymbolLikeTypeForNode), whose id is the symbol's creation order and
+// moves from run to run, and `\xfe@name` for a known symbol the library doesn't declare. It is matched as bytes
+// (#z9jcxp1): a regexp reads the invalid byte as U+FFFD, and the pattern this replaced matched U+00FE, so no
+// name ever matched and the id was printed.
 func StablePropertyName(name string) string {
-	if match := internalName.FindStringSubmatch(name); match != nil {
-		return "[" + match[1] + "]"
+	if symbolName, ok := strings.CutPrefix(name, ast.InternalSymbolNamePrefix+"@"); ok {
+		if at := strings.LastIndexByte(symbolName, '@'); at >= 0 && isDecimal(symbolName[at+1:]) {
+			symbolName = symbolName[:at]
+		}
+		return "[" + symbolName + "]"
 	}
 	if !isIdentifierName(name) {
 		return strconv.Quote(name)
@@ -385,4 +389,9 @@ var identifierName = regexp.MustCompile(`^[\p{L}_$][\p{L}\p{N}_$]*$`)
 
 func isIdentifierName(name string) bool {
 	return identifierName.MatchString(name)
+}
+
+// isDecimal is a symbol id: one or more ASCII digits.
+func isDecimal(text string) bool {
+	return text != "" && strings.Trim(text, "0123456789") == ""
 }
