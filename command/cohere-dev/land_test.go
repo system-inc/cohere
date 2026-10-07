@@ -290,3 +290,84 @@ func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(t *testing.T) {
 		t.Errorf("the gate's go build failed in a worktree with a symlinked submodule (%v):\n%s", err, output)
 	}
 }
+
+// The gate covers every module go.work names, not only the root's ./..., and says which (#ejcnkja): a test
+// failing in a nested module refuses the landing, and the same landing lands once it passes. A module
+// inside a submodule is not gated, by rule: this one's test always fails, and neither landing runs it.
+// This runs the real go, not the fixture's stand-in, since what's proven is which packages go is asked to
+// test.
+func TestTheGateCoversEveryWorkspaceModuleButASubmodules(t *testing.T) {
+	t.Parallel()
+	fixture := newLandFixture(t)
+	// The real go: the stand-in's directory comes off the front of PATH.
+	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
+	write := func(directory string, files map[string]string) {
+		t.Helper()
+		for name, contents := range files {
+			path := filepath.Join(directory, name)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	passing := "package inner\n\nimport \"testing\"\n\nfunc TestInner(t *testing.T) {}\n"
+	failing := "package inner\n\nimport \"testing\"\n\nfunc TestInner(t *testing.T) { t.Fatal(\"planted in the nested module\") }\n"
+
+	library := t.TempDir()
+	fixture.git(library, "init", "-q", "-b", "main")
+	write(library, map[string]string{
+		"mod/go.mod":          "module example.com/library\n\ngo 1.21\n",
+		"mod/library_test.go": "package library\n\nimport \"testing\"\n\nfunc TestLibrary(t *testing.T) { t.Fatal(\"a submodule's test ran\") }\n",
+	})
+	fixture.git(library, "add", ".")
+	fixture.git(library, "commit", "-q", "-m", "a module that fails")
+	write(fixture.repository, map[string]string{
+		"go.mod":              "module example.com/root\n\ngo 1.21\n",
+		"root.go":             "package root\n",
+		"go.work":             "go 1.21\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
+		"inner/go.mod":        "module example.com/root/inner\n\ngo 1.21\n",
+		"inner/inner_test.go": passing,
+	})
+	fixture.git(fixture.repository, "add", "go.mod", "root.go", "go.work", "inner")
+	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "a workspace of three modules, one in a submodule")
+	a := fixture.worktree("a")
+	fixture.git(a, "merge", "-q", "--no-edit", "main")
+	os.RemoveAll(filepath.Join(a, "library"))
+	if err := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); err != nil {
+		t.Fatal(err)
+	}
+
+	land := func() (string, error) {
+		landing := exec.Command(fixture.wrapper, "land")
+		landing.Dir, landing.Env = a, fixture.environment
+		output, err := landing.CombinedOutput()
+		return string(output), err
+	}
+
+	// Staged by name: the worktree's submodule is a symlink, and `commit -a` would commit it as one.
+	write(a, map[string]string{"inner/inner_test.go": failing})
+	fixture.git(a, "add", "inner/inner_test.go")
+	fixture.git(a, "commit", "-q", "-m", "plant a failing test in the nested module")
+	output, err := land()
+	if err == nil || !strings.Contains(output, "planted in the nested module") {
+		t.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", err, output)
+	}
+	if !strings.Contains(output, "gating 2 modules from go.work: ., inner") ||
+		!strings.Contains(output, "not gated, inside a submodule: library/mod") {
+		t.Errorf("the gate did not say what it covered:\n%s", output)
+	}
+	if strings.Contains(output, "a submodule's test ran") {
+		t.Errorf("the gate ran a test inside a submodule:\n%s", output)
+	}
+
+	write(a, map[string]string{"inner/inner_test.go": passing})
+	fixture.git(a, "add", "inner/inner_test.go")
+	fixture.git(a, "commit", "-q", "-m", "the nested module's test passes")
+	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
+		t.Errorf("the landing did not land once the nested test passed (%v):\n%s", err, output)
+	}
+}

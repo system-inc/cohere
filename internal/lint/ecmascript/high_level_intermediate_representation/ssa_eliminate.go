@@ -18,109 +18,20 @@
 // removed phi's result. So this iterates to a fixed point rather than making one pass.
 //
 // Upstream's equivalent is `eliminate_redundant_phi.rs`, 177 lines.
+//
+// The pass is static_single_assignment.EliminateRedundantPhis, which this IR shares with Adamic's flow
+// graph; the reasoning above is carried there too.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // EliminateRedundantPhis removes phis that are not merges, rewriting every reference to a removed
-// phi's result to the value it collapsed to.
+// phi's result, the Returns place included, to the value it collapsed to.
 //
-// Runs to a fixed point, and recursively for nested functions.
+// Runs to a fixed point over one function. Construct runs it for each function it converts.
 func EliminateRedundantPhis(function *Function) {
 	if function == nil {
 		return
 	}
-
-	for {
-		// rewrites maps a removed phi's result to what it collapsed to.
-		rewrites := map[IdentifierId]IdentifierId{}
-
-		for _, block := range function.Blocks {
-			kept := block.Phis[:0]
-			for _, phi := range block.Phis {
-				if collapsed, redundant := redundantPhiValue(phi); redundant {
-					rewrites[phi.Place.Identifier] = collapsed
-					continue
-				}
-				kept = append(kept, phi)
-			}
-			block.Phis = kept
-		}
-
-		if len(rewrites) == 0 {
-			return
-		}
-
-		// A removed phi may collapse to another removed phi's result, so chase each chain to its
-		// end before rewriting. The chain is acyclic because a phi only collapses to a value that
-		// is not itself.
-		resolve := func(id IdentifierId) IdentifierId {
-			seen := 0
-			for {
-				next, ok := rewrites[id]
-				if !ok {
-					return id
-				}
-				id = next
-				seen++
-				if seen > len(rewrites) {
-					// Defensive: a cycle cannot arise from the redundancy test above, but a caller
-					// that hand-built phis could create one, and looping forever is the worst
-					// possible response.
-					return id
-				}
-			}
-		}
-
-		applyRewrites(function, resolve)
-	}
-}
-
-// redundantPhiValue reports the single value a phi collapses to, if it collapses at all.
-//
-// The rule, which is upstream's: ignoring operands that are the phi's own result, if every
-// remaining operand names one value, the phi is that value. A phi with no operands other than
-// itself cannot arise from a reachable block and is treated as not redundant so it stays visible.
-func redundantPhiValue(phi *Phi) (IdentifierId, bool) {
-	var candidate IdentifierId
-	found := false
-	for _, entry := range phi.Operands {
-		if entry.Place.Identifier == phi.Place.Identifier {
-			continue
-		}
-		if !found {
-			candidate = entry.Place.Identifier
-			found = true
-			continue
-		}
-		if entry.Place.Identifier != candidate {
-			return 0, false
-		}
-	}
-	if !found {
-		return 0, false
-	}
-	return candidate, true
-}
-
-// applyRewrites rewrites every place in the function through resolve.
-func applyRewrites(function *Function, resolve func(IdentifierId) IdentifierId) {
-	for _, block := range function.Blocks {
-		for _, phi := range block.Phis {
-			phi.Place.Identifier = resolve(phi.Place.Identifier)
-			for index := range phi.Operands {
-				phi.Operands[index].Place.Identifier = resolve(phi.Operands[index].Place.Identifier)
-			}
-		}
-		for _, instructionId := range block.Instructions {
-			EachInstructionPlacePointer(function.Instructions[instructionId], func(place *Place, role PlaceRole) {
-				place.Identifier = resolve(place.Identifier)
-			})
-		}
-		EachTerminalPlacePointer(block.Terminal, func(place *Place, role PlaceRole) {
-			place.Identifier = resolve(place.Identifier)
-		})
-	}
-	for index := range function.Params {
-		function.Params[index].Identifier = resolve(function.Params[index].Identifier)
-	}
-	function.Returns.Identifier = resolve(function.Returns.Identifier)
+	static_single_assignment.EliminateRedundantPhis(ssaGraph{}, function)
 }

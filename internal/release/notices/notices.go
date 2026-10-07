@@ -39,6 +39,12 @@ const (
 // mainModule is cohere itself, which credits no one by being linked.
 const mainModule = "github.com/system-inc/cohere"
 
+// isCohere reports whether a module is cohere's own: the main module, or one beside it in the repository
+// under its path, as static_single_assignment is, a module of its own so another repository can import it.
+func isCohere(path string) bool {
+	return path == mainModule || strings.HasPrefix(path, mainModule+"/")
+}
+
 // compilerModulePrefix is the vendored TypeScript compiler and the shim modules over it. The compiler is
 // credited in NOTICE and its own entry, and the shims are cohere's generated code.
 const compilerModulePrefix = "github.com/microsoft/TypeScript/"
@@ -106,7 +112,7 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 		}
 		for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 			fields := strings.Split(line, "\t")
-			if len(fields) != 3 || fields[0] == mainModule || strings.HasPrefix(fields[0], compilerModulePrefix) {
+			if len(fields) != 3 || isCohere(fields[0]) || strings.HasPrefix(fields[0], compilerModulePrefix) {
 				continue
 			}
 			module := byPath[fields[0]]
@@ -146,7 +152,7 @@ func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module,
 	byPath := map[string]Module{}
 	for _, requirement := range goMod.Require {
 		isCompiled := slices.ContainsFunc(compiled, func(module Module) bool { return module.Path == requirement.Path })
-		if isCompiled || requirement.Path == mainModule || strings.HasPrefix(requirement.Path, compilerModulePrefix) {
+		if isCompiled || isCohere(requirement.Path) || strings.HasPrefix(requirement.Path, compilerModulePrefix) {
 			continue
 		}
 		download := exec.Command("go", "mod", "download", "-json", requirement.Path+"@"+requirement.Version)

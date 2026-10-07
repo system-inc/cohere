@@ -162,6 +162,9 @@ func fastTest(base []string, arguments []string) int {
 }
 
 // modulePackages is every package of the module, named as `go test` names it from the module root.
+//
+// The root module's only: the fast tier is not the landing gate, so it leaves the other modules go.work
+// names (the shims, static_single_assignment) to the gate and to `cohere-dev test ./...` (workspace.go).
 func modulePackages() (map[string]bool, error) {
 	return modulePackagesIn("")
 }

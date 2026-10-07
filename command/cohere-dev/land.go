@@ -125,16 +125,12 @@ func land(arguments []string) int {
 // worktree of it, or a symlink to another checkout's, as most of the house's worktrees are made: whichever,
 // its head must be the pin.
 func checkSubmodules(worktree string) error {
-	staged, err := gitOutput(worktree, "ls-files", "--stage")
+	links, err := gitlinksOf(worktree)
 	if err != nil {
-		return fmt.Errorf("listing %s's files: %w", worktree, err)
+		return err
 	}
-	for _, line := range strings.Split(staged, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 4 || fields[0] != "160000" {
-			continue
-		}
-		pin, path := fields[1], strings.Join(fields[3:], " ")
+	for _, link := range links {
+		pin, path := link.pin, link.path
 		directory := filepath.Join(worktree, path)
 		notCheckedOut := fmt.Errorf("%s's submodule %s is not checked out, so the gate could not build against its pin %s",
 			worktree, path, shortCommit(pin))
@@ -210,11 +206,19 @@ func mergeMain(worktree string, mainCommit string) error {
 	return fmt.Errorf("merging main at %s: %v\n%s", shortCommit(mainCommit), err, output)
 }
 
-// gate runs the landing gate on the worktree through a pool token: go vet and the whole module's tests.
+// gate runs the landing gate on the worktree through a pool token: go vet and the tests of every module
+// go.work names outside a submodule, each in one go invocation (workspace.go), saying which it covered.
 func gate(worktree string, commit string) int {
+	covered, err := readWorkspace(worktree)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to gate: %v\n", err)
+		return 2
+	}
+	covered.report(os.Stderr)
+	patterns := covered.patterns()
 	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(budget []string) int {
 		environment := gateEnvironment(budget)
-		vet := exec.Command("go", "vet", "./...")
+		vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
 		vet.Dir, vet.Env = worktree, environment
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
 		if err := vet.Run(); err != nil {
@@ -227,7 +231,7 @@ func gate(worktree string, commit string) int {
 			return 2
 		}
 		defer printUncovered(os.Stderr, uncovered)
-		test := exec.Command("go", "test", "./...")
+		test := exec.Command("go", append([]string{"test"}, patterns...)...)
 		test.Dir, test.Env = worktree, testing
 		test.Stdout, test.Stderr = os.Stdout, os.Stderr
 		if err := test.Run(); err != nil {

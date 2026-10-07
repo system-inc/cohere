@@ -402,7 +402,9 @@ func sourceSnapshot(t *testing.T) string {
 	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 		copySnapshotFile(t, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
 	}
-	for _, directory := range []string{"command", "internal", "policy", "TypeScript-shim"} {
+	// Every directory holding source go builds: the module's own, and the modules go.work names beside
+	// it. A module left out is one the snapshot's go.work names and cannot find.
+	for _, directory := range []string{"command", "internal", "policy", "TypeScript-shim", "static_single_assignment"} {
 		source := filepath.Join(moduleRoot, directory)
 		err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
 			if walkError != nil {
