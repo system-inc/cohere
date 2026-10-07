@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 /*
@@ -174,17 +175,8 @@ func whitespaceSize(text string, pos int) int {
 		return 0
 	}
 	value, size := utf8.DecodeRuneInString(text[pos:])
-	if IsJavaScriptWhitespace(value) {
+	if ecmascripttext.IsWhitespace(value) {
 		return size
 	}
 	return 0
-}
-
-// IsJavaScriptWhitespace is whether a rune matches JavaScript's \s.
-func IsJavaScriptWhitespace(value rune) bool {
-	switch value {
-	case ' ', '\t', '\n', '\r', '\v', '\f', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return value >= 0x2000 && value <= 0x200A
 }
