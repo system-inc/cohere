@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -111,15 +112,19 @@ type themeOptionFixture struct {
 // defect this whole component exists to fix, and the corpus is what proves it is real rather than
 // theorized. Both are the vendored snapshot of 4.3.3, which is that identical framework, on any machine
 // (#sycrdr6).
+//
+// The public theme's copy of the fixture (#f598zk0) carries one repository case, testdata/public_theme, on
+// the same vendored framework.
 var tailwindPackageRoots = map[string]string{
 	"ahra":              vendored.TailwindPackageRoot(),
 	"www-connected-app": vendored.TailwindPackageRoot(),
+	"public":            vendored.TailwindPackageRoot(),
 }
 
-func loadThemeCorpus(t *testing.T) themeCorpus {
+func loadThemeCorpus(t *testing.T, name string) themeCorpus {
 	t.Helper()
 
-	raw, err := os.ReadFile(filepath.Join("testdata", "theme_fixtures.json"))
+	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
 		t.Fatalf("read theme fixture: %v", err)
 	}
@@ -180,7 +185,8 @@ func loadRepositoryTheme(t *testing.T, aCase themeCase) (*Theme, []SkippedDirect
 }
 
 // coveredRepositoryCases is how many of the fixture's repository cases have their corpus set, which is
-// how many a run must check: the rest skip, naming their variable.
+// how many a run must check: the rest skip, naming their variable. A case recorded as a path inside this
+// repository, such as the public theme's, needs no corpus and is always covered.
 func coveredRepositoryCases(t *testing.T, fixture themeCorpus) int {
 	t.Helper()
 	covered := 0
@@ -189,8 +195,15 @@ func coveredRepositoryCases(t *testing.T, fixture themeCorpus) int {
 			continue
 		}
 		repositoryCorpus, _, spelled, err := corpus.Spelled(aCase.EntryPath)
-		if err != nil || !spelled {
-			t.Fatalf("repository case %q records %q, which is not spelled <corpus>:<path in it>: %v", aCase.Name, aCase.EntryPath, err)
+		if err != nil {
+			t.Fatalf("repository case %q records %q: %v", aCase.Name, aCase.EntryPath, err)
+		}
+		if !spelled {
+			if filepath.IsAbs(aCase.EntryPath) {
+				t.Fatalf("repository case %q records the absolute path %q, which reads the same on no other machine", aCase.Name, aCase.EntryPath)
+			}
+			covered++
+			continue
 		}
 		if repositoryCorpus.Covered() {
 			covered++
@@ -206,9 +219,20 @@ func coveredRepositoryCases(t *testing.T, fixture themeCorpus) int {
 // answers and a suite that compared two hundred thousand are indistinguishable from a green line,
 // and this component's whole claim is about scale: it is checked against two real design systems,
 // not against a reading.
+//
+// Run on the public theme's copy of the fixture and on ahra's (#f598zk0). Their synthetic cases are the
+// same; the public copy's repository case is testdata/public_theme, so the repository half runs on every
+// machine.
 func TestThemeMatchesEngine(t *testing.T) {
 	t.Parallel()
-	fixture := loadThemeCorpus(t)
+	forEachOracleCopy(t, "theme_fixtures.json", func(t *testing.T, fixtureName string) {
+		expectThemeMatchesEngine(t, loadThemeCorpus(t, fixtureName))
+	})
+}
+
+// expectThemeMatchesEngine compares every answer one copy of the fixture holds with the port's.
+func expectThemeMatchesEngine(t *testing.T, fixture themeCorpus) {
+	t.Helper()
 
 	var totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace int
 	var totalResolutions, totalResolveWith, totalOptionQueries, totalNested int
@@ -406,7 +430,7 @@ func TestThemeMatchesEngine(t *testing.T) {
 // quietly succeeding.
 func TestThemeRepositoriesDiffer(t *testing.T) {
 	t.Parallel()
-	fixture := loadThemeCorpus(t)
+	fixture := loadThemeCorpus(t, "theme_fixtures.json")
 
 	type resolved struct {
 		name string
@@ -474,7 +498,7 @@ func TestThemeRepositoriesDiffer(t *testing.T) {
 // wrong count. See the boundary note in themeloader.go.
 func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
 	t.Parallel()
-	fixture := loadThemeCorpus(t)
+	fixture := loadThemeCorpus(t, "theme_fixtures.json")
 
 	ran := 0
 	for _, aCase := range fixture.Cases {
@@ -500,6 +524,37 @@ func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
 		t.Fatal("the fixture holds no repository case, so this test checked nothing")
 	}
 	t.Logf("%d repositories each skip exactly one @config directive", ran)
+}
+
+// TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph is TestThemeLoaderReportsSkippedDirectives'
+// engine half on a design system in testdata (#f598zk0), asked of LoadDesignSystem, which is what
+// production loads through, rather than of the test-only theme loader. testdata/directives_theme writes an
+// `@config` and an `@plugin` in a file its entry point imports, so each must be found where it was
+// written, and the theme beside them still loads.
+func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(t *testing.T) {
+	t.Parallel()
+	entryPoint, err := filepath.Abs(filepath.Join("testdata", "directives_theme", "theme.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()})
+	if err != nil {
+		t.Fatalf("loading the directives theme: %v", err)
+	}
+
+	var names []string
+	for _, skipped := range system.SkippedDirectives {
+		names = append(names, skipped.Name+" "+skipped.Params)
+		if filepath.Base(skipped.Path) != "settings.css" {
+			t.Errorf("%s %s was reported in %s, and it is written in settings.css", skipped.Name, skipped.Params, skipped.Path)
+		}
+	}
+	if want := []string{"@config './tailwind.config.ts'", "@plugin './plugin.js'"}; !slices.Equal(names, want) {
+		t.Errorf("skipped %q, want %q", names, want)
+	}
+	if value, found := system.Theme().Get([]string{"--color-signal"}); !found || value != "#dc2626" {
+		t.Errorf("--color-signal read %q, %v beside the skipped directives; the theme in that file must still load", value, found)
+	}
 }
 
 // TestThemeInsertionOrderSurvivesRedefinition pins the JavaScript `Map.set` behaviour that a Go

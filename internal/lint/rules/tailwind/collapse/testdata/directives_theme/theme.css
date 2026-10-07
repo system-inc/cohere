@@ -1,0 +1,7 @@
+/*
+ * A design system that asks Tailwind for things cohere does not run (#f598zk0): a JavaScript config and
+ * a plugin, written in an imported file rather than the entry point, so the loader has to find them
+ * anywhere in the graph. Neither file exists, because neither is ever loaded.
+ */
+@import 'tailwindcss';
+@import './settings.css';

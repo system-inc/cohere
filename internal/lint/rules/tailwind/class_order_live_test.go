@@ -639,31 +639,20 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
 	})
 }
 
-// TestClassOrderLiveDeclinesOnlyTheKnownBoundary names the one list the rule cannot order.
+// TestClassOrderLiveDeclinesNoList pins that the rule orders every corpus list.
 //
-// `TestClassOrderLiveMatchesTheEngineOverTheCorpus` reports "1 lists declined" and a decline is how
-// classes leave the population, so an unexplained one is exactly the thing that would let a future
-// silence hide. This says which list, which class, and why, so the count is a fact with a reason
-// attached rather than a number nobody has looked at.
+// `TestClassOrderLiveMatchesTheEngineOverTheCorpus` reports how many lists it declined, and a decline is
+// how classes leave the population, so an unexplained one is exactly the thing that would let a future
+// silence hide. This test used to name the one list the rule could not order, `ahra/list-179` on
+// `data-[show=false]:fade-out`: sixteen roots in ahra are declared both as a static `@utility` and as a
+// functional one, the design system kept one kind per root, and the bare class read as a functional
+// candidate with no value. Since a root keeps both kinds (TestARootDeclaredBothWaysKeepsBothKinds), that
+// list is placed, and measured again for #f598zk0 the corpus declines none of its 2,396 lists. So any
+// decline now is a class the rule stopped answering for, and fails here by name.
 //
-// The list is `ahra/list-179` and the class is `data-[show=false]:fade-out`. Its root is declared
-// twice in this repository's own stylesheets:
-//
-//	@utility fade-out    { --exit-opacity: 0; }
-//	@utility fade-out-*  { --exit-opacity: calc(--value(number) / 100); … }
-//
-// `LoadedDesignSystem.utilityRoots` maps a root to ONE kind, and designsystem.go's own comment says
-// so and says why: it exists to answer the parser's question, and the parser asks about one kind at a
-// time. Sixteen roots in this repository have that shape. So the functional registration wins the
-// map, `ParseCandidate` reads the bare `fade-out` as a functional candidate with no value, the
-// descriptor declines it as per-declaration, and the evaluator declines it because a functional block
-// with no value does not compile.
-//
-// That is a boundary in a component this task does not own, and the right behaviour on reaching it is
-// the one the rule takes: decline the whole literal rather than sort around the class it cannot
-// place. It is pinned here so that a future change which fixes it, or which widens it, shows up as a
-// failure in a test that names the cause instead of as a silent shift in a count.
-func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
+// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme is the same question on the public theme,
+// where it runs everywhere.
+func TestClassOrderLiveDeclinesNoList(t *testing.T) {
 	t.Parallel()
 	lists := classOrderLiveLoadCorpus(t)
 	systems := classOrderLiveSystems(t, lists)
@@ -685,22 +674,9 @@ func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
 		t.Logf("declined %s on %q", name, unplaceable)
 	}
 
-	// Every decline must be a root this repository declares both statically and functionally, which
-	// is the boundary above. A decline on anything else is a class the rule stopped answering for,
-	// and that is the failure this whole suite is built to refuse.
 	for name, unplaceable := range declined {
-		_, base := splitVariants(unplaceable)
-		root := strings.SplitN(base, "-", 2)[0]
-		if root != "fade" && root != "zoom" && root != "slide" && root != "spin" {
-			t.Errorf(
-				"%s declined on %q, which is not the known static/functional collision; the rule has "+
-					"stopped answering for a class it used to place",
-				name, unplaceable)
-		}
-	}
-	if len(declined) > 3 {
-		t.Errorf("%d lists declined; 1 did when this was measured, and a rise means classes are "+
-			"leaving the population", len(declined))
+		t.Errorf("%s declined on %q; the rule orders every corpus list, so it has stopped answering for a class it used to place",
+			name, unplaceable)
 	}
 }
 

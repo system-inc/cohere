@@ -2,6 +2,7 @@ package tailwind
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // The public twins of the engine assertions that needed a shape only a repository's own stylesheet had
-// (#f598zk0, tier B). Each live original stays where it is, opt-in through its corpus; the twin asks the
+// (#f598zk0, tiers B and C). Each live original stays where it is, opt-in through its corpus; the twin asks the
 // same question of collapse/testdata/public_theme, which declares the shape on purpose, so it runs on
 // every machine and fails where the original would have skipped.
 
@@ -208,5 +209,65 @@ func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(t *testing.T) {
 			t.Errorf("%s reads as the theme's root %q and is reported, which is a false positive on a declared utility",
 				className, candidates[0].Root)
 		}
+	}
+}
+
+// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme is TestClassOrderLiveDeclinesNoList's question
+// on the public theme (#f598zk0): `pane`, `rail`, `appear`, `swell` and `drift-up` are each declared as a
+// static `@utility` and as a functional one, and a list holding both forms is placed and sorted, never
+// declined. The wanted orders are Prettier's Tailwind plugin (0.8.1) over the public theme.
+func TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	designSystem := publicThemeSystem(t)
+
+	for _, testCase := range []struct {
+		input, want []string
+	}{
+		{[]string{"appear-50", "pane-wide", "appear", "rail", "pane", "rail-thin"}, []string{"pane", "pane-wide", "rail-thin", "rail", "appear-50", "appear"}},
+		{[]string{"swell-50", "drift-up", "swell", "drift-up-4", "p-2", "flex"}, []string{"flex", "p-2", "swell-50", "drift-up", "drift-up-4", "swell"}},
+	} {
+		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
+		if !decided {
+			t.Errorf("%v was declined; every class in it is a root the theme declares", testCase.input)
+			continue
+		}
+		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
+			t.Errorf("%v ordered as %v, the plugin writes %v", testCase.input, ordered, testCase.want)
+		}
+	}
+}
+
+// TestRepositoryUtilitiesAreCompiledOnThePublicTheme is TestRepositoryUtilitiesAreCompiledRatherThanLookedUp's
+// repository half on the public theme (#f598zk0): a class the theme declares by `@utility` is answered by
+// compiling that block, to the property the block sets, and the same class on a design system that does
+// not declare it is not compiled there. `appear-50` sets only a custom property, which is not a property
+// a conflict can be about, so the repository half declines it rather than answering with nothing.
+func TestRepositoryUtilitiesAreCompiledOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	public := publicThemeSystem(t)
+
+	for className, properties := range map[string][]string{
+		"surface--2": {"background-color"}, "tone--1": {"color"}, "tone--4": {"color"}, "edge--1": {"border-color"},
+		"hover:surface--2": {"background-color"}, "dark:tone--1": {"color"}, "ink--strong": {"color"},
+		"lift--sm": {"box-shadow"},
+	} {
+		facts, compiled := repositoryClassFacts(className, "", public)
+		if !compiled {
+			t.Errorf("%s was not answered by compiling the public theme's own @utility block", className)
+			continue
+		}
+		if !slices.Equal(facts.Properties, properties) {
+			t.Errorf("%s compiled to %v, want %v, the properties its @utility block sets", className, facts.Properties, properties)
+		}
+	}
+
+	if facts, compiled := repositoryClassFacts("appear-50", "", public); compiled {
+		t.Errorf("appear-50 sets only a custom property and was answered with %v", facts.Properties)
+	}
+
+	independent := DesignSystemResult{System: independentLiveSystem(t)}
+	if _, compiledElsewhere := repositoryClassFacts("surface--2", "", independent); compiledElsewhere {
+		t.Error("surface--2 was answered by compiling a block on a design system that declares none, so " +
+			"the repository half is not reading the repository in front of the rule")
 	}
 }
