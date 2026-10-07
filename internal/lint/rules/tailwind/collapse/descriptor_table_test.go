@@ -35,7 +35,7 @@ var (
 func testTable(t *testing.T) *Table {
 	t.Helper()
 	testTableOnce.Do(func() {
-		testTableValue, testTableError = loadTestTable()
+		testTableValue, testTableError = loadTestTable("descriptor_table.json", "descriptor_context.json")
 	})
 	if testTableError != nil {
 		t.Fatalf("building the test table: %v", testTableError)
@@ -84,13 +84,13 @@ type extractedContextFile struct {
 	UnlistedStatics map[string]*extractedReading `json:"unlistedStatics"`
 }
 
-func loadTestTable() (*Table, error) {
+func loadTestTable(tableName, contextName string) (*Table, error) {
 	var tableFile extractedTableFile
-	if err := readJSON(filepath.Join("testdata", "descriptor_table.json"), &tableFile); err != nil {
+	if err := readJSON(filepath.Join("testdata", tableName), &tableFile); err != nil {
 		return nil, err
 	}
 	var contextFile extractedContextFile
-	if err := readJSON(filepath.Join("testdata", "descriptor_context.json"), &contextFile); err != nil {
+	if err := readJSON(filepath.Join("testdata", contextName), &contextFile); err != nil {
 		return nil, err
 	}
 

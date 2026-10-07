@@ -1,0 +1,99 @@
+/*
+ * Motion utilities in the shape of the enter and exit animations a real repository writes (#f598zk0).
+ *
+ * The `@utility` evaluator's tests need roots that resolve per declaration: several declarations of one
+ * property, each reading `--value()` a different way (a bare number, a ratio, an integer, a theme key, an
+ * arbitrary value), so a value satisfying two of them survives more declarations than one satisfying a
+ * single path. Also negative roots, roots whose declarations sit under `:dir()` nesting, a scale whose key
+ * `translate-full` is a key of two namespaces at once, and a colour and a shadow read through `--value()`.
+ */
+@theme {
+    --percentage-0: 0;
+    --percentage-5: 0.05;
+    --percentage-10: 0.1;
+    --percentage-15: 0.15;
+    --percentage-20: 0.2;
+    --percentage-25: 0.25;
+    --percentage-30: 0.3;
+    --percentage-35: 0.35;
+    --percentage-40: 0.4;
+    --percentage-45: 0.45;
+    --percentage-50: 0.5;
+    --percentage-55: 0.55;
+    --percentage-60: 0.6;
+    --percentage-65: 0.65;
+    --percentage-70: 0.7;
+    --percentage-75: 0.75;
+    --percentage-80: 0.8;
+    --percentage-85: 0.85;
+    --percentage-90: 0.9;
+    --percentage-95: 0.95;
+    --percentage-100: 1;
+    --percentage-translate-full: 1;
+
+    --color-ink-strong: #111827;
+    --color-ink-soft: #6b7280;
+}
+
+@utility ink--* {
+    color: --value(--color-ink-*, [color]);
+}
+
+@utility lift--* {
+    box-shadow: --value(--shadow-*, [box-shadow]);
+}
+
+@utility appear {
+    --appear-opacity: 0;
+}
+@utility appear-* {
+    --appear-opacity: calc(--value(number) / 100);
+    --appear-opacity: --value(--percentage-*, [*]);
+}
+
+@utility swell {
+    --swell-scale: 0;
+}
+@utility swell-* {
+    --swell-scale: calc(--value(number) * 1%);
+    --swell-scale: calc(--value(ratio));
+    --swell-scale: --value(--percentage-*, [*]);
+}
+@utility -swell-* {
+    --swell-scale: calc(--value(number) * -1%);
+    --swell-scale: calc(--value(ratio) * -1);
+    --swell-scale: --value(--percentage-*, [*]);
+}
+
+@utility drift-up {
+    --drift-y: -100%;
+}
+@utility drift-up-* {
+    --drift-y: calc(--value(integer) * var(--spacing) * -1);
+    --drift-y: calc(--value(--percentage-*, --percentage-translate-*) * -100%);
+    --drift-y: calc(--value(ratio) * -100%);
+    --drift-y: calc(--value(--translate-*, [percentage], [length]) * -1);
+}
+
+@utility drift-inline {
+    &:dir(ltr) {
+        --drift-x: -100%;
+    }
+    &:dir(rtl) {
+        --drift-x: 100%;
+    }
+}
+@utility drift-inline-* {
+    &:where(:dir(ltr), [dir='ltr'], [dir='ltr'] *) {
+        --drift-x: calc(--value(integer) * var(--spacing) * -1);
+        --drift-x: calc(--value(--percentage-*, --percentage-translate-*) * -100%);
+        --drift-x: calc(--value(ratio) * -100%);
+        --drift-x: calc(--value(--translate-*, [percentage], [length]) * -1);
+    }
+    &:where(:dir(rtl), [dir='rtl'], [dir='rtl'] *) {
+        --drift-x: calc(--value(integer) * var(--spacing));
+        --drift-x: calc(--value(--percentage-*, --percentage-translate-*) * 100%);
+        --drift-x: calc(--value(ratio) * 100%);
+        --drift-x: --value(--translate-*, [percentage], [length]);
+    }
+}

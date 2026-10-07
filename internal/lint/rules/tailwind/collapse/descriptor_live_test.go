@@ -53,6 +53,22 @@ func liveEntryPointFor(t testing.TB, spelling string) (entryPoint, packageRoot s
 	return entryPoint, packageRoot
 }
 
+// liveTableForOracle is liveTableFor for the design system an oracle records: a corpus repository with
+// the tailwindcss installed beside it, as before, or a repository path such as the public theme's over
+// the vendored tailwindcss.
+func liveTableForOracle(t *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
+	t.Helper()
+	if _, _, spelled, _ := corpus.Spelled(entryPoint); spelled {
+		return liveTableFor(t, entryPoint)
+	}
+	system := oracleSystem(t, entryPoint)
+	table := NewTable(system)
+	if table == nil {
+		t.Fatalf("NewTable returned nil for %s", entryPoint)
+	}
+	return system, table
+}
+
 // liveTableFor loads a repository's design system and builds its table, or skips.
 func liveTableFor(t *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
 	t.Helper()
@@ -97,10 +113,20 @@ func findTailwindPackageRootForTest(start string) string {
 // from one extraction can agree with each other and disagree with Tailwind, and the whole point of
 // this constructor is that its checked-in half was measured to be a fact about the framework. The
 // engine is the only thing that can refuse it.
+//
+// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
 func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
 	t.Parallel()
-	fixtures := loadDescriptorFixtures(t)
-	_, live := liveTableFor(t, corpusRepositories[0].spelling)
+	forEachOracleCopy(t, "descriptor_fixtures.json", func(t *testing.T, fixtureName string) {
+		fixtures := loadDescriptorFixtures(t, fixtureName)
+		_, live := liveTableForOracle(t, fixtures.EntryPoint)
+		expectLiveTableAgreesWithTheEngine(t, fixtures, live)
+	})
+}
+
+// expectLiveTableAgreesWithTheEngine scores one live table against the engine's readings in one oracle.
+func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtures, live *Table) {
+	t.Helper()
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
 		t.Fatalf("the fixtures are Tailwind %s and the live table is Tailwind %s", fixtures.TailwindVersion, live.TailwindVersion)
@@ -284,11 +310,30 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
 // must be recoverable from the `@utility` evaluator, or have no engine reading at all.
 //
 // Without this, "the evaluator picks it up" is a claim in a comment. A comment cannot fail.
+//
+// Run on the public theme's oracle and on ahra's (#f598zk0): each copy's fixtures, its measured table and
+// its live table come from one design system.
 func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
 	t.Parallel()
-	fixtures := loadDescriptorFixtures(t)
-	measured := testTable(t)
-	system, live := liveTableFor(t, corpusRepositories[0].spelling)
+	forEachOracleCopy(t, "descriptor_fixtures.json", func(t *testing.T, fixtureName string) {
+		fixtures := loadDescriptorFixtures(t, fixtureName)
+		measured := testTable(t)
+		if tableName := oracleSibling(t, fixtureName, "descriptor_table.json"); tableName != "descriptor_table.json" {
+			var err error
+			measured, err = loadTestTable(tableName, oracleSibling(t, fixtureName, "descriptor_context.json"))
+			if err != nil {
+				t.Fatalf("building the measured table from %s: %v", tableName, err)
+			}
+		}
+		system, live := liveTableForOracle(t, fixtures.EntryPoint)
+		expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t, fixtures, measured, system, live)
+	})
+}
+
+// expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers checks every case one live table declines and its
+// measured table answers against the evaluator.
+func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T, fixtures *descriptorFixtures, measured *Table, system *LoadedDesignSystem, live *Table) {
+	t.Helper()
 
 	evaluator := system.Utilities()
 	if evaluator == nil {

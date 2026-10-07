@@ -9,10 +9,11 @@ import (
 )
 
 type wave3Fixture struct {
-	RootCount int `json:"rootCount"`
-	CaseCount int `json:"caseCount"`
-	Answered  int `json:"answered"`
-	Cases     []struct {
+	EntryPoint string `json:"entryPoint"`
+	RootCount  int    `json:"rootCount"`
+	CaseCount  int    `json:"caseCount"`
+	Answered   int    `json:"answered"`
+	Cases      []struct {
 		Root         string `json:"root"`
 		ClassName    string `json:"className"`
 		FromRegistry bool   `json:"fromRegistry"`
@@ -39,10 +40,20 @@ type wave3Fixture struct {
 // is the future one. If a wave-4 change or a Tailwind bump makes one of these roots stop being a pure
 // function of its type, this is where it shows up, and the answer then is a new table rather than a
 // wider descriptor.
+//
+// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
 func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
 	t.Parallel()
-	fixture := loadWave3Fixture(t, "wave3_fixtures.json")
-	system := loadWave1DesignSystem(t)
+	forEachOracleCopy(t, "wave3_fixtures.json", func(t *testing.T, fixtureName string) {
+		fixture := loadWave3Fixture(t, fixtureName)
+		expectWave3RootsAnswered(t, fixture, oracleSystem(t, fixture.EntryPoint))
+	})
+}
+
+// expectWave3RootsAnswered compares one wave-3 oracle with the descriptor table over the design system
+// it was captured from.
+func expectWave3RootsAnswered(t *testing.T, fixture wave3Fixture, system *LoadedDesignSystem) {
+	t.Helper()
 	table := NewTable(system)
 
 	var agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe int
@@ -89,7 +100,9 @@ func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
 	t.Logf("wave 3: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, invented on registry %d, invented on probe %d",
 		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe)
 
-	if agreed < 7000 {
+	// A share of what the engine answered rather than a count, so the floor holds each copy to the same
+	// standard: it was 7,000 of ahra's 7,621, and 92% is that, rounded up.
+	if agreed*100 < fixture.Answered*92 {
 		t.Errorf("only %d of %d cases agreed; a lookup that stopped answering scores perfectly on any comparison counting disagreements alone", agreed, fixture.Answered)
 	}
 	if inventedOnRegistry > 0 {

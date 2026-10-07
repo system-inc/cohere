@@ -9,3 +9,4 @@
 @import 'tailwindcss';
 @import './tokens.css';
 @import './utilities.css';
+@import './motion.css';

@@ -10,11 +10,12 @@ import (
 )
 
 type wave2bFixture struct {
-	RootCount int `json:"rootCount"`
-	CaseCount int `json:"caseCount"`
-	Answered  int `json:"answered"`
-	Rejected  int `json:"rejected"`
-	Cases     []struct {
+	EntryPoint string `json:"entryPoint"`
+	RootCount  int    `json:"rootCount"`
+	CaseCount  int    `json:"caseCount"`
+	Answered   int    `json:"answered"`
+	Rejected   int    `json:"rejected"`
+	Cases      []struct {
 		Root      string `json:"root"`
 		ClassName string `json:"className"`
 		Reading   *struct {
@@ -28,13 +29,18 @@ type wave2bFixture struct {
 //
 // Scored as a lattice for the same reason wave 1 is: mutual silence is counted apart from agreement,
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
+//
+// Each wave runs on the public theme's oracle and on ahra's (#f598zk0), each against the design system
+// it records.
 func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(t *testing.T) {
 	t.Parallel()
-	system := loadWave1DesignSystem(t)
 	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json", "wave4_fixtures.json", "wave5_fixtures.json"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			runMultiDeclarationComparison(t, loadWave2bFixture(t, name), system)
+			forEachOracleCopy(t, name, func(t *testing.T, fixtureName string) {
+				fixture := loadWave2bFixture(t, fixtureName)
+				runMultiDeclarationComparison(t, fixture, oracleSystem(t, fixture.EntryPoint))
+			})
 		})
 	}
 }

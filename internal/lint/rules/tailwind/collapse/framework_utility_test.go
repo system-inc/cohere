@@ -13,11 +13,12 @@ import (
 )
 
 type wave1Fixture struct {
-	RootCount int `json:"rootCount"`
-	CaseCount int `json:"caseCount"`
-	Answered  int `json:"answered"`
-	Rejected  int `json:"rejected"`
-	Cases     []struct {
+	EntryPoint string `json:"entryPoint"`
+	RootCount  int    `json:"rootCount"`
+	CaseCount  int    `json:"caseCount"`
+	Answered   int    `json:"answered"`
+	Rejected   int    `json:"rejected"`
+	Cases      []struct {
 		Root       string  `json:"root"`
 		ClassName  string  `json:"className"`
 		ParsedRoot *string `json:"parsedRoot"`
@@ -39,10 +40,20 @@ type wave1Fixture struct {
 // Scored as a lattice rather than a rate. A case where both sides decline is an agreement about
 // nothing and is counted separately from one where both produced the same reading, because folding
 // silence into equality is how a table that stopped answering scores perfectly.
+//
+// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
 func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
 	t.Parallel()
-	fixture := loadWave1Fixture(t, "wave1_fixtures.json")
-	system := loadWave1DesignSystem(t)
+	forEachOracleCopy(t, "wave1_fixtures.json", func(t *testing.T, fixtureName string) {
+		fixture := loadWave1Fixture(t, fixtureName)
+		expectFrameworkFunctionalUtilitiesMatch(t, fixture, oracleSystem(t, fixture.EntryPoint))
+	})
+}
+
+// expectFrameworkFunctionalUtilitiesMatch compares one wave-1 oracle with the table, over the design
+// system it was captured from.
+func expectFrameworkFunctionalUtilitiesMatch(t *testing.T, fixture wave1Fixture, system *LoadedDesignSystem) {
+	t.Helper()
 
 	var agreed, bothDeclined, goSilent, engineSilent int
 	var disagreements, silentNames []string

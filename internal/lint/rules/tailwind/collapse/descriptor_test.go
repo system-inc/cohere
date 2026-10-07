@@ -40,6 +40,7 @@ type reading struct {
 
 type descriptorFixtures struct {
 	TailwindVersion string `json:"tailwindVersion"`
+	EntryPoint      string `json:"entryPoint"`
 	Counts          struct {
 		Cases             int `json:"cases"`
 		ClassesConsidered int `json:"classesConsidered"`
@@ -49,9 +50,9 @@ type descriptorFixtures struct {
 	Cases []descriptorFixtureCase `json:"cases"`
 }
 
-func loadDescriptorFixtures(t *testing.T) *descriptorFixtures {
+func loadDescriptorFixtures(t *testing.T, name string) *descriptorFixtures {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "descriptor_fixtures.json"))
+	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
 		t.Fatalf("reading fixtures: %v", err)
 	}
@@ -114,7 +115,7 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 
 func TestDescriptorLookupMatchesEngine(t *testing.T) {
 	t.Parallel()
-	fixtures := loadDescriptorFixtures(t)
+	fixtures := loadDescriptorFixtures(t, "descriptor_fixtures.json")
 	table := testTable(t)
 
 	if table.TailwindVersion != fixtures.TailwindVersion {
@@ -220,7 +221,7 @@ func countPerDeclaration(table *Table) int {
 // rather than for the ones the corpus happened to reach.
 func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
 	t.Parallel()
-	fixtures := loadDescriptorFixtures(t)
+	fixtures := loadDescriptorFixtures(t, "descriptor_fixtures.json")
 	table := testTable(t)
 
 	rootsInCorpus := map[string]bool{}

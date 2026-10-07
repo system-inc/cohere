@@ -127,10 +127,10 @@ type utilityReadingFixture struct {
 // machine (#sycrdr6).
 var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
 
-func utilityLoadCorpus(t *testing.T) utilityCorpus {
+func utilityLoadCorpus(t *testing.T, name string) utilityCorpus {
 	t.Helper()
 
-	raw, err := os.ReadFile(filepath.Join("testdata", "utility_fixtures.json"))
+	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
 		t.Fatalf("read utility fixture: %v", err)
 	}
@@ -151,7 +151,7 @@ func utilityLoadCorpus(t *testing.T) utilityCorpus {
 // The stylesheet is spelled inside its corpus, so this skips naming the variable when the corpus is
 // unset, and skips loudly, because a silently absent corpus turns this suite into one that compares
 // nothing and still prints green. A corpus that is set but lacks the stylesheet fails.
-func utilityBuildEvaluator(t *testing.T, fixture utilityCorpus) (*UtilityEvaluator, bool) {
+func utilityBuildEvaluator(t *testing.T, fixture utilityCorpus) *UtilityEvaluator {
 	t.Helper()
 
 	entryPath := corpus.Resolve(t, fixture.EntryPath)
@@ -161,7 +161,17 @@ func utilityBuildEvaluator(t *testing.T, fixture utilityCorpus) (*UtilityEvaluat
 	}
 
 	definitions := utilityParseDefinitions(t, fixture)
-	return NewUtilityEvaluator(theme, definitions), true
+	return NewUtilityEvaluator(theme, definitions)
+}
+
+// forEachUtilityOracle runs an evaluator assertion once per copy of the utility oracle, the public
+// theme's and ahra's (#f598zk0), each with the evaluator built from the stylesheet that copy records.
+func forEachUtilityOracle(t *testing.T, run func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator)) {
+	t.Helper()
+	forEachOracleCopy(t, "utility_fixtures.json", func(t *testing.T, fixtureName string) {
+		fixture := utilityLoadCorpus(t, fixtureName)
+		run(t, fixtureName, fixture, utilityBuildEvaluator(t, fixture))
+	})
 }
 
 // utilityParseDefinitions turns the fixture's `@utility` block text into definitions.
@@ -240,79 +250,76 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 // while looking identical in a summary that only counted matches.
 func TestUtilityMatchesEngine(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	var compared, agreedCompiling, agreedRejecting int
-	var disagreements []string
+		var compared, agreedCompiling, agreedRejecting int
+		var disagreements []string
 
-	for _, aCase := range fixture.Cases {
-		if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
-			continue
-		}
-		compared++
+		for _, aCase := range fixture.Cases {
+			if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
+				continue
+			}
+			compared++
 
-		reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
+			reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 
-		if aCase.Reading == nil {
-			if compiled {
+			if aCase.Reading == nil {
+				if compiled {
+					if len(disagreements) < 40 {
+						disagreements = append(disagreements, fmt.Sprintf(
+							"%s: evaluator read %s, engine rejected the class",
+							aCase.ClassName, utilityDescribeReading(reading),
+						))
+					}
+					continue
+				}
+				agreedRejecting++
+				continue
+			}
+
+			if !compiled {
 				if len(disagreements) < 40 {
 					disagreements = append(disagreements, fmt.Sprintf(
-						"%s: evaluator read %s, engine rejected the class",
-						aCase.ClassName, utilityDescribeReading(reading),
+						"%s: evaluator rejected the class, engine read %s",
+						aCase.ClassName, utilityDescribeReading(Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}),
 					))
 				}
 				continue
 			}
-			agreedRejecting++
-			continue
-		}
 
-		if !compiled {
-			if len(disagreements) < 40 {
-				disagreements = append(disagreements, fmt.Sprintf(
-					"%s: evaluator rejected the class, engine read %s",
-					aCase.ClassName, utilityDescribeReading(Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}),
-				))
+			want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
+			if !reading.Equal(want) {
+				if len(disagreements) < 40 {
+					disagreements = append(disagreements, fmt.Sprintf(
+						"%s: evaluator read %s, engine read %s",
+						aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want),
+					))
+				}
+				continue
 			}
-			continue
+			agreedCompiling++
 		}
 
-		want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
-		if !reading.Equal(want) {
-			if len(disagreements) < 40 {
-				disagreements = append(disagreements, fmt.Sprintf(
-					"%s: evaluator read %s, engine read %s",
-					aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want),
-				))
-			}
-			continue
+		if len(disagreements) > 0 {
+			t.Errorf("%d of %d classes disagreed with the engine:\n  %s", compared-agreedCompiling-agreedRejecting, compared, strings.Join(disagreements, "\n  "))
 		}
-		agreedCompiling++
-	}
 
-	if len(disagreements) > 0 {
-		t.Errorf("%d of %d classes disagreed with the engine:\n  %s", compared-agreedCompiling-agreedRejecting, compared, strings.Join(disagreements, "\n  "))
-	}
+		// Coverage, printed on success. A suite that compared twelve answers and one that compared
+		// thousands are indistinguishable from a green line, and both halves have to be large: the
+		// compiling half is what proves arity is counted right, and the rejecting half is what proves
+		// the post-conditions reject anything at all.
+		if agreedCompiling < 500 {
+			t.Errorf("only %d compiling classes were compared; the fixture is too small to have shown anything about arity", agreedCompiling)
+		}
+		if agreedRejecting < 500 {
+			t.Errorf("only %d rejected classes were compared; without them the post-conditions have never been shown to reject", agreedRejecting)
+		}
 
-	// Coverage, printed on success. A suite that compared twelve answers and one that compared
-	// thousands are indistinguishable from a green line, and both halves have to be large: the
-	// compiling half is what proves arity is counted right, and the rejecting half is what proves
-	// the post-conditions reject anything at all.
-	if agreedCompiling < 500 {
-		t.Errorf("only %d compiling classes were compared; the fixture is too small to have shown anything about arity", agreedCompiling)
-	}
-	if agreedRejecting < 500 {
-		t.Errorf("only %d rejected classes were compared; without them the post-conditions have never been shown to reject", agreedRejecting)
-	}
-
-	t.Logf(
-		"tailwind %s: %d functional classes on %d @utility roots; %d compiled and agreed, %d rejected and agreed",
-		fixture.TailwindVersion, compared, len(evaluator.Definitions), agreedCompiling, agreedRejecting,
-	)
+		t.Logf(
+			"tailwind %s: %d functional classes on %d @utility roots; %d compiled and agreed, %d rejected and agreed",
+			fixture.TailwindVersion, compared, len(evaluator.Definitions), agreedCompiling, agreedRejecting,
+		)
+	})
 }
 
 // TestUtilityReproducesTheKnownExceptions is the acceptance criterion for this component.
@@ -326,65 +333,65 @@ func TestUtilityMatchesEngine(t *testing.T) {
 // justification changed and that should be read rather than silently passed.
 func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	if len(fixture.KnownExceptions) != 18 {
-		t.Errorf(
-			"fixture holds %d known exceptions, Phase 0 measured 18; the population this component exists for has changed and the change should be read rather than absorbed",
-			len(fixture.KnownExceptions),
-		)
-	}
-
-	byClassName := make(map[string]utilityCase, len(fixture.Cases))
-	for _, aCase := range fixture.Cases {
-		byClassName[aCase.ClassName] = aCase
-	}
-
-	reproduced := 0
-	for _, exception := range fixture.KnownExceptions {
-		aCase, present := byClassName[exception.ClassName]
-		if !present {
-			t.Errorf("%s: the fixture names it an exception and holds no case for it", exception.ClassName)
-			continue
-		}
-		if !evaluator.Has(aCase.Root) {
-			t.Errorf("%s: root %q is not defined by any @utility block the evaluator holds", exception.ClassName, aCase.Root)
-			continue
-		}
-
-		reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
-		if !compiled {
-			t.Errorf("%s: evaluator rejected the class, engine read %s", exception.ClassName, utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}))
-			continue
-		}
-		want := Reading{Order: exception.Order, Count: exception.Count}
-		if !reading.Equal(want) {
+		// Measured per copy: 18 on ahra in Phase 0, and 5 on the public theme, its five per-declaration
+		// roots each with the `translate-full` key two of their namespaces share.
+		measured := map[string]int{"utility_fixtures.json": 18, "utility_fixtures_public.json": 5}[fixtureName]
+		if len(fixture.KnownExceptions) != measured {
 			t.Errorf(
-				"%s: evaluator read %s, engine read %s (the descriptor table predicted %s)",
-				exception.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want), exception.PredictedByDescriptorModel,
+				"fixture holds %d known exceptions, %d were measured; the population this component exists for has changed and the change should be read rather than absorbed",
+				len(fixture.KnownExceptions), measured,
 			)
-			continue
 		}
-		// The exception is only an exception because the table's answer differs. If the two ever
-		// agree, this class stopped needing the evaluator and the fixture is stale.
-		if utilityDescribeReading(want) == exception.PredictedByDescriptorModel {
-			t.Errorf(
-				"%s: the descriptor table predicted %s, which is what the engine says; this class is no longer an exception and the fixture is stale",
-				exception.ClassName, exception.PredictedByDescriptorModel,
-			)
-			continue
-		}
-		reproduced++
-	}
 
-	if reproduced != len(fixture.KnownExceptions) {
-		t.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
-	}
-	t.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
+		byClassName := make(map[string]utilityCase, len(fixture.Cases))
+		for _, aCase := range fixture.Cases {
+			byClassName[aCase.ClassName] = aCase
+		}
+
+		reproduced := 0
+		for _, exception := range fixture.KnownExceptions {
+			aCase, present := byClassName[exception.ClassName]
+			if !present {
+				t.Errorf("%s: the fixture names it an exception and holds no case for it", exception.ClassName)
+				continue
+			}
+			if !evaluator.Has(aCase.Root) {
+				t.Errorf("%s: root %q is not defined by any @utility block the evaluator holds", exception.ClassName, aCase.Root)
+				continue
+			}
+
+			reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
+			if !compiled {
+				t.Errorf("%s: evaluator rejected the class, engine read %s", exception.ClassName, utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}))
+				continue
+			}
+			want := Reading{Order: exception.Order, Count: exception.Count}
+			if !reading.Equal(want) {
+				t.Errorf(
+					"%s: evaluator read %s, engine read %s (the descriptor table predicted %s)",
+					exception.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want), exception.PredictedByDescriptorModel,
+				)
+				continue
+			}
+			// The exception is only an exception because the table's answer differs. If the two ever
+			// agree, this class stopped needing the evaluator and the fixture is stale.
+			if utilityDescribeReading(want) == exception.PredictedByDescriptorModel {
+				t.Errorf(
+					"%s: the descriptor table predicted %s, which is what the engine says; this class is no longer an exception and the fixture is stale",
+					exception.ClassName, exception.PredictedByDescriptorModel,
+				)
+				continue
+			}
+			reproduced++
+		}
+
+		if reproduced != len(fixture.KnownExceptions) {
+			t.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
+		}
+		t.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
+	})
 }
 
 // TestUtilityFindsThePerDeclarationRoots asserts the mechanism is detectable from the evaluator's own
@@ -397,54 +404,51 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 // empty population, which is the failure mode this whole slice has been bitten by.
 func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	if len(fixture.PerDeclarationRoots) == 0 {
-		t.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
-	}
-
-	byClassName := make(map[string]utilityCase, len(fixture.Cases))
-	for _, aCase := range fixture.Cases {
-		byClassName[aCase.ClassName] = aCase
-	}
-
-	checked := 0
-	for _, root := range fixture.PerDeclarationRoots {
-		if !evaluator.Has(root) {
-			t.Errorf("%s: the fixture reports it as per-declaration and no @utility block defines it", root)
-			continue
+		if len(fixture.PerDeclarationRoots) == 0 {
+			t.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
 		}
 
-		// `4` is only an integer. `50` is an integer and a `--percentage` key. Same root, same
-		// declaration list, and the count has to differ.
-		singlePathCase, hasSinglePath := byClassName[root+"-4"]
-		multiPathCase, hasMultiPath := byClassName[root+"-50"]
-		if !hasSinglePath || !hasMultiPath {
-			t.Errorf("%s: the fixture is missing the -4 or -50 probe that separates the two paths", root)
-			continue
+		byClassName := make(map[string]utilityCase, len(fixture.Cases))
+		for _, aCase := range fixture.Cases {
+			byClassName[aCase.ClassName] = aCase
 		}
 
-		singlePath, singleOK := evaluator.Reading(utilityCandidateFromCase(singlePathCase))
-		multiPath, multiOK := evaluator.Reading(utilityCandidateFromCase(multiPathCase))
-		if !singleOK || !multiOK {
-			t.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOK, multiOK)
-			continue
-		}
-		if multiPath.Count <= singlePath.Count {
-			t.Errorf(
-				"%s: -50 read %s and -4 read %s; a value satisfying two resolution paths must survive more declarations than one satisfying a single path, or this root is not per-declaration and the fixture is wrong about it",
-				root, utilityDescribeReading(multiPath), utilityDescribeReading(singlePath),
-			)
-			continue
-		}
-		checked++
-	}
+		checked := 0
+		for _, root := range fixture.PerDeclarationRoots {
+			if !evaluator.Has(root) {
+				t.Errorf("%s: the fixture reports it as per-declaration and no @utility block defines it", root)
+				continue
+			}
 
-	t.Logf("%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path", checked)
+			// `4` is only an integer. `50` is an integer and a `--percentage` key. Same root, same
+			// declaration list, and the count has to differ.
+			singlePathCase, hasSinglePath := byClassName[root+"-4"]
+			multiPathCase, hasMultiPath := byClassName[root+"-50"]
+			if !hasSinglePath || !hasMultiPath {
+				t.Errorf("%s: the fixture is missing the -4 or -50 probe that separates the two paths", root)
+				continue
+			}
+
+			singlePath, singleOK := evaluator.Reading(utilityCandidateFromCase(singlePathCase))
+			multiPath, multiOK := evaluator.Reading(utilityCandidateFromCase(multiPathCase))
+			if !singleOK || !multiOK {
+				t.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOK, multiOK)
+				continue
+			}
+			if multiPath.Count <= singlePath.Count {
+				t.Errorf(
+					"%s: -50 read %s and -4 read %s; a value satisfying two resolution paths must survive more declarations than one satisfying a single path, or this root is not per-declaration and the fixture is wrong about it",
+					root, utilityDescribeReading(multiPath), utilityDescribeReading(singlePath),
+				)
+				continue
+			}
+			checked++
+		}
+
+		t.Logf("%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path", checked)
+	})
 }
 
 // TestUtilityDropIsNotDefault is the first mutation, and it targets the rule the whole component is.
@@ -460,49 +464,46 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 // drift away from what it is mutating.
 func TestUtilityDropIsNotDefault(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	byClassName := make(map[string]utilityCase, len(fixture.Cases))
-	for _, aCase := range fixture.Cases {
-		byClassName[aCase.ClassName] = aCase
-	}
-
-	caught, checked := 0, 0
-	for _, exception := range fixture.KnownExceptions {
-		aCase, present := byClassName[exception.ClassName]
-		if !present {
-			continue
+		byClassName := make(map[string]utilityCase, len(fixture.Cases))
+		for _, aCase := range fixture.Cases {
+			byClassName[aCase.ClassName] = aCase
 		}
-		checked++
 
-		mutated, compiled := evaluator.compileKeepingDroppedDeclarations(utilityCandidateFromCase(aCase))
-		if !compiled {
-			t.Errorf("%s: the mutant did not compile at all, so this class proves nothing about the drop", exception.ClassName)
-			continue
-		}
-		mutatedSort := PropertySort(mutated)
-		want := Reading{Order: exception.Order, Count: exception.Count}
-		if !(Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(want) {
-			caught++
-			continue
-		}
-		t.Errorf(
-			"%s: keeping dropped declarations still reads %s, which is what the engine says; the drop rule is not what decides this class's arity and the test is not testing it",
-			exception.ClassName, utilityDescribeReading(want),
-		)
-	}
+		caught, checked := 0, 0
+		for _, exception := range fixture.KnownExceptions {
+			aCase, present := byClassName[exception.ClassName]
+			if !present {
+				continue
+			}
+			checked++
 
-	if checked == 0 {
-		t.Fatal("no exception class was available to mutate")
-	}
-	if caught != checked {
-		t.Errorf("the drop mutation was caught on %d of %d exception classes", caught, checked)
-	}
-	t.Logf("suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule", caught)
+			mutated, compiled := evaluator.compileKeepingDroppedDeclarations(utilityCandidateFromCase(aCase))
+			if !compiled {
+				t.Errorf("%s: the mutant did not compile at all, so this class proves nothing about the drop", exception.ClassName)
+				continue
+			}
+			mutatedSort := PropertySort(mutated)
+			want := Reading{Order: exception.Order, Count: exception.Count}
+			if !(Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(want) {
+				caught++
+				continue
+			}
+			t.Errorf(
+				"%s: keeping dropped declarations still reads %s, which is what the engine says; the drop rule is not what decides this class's arity and the test is not testing it",
+				exception.ClassName, utilityDescribeReading(want),
+			)
+		}
+
+		if checked == 0 {
+			t.Fatal("no exception class was available to mutate")
+		}
+		if caught != checked {
+			t.Errorf("the drop mutation was caught on %d of %d exception classes", caught, checked)
+		}
+		t.Logf("suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule", caught)
+	})
 }
 
 // TestUtilityRatioSpliceIsLoadBearing is the second mutation, on the other removal.
@@ -518,43 +519,40 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 // is a branch this suite has not exercised.
 func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	moved, unaffected := 0, 0
-	for _, aCase := range fixture.Cases {
-		if aCase.Reading == nil || aCase.CandidateKind != string(ParsedCandidateKindFunctional) {
-			continue
-		}
-		if aCase.Fraction == "" || !evaluator.Has(aCase.Root) {
-			continue
-		}
-		candidate := utilityCandidateFromCase(aCase)
+		moved, unaffected := 0, 0
+		for _, aCase := range fixture.Cases {
+			if aCase.Reading == nil || aCase.CandidateKind != string(ParsedCandidateKindFunctional) {
+				continue
+			}
+			if aCase.Fraction == "" || !evaluator.Has(aCase.Root) {
+				continue
+			}
+			candidate := utilityCandidateFromCase(aCase)
 
-		real, realOK := evaluator.Reading(candidate)
-		if !realOK {
-			continue
+			real, realOK := evaluator.Reading(candidate)
+			if !realOK {
+				continue
+			}
+			mutated, mutatedOK := evaluator.compileWithoutRatioSplice(candidate)
+			if !mutatedOK {
+				t.Errorf("%s: the mutant did not compile while the real path did", aCase.ClassName)
+				continue
+			}
+			mutatedSort := PropertySort(mutated)
+			if (Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(real) {
+				unaffected++
+				continue
+			}
+			moved++
 		}
-		mutated, mutatedOK := evaluator.compileWithoutRatioSplice(candidate)
-		if !mutatedOK {
-			t.Errorf("%s: the mutant did not compile while the real path did", aCase.ClassName)
-			continue
-		}
-		mutatedSort := PropertySort(mutated)
-		if (Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(real) {
-			unaffected++
-			continue
-		}
-		moved++
-	}
 
-	if moved == 0 {
-		t.Error("suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code")
-	}
-	t.Logf("suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved", moved, unaffected)
+		if moved == 0 {
+			t.Error("suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code")
+		}
+		t.Logf("suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved", moved, unaffected)
+	})
 }
 
 // TestUtilityAgreesThroughTheGoCandidateParser closes the loop the other tests deliberately leave
@@ -567,65 +565,62 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 // the Go parser produces is a failure here rather than a surprise in the rule.
 func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	designSystem := &utilityTestDesignSystem{evaluator: evaluator}
+		designSystem := &utilityTestDesignSystem{evaluator: evaluator}
 
-	var compared, agreed int
-	var disagreements []string
-	for _, aCase := range fixture.Cases {
-		if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
-			continue
-		}
-
-		parsed := ParseCandidate(aCase.ClassName, designSystem)
-		if len(parsed) == 0 {
-			// The Go parser produced no candidate. That is the candidate parser's business and it
-			// has its own differential; counting it here would score this component on another's
-			// answer. It is reported in the log so a large number is visible.
-			continue
-		}
-		// The first reading, matching `getClassOrder`, which takes the position of the first parse.
-		candidate := parsed[0]
-		if candidate.Kind != ParsedCandidateKindFunctional || candidate.Root != aCase.Root {
-			continue
-		}
-		compared++
-
-		reading, compiled := evaluator.Reading(&candidate)
-		if aCase.Reading == nil {
-			if compiled && len(disagreements) < 20 {
-				disagreements = append(disagreements, fmt.Sprintf("%s: read %s through the Go parser, engine rejected it", aCase.ClassName, utilityDescribeReading(reading)))
+		var compared, agreed int
+		var disagreements []string
+		for _, aCase := range fixture.Cases {
+			if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
+				continue
 			}
-			if !compiled {
-				agreed++
-			}
-			continue
-		}
-		want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
-		if !compiled || !reading.Equal(want) {
-			if len(disagreements) < 20 {
-				disagreements = append(disagreements, fmt.Sprintf(
-					"%s: read %s through the Go parser (compiled=%v), engine read %s",
-					aCase.ClassName, utilityDescribeReading(reading), compiled, utilityDescribeReading(want),
-				))
-			}
-			continue
-		}
-		agreed++
-	}
 
-	if len(disagreements) > 0 {
-		t.Errorf("%d of %d classes disagreed end to end:\n  %s", compared-agreed, compared, strings.Join(disagreements, "\n  "))
-	}
-	if agreed < 500 {
-		t.Errorf("only %d classes agreed end to end; the chain has not been shown to work at scale", agreed)
-	}
-	t.Logf("%d of %d classes agree end to end, from class string through ParseCandidate to a reading", agreed, compared)
+			parsed := ParseCandidate(aCase.ClassName, designSystem)
+			if len(parsed) == 0 {
+				// The Go parser produced no candidate. That is the candidate parser's business and it
+				// has its own differential; counting it here would score this component on another's
+				// answer. It is reported in the log so a large number is visible.
+				continue
+			}
+			// The first reading, matching `getClassOrder`, which takes the position of the first parse.
+			candidate := parsed[0]
+			if candidate.Kind != ParsedCandidateKindFunctional || candidate.Root != aCase.Root {
+				continue
+			}
+			compared++
+
+			reading, compiled := evaluator.Reading(&candidate)
+			if aCase.Reading == nil {
+				if compiled && len(disagreements) < 20 {
+					disagreements = append(disagreements, fmt.Sprintf("%s: read %s through the Go parser, engine rejected it", aCase.ClassName, utilityDescribeReading(reading)))
+				}
+				if !compiled {
+					agreed++
+				}
+				continue
+			}
+			want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
+			if !compiled || !reading.Equal(want) {
+				if len(disagreements) < 20 {
+					disagreements = append(disagreements, fmt.Sprintf(
+						"%s: read %s through the Go parser (compiled=%v), engine read %s",
+						aCase.ClassName, utilityDescribeReading(reading), compiled, utilityDescribeReading(want),
+					))
+				}
+				continue
+			}
+			agreed++
+		}
+
+		if len(disagreements) > 0 {
+			t.Errorf("%d of %d classes disagreed end to end:\n  %s", compared-agreed, compared, strings.Join(disagreements, "\n  "))
+		}
+		if agreed < 500 {
+			t.Errorf("only %d classes agreed end to end; the chain has not been shown to work at scale", agreed)
+		}
+		t.Logf("%d of %d classes agree end to end, from class string through ParseCandidate to a reading", agreed, compared)
+	})
 }
 
 // TestUtilityDoesNotClaimTheShadowQuirk states the boundary of this component in a test rather than
@@ -639,29 +634,31 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 // wrong one.
 func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, fixture)
-	if !ok {
-		return
-	}
+	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-	if len(fixture.ShadowQuirkProbes) != 4 {
-		t.Errorf("fixture holds %d shadow-quirk probes, Phase 0 measured 4", len(fixture.ShadowQuirkProbes))
-	}
+		// Measured per copy. Ahra's are the four `[16/9]` probes. The public theme's sweep also carries the
+		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and the engine reads as
+		// `max-width`; the Go table reads them as the engine does, so they are the generator's model
+		// disagreeing, and outside this component like the rest.
+		measured := map[string]int{"utility_fixtures.json": 4, "utility_fixtures_public.json": 9}[fixtureName]
+		if len(fixture.ShadowQuirkProbes) != measured {
+			t.Errorf("fixture holds %d shadow-quirk probes, %d were measured", len(fixture.ShadowQuirkProbes), measured)
+		}
 
-	for _, probe := range fixture.ShadowQuirkProbes {
-		root := probe.ClassName
-		if index := strings.Index(root, "-["); index != -1 {
-			root = root[:index]
+		for _, probe := range fixture.ShadowQuirkProbes {
+			root := probe.ClassName
+			if index := strings.Index(root, "-["); index != -1 {
+				root = root[:index]
+			}
+			if evaluator.Has(root) {
+				t.Errorf(
+					"%s: this evaluator defines root %q, so it is answering a class the shadow quirk explains; the quirk is recorded and not modelled",
+					probe.ClassName, root,
+				)
+			}
 		}
-		if evaluator.Has(root) {
-			t.Errorf(
-				"%s: this evaluator defines root %q, so it is answering a class the shadow quirk explains; the quirk is recorded and not modelled",
-				probe.ClassName, root,
-			)
-		}
-	}
-	t.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
+		t.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
+	})
 }
 
 // TestUtilitySpacingMultiplierRejects pins the numeric guard that separates a surviving
@@ -734,7 +731,7 @@ func TestUtilityNormalizesValueArguments(t *testing.T) {
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
 func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 	t.Parallel()
-	fixture := utilityLoadCorpus(t)
+	fixture := utilityLoadCorpus(t, "utility_fixtures.json")
 
 	if len(fixture.SyntheticCases) == 0 {
 		t.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")
