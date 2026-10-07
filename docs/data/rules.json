@@ -4432,7 +4432,8 @@
             "category": "adamic",
             "typeAware": true,
             "messageIds": [
-                "mutableWidening"
+                "mutableWidening",
+                "readonlyMadeWritable"
             ],
             "sets": [
                 {
