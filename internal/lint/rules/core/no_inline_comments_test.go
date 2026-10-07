@@ -223,6 +223,14 @@ var noInlineCommentsFiresCases = []noInlineCommentsCase{
 		options: "",
 		ids:     []string{"unexpectedInlineComment", "unexpectedInlineComment"},
 	},
+	{
+		// #7mztrdd: the control for lookahead-1 below. In Node, new RegExp("Note(?=:)", "u") tests false
+		// on "Notes are legal.", so the comment still reports.
+		name:    "lookahead-control",
+		source:  "var foo = 2; // Notes are legal.",
+		options: "{\"ignorePattern\": \"Note(?=:)\"}",
+		ids:     []string{"unexpectedInlineComment"},
+	},
 }
 
 // noInlineCommentsSilentCases are the rows upstream is clean on.
@@ -311,6 +319,26 @@ var noInlineCommentsSilentCases = []noInlineCommentsCase{
 		name:    "valid-16",
 		source:  "var foo = 2; // Note: This comment is legal.",
 		options: "{\"ignorePattern\": \"Note: \"}",
+	},
+	// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(ignorePattern, "u")`. RE2
+	// refuses a lookahead and a lookbehind, so these were dropped and the comment reported; in Node
+	// both test true on "Note: This comment is legal.".
+	{
+		name:    "lookahead-1",
+		source:  "var foo = 2; // Note: This comment is legal.",
+		options: "{\"ignorePattern\": \"Note(?=:)\"}",
+	},
+	{
+		name:    "lookbehind-1",
+		source:  "var foo = 2; // Note: This comment is legal.",
+		options: "{\"ignorePattern\": \"(?<=Note: )This\"}",
+	},
+	// #7mztrdd: JavaScript's `\s` matches U+00A0, RE2's does not. In Node, new RegExp("^Note:\\sThis", "u")
+	// tests true on "Note:\u00a0This comment is legal.".
+	{
+		name:    "nbsp-whitespace-1",
+		source:  "var foo = 2; // Note:\u00a0This comment is legal.",
+		options: "{\"ignorePattern\": \"^Note:\\\\sThis\"}",
 	},
 }
 

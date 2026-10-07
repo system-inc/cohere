@@ -130,9 +130,21 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 		{true, "{\"destructuredArrayIgnorePattern\":\"^_\"}", "{}", "const [_a] = list;\ntype T = typeof _a;\nuse(1 as T);", nil, []string{"usedOnlyAsType _a"}},
 		{true, "{\"destructuredArrayIgnorePattern\":\"^_\"}", "{}", "const [notMatched] = list;", []string{"unusedVar notMatched"}, []string{"unusedVar notMatched"}},
 		{true, "{\"destructuredArrayIgnorePattern\":\"^_\",\"varsIgnorePattern\":\"^ignored\"}", "{\"varsIgnorePattern\":\"^ignored\"}", "const [_a, ignoredToo] = list;\nconst ignoredAlone = 1;\nconst [kept] = list;", []string{"unusedVar kept"}, []string{"unusedVar _a", "unusedVar kept"}},
+		// #7mztrdd: each ignore pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a
+		// lookahead and a lookbehind, so each of these ignored nothing. Node's `new RegExp(p, "u").test(name)`
+		// answers true for _skipped, _ignored, err and _a, and false for each control after it (_kept, ignored,
+		// reportMe, a), so the controls prove the pattern is tested rather than excusing every name.
+		{true, "{\"varsIgnorePattern\":\"^_(?=skip)\"}", "{}", "const _skipped = 1;", nil, []string{"unusedVar _skipped"}},
+		{true, "{\"varsIgnorePattern\":\"^_(?=skip)\"}", "{}", "const _kept = 1;", []string{"unusedVar _kept"}, []string{"unusedVar _kept"}},
+		{true, "{\"argsIgnorePattern\":\"(?<=_)ignored$\"}", "{}", "function f(_ignored: number) {}\nuse(f);", nil, []string{"unusedVar _ignored"}},
+		{true, "{\"argsIgnorePattern\":\"(?<=_)ignored$\"}", "{}", "function f(ignored: number) {}\nuse(f);", []string{"unusedVar ignored"}, []string{"unusedVar ignored"}},
+		{true, "{\"caughtErrorsIgnorePattern\":\"^(?!report)\"}", "{}", "try {} catch (err) {}", nil, []string{"unusedVar err"}},
+		{true, "{\"caughtErrorsIgnorePattern\":\"^(?!report)\"}", "{}", "try {} catch (reportMe) {}", []string{"unusedVar reportMe"}, []string{"unusedVar reportMe"}},
+		{true, "{\"destructuredArrayIgnorePattern\":\"^(?=_)\"}", "{}", "const [_a, b] = list;\nuse(b);", nil, []string{"unusedVar _a"}},
+		{true, "{\"destructuredArrayIgnorePattern\":\"^(?=_)\"}", "{}", "const [a, b] = list;\nuse(b);", []string{"unusedVar a"}, []string{"unusedVar a"}},
 	}
-	if len(cases) != 79 {
-		t.Fatalf("%d rows, and 79 were replayed", len(cases))
+	if len(cases) != 87 {
+		t.Fatalf("%d rows, and 87 were replayed", len(cases))
 	}
 
 	for _, testCase := range cases {

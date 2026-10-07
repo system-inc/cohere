@@ -17,6 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/css/postcss"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // parseOptions is the part of Prettier's options object the parser reads and writes.
@@ -108,7 +109,7 @@ func customSelectorName(params string) string {
 			panic(javaScriptError{message: "Cannot read properties of null (reading '0')"})
 		}
 		rest := params[index+3:]
-		nameEnd := strings.IndexFunc(rest, isJavaScriptWhitespace)
+		nameEnd := strings.IndexFunc(rest, ecmascripttext.IsWhitespace)
 		if nameEnd > 0 {
 			return params[index : index+3+nameEnd]
 		}

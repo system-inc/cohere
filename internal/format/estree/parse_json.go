@@ -329,7 +329,8 @@ func (reader *jsonReader) parseTemplate() (*Node, error) {
 }
 
 // parseNumber reads a numeric literal: decimal with fraction and exponent, or hexadecimal, octal and
-// binary with their prefixes, numeric separators allowed. Legacy octal (`017`) and bigint are refused.
+// binary with their prefixes, numeric separators allowed where Babel allows them. Legacy octal (`017`) and
+// bigint are refused.
 func (reader *jsonReader) parseNumber() (*Node, error) {
 	text := reader.text
 	start := reader.position
@@ -342,6 +343,9 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 		digitsStart := position
 		for position < len(text) && (text[position] == '_' || digitValue(text[position]) < base) {
 			position++
+		}
+		if !separatorsBetweenDigits(text, digitsStart, position, base) {
+			return nil, reader.errorf("%s", unexpectedNumericSeparator)
 		}
 		digits := strings.ReplaceAll(text[digitsStart:position], "_", "")
 		integer, ok := new(big.Int).SetString(digits, base)
@@ -368,6 +372,9 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 				position++
 			}
 		}
+		if !separatorsBetweenDigits(text, start, position, 10) {
+			return nil, reader.errorf("%s", unexpectedNumericSeparator)
+		}
 		literal := strings.ReplaceAll(text[start:position], "_", "")
 		if len(literal) > 1 && literal[0] == '0' && literal[1] >= '0' && literal[1] <= '9' {
 			return nil, reader.errorf("legacy octal literal %q", literal)
@@ -383,6 +390,32 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 	}
 	reader.position = position
 	return New("NumericLiteral", start, position, "value", value, "raw", text[start:position]), nil
+}
+
+// unexpectedNumericSeparator is Babel's refusal of a separator out of place, Errors.UnexpectedNumericSeparator.
+const unexpectedNumericSeparator = "A numeric separator is only allowed between two digits."
+
+// separatorsBetweenDigits is Babel's check on each numeric separator in text[start:end], a literal's digits
+// in radix (its tokenizer's readInt): a separator stands only where the next character is a digit of the
+// radix, and neither neighbour is a prefix letter, a dot, an exponent or another separator. The neighbours
+// are read from the whole text, so the prefix before a radix literal's first digit counts (#w6vtsrn).
+func separatorsBetweenDigits(text string, start int, end int, radix int) bool {
+	forbidden := ".BEO_beo"
+	if radix == 16 {
+		forbidden = ".X_x"
+	}
+	for index := start; index < end; index++ {
+		if text[index] != '_' {
+			continue
+		}
+		if index+1 >= len(text) || digitValue(text[index+1]) >= radix || strings.IndexByte(forbidden, text[index+1]) >= 0 {
+			return false
+		}
+		if index > 0 && strings.IndexByte(forbidden, text[index-1]) >= 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func isRangeError(err error) bool {

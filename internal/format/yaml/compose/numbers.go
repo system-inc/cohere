@@ -7,6 +7,8 @@ import (
 	"math"
 	"math/big"
 	"strconv"
+
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 func nan() float64              { return math.NaN() }
@@ -31,7 +33,7 @@ func digitValue(unit uint16) int {
 // correctly (strconv), and the power-of-two radixes exactly, rounding half to even (big.Float).
 func parseInt(text []uint16, radix int) float64 {
 	index := 0
-	for index < len(text) && isJavaScriptWhitespace(text[index]) {
+	for index < len(text) && ecmascripttext.IsWhitespace(rune(text[index])) {
 		index++
 	}
 	sign := 1.0
@@ -66,7 +68,7 @@ func parseInt(text []uint16, radix int) float64 {
 // there is none. The tags hand it only signs, digits, dots and exponents.
 func parseFloat(text []uint16) float64 {
 	index := 0
-	for index < len(text) && isJavaScriptWhitespace(text[index]) {
+	for index < len(text) && ecmascripttext.IsWhitespace(rune(text[index])) {
 		index++
 	}
 	start := index

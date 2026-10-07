@@ -25,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // Print formats one file's text with the options its repository resolves to.
@@ -226,7 +227,11 @@ func (formatter Formatter) FormatParsed(fileName string, text string, parsed *as
 	// texts, but not handing it over says why.
 	var formatted string
 	var err error
-	if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil && parsed.Text() == text {
+	if ecmascripttext.TrimWhitespace(text) == "" {
+		// core.js's coreFormat: empty or whitespace-only text formats to nothing before any parser sees it,
+		// in every language. A parser that refuses empty input (JSON's) is never asked (#w6vtsrn).
+		formatted = ""
+	} else if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil && parsed.Text() == text {
 		formatted, err = printParsed(fileName, text, parsed, formatter.Options)
 	} else {
 		formatted, err = print(fileName, text, formatter.Options)

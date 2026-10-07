@@ -69,6 +69,12 @@ func noWarningCommentsFiresCases() []noWarningCommentsCase {
 		{"/* fixme and todo */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme"}},
 		{"/* any fixme */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
 		{"/* fixme! */", NoWarningCommentsOptions{Terms: []string{"fixme"}}, []string{"unexpectedComment"}, []string{"fixme"}},
+		// #7mztrdd: the pattern is read as JavaScript reads upstream's `/^[\s]*todo\b/iu`, whose `\s` takes in the
+		// no-break space and the byte order mark (Node: true for both), and a `-` decoration is escaped, so it is one
+		// character to skip rather than a range (Node: true on "- todo" under ["*", "-", "/"]).
+		{"//\u00a0TODO later", nil, []string{"unexpectedComment"}, []string{"todo"}},
+		{"//\ufeffTODO later", nil, []string{"unexpectedComment"}, []string{"todo"}},
+		{"/*- todo */", NoWarningCommentsOptions{Decoration: []string{"*", "-", "/"}}, []string{"unexpectedComment"}, []string{"todo"}},
 		{"// regex [litera|$]", NoWarningCommentsOptions{Terms: []string{"[litera|$]"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"[litera|$]"}},
 		{"/* eslint one-var: 2 */", NoWarningCommentsOptions{Terms: []string{"eslint"}}, []string{"unexpectedComment"}, []string{"eslint"}},
 		{"/* eslint one-var: 2 */", NoWarningCommentsOptions{Terms: []string{"one"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"one"}},
@@ -120,6 +126,9 @@ func noWarningCommentsSilentCases() []noWarningCommentsCase {
 		{"// foo", NoWarningCommentsOptions{Terms: []string{"foo-bar"}}, nil, nil},
 		{"/** multi-line block comment with lines starting with\nTODO\nFIXME or\nXXX\n*/", nil, nil, nil},
 		{"//!TODO ", NoWarningCommentsOptions{Decoration: []string{"*"}}, nil, nil},
+		// #7mztrdd: `*`, `-` and `/` are three characters to skip, not the range `*` to `/`, so `+` is not skipped
+		// (Node: false on "+ todo"); RE2 read the unescaped `-` as a range and reported it.
+		{"/*+ todo */", NoWarningCommentsOptions{Decoration: []string{"*", "-", "/"}}, nil, nil},
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -90,7 +91,9 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 	options.ValidateNested = wire.ValidateNested
 	options.Message = wire.Message
 
-	if _, err := regexp.Compile(options.Rule); err != nil {
+	// Upstream's `new RegExp(config.rule)`, with no flags, read as JavaScript reads it: RE2 refuses a
+	// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
+	if _, err := esregexp.Compile(options.Rule, ""); err != nil {
 		return options, err
 	}
 	return options, nil
@@ -170,7 +173,7 @@ var BooleanPropNaming = rule.Rule{
 			//
 			// This decline is not observable in a findings count and a mutation neutralising it
 			// survived the whole suite. The reason, measured by A/B on 2026-08-28: without it the
-			// zero-value Rule is the empty string, `regexp.Compile("")` succeeds, and an empty
+			// zero-value Rule is the empty string, `esregexp.Compile("", "")` succeeds, and an empty
 			// pattern matches every name, so the rule reports nothing either way.
 			//
 			// Kept because the two are equal only in output. Without it the rule registers a
@@ -179,7 +182,8 @@ var BooleanPropNaming = rule.Rule{
 			// into silent over-reporting. Declining says what is meant.
 			return nil
 		}
-		pattern, err := regexp.Compile(settings.Rule)
+		// Compiled as the decoder validated it, `new RegExp(config.rule)` with no flags (#7mztrdd).
+		pattern, err := esregexp.Compile(settings.Rule, "")
 		if err != nil {
 			return nil
 		}
@@ -202,7 +206,7 @@ func checkBooleanPropNaming(
 	ctx rule.Context,
 	sourceFile *ast.Node,
 	settings BooleanPropNamingOptions,
-	pattern *regexp.Regexp,
+	pattern *esregexp.RegExp,
 ) {
 	// Findings are collected before reporting so a prop reachable through two routes, a propTypes
 	// object and a props type, reports once rather than twice.
@@ -304,7 +308,7 @@ func checkPropTypesValue(
 	ctx rule.Context,
 	value *ast.Node,
 	settings BooleanPropNamingOptions,
-	pattern *regexp.Regexp,
+	pattern *esregexp.RegExp,
 	report func(*ast.Node, string),
 ) {
 	value = skipParenthesesOptional(value)
@@ -322,7 +326,7 @@ func checkPropTypesValue(
 func runBooleanPropCheck(
 	properties *ast.NodeList,
 	settings BooleanPropNamingOptions,
-	pattern *regexp.Regexp,
+	pattern *esregexp.RegExp,
 	report func(*ast.Node, string),
 ) {
 	if properties == nil {
@@ -353,7 +357,8 @@ func runBooleanPropCheck(
 			continue
 		}
 		name, hasName := propTypesKeyName(assignment.Name())
-		if pattern.MatchString(name) && hasName {
+		// A match that overruns the time bound passes too: no answer here is a report.
+		if pattern.TestOrTimeout(name) && hasName {
 			continue
 		}
 		report(property, name)
@@ -600,7 +605,7 @@ func resolvedTypeDeclarationBody(ctx rule.Context, reference *ast.Node) *ast.Nod
 // `enabled: boolean | undefined` does not. Both are reproduced by testing the annotation kind
 // directly rather than asking the checker whether the type is assignable to boolean, which would be
 // a wider question than upstream asks.
-func checkTypeMember(member *ast.Node, pattern *regexp.Regexp, report func(*ast.Node, string)) {
+func checkTypeMember(member *ast.Node, pattern *esregexp.RegExp, report func(*ast.Node, string)) {
 	if member == nil || member.Kind != ast.KindPropertySignature {
 		return
 	}
@@ -610,7 +615,8 @@ func checkTypeMember(member *ast.Node, pattern *regexp.Regexp, report func(*ast.
 	}
 
 	name, hasName := propTypesKeyName(signature.Name())
-	if pattern.MatchString(name) && hasName {
+	// A match that overruns the time bound passes too: no answer here is a report.
+	if pattern.TestOrTimeout(name) && hasName {
 		return
 	}
 	report(member, name)

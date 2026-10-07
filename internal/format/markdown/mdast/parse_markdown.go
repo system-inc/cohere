@@ -5,6 +5,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/system-inc/cohere/internal/format/arena"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // ParseMarkdown is the fork's parseMarkdown, src/language-markdown/parse/parse-markdown.js: front matter
@@ -150,13 +151,5 @@ func replaceNonLineBreaksWithSpace(text string) string {
 // trimJavaScriptWhitespace is String#trim, whose whitespace is ECMAScript's WhiteSpace and
 // LineTerminator: Go's TrimSpace differs on U+FEFF (JavaScript trims it) and U+0085 (Go trims it).
 func trimJavaScriptWhitespace(text string) string {
-	return strings.TrimFunc(text, isJavaScriptWhitespace)
-}
-
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
+	return strings.TrimFunc(text, ecmascripttext.IsWhitespace)
 }

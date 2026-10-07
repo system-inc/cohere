@@ -1,10 +1,9 @@
 package core
 
 import (
-	"regexp"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -517,7 +516,7 @@ func forStatementInitializer(node *ast.Node) *ast.Node {
 // ignoredParameterNames is the compiled form of the two allowance options.
 type ignoredParameterNames struct {
 	literal  map[string]bool
-	patterns []*regexp.Regexp
+	patterns []*esregexp.RegExp
 }
 
 // matches reports whether a parameter's property writes are excused.
@@ -526,7 +525,8 @@ func (ignored ignoredParameterNames) matches(name string) bool {
 		return true
 	}
 	for _, pattern := range ignored.patterns {
-		if pattern.MatchString(name) {
+		// A match that overruns the time bound excuses too: no answer here is a report.
+		if pattern.TestOrTimeout(name) {
 			return true
 		}
 	}
@@ -541,16 +541,15 @@ func (ignored ignoredParameterNames) matches(name string) bool {
 // misconfigured pattern silently stops excusing, which reports MORE rather than less -- the direction
 // that is visible rather than the one that hides findings.
 //
-// The patterns are also not identical in dialect. Upstream compiles with the `u` flag, so its escapes
-// are the Unicode-mode JavaScript ones; Go's regexp is RE2, which has no backreferences and no
-// lookaround. A pattern using either is rejected here and accepted there, which is the same drop.
+// Each pattern is upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refused a
+// lookaround or a backreference its user wrote, and read `\s` and `\b` differently (#7mztrdd).
 func compileIgnoredNames(options NoParamReassignOptions) ignoredParameterNames {
 	compiled := ignoredParameterNames{literal: map[string]bool{}}
 	for _, name := range options.IgnorePropertyModificationsFor {
 		compiled.literal[name] = true
 	}
 	for _, source := range options.IgnorePropertyModificationsForRegex {
-		if pattern, err := regexp.Compile(source); err == nil {
+		if pattern, err := esregexp.Compile(source, "u"); err == nil {
 			compiled.patterns = append(compiled.patterns, pattern)
 		}
 	}

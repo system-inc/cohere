@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // JavaScript's string operations over UTF-16 code units, and the conversion between a JavaScript string
@@ -172,22 +174,13 @@ func asciiView(text []uint16) string {
 	return string(view)
 }
 
-// isJavaScriptWhitespace is a code unit String.prototype.trim removes: WhiteSpace and LineTerminator.
-func isJavaScriptWhitespace(unit uint16) bool {
-	switch unit {
-	case '\t', '\n', 0x0B, '\f', '\r', ' ', 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return unit >= 0x2000 && unit <= 0x200A
-}
-
 // trim is `text.trim()`.
 func trim(text []uint16) []uint16 {
 	start, end := 0, len(text)
-	for start < end && isJavaScriptWhitespace(text[start]) {
+	for start < end && ecmascripttext.IsWhitespace(rune(text[start])) {
 		start++
 	}
-	for end > start && isJavaScriptWhitespace(text[end-1]) {
+	for end > start && ecmascripttext.IsWhitespace(rune(text[end-1])) {
 		end--
 	}
 	return text[start:end:end]

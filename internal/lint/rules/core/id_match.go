@@ -3,9 +3,9 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -17,7 +17,7 @@ import (
 type IdMatchSettings struct {
 	// Pattern is the compiled regular expression every checked name must match. Nil means the rule
 	// does nothing, which is what an unconfigured rule gets.
-	Pattern *regexp.Regexp
+	Pattern *esregexp.RegExp
 	// PatternText is the pattern as written, because the message quotes it back at the reader.
 	PatternText string
 	// CheckProperties extends the rule to object properties and member accesses.
@@ -105,10 +105,9 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 		return settings, nil
 	}
 
-	// Upstream compiles with the `u` flag, which in JavaScript makes the pattern operate on code
-	// points rather than UTF-16 units. Go's regexp is already code-point oriented, so there is no
-	// flag to add: the behaviour the `u` flag buys is the only behaviour Go offers.
-	compiled, err := regexp.Compile(patternText)
+	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or
+	// a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
+	compiled, err := esregexp.Compile(patternText, "u")
 	if err != nil {
 		return settings, fmt.Errorf("id-match pattern %q does not compile: %w", patternText, err)
 	}
@@ -279,9 +278,10 @@ var IdMatch = rule.Rule{
 	},
 }
 
-// idMatchIsInvalid answers upstream's `isInvalid`: the name fails the pattern.
+// idMatchIsInvalid answers upstream's `isInvalid`: the name fails the pattern. A match that overruns
+// the time bound counts as a match, because no answer here would be a report (#7mztrdd).
 func idMatchIsInvalid(settings IdMatchSettings, name string) bool {
-	return !settings.Pattern.MatchString(name)
+	return !settings.Pattern.TestOrTimeout(name)
 }
 
 // reportIdMatch emits the finding, rendering the name and the pattern the way upstream does.

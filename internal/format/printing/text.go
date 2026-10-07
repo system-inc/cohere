@@ -3,6 +3,8 @@ package printing
 import (
 	"strings"
 	"unicode/utf8"
+
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 /*
@@ -68,18 +70,9 @@ func skip(matches func(rune) bool) func(text string, startIndex int, backwards b
 	}
 }
 
-// isJavaScriptWhitespace is JavaScript's \s: WhiteSpace and LineTerminator in ECMA-262.
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
-}
-
 var (
 	// SkipWhitespace is upstream's skipWhitespace, skip(/\s/).
-	SkipWhitespace = skip(isJavaScriptWhitespace)
+	SkipWhitespace = skip(ecmascripttext.IsWhitespace)
 	// SkipSpaces is upstream's skipSpaces, skip(" \t").
 	SkipSpaces = skip(func(character rune) bool { return character == ' ' || character == '\t' })
 	// SkipToLineEnd is upstream's skipToLineEnd, skip(",; \t").

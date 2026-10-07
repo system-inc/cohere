@@ -3,12 +3,12 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -276,10 +276,12 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 
 	reads, writes, typeOnlyReads := collectReadSymbols(ctx, sourceFile, interesting)
 
-	// Compiled once per file. An unparseable pattern ignores nothing, as the other patterns do.
-	var destructuredArrayIgnore *regexp.Regexp
+	// Compiled once per file. An unparseable pattern ignores nothing, as the other patterns do. It is
+	// upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
+	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
+	var destructuredArrayIgnore *esregexp.RegExp
 	if settings.DestructuredArrayIgnorePattern != "" {
-		destructuredArrayIgnore, _ = regexp.Compile(settings.DestructuredArrayIgnorePattern)
+		destructuredArrayIgnore, _ = esregexp.Compile(settings.DestructuredArrayIgnorePattern, "u")
 	}
 
 	// The bindings reported unused so far, in report order, which an import's removal reads. See
@@ -306,7 +308,8 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		// Upstream asks this of every kind before any other: a parameter or a caught error
 		// destructured from an array is an ignored array element first.
 		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
-		if arrayElement && destructuredArrayIgnore.MatchString(name) {
+		// A match that overruns the time bound ignores too: no answer here is a report.
+		if arrayElement && destructuredArrayIgnore.TestOrTimeout(name) {
 			reportUsedIgnoredName(ctx, candidate, symbol, candidateWrites, settings, reads,
 				"destructuredArrayIgnorePattern", settings.DestructuredArrayIgnorePattern, "an element of array destructuring")
 			continue
@@ -356,7 +359,9 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			name,
 			len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
 			nameMatchesIgnorePattern("_"+name, candidate.kind, settings) ||
-				(arrayElement && destructuredArrayIgnore.MatchString("_"+name)),
+				// Asked the way the gate above asks it, so the escape is offered exactly when the
+				// renamed binding would be ignored.
+				(arrayElement && destructuredArrayIgnore.TestOrTimeout("_"+name)),
 		)
 		// Marked before the removal is computed, as upstream's report does: the removal asks whether
 		// every binding of the declaration has been reported yet, this one included.
@@ -2273,13 +2278,16 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 		return false
 	}
 
-	compiled, err := regexp.Compile(pattern)
+	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
+	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
+	compiled, err := esregexp.Compile(pattern, "u")
 	if err != nil {
 		// An unparseable pattern ignores nothing rather than everything. The other direction would
 		// silence the whole rule on a typo in a config file, which is the failure that looks clean.
 		return false
 	}
-	return compiled.MatchString(name)
+	// A match that overruns the time bound ignores too: no answer here is a report.
+	return compiled.TestOrTimeout(name)
 }
 
 // NoUnusedVarsOptions is the rule's configuration surface.

@@ -1,6 +1,10 @@
 package postcss
 
-import "strings"
+import (
+	"strings"
+
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+)
 
 // postcss 8.5.16, lib/parser.js.
 //
@@ -254,15 +258,15 @@ func (p *parser) comment(commentToken token) {
 	node.source.end.offset++
 
 	text := commentToken.value[2 : len(commentToken.value)-2]
-	if strings.TrimFunc(text, isJavaScriptWhitespace) == "" {
+	if strings.TrimFunc(text, ecmascripttext.IsWhitespace) == "" {
 		node.text = ""
 		node.raws["left"] = text
 		node.raws["right"] = ""
 	} else {
 		// text.match(/^(\s*)([^]*\S)(\s*)$/): the leading whitespace, the rest up to the last
 		// non-whitespace character, and the trailing whitespace.
-		trimmedStart := strings.TrimLeftFunc(text, isJavaScriptWhitespace)
-		trimmed := strings.TrimRightFunc(trimmedStart, isJavaScriptWhitespace)
+		trimmedStart := strings.TrimLeftFunc(text, ecmascripttext.IsWhitespace)
+		trimmed := strings.TrimRightFunc(trimmedStart, ecmascripttext.IsWhitespace)
 		node.text = trimmed
 		node.raws["left"] = text[:len(text)-len(trimmedStart)]
 		node.raws["right"] = trimmedStart[len(trimmed):]
@@ -362,13 +366,13 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 			str := ""
 			for j := index; j > 0; j-- {
 				kind := cache[j].kind
-				if strings.HasPrefix(strings.TrimFunc(str, isJavaScriptWhitespace), "!") && kind != "space" {
+				if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 					break
 				}
 				str = cache[len(cache)-1].value + str
 				cache = cache[:len(cache)-1]
 			}
-			if strings.HasPrefix(strings.TrimFunc(str, isJavaScriptWhitespace), "!") {
+			if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") {
 				node.important = true
 				node.mark("important")
 				node.raws["important"] = str
@@ -713,16 +717,6 @@ func (p *parser) unknownWord(tokens []token) {
 
 func (p *parser) unnamedAtrule(_ *node, each token) {
 	panic(p.input.errorBetween("At-rule without name", each.start, each.start+utf16Length(each.value)))
-}
-
-// isJavaScriptWhitespace is a character JavaScript's \s and String.prototype.trim treat as whitespace:
-// WhiteSpace and LineTerminator in ECMA-262, the byte order mark among them.
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
 }
 
 // hasWordCharacter is /\w/.test(text): an ASCII letter, digit or underscore.

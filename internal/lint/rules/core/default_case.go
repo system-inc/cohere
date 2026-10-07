@@ -1,11 +1,11 @@
 package core
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -25,9 +25,10 @@ type DefaultCaseOptions struct {
 // defaultCaseDefaultCommentPattern is upstream's `DEFAULT_COMMENT_PATTERN`, `/^no default$/iu`.
 //
 // Anchored at both ends and case-insensitive, so `// no default` and `// NO DEFAULT` excuse the
-// switch while `// no default case here` does not. The `u` flag has no Go equivalent and needs
-// none: the pattern contains no escapes whose meaning changes under Unicode mode.
-var defaultCaseDefaultCommentPattern = regexp.MustCompile(`(?i)^no default$`)
+// switch while `// no default case here` does not. Compiled with upstream's own source and flags and
+// read as JavaScript reads it, the same engine a user's `commentPattern` goes through, since both
+// fill the one variable the listener tests (#7mztrdd).
+var defaultCaseDefaultCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 
 var messageDefaultCaseMissingDefaultCase = rule.Message{
 	Id: "missingDefaultCase",
@@ -93,11 +94,13 @@ var DefaultCase = rule.Rule{
 		if resolved, isDefaultCaseOptions := rule.OptionsAs[DefaultCaseOptions](options); isDefaultCaseOptions &&
 			resolved.CommentPattern != "" {
 			// Upstream builds `new RegExp(options.commentPattern, "u")`, which THROWS on a bad
-			// pattern and takes the lint run down naming the rule. A pattern Go's RE2 cannot compile
-			// is kept as the default here instead: the rule keeps enforcing rather than crashing,
-			// and a crash costs every OTHER rule its verdict on that file because the walk recovers
-			// per file. Same drop `core/no-param-reassign` takes for the same reason.
-			if compiled, err := regexp.Compile(resolved.CommentPattern); err == nil {
+			// pattern and takes the lint run down naming the rule. The pattern is read as JavaScript
+			// reads it (#7mztrdd), so a lookaround or a backreference compiles and takes effect; one
+			// JavaScript itself would refuse is kept as the default here instead: the rule keeps
+			// enforcing rather than crashing, and a crash costs every OTHER rule its verdict on that
+			// file because the walk recovers per file. Same drop `core/no-param-reassign` takes for
+			// the same reason.
+			if compiled, err := esregexp.Compile(resolved.CommentPattern, "u"); err == nil {
 				pattern = compiled
 			}
 		}
@@ -151,7 +154,7 @@ func defaultCaseHasExcusingComment(
 	ctx rule.Context,
 	lastClause *ast.Node,
 	caseBlock *ast.Node,
-	pattern *regexp.Regexp,
+	pattern *esregexp.RegExp,
 ) bool {
 	searchStart := lastClause.End()
 	searchEnd := caseBlock.End()
@@ -175,7 +178,8 @@ func defaultCaseHasExcusingComment(
 		return false
 	}
 
-	return pattern.MatchString(defaultCaseCommentBody(lastComment))
+	// A match that overruns the time bound excuses too: no answer here is a report.
+	return pattern.TestOrTimeout(defaultCaseCommentBody(lastComment))
 }
 
 // defaultCaseCommentBody strips a comment's delimiters and trims it, matching upstream's

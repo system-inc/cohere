@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -408,7 +409,7 @@ type ExhaustiveDepsOptions struct {
 
 // exhaustiveDepsRun is the options, read once per file into the shape the visitors use.
 type exhaustiveDepsRun struct {
-	additionalHooks           *regexp.Regexp
+	additionalHooks           *esregexp.RegExp
 	autoDependenciesHooks     map[string]bool
 	dangerousAutofix          bool
 	requireExplicitEffectDeps bool
@@ -459,8 +460,9 @@ func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 	}
 	if settings.AdditionalHooks != "" {
 		// A malformed pattern disables the extension rather than failing the run. See the option's
-		// own comment for why.
-		run.additionalHooks, _ = regexp.Compile(settings.AdditionalHooks)
+		// own comment for why. Upstream's `new RegExp(additionalHooks)`, with no flags, read as
+		// JavaScript reads it: RE2 refuses a lookaround or a backreference its user wrote (#7mztrdd).
+		run.additionalHooks, _ = esregexp.Compile(settings.AdditionalHooks, "")
 	}
 	for _, name := range settings.ExperimentalAutoDependenciesHooks {
 		run.autoDependenciesHooks[name] = true
@@ -492,7 +494,8 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 	}
 	callbackIndex, known := hookCallbackIndexes[hookName]
 	if !known {
-		if run.additionalHooks == nil || !run.additionalHooks.MatchString(hookName) {
+		// A match makes the Hook one this rule checks, so a match that overruns the time bound does not.
+		if run.additionalHooks == nil || !run.additionalHooks.Test(hookName) {
 			return
 		}
 		callbackIndex = 0

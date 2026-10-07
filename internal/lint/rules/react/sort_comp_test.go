@@ -1,7 +1,6 @@
 package react
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 
@@ -110,6 +109,18 @@ var sortCompFiresCases = []sortCompCase{
 		},
 	},
 	{
+		// Held out of this table while the rule compiled patterns with RE2, which refused this
+		// lookahead and sent getA and getB to `everything-else`, so the message named
+		// componentWillMount. Read as JavaScript reads it, the pattern groups both getters and the
+		// message is upstream's own (#7mztrdd).
+		name:    "invalid-9",
+		source:  "\n        // componentDidMountOk should be placed after getA\n        export default class View extends React.Component {\n          componentDidMountOk() {}\n          getB() {}\n          componentWillMount() {}\n          getA() {}\n          render() {}\n        }\n      ",
+		options: "{\"order\": [\"static-methods\", \"lifecycle\", \"/^on.+$/\", \"/^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$/\", \"everything-else\", \"/^render.+$/\", \"render\"]}",
+		messages: []string{
+			"componentDidMountOk should be placed after getA",
+		},
+	},
+	{
 		name:    "invalid-10",
 		source:  "\n        // Getters should at the top\n        class Hello extends React.Component {\n          constructor() {}\n          get foo() {}\n          render() {\n            return <div>{this.props.text}</div>;\n          }\n        }\n      ",
 		options: "{\"order\": [\"getters\", \"static-methods\", \"lifecycle\", \"everything-else\", \"render\"]}",
@@ -171,6 +182,41 @@ var sortCompFiresCases = []sortCompCase{
 		options: "{\"order\": [\"instance-variables\", \"static-variables\", \"static-methods\"]}",
 		messages: []string{
 			"foo should be placed after bar",
+		},
+	},
+	// #7mztrdd: an order pattern is upstream's `new RegExp(body, flags)`, read as JavaScript reads
+	// it. Each group below sits AFTER render, so a member the pattern claims reports, and a member
+	// it does not claim falls to `everything-else` and is clean. Their silent counterparts are at
+	// the end of sortCompSilentCases.
+	{
+		// RE2 refused the lookahead, so handleClick fell to `everything-else` and nothing reported.
+		// In Node, new RegExp("^(?=handle)", "").test("handleClick") is true.
+		name:    "lookahead-group",
+		source:  "class Hello extends React.Component {\n  handleClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/^(?=handle)/\"]}",
+		messages: []string{
+			"handleClick should be placed after render",
+		},
+	},
+	{
+		// `\u{68}` is `h` only under `u`; RE2 refused the escape outright. In Node,
+		// new RegExp("^\\u{68}andle", "u").test("handleClick") is true (and false without `u`).
+		name:    "unicode-flag-group",
+		source:  "class Hello extends React.Component {\n  handleClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/^\\\\u{68}andle/u\"]}",
+		messages: []string{
+			"handleClick should be placed after render",
+		},
+	},
+	{
+		// The sticky flag anchors a fresh regexp at index 0, and handleClick starts with handle.
+		// In Node, new RegExp("handle", "y").test("handleClick") is true. The silent case
+		// `sticky-flag-unanchored` is the one the old translation, which dropped `y`, got wrong.
+		name:    "sticky-flag-group",
+		source:  "class Hello extends React.Component {\n  handleClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/handle/y\"]}",
+		messages: []string{
+			"handleClick should be placed after render",
 		},
 	},
 	{
@@ -355,6 +401,29 @@ var sortCompSilentCases = []sortCompCase{
 		source:  "\n        class ClassName extends React.Component {\n          static defaultProps = {};\n          static parseDateString(date?: Date) {}\n          state = {};\n          render() {\n            return <div />;\n          }\n        }\n      ",
 		options: "{\"order\": [\"static-variables\", \"static-methods\", \"type-annotations\", \"instance-variables\", \"lifecycle\", \"everything-else\", \"render\"]}",
 	},
+	// #7mztrdd: the controls for the pattern groups in sortCompFiresCases. The same pattern on a
+	// member it does not claim leaves that member in `everything-else`, before render, so these are
+	// clean; they prove the pattern is tested rather than claiming everything.
+	{
+		// In Node, new RegExp("^(?=handle)", "").test("onClick") is false.
+		name:    "lookahead-group-control",
+		source:  "class Hello extends React.Component {\n  onClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/^(?=handle)/\"]}",
+	},
+	{
+		// In Node, new RegExp("^\\u{68}andle", "u").test("onClick") is false.
+		name:    "unicode-flag-group-control",
+		source:  "class Hello extends React.Component {\n  onClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/^\\\\u{68}andle/u\"]}",
+	},
+	{
+		// `andle` occurs in handleClick but not at index 0, and the sticky flag anchors there. In
+		// Node, new RegExp("andle", "y").test("handleClick") is false. The old translation dropped
+		// `y` as meaningless for one `test()` call and so claimed handleClick and reported.
+		name:    "sticky-flag-unanchored",
+		source:  "class Hello extends React.Component {\n  handleClick() {}\n  render() {}\n}\n",
+		options: "{\"order\": [\"everything-else\", \"render\", \"/andle/y\"]}",
+	},
 }
 
 // decodedSortCompOptions routes a row's raw JSON through the rule's own exported decoder.
@@ -410,58 +479,6 @@ func TestSortCompStaysSilent(t *testing.T) {
 				decodedSortCompOptions(t, testCase.options))
 			rule_testing.ExpectClean(t, result)
 		})
-	}
-}
-
-// sortCompRe2LookaroundCase is upstream's invalid[9], held out of the generated tables.
-//
-// Its order carries `/^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$/`, and Go's
-// regexp is RE2, which has no lookaround. The pattern is therefore dropped rather than compiled,
-// exactly as `core/no-param-reassign` drops an uncompilable ignore pattern, and the divergence is
-// recorded here with BOTH verdicts written out rather than removed to make the suite green.
-//
-// What agrees: the finding COUNT, the message id, and the offending member. What differs: the
-// PARTNER the message names, because `getA` and `getB` fall through to `everything-else` once the
-// pattern that would have grouped them is gone.
-//
-// Measured across the whole 53-case corpus, 13 order entries are regex patterns and this is the
-// only one using lookaround.
-const (
-	sortCompRe2LookaroundSource  = "\n        // componentDidMountOk should be placed after getA\n        export default class View extends React.Component {\n          componentDidMountOk() {}\n          getB() {}\n          componentWillMount() {}\n          getA() {}\n          render() {}\n        }\n      "
-	sortCompRe2LookaroundOptions = "{\"order\": [\"static-methods\", \"lifecycle\", \"/^on.+$/\", \"/^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$/\", \"everything-else\", \"/^render.+$/\", \"render\"]}"
-
-	// What upstream's installed 7.37.5 build says, driven through the ESLint Linter API.
-	sortCompRe2LookaroundUpstreamMessage = "componentDidMountOk should be placed after getA"
-
-	// What this rule says, and why. Written out rather than described so a change to either side
-	// fails loudly instead of quietly re-converging on a wrong answer.
-	sortCompRe2LookaroundOurMessage = "componentDidMountOk should be placed after componentWillMount"
-)
-
-func TestSortCompDropsAnRe2IncompatiblePattern(t *testing.T) {
-	t.Parallel()
-
-	// The premise first: if this pattern ever compiles, the divergence below is stale and the case
-	// belongs back in the generated table. Asserting it here means a future Go regexp that grows
-	// lookaround fails this test rather than silently leaving a wrong expectation in place.
-	if _, err := regexp.Compile("^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$"); err == nil {
-		t.Fatal("this pattern now compiles, so the divergence recorded here no longer applies")
-	}
-
-	result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, sortCompRe2LookaroundSource,
-		decodedSortCompOptions(t, sortCompRe2LookaroundOptions))
-
-	// The count and the offending member agree with upstream; only the named partner moves.
-	rule_testing.ExpectFindings(t, result, "unsortedProps")
-	if len(result.Diagnostics) != 1 {
-		return
-	}
-	if !strings.HasPrefix(result.Diagnostics[0].Message.Description, sortCompRe2LookaroundOurMessage+".") {
-		t.Errorf("rendered %q, expected the recorded divergence %q",
-			result.Diagnostics[0].Message.Description, sortCompRe2LookaroundOurMessage)
-	}
-	if strings.HasPrefix(result.Diagnostics[0].Message.Description, sortCompRe2LookaroundUpstreamMessage+".") {
-		t.Errorf("this now matches upstream exactly, so the recorded divergence is stale")
 	}
 }
 

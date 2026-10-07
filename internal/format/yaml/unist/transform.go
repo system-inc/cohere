@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/yaml/compose"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // transformNode is upstream's transformNode. props is upstream's { tokens }: the tag, anchor and comment
@@ -257,27 +258,16 @@ var directiveSeparator = regexp.MustCompile(`[\t ]+`)
 
 // transformDirective is upstream's transformDirective (directive.mjs).
 func (context *context) transformDirective(directive *cst.Token) *Node {
-	parts := directiveSeparator.Split(strings.TrimFunc(unitsToString(directive.Source), isJavaScriptWhitespace), -1)
+	parts := directiveSeparator.Split(strings.TrimFunc(unitsToString(directive.Source), ecmascripttext.IsWhitespace), -1)
 	// parts.shift().replace(/^%/, "")
 	name := strings.TrimPrefix(parts[0], "%")
 	return context.createDirective(context.transformRange(directive.Offset, directive.Offset+len(directive.Source)),
 		name, parts[1:])
 }
 
-// isJavaScriptWhitespace is what String.prototype.trim removes and /\s/ matches: WhiteSpace and
-// LineTerminator.
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', '\u00a0', '\u1680', '\u2028', '\u2029', '\u202f', '\u205f',
-		'\u3000', '\ufeff':
-		return true
-	}
-	return character >= '\u2000' && character <= '\u200a'
-}
-
 // isNotWhitespace is /\S/u tested on one code unit. A lone surrogate is not whitespace.
 func isNotWhitespace(unit int) bool {
-	return !isJavaScriptWhitespace(rune(unit))
+	return !ecmascripttext.IsWhitespace(rune(unit))
 }
 
 // findCharIndex is utils/find-char-index.mjs; -1 is its null.

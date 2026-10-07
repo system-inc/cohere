@@ -1,6 +1,10 @@
 package postcss
 
-import "strings"
+import (
+	"strings"
+
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+)
 
 // postcss-scss 4.0.9, lib/scss-parser.js: `class ScssParser extends Parser`, overriding atrule, comment,
 // createTokenizer, raw and rule.
@@ -64,14 +68,14 @@ func (s *scssParser) comment(commentToken token) {
 		}
 
 		text := commentToken.value[2:]
-		if strings.TrimFunc(text, isJavaScriptWhitespace) == "" {
+		if strings.TrimFunc(text, ecmascripttext.IsWhitespace) == "" {
 			node.text = ""
 			node.raws["left"] = text
 			node.raws["right"] = ""
 		} else {
 			// text.match(/^(\s*)([^]*\S)(\s*)$/), as Parser.comment reads it.
-			trimmedStart := strings.TrimLeftFunc(text, isJavaScriptWhitespace)
-			trimmed := strings.TrimRightFunc(trimmedStart, isJavaScriptWhitespace)
+			trimmedStart := strings.TrimLeftFunc(text, ecmascripttext.IsWhitespace)
+			trimmed := strings.TrimRightFunc(trimmedStart, ecmascripttext.IsWhitespace)
 			fixed := replaceCommentDelimiters(trimmed)
 			node.text = fixed
 			node.raws["left"] = text[:len(text)-len(trimmedStart)]
@@ -129,7 +133,7 @@ func (s *scssParser) rule(tokens []token) {
 		}
 	}
 
-	if !withColon || strings.TrimFunc(value, isJavaScriptWhitespace) == "" || startsLikeAProperty(value) {
+	if !withColon || strings.TrimFunc(value, ecmascripttext.IsWhitespace) == "" || startsLikeAProperty(value) {
 		s.parser.rule(tokens)
 	} else {
 		tokens = tokens[:len(tokens)-1]
@@ -232,13 +236,13 @@ func (s *scssParser) rule(tokens []token) {
 				str := ""
 				for j := i; j > 0; j-- {
 					kind := cache[j].kind
-					if strings.HasPrefix(strings.TrimFunc(str, isJavaScriptWhitespace), "!") && kind != "space" {
+					if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 						break
 					}
 					str = cache[len(cache)-1].value + str
 					cache = cache[:len(cache)-1]
 				}
-				if strings.HasPrefix(strings.TrimFunc(str, isJavaScriptWhitespace), "!") {
+				if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") {
 					node.important = true
 					node.mark("important")
 					node.raws["important"] = str

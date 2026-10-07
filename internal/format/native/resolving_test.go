@@ -42,7 +42,8 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, want := range map[string]string{"narrow": "40", "wide": "160"} {
-		got, err := resolving.Format(filepath.Join(root, name, "source", "file.resolvingprobe"), "")
+		// Text, not "": core.js answers empty text itself, before any printer, so the probe would never run.
+		got, err := resolving.Format(filepath.Join(root, name, "source", "file.resolvingprobe"), "x")
 		if err != nil {
 			t.Fatal(err)
 		}
