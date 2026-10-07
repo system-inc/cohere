@@ -2,7 +2,9 @@ package static_single_assignment_test
 
 import (
 	"fmt"
+	"math/rand"
 	"slices"
+	"strings"
 	"testing"
 
 	ssa "github.com/system-inc/cohere/static_single_assignment"
@@ -478,5 +480,237 @@ func TestDominanceIsTheEntrysAndTheJoins(t *testing.T) {
 	}
 	if dominance.Dominates(left.id, join.id) || dominance.Dominates(left.id, right.id) {
 		t.Errorf("an arm dominates the join or the other arm")
+	}
+}
+
+// TestDominanceFollowsRealEdgesPastAFallthrough: a structural fallthrough reaches d before the back edge
+// does, so reverse postorder puts d ahead of every real predecessor it has. Every path to d runs a, b
+// and c, so all three dominate it. Over the block slice, dominance said only the entry and a did
+// (#6v4a54x, Adamic's generated-631).
+func TestDominanceFollowsRealEdgesPastAFallthrough(t *testing.T) {
+	t.Parallel()
+	f := newTestFunction()
+	entry, a, b, c, d := f.block(), f.block(), f.block(), f.block(), f.block()
+	f.entry = entry.id
+	goTo(entry, a)
+	a.edges = []testEdge{{to: d.id, kind: ssa.Fallthrough}, {to: b.id, kind: ssa.Real}}
+	goTo(b, a, c)
+	goTo(c, d)
+	goTo(d, d, b)
+	finalize(f)
+
+	var order []ssa.BlockId
+	for _, block := range f.blocks {
+		order = append(order, block.id)
+	}
+	if !slices.Equal(order, []ssa.BlockId{entry.id, a.id, d.id, b.id, c.id}) {
+		t.Fatalf("the block order is %v; the test needs d ahead of its real predecessors", order)
+	}
+	dominance := ssa.ComputeDominance(testGraph{}, f)
+	for _, dominator := range []*testBlock{entry, a, b, c, d} {
+		if !dominance.Dominates(dominator.id, d.id) {
+			t.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, d.id)
+		}
+	}
+}
+
+// TestDominanceAgreesWithSetIntersection: over thousands of generated graphs, with fallthroughs,
+// exceptional edges, self loops and edges to blocks that aren't there, ComputeDominance answers every
+// pair of blocks as dominance computed the plain way does: each block's dominators are itself and the
+// intersection of its reachable predecessors', to a fixed point. The graphs have to reach the shape
+// #6v4a54x was, a block reached by real edges with none of its real predecessors ahead of it in the
+// block slice, or the comparison couldn't see that bug.
+func TestDominanceAgreesWithSetIntersection(t *testing.T) {
+	t.Parallel()
+	random := rand.New(rand.NewSource(20261007))
+	const graphs = 4000
+	behind := 0
+	for graph := 0; graph < graphs; graph++ {
+		f := newTestFunction()
+		count := 1 + random.Intn(12)
+		blocks := make([]*testBlock, 0, count)
+		for index := 0; index < count; index++ {
+			blocks = append(blocks, f.block())
+		}
+		f.entry = blocks[0].id
+		target := func() ssa.BlockId {
+			if random.Intn(25) == 0 {
+				return ssa.BlockId(int(f.next) + 3)
+			}
+			return blocks[random.Intn(len(blocks))].id
+		}
+		for _, block := range blocks {
+			if random.Intn(4) == 0 {
+				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Fallthrough})
+			}
+			for edges := random.Intn(3); edges > 0; edges-- {
+				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Real})
+			}
+			if random.Intn(10) == 0 {
+				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
+			}
+		}
+		finalize(f)
+
+		want := setIntersectionDominators(f)
+		dominance := ssa.ComputeDominance(testGraph{}, f)
+		for _, block := range f.blocks {
+			for _, dominator := range f.blocks {
+				if got := dominance.Dominates(dominator.id, block.id); got != want[block.id][dominator.id] {
+					t.Fatalf("graph %d: Dominates(bb%d, bb%d) is %t, set intersection says %t\n%s",
+						graph, dominator.id, block.id, got, !got, describeTestGraph(f))
+				}
+			}
+		}
+		if reachedFromBehind(f) {
+			behind++
+		}
+	}
+	if behind == 0 {
+		t.Fatalf("none of the %d graphs puts a reached block ahead of all its real predecessors", graphs)
+	}
+	t.Logf("%d graphs, %d of them with a reached block ahead of all its real predecessors", graphs, behind)
+}
+
+// reachedBlocks is the blocks the entry reaches by real edges.
+func reachedBlocks(f *testFunction) map[ssa.BlockId]bool {
+	reached := map[ssa.BlockId]bool{}
+	var walk func(id ssa.BlockId)
+	walk = func(id ssa.BlockId) {
+		block, ok := f.table[id]
+		if !ok || reached[id] {
+			return
+		}
+		reached[id] = true
+		for _, edge := range block.edges {
+			if edge.kind != ssa.Fallthrough {
+				walk(edge.to)
+			}
+		}
+	}
+	walk(f.entry)
+	return reached
+}
+
+// setIntersectionDominators is dominance computed the plain way, over the real predecessors
+// MarkPredecessors set: the entry dominates itself, a block the entry reaches is dominated by itself and
+// every block that dominates all its reached predecessors, and a block it doesn't reach only by itself.
+func setIntersectionDominators(f *testFunction) map[ssa.BlockId]map[ssa.BlockId]bool {
+	reached := reachedBlocks(f)
+	dominators := map[ssa.BlockId]map[ssa.BlockId]bool{}
+	for _, block := range f.blocks {
+		set := map[ssa.BlockId]bool{block.id: true}
+		if reached[block.id] && block.id != f.entry {
+			for _, other := range f.blocks {
+				set[other.id] = true
+			}
+		}
+		dominators[block.id] = set
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, block := range f.blocks {
+			if !reached[block.id] || block.id == f.entry {
+				continue
+			}
+			var next map[ssa.BlockId]bool
+			for _, predecessor := range block.predecessors {
+				if !reached[predecessor] {
+					continue
+				}
+				if next == nil {
+					next = map[ssa.BlockId]bool{}
+					for id := range dominators[predecessor] {
+						next[id] = true
+					}
+					continue
+				}
+				for id := range next {
+					if !dominators[predecessor][id] {
+						delete(next, id)
+					}
+				}
+			}
+			if next == nil {
+				next = map[ssa.BlockId]bool{}
+			}
+			next[block.id] = true
+			if len(next) != len(dominators[block.id]) {
+				dominators[block.id] = next
+				changed = true
+			}
+		}
+	}
+	return dominators
+}
+
+// reachedFromBehind reports whether a block the entry reaches, other than the entry, sits in the block
+// slice ahead of every real predecessor it has.
+func reachedFromBehind(f *testFunction) bool {
+	reached := reachedBlocks(f)
+	position := map[ssa.BlockId]int{}
+	for index, block := range f.blocks {
+		position[block.id] = index
+	}
+	for index, block := range f.blocks {
+		if block.id == f.entry || !reached[block.id] {
+			continue
+		}
+		ahead := false
+		for _, predecessor := range block.predecessors {
+			if at, ok := position[predecessor]; ok && at < index {
+				ahead = true
+			}
+		}
+		if !ahead {
+			return true
+		}
+	}
+	return false
+}
+
+// describeTestGraph renders a function's blocks, edges and predecessors for a failure message.
+func describeTestGraph(f *testFunction) string {
+	var out strings.Builder
+	fmt.Fprintf(&out, "entry bb%d\n", f.entry)
+	for _, block := range f.blocks {
+		fmt.Fprintf(&out, "bb%d predecessors %v edges", block.id, block.predecessors)
+		for _, edge := range block.edges {
+			fmt.Fprintf(&out, " %d:%d", edge.to, edge.kind)
+		}
+		out.WriteByte('\n')
+	}
+	return out.String()
+}
+
+// TestAnEntryWithPredecessorsIsReportedAndRefused: an edge into the entry breaks Graph.Entry's rule.
+// VerifySSA says so, and Construct refuses with a panic that names the block. Without the refusal, the
+// read of x in c, which nothing defines, looks back through b, a and the entry, each with one sealed
+// predecessor, and around again until the stack runs out.
+func TestAnEntryWithPredecessorsIsReportedAndRefused(t *testing.T) {
+	t.Parallel()
+	f := newTestFunction()
+	entry, a, b, c := f.block(), f.block(), f.block(), f.block()
+	f.entry = entry.id
+	f.use(c, "x")
+	goTo(entry, a)
+	goTo(a, b)
+	goTo(b, entry, c)
+	finalize(f)
+
+	violations := ssa.VerifySSA(testGraph{}, f)
+	if len(violations) == 0 || violations[0].Kind != ssa.SSAViolationEntryHasPredecessors || violations[0].Block != entry.id {
+		t.Fatalf("violations are %v, want the entry's predecessors first", violations)
+	}
+
+	refusal := func() (message string) {
+		defer func() {
+			message = fmt.Sprint(recover())
+		}()
+		ssa.Construct(testGraph{}, f)
+		return "no refusal"
+	}()
+	if want := fmt.Sprintf("the entry block bb%d has predecessors [%d]", entry.id, b.id); !strings.Contains(refusal, want) {
+		t.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
 	}
 }

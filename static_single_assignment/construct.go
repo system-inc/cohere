@@ -38,6 +38,8 @@
 // Construct runs. Recursion into nested functions is each IR's own, around this.
 package static_single_assignment
 
+import "fmt"
+
 // Construct converts one function to single static assignment form, in place, then eliminates the
 // redundant phis that placement produces. It does not re-establish the graph's invariants or recurse
 // into nested functions; an IR's own Construct does both around it.
@@ -45,7 +47,19 @@ package static_single_assignment
 // After it returns: every identifier that a source binding takes is written exactly once, every use
 // names the definition that actually reaches it, and each block's phis hold a phi wherever a
 // binding's value depends on which predecessor control arrived from.
+//
+// It refuses, by panicking with the reason, a function whose entry block some edge enters, which
+// Graph.Entry rules out. Its lookup walks back through predecessors until it finds a definition or a
+// block with none, and an entry on a cycle of blocks with one predecessor each gives it neither: before
+// this check, that was a stack overflow in valueAt. Neither IR builds such a function; one that did has
+// a bug in its adapter or its lowering, and the panic names it. VerifySSA reports the same thing
+// without constructing.
 func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) {
+	if entry, predecessors, entered := entryPredecessors(graph, function); entered {
+		panic(fmt.Sprintf("static_single_assignment.Construct: the entry block bb%d has predecessors %v; "+
+			"Graph.Entry must be a block no edge enters", entry, predecessors))
+	}
+
 	// Phis from a previous run are dropped, because this pass APPENDS them and cannot reconcile
 	// what it did not mint.
 	//
