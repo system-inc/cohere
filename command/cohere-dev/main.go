@@ -136,6 +136,16 @@ func run(verb string, arguments []string) int {
 		refuseCountOnce()
 		return 2
 	}
+	// A whole-module run from the root covers what the landing gate covers: every module go.work names
+	// outside a submodule (workspace.go).
+	if wholeModule(arguments) {
+		expanded, err := withWorkspaceModules(arguments)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to test: %v\n", err)
+			return 2
+		}
+		arguments = expanded
+	}
 	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
 		return goTest(environment, arguments)
 	})
@@ -164,6 +174,32 @@ func wholeModule(arguments []string) bool {
 		}
 	}
 	return false
+}
+
+// withWorkspaceModules replaces a ./... run from the repository's root with the patterns of every module
+// the landing gate covers, saying which. From anywhere else ./... means that directory's tree, and stays.
+func withWorkspaceModules(arguments []string) ([]string, error) {
+	root, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.work")); err != nil {
+		return arguments, nil
+	}
+	covered, err := readWorkspace(root)
+	if err != nil {
+		return nil, err
+	}
+	covered.report(os.Stderr)
+	expanded := make([]string, 0, len(arguments)+len(covered.gated))
+	for _, argument := range arguments {
+		if argument == "./..." {
+			expanded = append(expanded, covered.patterns()...)
+			continue
+		}
+		expanded = append(expanded, argument)
+	}
+	return expanded, nil
 }
 
 // refuseCountOnce says why a run of nearly every package, through the slot or the fast tier, never passes
