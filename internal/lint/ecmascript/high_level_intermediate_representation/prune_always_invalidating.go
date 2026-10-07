@@ -29,6 +29,8 @@
 // direction, and it is the reason `updateScopeDeclarations` stopped being optional.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // PruneAlwaysInvalidatingScopes marks scopes whose dependencies can never compare equal.
 //
 // Returns how many it pruned, so a caller can tell a no-op from an unrun pass.
@@ -40,8 +42,8 @@ func PruneAlwaysInvalidatingScopes(tree *ReactiveFunction, function *Function,
 	pruner := alwaysInvalidatingPruner{
 		function:           function,
 		dependencies:       dependencies,
-		alwaysInvalidating: map[IdentifierId]bool{},
-		unmemoized:         map[IdentifierId]bool{},
+		alwaysInvalidating: map[static_single_assignment.IdentifierId]bool{},
+		unmemoized:         map[static_single_assignment.IdentifierId]bool{},
 	}
 	pruner.walk(tree.Body, false)
 	return pruner.pruned
@@ -51,10 +53,10 @@ type alwaysInvalidatingPruner struct {
 	function     *Function
 	dependencies *ScopeDependencies
 	// alwaysInvalidating are values that allocate fresh identity on every evaluation.
-	alwaysInvalidating map[IdentifierId]bool
+	alwaysInvalidating map[static_single_assignment.IdentifierId]bool
 	// unmemoized are the subset of those that no scope is memoizing, so they really do change every
 	// render rather than merely being capable of it.
-	unmemoized map[IdentifierId]bool
+	unmemoized map[static_single_assignment.IdentifierId]bool
 	pruned     int
 }
 

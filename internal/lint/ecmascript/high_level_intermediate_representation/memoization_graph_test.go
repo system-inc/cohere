@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // TestComputeMemoizedWalksFromEscapingRoots is the core propagation, and the case a boolean model
 // gets wrong.
@@ -14,9 +17,9 @@ func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
 	graph := NewMemoizationGraph()
 
 	// c = [b] escapes; b = [] feeds it; a = [props.a] feeds nothing that escapes.
-	graph.Record(1, MemoizationMemoized, nil)                // a
-	graph.Record(2, MemoizationMemoized, nil)                // b
-	graph.Record(3, MemoizationMemoized, []DeclarationId{2}) // c = [b]
+	graph.Record(1, MemoizationMemoized, nil)                                         // a
+	graph.Record(2, MemoizationMemoized, nil)                                         // b
+	graph.Record(3, MemoizationMemoized, []static_single_assignment.DeclarationId{2}) // c = [b]
 	graph.MarkEscaping(3)
 
 	memoized := graph.ComputeMemoized()
@@ -47,7 +50,7 @@ func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
 	// Scope 1 depends on declaration 10. Declaration 2 belongs to it and escapes.
 	graph.Record(2, MemoizationMemoized, nil)
 	graph.Record(10, MemoizationConditional, nil)
-	graph.AssociateScope(2, 1, []DeclarationId{10})
+	graph.AssociateScope(2, 1, []static_single_assignment.DeclarationId{10})
 	graph.MarkEscaping(2)
 
 	memoized := graph.ComputeMemoized()
@@ -92,7 +95,7 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			graph := NewMemoizationGraph()
-			graph.Record(1, MemoizationMemoized, []DeclarationId{2})
+			graph.Record(1, MemoizationMemoized, []static_single_assignment.DeclarationId{2})
 			graph.Record(2, testCase.level, nil)
 			graph.MarkEscaping(1)
 
@@ -105,7 +108,7 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 	// Conditional WITH a memoized dependency is the arm the table above cannot show, since it
 	// varies the leaf rather than the middle.
 	graph := NewMemoizationGraph()
-	graph.Record(1, MemoizationConditional, []DeclarationId{2})
+	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
 	graph.Record(2, MemoizationMemoized, nil)
 	graph.MarkEscaping(1)
 	memoized := graph.ComputeMemoized()
@@ -128,9 +131,9 @@ func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
 
 	graph := NewMemoizationGraph()
 	// 1 -> 2 -> 3 -> 1, with 1 escaping and 3 memoized.
-	graph.Record(1, MemoizationConditional, []DeclarationId{2})
-	graph.Record(2, MemoizationConditional, []DeclarationId{3})
-	graph.Record(3, MemoizationMemoized, []DeclarationId{1})
+	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
+	graph.Record(2, MemoizationConditional, []static_single_assignment.DeclarationId{3})
+	graph.Record(3, MemoizationMemoized, []static_single_assignment.DeclarationId{1})
 	graph.MarkEscaping(1)
 
 	memoized := graph.ComputeMemoized()
@@ -152,7 +155,7 @@ func TestComputeMemoizedIsRepeatable(t *testing.T) {
 	t.Parallel()
 
 	graph := NewMemoizationGraph()
-	graph.Record(1, MemoizationMemoized, []DeclarationId{2})
+	graph.Record(1, MemoizationMemoized, []static_single_assignment.DeclarationId{2})
 	graph.Record(2, MemoizationConditional, nil)
 	graph.MarkEscaping(1)
 
@@ -182,7 +185,7 @@ func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
 	t.Parallel()
 
 	graph := NewMemoizationGraph()
-	graph.Record(1, MemoizationConditional, []DeclarationId{99})
+	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{99})
 	graph.MarkEscaping(1)
 
 	memoized := graph.ComputeMemoized()
@@ -234,7 +237,7 @@ func TestRecordJoinsRatherThanAssigns(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			graph := NewMemoizationGraph()
-			graph.Record(1, MemoizationConditional, []DeclarationId{2})
+			graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
 			for _, level := range testCase.levels {
 				graph.Record(2, level, nil)
 			}

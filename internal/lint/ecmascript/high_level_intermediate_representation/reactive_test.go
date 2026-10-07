@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // reactiveDeclarations is the part of `@types/react` these tests read.
@@ -733,8 +734,8 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 						state := &reactivity{
 							function:    function,
 							typeChecker: ctx.TypeChecker,
-							reactive:    map[IdentifierId]bool{},
-							stable:      map[IdentifierId]bool{},
+							reactive:    map[static_single_assignment.IdentifierId]bool{},
+							stable:      map[static_single_assignment.IdentifierId]bool{},
 						}
 						state.run()
 						if state.rounds > worst {

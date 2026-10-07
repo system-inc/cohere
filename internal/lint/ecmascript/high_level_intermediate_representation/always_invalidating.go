@@ -34,6 +34,7 @@ package high_level_intermediate_representation
 
 import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // IsAlwaysInvalidatingType reports whether a value of this type gets a fresh identity every render.
@@ -46,7 +47,7 @@ import (
 // answer means "do not treat this scope as always-invalidating", so a missing type declines to
 // merge rather than merging on a guess. That matters because the two upstream call sites both use a
 // true answer to permit a merge.
-func IsAlwaysInvalidatingType(function *Function, id IdentifierId,
+func IsAlwaysInvalidatingType(function *Function, id static_single_assignment.IdentifierId,
 	typeChecker *shimchecker.Checker) bool {
 	if function == nil || typeChecker == nil {
 		return false

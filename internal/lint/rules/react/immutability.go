@@ -6,6 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // Immutability flags mutating a value React requires to stay frozen.
@@ -250,7 +251,7 @@ func immutabilityInstructionAt(function *high_level_intermediate_representation.
 }
 
 // immutabilityIdentifierNode returns the syntax a value came from, or nil for a pure temporary.
-func immutabilityIdentifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
+func immutabilityIdentifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -262,7 +263,7 @@ func immutabilityIdentifierNode(function *high_level_intermediate_representation
 }
 
 // immutabilityIdentifierName returns a value's source binding name, empty for a temporary.
-func immutabilityIdentifierName(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
+func immutabilityIdentifierName(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return ""
 	}
@@ -477,32 +478,32 @@ type immutabilityFinding struct {
 type immutabilityState struct {
 	// values holds each value's abstract kind and reasons, keyed by the identifier that introduced
 	// it. A binding reaches its value through `aliases`.
-	values map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue
+	values map[static_single_assignment.IdentifierId]immutabilityAbstractValue
 	// aliases maps a binding onto the value it ultimately names.
-	aliases map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId
+	aliases map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	// declarationValues recovers a value whose single-assignment numbering did not unify, keyed by
 	// the source binding. refs.go documents the same representation gap and works around it the
 	// same way.
-	declarations  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId
-	byDeclaration map[high_level_intermediate_representation.DeclarationId]high_level_intermediate_representation.IdentifierId
+	declarations  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
+	byDeclaration map[static_single_assignment.DeclarationId]static_single_assignment.IdentifierId
 	// names carries a source binding name onto the temporary that loaded it.
-	names map[high_level_intermediate_representation.IdentifierId]string
+	names map[static_single_assignment.IdentifierId]string
 	// functionsReassigning records, per value, which locals calling it would reassign. A function
 	// value carrying a non-empty set is a "known mutable function".
-	functionsReassigning map[high_level_intermediate_representation.IdentifierId][]immutabilityReassignment
+	functionsReassigning map[static_single_assignment.IdentifierId][]immutabilityReassignment
 	// functionCaptures records what a closure closes over, so freezing the closure freezes them.
-	functionCaptures map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId
+	functionCaptures map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId
 	// aggregateElements records what an object or array literal holds, so freezing the aggregate
 	// freezes its contents. Kept separate from functionCaptures because an object holding a value
 	// and a closure capturing one are different relations that happen to propagate the same way.
-	aggregateElements map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId
+	aggregateElements map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId
 	// changed is the fixpoint's only termination signal.
 	changed bool
 	// insideLoop is true while the sweep is walking a block that a back edge can re-enter.
 	insideLoop bool
 	// frozenInsideLoop records values frozen at such a point, which are the only ones a back edge
 	// may carry into the next round. See the sweep.
-	frozenInsideLoop map[high_level_intermediate_representation.IdentifierId]bool
+	frozenInsideLoop map[static_single_assignment.IdentifierId]bool
 }
 
 // immutabilityReassignment is one local a nested function reassigns.
@@ -513,7 +514,7 @@ type immutabilityReassignment struct {
 	// Target is the DECLARATION written. Compared by declaration rather than by identifier because
 	// the capture edge and the store name the same binding under two different single-assignment
 	// numberings; see the caller.
-	Target high_level_intermediate_representation.DeclarationId
+	Target static_single_assignment.DeclarationId
 	// Direct is true when the write happened in the immediate closure rather than in one nested
 	// inside it. Only a direct write can be matched against the capture edge, because a deeper
 	// closure's identifier space is a third one again.
@@ -527,7 +528,7 @@ type immutabilityReassignment struct {
 // translating them would need the capture edge chained through every level. That is a real
 // narrowing and it is stated rather than hidden: a two-level closure reassigning a render local is
 // silent here and reports upstream. See the report.
-func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map[high_level_intermediate_representation.DeclarationId]bool) []immutabilityReassignment {
+func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map[static_single_assignment.DeclarationId]bool) []immutabilityReassignment {
 	kept := reassignments[:0]
 	for _, reassignment := range reassignments {
 		if reassignment.Direct && owned[reassignment.Target] {
@@ -539,15 +540,15 @@ func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map
 
 func newImmutabilityState() *immutabilityState {
 	return &immutabilityState{
-		values:               map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{},
-		aliases:              map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{},
-		declarations:         map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId{},
-		byDeclaration:        map[high_level_intermediate_representation.DeclarationId]high_level_intermediate_representation.IdentifierId{},
-		names:                map[high_level_intermediate_representation.IdentifierId]string{},
-		functionsReassigning: map[high_level_intermediate_representation.IdentifierId][]immutabilityReassignment{},
-		functionCaptures:     map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{},
-		aggregateElements:    map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{},
-		frozenInsideLoop:     map[high_level_intermediate_representation.IdentifierId]bool{},
+		values:               map[static_single_assignment.IdentifierId]immutabilityAbstractValue{},
+		aliases:              map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{},
+		declarations:         map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId{},
+		byDeclaration:        map[static_single_assignment.DeclarationId]static_single_assignment.IdentifierId{},
+		names:                map[static_single_assignment.IdentifierId]string{},
+		functionsReassigning: map[static_single_assignment.IdentifierId][]immutabilityReassignment{},
+		functionCaptures:     map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{},
+		aggregateElements:    map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{},
+		frozenInsideLoop:     map[static_single_assignment.IdentifierId]bool{},
 	}
 }
 
@@ -556,7 +557,7 @@ func newImmutabilityState() *immutabilityState {
 // Bounded rather than a bare loop: an alias chain is acyclic by construction in single-assignment
 // form, but this pass also seeds aliases from a declaration fallback, and a defensive bound costs
 // nothing next to a hang in a linter.
-func (state *immutabilityState) resolve(id high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
+func (state *immutabilityState) resolve(id static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
 	current := id
 	for round := 0; round < 32; round++ {
 		next, found := state.aliases[current]
@@ -569,7 +570,7 @@ func (state *immutabilityState) resolve(id high_level_intermediate_representatio
 }
 
 // alias records that one binding names the same value as another.
-func (state *immutabilityState) alias(from high_level_intermediate_representation.IdentifierId, to high_level_intermediate_representation.IdentifierId) {
+func (state *immutabilityState) alias(from static_single_assignment.IdentifierId, to static_single_assignment.IdentifierId) {
 	resolved := state.resolve(to)
 	if resolved == from {
 		return
@@ -586,7 +587,7 @@ func (state *immutabilityState) alias(from high_level_intermediate_representatio
 // Mutable is the default rather than a bottom element because an unseen value is one this code has
 // not been shown to have frozen, and the rule reports only on freezing. Defaulting to anything
 // else would report values nothing had frozen.
-func (state *immutabilityState) kindOf(id high_level_intermediate_representation.IdentifierId) immutabilityAbstractValue {
+func (state *immutabilityState) kindOf(id static_single_assignment.IdentifierId) immutabilityAbstractValue {
 	resolved := state.resolve(id)
 	if found, ok := state.values[resolved]; ok {
 		return found
@@ -609,7 +610,7 @@ func (state *immutabilityState) kindOf(id high_level_intermediate_representation
 // This is the convergence test and it deliberately ignores the reason set. See the rule comment:
 // reasons only ever grow, so counting a reason arrival as movement makes any function with a loop
 // burn the whole bound.
-func (state *immutabilityState) setKind(id high_level_intermediate_representation.IdentifierId, value immutabilityAbstractValue) {
+func (state *immutabilityState) setKind(id static_single_assignment.IdentifierId, value immutabilityAbstractValue) {
 	resolved := state.resolve(id)
 	previous, existed := state.values[resolved]
 	merged := value
@@ -629,7 +630,7 @@ func (state *immutabilityState) setKind(id high_level_intermediate_representatio
 //
 // A value that is already Frozen, Global or Primitive is left alone, matching upstream's `freeze`:
 // re-freezing an already-frozen value must not count as movement or the fixpoint never settles.
-func (state *immutabilityState) freeze(id high_level_intermediate_representation.IdentifierId, reason immutabilityReason) {
+func (state *immutabilityState) freeze(id static_single_assignment.IdentifierId, reason immutabilityReason) {
 	current := state.kindOf(id)
 	switch current.Kind {
 	case immutabilityFrozen, immutabilityGlobal, immutabilityPrimitive:
@@ -657,7 +658,7 @@ func (state *immutabilityState) freeze(id high_level_intermediate_representation
 // elements. Both maps are removed for the duration of the descent rather than guarded by a visited
 // set, so a structure that contains itself cannot recurse forever, and are restored afterwards so a
 // second freeze for a different reason still reaches inside.
-func (state *immutabilityState) freezeInward(id high_level_intermediate_representation.IdentifierId, reason immutabilityReason) {
+func (state *immutabilityState) freezeInward(id static_single_assignment.IdentifierId, reason immutabilityReason) {
 	resolved := state.resolve(id)
 	captures, hasCaptures := state.functionCaptures[resolved]
 	elements, hasElements := state.aggregateElements[resolved]
@@ -681,7 +682,7 @@ func (state *immutabilityState) freezeInward(id high_level_intermediate_represen
 }
 
 // noteDeclaration records which source binding a value belongs to.
-func (state *immutabilityState) noteDeclaration(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) {
+func (state *immutabilityState) noteDeclaration(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return
 	}
@@ -694,7 +695,7 @@ func (state *immutabilityState) noteDeclaration(function *high_level_intermediat
 }
 
 // nameOf is the value's own binding name, or the one a load carried onto it.
-func (state *immutabilityState) nameOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
+func (state *immutabilityState) nameOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
 	// `function` is nil at one call site, where only the side maps are wanted. `immutability
 	// IdentifierName` already declines a nil function rather than panicking, so this is safe and is
 	// stated here because a nil receiver in a name lookup reads like an oversight.
@@ -744,7 +745,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermedia
 	// before the first instruction ran. That is the whole seeding bug: every props fixture went
 	// silent at once and every ordering fixture kept passing, which reads as a props-specific defect
 	// and is really a lifetime one.
-	entry := map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
+	entry := map[static_single_assignment.IdentifierId]immutabilityAbstractValue{}
 	immutabilitySeedParameters(function, entry)
 	// A function with no back edge settles in ONE round: `Function.Blocks` is in reverse postorder,
 	// so a single forward pass already visits every definition before every use. Iterating such a
@@ -758,7 +759,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermedia
 	}
 	var findings []immutabilityFinding
 	for iteration := 0; iteration < rounds; iteration++ {
-		state.values = map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
+		state.values = map[static_single_assignment.IdentifierId]immutabilityAbstractValue{}
 		for id, value := range entry {
 			state.values[id] = value
 		}
@@ -808,7 +809,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermedia
 // Destructuring is handled by the ordinary instruction arms rather than here: a destructured
 // parameter lowers to a temporary in `Params` plus destructuring instructions in the entry block,
 // so freezing the temporary reaches every bound name through `Destructure`.
-func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue) {
+func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[static_single_assignment.IdentifierId]immutabilityAbstractValue) {
 	for _, param := range function.Params {
 		entry[param.Identifier] = immutabilityAbstractValue{
 			Kind:    immutabilityFrozen,
@@ -909,7 +910,7 @@ func immutabilityRunOneRound(ctx rule.Context, function *high_level_intermediate
 		phiAt[block.Instructions[0]] = block.Phis
 	}
 	// Which block each instruction belongs to, so the loop flag still follows the instruction.
-	blockOfInstruction := make(map[high_level_intermediate_representation.InstructionId]high_level_intermediate_representation.BlockId, len(function.Instructions))
+	blockOfInstruction := make(map[high_level_intermediate_representation.InstructionId]static_single_assignment.BlockId, len(function.Instructions))
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			blockOfInstruction[instructionId] = block.Id
@@ -1105,7 +1106,7 @@ func immutabilityTransfer(
 	// has to travel one hop inward to reach `o`. Without that hop the array froze and the value it
 	// named did not, and the fixture read as a missing hook rather than as a missing edge.
 	case *high_level_intermediate_representation.ObjectExpression, *high_level_intermediate_representation.ArrayExpression:
-		elements := []high_level_intermediate_representation.IdentifierId{}
+		elements := []static_single_assignment.IdentifierId{}
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			elements = append(elements, place.Identifier)
 		})
@@ -1143,7 +1144,7 @@ func immutabilityTransfer(
 // A member of a PRIMITIVE is treated as mutable rather than primitive: reading a property off a
 // number yields undefined, not another primitive, and carrying `Primitive` forward would make a
 // later write silent for the wrong reason.
-func immutabilityPropagate(state *immutabilityState, object high_level_intermediate_representation.IdentifierId) immutabilityAbstractValue {
+func immutabilityPropagate(state *immutabilityState, object static_single_assignment.IdentifierId) immutabilityAbstractValue {
 	current := state.kindOf(object)
 	if current.Kind == immutabilityPrimitive {
 		return immutabilityAbstractValue{Kind: immutabilityMutable}
@@ -1156,7 +1157,7 @@ func immutabilityCheckWrite(
 	ctx rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	object high_level_intermediate_representation.IdentifierId,
+	object static_single_assignment.IdentifierId,
 	node *ast.Node,
 	findings []immutabilityFinding,
 	order *int,
@@ -1211,7 +1212,7 @@ func immutabilityCheckWrite(
 // So the node wanted is the LEFT-HAND side of the member expression being written, which is the
 // instruction node's own object. Falling back to the instruction node keeps a finding rather than
 // dropping one when the shape is not a member expression.
-func immutabilityMutatedObjectNode(node *ast.Node, object high_level_intermediate_representation.IdentifierId, function *high_level_intermediate_representation.Function) *ast.Node {
+func immutabilityMutatedObjectNode(node *ast.Node, object static_single_assignment.IdentifierId, function *high_level_intermediate_representation.Function) *ast.Node {
 	if node == nil {
 		return immutabilityIdentifierNode(function, object)
 	}
@@ -1255,9 +1256,9 @@ func immutabilityCallTransfer(
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
-	callee high_level_intermediate_representation.IdentifierId,
+	callee static_single_assignment.IdentifierId,
 	args []high_level_intermediate_representation.Argument,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1332,7 +1333,7 @@ func immutabilityDependencyArrayIsExempt(name string) bool {
 // Note this is a lookup on the DEFINING instruction rather than on syntax: a value whose defining
 // instruction is an array literal is the exemption, and a value that merely happens to hold an
 // array is not.
-func immutabilityIsDependencyArray(function *high_level_intermediate_representation.Function, state *immutabilityState, id high_level_intermediate_representation.IdentifierId) bool {
+func immutabilityIsDependencyArray(function *high_level_intermediate_representation.Function, state *immutabilityState, id static_single_assignment.IdentifierId) bool {
 	resolved := state.resolve(id)
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -1393,7 +1394,7 @@ func immutabilityMethodCallTransfer(
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
 	value *high_level_intermediate_representation.MethodCall,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1453,7 +1454,7 @@ func immutabilityNestedFunctionTransfer(
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	value *high_level_intermediate_representation.FunctionExpression,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1489,7 +1490,7 @@ func immutabilityNestedFunctionTransfer(
 	// capture arrives as context id 2 while the store writes id 6. An identifier comparison answers
 	// false for every real case and silences the rule completely, which is what it did on the first
 	// run of this check. `high_level_intermediate_representation.Identifier.Declaration` is the identity that survives the renumbering.
-	owned := map[high_level_intermediate_representation.DeclarationId]bool{}
+	owned := map[static_single_assignment.DeclarationId]bool{}
 	for index := range value.Captures {
 		if index >= len(inner.Context) {
 			continue
@@ -1511,7 +1512,7 @@ func immutabilityNestedFunctionTransfer(
 	// `const o = {}; useEffect(() => { read(o); }, []); o.a = 1;` report while the same value named
 	// only in the dependency array stays clean. Both were measured; the pair is the fixture
 	// `f_useEffect_callback_captures` against `s_useEffect_dependency_array`.
-	captured := make([]high_level_intermediate_representation.IdentifierId, 0, len(value.Captures))
+	captured := make([]static_single_assignment.IdentifierId, 0, len(value.Captures))
 	for _, capture := range value.Captures {
 		captured = append(captured, capture.Identifier)
 	}
@@ -1611,8 +1612,8 @@ func immutabilityCapturedWrites(
 	order *int,
 ) []immutabilityFinding {
 	// Translate the outer kinds into the inner function's identifier space through the capture edge.
-	innerKinds := map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
-	innerNames := map[high_level_intermediate_representation.IdentifierId]string{}
+	innerKinds := map[static_single_assignment.IdentifierId]immutabilityAbstractValue{}
+	innerNames := map[static_single_assignment.IdentifierId]string{}
 	for index, capture := range value.Captures {
 		if index >= len(inner.Context) {
 			continue
@@ -1622,8 +1623,8 @@ func immutabilityCapturedWrites(
 		innerNames[contextId] = state.nameOf(nil, capture.Identifier)
 	}
 	// An alias built inside the closure carries the captured value's kind along with it.
-	aliases := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
-	resolve := func(id high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
+	aliases := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
+	resolve := func(id static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
 		for round := 0; round < 32; round++ {
 			next, found := aliases[id]
 			if !found || next == id {
@@ -1668,9 +1669,9 @@ func immutabilityCapturedWrites(
 func immutabilityCapturedWriteFinding(
 	ctx rule.Context,
 	inner *high_level_intermediate_representation.Function,
-	kinds map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue,
-	names map[high_level_intermediate_representation.IdentifierId]string,
-	object high_level_intermediate_representation.IdentifierId,
+	kinds map[static_single_assignment.IdentifierId]immutabilityAbstractValue,
+	names map[static_single_assignment.IdentifierId]string,
+	object static_single_assignment.IdentifierId,
 	instruction *high_level_intermediate_representation.Instruction,
 	findings []immutabilityFinding,
 	order *int,
@@ -1745,7 +1746,7 @@ func immutabilityReassignmentsInner(function *high_level_intermediate_representa
 			if name == "" || seen[name] {
 				continue
 			}
-			declarationOf := high_level_intermediate_representation.DeclarationId(0)
+			declarationOf := static_single_assignment.DeclarationId(0)
 			if int(store.LValue.Identifier) < len(function.Identifiers) {
 				if identifier := function.Identifiers[store.LValue.Identifier]; identifier != nil {
 					declarationOf = identifier.Declaration
@@ -1781,7 +1782,7 @@ func immutabilityReassignmentsInner(function *high_level_intermediate_representa
 // function is handed over, which is why React emits two diagnostics for a single such callback.
 func immutabilityCheckFrozenFunction(
 	state *immutabilityState,
-	id high_level_intermediate_representation.IdentifierId,
+	id static_single_assignment.IdentifierId,
 	node *ast.Node,
 	findings []immutabilityFinding,
 	order *int,
@@ -1935,7 +1936,7 @@ func immutabilityReport(ctx rule.Context, function *high_level_intermediate_repr
 // walking terminals, because every terminal shape would otherwise have to be enumerated and a new
 // one would silently answer false.
 func immutabilityHasBackEdge(function *high_level_intermediate_representation.Function) bool {
-	position := make(map[high_level_intermediate_representation.BlockId]int, len(function.Blocks))
+	position := make(map[static_single_assignment.BlockId]int, len(function.Blocks))
 	for index, block := range function.Blocks {
 		position[block.Id] = index
 	}
@@ -1965,11 +1966,11 @@ func immutabilityHasBackEdge(function *high_level_intermediate_representation.Fu
 //
 // The property name is checked too, because the exemption is for writing a ref's `current` and not
 // for writing arbitrary properties onto a ref object.
-func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState, id high_level_intermediate_representation.IdentifierId) bool {
+func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState, id static_single_assignment.IdentifierId) bool {
 	if ctx.TypeChecker == nil || function == nil {
 		return false
 	}
-	for _, candidate := range [2]high_level_intermediate_representation.IdentifierId{id, state.resolve(id)} {
+	for _, candidate := range [2]static_single_assignment.IdentifierId{id, state.resolve(id)} {
 		node := immutabilityIdentifierNode(function, candidate)
 		if node == nil {
 			continue
@@ -2006,14 +2007,14 @@ func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_
 // swept b5 in, so the `useThing` freeze counted as happening inside the loop and travelled back into
 // the body on the next round, reporting the writes that built the accumulator. The predecessor walk
 // gets b5 right because b5 cannot reach the latch.
-func immutabilityLoopBlocks(function *high_level_intermediate_representation.Function) map[high_level_intermediate_representation.BlockId]bool {
-	position := make(map[high_level_intermediate_representation.BlockId]int, len(function.Blocks))
-	byId := make(map[high_level_intermediate_representation.BlockId]*high_level_intermediate_representation.BasicBlock, len(function.Blocks))
+func immutabilityLoopBlocks(function *high_level_intermediate_representation.Function) map[static_single_assignment.BlockId]bool {
+	position := make(map[static_single_assignment.BlockId]int, len(function.Blocks))
+	byId := make(map[static_single_assignment.BlockId]*high_level_intermediate_representation.BasicBlock, len(function.Blocks))
 	for index, block := range function.Blocks {
 		position[block.Id] = index
 		byId[block.Id] = block
 	}
-	inside := map[high_level_intermediate_representation.BlockId]bool{}
+	inside := map[static_single_assignment.BlockId]bool{}
 	for index, header := range function.Blocks {
 		for _, predecessor := range header.Predecessors {
 			at, known := position[predecessor]
@@ -2023,7 +2024,7 @@ func immutabilityLoopBlocks(function *high_level_intermediate_representation.Fun
 			// `predecessor` is a latch and `header` is the loop header. Walk backwards from the
 			// latch through predecessors, stopping at the header, to collect the loop body.
 			inside[header.Id] = true
-			pending := []high_level_intermediate_representation.BlockId{predecessor}
+			pending := []static_single_assignment.BlockId{predecessor}
 			for len(pending) > 0 {
 				current := pending[len(pending)-1]
 				pending = pending[:len(pending)-1]

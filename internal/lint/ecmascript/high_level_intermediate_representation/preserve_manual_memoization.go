@@ -29,16 +29,17 @@ package high_level_intermediate_representation
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // PreserveManualMemoizationFinding is one disagreement between source and output.
 type PreserveManualMemoizationFinding struct {
 	// Identifier is the value whose memoization was lost.
-	Identifier IdentifierId
+	Identifier static_single_assignment.IdentifierId
 	// Scope is the scope it belonged to, which did not survive.
 	Scope ScopeId
 	// Order is where in the function the finding sits, for reporting.
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 	// Kind separates the two conditions, which carry different messages upstream.
 	Kind PreserveManualMemoizationKind
 }
@@ -119,7 +120,7 @@ func ValidatePreservedManualMemoizationWithPruned(tree *ReactiveFunction, functi
 		openMemoBlocks:   map[int]bool{},
 		dependencies:     dependencies,
 		sourceDeps:       map[int][]ManualMemoDependency{},
-		declsInMemoBlock: map[DeclarationId]bool{},
+		declsInMemoBlock: map[static_single_assignment.DeclarationId]bool{},
 	}
 	validator.walk(tree.Body)
 	return validator.findings
@@ -161,7 +162,7 @@ type manualMemoValidator struct {
 	// Upstream's `manualMemoState.decls`. A scope dependency rooted at a value the memo block
 	// itself declared is not a dependency the developer could have written, so it is skipped rather
 	// than reported. Without this the comparison reports every intermediate value in the callback.
-	declsInMemoBlock map[DeclarationId]bool
+	declsInMemoBlock map[static_single_assignment.DeclarationId]bool
 	findings         []PreserveManualMemoizationFinding
 }
 
@@ -304,7 +305,7 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 //
 // The `StartMemoize` condition additionally accepts a pruned scope, because a pruned scope was a
 // deliberate decision rather than a lost one. The `FinishMemoize` condition does not.
-func (v *manualMemoValidator) check(identifier IdentifierId, order EvaluationOrder,
+func (v *manualMemoValidator) check(identifier static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
 	kind PreserveManualMemoizationKind) {
 	if v.scopes == nil {
 		return

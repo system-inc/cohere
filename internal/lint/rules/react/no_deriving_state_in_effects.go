@@ -6,6 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 var messageNoDerivingStateInEffects = rule.Message{
@@ -180,9 +181,9 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 
 	// Upstream's three maps, keyed the same way. Single-assignment form is what lets each be one
 	// entry per value rather than per binding.
-	candidateDependencies := map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
-	functions := map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.FunctionExpression{}
-	locals := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
+	candidateDependencies := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
+	functions := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression{}
+	locals := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -230,9 +231,9 @@ func derivedEffectCandidate(
 	function *high_level_intermediate_representation.Function,
 	callee high_level_intermediate_representation.Place,
 	args []high_level_intermediate_representation.Argument,
-	candidateDependencies map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.ArrayExpression,
-	functions map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.FunctionExpression,
-	locals map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId,
+	candidateDependencies map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression,
+	functions map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression,
+	locals map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId,
 ) {
 	if len(args) != 2 || args[0].Spread || args[1].Spread {
 		return
@@ -266,7 +267,7 @@ func derivedEffectCandidate(
 
 	// `deps.elements.every(element => element.kind === 'Identifier')` upstream: a hole or a spread
 	// in the dependency array abandons the effect rather than being skipped.
-	dependencies := make([]high_level_intermediate_representation.IdentifierId, 0, len(deps.Elements))
+	dependencies := make([]static_single_assignment.IdentifierId, 0, len(deps.Elements))
 	for _, element := range deps.Elements {
 		// The `Hole` half is SUBSUMED and kept for fidelity, with the measurement recorded rather
 		// than the branch deleted. A hole lowers to a real `<hole>` element, so this is reachable,
@@ -315,7 +316,7 @@ func validateDerivedEffect(
 	enclosing *high_level_intermediate_representation.Function,
 	effectFunction *high_level_intermediate_representation.Function,
 	effectValue *high_level_intermediate_representation.FunctionExpression,
-	effectDeps []high_level_intermediate_representation.IdentifierId,
+	effectDeps []static_single_assignment.IdentifierId,
 ) {
 	// The captures are places in the ENCLOSING function, which is what makes them comparable to the
 	// dependency identifiers gathered there. `effectFunction.Context` holds the same values renamed
@@ -354,14 +355,14 @@ func validateDerivedEffect(
 	// Upstream seeds `values` directly from `effectDeps` because its context operands carry the same
 	// identifier ids inside and out; ours are renamed by lowering, so the seed is translated through
 	// the context list, which is index-aligned with the captures.
-	values := map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{}
+	values := map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{}
 	for index, capture := range captures {
 		if index >= len(effectFunction.Context) {
 			break
 		}
 		if containsIdentifier(effectDeps, capture.Identifier) {
 			inner := effectFunction.Context[index].Identifier
-			values[inner] = []high_level_intermediate_representation.IdentifierId{capture.Identifier}
+			values[inner] = []static_single_assignment.IdentifierId{capture.Identifier}
 		}
 	}
 	// This guard is UNREACHABLE today and is kept deliberately, because what makes it unreachable
@@ -384,7 +385,7 @@ func validateDerivedEffect(
 		return
 	}
 
-	seenBlocks := map[high_level_intermediate_representation.BlockId]bool{}
+	seenBlocks := map[static_single_assignment.BlockId]bool{}
 	var setStateLocations []high_level_intermediate_representation.Place
 
 	for _, block := range effectFunction.Blocks {
@@ -398,7 +399,7 @@ func validateDerivedEffect(
 		}
 
 		for _, phi := range block.Phis {
-			aggregate := map[high_level_intermediate_representation.IdentifierId]bool{}
+			aggregate := map[static_single_assignment.IdentifierId]bool{}
 			for _, predecessor := range high_level_intermediate_representation.PhiOperandsInOrder(phi) {
 				operand := phi.Operands.At(predecessor)
 				for _, dep := range values[operand.Identifier] {
@@ -437,7 +438,7 @@ func validateDerivedEffect(
 
 			case *high_level_intermediate_representation.ComputedLoad, *high_level_intermediate_representation.PropertyLoad, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral,
 				*high_level_intermediate_representation.CallExpression, *high_level_intermediate_representation.MethodCall:
-				aggregate := map[high_level_intermediate_representation.IdentifierId]bool{}
+				aggregate := map[static_single_assignment.IdentifierId]bool{}
 				high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, _ high_level_intermediate_representation.PlaceRole) {
 					for _, dep := range values[place.Identifier] {
 						aggregate[dep] = true
@@ -603,7 +604,7 @@ func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_repr
 // the intermediate representation rather than a helper for this rule. Recorded here so the next
 // reader can see the limit was measured rather than assumed, and so it is findable when the fold
 // lands: this function should be deleted then, not extended.
-func dependencyIsFoldedConstant(function *high_level_intermediate_representation.Function, dependency high_level_intermediate_representation.IdentifierId) bool {
+func dependencyIsFoldedConstant(function *high_level_intermediate_representation.Function, dependency static_single_assignment.IdentifierId) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
@@ -623,7 +624,7 @@ func dependencyIsFoldedConstant(function *high_level_intermediate_representation
 }
 
 // definesPrimitive answers whether a value was produced by a literal.
-func definesPrimitive(function *high_level_intermediate_representation.Function, identifier high_level_intermediate_representation.IdentifierId) bool {
+func definesPrimitive(function *high_level_intermediate_representation.Function, identifier static_single_assignment.IdentifierId) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
@@ -639,7 +640,7 @@ func definesPrimitive(function *high_level_intermediate_representation.Function,
 
 // containsIdentifier is a linear scan because a dependency array is short. A map would cost a
 // build per effect to answer at most a handful of questions.
-func containsIdentifier(identifiers []high_level_intermediate_representation.IdentifierId, want high_level_intermediate_representation.IdentifierId) bool {
+func containsIdentifier(identifiers []static_single_assignment.IdentifierId, want static_single_assignment.IdentifierId) bool {
 	for _, identifier := range identifiers {
 		if identifier == want {
 			return true
@@ -655,8 +656,8 @@ func containsIdentifier(identifiers []high_level_intermediate_representation.Ide
 // is how many distinct entries it holds. It is fixed anyway because an unordered slice stored into a
 // map that later feeds a phi aggregate makes the whole pass produce different intermediate values
 // between runs, which is the class of bug `TestLowerIsDeterministic` exists to catch one layer down.
-func identifiersOf(set map[high_level_intermediate_representation.IdentifierId]bool, order []high_level_intermediate_representation.IdentifierId) []high_level_intermediate_representation.IdentifierId {
-	result := make([]high_level_intermediate_representation.IdentifierId, 0, len(set))
+func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []static_single_assignment.IdentifierId) []static_single_assignment.IdentifierId {
+	result := make([]static_single_assignment.IdentifierId, 0, len(set))
 	for _, identifier := range order {
 		if set[identifier] {
 			result = append(result, identifier)
@@ -692,8 +693,8 @@ func identifiersOf(set map[high_level_intermediate_representation.IdentifierId]b
 // consequence of how this file happens to build its slices rather than something the type system
 // enforces. A future writer that appends without deduplicating would make the difference real, and
 // this comment is what tells them the guard is load-bearing again at that point.
-func distinctCount(identifiers []high_level_intermediate_representation.IdentifierId) int {
-	seen := map[high_level_intermediate_representation.IdentifierId]bool{}
+func distinctCount(identifiers []static_single_assignment.IdentifierId) int {
+	seen := map[static_single_assignment.IdentifierId]bool{}
 	for _, identifier := range identifiers {
 		seen[identifier] = true
 	}

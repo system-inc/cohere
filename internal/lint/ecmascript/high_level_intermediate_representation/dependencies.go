@@ -88,6 +88,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"strconv"
 	"strings"
 )
@@ -110,7 +111,7 @@ type DependencyPathEntry struct {
 // is upstream's `reactive` field; it is not consulted by this pass and exists for the pruning pass
 // that would consume it (`prune_non_reactive_dependencies.rs:230` retains on exactly this).
 type ReactiveScopeDependency struct {
-	Identifier IdentifierId
+	Identifier static_single_assignment.IdentifierId
 	Reactive   bool
 	Path       []DependencyPathEntry
 }
@@ -191,7 +192,7 @@ type ScopeDependencies struct {
 	temporaries temporaries
 
 	dependencies map[ScopeId][]ReactiveScopeDependency
-	declarations map[ScopeId][]IdentifierId
+	declarations map[ScopeId][]static_single_assignment.IdentifierId
 	// declarationOrigin names the scope a declared value actually originated in.
 	//
 	// `declarations` records a value into every enclosing scope on its stack, which is upstream's
@@ -205,8 +206,8 @@ type ScopeDependencies struct {
 	// origin. `pruneUnusedScopes` is the pass that needs the difference: its `hasOwnDeclaration`
 	// prunes a scope whose declarations all bubbled up from inner ones, and without the origin that
 	// question cannot be asked at all.
-	declarationOrigin map[IdentifierId]ScopeId
-	reassignments     map[ScopeId][]IdentifierId
+	declarationOrigin map[static_single_assignment.IdentifierId]ScopeId
+	reassignments     map[ScopeId][]static_single_assignment.IdentifierId
 	order             []ScopeId
 	// conflicts counts hoistable entries that disagreed about an access type. Upstream raises an
 	// invariant on these; see `hoistableTreeFor`. Measured at zero on the corpus.
@@ -227,7 +228,7 @@ func (d *ScopeDependencies) DependenciesOf(scope ScopeId) []ReactiveScopeDepende
 //
 // Upstream stores `(IdentifierId, ReactiveScopeDeclaration)` pairs where the second names the
 // declaring scope. The scope is the map key here, so the pair would store it twice.
-func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []IdentifierId {
+func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []static_single_assignment.IdentifierId {
 	if d == nil || d.declarations == nil {
 		return nil
 	}
@@ -239,7 +240,7 @@ func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []IdentifierId {
 // Distinct from the key of `DeclarationsOf`, which names a scope that holds the declaration and may
 // be an enclosing one. `pruneUnusedScopes` prunes a scope whose declarations all came from within
 // it, and that is the only question this answers.
-func (d *ScopeDependencies) OriginOf(identifier IdentifierId) (ScopeId, bool) {
+func (d *ScopeDependencies) OriginOf(identifier static_single_assignment.IdentifierId) (ScopeId, bool) {
 	if d == nil || d.declarationOrigin == nil {
 		return 0, false
 	}
@@ -273,7 +274,7 @@ func (d *ScopeDependencies) OriginOf(identifier IdentifierId) (ScopeId, bool) {
 //
 // A declaration with no recorded last usage is kept, which is the conservative direction: a value
 // this pass knows nothing about is not a value proven dead.
-func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end EvaluationOrder,
+func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end static_single_assignment.EvaluationOrder,
 	usage *LastUsage, function *Function) int {
 	if d == nil || d.declarations == nil || usage == nil || function == nil {
 		return 0
@@ -283,7 +284,7 @@ func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end E
 		return 0
 	}
 
-	kept := make([]IdentifierId, 0, len(held))
+	kept := make([]static_single_assignment.IdentifierId, 0, len(held))
 	for _, declared := range held {
 		lastUsedAt, found := usage.LastUsedAt(declarationOf(function, declared))
 		if found && lastUsedAt < end {
@@ -307,7 +308,7 @@ func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end E
 // This is the only pass in phase 6 that changes a value the rule reads directly. The rule compares
 // dependency sets, so a set left wider than upstream's is a set that will not correspond.
 func (d *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
-	reactive map[IdentifierId]bool) int {
+	reactive map[static_single_assignment.IdentifierId]bool) int {
 	if d == nil || d.dependencies == nil || reactive == nil {
 		return 0
 	}
@@ -330,7 +331,7 @@ func (d *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
 }
 
 // ReassignmentsOf returns the bindings a scope reassigns.
-func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []IdentifierId {
+func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []static_single_assignment.IdentifierId {
 	if d == nil || d.reassignments == nil {
 		return nil
 	}
@@ -451,9 +452,9 @@ type hoistableNode struct {
 // Upstream's `ReactiveScopeDependencyTreeHIR`. Two trees, not one: `hoistable` is what may be read
 // early, `roots` is what was actually read, and `addDependency` walks them in lockstep.
 type dependencyTree struct {
-	hoistable map[IdentifierId]*hoistableNode
-	roots     map[IdentifierId]*dependencyNode
-	rootOrder []IdentifierId
+	hoistable map[static_single_assignment.IdentifierId]*hoistableNode
+	roots     map[static_single_assignment.IdentifierId]*dependencyNode
+	rootOrder []static_single_assignment.IdentifierId
 }
 
 // newDependencyTree builds the tree, seeding it with the accesses proven hoistable.
@@ -470,11 +471,11 @@ type dependencyTree struct {
 // supplies real entries. Measured on `useMemo-alias-property-load-dep.ts`, the tree seeds three
 // roots, one carrying a property and marked non-null. So ordering and conflicts are now reachable
 // and this note is a live caveat rather than a dormant one.
-func newDependencyTree(hoistable map[IdentifierId]*hoistableNode) *dependencyTree {
+func newDependencyTree(hoistable map[static_single_assignment.IdentifierId]*hoistableNode) *dependencyTree {
 	if hoistable == nil {
-		hoistable = map[IdentifierId]*hoistableNode{}
+		hoistable = map[static_single_assignment.IdentifierId]*hoistableNode{}
 	}
-	return &dependencyTree{hoistable: hoistable, roots: map[IdentifierId]*dependencyNode{}}
+	return &dependencyTree{hoistable: hoistable, roots: map[static_single_assignment.IdentifierId]*dependencyNode{}}
 }
 
 // addDependency records one access path, truncating it where the path stops being safe to hoist.
@@ -564,7 +565,7 @@ func (t *dependencyTree) deriveMinimalDependencies() []ReactiveScopeDependency {
 //
 // Recursion depth is the longest access path, and the tree is finite and fully built before this
 // runs, so this terminates without any convergence argument. See the package comment on termination.
-func collectMinimalInSubtree(node *dependencyNode, root IdentifierId,
+func collectMinimalInSubtree(node *dependencyNode, root static_single_assignment.IdentifierId,
 	path []DependencyPathEntry, results *[]ReactiveScopeDependency) {
 	if isDependencyAccess(node.access) {
 		copied := make([]DependencyPathEntry, len(path))
@@ -595,7 +596,7 @@ func collectMinimalInSubtree(node *dependencyNode, root IdentifierId,
 // into a temporary and a second `PropertyLoad` off it. Without this map the second load's object is
 // an anonymous value and the dependency would be recorded as that temporary rather than as a path
 // through `props`. This is what reassembles them.
-type temporaries map[IdentifierId]ReactiveScopeDependency
+type temporaries map[static_single_assignment.IdentifierId]ReactiveScopeDependency
 
 // getProperty resolves one property access into a dependency, upstream's `getProperty`.
 //
@@ -643,7 +644,7 @@ func (t temporaries) resolve(place Place) ReactiveScopeDependency {
 // The `LoadLocal` arm requires the destination to be ANONYMOUS and the source to be NAMED, which is
 // upstream's `lvalue.identifier.name === null && place.identifier.name !== null`. That asymmetry is
 // what keeps this a map from temporaries to real values rather than a general alias table.
-func collectTemporaries(function *Function, usedOutside map[DeclarationId]bool) temporaries {
+func collectTemporaries(function *Function, usedOutside map[static_single_assignment.DeclarationId]bool) temporaries {
 	result := temporaries{}
 	collectTemporariesInto(function, usedOutside, result)
 	return result
@@ -663,7 +664,7 @@ func collectTemporaries(function *Function, usedOutside map[DeclarationId]bool) 
 // function resolves to the nested value rather than to a path through the outer one, so a path is
 // reported shallower rather than wrong. Recorded because a reader diffing against the bundle will
 // see the shared map missing.
-func collectTemporariesInto(function *Function, usedOutside map[DeclarationId]bool, into temporaries) {
+func collectTemporariesInto(function *Function, usedOutside map[static_single_assignment.DeclarationId]bool, into temporaries) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -720,9 +721,9 @@ func collectTemporariesInto(function *Function, usedOutside map[DeclarationId]bo
 // separately memoized. Keyed by `DeclarationId` rather than `IdentifierId` so that a binding
 // reassigned inside a scope is one subject rather than several.
 func findTemporariesUsedOutsideDeclaringScope(function *Function,
-	terminals map[BlockId]scopeBlockInfo) map[DeclarationId]bool {
-	declaringScope := map[DeclarationId]ScopeId{}
-	usedOutside := map[DeclarationId]bool{}
+	terminals map[static_single_assignment.BlockId]scopeBlockInfo) map[static_single_assignment.DeclarationId]bool {
+	declaringScope := map[static_single_assignment.DeclarationId]ScopeId{}
+	usedOutside := map[static_single_assignment.DeclarationId]bool{}
 	var active []ScopeId
 
 	isActive := func(scope ScopeId) bool {
@@ -808,8 +809,8 @@ type scopeBlockInfo struct {
 // `Scope` TERMINAL in the graph rather than by consulting a table, so before
 // `BuildReactiveScopeTerminals` landed it returned an empty map on every function and every
 // consumer of it silently produced nothing.
-func scopeBlockTraversal(function *Function) map[BlockId]scopeBlockInfo {
-	infos := map[BlockId]scopeBlockInfo{}
+func scopeBlockTraversal(function *Function) map[static_single_assignment.BlockId]scopeBlockInfo {
+	infos := map[static_single_assignment.BlockId]scopeBlockInfo{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -827,7 +828,7 @@ func scopeBlockTraversal(function *Function) map[BlockId]scopeBlockInfo {
 // Upstream's `Decl`. The scope stack is what `visitDependency` consults to decide that a value
 // produced inside one scope and read inside another must be recorded as a DECLARATION of the first.
 type declaration struct {
-	order      EvaluationOrder
+	order      static_single_assignment.EvaluationOrder
 	scopeStack []ScopeId
 }
 
@@ -848,12 +849,12 @@ type dependencyCollector struct {
 	// `PropagateScopeDependenciesHIR.ts:833`). Without the gate the test's operand is submitted as a
 	// dependency in its own right, which is a shallower access than the chain it belongs to and wins
 	// the shallowest-node reduction.
-	processedOptionalTests map[BlockId]bool
+	processedOptionalTests map[static_single_assignment.BlockId]bool
 	scopeStack             []ScopeId
 	dependencies           [][]ReactiveScopeDependency
-	declarations           map[DeclarationId]declaration
-	reassignments          map[IdentifierId]declaration
-	objectMethods          map[IdentifierId]bool
+	declarations           map[static_single_assignment.DeclarationId]declaration
+	reassignments          map[static_single_assignment.IdentifierId]declaration
+	objectMethods          map[static_single_assignment.IdentifierId]bool
 	result                 *ScopeDependencies
 	// scopeRange answers a scope's final range, which `checkValidDependency` compares against.
 	scopeRange func(ScopeId) MutableRange
@@ -908,7 +909,7 @@ func (c *dependencyCollector) exitScope(scope ScopeId) {
 	c.result.dependencies[scope] = append(c.result.dependencies[scope], scoped...)
 }
 
-func (c *dependencyCollector) declare(id IdentifierId, decl declaration) {
+func (c *dependencyCollector) declare(id static_single_assignment.IdentifierId, decl declaration) {
 	identifier := c.function.Identifiers[id]
 	if identifier == nil {
 		return
@@ -983,7 +984,7 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 				continue
 			}
 			if c.result.declarations == nil {
-				c.result.declarations = map[ScopeId][]IdentifierId{}
+				c.result.declarations = map[ScopeId][]static_single_assignment.IdentifierId{}
 			}
 			if !containsIdentifier(c.result.declarations[declaringScope], dep.Identifier) {
 				c.result.declarations[declaringScope] =
@@ -999,7 +1000,7 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 			// itself, and that cannot happen because the value written does not depend on
 			// `declaringScope` at all.
 			if c.result.declarationOrigin == nil {
-				c.result.declarationOrigin = map[IdentifierId]ScopeId{}
+				c.result.declarationOrigin = map[static_single_assignment.IdentifierId]ScopeId{}
 			}
 			c.result.declarationOrigin[dep.Identifier] =
 				original.scopeStack[len(original.scopeStack)-1]
@@ -1025,7 +1026,7 @@ func (c *dependencyCollector) visitReassignment(place Place) {
 		return
 	}
 	if c.result.reassignments == nil {
-		c.result.reassignments = map[ScopeId][]IdentifierId{}
+		c.result.reassignments = map[ScopeId][]static_single_assignment.IdentifierId{}
 	}
 	target := c.function.Identifiers[place.Identifier]
 	if target == nil {
@@ -1049,7 +1050,7 @@ func (c *dependencyCollector) scopeIsActive(scope ScopeId) bool {
 	return false
 }
 
-func containsIdentifier(list []IdentifierId, id IdentifierId) bool {
+func containsIdentifier(list []static_single_assignment.IdentifierId, id static_single_assignment.IdentifierId) bool {
 	for _, existing := range list {
 		if existing == id {
 			return true
@@ -1099,8 +1100,8 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 	collector := &dependencyCollector{
 		function:                      function,
 		temporaries:                   collected,
-		declarations:                  map[DeclarationId]declaration{},
-		reassignments:                 map[IdentifierId]declaration{},
+		declarations:                  map[static_single_assignment.DeclarationId]declaration{},
+		reassignments:                 map[static_single_assignment.IdentifierId]declaration{},
 		objectMethods:                 objectMethodValues(function),
 		result:                        result,
 		scopeRange:                    identity.RangeOf,
@@ -1163,8 +1164,8 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 	collector := &dependencyCollector{
 		function:                      function,
 		temporaries:                   collected,
-		declarations:                  map[DeclarationId]declaration{},
-		reassignments:                 map[IdentifierId]declaration{},
+		declarations:                  map[static_single_assignment.DeclarationId]declaration{},
+		reassignments:                 map[static_single_assignment.IdentifierId]declaration{},
 		objectMethods:                 objectMethodValues(function),
 		result:                        result,
 		scopeRange:                    identity.RangeOf,
@@ -1199,8 +1200,8 @@ func (d *ScopeDependencies) Conflicts() int {
 // that produces one is identifiable, and its lvalue is the value upstream's type would have named.
 // Seven such instructions exist across the corpus, so this is a small but exact recovery rather than
 // an approximation of the type check.
-func objectMethodValues(function *Function) map[IdentifierId]bool {
-	methods := map[IdentifierId]bool{}
+func objectMethodValues(function *Function) map[static_single_assignment.IdentifierId]bool {
+	methods := map[static_single_assignment.IdentifierId]bool{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -1223,7 +1224,7 @@ func objectMethodValues(function *Function) map[IdentifierId]bool {
 // One traversal of the blocks in execution order, maintaining the scope stack. Every block, every
 // instruction and every operand is visited exactly once, which is the whole termination argument:
 // the work is linear in the graph and the loops are over slices fixed before the walk begins.
-func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]scopeBlockInfo) {
+func (c *dependencyCollector) walk(function *Function, terminals map[static_single_assignment.BlockId]scopeBlockInfo) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -1407,14 +1408,14 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	}
 
 	// Inner identifier -> the place in THIS function naming the same binding.
-	translate := map[IdentifierId]Place{}
+	translate := map[static_single_assignment.IdentifierId]Place{}
 	for i := range captures {
 		translate[nested.Context[i].Identifier] = captures[i]
 	}
 
 	// The nested function's own temporaries, which `collectTemporariesInto` builds and discards.
 	nestedTemporaries := temporaries{}
-	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
+	collectTemporariesInto(nested, map[static_single_assignment.DeclarationId]bool{}, nestedTemporaries)
 
 	// The nested function's own optional chains, in the nested function's own key space.
 	//
@@ -1449,7 +1450,7 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	}
 	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
 	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
-	deepRoots := map[IdentifierId]bool{}
+	deepRoots := map[static_single_assignment.IdentifierId]bool{}
 	for _, dep := range accesses {
 		if len(dep.Path) > 0 {
 			if outer, ok := translate[dep.Identifier]; ok {
@@ -1496,16 +1497,16 @@ func nestedAccesses(function *Function, temps temporaries) []ReactiveScopeDepend
 // block for exactly this reason, and a scope reads the set at its own block, so a fact established
 // inside a branch is available in that branch and nowhere else.
 func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveScopeDependency,
-	[]BlockId) {
+	[]static_single_assignment.BlockId) {
 	var accesses []ReactiveScopeDependency
-	var blocks []BlockId
-	processedOptionalTests := map[BlockId]bool{}
+	var blocks []static_single_assignment.BlockId
+	processedOptionalTests := map[static_single_assignment.BlockId]bool{}
 	processedInstructions := map[InstructionId]bool{}
 	if optional := CollectOptionalChainSidemap(function); optional != nil {
 		processedOptionalTests = optional.ProcessedOptionalTests
 		processedInstructions = nestedOptionalInstructionsToDefer(function, optional)
 	}
-	record := func(block BlockId, dependency ReactiveScopeDependency) {
+	record := func(block static_single_assignment.BlockId, dependency ReactiveScopeDependency) {
 		accesses = append(accesses, dependency)
 		blocks = append(blocks, block)
 	}
@@ -1533,12 +1534,12 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 				if inner == nil || len(value.Captures) != len(inner.Context) {
 					continue
 				}
-				translate := map[IdentifierId]Place{}
+				translate := map[static_single_assignment.IdentifierId]Place{}
 				for i := range value.Captures {
 					translate[inner.Context[i].Identifier] = value.Captures[i]
 				}
 				innerTemporaries := temporaries{}
-				collectTemporariesInto(inner, map[DeclarationId]bool{}, innerTemporaries)
+				collectTemporariesInto(inner, map[static_single_assignment.DeclarationId]bool{}, innerTemporaries)
 				if innerOptional := CollectOptionalChainSidemap(inner); innerOptional != nil {
 					for identifier, dependency := range innerOptional.TemporariesReadInOptional {
 						innerTemporaries[identifier] = dependency
@@ -1618,8 +1619,8 @@ func nestedOptionalInstructionsToDefer(function *Function,
 //
 // Post-dominance is the exact relation: a block runs on every path from entry to exit precisely when
 // every such path passes through it.
-func blocksAlwaysReached(function *Function) map[BlockId]bool {
-	always := map[BlockId]bool{}
+func blocksAlwaysReached(function *Function) map[static_single_assignment.BlockId]bool {
+	always := map[static_single_assignment.BlockId]bool{}
 	if function == nil || len(function.Blocks) == 0 || function.Blocks[0] == nil {
 		return always
 	}
@@ -1878,7 +1879,7 @@ func prefixesDisagree(path ReactiveScopeDependency, committed map[string]bool) b
 }
 
 // optionalHoistable is the sidemap's per-block hoistable set, or nil when there was no traversal.
-func optionalHoistable(sidemap *OptionalChainSidemap) map[BlockId]ReactiveScopeDependency {
+func optionalHoistable(sidemap *OptionalChainSidemap) map[static_single_assignment.BlockId]ReactiveScopeDependency {
 	if sidemap == nil {
 		return nil
 	}
@@ -1896,7 +1897,7 @@ func optionalProcessedInstructions(sidemap *OptionalChainSidemap) map[Instructio
 
 // optionalProcessedTests names the blocks whose branch terminal an optional chain was recovered
 // from, or nil when no chains were found.
-func optionalProcessedTests(sidemap *OptionalChainSidemap) map[BlockId]bool {
+func optionalProcessedTests(sidemap *OptionalChainSidemap) map[static_single_assignment.BlockId]bool {
 	if sidemap == nil {
 		return nil
 	}

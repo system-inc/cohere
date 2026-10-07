@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 	"testing"
 )
@@ -21,7 +22,7 @@ type mergeCase struct {
 	scopes []MutableRange
 	// instructions are {order, lvalueScope, useScope}; a scope index of 0 means no scope.
 	instructions [][3]int
-	terminal     EvaluationOrder
+	terminal     static_single_assignment.EvaluationOrder
 	// terminalScope, when non-zero, gives the terminal a Return carrying a place in that scope.
 	// Zero leaves the terminal an Unreachable with no operands.
 	terminalScope int
@@ -37,9 +38,9 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 
 	function := &Function{}
 	scopes := &ReactiveScopes{
-		byIdentifier: map[IdentifierId]ScopeId{},
+		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
 		ranges:       map[ScopeId]MutableRange{},
-		members:      map[ScopeId][]IdentifierId{},
+		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
 	for index, scopeRange := range testCase.scopes {
 		id := ScopeId(index + 1)
@@ -49,7 +50,7 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 
 	block := &BasicBlock{Id: 0, Kind: BlockKindBlock}
 	function.Identifiers = append(function.Identifiers, nil)
-	nextIdentifier := IdentifierId(1)
+	nextIdentifier := static_single_assignment.IdentifierId(1)
 
 	place := func(scopeIndex int) Place {
 		id := nextIdentifier
@@ -64,7 +65,7 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 	}
 
 	for _, spec := range testCase.instructions {
-		order := EvaluationOrder(spec[0])
+		order := static_single_assignment.EvaluationOrder(spec[0])
 		lvalue := place(spec[1])
 		use := place(spec[2])
 		instruction := &Instruction{
@@ -318,13 +319,13 @@ func TestMergeConservesMembership(t *testing.T) {
 	})
 	merged := MergeOverlappingReactiveScopes(function, scopes)
 
-	before := map[IdentifierId]bool{}
+	before := map[static_single_assignment.IdentifierId]bool{}
 	for _, scope := range scopes.Ids() {
 		for _, member := range scopes.MembersOf(scope) {
 			before[member] = true
 		}
 	}
-	after := map[IdentifierId]bool{}
+	after := map[static_single_assignment.IdentifierId]bool{}
 	for _, scope := range merged.Ids() {
 		for _, member := range merged.MembersOf(scope) {
 			if after[member] {
@@ -793,7 +794,7 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 	functions, violations := 0, 0
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		functions++
-		var last EvaluationOrder
+		var last static_single_assignment.EvaluationOrder
 		for _, block := range function.Blocks {
 			if block == nil {
 				continue

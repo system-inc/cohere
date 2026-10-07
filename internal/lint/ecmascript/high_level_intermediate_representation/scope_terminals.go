@@ -86,7 +86,10 @@
 // upstream does.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // ScopeIdentity is how this pass resolves a value's scope to the scope that actually survives.
 //
@@ -202,11 +205,11 @@ type ScopeTerminals struct {
 type scopeRewrite struct {
 	isStart bool
 	// order is the evaluation position this rewrite lands at: the scope's range start or end.
-	order EvaluationOrder
+	order static_single_assignment.EvaluationOrder
 	// block is the scope body's block id. Meaningful only for a start.
-	block BlockId
+	block static_single_assignment.BlockId
 	// fallthrough is where control resumes after the scope. Shared by the start and its end.
-	fallthroughBlock BlockId
+	fallthroughBlock static_single_assignment.BlockId
 	// scope is the scope being begun. Meaningful only for a start.
 	scope ScopeId
 }
@@ -249,7 +252,7 @@ func ScopeTerminalsPrecondition(function *Function, scopes *ReactiveScopes,
 // scopeItem is one scope reduced to the two positions the traversal orders it by.
 type scopeItem struct {
 	scope      ScopeId
-	start, end EvaluationOrder
+	start, end static_single_assignment.EvaluationOrder
 }
 
 // scopeItemsInNestingOrder is React's `getScopes` followed by its `rangePreOrderComparator`.
@@ -446,7 +449,7 @@ func fixScopeRanges(function *Function, scopes *ReactiveScopes, identity ScopeId
 // fallthrough its start recorded -- that pairing is the whole reason the stack exists.
 func queueScopeRewrites(function *Function, items []scopeItem) []scopeRewrite {
 	var rewrites []scopeRewrite
-	fallthroughs := map[ScopeId]BlockId{}
+	fallthroughs := map[ScopeId]static_single_assignment.BlockId{}
 
 	enter := func(item scopeItem) {
 		body := function.NewBlock(BlockKindBlock)
@@ -534,7 +537,7 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 	var rebuilt []*BasicBlock
 	// finalBlockOf maps an original block id to the id of the last block carved out of it, which is
 	// the block that now reaches whatever the original reached. Phi operands are rekeyed through it.
-	finalBlockOf := map[BlockId]BlockId{}
+	finalBlockOf := map[static_single_assignment.BlockId]static_single_assignment.BlockId{}
 
 	for _, block := range original {
 		if block.Terminal == nil {
@@ -548,7 +551,7 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 		var carved []*BasicBlock
 
 		for position := 0; position <= len(block.Instructions); position++ {
-			var order EvaluationOrder
+			var order static_single_assignment.EvaluationOrder
 			if position < len(block.Instructions) {
 				order = function.Instructions[block.Instructions[position]].Order
 			} else {
@@ -642,7 +645,7 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 // Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the block slice
 // wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
 func (f *Function) reindexBlocks() {
-	f.blocksById = make(map[BlockId]*BasicBlock, len(f.Blocks))
+	f.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(f.Blocks))
 	for _, block := range f.Blocks {
 		f.blocksById[block.Id] = block
 	}

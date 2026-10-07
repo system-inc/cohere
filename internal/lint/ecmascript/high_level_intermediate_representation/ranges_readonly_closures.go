@@ -1,13 +1,15 @@
 package high_level_intermediate_representation
 
-func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[IdentifierId]EffectValueKind) bool {
+import "github.com/system-inc/cohere/static_single_assignment"
+
+func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[static_single_assignment.IdentifierId]EffectValueKind) bool {
 	if hasReadOnlyClosureEffects(function, map[*Function]bool{}) {
 		return true
 	}
 	if function == nil || len(function.Context) != len(captures) {
 		return false
 	}
-	contextKinds := map[IdentifierId]EffectValueKind{}
+	contextKinds := map[static_single_assignment.IdentifierId]EffectValueKind{}
 	hasMixedCapture := false
 	for index, capture := range captures {
 		kind, known := kinds[capture.Identifier]
@@ -22,7 +24,7 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 	}
 	effects := InferAliasingEffects(function)
 	calleeProducers := newCalleeProducers(function)
-	producers := map[IdentifierId]InstructionValue{}
+	producers := map[static_single_assignment.IdentifierId]InstructionValue{}
 	for _, instruction := range function.Instructions {
 		if instruction != nil {
 			producers[instruction.LValue.Identifier] = instruction.Value
@@ -92,11 +94,11 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 	return true
 }
 
-func refDerivedValues(function *Function) map[IdentifierId]bool {
+func refDerivedValues(function *Function) map[static_single_assignment.IdentifierId]bool {
 	refs := useRefResultValues(function)
 	for {
 		changed := false
-		mark := func(from, into IdentifierId) {
+		mark := func(from, into static_single_assignment.IdentifierId) {
 			if refs[from] && !refs[into] {
 				refs[into] = true
 				changed = true

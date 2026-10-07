@@ -22,6 +22,8 @@
 // variant added without updating these goes red rather than silently contributing no places.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // PlaceRole is why an instruction touches a place.
 //
 // A pass computing effects needs to distinguish the value being stored from the object being stored
@@ -273,8 +275,8 @@ func EachTerminalPlace(terminal Terminal, visit func(place Place, role PlaceRole
 // The distinction is load-bearing. A dataflow analysis given the fallthrough as an edge propagates
 // values along a path that does not exist, and the error is silent because the fallthrough is
 // genuinely reachable by other means.
-func EachSuccessor(terminal Terminal, visit func(block BlockId)) {
-	visitReal := func(block BlockId) {
+func EachSuccessor(terminal Terminal, visit func(block static_single_assignment.BlockId)) {
+	visitReal := func(block static_single_assignment.BlockId) {
 		if HasBlock(block) {
 			visit(block)
 		}
@@ -341,8 +343,8 @@ func hasDefaultCase(cases []SwitchCase) bool {
 }
 
 // Fallthrough returns the block where the construct this terminal begins completes, if it has one.
-func Fallthrough(terminal Terminal) (BlockId, bool) {
-	var block BlockId
+func Fallthrough(terminal Terminal) (static_single_assignment.BlockId, bool) {
+	var block static_single_assignment.BlockId
 	switch t := terminal.(type) {
 	case *If:
 		block = t.Fallthrough
@@ -384,10 +386,10 @@ func Fallthrough(terminal Terminal) (BlockId, bool) {
 //
 // For a printer, a structural walk, or a reachability check that wants to reach every block a
 // construct owns. Not for dataflow; see EachSuccessor.
-func EachSuccessorAndFallthrough(terminal Terminal, visit func(block BlockId)) {
+func EachSuccessorAndFallthrough(terminal Terminal, visit func(block static_single_assignment.BlockId)) {
 	seen := false
 	fallthroughBlock, hasFallthrough := Fallthrough(terminal)
-	EachSuccessor(terminal, func(block BlockId) {
+	EachSuccessor(terminal, func(block static_single_assignment.BlockId) {
 		if hasFallthrough && block == fallthroughBlock {
 			seen = true
 		}
@@ -399,7 +401,7 @@ func EachSuccessorAndFallthrough(terminal Terminal, visit func(block BlockId)) {
 }
 
 // TerminalOrder returns the terminal's position in evaluation order.
-func TerminalOrder(terminal Terminal) EvaluationOrder {
+func TerminalOrder(terminal Terminal) static_single_assignment.EvaluationOrder {
 	switch t := terminal.(type) {
 	case *Return:
 		return t.Order

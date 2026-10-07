@@ -101,6 +101,8 @@
 // `TestDropManualMemoizationDistributionIsReal`.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // ManualMemoKind is which of the two memoization hooks a call site used.
 //
 // The two differ in what they memoize -- `useMemo` a value, `useCallback` a function -- and that
@@ -167,27 +169,27 @@ type ManualMemoization struct {
 // instruction precedes every use of it in evaluation order.
 type manualMemoSidemap struct {
 	// functions maps a temporary to the function expression stored in it.
-	functions map[IdentifierId]bool
+	functions map[static_single_assignment.IdentifierId]bool
 	// manualMemos maps a temporary holding a loaded `useMemo`/`useCallback` to which one it is.
-	manualMemos map[IdentifierId]ManualMemoKind
+	manualMemos map[static_single_assignment.IdentifierId]ManualMemoKind
 	// react holds temporaries holding the `React` namespace object.
-	react map[IdentifierId]bool
+	react map[static_single_assignment.IdentifierId]bool
 	// depsLists maps a temporary holding an array literal to its element places.
-	depsLists map[IdentifierId][]Place
+	depsLists map[static_single_assignment.IdentifierId][]Place
 	// deps maps a temporary to the access path it evaluates to, when it is one.
-	deps map[IdentifierId]ManualMemoDependency
+	deps map[static_single_assignment.IdentifierId]ManualMemoDependency
 	// optionals is upstream's `findOptionalPlaces`: property values guarded by an Optional
 	// terminal. Structural optional lowering deliberately leaves PropertyLoad.Optional false.
-	optionals map[IdentifierId]bool
+	optionals map[static_single_assignment.IdentifierId]bool
 	// optionalJoins are the only phi blocks through which a single resolved optional arm may be
 	// projected. An enclosing ternary or logical join is a distinct expression.
-	optionalJoins map[BlockId]bool
+	optionalJoins map[static_single_assignment.BlockId]bool
 	// anchors maps a temporary to the instruction that defined it.
 	//
 	// Upstream keeps the whole defining instruction on its `ManualMemoCallee`; only the id is
 	// needed here, and keeping it for every temporary rather than only callee loads costs one map
 	// write per instruction and removes a special case.
-	anchors map[IdentifierId]InstructionId
+	anchors map[static_single_assignment.IdentifierId]InstructionId
 }
 
 // DropManualMemoization rewrites `useMemo`/`useCallback` calls and records what was written.
@@ -196,14 +198,14 @@ type manualMemoSidemap struct {
 func DropManualMemoization(function *Function) ManualMemoization {
 	result := ManualMemoization{}
 	sidemap := manualMemoSidemap{
-		functions:     map[IdentifierId]bool{},
-		manualMemos:   map[IdentifierId]ManualMemoKind{},
-		react:         map[IdentifierId]bool{},
-		depsLists:     map[IdentifierId][]Place{},
-		deps:          map[IdentifierId]ManualMemoDependency{},
+		functions:     map[static_single_assignment.IdentifierId]bool{},
+		manualMemos:   map[static_single_assignment.IdentifierId]ManualMemoKind{},
+		react:         map[static_single_assignment.IdentifierId]bool{},
+		depsLists:     map[static_single_assignment.IdentifierId][]Place{},
+		deps:          map[static_single_assignment.IdentifierId]ManualMemoDependency{},
 		optionals:     findManualMemoOptionalPlaces(function),
 		optionalJoins: optionalChainJoinBlocks(function),
-		anchors:       map[IdentifierId]InstructionId{},
+		anchors:       map[static_single_assignment.IdentifierId]InstructionId{},
 	}
 
 	// An optional chain in the dependency ARRAY spans blocks rather than being one `PropertyLoad`.
@@ -402,7 +404,7 @@ func recogniseManualMemoCall(instruction *Instruction, sidemap *manualMemoSidema
 }
 
 // calleeAnchor is the instruction that defined a temporary, for anchoring `StartMemoize`.
-func (s *manualMemoSidemap) calleeAnchor(identifier IdentifierId) InstructionId {
+func (s *manualMemoSidemap) calleeAnchor(identifier static_single_assignment.IdentifierId) InstructionId {
 	return s.anchors[identifier]
 }
 
@@ -590,8 +592,8 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 // dependencies and therefore accepts only local/context roots. Source dependency extraction has a
 // different contract: `[GLOBAL?.field]` is a valid written dependency even though a LoadGlobal is
 // not a hoistable inferred root.
-func findManualMemoOptionalPlaces(function *Function) map[IdentifierId]bool {
-	result := map[IdentifierId]bool{}
+func findManualMemoOptionalPlaces(function *Function) map[static_single_assignment.IdentifierId]bool {
+	result := map[static_single_assignment.IdentifierId]bool{}
 	if function == nil {
 		return result
 	}
@@ -601,10 +603,10 @@ func findManualMemoOptionalPlaces(function *Function) map[IdentifierId]bool {
 			continue
 		}
 		test, found := function.Block(optional.Test)
-		seen := map[BlockId]bool{}
+		seen := map[static_single_assignment.BlockId]bool{}
 		for found && test != nil && !seen[test.Id] {
 			seen[test.Id] = true
-			var next BlockId
+			var next static_single_assignment.BlockId
 			switch terminal := test.Terminal.(type) {
 			case *Branch:
 				if terminal.Fallthrough == optional.Fallthrough {
@@ -680,7 +682,7 @@ func collectManualMemoPhiDependencies(block *BasicBlock, sidemap *manualMemoSide
 }
 
 // isNamedBinding reports whether a value is a named source binding rather than a temporary.
-func isNamedBinding(function *Function, id IdentifierId) bool {
+func isNamedBinding(function *Function, id static_single_assignment.IdentifierId) bool {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return false
 	}
@@ -694,7 +696,7 @@ func isNamedBinding(function *Function, id IdentifierId) bool {
 // fresh path rooted there, which is what makes `props` in `[props.items]` a root at all. An unnamed
 // temporary with no path is neither and is left absent, which is what makes `[a + b]` unextractable
 // rather than silently rooted at a meaningless place.
-func propagateManualMemoDependency(function *Function, sidemap *manualMemoSidemap, target IdentifierId, source Place) {
+func propagateManualMemoDependency(function *Function, sidemap *manualMemoSidemap, target static_single_assignment.IdentifierId, source Place) {
 	if existing, ok := sidemap.deps[source.Identifier]; ok {
 		sidemap.deps[target] = existing
 		return

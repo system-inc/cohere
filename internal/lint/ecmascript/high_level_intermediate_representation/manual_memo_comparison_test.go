@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // TestCompareManualMemoDependenciesAsymmetry pins the direction, which is the whole rule.
 //
@@ -14,7 +17,7 @@ import "testing"
 func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
 	t.Parallel()
 
-	local := func(identifier IdentifierId, properties ...string) ManualMemoDependency {
+	local := func(identifier static_single_assignment.IdentifierId, properties ...string) ManualMemoDependency {
 		path := make([]DependencyPathEntry, 0, len(properties))
 		for _, property := range properties {
 			path = append(path, DependencyPathEntry{Property: property})

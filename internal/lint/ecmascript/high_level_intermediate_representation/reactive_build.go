@@ -5,6 +5,8 @@
 // three-level input check that preceded this work.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // controlFlowKind is why a block is on the control-flow stack.
 //
 // The distinction decides whether a `goto` becomes a break, a continue, or nothing. Upstream models
@@ -24,11 +26,11 @@ const (
 // control goes implicitly, which is what lets a `goto` to it be elided entirely rather than printed
 // as a break.
 type controlFlowTarget struct {
-	block BlockId
+	block static_single_assignment.BlockId
 	id    int
 	kind  controlFlowKind
 	// continueBlock is the loop's back edge target, meaningful only for controlFlowLoop.
-	continueBlock BlockId
+	continueBlock static_single_assignment.BlockId
 	// hasContinue records that this loop entry owns a continue target.
 	hasContinue bool
 	// ownsBlock records whether this entry itself claimed the fallthrough, or found it already claimed by
@@ -54,13 +56,13 @@ type reactiveContext struct {
 	flattenedScopes map[ScopeId]bool
 	// scheduled are blocks a parent has committed to emitting, so a child emits a break instead of
 	// emitting them again. This is what makes the walk single-visit in the presence of joins.
-	scheduled map[BlockId]bool
+	scheduled map[static_single_assignment.BlockId]bool
 	// emitted is the independent check on that. Upstream keeps it purely to abort if a block is
 	// generated twice, and it is kept here for the same reason and surfaced for measurement.
-	emitted map[BlockId]bool
+	emitted map[static_single_assignment.BlockId]bool
 	// catchHandlers are blocks reached only as a `try` handler, which the walk must not treat as
 	// ordinary successors.
-	catchHandlers map[BlockId]bool
+	catchHandlers map[static_single_assignment.BlockId]bool
 	// scopeFallthroughs are the blocks a scope terminal falls through to.
 	//
 	// Upstream's `scopeFallthroughs`, and it exists because a break to one of these must be elided
@@ -69,7 +71,7 @@ type reactiveContext struct {
 	// target that no enclosing construct claims. That is measurable: before this set existed the
 	// walk reported 61 unmatched gotos and 21 double emissions on the corpus, and the four
 	// functions losing instructions were the subset whose orphaned target held any.
-	scopeFallthroughs map[BlockId]bool
+	scopeFallthroughs map[static_single_assignment.BlockId]bool
 	stack             []controlFlowTarget
 	nextScheduleId    int
 	// unmatchedGotos counts gotos whose target was not on the control-flow stack.
@@ -87,11 +89,11 @@ type reactiveContext struct {
 	// `BlockId` is explicitly NOT an index into `Blocks` -- the slice is in reverse postorder and
 	// the two move independently, per the doc on `BlockId`. A linear scan per lookup would make this
 	// pass quadratic in block count, so the index is built once up front.
-	blockIndex map[BlockId]*BasicBlock
+	blockIndex map[static_single_assignment.BlockId]*BasicBlock
 }
 
 func newReactiveContext(function *Function) *reactiveContext {
-	index := map[BlockId]*BasicBlock{}
+	index := map[static_single_assignment.BlockId]*BasicBlock{}
 	for _, block := range function.Blocks {
 		if block != nil {
 			index[block.Id] = block
@@ -99,19 +101,19 @@ func newReactiveContext(function *Function) *reactiveContext {
 	}
 	return &reactiveContext{
 		function:          function,
-		scheduled:         map[BlockId]bool{},
-		emitted:           map[BlockId]bool{},
-		catchHandlers:     map[BlockId]bool{},
-		scopeFallthroughs: map[BlockId]bool{},
+		scheduled:         map[static_single_assignment.BlockId]bool{},
+		emitted:           map[static_single_assignment.BlockId]bool{},
+		catchHandlers:     map[static_single_assignment.BlockId]bool{},
+		scopeFallthroughs: map[static_single_assignment.BlockId]bool{},
 		blockIndex:        index,
 	}
 }
 
-func (c *reactiveContext) block(id BlockId) *BasicBlock {
+func (c *reactiveContext) block(id static_single_assignment.BlockId) *BasicBlock {
 	return c.blockIndex[id]
 }
 
-func (c *reactiveContext) isScheduled(id BlockId) bool {
+func (c *reactiveContext) isScheduled(id static_single_assignment.BlockId) bool {
 	return c.scheduled[id]
 }
 
@@ -120,7 +122,7 @@ func (c *reactiveContext) isScheduled(id BlockId) bool {
 // Upstream raises an invariant when a block is scheduled twice. That cannot be reproduced as a
 // panic in a linter, so a double schedule is counted and the second one is ignored -- which keeps
 // the walk single-visit rather than letting the block be emitted by both parents.
-func (c *reactiveContext) schedule(block BlockId, kind controlFlowKind) int {
+func (c *reactiveContext) schedule(block static_single_assignment.BlockId, kind controlFlowKind) int {
 	id := c.nextScheduleId
 	c.nextScheduleId++
 	c.scheduled[block] = true
@@ -132,7 +134,7 @@ func (c *reactiveContext) schedule(block BlockId, kind controlFlowKind) int {
 //
 // `ownsBlock` is upstream's, and it matters: a loop whose fallthrough was ALREADY scheduled by an
 // enclosing construct must not unschedule it on the way out, or the parent's break target vanishes.
-func (c *reactiveContext) scheduleLoop(fallthrough_, continueBlock BlockId) int {
+func (c *reactiveContext) scheduleLoop(fallthrough_, continueBlock static_single_assignment.BlockId) int {
 	id := c.nextScheduleId
 	c.nextScheduleId++
 	ownsBlock := !c.scheduled[fallthrough_]
@@ -188,7 +190,7 @@ func (c *reactiveContext) unscheduleAll(ids []int) {
 // The `hasPrecedingLoop` tracking is what separates the second from the third, and getting it wrong
 // produces a program that breaks out of the wrong loop while passing any test that only checks
 // which statements exist.
-func (c *reactiveContext) breakTarget(block BlockId) (ReactiveTerminalTargetKind, bool) {
+func (c *reactiveContext) breakTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
 	for index := len(c.stack) - 1; index >= 0; index-- {
 		target := c.stack[index]
@@ -216,7 +218,7 @@ func (c *reactiveContext) breakTarget(block BlockId) (ReactiveTerminalTargetKind
 }
 
 // continueTarget decides how a goto to a loop's back edge should be printed.
-func (c *reactiveContext) continueTarget(block BlockId) (ReactiveTerminalTargetKind, bool) {
+func (c *reactiveContext) continueTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
 	for index := len(c.stack) - 1; index >= 0; index-- {
 		target := c.stack[index]
@@ -735,17 +737,17 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 }
 
 type reactiveValueBlockResult struct {
-	block BlockId
+	block static_single_assignment.BlockId
 	place Place
 	value ReactiveValue
-	order EvaluationOrder
+	order static_single_assignment.EvaluationOrder
 }
 
 type reactiveValueTerminalResult struct {
 	place        Place
 	value        ReactiveValue
-	continuation BlockId
-	order        EvaluationOrder
+	continuation static_single_assignment.BlockId
+	order        static_single_assignment.EvaluationOrder
 }
 
 // emitStructuredValueTerminal reconstructs value-producing control flow as one reactive
@@ -758,8 +760,8 @@ type reactiveValueTerminalResult struct {
 // and losing the unvisited arm.
 func (c *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *ReactiveBlock,
 	ids *[]int) bool {
-	var continuation BlockId
-	var order EvaluationOrder
+	var continuation static_single_assignment.BlockId
+	var order static_single_assignment.EvaluationOrder
 	switch shape := terminal.(type) {
 	case *Optional:
 		continuation = shape.Fallthrough
@@ -774,7 +776,7 @@ func (c *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *R
 		return false
 	}
 
-	savedEmitted := make(map[BlockId]bool, len(c.emitted))
+	savedEmitted := make(map[static_single_assignment.BlockId]bool, len(c.emitted))
 	for block, emitted := range c.emitted {
 		savedEmitted[block] = emitted
 	}
@@ -921,7 +923,7 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 // to BuildReactiveFunction. Each arm result is an operand of a phi in the value terminal's
 // continuation; the reconstructed composite instruction defines that phi's place directly, so
 // instructions after the expression read a value the reactive tree actually declares.
-func (c *reactiveContext) valueJoinPlace(continuation BlockId,
+func (c *reactiveContext) valueJoinPlace(continuation static_single_assignment.BlockId,
 	results ...reactiveValueBlockResult) Place {
 	if len(results) == 0 {
 		return Place{}
@@ -949,7 +951,7 @@ func (c *reactiveContext) valueJoinPlace(continuation BlockId,
 // visitTestValueBlock follows nested value terminals until it reaches the Branch that selects the
 // current composite expression's arms. Nested chains such as `a?.b?.c` require returning the final
 // block rather than assuming the terminal's Test block itself owns that branch.
-func (c *reactiveContext) visitTestValueBlock(block BlockId) (reactiveValueBlockResult, *Branch,
+func (c *reactiveContext) visitTestValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, *Branch,
 	bool) {
 	test, ok := c.visitValueBlock(block)
 	if !ok {
@@ -970,7 +972,7 @@ func (c *reactiveContext) visitTestValueBlock(block BlockId) (reactiveValueBlock
 // temporary is erased exactly as upstream erases it: ReactiveFunction has compound values instead
 // of the join phi that StoreLocal feeds, so the store becomes a LoadLocal of its input and the
 // enclosing composite instruction takes its lvalue.
-func (c *reactiveContext) visitValueBlock(block BlockId) (reactiveValueBlockResult, bool) {
+func (c *reactiveContext) visitValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, bool) {
 	basic := c.block(block)
 	if basic == nil || c.emitted[basic.Id] {
 		return reactiveValueBlockResult{}, false
@@ -1077,8 +1079,8 @@ func (c *reactiveContext) reactiveInstructions(ids []InstructionId) []*ReactiveI
 //
 // Returns the block to visit as a sibling afterwards, and whether this call is the one that claimed
 // it. A fallthrough already scheduled by an enclosing construct is that construct's to emit.
-func (c *reactiveContext) scheduleFallthrough(block BlockId, kind controlFlowKind,
-	ids *[]int) (BlockId, bool) {
+func (c *reactiveContext) scheduleFallthrough(block static_single_assignment.BlockId, kind controlFlowKind,
+	ids *[]int) (static_single_assignment.BlockId, bool) {
 	if c.isScheduled(block) {
 		return 0, false
 	}
@@ -1087,8 +1089,8 @@ func (c *reactiveContext) scheduleFallthrough(block BlockId, kind controlFlowKin
 }
 
 // scheduleLoopTargets claims a loop's fallthrough and its continue block together.
-func (c *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock BlockId,
-	ids *[]int) BlockId {
+func (c *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock static_single_assignment.BlockId,
+	ids *[]int) static_single_assignment.BlockId {
 	owns := !c.isScheduled(fallthrough_)
 	*ids = append(*ids, c.scheduleLoop(fallthrough_, continueBlock))
 	if !owns {
@@ -1101,7 +1103,7 @@ func (c *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock BlockI
 //
 // This is what keeps the tree flat where the source was flat: statements after an `if` are siblings
 // of it, not children. A zero id means the fallthrough belongs to an enclosing construct.
-func (c *reactiveContext) visitFallthrough(block BlockId, into *ReactiveBlock) {
+func (c *reactiveContext) visitFallthrough(block static_single_assignment.BlockId, into *ReactiveBlock) {
 	if block == 0 {
 		return
 	}
@@ -1112,7 +1114,7 @@ func (c *reactiveContext) visitFallthrough(block BlockId, into *ReactiveBlock) {
 //
 // Upstream emits these naively and prunes them later; see `ReactiveFunctionGapUnprunedLabels`. The
 // `Implicit` flag is upstream's and records that control would reach the target anyway.
-func (c *reactiveContext) labelFor(block BlockId, owned bool) *ReactiveLabel {
+func (c *reactiveContext) labelFor(block static_single_assignment.BlockId, owned bool) *ReactiveLabel {
 	if !owned {
 		return nil
 	}
@@ -1170,8 +1172,8 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 // structured extractor does not understand. It preserves the test and both arms as a statement
 // subtree, then emits the continuation as a sibling. The source-expression form is lost, but no
 // graph instructions are guessed away.
-func (c *reactiveContext) emitValueTerminal(fallthrough_ BlockId, into *ReactiveBlock,
-	ids *[]int, test BlockId) {
+func (c *reactiveContext) emitValueTerminal(fallthrough_ static_single_assignment.BlockId, into *ReactiveBlock,
+	ids *[]int, test static_single_assignment.BlockId) {
 	blockId, _ := c.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
 	// The test block, walked while the fallthrough is SCHEDULED.
 	//
@@ -1192,7 +1194,7 @@ func (c *reactiveContext) emitValueTerminal(fallthrough_ BlockId, into *Reactive
 }
 
 // traverse builds a fresh block from one entry point.
-func (c *reactiveContext) traverse(block BlockId) ReactiveBlock {
+func (c *reactiveContext) traverse(block static_single_assignment.BlockId) ReactiveBlock {
 	var built ReactiveBlock
 	c.visitBlock(c.block(block), &built)
 	return built
@@ -1220,7 +1222,7 @@ func (c *reactiveContext) traverse(block BlockId) ReactiveBlock {
 //
 // The block is marked emitted so the ordinary walk does not visit it again as a statement block --
 // a value block belongs to its terminal, not to the enclosing statement list.
-func (c *reactiveContext) valueOf(block BlockId) ReactiveValue {
+func (c *reactiveContext) valueOf(block static_single_assignment.BlockId) ReactiveValue {
 	basic := c.block(block)
 	if basic == nil || len(basic.Instructions) == 0 {
 		return nil

@@ -7,6 +7,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPrunedScopesAreRecordedRatherThanCompared pins upstream's split into two visitor methods.
@@ -116,8 +117,8 @@ func prunedScopeShape(function *Function, checker *shimchecker.Checker) (int, in
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	live, pruned := 0, 0
-	liveKeys := map[IdentifierId]bool{}
-	prunedKeys := map[IdentifierId]bool{}
+	liveKeys := map[static_single_assignment.IdentifierId]bool{}
+	prunedKeys := map[static_single_assignment.IdentifierId]bool{}
 	VisitReactiveFunction(tree, ReactiveVisitor{
 		Scope: func(block *ReactiveScopeBlock, traverse func()) {
 			target := liveKeys

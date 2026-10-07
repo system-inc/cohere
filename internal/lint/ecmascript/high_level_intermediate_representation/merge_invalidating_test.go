@@ -7,6 +7,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestFindLastUsageRecordsTheHighestOrder is the property the merge condition reads.
@@ -43,16 +44,16 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 
 	// Asserted against an independent walk rather than against the builder: the maximum order any
 	// place carries must equal the maximum this table holds, or the walk missed a read.
-	highestSeen := EvaluationOrder(0)
+	highestSeen := static_single_assignment.EvaluationOrder(0)
 	VisitReactiveFunction(tree, ReactiveVisitor{
-		Place: func(order EvaluationOrder, place Place, role PlaceRole) {
+		Place: func(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
 			if order > highestSeen {
 				highestSeen = order
 			}
 		},
 	})
 
-	highestRecorded := EvaluationOrder(0)
+	highestRecorded := static_single_assignment.EvaluationOrder(0)
 	for declaration := range usage.byDeclaration {
 		if at, found := usage.LastUsedAt(declaration); found && at > highestRecorded {
 			highestRecorded = at
@@ -76,7 +77,7 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
 	t.Parallel()
 
-	usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{7: 0}}
+	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{7: 0}}
 
 	if order, found := usage.LastUsedAt(7); !found || order != 0 {
 		t.Errorf("a declaration recorded at order zero answered (%d, %t), want (0, true)", order, found)
@@ -99,7 +100,7 @@ func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
 func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 	t.Parallel()
 
-	plain := func(identifier IdentifierId, property string, optional bool) ReactiveScopeDependency {
+	plain := func(identifier static_single_assignment.IdentifierId, property string, optional bool) ReactiveScopeDependency {
 		return ReactiveScopeDependency{
 			Identifier: identifier,
 			Path:       []DependencyPathEntry{{Property: property, Optional: optional}},
@@ -170,22 +171,22 @@ func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
 	t.Parallel()
 
-	usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{
+	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{
 		1: 5,
 		2: 12,
 	}}
 
-	if !AreLValuesLastUsedByScope(10, []DeclarationId{1}, usage) {
+	if !AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{1}, usage) {
 		t.Error("a declaration last used at 5 before a scope ending at 10 should be mergeable")
 	}
-	if AreLValuesLastUsedByScope(10, []DeclarationId{2}, usage) {
+	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{2}, usage) {
 		t.Error("a declaration last used at 12 is read after a scope ending at 10, so the merge " +
 			"must be declined")
 	}
-	if AreLValuesLastUsedByScope(10, []DeclarationId{1, 2}, usage) {
+	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{1, 2}, usage) {
 		t.Error("one unmergeable lvalue must decline the whole set")
 	}
-	if AreLValuesLastUsedByScope(10, []DeclarationId{99}, usage) {
+	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{99}, usage) {
 		t.Error("an unrecorded declaration answered true; missing information must decline")
 	}
 	if !AreLValuesLastUsedByScope(10, nil, usage) {
@@ -193,7 +194,7 @@ func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
 	}
 	// The boundary: upstream's test is `lastUsedAt >= scope.range.end`, so a usage exactly at the
 	// end is a usage after the scope.
-	if AreLValuesLastUsedByScope(5, []DeclarationId{1}, usage) {
+	if AreLValuesLastUsedByScope(5, []static_single_assignment.DeclarationId{1}, usage) {
 		t.Error("a declaration last used exactly at the scope end must decline; upstream's test " +
 			"is >= rather than >")
 	}
@@ -212,8 +213,8 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	// unique within its function -- so these are compared per function, inside the walk below, and
 	// only the last function's tables survive to the assertion. That is deliberate: the property is
 	// per function and one counterexample is enough.
-	highestPerDeclaration := map[DeclarationId]EvaluationOrder{}
-	recordedTable := map[DeclarationId]EvaluationOrder{}
+	highestPerDeclaration := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
+	recordedTable := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 
 	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -226,10 +227,10 @@ func TestFindLastUsageCorpus(t *testing.T) {
 		functions++
 		usage := FindLastUsage(tree, function)
 
-		highest := map[DeclarationId]EvaluationOrder{}
-		previous, first := EvaluationOrder(0), true
+		highest := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
+		previous, first := static_single_assignment.EvaluationOrder(0), true
 		VisitReactiveFunction(tree, ReactiveVisitor{
-			Place: func(order EvaluationOrder, place Place, role PlaceRole) {
+			Place: func(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
 				declarationsSeen++
 				if !first && order < previous {
 					outOfOrder++
@@ -365,11 +366,11 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name          string
-		reassignments map[ScopeId][]IdentifierId
+		reassignments map[ScopeId][]static_single_assignment.IdentifierId
 	}{
-		{name: "current reassigns", reassignments: map[ScopeId][]IdentifierId{1: {5}}},
-		{name: "next reassigns", reassignments: map[ScopeId][]IdentifierId{2: {5}}},
-		{name: "both reassign", reassignments: map[ScopeId][]IdentifierId{1: {5}, 2: {6}}},
+		{name: "current reassigns", reassignments: map[ScopeId][]static_single_assignment.IdentifierId{1: {5}}},
+		{name: "next reassigns", reassignments: map[ScopeId][]static_single_assignment.IdentifierId{2: {5}}},
+		{name: "both reassign", reassignments: map[ScopeId][]static_single_assignment.IdentifierId{1: {5}, 2: {6}}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
@@ -406,7 +407,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 			1: {{Identifier: 7}},
 			2: {{Identifier: 9, Path: []DependencyPathEntry{{Property: "a"}}}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {9}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9}},
 	}
 	if CanMergeScopes(function, 1, 2, pathed, nil, nil) {
 		t.Error("a dependency read through a property path must decline; a property off an " +
@@ -425,7 +426,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 			1: {{Identifier: 7}},
 			2: {{Identifier: 9}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {9, 11}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9, 11}},
 	}
 	if CanMergeScopes(function, 1, 2, rooted, nil, nil) {
 		t.Error("a rooted dependency whose type is not always-invalidating must decline; the " +
@@ -438,7 +439,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 			1: {{Identifier: 7}},
 			2: {{Identifier: 9, Reactive: true}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {9}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9}},
 	}
 	if !CanMergeScopes(function, 1, 2, declarationsMatch, nil, nil) {
 		t.Error("when the earlier scope's declarations are exactly the later scope's dependencies, " +
@@ -459,7 +460,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 	t.Parallel()
 
 	withInvalidatingScopes(t, func(function *Function, checker *shimchecker.Checker,
-		invalidating IdentifierId) {
+		invalidating static_single_assignment.IdentifierId) {
 		// The baseline: rooted, always-invalidating, flowing from the earlier scope's declarations,
 		// and the two dependency sets deliberately unequal so conditions one and two cannot fire.
 		// This must merge, or every rejection below proves nothing.
@@ -468,7 +469,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
 				2: {{Identifier: invalidating}},
 			},
-			declarations: map[ScopeId][]IdentifierId{1: {invalidating}},
+			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating}},
 		}
 		if !CanMergeScopes(function, 1, 2, baseline, nil, checker) {
 			t.Fatal("the baseline did not merge, so every case below is rejected for the wrong " +
@@ -481,7 +482,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
 				2: {{Identifier: invalidating, Path: []DependencyPathEntry{{Property: "a"}}}},
 			},
-			declarations: map[ScopeId][]IdentifierId{1: {invalidating}},
+			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating}},
 		}
 		if CanMergeScopes(function, 1, 2, pathed, nil, checker) {
 			t.Error("a pathed dependency merged; a property read off an invalidating value is not " +
@@ -494,7 +495,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
 				2: {{Identifier: invalidating}},
 			},
-			declarations: map[ScopeId][]IdentifierId{1: {invalidating + 2}},
+			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating + 2}},
 		}
 		if CanMergeScopes(function, 1, 2, unflowed, nil, checker) {
 			t.Error("a dependency the earlier scope does not declare merged; without the flow " +
@@ -508,7 +509,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 //
 // The identifier is found rather than assumed: a hardcoded id would silently stop being an array
 // the day lowering changes, and the test would keep passing while asserting nothing.
-func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Checker, IdentifierId)) {
+func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Checker, static_single_assignment.IdentifierId)) {
 	t.Helper()
 
 	ran := false

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething is the baseline.
@@ -177,7 +178,7 @@ func TestPruneAlwaysInvalidatingPropagatesOutward(t *testing.T) {
 			1: {{Identifier: 1}},
 			2: {{Identifier: 2}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {2}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {2}},
 	}
 
 	// Value 2 must be known always-invalidating for the propagation to have anything to carry.

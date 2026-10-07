@@ -21,22 +21,25 @@
 // no gain because the answer only ever moves one way.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // MemoizationGraph is what one walk of the tree produces: a node per declaration and per scope.
 type MemoizationGraph struct {
 	// identifiers is the node table, keyed by declaration.
-	identifiers map[DeclarationId]*memoizationNode
+	identifiers map[static_single_assignment.DeclarationId]*memoizationNode
 	// scopes maps a scope to the declarations it depends on.
-	scopes map[ScopeId][]DeclarationId
+	scopes map[ScopeId][]static_single_assignment.DeclarationId
 	// escaping are the roots: values returned, or passed to a hook.
-	escaping map[DeclarationId]bool
+	escaping map[static_single_assignment.DeclarationId]bool
 }
 
 type memoizationNode struct {
 	level        MemoizationLevel
 	memoized     bool
-	dependencies map[DeclarationId]bool
+	dependencies map[static_single_assignment.DeclarationId]bool
 	scopes       map[ScopeId]bool
 	seen         bool
 }
@@ -44,9 +47,9 @@ type memoizationNode struct {
 // NewMemoizationGraph returns an empty graph ready to have nodes declared into it.
 func NewMemoizationGraph() *MemoizationGraph {
 	return &MemoizationGraph{
-		identifiers: map[DeclarationId]*memoizationNode{},
-		scopes:      map[ScopeId][]DeclarationId{},
-		escaping:    map[DeclarationId]bool{},
+		identifiers: map[static_single_assignment.DeclarationId]*memoizationNode{},
+		scopes:      map[ScopeId][]static_single_assignment.DeclarationId{},
+		escaping:    map[static_single_assignment.DeclarationId]bool{},
 	}
 }
 
@@ -55,7 +58,7 @@ func NewMemoizationGraph() *MemoizationGraph {
 // Upstream's `declare`, used for the function's own id and its parameters. Later classification
 // raises the level through `Record`; a declaration that is never classified stays at `Never`, which
 // is the right answer for a parameter nothing writes to.
-func (g *MemoizationGraph) Declare(declaration DeclarationId) {
+func (g *MemoizationGraph) Declare(declaration static_single_assignment.DeclarationId) {
 	if g == nil || g.identifiers == nil {
 		return
 	}
@@ -64,7 +67,7 @@ func (g *MemoizationGraph) Declare(declaration DeclarationId) {
 	}
 	g.identifiers[declaration] = &memoizationNode{
 		level:        MemoizationNever,
-		dependencies: map[DeclarationId]bool{},
+		dependencies: map[static_single_assignment.DeclarationId]bool{},
 		scopes:       map[ScopeId]bool{},
 	}
 }
@@ -74,8 +77,8 @@ func (g *MemoizationGraph) Declare(declaration DeclarationId) {
 // The level is joined rather than assigned, because one declaration can be an lvalue more than once
 // -- reassigned, or destructured alongside another binding -- and the final level is the strongest
 // any assignment demanded. Assigning instead would make the answer depend on visit order.
-func (g *MemoizationGraph) Record(declaration DeclarationId, level MemoizationLevel,
-	dependencies []DeclarationId) {
+func (g *MemoizationGraph) Record(declaration static_single_assignment.DeclarationId, level MemoizationLevel,
+	dependencies []static_single_assignment.DeclarationId) {
 	if g == nil {
 		return
 	}
@@ -96,15 +99,15 @@ func (g *MemoizationGraph) Record(declaration DeclarationId, level MemoizationLe
 //
 // Both halves matter. The declaration-to-scope edge is how marking a value memoized forces the
 // scope's other dependencies; the scope-to-dependencies edge is what that forcing walks.
-func (g *MemoizationGraph) AssociateScope(declaration DeclarationId, scope ScopeId,
-	scopeDependencies []DeclarationId) {
+func (g *MemoizationGraph) AssociateScope(declaration static_single_assignment.DeclarationId, scope ScopeId,
+	scopeDependencies []static_single_assignment.DeclarationId) {
 	if g == nil {
 		return
 	}
 	g.Declare(declaration)
 	g.identifiers[declaration].scopes[scope] = true
 	if _, recorded := g.scopes[scope]; !recorded {
-		g.scopes[scope] = append([]DeclarationId(nil), scopeDependencies...)
+		g.scopes[scope] = append([]static_single_assignment.DeclarationId(nil), scopeDependencies...)
 	}
 }
 
@@ -113,7 +116,7 @@ func (g *MemoizationGraph) AssociateScope(declaration DeclarationId, scope Scope
 // Upstream collects two kinds. A returned value escapes because the caller holds it. A value passed
 // to a hook escapes because React may retain it -- the closure handed to `useEffect` is the standard
 // case, and it is why `IsHookCallee` was lifted to the shelf.
-func (g *MemoizationGraph) MarkEscaping(declaration DeclarationId) {
+func (g *MemoizationGraph) MarkEscaping(declaration static_single_assignment.DeclarationId) {
 	if g == nil {
 		return
 	}
@@ -127,8 +130,8 @@ func (g *MemoizationGraph) MarkEscaping(declaration DeclarationId) {
 // `Conditional` with a memoized dependency, or `Unmemoized` under forcing. Marking a node forces
 // every dependency of every scope it belongs to, which is the second case the pass exists for: a
 // value that does not itself escape still needs holding when it feeds a scope whose output does.
-func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
-	memoized := map[DeclarationId]bool{}
+func (g *MemoizationGraph) ComputeMemoized() map[static_single_assignment.DeclarationId]bool {
+	memoized := map[static_single_assignment.DeclarationId]bool{}
 	if g == nil {
 		return memoized
 	}
@@ -139,10 +142,10 @@ func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
 	}
 	seenScopes := map[ScopeId]bool{}
 
-	var visit func(declaration DeclarationId, force bool) bool
+	var visit func(declaration static_single_assignment.DeclarationId, force bool) bool
 	var forceScope func(scope ScopeId)
 
-	visit = func(declaration DeclarationId, force bool) bool {
+	visit = func(declaration static_single_assignment.DeclarationId, force bool) bool {
 		node, exists := g.identifiers[declaration]
 		if !exists {
 			// Upstream raises an invariant. A linter answers false: a declaration nothing recorded
@@ -203,8 +206,8 @@ func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
 }
 
 // sortedDeclarations returns a map's keys in a stable order. See ComputeMemoized for why.
-func sortedDeclarations(set map[DeclarationId]bool) []DeclarationId {
-	keys := make([]DeclarationId, 0, len(set))
+func sortedDeclarations(set map[static_single_assignment.DeclarationId]bool) []static_single_assignment.DeclarationId {
+	keys := make([]static_single_assignment.DeclarationId, 0, len(set))
 	for key := range set {
 		keys = append(keys, key)
 	}

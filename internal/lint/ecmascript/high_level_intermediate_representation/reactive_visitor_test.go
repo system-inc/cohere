@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
 
@@ -164,7 +165,7 @@ func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
 
 	sequences, instructionsInSequences := 0, 0
 	VisitReactiveFunction(tree, ReactiveVisitor{
-		Value: func(order EvaluationOrder, value ReactiveValue, traverse func()) {
+		Value: func(order static_single_assignment.EvaluationOrder, value ReactiveValue, traverse func()) {
 			if sequence, ok := value.(*ReactiveSequenceValue); ok {
 				sequences++
 				instructionsInSequences += len(sequence.Instructions)

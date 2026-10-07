@@ -6,6 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 var setStateInRenderMessage = rule.Message{
@@ -216,7 +217,7 @@ func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_
 	// on its own; see AsCompilationUnit.
 	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
 		high_level_intermediate_representation.ForFunction)
-	reportSetStateInRender(ctx, function, function.Node, true, map[high_level_intermediate_representation.IdentifierId]bool{})
+	reportSetStateInRender(ctx, function, function.Node, true, map[static_single_assignment.IdentifierId]bool{})
 }
 
 // reportSetStateInRender is upstream's `validate_impl` over one lowered function.
@@ -254,7 +255,7 @@ func reportSetStateInRender(
 	function *high_level_intermediate_representation.Function,
 	compiledUnit *ast.Node,
 	emit bool,
-	unconditionalSetStateFunctions map[high_level_intermediate_representation.IdentifierId]bool,
+	unconditionalSetStateFunctions map[static_single_assignment.IdentifierId]bool,
 ) bool {
 	unconditional := high_level_intermediate_representation.UnconditionalBlocks(function)
 	reported := false
@@ -423,9 +424,9 @@ func setterCapturesOf(
 	enclosing *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
 	nested *high_level_intermediate_representation.Function,
-	unconditionalSetStateFunctions map[high_level_intermediate_representation.IdentifierId]bool,
-) (map[high_level_intermediate_representation.IdentifierId]bool, bool) {
-	translated := map[high_level_intermediate_representation.IdentifierId]bool{}
+	unconditionalSetStateFunctions map[static_single_assignment.IdentifierId]bool,
+) (map[static_single_assignment.IdentifierId]bool, bool) {
+	translated := map[static_single_assignment.IdentifierId]bool{}
 	for index, captured := range value.Captures {
 		isSetter := unconditionalSetStateFunctions[captured.Identifier] ||
 			isStateSetter(ctx, enclosing, captured.Identifier)
@@ -451,7 +452,7 @@ func setterCapturesOf(
 // `ActionDispatch`, which `useReducer` produces, is deliberately not accepted. Upstream gives it a
 // different built-in shape and its own diagnostics, and a dispatch called during render is not the
 // same defect.
-func isStateSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) bool {
+func isStateSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
@@ -475,7 +476,7 @@ func isStateSetter(ctx rule.Context, function *high_level_intermediate_represent
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass.
-func identifierNodeOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
+func identifierNodeOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -492,7 +493,7 @@ func identifierNodeOf(function *high_level_intermediate_representation.Function,
 // golden for `setX(1)` underlines four characters and the one for `aliased(2)` underlines seven.
 // Reporting through `ctx.ReportNode` routes via `rule.TokenRange`, which trims leading trivia at
 // the harness.
-func reportSetterCall(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId, message rule.Message) {
+func reportSetterCall(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, message rule.Message) {
 	if node := identifierNodeOf(function, id); node != nil {
 		ctx.ReportNode(node, message)
 		return

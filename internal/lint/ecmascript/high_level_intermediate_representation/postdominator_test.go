@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
 
@@ -24,12 +25,12 @@ import (
 //
 // Deliberately a naive walk over `EachSuccessor` with a visited set. It is the definition written
 // out, and its only job is to disagree with the tree when the tree is wrong.
-func reachesAReturnWithout(function *Function, start, excluded BlockId) bool {
+func reachesAReturnWithout(function *Function, start, excluded static_single_assignment.BlockId) bool {
 	if start == excluded {
 		return false
 	}
-	visited := map[BlockId]bool{start: true}
-	stack := []BlockId{start}
+	visited := map[static_single_assignment.BlockId]bool{start: true}
+	stack := []static_single_assignment.BlockId{start}
 	for len(stack) > 0 {
 		id := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
@@ -40,7 +41,7 @@ func reachesAReturnWithout(function *Function, start, excluded BlockId) bool {
 		if _, isReturn := block.Terminal.(*Return); isReturn {
 			return true
 		}
-		EachSuccessor(block.Terminal, func(next BlockId) {
+		EachSuccessor(block.Terminal, func(next static_single_assignment.BlockId) {
 			if next == excluded || visited[next] {
 				return
 			}
@@ -53,12 +54,12 @@ func reachesAReturnWithout(function *Function, start, excluded BlockId) bool {
 
 // reachesAReturn is the same walk with nothing excluded, used to skip blocks for which the question
 // is vacuous.
-func reachesAReturn(function *Function, start BlockId) bool {
+func reachesAReturn(function *Function, start static_single_assignment.BlockId) bool {
 	return reachesAReturnWithout(function, start, InvalidBlock)
 }
 
 // postDominates answers the tree: is candidate on the post-dominator chain rising from block.
-func postDominates(tree *postDominanceTree, block, candidate BlockId) bool {
+func postDominates(tree *postDominanceTree, block, candidate static_single_assignment.BlockId) bool {
 	for current, steps := block, 0; steps <= len(tree.immediate)+1; steps++ {
 		if current == candidate {
 			return true
@@ -293,9 +294,9 @@ func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
 }
 
 // blockHoldingLastCall finds the block containing the last CallExpression in evaluation order.
-func blockHoldingLastCall(function *Function) (BlockId, bool) {
+func blockHoldingLastCall(function *Function) (static_single_assignment.BlockId, bool) {
 	best := InvalidBlock
-	var bestOrder EvaluationOrder
+	var bestOrder static_single_assignment.EvaluationOrder
 	found := false
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {

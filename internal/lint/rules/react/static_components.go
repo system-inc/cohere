@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // StaticComponents flags a component value created during render and then used as a JSX tag.
@@ -166,7 +167,7 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 	// Value to the span of whatever made it dynamic. Upstream keys this by identifier and carries
 	// an optional span; single-assignment form means one entry per value rather than per binding,
 	// which is the property that makes the propagation below sound without a fixpoint.
-	dynamic := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
+	dynamic := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 
 	for _, block := range function.Blocks {
 		// A phi is dynamic when any operand reaching it is. Upstream stops at the first such
@@ -315,7 +316,7 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 // The defect this replaced was invisible in the obvious fixture: with no leading newline the
 // element's raw start coincides with the tag identifier's start, so the span read correctly. oxc's
 // tester writes its cases with a leading newline, which is the only reason it was caught.
-func identifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
+func identifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -332,7 +333,7 @@ func identifierNode(function *high_level_intermediate_representation.Function, i
 // put, so it is quoted into the message instead. Read from the source text rather than rebuilt from
 // the representation, because the representation holds values rather than syntax and
 // `props.foo.bar()` has no readable spelling there.
-func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate_representation.Function, creator high_level_intermediate_representation.IdentifierId) rule.Message {
+func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate_representation.Function, creator static_single_assignment.IdentifierId) rule.Message {
 	created := ""
 	if node := identifierNode(function, creator); node != nil && ctx.SourceFile != nil {
 		span := rule.TokenRange(ctx.SourceFile, node)

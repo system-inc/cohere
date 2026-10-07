@@ -161,6 +161,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // AliasingEffectKind is what one effect does. These are React's `AliasingEffect` variants.
@@ -1423,8 +1424,8 @@ func calleeSyntaxName(instruction *Instruction) string {
 // place and can, because it owns the whole compilation; here a pass that wrote effects onto shared
 // places would make one rule's analysis visible to a rule that never ran it, and `Construct` is
 // already documented as not idempotent. A caller wanting the field populated copies the place.
-func ProjectEffects(effects []AliasingEffect, ranges *MutableRanges, order EvaluationOrder) map[IdentifierId]Effect {
-	out := map[IdentifierId]Effect{}
+func ProjectEffects(effects []AliasingEffect, ranges *MutableRanges, order static_single_assignment.EvaluationOrder) map[static_single_assignment.IdentifierId]Effect {
+	out := map[static_single_assignment.IdentifierId]Effect{}
 	for _, effect := range effects {
 		switch {
 		case effect.Kind.IsAliasing():
@@ -1608,8 +1609,8 @@ func argumentMutationsFromCallbacks(function *Function, receiver Place,
 // Follows the same stores and loads `collectInvokedCandidates` does, and for the same reason: a
 // callback is usually passed as a temporary that a `FunctionExpression` was assigned into rather
 // than as the expression itself.
-func nestedFunctionHeldBy(function *Function, id IdentifierId) *Function {
-	held := map[IdentifierId]FunctionId{}
+func nestedFunctionHeldBy(function *Function, id static_single_assignment.IdentifierId) *Function {
+	held := map[static_single_assignment.IdentifierId]FunctionId{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -1680,11 +1681,11 @@ func mutatesOwnCapture(nested *Function) bool {
 		return false
 	}
 
-	reaches := map[IdentifierId]bool{}
+	reaches := map[static_single_assignment.IdentifierId]bool{}
 	for _, context := range nested.Context {
 		reaches[context.Identifier] = true
 	}
-	var mutated []IdentifierId
+	var mutated []static_single_assignment.IdentifierId
 	for _, block := range nested.Blocks {
 		if block == nil {
 			continue
@@ -1723,11 +1724,11 @@ func mutatesOwnParameter(nested *Function) bool {
 	}
 
 	// Values reachable from a parameter by assignment or aliasing, seeded with the parameters.
-	reaches := map[IdentifierId]bool{}
+	reaches := map[static_single_assignment.IdentifierId]bool{}
 	for _, param := range nested.Params {
 		reaches[param.Identifier] = true
 	}
-	var mutated []IdentifierId
+	var mutated []static_single_assignment.IdentifierId
 	for _, block := range nested.Blocks {
 		if block == nil {
 			continue

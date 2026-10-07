@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // disjointFor lowers one source and returns the outermost function with its classes.
@@ -24,14 +25,14 @@ func disjointFor(t *testing.T, source string) (*Function, *DisjointSet) {
 }
 
 // classOfName returns the sorted class containing the LAST value a named binding takes.
-func classOfName(t *testing.T, function *Function, set *DisjointSet, name string) []IdentifierId {
+func classOfName(t *testing.T, function *Function, set *DisjointSet, name string) []static_single_assignment.IdentifierId {
 	t.Helper()
-	var target IdentifierId
+	var target static_single_assignment.IdentifierId
 	found := false
 	for id, identifier := range function.Identifiers {
 		if identifier != nil && identifier.Name == name {
-			if !found || IdentifierId(id) > target {
-				target = IdentifierId(id)
+			if !found || static_single_assignment.IdentifierId(id) > target {
+				target = static_single_assignment.IdentifierId(id)
 				found = true
 			}
 		}
@@ -69,75 +70,75 @@ func TestDisjointSetMatchesReact(t *testing.T) {
 	t.Parallel()
 
 	const (
-		a IdentifierId = 1
-		b IdentifierId = 2
-		c IdentifierId = 3
-		d IdentifierId = 4
-		e IdentifierId = 5
-		f IdentifierId = 6
+		a static_single_assignment.IdentifierId = 1
+		b static_single_assignment.IdentifierId = 2
+		c static_single_assignment.IdentifierId = 3
+		d static_single_assignment.IdentifierId = 4
+		e static_single_assignment.IdentifierId = 5
+		f static_single_assignment.IdentifierId = 6
 	)
 
 	tests := []struct {
 		name     string
-		unions   [][]IdentifierId
-		wantSets [][]IdentifierId
-		wantRoot map[IdentifierId]IdentifierId
+		unions   [][]static_single_assignment.IdentifierId
+		wantSets [][]static_single_assignment.IdentifierId
+		wantRoot map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	}{
 		{
 			name:     "chain",
-			unions:   [][]IdentifierId{{a, b}, {b, c}, {c, d}},
-			wantSets: [][]IdentifierId{{a, b, c, d}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {c, d}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
 		},
 		{
 			name:     "two established classes merge",
-			unions:   [][]IdentifierId{{a, b}, {c, d}, {a, c}},
-			wantSets: [][]IdentifierId{{a, b, c, d}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {a, c}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
 		},
 		{
 			name:     "singleton",
-			unions:   [][]IdentifierId{{a}},
-			wantSets: [][]IdentifierId{{a}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
 		},
 		{
 			name:     "repeated union is idempotent",
-			unions:   [][]IdentifierId{{a, b}, {a, b}},
-			wantSets: [][]IdentifierId{{a, b}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, b}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a},
 		},
 		{
 			// The first element is already a NON-ROOT member of a class, so the root the union
 			// adopts under is not the element passed first.
 			name:     "first element is not a root",
-			unions:   [][]IdentifierId{{a, b}, {c, d}, {b, d}},
-			wantSets: [][]IdentifierId{{a, b, c, d}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {b, d}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
 		},
 		{
 			name:     "three way merge",
-			unions:   [][]IdentifierId{{a, b, c}, {d, e, f}, {c, d}},
-			wantSets: [][]IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b, c}, {d, e, f}, {c, d}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
 		},
 		{
 			name:     "self union",
-			unions:   [][]IdentifierId{{a, a}},
-			wantSets: [][]IdentifierId{{a}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, a}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
 		},
 		{
 			name:     "two chains merged at their tails",
-			unions:   [][]IdentifierId{{a, b}, {b, c}, {d, e}, {e, f}, {a, f}},
-			wantSets: [][]IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {d, e}, {e, f}, {a, f}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
 		},
 		{
 			name:     "star",
-			unions:   [][]IdentifierId{{a, b}, {a, c}, {a, d}},
-			wantSets: [][]IdentifierId{{a, b, c, d}},
-			wantRoot: map[IdentifierId]IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, c}, {a, d}},
+			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
 		},
 	}
 
@@ -185,7 +186,7 @@ func TestDisjointSetAbsentValueIsNotClassZero(t *testing.T) {
 	t.Parallel()
 
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{0, 1})
+	set.Union([]static_single_assignment.IdentifierId{0, 1})
 
 	if root, ok := set.Find(0); !ok || root != 0 {
 		t.Fatalf("value zero should be a member with root 0, got (%d, %v)", root, ok)
@@ -211,7 +212,7 @@ func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
 
 	set := &DisjointSet{}
 	set.Union(nil)
-	set.Union([]IdentifierId{})
+	set.Union([]static_single_assignment.IdentifierId{})
 	if set.Size() != 0 {
 		t.Fatalf("an empty union added %d members", set.Size())
 	}
@@ -229,7 +230,7 @@ func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
 func TestDisjointSetDoesNotMutateTheCallersSlice(t *testing.T) {
 	t.Parallel()
 
-	items := []IdentifierId{7, 8, 9}
+	items := []static_single_assignment.IdentifierId{7, 8, 9}
 	set := &DisjointSet{}
 	set.Union(items)
 
@@ -249,26 +250,26 @@ func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
 	t.Parallel()
 
 	const length = 10000
-	set := &DisjointSet{parent: map[IdentifierId]IdentifierId{}}
+	set := &DisjointSet{parent: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}}
 
 	// A degenerate chain: 1 -> 2 -> 3 -> ... -> length, with length its own root. Built directly
 	// rather than through Union, because Union's own rewriting would flatten it and the point here
 	// is to hand Find the worst case.
-	set.parent[IdentifierId(length)] = IdentifierId(length)
+	set.parent[static_single_assignment.IdentifierId(length)] = static_single_assignment.IdentifierId(length)
 	for i := 1; i < length; i++ {
-		set.parent[IdentifierId(i)] = IdentifierId(i + 1)
+		set.parent[static_single_assignment.IdentifierId(i)] = static_single_assignment.IdentifierId(i + 1)
 	}
 
 	root, ok := set.Find(1)
-	if !ok || root != IdentifierId(length) {
+	if !ok || root != static_single_assignment.IdentifierId(length) {
 		t.Fatalf("Find(1) = (%d, %v), want (%d, true)", root, ok, length)
 	}
 
 	// Compression: every node on the walked path now points straight at the root.
 	for i := 1; i < length; i++ {
-		if set.parent[IdentifierId(i)] != IdentifierId(length) {
+		if set.parent[static_single_assignment.IdentifierId(i)] != static_single_assignment.IdentifierId(length) {
 			t.Fatalf("path compression left %d pointing at %d rather than the root %d",
-				i, set.parent[IdentifierId(i)], length)
+				i, set.parent[static_single_assignment.IdentifierId(i)], length)
 		}
 	}
 }
@@ -649,7 +650,7 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 	tests := []struct {
 		name       string
 		phiRange   MutableRange
-		firstOrder EvaluationOrder
+		firstOrder static_single_assignment.EvaluationOrder
 		want       bool
 	}{
 		{"unset range is rejected by the second term", MutableRange{0, 0}, 5, false},
@@ -858,7 +859,7 @@ export function gather(limit: number) {
 			function, ranges := rangesFor(t, test.source)
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-			var declaration IdentifierId
+			var declaration static_single_assignment.IdentifierId
 			var declarationFound bool
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -879,9 +880,9 @@ export function gather(limit: number) {
 				t.Fatalf("no DeclareLocal for %q", test.binding)
 			}
 
-			var phi IdentifierId
+			var phi static_single_assignment.IdentifierId
 			var phiFound bool
-			var phiBlockFirstOrder EvaluationOrder
+			var phiBlockFirstOrder static_single_assignment.EvaluationOrder
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -952,7 +953,7 @@ export function reassign(limit: number) {
 `)
 
 	// Rebuild the declarations map exactly as the pass does, and assert the guard holds.
-	declarations := map[DeclarationId]IdentifierId{}
+	declarations := map[static_single_assignment.DeclarationId]static_single_assignment.IdentifierId{}
 	rewriteAttempts := 0
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {

@@ -2,6 +2,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"maps"
 	"slices"
 )
@@ -54,7 +55,7 @@ func CloneFunction(function *Function) *Function {
 			Kind:         block.Kind,
 			Instructions: append([]InstructionId(nil), block.Instructions...),
 			Terminal:     copyTerminal(block.Terminal),
-			Predecessors: append([]BlockId(nil), block.Predecessors...),
+			Predecessors: append([]static_single_assignment.BlockId(nil), block.Predecessors...),
 		}
 		if block.Phis != nil {
 			copied.Phis = make([]*Phi, len(block.Phis))
@@ -74,7 +75,7 @@ func CloneFunction(function *Function) *Function {
 		}
 	}
 	if function.blocksById != nil {
-		clone.blocksById = make(map[BlockId]*BasicBlock, len(function.blocksById))
+		clone.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(function.blocksById))
 		for id, block := range function.blocksById {
 			clone.blocksById[id] = copyBlock(block)
 		}

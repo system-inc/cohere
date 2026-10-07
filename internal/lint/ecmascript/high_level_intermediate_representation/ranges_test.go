@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // rangesFor lowers one source, constructs single-assignment form, and returns the outermost
@@ -113,12 +114,12 @@ func TestRangesAreHalfOpen(t *testing.T) {
 	t.Parallel()
 
 	r := MutableRange{Start: 3, End: 6}
-	for _, order := range []EvaluationOrder{3, 4, 5} {
+	for _, order := range []static_single_assignment.EvaluationOrder{3, 4, 5} {
 		if !r.Contains(order) {
 			t.Errorf("[3,6) should contain %d", order)
 		}
 	}
-	for _, order := range []EvaluationOrder{2, 6, 7} {
+	for _, order := range []static_single_assignment.EvaluationOrder{2, 6, 7} {
 		if r.Contains(order) {
 			t.Errorf("[3,6) should not contain %d; the end is exclusive, which is React's inRange", order)
 		}
@@ -362,7 +363,7 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 			}
 
 			if !testCase.wantPhiInScope {
-				callMembers := map[IdentifierId]bool{}
+				callMembers := map[static_single_assignment.IdentifierId]bool{}
 				for _, member := range scopes.MembersOf(callScope) {
 					callMembers[member] = true
 				}
@@ -652,7 +653,7 @@ func unknownCallAndArgumentPhi(t *testing.T, function *Function,
 	name string) (*Instruction, *Phi) {
 	t.Helper()
 	var call *Instruction
-	var argument IdentifierId
+	var argument static_single_assignment.IdentifierId
 	for _, instruction := range function.Instructions {
 		if instruction == nil {
 			continue
@@ -1188,7 +1189,7 @@ export function f(items: number[][]) {
 
 	// Two-sided: the loop body's value really is widened, so this input exercises the widening
 	// rather than passing because nothing happened.
-	widest := EvaluationOrder(0)
+	widest := static_single_assignment.EvaluationOrder(0)
 	for _, identifier := range function.Identifiers {
 		if identifier == nil {
 			continue
@@ -1288,7 +1289,7 @@ export function f(p: number[]) {
 }
 `)
 
-	var parameter IdentifierId
+	var parameter static_single_assignment.IdentifierId
 	var found bool
 	for _, place := range function.Params {
 		for _, identifier := range function.Identifiers {
@@ -1415,7 +1416,7 @@ export function f(seed: number[]) {
 }
 `)
 
-	var seed IdentifierId
+	var seed static_single_assignment.IdentifierId
 	var found bool
 	for _, place := range function.Params {
 		for _, identifier := range function.Identifiers {

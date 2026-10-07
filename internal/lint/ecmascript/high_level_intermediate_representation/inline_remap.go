@@ -18,7 +18,10 @@
 // consumes it is upstream's and transcribes directly once ids are safe.
 package high_level_intermediate_representation
 
-import "reflect"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"reflect"
+)
 
 // InlineRemap is the correspondence between a nested function's ids and the parent's.
 //
@@ -28,13 +31,13 @@ import "reflect"
 // values.
 type InlineRemap struct {
 	// Identifiers maps a nested identifier id to the parent's.
-	Identifiers map[IdentifierId]IdentifierId
+	Identifiers map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	// Blocks maps a nested block id to the parent's.
-	Blocks map[BlockId]BlockId
+	Blocks map[static_single_assignment.BlockId]static_single_assignment.BlockId
 	// Instructions maps a nested instruction id to the parent's.
 	Instructions map[InstructionId]InstructionId
 	// Entry is the parent-space id of the nested function's entry block.
-	Entry BlockId
+	Entry static_single_assignment.BlockId
 }
 
 // CopyNestedBodyInto copies a nested function's blocks, instructions and identifiers into parent.
@@ -73,8 +76,8 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 	}
 
 	remap := &InlineRemap{
-		Identifiers:  map[IdentifierId]IdentifierId{},
-		Blocks:       map[BlockId]BlockId{},
+		Identifiers:  map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{},
+		Blocks:       map[static_single_assignment.BlockId]static_single_assignment.BlockId{},
 		Instructions: map[InstructionId]InstructionId{},
 	}
 
@@ -82,7 +85,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 	// time. Construction has already put the nested body in SSA form, so other nested identifiers
 	// may be distinct values of this same source binding; those need fresh parent identifiers but
 	// must remain in the capture's declaration equivalence class.
-	declarations := map[DeclarationId]DeclarationId{}
+	declarations := map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{}
 	for index, contextValue := range nested.Context {
 		capture := captures[index]
 		remap.Identifiers[contextValue.Identifier] = capture.Identifier
@@ -106,7 +109,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		if identifier == nil {
 			continue
 		}
-		if _, seeded := remap.Identifiers[IdentifierId(id)]; seeded {
+		if _, seeded := remap.Identifiers[static_single_assignment.IdentifierId(id)]; seeded {
 			continue
 		}
 		declaration, mapped := declarations[identifier.Declaration]
@@ -119,7 +122,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		} else {
 			copied = parent.NewIdentifier(identifier.Name, identifier.Node, declaration)
 		}
-		remap.Identifiers[IdentifierId(id)] = copied.Id
+		remap.Identifiers[static_single_assignment.IdentifierId(id)] = copied.Id
 	}
 
 	// Blocks, allocated before instructions so a terminal can name a block copied later.
@@ -181,7 +184,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 				place.Identifier = mapped
 			}
 		})
-		EachBlockReferencePointer(target.Terminal, func(reference *BlockId) {
+		EachBlockReferencePointer(target.Terminal, func(reference *static_single_assignment.BlockId) {
 			if mapped, ok := remap.Blocks[*reference]; ok {
 				*reference = mapped
 			}

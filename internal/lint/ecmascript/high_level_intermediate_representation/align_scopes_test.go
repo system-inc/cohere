@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 	"testing"
 )
@@ -349,7 +350,7 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 func TestAlignExcludesBranchTerminals(t *testing.T) {
 	t.Parallel()
 
-	widened := func(makeTerminal func(fallthroughBlock BlockId) Terminal) MutableRange {
+	widened := func(makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) MutableRange {
 		function, scopes := buildAlignCaseWithTerminal(t, alignCase{
 			scope:        MutableRange{4, 6},
 			terminalId:   5,
@@ -359,14 +360,14 @@ func TestAlignExcludesBranchTerminals(t *testing.T) {
 		return AlignReactiveScopesToBlockScopes(function, scopes).RangeOf(1)
 	}
 
-	ifRange := widened(func(ft BlockId) Terminal {
+	ifRange := widened(func(ft static_single_assignment.BlockId) Terminal {
 		return &If{Consequent: 2, Alternate: ft, Fallthrough: ft, Order: 5}
 	})
 	if ifRange != (MutableRange{4, 9}) {
 		t.Errorf("an `if` widened to %v, want [4,9); the fallthrough push did not fire", ifRange)
 	}
 
-	branchRange := widened(func(ft BlockId) Terminal {
+	branchRange := widened(func(ft static_single_assignment.BlockId) Terminal {
 		return &Branch{Consequent: 2, Alternate: ft, Fallthrough: ft, Order: 5}
 	})
 	if branchRange != (MutableRange{4, 6}) {
@@ -431,7 +432,7 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
 	state := &alignSweepState{
 		activeSet:       map[ScopeId]bool{},
 		seen:            map[ScopeId]bool{},
-		valueBlockNodes: map[BlockId]*valueBlockNode{},
+		valueBlockNodes: map[static_single_assignment.BlockId]*valueBlockNode{},
 		ranges:          map[ScopeId]MutableRange{1: {4, 6}},
 		scopes:          scopes,
 	}
@@ -572,7 +573,7 @@ func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
 	branchReuse, nonBranchReuse, branchesWithFallthrough := 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
-		seen := map[BlockId]bool{}
+		seen := map[static_single_assignment.BlockId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {
 				continue

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPostDominatorFrontiersMatchTheChainWalk holds postDominatorFrontiers to the walk it replaced.
@@ -132,11 +133,11 @@ func pinnedCorpusFilesIfPresent(t *testing.T, count int) ([]string, map[string]s
 }
 
 // chainWalkFrontiers is postDominatorFrontiers as it was before #hekjpw3, kept as the reference.
-func chainWalkFrontiers(function *Function) map[BlockId][]BlockId {
+func chainWalkFrontiers(function *Function) map[static_single_assignment.BlockId][]static_single_assignment.BlockId {
 	tree := computePostDominance(function)
-	frontiers := make(map[BlockId][]BlockId, len(function.Blocks))
+	frontiers := make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(function.Blocks))
 	for _, block := range function.Blocks {
-		postDominated := make(map[BlockId]bool, len(function.Blocks))
+		postDominated := make(map[static_single_assignment.BlockId]bool, len(function.Blocks))
 		for _, other := range function.Blocks {
 			current := other.Id
 			for step := 0; step <= len(function.Blocks); step++ {
@@ -154,8 +155,8 @@ func chainWalkFrontiers(function *Function) map[BlockId][]BlockId {
 			}
 		}
 
-		seen := map[BlockId]bool{}
-		var frontier []BlockId
+		seen := map[static_single_assignment.BlockId]bool{}
+		var frontier []static_single_assignment.BlockId
 		for _, candidate := range function.Blocks {
 			if !postDominated[candidate.Id] && candidate.Id != block.Id {
 				continue

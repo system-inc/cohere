@@ -153,17 +153,6 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-// BlockId identifies a basic block within one Function.
-//
-// Ids are dense and assigned in creation order, which is not execution order. `Function.Blocks` is
-// held in reverse postorder after lowering completes, so a walk that wants execution order iterates
-// the slice, and one that wants to address a specific block holds the id. The two are deliberately
-// different types of thing: an index into `Blocks` moves when the order changes, an id does not.
-//
-// Defined in static_single_assignment, which this IR and Adamic's flow graph share, as are
-// IdentifierId, DeclarationId, EvaluationOrder and the phi types.
-type BlockId = static_single_assignment.BlockId
-
 // InstructionId indexes Function.Instructions.
 //
 // Instructions live in one flat table per function and blocks hold ids into it. Upstream's reason
@@ -172,20 +161,6 @@ type BlockId = static_single_assignment.BlockId
 // pair does not survive an insertion into that block.
 type InstructionId uint32
 
-// IdentifierId names one value.
-//
-// Two places with the same IdentifierId are the same value: not equal, the same. That is the
-// property the whole IR exists to provide, and it is what lets a later pass ask whether the object
-// mutated here is the object passed there without re-deriving aliasing from syntax.
-type IdentifierId = static_single_assignment.IdentifierId
-
-// DeclarationId names one source-level binding across all the values it takes.
-//
-// One `let` reassigned three times is three IdentifierIds and one DeclarationId. Single-assignment
-// construction will mint further IdentifierIds against the same DeclarationId, so a pass that wants
-// "this variable" rather than "this value" asks for the DeclarationId and keeps working afterwards.
-type DeclarationId = static_single_assignment.DeclarationId
-
 // FunctionId indexes Function.Functions, the nested functions lowered within this one.
 //
 // A function expression lowers to an instruction holding an id, not an inline Function. Passes that
@@ -193,24 +168,15 @@ type DeclarationId = static_single_assignment.DeclarationId
 // value, and a pass that does not care about nesting never touches it.
 type FunctionId uint32
 
-// EvaluationOrder is a monotonically increasing position in the function's evaluation.
-//
-// It is distinct from InstructionId, which is a table index. This is upstream's rename and it is
-// worth keeping: terminals carry one too, so "did A evaluate before B" is answerable across an
-// instruction and a terminal, which a table index cannot answer.
-//
-// Assigned by a walk in reverse postorder after lowering. Zero means unassigned.
-type EvaluationOrder = static_single_assignment.EvaluationOrder
-
 // InvalidBlock is the zero BlockId used where a terminal has no such successor.
 //
 // Terminals name their successors by id and several have optional ones. A sentinel is used rather
 // than a pointer or an Option because a BlockId is Copy and a zero value is what an unset struct
 // field already holds; the entry block is never id 0 for this reason. `HasBlock` is the guard.
-const InvalidBlock BlockId = 0
+const InvalidBlock static_single_assignment.BlockId = 0
 
 // HasBlock reports whether a terminal's successor field names a real block.
-func HasBlock(block BlockId) bool { return block != InvalidBlock }
+func HasBlock(block static_single_assignment.BlockId) bool { return block != InvalidBlock }
 
 // Function is one lowered function: its control-flow graph, its instruction table, and the tables
 // naming everything the graph refers to.
@@ -221,7 +187,7 @@ type Function struct {
 	// ContextDeclarations are bindings this function declares, reassigns, and shares with a closure
 	// inside it -- upstream's second `FindContextIdentifiers` rule. Recorded during lowering, and
 	// read by SSA, which defines such a binding once rather than versioning every write.
-	ContextDeclarations map[DeclarationId]bool
+	ContextDeclarations map[static_single_assignment.DeclarationId]bool
 
 	// Node is the syntactic function this was lowered from. Retained so a pass can reach the type
 	// checker, and so a diagnostic can point at source without the IR carrying its own copy of
@@ -251,7 +217,7 @@ type Function struct {
 	Context []Place
 
 	// Entry is the block control begins at.
-	Entry BlockId
+	Entry static_single_assignment.BlockId
 
 	// Blocks are the basic blocks in reverse postorder, so a forward analysis that iterates the
 	// slice once converges in one pass over an acyclic region.
@@ -275,15 +241,15 @@ type Function struct {
 	// function called `_temp` would otherwise resolve to the wrong body.
 	//
 	// Nil until something is outlined, which is the common case.
-	Outlined map[IdentifierId]FunctionId
+	Outlined map[static_single_assignment.IdentifierId]FunctionId
 
 	// IsAsync and IsGenerator carry the modifiers, which change what `await` and `yield` mean and
 	// are consulted by validators that do not want to walk back to the AST for them.
 	IsAsync     bool
 	IsGenerator bool
 
-	blocksById map[BlockId]*BasicBlock
-	nextBlock  BlockId
+	blocksById map[static_single_assignment.BlockId]*BasicBlock
+	nextBlock  static_single_assignment.BlockId
 
 	// identifierSlab is the chunk NewIdentifier carves identifiers from. See NewIdentifier.
 	identifierSlab []Identifier
@@ -317,7 +283,7 @@ func (k FunctionKind) String() string {
 // The second result is false for InvalidBlock and for an id that no longer names a block, which a
 // pass that removes blocks will produce. Callers that have just read the id out of a terminal of a
 // well-formed function may ignore it; callers walking a function mid-mutation may not.
-func (f *Function) Block(id BlockId) (*BasicBlock, bool) {
+func (f *Function) Block(id static_single_assignment.BlockId) (*BasicBlock, bool) {
 	block, ok := f.blocksById[id]
 	return block, ok
 }
@@ -328,7 +294,7 @@ func (f *Function) Instruction(id InstructionId) *Instruction {
 }
 
 // Identifier returns the identifier naming one value.
-func (f *Function) Identifier(id IdentifierId) *Identifier {
+func (f *Function) Identifier(id static_single_assignment.IdentifierId) *Identifier {
 	return f.Identifiers[id]
 }
 
@@ -343,7 +309,7 @@ func (f *Function) IdentifierOf(place Place) *Identifier {
 // a dataflow analysis over this correct with a per-block transfer function, and lowering maintains
 // it: an expression that can branch mid-evaluation ends the block.
 type BasicBlock struct {
-	Id   BlockId
+	Id   static_single_assignment.BlockId
 	Kind BlockKind
 
 	// Instructions are ids into Function.Instructions, in evaluation order.
@@ -357,7 +323,7 @@ type BasicBlock struct {
 	// Held as a slice rather than a set because insertion order is stable and phi operands will be
 	// keyed by predecessor: single-assignment construction needs a deterministic order to produce
 	// deterministic phis, and a Go map does not have one.
-	Predecessors []BlockId
+	Predecessors []static_single_assignment.BlockId
 
 	// Phis are the merge points for values with several reaching definitions.
 	//
@@ -422,7 +388,7 @@ type Instruction struct {
 	Id InstructionId
 
 	// Order is where this evaluated relative to everything else in the function.
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 
 	// LValue is where the result is stored.
 	LValue Place
@@ -440,10 +406,10 @@ type Instruction struct {
 
 // Identifier names one value and carries what is known about it.
 type Identifier struct {
-	Id IdentifierId
+	Id static_single_assignment.IdentifierId
 
 	// Declaration groups every value one source binding takes. See DeclarationId.
-	Declaration DeclarationId
+	Declaration static_single_assignment.DeclarationId
 
 	// Name is the source name, or empty for a temporary. Temporaries are the common case: every
 	// intermediate value in an expression gets one.
@@ -474,7 +440,7 @@ type Identifier struct {
 // React prop all separately mean. `Reactive` is genuinely React's and is carried as a bool because
 // the alternative is a parallel side table that every pass must be handed.
 type Place struct {
-	Identifier IdentifierId
+	Identifier static_single_assignment.IdentifierId
 
 	// Effect is what this reference does to the value. Left EffectUnknown by lowering; an effect
 	// inference pass fills it in.
@@ -619,7 +585,7 @@ func NewFunction(node *ast.Node, name string, kind FunctionKind) *Function {
 		Node:       node,
 		Name:       name,
 		Kind:       kind,
-		blocksById: map[BlockId]*BasicBlock{},
+		blocksById: map[static_single_assignment.BlockId]*BasicBlock{},
 		nextBlock:  1, // 0 is InvalidBlock.
 	}
 }
@@ -637,10 +603,10 @@ func (f *Function) NewBlock(kind BlockKind) *BasicBlock {
 //
 // Every value gets its own IdentifierId. Passing a non-zero declaration groups this value with
 // others of the same binding; passing 0 mints a fresh declaration, which is what a temporary wants.
-func (f *Function) NewIdentifier(name string, node *ast.Node, declaration DeclarationId) *Identifier {
-	id := IdentifierId(len(f.Identifiers))
+func (f *Function) NewIdentifier(name string, node *ast.Node, declaration static_single_assignment.DeclarationId) *Identifier {
+	id := static_single_assignment.IdentifierId(len(f.Identifiers))
 	if declaration == 0 {
-		declaration = DeclarationId(id) + 1
+		declaration = static_single_assignment.DeclarationId(id) + 1
 	}
 	// Identifiers are carved from a chunk this function owns rather than allocated one at a time,
 	// which was 1.28M objects on a cold ahra run, the most of any allocation in lowering (#rwsffzm).

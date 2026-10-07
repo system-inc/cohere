@@ -16,6 +16,8 @@
 // The roles are visitor.go's and mean the same thing here.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // EachPlacePointer calls visit for every place the instruction value touches, with the role it
 // plays, handing each one out by pointer so the caller can rename it in place.
 //
@@ -250,8 +252,8 @@ func eachPatternPlacePointer(pattern Pattern, visit func(place *Place, role Plac
 //
 // `TestEachBlockReferencePointerCoversEveryTerminal` guards the arm set the same way its read-only
 // siblings are guarded, by scanning this switch against the declared terminals.
-func EachBlockReferencePointer(terminal Terminal, visit func(block *BlockId)) {
-	visitReal := func(block *BlockId) {
+func EachBlockReferencePointer(terminal Terminal, visit func(block *static_single_assignment.BlockId)) {
+	visitReal := func(block *static_single_assignment.BlockId) {
 		if block != nil && HasBlock(*block) {
 			visit(block)
 		}

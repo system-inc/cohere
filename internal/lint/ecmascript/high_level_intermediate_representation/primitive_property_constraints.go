@@ -1,8 +1,10 @@
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 type primitiveConstraintKey struct {
 	function   *Function
-	identifier IdentifierId
+	identifier static_single_assignment.IdentifierId
 }
 
 type primitiveConstraintKind uint8
@@ -148,7 +150,7 @@ func (state *primitiveConstraintState) visit(function *Function) {
 	}
 }
 
-func inferPrimitivePropertyReads(function *Function) map[IdentifierId]bool {
+func inferPrimitivePropertyReads(function *Function) map[static_single_assignment.IdentifierId]bool {
 	state := primitiveConstraintState{
 		parents:  map[primitiveConstraintKey]primitiveConstraintKey{},
 		kinds:    map[primitiveConstraintKey]primitiveConstraintKind{},
@@ -156,7 +158,7 @@ func inferPrimitivePropertyReads(function *Function) map[IdentifierId]bool {
 		visited:  map[*Function]bool{},
 	}
 	state.visit(function)
-	result := map[IdentifierId]bool{}
+	result := map[static_single_assignment.IdentifierId]bool{}
 	if function != nil {
 		for _, instruction := range function.Instructions {
 			if instruction == nil {

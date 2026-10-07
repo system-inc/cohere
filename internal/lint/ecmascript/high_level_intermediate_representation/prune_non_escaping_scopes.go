@@ -24,6 +24,7 @@ package high_level_intermediate_representation
 
 import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // PruneNonEscapingScopesResult reports what the pass did, and what it could not decide.
@@ -70,7 +71,7 @@ func PruneNonEscapingScopes(tree *ReactiveFunction, function *Function,
 		function:     function,
 		dependencies: dependencies,
 		graph:        NewMemoizationGraph(),
-		definitions:  map[DeclarationId]DeclarationId{},
+		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
 	for _, parameter := range function.Params {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
@@ -102,7 +103,7 @@ func PruneNonEscapingScopesWithScopes(tree *ReactiveFunction, function *Function
 		function:     function,
 		dependencies: dependencies,
 		graph:        NewMemoizationGraph(),
-		definitions:  map[DeclarationId]DeclarationId{},
+		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
 	for _, parameter := range function.Params {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
@@ -116,7 +117,7 @@ func PruneNonEscapingScopesWithScopes(tree *ReactiveFunction, function *Function
 
 func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
 	dependencies *ScopeDependencies, collector memoizationCollector,
-	memoized map[DeclarationId]bool, scopes *ReactiveScopes) PruneNonEscapingScopesResult {
+	memoized map[static_single_assignment.DeclarationId]bool, scopes *ReactiveScopes) PruneNonEscapingScopesResult {
 	prunedScopes := map[ScopeId]bool{}
 	pruned := prunePassOverScopes(tree, function, dependencies, memoized, prunedScopes,
 		collector.resolve)
@@ -141,13 +142,13 @@ type memoizationCollector struct {
 	//
 	// Upstream keeps the same map and consults it on every lvalue and rvalue. Without it a chain of
 	// loads produces a chain of distinct nodes and the propagation stops at the first one.
-	definitions map[DeclarationId]DeclarationId
+	definitions map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId
 	// scopeStack is the scopes currently open, innermost last.
 	scopeStack []ScopeId
 }
 
 // resolve follows a `LoadLocal` indirection to the binding a value really names.
-func (c *memoizationCollector) resolve(declaration DeclarationId) DeclarationId {
+func (c *memoizationCollector) resolve(declaration static_single_assignment.DeclarationId) static_single_assignment.DeclarationId {
 	if target, found := c.definitions[declaration]; found {
 		return target
 	}
@@ -202,7 +203,7 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	// places it reads are dependencies. Collapsing the two inverts every store's edge: the binding
 	// written to would become a dependency of the temporary rather than a value depending on what
 	// was stored into it, and the propagation then walks away from the value it is looking for.
-	var operands []DeclarationId
+	var operands []static_single_assignment.DeclarationId
 	var defines []Place
 	c.eachMemoizationOperand(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
@@ -268,7 +269,7 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 }
 
 // associate records that a declaration belongs to the innermost scope currently open.
-func (c *memoizationCollector) associate(declaration DeclarationId) {
+func (c *memoizationCollector) associate(declaration static_single_assignment.DeclarationId) {
 	if len(c.scopeStack) == 0 || c.dependencies == nil {
 		return
 	}
@@ -281,7 +282,7 @@ func (c *memoizationCollector) associate(declaration DeclarationId) {
 // ordinary value belongs to the scope it was computed in. A value that escapes from inside a nest of
 // scopes -- returned, or reassigned -- depends on all of them having been evaluated, so forcing it
 // has to force the whole chain or the outer scopes' dependencies are never held.
-func (c *memoizationCollector) associateChain(declaration DeclarationId) {
+func (c *memoizationCollector) associateChain(declaration static_single_assignment.DeclarationId) {
 	if c.dependencies == nil {
 		return
 	}
@@ -291,8 +292,8 @@ func (c *memoizationCollector) associateChain(declaration DeclarationId) {
 }
 
 // associateScope records that a declaration belongs to one named scope.
-func (c *memoizationCollector) associateScope(declaration DeclarationId, scope ScopeId) {
-	var scopeDependencies []DeclarationId
+func (c *memoizationCollector) associateScope(declaration static_single_assignment.DeclarationId, scope ScopeId) {
+	var scopeDependencies []static_single_assignment.DeclarationId
 	for _, dependency := range c.dependencies.DependenciesOf(scope) {
 		scopeDependencies = append(scopeDependencies,
 			c.resolve(declarationOf(c.function, dependency.Identifier)))
@@ -452,8 +453,8 @@ func (c *memoizationCollector) eachMemoizationOperand(value ReactiveValue, visit
 // needs the scope standing. We have no early-return representation, so only the first half applies
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
 func prunePassOverScopes(tree *ReactiveFunction, function *Function,
-	dependencies *ScopeDependencies, memoized map[DeclarationId]bool,
-	prunedScopes map[ScopeId]bool, resolve func(DeclarationId) DeclarationId) int {
+	dependencies *ScopeDependencies, memoized map[static_single_assignment.DeclarationId]bool,
+	prunedScopes map[ScopeId]bool, resolve func(static_single_assignment.DeclarationId) static_single_assignment.DeclarationId) int {
 	pruned := 0
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
@@ -546,11 +547,11 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 		return 0
 	}
 	marked := 0
-	reassignments := map[DeclarationId][]IdentifierId{}
+	reassignments := map[static_single_assignment.DeclarationId][]static_single_assignment.IdentifierId{}
 
 	// scopeless answers upstream's `decl.identifier.scope == null`. Zero is this tree's "no scope"
 	// sentinel, standing in for upstream's null.
-	scopeless := func(id IdentifierId) bool { return scopes.ScopeOf(id) == 0 }
+	scopeless := func(id static_single_assignment.IdentifierId) bool { return scopes.ScopeOf(id) == 0 }
 
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Instruction: func(statement *ReactiveInstructionStatement,
@@ -589,7 +590,7 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 				if value.Pruned {
 					return KeepStatement()
 				}
-				declarations := []IdentifierId{value.Value.Identifier}
+				declarations := []static_single_assignment.IdentifierId{value.Value.Identifier}
 				if scopeless(value.Value.Identifier) {
 					if inlined, found :=
 						reassignments[declarationOf(function, value.Value.Identifier)]; found {

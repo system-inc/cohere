@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
@@ -368,11 +369,11 @@ func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
 			len(terminals))
 	}
 	for _, terminal := range terminals {
-		expected := map[BlockId]bool{}
-		EachSuccessorAndFallthrough(terminal, func(block BlockId) { expected[block] = true })
+		expected := map[static_single_assignment.BlockId]bool{}
+		EachSuccessorAndFallthrough(terminal, func(block static_single_assignment.BlockId) { expected[block] = true })
 
-		seen := map[BlockId]bool{}
-		EachBlockReferencePointer(terminal, func(block *BlockId) { seen[*block] = true })
+		seen := map[static_single_assignment.BlockId]bool{}
+		EachBlockReferencePointer(terminal, func(block *static_single_assignment.BlockId) { seen[*block] = true })
 
 		for block := range expected {
 			if !seen[block] {
@@ -389,8 +390,8 @@ func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
 // `t.Alternate` passes any sample where the two are equal.
 func everyTerminalSample(t *testing.T) []Terminal {
 	t.Helper()
-	next := BlockId(0)
-	block := func() BlockId {
+	next := static_single_assignment.BlockId(0)
+	block := func() static_single_assignment.BlockId {
 		next++
 		return next
 	}

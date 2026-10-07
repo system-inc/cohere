@@ -25,6 +25,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // Run SSA over a real tree with a real checker and cohere every function.
@@ -85,7 +86,7 @@ func TestSSAOverRealCodebase(t *testing.T) {
 										t.Errorf("%s: %s", filepath.Base(path), v.Detail)
 									}
 									switch v.Kind {
-									case SSAViolationMultipleDefinitions:
+									case static_single_assignment.SSAViolationMultipleDefinitions:
 										kinds["multiple-definitions"]++
 									default:
 										kinds["use-not-dominated"]++

@@ -28,6 +28,8 @@
 // values handed to JSX.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // AssumedInvokedFunctions returns the nested functions this one is assumed to invoke.
 //
 // Keyed by `FunctionId` rather than by the lowered function pointer upstream uses, because a nested
@@ -52,7 +54,7 @@ func CollectAssumedInvokedFunctions(function *Function) AssumedInvokedFunctions 
 	if function == nil {
 		return invoked
 	}
-	candidates := map[IdentifierId]*invokedCandidate{}
+	candidates := map[static_single_assignment.IdentifierId]*invokedCandidate{}
 	collectInvokedCandidates(function, candidates)
 	collectInvocations(function, candidates, invoked)
 
@@ -87,7 +89,7 @@ func CollectAssumedInvokedFunctions(function *Function) AssumedInvokedFunctions 
 // Upstream's step 1, and its comment gives the reason it only matches `FunctionExpression`:
 // "conservatively only match function expressions which can have guaranteed ssa. ObjectMethods and
 // ObjectProperties do not". A value whose definition is not unique cannot be traced to one function.
-func collectInvokedCandidates(function *Function, candidates map[IdentifierId]*invokedCandidate) {
+func collectInvokedCandidates(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -117,7 +119,7 @@ func collectInvokedCandidates(function *Function, candidates map[IdentifierId]*i
 }
 
 // collectInvocations reads the call sites, upstream's step 2.
-func collectInvocations(function *Function, candidates map[IdentifierId]*invokedCandidate,
+func collectInvocations(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
 	invoked AssumedInvokedFunctions) {
 	for _, block := range function.Blocks {
 		if block == nil {
@@ -208,7 +210,7 @@ func invokedWithinNested(parent *Function, nested *Function) map[FunctionId]bool
 		return reached
 	}
 	// Which of the inner function's captures name a function the parent holds.
-	parentFunctions := map[IdentifierId]FunctionId{}
+	parentFunctions := map[static_single_assignment.IdentifierId]FunctionId{}
 	for _, block := range parent.Blocks {
 		if block == nil {
 			continue

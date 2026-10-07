@@ -19,7 +19,10 @@
 // again and the markers sit where they sat before.
 package high_level_intermediate_representation
 
-import "slices"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"slices"
+)
 
 // MergeConsecutiveBlocks collapses each block into its predecessor where control always flows from
 // one to the other, and reports how many blocks were merged away.
@@ -63,8 +66,8 @@ func MergeConsecutiveBlocks(function *Function) int {
 
 	// Where each merged-away block's contents ended up. Transitive, because a block merged into a
 	// predecessor that is itself later merged has to resolve all the way down.
-	mergedInto := map[BlockId]BlockId{}
-	resolve := func(id BlockId) BlockId {
+	mergedInto := map[static_single_assignment.BlockId]static_single_assignment.BlockId{}
+	resolve := func(id static_single_assignment.BlockId) static_single_assignment.BlockId {
 		current := id
 		for {
 			next, moved := mergedInto[current]
@@ -78,7 +81,7 @@ func MergeConsecutiveBlocks(function *Function) int {
 	// Blocks that are some terminal's fallthrough. Collected as the walk goes, matching upstream:
 	// a fallthrough named by a LATER block does not protect an earlier one, because the walk is in
 	// reverse postorder and a fallthrough is always laid out after the terminal that names it.
-	fallthroughs := map[BlockId]bool{}
+	fallthroughs := map[static_single_assignment.BlockId]bool{}
 	merged := 0
 	survivors := make([]*BasicBlock, 0, len(function.Blocks))
 
@@ -171,7 +174,7 @@ func MergeConsecutiveBlocks(function *Function) int {
 		if block == nil {
 			continue
 		}
-		EachBlockReferencePointer(block.Terminal, func(reference *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(reference *static_single_assignment.BlockId) {
 			*reference = resolve(*reference)
 		})
 	}

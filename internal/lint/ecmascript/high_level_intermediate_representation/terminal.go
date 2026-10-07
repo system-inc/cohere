@@ -30,6 +30,8 @@
 //     still visits it, via whichever arm reaches it.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // Terminal is how control leaves a basic block.
 //
 // The set is closed: the unexported marker method means only this package can add a variant.
@@ -44,23 +46,27 @@ type Terminal interface {
 // Return returns a value.
 type Return struct {
 	Value Place
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // Throw throws a value.
 type Throw struct {
 	Value Place
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // Unreachable is a block control cannot arrive at.
 //
 // Lowering lays out the code after an abrupt exit rather than dropping it, matching what
 // `controlflow` does and for the same reason: a rule may want to ask what would have run.
-type Unreachable struct{ Order EvaluationOrder }
+type Unreachable struct {
+	Order static_single_assignment.EvaluationOrder
+}
 
 // Unsupported terminates a block whose construct lowering does not model.
-type Unsupported struct{ Order EvaluationOrder }
+type Unsupported struct {
+	Order static_single_assignment.EvaluationOrder
+}
 
 // ---------------------------------------------------------------------------
 // Unconditional
@@ -68,9 +74,9 @@ type Unsupported struct{ Order EvaluationOrder }
 
 // Goto jumps to a block.
 type Goto struct {
-	Block   BlockId
+	Block   static_single_assignment.BlockId
 	Variant GotoVariant
-	Order   EvaluationOrder
+	Order   static_single_assignment.EvaluationOrder
 }
 
 // GotoVariant records why a jump exists, which a later pass reconstructing structure needs.
@@ -92,10 +98,10 @@ const (
 // If is a statement-level conditional.
 type If struct {
 	Test        Place
-	Consequent  BlockId
-	Alternate   BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Consequent  static_single_assignment.BlockId
+	Alternate   static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Branch is a conditional inside a value-producing construct.
@@ -105,10 +111,10 @@ type If struct {
 // alike, and `EachSuccessor` does.
 type Branch struct {
 	Test        Place
-	Consequent  BlockId
-	Alternate   BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Consequent  static_single_assignment.BlockId
+	Alternate   static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Switch dispatches on a value.
@@ -119,14 +125,14 @@ type Branch struct {
 type Switch struct {
 	Test        Place
 	Cases       []SwitchCase
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // SwitchCase is one arm. Test is nil for `default`.
 type SwitchCase struct {
 	Test  *Place
-	Block BlockId
+	Block static_single_assignment.BlockId
 }
 
 // ---------------------------------------------------------------------------
@@ -135,30 +141,30 @@ type SwitchCase struct {
 
 // While is a `while` loop: test, then body.
 type While struct {
-	Test        BlockId
-	Loop        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Test        static_single_assignment.BlockId
+	Loop        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // DoWhile is a `do...while` loop: body, then test.
 type DoWhile struct {
-	Loop        BlockId
-	Test        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Loop        static_single_assignment.BlockId
+	Test        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // For is a C-style `for` loop.
 //
 // Update is InvalidBlock when the loop has no update clause.
 type For struct {
-	Init        BlockId
-	Test        BlockId
-	Update      BlockId
-	Loop        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Init        static_single_assignment.BlockId
+	Test        static_single_assignment.BlockId
+	Update      static_single_assignment.BlockId
+	Loop        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // ForOf is a `for...of` loop.
@@ -167,19 +173,19 @@ type For struct {
 // and the done check. Keeping them as instructions rather than folding them into the terminal is
 // what lets an effect pass see that iterating mutates the iterator.
 type ForOf struct {
-	Init        BlockId
-	Test        BlockId
-	Loop        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Init        static_single_assignment.BlockId
+	Test        static_single_assignment.BlockId
+	Loop        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // ForIn is a `for...in` loop.
 type ForIn struct {
-	Init        BlockId
-	Loop        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Init        static_single_assignment.BlockId
+	Loop        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // ---------------------------------------------------------------------------
@@ -192,16 +198,16 @@ type ForIn struct {
 // right operand is not evaluated on every path, which is control flow by definition.
 type Logical struct {
 	Operator    string
-	Test        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Test        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Ternary is `a ? b : c`.
 type Ternary struct {
-	Test        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Test        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Optional is an optional chain link, `a?.b` or `a?.()`.
@@ -210,16 +216,16 @@ type Ternary struct {
 // link and one that merely rides the short circuit.
 type Optional struct {
 	Optional    bool
-	Test        BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Test        static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Sequence is one element of a comma expression.
 type Sequence struct {
-	Block       BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Block       static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // ---------------------------------------------------------------------------
@@ -228,9 +234,9 @@ type Sequence struct {
 
 // Label is a labeled statement, the target of a labeled break or continue.
 type Label struct {
-	Block       BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Block       static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // Try enters a try statement.
@@ -253,11 +259,11 @@ type Label struct {
 // The cost is that a pass wanting the ESLint answer cannot get it from here, and must use the other
 // graph. That is the correct outcome: two graphs, two questions, neither bent.
 type Try struct {
-	Block          BlockId
+	Block          static_single_assignment.BlockId
 	HandlerBinding *Place
-	Handler        BlockId
-	Fallthrough    BlockId
-	Order          EvaluationOrder
+	Handler        static_single_assignment.BlockId
+	Fallthrough    static_single_assignment.BlockId
+	Order          static_single_assignment.EvaluationOrder
 }
 
 // MaybeThrow marks a point where an exception can leave the block.
@@ -277,9 +283,9 @@ type Try struct {
 // always has an edge. A block ending in MaybeThrow has two successors: Continuation on the normal
 // path, Handler on the exceptional one.
 type MaybeThrow struct {
-	Continuation BlockId
-	Handler      BlockId
-	Order        EvaluationOrder
+	Continuation static_single_assignment.BlockId
+	Handler      static_single_assignment.BlockId
+	Order        static_single_assignment.EvaluationOrder
 }
 
 // ---------------------------------------------------------------------------
@@ -317,9 +323,9 @@ type MaybeThrow struct {
 // terminal. See this file's header.
 type Scope struct {
 	Scope       ScopeId
-	Block       BlockId
-	Fallthrough BlockId
-	Order       EvaluationOrder
+	Block       static_single_assignment.BlockId
+	Fallthrough static_single_assignment.BlockId
+	Order       static_single_assignment.EvaluationOrder
 }
 
 // ---------------------------------------------------------------------------

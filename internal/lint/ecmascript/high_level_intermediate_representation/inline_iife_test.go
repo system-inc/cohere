@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // inlinedFixture lowers source, splices, and returns the function plus how many calls were spliced.
@@ -232,7 +233,7 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(t *testing.T) {
 				t.Fatalf("the fixture spliced %d calls, want 1", inlined)
 			}
 
-			defined := map[IdentifierId]bool{}
+			defined := map[static_single_assignment.IdentifierId]bool{}
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -299,8 +300,8 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(t *testing.T) {
 			// So the result is asserted separately and on assignment alone: the value the caller
 			// reads after the splice must be written by a store or a load somewhere, not merely
 			// introduced.
-			assigned := map[IdentifierId]bool{}
-			declared := map[IdentifierId]bool{}
+			assigned := map[static_single_assignment.IdentifierId]bool{}
+			declared := map[static_single_assignment.IdentifierId]bool{}
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -348,7 +349,7 @@ func TestInlineLeavesEveryBlockReferenceResolvable(t *testing.T) {
 		if block == nil {
 			continue
 		}
-		EachBlockReferencePointer(block.Terminal, func(reference *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(reference *static_single_assignment.BlockId) {
 			references++
 			if _, found := function.Block(*reference); !found {
 				t.Errorf("block %d names block %d, which the function does not hold",
@@ -516,8 +517,8 @@ func TestInlineFindsAMemoCallbackAcrossBlocks(t *testing.T) {
 		t.Fatalf("the guarded pass spliced %d calls, want 0 for a dropped memo callback", guarded)
 	}
 
-	definitions := map[IdentifierId]BlockId{}
-	calls := map[IdentifierId]BlockId{}
+	definitions := map[static_single_assignment.IdentifierId]static_single_assignment.BlockId{}
+	calls := map[static_single_assignment.IdentifierId]static_single_assignment.BlockId{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -692,7 +693,7 @@ func TestInlineStoresTheValueEachReturnProduces(t *testing.T) {
 
 	// Every identifier an instruction defines. A store whose rvalue is outside this set names a
 	// value the caller never produces.
-	defined := map[IdentifierId]bool{}
+	defined := map[static_single_assignment.IdentifierId]bool{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue

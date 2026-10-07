@@ -80,7 +80,10 @@
 // `RangeGapLoopCarriedInversion` made about an upstream bug.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // pathNode is one access path in the registry: a root identifier plus a property chain.
 //
@@ -104,15 +107,15 @@ type pathNode struct {
 // dataflow, the dependency tree reduces accesses to a minimal set.
 type pathRegistry struct {
 	nodes []pathNode
-	roots map[IdentifierId]int
+	roots map[static_single_assignment.IdentifierId]int
 }
 
 func newPathRegistry() *pathRegistry {
-	return &pathRegistry{roots: map[IdentifierId]int{}}
+	return &pathRegistry{roots: map[static_single_assignment.IdentifierId]int{}}
 }
 
 // identifierNode returns the interned node for a bare root, creating it if absent.
-func (r *pathRegistry) identifierNode(id IdentifierId, reactive bool) int {
+func (r *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, reactive bool) int {
 	if index, ok := r.roots[id]; ok {
 		return index
 	}
@@ -289,7 +292,7 @@ const hoistableIterationCap = 100
 // this type. React throws when the loop hits the cap; oxc silently exits and returns a truncated
 // answer indistinguishable from a real one. A linter can do neither, so it reports.
 type HoistableAnalysis struct {
-	blocks    map[BlockId]map[int]bool
+	blocks    map[static_single_assignment.BlockId]map[int]bool
 	registry  *pathRegistry
 	converged bool
 	// iterations is how many outer passes ran, for measuring how close real code comes to the cap.
@@ -315,7 +318,7 @@ func (h *HoistableAnalysis) Iterations() int {
 }
 
 // hoistableAt returns the non-null access paths proven at one block.
-func (h *HoistableAnalysis) hoistableAt(block BlockId) []ReactiveScopeDependency {
+func (h *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) []ReactiveScopeDependency {
 	if h == nil || h.blocks == nil {
 		return nil
 	}
@@ -343,7 +346,7 @@ func (h *HoistableAnalysis) hoistableAt(block BlockId) []ReactiveScopeDependency
 // is hoistable to anywhere that dominates it.
 func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *MutableRanges,
 	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry,
-	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) map[BlockId]map[int]bool {
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) map[static_single_assignment.BlockId]map[int]bool {
 	known := map[int]bool{}
 	invoked := CollectAssumedInvokedFunctions(function)
 
@@ -377,7 +380,7 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 	// evidence. See `dependencyArrayInstructions`.
 	written := dependencyArrayInstructions(function)
 
-	blocks := map[BlockId]map[int]bool{}
+	blocks := map[static_single_assignment.BlockId]map[int]bool{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -477,7 +480,7 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 // The gate is the same one upstream applies: `fn.fnType === 'Component' || fn.fnType === 'Hook'`,
 // approximated here by name as `isLikelyComponentFunction` already does -- see the divergence note
 // at `collectNonNullsInBlocks` for why a name rather than an inferred function type.
-func isKnownImmutableParameter(function *Function, id IdentifierId) bool {
+func isKnownImmutableParameter(function *Function, id static_single_assignment.IdentifierId) bool {
 	if function == nil || len(function.Params) == 0 {
 		return false
 	}
@@ -566,7 +569,7 @@ func maybeNonNullInInstruction(value InstructionValue,
 // The `end > start + 1` test is upstream's and is not a tidy-up of `end > start`: a range spanning a
 // single instruction describes a value written once and never mutated, which is immutable for this
 // purpose despite having a non-empty range.
-func isImmutableAtInstruction(function *Function, id IdentifierId, order EvaluationOrder,
+func isImmutableAtInstruction(function *Function, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
 	ranges *MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
 	if isKnownImmutableParameter(function, id) {
 		return true
@@ -595,9 +598,9 @@ func isImmutableAtInstruction(function *Function, id IdentifierId, order Evaluat
 // `EachSuccessor` instead would let the two disagree wherever a fallthrough is involved -- and
 // `terminal.go` is explicit that a fallthrough is not an edge, which is exactly the case a hand-built
 // successor map gets wrong.
-func propagateNonNull(function *Function, blocks map[BlockId]map[int]bool,
-	registry *pathRegistry) (map[BlockId]map[int]bool, bool, int) {
-	successors := map[BlockId][]BlockId{}
+func propagateNonNull(function *Function, blocks map[static_single_assignment.BlockId]map[int]bool,
+	registry *pathRegistry) (map[static_single_assignment.BlockId]map[int]bool, bool, int) {
+	successors := map[static_single_assignment.BlockId][]static_single_assignment.BlockId{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -614,18 +617,18 @@ func propagateNonNull(function *Function, blocks map[BlockId]map[int]bool,
 
 	// Forward order is the slice, which is reverse postorder and therefore already the order a
 	// forward dataflow wants. Backward is its reverse. Both are fixed before the loop begins.
-	forward := make([]BlockId, 0, len(function.Blocks))
+	forward := make([]static_single_assignment.BlockId, 0, len(function.Blocks))
 	for _, block := range function.Blocks {
 		if block != nil {
 			forward = append(forward, block.Id)
 		}
 	}
-	backward := make([]BlockId, len(forward))
+	backward := make([]static_single_assignment.BlockId, len(forward))
 	for index, id := range forward {
 		backward[len(forward)-1-index] = id
 	}
 
-	working := map[BlockId]map[int]bool{}
+	working := map[static_single_assignment.BlockId]map[int]bool{}
 	for id, set := range blocks {
 		copied := make(map[int]bool, len(set))
 		for index := range set {
@@ -639,7 +642,7 @@ func propagateNonNull(function *Function, blocks map[BlockId]map[int]bool,
 		iterations++
 		changed := false
 
-		state := map[BlockId]traversalState{}
+		state := map[static_single_assignment.BlockId]traversalState{}
 		for _, id := range forward {
 			if recursivelyPropagateNonNull(id, propagateForward, state, working,
 				function, successors, registry) {
@@ -647,7 +650,7 @@ func propagateNonNull(function *Function, blocks map[BlockId]map[int]bool,
 			}
 		}
 
-		state = map[BlockId]traversalState{}
+		state = map[static_single_assignment.BlockId]traversalState{}
 		for _, id := range backward {
 			if recursivelyPropagateNonNull(id, propagateBackward, state, working,
 				function, successors, registry) {
@@ -684,15 +687,15 @@ func propagateNonNull(function *Function, blocks map[BlockId]map[int]bool,
 // here only if it was non-null on EVERY path that reaches here. An empty neighbour list therefore
 // contributes the empty set rather than everything, which is why `doneSets` being empty short
 // circuits to no contribution rather than to a universal one.
-func recursivelyPropagateNonNull(id BlockId, direction propagationDirection,
-	state map[BlockId]traversalState, working map[BlockId]map[int]bool, function *Function,
-	successors map[BlockId][]BlockId, registry *pathRegistry) bool {
+func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction propagationDirection,
+	state map[static_single_assignment.BlockId]traversalState, working map[static_single_assignment.BlockId]map[int]bool, function *Function,
+	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId, registry *pathRegistry) bool {
 	if _, seen := state[id]; seen {
 		return false
 	}
 	state[id] = traversalActive
 
-	var neighbours []BlockId
+	var neighbours []static_single_assignment.BlockId
 	switch direction {
 	case propagateBackward:
 		neighbours = successors[id]
@@ -788,7 +791,7 @@ func recursivelyPropagateNonNull(id BlockId, direction propagationDirection,
 //
 // A linear scan rather than an index, because `BlockId` is explicitly NOT an index into `Blocks` --
 // the slice is held in reverse postorder and the two move independently. See the doc on `BlockId`.
-func blockById(function *Function, id BlockId) *BasicBlock {
+func blockById(function *Function, id static_single_assignment.BlockId) *BasicBlock {
 	for _, block := range function.Blocks {
 		if block != nil && block.Id == id {
 			return block
@@ -821,7 +824,7 @@ func sameNodeSet(a, b map[int]bool) bool {
 // scope's set from the block its terminal names as the body -- upstream's `keyByScopeId`.
 func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity, ranges *MutableRanges,
-	hoistableFromOptionals map[BlockId]ReactiveScopeDependency,
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency,
 ) map[ScopeId][]ReactiveScopeDependency {
 	analysis := analyseHoistableLoads(function, scopes, identity, ranges, hoistableFromOptionals)
 	if analysis == nil {
@@ -830,7 +833,7 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	// Which blocks run on every path through the function. A scope beginning inside a branch is
 	// seeded from the entry instead of from its own block; see below.
 	always := blocksAlwaysReached(function)
-	entry := BlockId(0)
+	entry := static_single_assignment.BlockId(0)
 	if len(function.Blocks) > 0 && function.Blocks[0] != nil {
 		entry = function.Blocks[0].Id
 	}
@@ -876,8 +879,8 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	return result
 }
 
-func dominatedByOtherReactiveScope(function *Function, dominance *dominanceTree,
-	identity ScopeIdentity, targetBlock BlockId, targetScope ScopeId) bool {
+func dominatedByOtherReactiveScope(function *Function, dominance *static_single_assignment.Dominance,
+	identity ScopeIdentity, targetBlock static_single_assignment.BlockId, targetScope ScopeId) bool {
 	if function == nil || dominance == nil || identity == nil {
 		return false
 	}
@@ -900,7 +903,7 @@ func dominatedByOtherReactiveScope(function *Function, dominance *dominanceTree,
 // analyseHoistableLoads runs the whole analysis, returning the per-block answer.
 func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity, ranges *MutableRanges,
-	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) *HoistableAnalysis {
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) *HoistableAnalysis {
 	if function == nil || scopes == nil || identity == nil || ranges == nil {
 		return nil
 	}
@@ -942,8 +945,8 @@ func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
 // Measured over 400 corpus files: 0 conflicts across every scope, so the two behaviours are
 // indistinguishable on this corpus and the divergence is recorded rather than demonstrated.
 // `TestHoistableConflictsAreReportedNotSwallowed` pins that zero.
-func hoistableTreeFor(paths []ReactiveScopeDependency) (map[IdentifierId]*hoistableNode, int) {
-	tree := map[IdentifierId]*hoistableNode{}
+func hoistableTreeFor(paths []ReactiveScopeDependency) (map[static_single_assignment.IdentifierId]*hoistableNode, int) {
+	tree := map[static_single_assignment.IdentifierId]*hoistableNode{}
 	conflicts := 0
 	for _, path := range paths {
 		root, ok := tree[path.Identifier]
@@ -977,8 +980,8 @@ func hoistableTreeFor(paths []ReactiveScopeDependency) (map[IdentifierId]*hoista
 // a zip. A path rooted anywhere else is inner-local and is dropped rather than guessed at.
 func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 	invoked AssumedInvokedFunctions, ranges *MutableRanges,
-	identity ScopeIdentity, scopes *ReactiveScopes, order EvaluationOrder,
-	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) []ReactiveScopeDependency {
+	identity ScopeIdentity, scopes *ReactiveScopes, order static_single_assignment.EvaluationOrder,
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) []ReactiveScopeDependency {
 	if !invoked[expression.Function] || int(expression.Function) >= len(parent.Functions) {
 		return nil
 	}
@@ -994,7 +997,7 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 	//
 	// Asked of the capture rather than of each path root, which is the same subject upstream uses:
 	// `innerFn.func.context.filter(place => isImmutableAtInstr(place.identifier, instr.id, ...))`.
-	translate := map[IdentifierId]Place{}
+	translate := map[static_single_assignment.IdentifierId]Place{}
 	for index := range expression.Captures {
 		capture := expression.Captures[index]
 		if !isImmutableAtInstruction(parent, capture.Identifier, order, ranges, identity, scopes) {
@@ -1111,8 +1114,8 @@ func dependencyArrayInstructions(function *Function) map[InstructionId]bool {
 		return written
 	}
 
-	producer := map[IdentifierId]InstructionId{}
-	reads := map[IdentifierId]int{}
+	producer := map[static_single_assignment.IdentifierId]InstructionId{}
+	reads := map[static_single_assignment.IdentifierId]int{}
 	countRead := func(place Place, role PlaceRole) {
 		if role != PlaceRoleDefine {
 			reads[place.Identifier]++
@@ -1133,8 +1136,8 @@ func dependencyArrayInstructions(function *Function) map[InstructionId]bool {
 		EachTerminalPlace(block.Terminal, countRead)
 	}
 
-	var walk func(id IdentifierId, depth int)
-	walk = func(id IdentifierId, depth int) {
+	var walk func(id static_single_assignment.IdentifierId, depth int)
+	walk = func(id static_single_assignment.IdentifierId, depth int) {
 		// Bounded by the longest access path. Re-entry cannot occur because an instruction is
 		// marked before its operands are walked.
 		if depth > 64 {

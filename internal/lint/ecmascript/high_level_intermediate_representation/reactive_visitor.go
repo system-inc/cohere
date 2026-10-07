@@ -37,6 +37,8 @@
 // omitted rather than declared-and-never-called.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // ReactiveVisitor is the set of hooks a pass can install on the tree walk.
 //
 // Every field is optional. A nil hook means the walk recurses with its default behaviour, which is
@@ -52,13 +54,13 @@ type ReactiveVisitor struct {
 	// `PlaceRole` is this package's own, and it carries strictly more than upstream's split into
 	// `visitPlace` and `visitLValue`: a receiver is distinguishable from an ordinary read, which
 	// two of the consuming passes need and which upstream recovers by re-matching the variant.
-	Place func(order EvaluationOrder, place Place, role PlaceRole)
+	Place func(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole)
 
 	// Instruction is called for each instruction statement. Call traverse to descend into its value.
 	Instruction func(instruction *ReactiveInstruction, traverse func())
 
 	// Value is called for each value, including the composite ones nested inside another value.
-	Value func(order EvaluationOrder, value ReactiveValue, traverse func())
+	Value func(order static_single_assignment.EvaluationOrder, value ReactiveValue, traverse func())
 
 	// Terminal is called for each terminal statement. Call traverse to descend into its blocks.
 	Terminal func(statement *ReactiveTerminalStatement, traverse func())
@@ -145,7 +147,7 @@ func (w *reactiveWalker) traverseInstruction(instruction *ReactiveInstruction) {
 	w.visitValue(instruction.Order, instruction.Value)
 }
 
-func (w *reactiveWalker) visitValue(order EvaluationOrder, value ReactiveValue) {
+func (w *reactiveWalker) visitValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
 	if value == nil {
 		return
 	}
@@ -156,7 +158,7 @@ func (w *reactiveWalker) visitValue(order EvaluationOrder, value ReactiveValue) 
 	w.traverseValue(order, value)
 }
 
-func (w *reactiveWalker) traverseValue(order EvaluationOrder, value ReactiveValue) {
+func (w *reactiveWalker) traverseValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
 		// The leaf. A plain instruction value's places are read through this package's own
@@ -187,7 +189,7 @@ func (w *reactiveWalker) traverseValue(order EvaluationOrder, value ReactiveValu
 	}
 }
 
-func (w *reactiveWalker) visitPlace(order EvaluationOrder, place Place, role PlaceRole) {
+func (w *reactiveWalker) visitPlace(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
 	if w.visitor.Place != nil {
 		w.visitor.Place(order, place, role)
 	}

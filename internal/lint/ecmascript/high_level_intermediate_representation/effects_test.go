@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // effectsFor lowers one function and returns its effect table plus the function.
@@ -70,7 +71,7 @@ func effectsFor(t *testing.T, source string) (*Function, *AliasingEffects) {
 // Resolving the name to a DeclarationId first, then matching any identifier carrying it, is what
 // makes an assertion about "what happens to `o`" mean what it says.
 func effectsOn(function *Function, table *AliasingEffects, name string) []string {
-	wantedDeclarations := map[DeclarationId]bool{}
+	wantedDeclarations := map[static_single_assignment.DeclarationId]bool{}
 	for _, identifier := range function.Identifiers {
 		if identifier != nil && identifier.Name == name {
 			wantedDeclarations[identifier.Declaration] = true
@@ -85,10 +86,10 @@ func effectsOn(function *Function, table *AliasingEffects, name string) []string
 	// is that temporary the property store mutates, so a set closed only over the declaration stops
 	// one hop short of every interesting effect. Closing over Assign edges is what makes "the
 	// effects on `o`" include what happens to the value just loaded out of it.
-	wanted := map[IdentifierId]bool{}
+	wanted := map[static_single_assignment.IdentifierId]bool{}
 	for index, identifier := range function.Identifiers {
 		if identifier != nil && wantedDeclarations[identifier.Declaration] {
-			wanted[IdentifierId(index)] = true
+			wanted[static_single_assignment.IdentifierId(index)] = true
 		}
 	}
 	for round := 0; round < len(function.Instructions)+1; round++ {
@@ -113,7 +114,7 @@ func effectsOn(function *Function, table *AliasingEffects, name string) []string
 	}
 
 	found := map[string]bool{}
-	matches := func(id IdentifierId) bool { return wanted[id] }
+	matches := func(id static_single_assignment.IdentifierId) bool { return wanted[id] }
 	for _, instruction := range function.Instructions {
 		if instruction == nil {
 			continue
@@ -177,7 +178,7 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 	}
 
 	effects := table.Get(instruction.Id)
-	has := func(kind AliasingEffectKind, from, into IdentifierId) bool {
+	has := func(kind AliasingEffectKind, from, into static_single_assignment.IdentifierId) bool {
 		for _, effect := range effects {
 			if effect.Kind == kind && effect.HasFrom && effect.From.Identifier == from &&
 				effect.Into.Identifier == into {
@@ -186,7 +187,7 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 		}
 		return false
 	}
-	hasCreate := func(into IdentifierId, kind EffectValueKind) bool {
+	hasCreate := func(into static_single_assignment.IdentifierId, kind EffectValueKind) bool {
 		for _, effect := range effects {
 			if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == into &&
 				effect.Value == kind {
@@ -838,19 +839,19 @@ declare function use(v: object): void;`
 func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 	t.Parallel()
 
-	from := Place{Identifier: IdentifierId(1)}
-	into := Place{Identifier: IdentifierId(2)}
+	from := Place{Identifier: static_single_assignment.IdentifierId(1)}
+	into := Place{Identifier: static_single_assignment.IdentifierId(2)}
 	effects := []AliasingEffect{{Kind: AliasingEffectCapture, From: from, Into: into, HasFrom: true}}
 
-	withoutRanges := ProjectEffects(effects, nil, EvaluationOrder(5))
+	withoutRanges := ProjectEffects(effects, nil, static_single_assignment.EvaluationOrder(5))
 	if withoutRanges[from.Identifier] != EffectRead {
 		t.Fatalf("with no range table an aliasing source must under-approximate to Read, got %v",
 			withoutRanges[from.Identifier])
 	}
 
 	ranges := &MutableRanges{}
-	ranges.set(into.Identifier, MutableRange{Start: EvaluationOrder(1), End: EvaluationOrder(9)})
-	withRanges := ProjectEffects(effects, ranges, EvaluationOrder(5))
+	ranges.set(into.Identifier, MutableRange{Start: static_single_assignment.EvaluationOrder(1), End: static_single_assignment.EvaluationOrder(9)})
+	withRanges := ProjectEffects(effects, ranges, static_single_assignment.EvaluationOrder(5))
 	if withRanges[from.Identifier] != EffectCapture {
 		t.Fatalf("a source flowing into a still-mutable target must be Capture, got %v",
 			withRanges[from.Identifier])

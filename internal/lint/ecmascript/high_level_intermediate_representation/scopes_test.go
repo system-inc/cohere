@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // scopesFor lowers one source and returns the outermost function with its scopes.
@@ -26,12 +27,12 @@ func scopesFor(t *testing.T, source string) (*Function, *ReactiveScopes) {
 // scopeOfName returns the scope holding the LAST value a named binding takes.
 func scopeOfName(t *testing.T, function *Function, scopes *ReactiveScopes, name string) ScopeId {
 	t.Helper()
-	var target IdentifierId
+	var target static_single_assignment.IdentifierId
 	found := false
 	for id, identifier := range function.Identifiers {
 		if identifier != nil && identifier.Name == name {
-			if !found || IdentifierId(id) > target {
-				target = IdentifierId(id)
+			if !found || static_single_assignment.IdentifierId(id) > target {
+				target = static_single_assignment.IdentifierId(id)
 				found = true
 			}
 		}
@@ -87,9 +88,9 @@ func TestScopeHullMatchesReact(t *testing.T) {
 			// arbitrary range table.
 			function := &Function{}
 			ranges := &MutableRanges{}
-			var members []IdentifierId
+			var members []static_single_assignment.IdentifierId
 			for index, memberRange := range testCase.ranges {
-				id := IdentifierId(index + 1)
+				id := static_single_assignment.IdentifierId(index + 1)
 				function.Identifiers = append(function.Identifiers, nil)
 				ranges.set(id, memberRange)
 				members = append(members, id)
@@ -126,7 +127,7 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 	ranges.set(2, MutableRange{0, 0})
 
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1, 2})
+	set.Union([]static_single_assignment.IdentifierId{1, 2})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	got := scopes.RangeOf(scopes.Ids()[0])
@@ -154,13 +155,13 @@ func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil, nil, nil}}
 	ranges := &MutableRanges{}
-	for id := IdentifierId(1); id <= 5; id++ {
-		ranges.set(id, MutableRange{EvaluationOrder(id), EvaluationOrder(id) + 3})
+	for id := static_single_assignment.IdentifierId(1); id <= 5; id++ {
+		ranges.set(id, MutableRange{static_single_assignment.EvaluationOrder(id), static_single_assignment.EvaluationOrder(id) + 3})
 	}
 
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1, 2, 3})
-	set.Union([]IdentifierId{4, 5})
+	set.Union([]static_single_assignment.IdentifierId{1, 2, 3})
+	set.Union([]static_single_assignment.IdentifierId{4, 5})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if scopes.Len() != 2 {
@@ -191,7 +192,7 @@ func TestScopeAbsentValueHasNoScope(t *testing.T) {
 	ranges.set(2, MutableRange{2, 5})
 
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1, 2})
+	set.Union([]static_single_assignment.IdentifierId{1, 2})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if got := scopes.ScopeOf(3); got != 0 {
@@ -217,13 +218,13 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 	ranges.set(2, MutableRange{1, 9})
 
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1, 2})
+	set.Union([]static_single_assignment.IdentifierId{1, 2})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	rewritten := scopes.MemberRanges()
 
 	want := MutableRange{1, 9}
-	for _, id := range []IdentifierId{1, 2} {
+	for _, id := range []static_single_assignment.IdentifierId{1, 2} {
 		if got := rewritten.Get(id); got != want {
 			t.Errorf("value %d reports [%d,%d) after entanglement, want the hull [%d,%d)",
 				id, got.Start, got.End, want.Start, want.End)
@@ -311,11 +312,11 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 	const classes, perClass = 200, 10
 	function.Identifiers = append(function.Identifiers, nil)
 	for class := 0; class < classes; class++ {
-		var members []IdentifierId
+		var members []static_single_assignment.IdentifierId
 		for member := 0; member < perClass; member++ {
-			id := IdentifierId(class*perClass + member + 1)
+			id := static_single_assignment.IdentifierId(class*perClass + member + 1)
 			function.Identifiers = append(function.Identifiers, nil)
-			ranges.set(id, MutableRange{EvaluationOrder(id), EvaluationOrder(id) + 2})
+			ranges.set(id, MutableRange{static_single_assignment.EvaluationOrder(id), static_single_assignment.EvaluationOrder(id) + 2})
 			members = append(members, id)
 		}
 		set.Union(members)
@@ -326,7 +327,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 		t.Fatalf("got %d scopes for %d classes", scopes.Len(), classes)
 	}
 
-	seen := map[IdentifierId]ScopeId{}
+	seen := map[static_single_assignment.IdentifierId]ScopeId{}
 	total := 0
 	for _, id := range scopes.Ids() {
 		for _, member := range scopes.MembersOf(id) {
@@ -426,7 +427,7 @@ func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
 	ranges.set(2, MutableRange{2, 5})
 	ranges.set(3, MutableRange{3, 6})
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1, 2, 3})
+	set.Union([]static_single_assignment.IdentifierId{1, 2, 3})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	scope := scopes.Ids()[0]
@@ -707,12 +708,12 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 
 	// Two values whose ranges are unset, unioned into one class. This is the shape an all-unset
 	// loop-carried class would take.
-	unsetA, unsetB := IdentifierId(1), IdentifierId(2)
+	unsetA, unsetB := static_single_assignment.IdentifierId(1), static_single_assignment.IdentifierId(2)
 	handmade := &MutableRanges{}
 	handmade.set(unsetA, MutableRange{0, 0})
 	handmade.set(unsetB, MutableRange{0, 0})
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{unsetA, unsetB})
+	set.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 
 	scopes := AssignReactiveScopesWithSets(function, handmade, set)
 	if scopes.Len() != 1 {
@@ -737,7 +738,7 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 	valid.set(unsetA, MutableRange{1, 3})
 	valid.set(unsetB, MutableRange{2, 4})
 	validSet := &DisjointSet{}
-	validSet.Union([]IdentifierId{unsetA, unsetB})
+	validSet.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 	if named := ValidateScopes(function, AssignReactiveScopesWithSets(function, valid, validSet)); len(named) != 0 {
 		t.Errorf("a valid scope was named as invalid: %v", named)
 	}
@@ -775,7 +776,7 @@ func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{0, 5})
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1})
+	set.Union([]static_single_assignment.IdentifierId{1})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	hull := scopes.RangeOf(scopes.Ids()[0])
@@ -808,7 +809,7 @@ func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{5, 0})
 	set := &DisjointSet{}
-	set.Union([]IdentifierId{1})
+	set.Union([]static_single_assignment.IdentifierId{1})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if named := ValidateScopes(function, scopes); len(named) != 1 {

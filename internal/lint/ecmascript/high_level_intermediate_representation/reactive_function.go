@@ -71,6 +71,8 @@
 // rather than leaving it as an argument.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // ReactiveFunction is the tree form of a lowered function.
 //
 // Mirrors upstream's type, minus `env` and `directives`. `env` is an Environment, which this package
@@ -118,7 +120,7 @@ type ReactiveTerminalStatement struct {
 
 // ReactiveLabel names a break target.
 type ReactiveLabel struct {
-	Id BlockId
+	Id static_single_assignment.BlockId
 	// Implicit records that control would reach this point anyway, so a printed `break` is
 	// unnecessary. Upstream's `implicit`.
 	Implicit bool
@@ -163,7 +165,7 @@ func (*ReactiveScopeBlock) reactiveStatement()           {}
 // load-bearing: an instruction whose result is discarded has no lvalue, and a zero `Place` would be
 // indistinguishable from a real place naming identifier zero.
 type ReactiveInstruction struct {
-	Order  EvaluationOrder
+	Order  static_single_assignment.EvaluationOrder
 	LValue *Place
 	Value  ReactiveValue
 }
@@ -201,7 +203,7 @@ type ReactiveTernaryValue struct {
 // result, which is the ordinary case rather than an exotic one.
 type ReactiveSequenceValue struct {
 	Instructions []*ReactiveInstruction
-	Order        EvaluationOrder
+	Order        static_single_assignment.EvaluationOrder
 	Value        ReactiveValue
 }
 
@@ -209,7 +211,7 @@ type ReactiveSequenceValue struct {
 // is a sequence containing the chain's test and consequent computations, matching upstream's
 // `visitValueBlockTerminal` reconstruction.
 type ReactiveOptionalValue struct {
-	Order    EvaluationOrder
+	Order    static_single_assignment.EvaluationOrder
 	Value    ReactiveValue
 	Optional bool
 }
@@ -252,28 +254,28 @@ const (
 
 // ReactiveBreak leaves a labeled block, a loop, or a switch.
 type ReactiveBreak struct {
-	Target     BlockId
+	Target     static_single_assignment.BlockId
 	TargetKind ReactiveTerminalTargetKind
-	Order      EvaluationOrder
+	Order      static_single_assignment.EvaluationOrder
 }
 
 // ReactiveContinue jumps to the next iteration of a loop.
 type ReactiveContinue struct {
-	Target     BlockId
+	Target     static_single_assignment.BlockId
 	TargetKind ReactiveTerminalTargetKind
-	Order      EvaluationOrder
+	Order      static_single_assignment.EvaluationOrder
 }
 
 // ReactiveReturn returns a value.
 type ReactiveReturn struct {
 	Value Place
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveThrow throws a value.
 type ReactiveThrow struct {
 	Value Place
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveSwitchCase is one arm. A nil Test is the default case; a nil Block is a fallthrough arm.
@@ -290,21 +292,21 @@ type ReactiveSwitchCase struct {
 type ReactiveSwitch struct {
 	Test  Place
 	Cases []ReactiveSwitchCase
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveDoWhile is a `do { } while ()` loop.
 type ReactiveDoWhile struct {
 	Loop  ReactiveBlock
 	Test  ReactiveValue
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveWhile is a `while () { }` loop.
 type ReactiveWhile struct {
 	Test  ReactiveValue
 	Loop  ReactiveBlock
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveFor is a three-clause `for` loop. Update is nil when the loop has no update clause.
@@ -313,7 +315,7 @@ type ReactiveFor struct {
 	Test   ReactiveValue
 	Update ReactiveValue
 	Loop   ReactiveBlock
-	Order  EvaluationOrder
+	Order  static_single_assignment.EvaluationOrder
 }
 
 // ReactiveForOf is a `for (... of ...)` loop.
@@ -321,14 +323,14 @@ type ReactiveForOf struct {
 	Init  ReactiveValue
 	Test  ReactiveValue
 	Loop  ReactiveBlock
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveForIn is a `for (... in ...)` loop.
 type ReactiveForIn struct {
 	Init  ReactiveValue
 	Loop  ReactiveBlock
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveIf is an if statement. Alternate is nil when there is no else arm.
@@ -336,13 +338,13 @@ type ReactiveIf struct {
 	Test       Place
 	Consequent ReactiveBlock
 	Alternate  *ReactiveBlock
-	Order      EvaluationOrder
+	Order      static_single_assignment.EvaluationOrder
 }
 
 // ReactiveLabel is a labeled block, the target of a labeled break.
 type ReactiveLabelTerminal struct {
 	Block ReactiveBlock
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 }
 
 // ReactiveTry is a try/catch. HandlerBinding is nil for `catch { }` with no parameter.
@@ -350,7 +352,7 @@ type ReactiveTry struct {
 	Block          ReactiveBlock
 	HandlerBinding *Place
 	Handler        ReactiveBlock
-	Order          EvaluationOrder
+	Order          static_single_assignment.EvaluationOrder
 }
 
 func (*ReactiveBreak) reactiveTerminal()         {}

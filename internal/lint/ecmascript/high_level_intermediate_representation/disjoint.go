@@ -126,6 +126,7 @@ import (
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // DisjointGap names a union rule this pass cannot apply, for a caller that needs to know.
@@ -165,7 +166,7 @@ func DisjointGaps() []DisjointGap {
 //
 // The zero value is an empty set and is ready to use.
 type DisjointSet struct {
-	parent map[IdentifierId]IdentifierId
+	parent map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 }
 
 // Union merges every value in items into one class.
@@ -179,12 +180,12 @@ type DisjointSet struct {
 // Note that upstream's `union` MUTATES the caller's array through `shift()`. This takes the slice by
 // value and never writes to it, which is a difference in the implementation rather than in what it
 // decides; the call sites below would be correct under either.
-func (d *DisjointSet) Union(items []IdentifierId) {
+func (d *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
 	if len(items) == 0 {
 		return
 	}
 	if d.parent == nil {
-		d.parent = map[IdentifierId]IdentifierId{}
+		d.parent = map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 	}
 
 	first := items[0]
@@ -221,7 +222,7 @@ func (d *DisjointSet) Union(items []IdentifierId) {
 // the recursion depth safe. Upstream returns `null` for an absent value; the second return is that
 // null, kept separate from the id because zero is a usable IdentifierId and conflating them would
 // make an absent value read as a member of class zero.
-func (d *DisjointSet) Find(item IdentifierId) (IdentifierId, bool) {
+func (d *DisjointSet) Find(item static_single_assignment.IdentifierId) (static_single_assignment.IdentifierId, bool) {
 	if d.parent == nil {
 		return 0, false
 	}
@@ -246,7 +247,7 @@ func (d *DisjointSet) Find(item IdentifierId) (IdentifierId, bool) {
 // (line 43011), written once here so that every consumer does not re-derive the fallback. A value
 // that was never unified is its own representative, which is the answer that lets a caller key a map
 // on the result without first asking whether the value is a member.
-func (d *DisjointSet) RepresentativeOf(item IdentifierId) IdentifierId {
+func (d *DisjointSet) RepresentativeOf(item static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
 	if root, ok := d.Find(item); ok {
 		return root
 	}
@@ -254,7 +255,7 @@ func (d *DisjointSet) RepresentativeOf(item IdentifierId) IdentifierId {
 }
 
 // Has reports whether a value was ever unified into a class.
-func (d *DisjointSet) Has(item IdentifierId) bool {
+func (d *DisjointSet) Has(item static_single_assignment.IdentifierId) bool {
 	if d.parent == nil {
 		return false
 	}
@@ -273,18 +274,18 @@ func (d *DisjointSet) Size() int { return len(d.parent) }
 // sorted for that reason. The classes themselves are identical either way -- only the order is
 // pinned, and it is pinned because a non-deterministic ordering is the shape that makes a cache
 // non-reproducible without ever producing a wrong answer.
-func (d *DisjointSet) Sets() [][]IdentifierId {
+func (d *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
 	if len(d.parent) == 0 {
 		return nil
 	}
-	members := make([]IdentifierId, 0, len(d.parent))
+	members := make([]static_single_assignment.IdentifierId, 0, len(d.parent))
 	for item := range d.parent {
 		members = append(members, item)
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i] < members[j] })
 
-	grouped := map[IdentifierId][]IdentifierId{}
-	var order []IdentifierId
+	grouped := map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{}
+	var order []static_single_assignment.IdentifierId
 	for _, item := range members {
 		root := d.RepresentativeOf(item)
 		if _, seen := grouped[root]; !seen {
@@ -293,7 +294,7 @@ func (d *DisjointSet) Sets() [][]IdentifierId {
 		grouped[root] = append(grouped[root], item)
 	}
 
-	sets := make([][]IdentifierId, 0, len(order))
+	sets := make([][]static_single_assignment.IdentifierId, 0, len(order))
 	for _, root := range order {
 		sets = append(sets, grouped[root])
 	}
@@ -336,7 +337,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 	// back to the declaration that introduced the variable. Upstream keys it on `declarationId` and
 	// writes only when absent (`declareIdentifier`, line 32381); `DeclarationId` is this graph's
 	// counterpart and carries the same meaning, one entry per source-level binding.
-	declarations := map[DeclarationId]IdentifierId{}
+	declarations := map[static_single_assignment.DeclarationId]static_single_assignment.IdentifierId{}
 	producers := newCalleeProducers(function)
 	declareIdentifier := func(place Place) {
 		declaration := declarationOf(function, place.Identifier)
@@ -367,7 +368,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 				continue
 			}
 
-			operands := []IdentifierId{phi.Place.Identifier}
+			operands := []static_single_assignment.IdentifierId{phi.Place.Identifier}
 			if declaration, present := declarations[declarationOf(function, phi.Place.Identifier)]; present {
 				operands = append(operands, declaration)
 			}
@@ -401,7 +402,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 				continue
 			}
 
-			var operands []IdentifierId
+			var operands []static_single_assignment.IdentifierId
 
 			lvalueRange := ranges.Get(instruction.LValue.Identifier)
 			if lvalueRange.End > lvalueRange.Start+1 || mayAllocate(function, producers, instruction) {
@@ -470,10 +471,10 @@ func appendStore(
 	ranges *MutableRanges,
 	instruction *Instruction,
 	declareIdentifier func(Place),
-	operands []IdentifierId,
+	operands []static_single_assignment.IdentifierId,
 	lvalue Place,
 	value Place,
-) []IdentifierId {
+) []static_single_assignment.IdentifierId {
 	declareIdentifier(lvalue)
 	lvalueRange := ranges.Get(lvalue.Identifier)
 	if lvalueRange.End > lvalueRange.Start+1 {
@@ -491,9 +492,9 @@ func appendStore(
 func appendMutableOperand(
 	ranges *MutableRanges,
 	instruction *Instruction,
-	operands []IdentifierId,
+	operands []static_single_assignment.IdentifierId,
 	operand Place,
-) []IdentifierId {
+) []static_single_assignment.IdentifierId {
 	operandRange := ranges.Get(operand.Identifier)
 	if operandRange.Contains(instruction.Order) && operandRange.Start > 0 {
 		operands = append(operands, operand.Identifier)
@@ -510,8 +511,8 @@ func appendMutableOperand(
 func appendMutableOperands(
 	instruction *Instruction,
 	ranges *MutableRanges,
-	operands []IdentifierId,
-) []IdentifierId {
+	operands []static_single_assignment.IdentifierId,
+) []static_single_assignment.IdentifierId {
 	EachPlace(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
 			return
@@ -528,7 +529,7 @@ func appendMutableOperands(
 // answers zero, which groups every such value together -- acceptable because the only consumer is
 // the `declarations` map, whose entries are written from real places and read for phis of real
 // bindings.
-func declarationOf(function *Function, id IdentifierId) DeclarationId {
+func declarationOf(function *Function, id static_single_assignment.IdentifierId) static_single_assignment.DeclarationId {
 	if function == nil {
 		return 0
 	}

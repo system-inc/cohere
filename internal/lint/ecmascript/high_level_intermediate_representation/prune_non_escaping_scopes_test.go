@@ -9,6 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPruneNonEscapingScopesPrunesAndKeeps is the baseline, and it guards two opposite failures.
@@ -86,7 +87,7 @@ func TestPruneNonEscapingScopesKeepsAReturnedValue(t *testing.T) {
 		&ReactiveTerminalStatement{Terminal: &ReactiveReturn{Value: produced}},
 	}}
 	dependencies := &ScopeDependencies{
-		declarations: map[ScopeId][]IdentifierId{1: {1}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}},
 	}
 
 	result := PruneNonEscapingScopes(tree, function, dependencies, nil)
@@ -118,7 +119,7 @@ func TestPruneNonEscapingScopesPrunesAValueNothingHolds(t *testing.T) {
 	}}
 	tree := &ReactiveFunction{Body: ReactiveBlock{scope}}
 	dependencies := &ScopeDependencies{
-		declarations: map[ScopeId][]IdentifierId{1: {1}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}},
 	}
 
 	result := PruneNonEscapingScopes(tree, function, dependencies, nil)
@@ -311,7 +312,7 @@ func TestPruneNonEscapingScopesResolvesLoadLocalIndirection(t *testing.T) {
 			function:     function,
 			dependencies: dependencies,
 			graph:        NewMemoizationGraph(),
-			definitions:  map[DeclarationId]DeclarationId{},
+			definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 		}
 		collector.walk(tree.Body)
 		roots += collector.graph.EscapingCount()
@@ -370,7 +371,7 @@ func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(t *testing.T) {
 	collector := memoizationCollector{
 		function:    function,
 		graph:       NewMemoizationGraph(),
-		definitions: map[DeclarationId]DeclarationId{},
+		definitions: map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
 	collector.visitInstruction(logical)
 
