@@ -497,12 +497,12 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		switch {
 		case checker.Checker_isArrayType(w.typeChecker, source):
 			step := Step{Kind: StepElement, Index: -1}
-			built, literals := partOf(pair.Literals, step)
+			built, literals := w.partOf(pair.Literals, step)
 			return w.into(pair, Pair{Source: w.typeArgument(source, 0), Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
 				step, depth)
 		case checker.IsTupleType(source):
 			step := Step{Kind: StepElement, Index: -1}
-			built, literals := partOf(pair.Literals, step)
+			built, literals := w.partOf(pair.Literals, step)
 			for _, element := range checker.Checker_getTypeArguments(w.typeChecker, source) {
 				if found, wrong := w.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
 					step, depth); wrong {
@@ -521,7 +521,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		targetElements := checker.Checker_getTypeArguments(w.typeChecker, target)
 		for index := 0; index < len(sourceElements) && index < len(targetElements); index++ {
 			step := Step{Kind: StepElement, Index: index}
-			built, literals := partOf(pair.Literals, step)
+			built, literals := w.partOf(pair.Literals, step)
 			if found, wrong := w.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable, Built: built, Literals: literals},
 				step, depth); wrong {
 				return found, true
@@ -555,7 +555,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
 		sourceSignature, targetSignature := w.inContextOf(sourceSignatures[0], targetSignatures[0])
-		built, literals := returnsBuilt(source)
+		built, literals := w.returnsBuilt(source)
 		// A function's return is paired, and a method's as a function's is (#y0ejf6a): `all(): Dog[] { return
 		// this.dogs }` seen as `all(): Animal[]` hands out the array its object still holds. Unless the function builds
 		// what it returns, every call, which nobody else then holds (#jpdf48x).
@@ -617,7 +617,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			continue
 		}
 		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
-		built, literals := partOf(pair.Literals, step)
+		built, literals := w.partOf(pair.Literals, step)
 		if found, wrong := w.into(pair, Pair{
 			Source:         checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
 			Target:         checker.Checker_getTypeOfSymbol(w.typeChecker, property),
@@ -710,7 +710,7 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
  * project's own source, an interface's or a function type's, is not, since whatever implements it may hand back
  * what it holds.
  */
-func returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
+func (w *Walker) returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
 	symbol := function.Symbol()
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false, nil
@@ -738,11 +738,11 @@ func returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
 		})
 	}
 	for _, expression := range returned {
-		if expression != nil && !isBuilt(expression) {
+		if expression != nil && !w.isBuilt(expression, 0) {
 			return false, nil
 		}
 	}
-	return true, literalsOf(returned)
+	return true, w.literalsOf(returned, 0)
 }
 
 /*
@@ -752,7 +752,7 @@ func returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
  * or comes before a spread or a computed name, may hold what someone else does there, so it is not Built. A literal
  * that does not write the part at all puts nothing in it.
  */
-func partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
+func (w *Walker) partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 	if len(literals) == 0 {
 		return false, nil
 	}
@@ -769,6 +769,9 @@ func partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 					parts = append(parts, element)
 				}
 			}
+		case literal.Kind == ast.KindCallExpression && step.Kind == StepElement && step.Index < 0:
+			// A `.map` whose callback returns only literals (mapsToFresh): its elements are those literals.
+			parts = append(parts, mapReturns(literal)...)
 		case literal.Kind == ast.KindObjectLiteralExpression && step.Kind == StepProperty:
 			// The last write of the part is what the literal holds there: one after a spread overrides it, and a
 			// spread, a computed name, a shorthand, a method or an accessor after the last assignment may be what is.
@@ -784,6 +787,9 @@ func partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 				case name.Text() != step.Name:
 				case property.Kind == ast.KindPropertyAssignment:
 					written, readable = property.AsPropertyAssignment().Initializer, true
+				case property.Kind == ast.KindShorthandPropertyAssignment && property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == nil:
+					// `{ filters }` holds what the binding does, which isBuilt traces (#qq4haam).
+					written, readable = name, true
 				default:
 					readable = false
 				}
@@ -799,16 +805,17 @@ func partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 		}
 	}
 	for _, part := range parts {
-		if !isBuilt(part) {
+		if !w.isBuilt(part, 0) {
 			return false, nil
 		}
 	}
-	return true, literalsOf(parts)
+	return true, w.literalsOf(parts, 0)
 }
 
-// literalsOf is the object and array literals expressions are, through parentheses and a conditional's branches, a
-// `null` or `undefined` adding none; nil when any is something else, or nothing is a literal.
-func literalsOf(expressions []*ast.Node) []*ast.Node {
+// literalsOf is the object and array literals expressions are, through parentheses, a conditional's branches and a
+// local binding's initializer (traced), a `null` or `undefined` adding none, and a `.map` building fresh elements
+// (mapsToFresh) standing for the array of them; nil when any is something else, or nothing is a literal.
+func (w *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
 	var literals []*ast.Node
 	for _, expression := range expressions {
 		if expression == nil {
@@ -820,22 +827,97 @@ func literalsOf(expressions []*ast.Node) []*ast.Node {
 			literals = append(literals, expression)
 		case expression.Kind == ast.KindConditionalExpression:
 			conditional := expression.AsConditionalExpression()
-			branches := literalsOf([]*ast.Node{conditional.WhenTrue, conditional.WhenFalse})
+			branches := w.literalsOf([]*ast.Node{conditional.WhenTrue, conditional.WhenFalse}, depth)
 			if branches == nil {
 				return nil
 			}
 			literals = append(literals, branches...)
 		case expression.Kind == ast.KindNullKeyword || expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
+		case mapsToFresh(expression):
+			// A new array whose elements the callback builds, read by partOf as the literals it returns.
+			literals = append(literals, ast.SkipParentheses(expression))
 		default:
-			return nil
+			initializer := w.traced(expression, depth)
+			if initializer == nil {
+				return nil
+			}
+			traced := w.literalsOf([]*ast.Node{initializer}, depth+1)
+			if traced == nil {
+				return nil
+			}
+			literals = append(literals, traced...)
 		}
 	}
 	return literals
 }
 
-// isBuilt is an expression whose value is made right here, whole or as a new container.
-func isBuilt(expression *ast.Node) bool {
-	return isFresh(expression) || isNewContainer(expression)
+// isBuilt is an expression whose value is made right here, whole or as a new container, or a local binding of one
+// (traced).
+func (w *Walker) isBuilt(expression *ast.Node, depth int) bool {
+	if isFresh(expression) || isNewContainer(expression) {
+		return true
+	}
+	initializer := w.traced(expression, depth)
+	return initializer != nil && w.isBuilt(initializer, depth+1)
+}
+
+// maximumTraceDepth bounds a chain of bindings traced through one another, `const b = a` after `const a = [x]`.
+const maximumTraceDepth = 4
+
+/*
+ * traced is the initializer of the local `const` expression names, when what it holds is no one else's by the time it
+ * is returned (#qq4haam): `const filters = incoming.filters?.map(...)` then `return { ...incoming, filters }`. The
+ * binding is a `const` declared in the function the expression is in, and the expression is its one reference there:
+ * a second one may store it, pass it to a call, capture it in a closure, write through it, or put it in the result
+ * twice, where two slots of different types reach one value (each a TypeError in Node; const-probe.tgz). References
+ * are read through the checker, a shorthand's by its value symbol, and anything not decided by that is not traced,
+ * which leaves the value held.
+ */
+func (w *Walker) traced(expression *ast.Node, depth int) *ast.Node {
+	expression = ast.SkipParentheses(expression)
+	if expression.Kind != ast.KindIdentifier || depth >= maximumTraceDepth {
+		return nil
+	}
+	symbol := w.valueSymbol(expression)
+	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
+		return nil
+	}
+	declaration := symbol.ValueDeclaration
+	list := declaration.Parent
+	initializer := declaration.AsVariableDeclaration().Initializer
+	if initializer == nil || list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsConst == 0 {
+		return nil
+	}
+	function := ast.GetContainingFunction(expression)
+	if function == nil || ast.GetContainingFunction(declaration) != function || function.Body() == nil {
+		return nil
+	}
+	references := 0
+	only := true
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && node.Text() == expression.Text() && node != declaration.Name() && w.valueSymbol(node) == symbol {
+			references++
+			if node != expression {
+				only = false
+			}
+		}
+		node.ForEachChild(visit)
+		return !only
+	}
+	function.Body().ForEachChild(visit)
+	if !only || references != 1 {
+		return nil
+	}
+	return initializer
+}
+
+// valueSymbol is the symbol an identifier reads: a shorthand property's name reads the binding of that name.
+func (w *Walker) valueSymbol(identifier *ast.Node) *ast.Symbol {
+	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == identifier {
+		return w.typeChecker.GetShorthandAssignmentValueSymbol(parent)
+	}
+	return w.typeChecker.GetSymbolAtLocation(identifier)
 }
 
 // hasInitializer is a parameter declared with a default, `value = 1`, which a caller may leave out or pass

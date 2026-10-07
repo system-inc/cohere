@@ -399,38 +399,58 @@ func (w *Walker) offerSpread(node *ast.Node) {
  * callback returning anything else may return what someone holds (`.map((row) => row)`, any `.filter`).
  */
 func mapsToFresh(expression *ast.Node) bool {
+	returned := mapReturns(expression)
+	if len(returned) == 0 {
+		return false
+	}
+	for _, expression := range returned {
+		if !isFresh(expression) {
+			return false
+		}
+	}
+	return true
+}
+
+// mapReturns is what a `.map` call's inline callback returns, each return's expression, or nil when expression is no
+// such call or a return has none. A callback with no return returns nothing it could share, but builds no element.
+func mapReturns(expression *ast.Node) []*ast.Node {
 	expression = ast.SkipParentheses(expression)
 	if expression.Kind != ast.KindCallExpression {
-		return false
+		return nil
 	}
 	callee := ast.SkipParentheses(expression.Expression())
 	if callee.Kind != ast.KindPropertyAccessExpression || callee.AsPropertyAccessExpression().Name().Text() != "map" {
-		return false
+		return nil
 	}
 	arguments := expression.Arguments()
 	if len(arguments) == 0 {
-		return false
+		return nil
 	}
 	callback := ast.SkipParentheses(arguments[0])
 	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
-		return false
+		return nil
 	}
 	body := callback.Body()
 	if body == nil {
-		return false
+		return nil
 	}
 	if !ast.IsBlock(body) {
-		return isFresh(body)
+		return []*ast.Node{body}
 	}
-	returnsFresh, returns := true, 0
+	var returned []*ast.Node
+	complete := true
 	ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
-		returns++
-		if returned := statement.AsReturnStatement().Expression; returned == nil || !isFresh(returned) {
-			returnsFresh = false
+		expression := statement.AsReturnStatement().Expression
+		if expression == nil {
+			complete = false
 		}
-		return !returnsFresh
+		returned = append(returned, expression)
+		return !complete
 	})
-	return returnsFresh && returns > 0
+	if !complete {
+		return nil
+	}
+	return returned
 }
 
 // writtenAfter is the names an object literal writes after spread: its own properties by name, and a later

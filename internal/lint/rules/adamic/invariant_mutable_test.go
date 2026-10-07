@@ -73,6 +73,21 @@ const animalsOf: () => Animal[] = dogsOf;`, "dogsOf"},
 const kennel: Dog[] = [rex];
 const kennelOf = (): { pets: Dog[] } => ({ pets: kennel });
 const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
+		// #qq4haam, const-probe.tgz's r1 and r2: a local value built here, which escapes before the return.
+		"a local value also cached": {animals + `
+const cache: Dog[][] = [];
+const kennelOf = (): { pets: Dog[] } => { const pets = [rex]; cache.push(pets); return { pets }; };
+const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
+		// A `.map` handing back the elements it is given builds the array, not what is in it.
+		"a local map of held elements": {`interface Row { id?: string } declare const rows: { id: string }[]; const make = (): { rows: { id: string }[] } => { const kept = rows.map((row) => row); return { rows: kept }; }; const wide: () => { rows: Row[] } = make;`, "make"},
+		"a local value captured": {animals + `
+let later: () => Dog[] = () => [];
+const kennelOf = (): { pets: Dog[] } => { const pets = [rex]; later = () => pets; return { pets }; };
+const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
+		"a module's value, not a local": {animals + `
+const pets = [rex];
+const kennelOf = (): { pets: Dog[] } => { return { pets }; };
+const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
 		// A spread after the last write may be what the literal holds there.
 		"a part a later spread may write": {animals + `
 declare const holder: { pets: Dog[] };
@@ -390,9 +405,19 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 		"a nested literal": `interface Result { valid: string; errors: { identifier: string }[] } const validate = (): { valid: 'no'; errors: { identifier: 'short' }[] } => ({ valid: 'no', errors: [{ identifier: 'short' }] }); const wide: () => Result = validate;`,
 		// Written after the spread, so the literal holds the later value there (MessageService's reconnection data on api).
 		"a literal written after a spread": `declare const base: { other: number }; const data = (): { other: number; mode: { id: 'x' } } => ({ ...base, mode: { id: 'x' } }); const wide: () => { other: number; mode: { id: string } } = data;`,
-		"a declaration's literals":         animals + `function makeDogs(): Dog[] { if(rex.name === '') { return []; } return [rex]; } const make: () => Animal[] = makeDogs;`,
-		"a literal's method building":      animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
-		"an iterator's next()":             animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
+		// #qq4haam, const-probe.tgz's n1: a local value built here and only returned (TableColumnFilterGroup on the
+		// consumers, its `filters` a `.map` result), through a shorthand and a plain property.
+		"a local new array returned": animals + `const kennel: Dog[] = [rex]; const make = (): { pets: Dog[] } => { const pets = kennel.map((dog) => dog); return { pets }; }; const wide: () => { pets: Animal[] } = make;`,
+		"a local literal returned":   animals + `const make = (): { pets: Dog[] } => { const pets = [rex]; return { pets: pets }; }; const wide: () => { pets: Animal[] } = make;`,
+		// Another binding of the same name is no reference to this one, which the checker tells apart.
+		"a shadowing name elsewhere": animals + `const make = (): { pets: Dog[] } => { const pets = [rex]; const count = (pets: Dog[]): number => pets.length; count([]); return { pets }; }; const wide: () => { pets: Animal[] } = make;`,
+		// TableColumnFilterGroup's shape whole: the local is a `.map` whose callback builds each element, so an element's
+		// own slots are no one else's either.
+		"a local map building its elements": `interface Filter { id?: string; name: string } declare const incoming: { filters?: Filter[] }; const make = (): { filters?: { id: string; name: string }[] } => { const filters = incoming.filters?.map(function(filter) { return { ...filter, id: filter.id ?? 'x' }; }); return { filters }; }; const wide: () => { filters?: Filter[] } = make;`,
+		"a spread with a local after it":    animals + `declare const incoming: { name: string; pets?: Dog[] }; const make = (): { name: string; pets?: Dog[] } => { const pets = incoming.pets?.map((dog) => dog); return { ...incoming, pets }; }; const wide: () => { name: string; pets?: Animal[] } = make;`,
+		"a declaration's literals":          animals + `function makeDogs(): Dog[] { if(rex.name === '') { return []; } return [rex]; } const make: () => Animal[] = makeDogs;`,
+		"a literal's method building":       animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
+		"an iterator's next()":              animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
