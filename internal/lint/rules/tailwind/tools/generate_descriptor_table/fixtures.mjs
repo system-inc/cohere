@@ -14,20 +14,24 @@
  *
  * Usage:
  *
- *   node internal/lint/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs <theme.css> [--limit N] > fixtures.json
+ *   node internal/lint/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs <theme.css> [--limit N] [--resolve-root <dir>] > fixtures.json
  */
 
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const [entryPointArgument, ...restArguments] = process.argv.slice(2);
 if (!entryPointArgument) {
-    process.stderr.write('usage: fixtures.mjs <theme.css> [--limit N]\n');
+    process.stderr.write('usage: fixtures.mjs <theme.css> [--limit N] [--resolve-root <dir>]\n');
     process.exit(2);
 }
 const limitFlagIndex = restArguments.indexOf('--limit');
 const limit = limitFlagIndex >= 0 ? Number(restArguments[limitFlagIndex + 1]) : Infinity;
+const resolveRootFlagIndex = restArguments.indexOf('--resolve-root');
 
-const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(entryPointArgument);
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(
+    entryPointArgument,
+    resolveRootFlagIndex >= 0 ? restArguments[resolveRootFlagIndex + 1] : undefined,
+);
 
 /*
  * The populations, and why there is more than one.

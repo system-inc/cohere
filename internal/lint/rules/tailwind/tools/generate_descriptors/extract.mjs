@@ -46,7 +46,7 @@ import { DataTypeNames, probeClassName, Shapes } from './shapes.mjs';
 const [, , entryPointArgument, ...restArguments] = process.argv;
 if (!entryPointArgument) {
     process.stderr.write(
-        'usage: extract.mjs <theme.css> [--json <path>] [--resolve-root <dir>] [--corpus-root <dir>]\n',
+        'usage: extract.mjs <theme.css> [--json <path>] [--resolve-root <dir>] [--corpus-root <dir> | --no-corpus]\n',
     );
     process.exit(2);
 }
@@ -70,9 +70,14 @@ const jsonOutputPath = flagValue('--json');
  * climbed into an unrelated tree and scanned 28,219 class occurrences that had nothing to do with
  * the design system under test, clearing the `>= 100` floor on somebody else's files. A scan that
  * cannot find a corpus should report zero, not borrow one.
+ *
+ * `--no-corpus` is for a design system that has no corpus at all, such as a public theme in testdata,
+ * and for a caller that reads only the registry's half of the report. The scan is skipped and its floor
+ * with it, and the report says `skipped` rather than a zero that would read as a scan finding nothing.
  */
 const resolveRootArgument = flagValue('--resolve-root');
 const corpusRootArgument = flagValue('--corpus-root');
+const skipsCorpus = restArguments.includes('--no-corpus');
 
 const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot, inferDataType } = await loadDesignSystem(
     entryPointArgument,
@@ -1090,7 +1095,7 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
             }
         }
     }
-    scanDirectory(corpusRoot, 0);
+    if (!skipsCorpus) scanDirectory(corpusRoot, 0);
     corpusResult.distinct = distinctClasses.size;
 
     for (const className of distinctClasses) {
@@ -1363,6 +1368,7 @@ const report = {
     },
     corpus: {
         note: 'The corpus, not the registry. This is the population the documented null figure came from; a class with no reading is counted here and never scored as agreement.',
+        skipped: skipsCorpus,
         classNameOccurrences: corpusResult.scanned,
         distinctClasses: corpusResult.distinct,
         measured: corpusResult.measured,
@@ -1428,7 +1434,7 @@ if (report.sweep.measured < 50000) {
 if (propertyOrder.length < 300) {
     assertionFailures.push('the property order has ' + propertyOrder.length + ' entries; expected around 359. Arbitrary properties cannot be predicted without it.');
 }
-if (report.corpus.distinctClasses < 100) {
+if (!skipsCorpus && report.corpus.distinctClasses < 100) {
     assertionFailures.push('the corpus scan found only ' + report.corpus.distinctClasses + ' distinct classes; it probably scanned the wrong directory, so its null count means nothing.');
 }
 if (!report.controls.plantedDirty.proven) {

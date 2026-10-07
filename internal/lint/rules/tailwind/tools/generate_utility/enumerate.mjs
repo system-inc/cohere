@@ -25,7 +25,7 @@
  *
  * Usage:
  *
- *   node internal/lint/rules/tailwind/tools/generate_utility/enumerate.mjs <theme.css>
+ *   node internal/lint/rules/tailwind/tools/generate_utility/enumerate.mjs <theme.css> [--resolve-root <dir>]
  */
 
 import NodeFileSystem from 'node:fs';
@@ -36,11 +36,19 @@ import { loadDesignSystem, readingOf, parseCandidate } from '../generate_descrip
 
 const entryPointArgument = process.argv[2];
 if (!entryPointArgument) {
-    process.stderr.write('usage: enumerate.mjs <theme.css>\n');
+    process.stderr.write('usage: enumerate.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
 
-const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(entryPointArgument);
+function flagValue(name) {
+    const index = process.argv.indexOf(name);
+    return index === -1 ? undefined : process.argv[index + 1];
+}
+
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot } = await loadDesignSystem(
+    entryPointArgument,
+    flagValue('--resolve-root'),
+);
 
 /*
  * The theme namespaces, recovered the way generate_descriptor_table recovers them: every
@@ -266,7 +274,9 @@ const knownExceptions = [];
 const shadowQuirkProbes = [];
 {
     const extractPath = NodePath.join(NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url)), '..', 'generate_descriptors', 'extract.mjs');
-    const report = JSON.parse(NodeChildProcess.execFileSync(process.execPath, [extractPath, entryPoint], {
+    // The same resolve root, so a theme borrowing an install is measured against that install here too.
+    // No corpus: only the registry's disagreeing roots are read, and a public theme has no corpus to scan.
+    const report = JSON.parse(NodeChildProcess.execFileSync(process.execPath, [extractPath, entryPoint, '--resolve-root', resolveRoot, '--no-corpus'], {
         encoding: 'utf8',
         maxBuffer: 1024 * 1024 * 256,
     }));
@@ -472,14 +482,15 @@ const syntheticStylesheets = [
 
 for (const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
     // Written beside the repository's own entry point rather than in a temporary directory, so that
-    // `@import "tailwindcss"` resolves against the same install the repository half measured. A
-    // stylesheet in the system temp directory has no `node_modules` above it and the import fails.
+    // `@import "tailwindcss"` resolves against the same install the repository half measured, which
+    // is the resolve root when one was given. A stylesheet in the system temp directory has no
+    // `node_modules` above it and the import fails.
     const temporaryPath = NodePath.join(NodePath.dirname(entryPoint), `.gen-tailwind-utility-${name}.css`);
     NodeFileSystem.writeFileSync(temporaryPath, '@import "tailwindcss";\n' + stylesheet);
 
     let syntheticSystem;
     try {
-        ({ designSystem: syntheticSystem } = await loadDesignSystem(temporaryPath));
+        ({ designSystem: syntheticSystem } = await loadDesignSystem(temporaryPath, resolveRoot));
     }
     finally {
         NodeFileSystem.rmSync(temporaryPath, { force: true });

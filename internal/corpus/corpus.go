@@ -99,7 +99,11 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 
 // Resolve is the path a "<corpus>:<path in it>" spelling names. When the corpus is unset it skips naming
 // the variable, as Root does. It fails when the corpus is set and the path is not there, and when the
-// spelling names no corpus or is not a spelling at all.
+// spelling names no corpus.
+//
+// A path relative to this repository's root, such as a public design system under testdata, resolves
+// too and never skips, which is how a fixture generated from a public theme records its entry point
+// (#f598zk0). An absolute path fails: it reads the same on no other machine.
 func Resolve(t testing.TB, spelling string) string {
 	t.Helper()
 	corpus, inside, spelled, err := Spelled(spelling)
@@ -107,13 +111,54 @@ func Resolve(t testing.TB, spelling string) string {
 		t.Fatal(err)
 	}
 	if !spelled {
-		t.Fatalf("%q is not spelled <corpus>:<path in it>, so it names no corpus", spelling)
+		if filepath.IsAbs(spelling) {
+			t.Fatalf("%q is an absolute path, which reads the same on no other machine: spell it "+
+				"<corpus>:<path in it>, or give it relative to this repository", spelling)
+		}
+		root, err := RepositoryRoot()
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(root, filepath.FromSlash(spelling))
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, err)
+		}
+		return path
 	}
 	path := corpus.Path(t, filepath.FromSlash(inside))
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, err)
 	}
 	return path
+}
+
+// repositoryModule is the module path in this repository's go.mod, which is how RepositoryRoot knows the
+// go.mod it found is this repository's rather than a nested module's.
+const repositoryModule = "github.com/system-inc/cohere"
+
+// RepositoryRoot is this repository's root: the nearest directory above the working directory whose
+// go.mod declares this module. A test runs in its package's directory, so it finds the root from any
+// package.
+func RepositoryRoot() (string, error) {
+	directory, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		contents, err := os.ReadFile(filepath.Join(directory, "go.mod"))
+		if err == nil {
+			for _, line := range strings.Split(string(contents), "\n") {
+				if module, isModule := strings.CutPrefix(strings.TrimSpace(line), "module "); isModule && strings.TrimSpace(module) == repositoryModule {
+					return directory, nil
+				}
+			}
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			return "", fmt.Errorf("no go.mod declaring %s above the working directory", repositoryModule)
+		}
+		directory = parent
+	}
 }
 
 // Locate is Resolve for a generator, which has no test to skip: the corpus's variable, or else the user's

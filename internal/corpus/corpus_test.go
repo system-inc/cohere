@@ -134,12 +134,15 @@ func TestSpelledSplitsOnlyCorpusSpellings(t *testing.T) {
 }
 
 // Resolve skips naming the variable when the corpus is unset, fails when it is set and the path is not in
-// it, and fails on a spelling that names no corpus whether the corpus is set or not. Each runs in a child
-// process, since a skip and a failure end the test that meets them.
+// it, and fails on a spelling that names no corpus whether the corpus is set or not. A path inside this
+// repository resolves with no corpus set, and an absolute path fails. Each runs in a child process, since
+// a skip and a failure end the test that meets them.
 func TestResolveSkipsWhenUnsetAndFailsWhenWrong(t *testing.T) {
 	t.Parallel()
 	if probe := os.Getenv("COHERE_CORPUS_PROBE"); probe != "" {
-		Resolve(t, probe)
+		if path := Resolve(t, probe); !filepath.IsAbs(path) {
+			t.Fatalf("Resolve(%q) = %q, which is not absolute", probe, path)
+		}
 		return
 	}
 	root := t.TempDir()
@@ -160,8 +163,9 @@ func TestResolveSkipsWhenUnsetAndFailsWhenWrong(t *testing.T) {
 		"missing from the corpus": {spelling: "ahra:app/styles/absent.css", value: root, want: "--- FAIL"},
 		"no corpus, set":          {spelling: "arha:app/styles/theme.css", value: root, want: "--- FAIL"},
 		"no corpus, unset":        {spelling: "arha:app/styles/theme.css", want: "--- FAIL"},
-		"a path, not a spelling":  {spelling: filepath.Join(root, "app", "styles", "theme.css"), value: root, want: "--- FAIL"},
-		"a relative path, unset":  {spelling: "app/styles/theme.css", want: "--- FAIL"},
+		"an absolute path":        {spelling: filepath.Join(root, "app", "styles", "theme.css"), value: root, want: "--- FAIL"},
+		"not in the repository":   {spelling: "app/styles/theme.css", want: "--- FAIL"},
+		"in the repository":       {spelling: "internal/corpus/corpus.go", want: "--- PASS"},
 	} {
 		output := runProbe(t, "TestResolveSkipsWhenUnsetAndFailsWhenWrong", testCase.spelling, testCase.value)
 		if !strings.Contains(output, testCase.want) {

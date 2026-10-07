@@ -130,13 +130,17 @@ async function loadInferDataType(tailwindModuleUrl) {
  *
  * `entryPointArgument` may be a corpus spelling such as `ahra:app/_theme/styles/theme.css` (see
  * `../corpus.mjs`). `entryPoint` is then the file it names, and `recordedEntryPoint` the spelling,
- * which is what a fixture records so it reads the same on every machine.
+ * which is what a fixture records so it reads the same on every machine. A path inside this
+ * repository, such as a public theme under testdata, is recorded relative to it.
+ *
+ * `resolveRootArgument` may be a spelling too, so a public theme can borrow a private checkout's
+ * install with an invocation that reads the same on every machine: `--resolve-root ahra:`.
  */
 export async function loadDesignSystem(entryPointArgument, resolveRootArgument, entrySourceOverride) {
     const entryPointLocated = locate(entryPointArgument);
     const entryPointPath = entryPointLocated.path;
     const entryDirectory = NodePath.dirname(entryPointPath);
-    const resolveRoot = NodePath.resolve(resolveRootArgument ?? entryDirectory);
+    const resolveRoot = resolveRootArgument ? locate(resolveRootArgument).path : entryDirectory;
     const tailwindModuleUrl = resolveModuleUrl('tailwindcss', resolveRoot);
     const tailwindModule = await import(tailwindModuleUrl);
 
