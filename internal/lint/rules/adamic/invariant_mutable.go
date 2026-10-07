@@ -53,10 +53,11 @@ var (
  * A method taking a narrower parameter than the wider type passes is the hole a caller opens (#gvzdft9 shape 5):
  * tsc compares a method's parameters in both directions, so `{ put(dog: Dog) }` passes as `{ put(animal: Animal):
  * void }`, and a Cat passed through the wider type reaches code reading a Dog. The rule asks the walk for methods
- * and judges their parameters one way, a function's being tsc's own under strictFunctionTypes. Two gaps are named
- * rather than guessed at. A generic method's parameters are not paired: each signature's parameters are in its
- * own type parameters, which no pairing unifies without instantiating one signature against the other, so
- * Promise's `then` read every promise as a hole. And a method's return is not paired, as no method was before.
+ * and judges their parameters one way, a function's being tsc's own under strictFunctionTypes. A generic method is
+ * related as tsc relates it (#bbtfx99): one with type parameters of its own is instantiated in the context of the
+ * other, so `{ put<T extends Dog>(dog: T) }` as `{ put(animal: Animal) }` is a Dog parameter under an Animal one,
+ * and Promise's `then` is the same `then` under two promises. A method's return is not paired, as no method was
+ * before.
  *
  * It began as identity, by the checker's identity relation, and the four consumers measured why not: an
  * `HTMLElement` seen as an `Element` reported its event handler slots, which differ only in `this` and are
@@ -94,9 +95,12 @@ var InvariantMutable = rule.Rule{
 			// A method's parameter is written by the caller, so whatever the wider type passes must be something
 			// the method reads: the target's parameter type (the pair's Source) assignable to the source's. tsc
 			// compares a method's parameters both ways (#gvzdft9 shape 5); a function's it already checks one way
-			// under strictFunctionTypes, so only a method's are judged here.
+			// under strictFunctionTypes, so only a method's are judged here. The parameter is judged whole, as tsc
+			// judges a function's, and the walk goes no further into it: below a callback parameter is the value it is
+			// called with, and Promise's `then` read every promise's value as a slot written through the wider type,
+			// about a hundred findings on fresh values, an async function's literal or `Promise.resolve([])` (#bbtfx99).
 			if pair.MethodParameter {
-				return !walker.IsAssignable(pair.Source, pair.Target), descend
+				return !walker.IsAssignableToParameter(pair.Source, pair.Target, pair.Defaulted), false
 			}
 			if !pair.Mutable {
 				return false, descend

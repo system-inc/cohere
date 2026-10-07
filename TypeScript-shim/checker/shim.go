@@ -139,6 +139,12 @@ func Checker_getIndexTypeOfType(recv *checker.Checker, t *checker.Type, keyType 
 //go:linkname Checker_getBaseTypes github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypes
 func Checker_getBaseTypes(recv *checker.Checker, t *checker.Type) []*checker.Type
 
+//go:linkname Checker_getCanonicalSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getCanonicalSignature
+func Checker_getCanonicalSignature(recv *checker.Checker, signature *checker.Signature) *checker.Signature
+
+//go:linkname Checker_instantiateSignatureInContextOf github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).instantiateSignatureInContextOf
+func Checker_instantiateSignatureInContextOf(recv *checker.Checker, signature *checker.Signature, contextualSignature *checker.Signature, inferenceContext *checker.InferenceContext, compareTypes checker.TypeComparer) *checker.Signature
+
 //go:linkname Checker_getSignatureFromDeclaration github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSignatureFromDeclaration
 func Checker_getSignatureFromDeclaration(recv *checker.Checker, declaration *ast.Node) *checker.Signature
 

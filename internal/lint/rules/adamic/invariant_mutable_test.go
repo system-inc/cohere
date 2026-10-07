@@ -292,6 +292,13 @@ func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) 
 		"a literal's method":           {animals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(dog: Dog) { dog.bark(); } };`, "put"},
 		"a held object's method":       {animals + `interface Sink { put(animal: Animal): void } declare const dogSink: { put(dog: Dog): void }; const sink: Sink = dogSink;`, "dogSink"},
 		"a function where a method is": {animals + `interface Sink { put(animal: Animal): void } declare const dogSink: { put: (dog: Dog) => void }; const sink: Sink = dogSink;`, "dogSink"},
+		// #bbtfx99, generic-probe.tgz: a generic source is instantiated in the target's context, as tsc relates it, and
+		// what it takes is then a Dog. g3, g6 and g5; each is accepted by tsc 6.0.3 and a TypeError in Node.
+		"a generic method":                       {animals + `interface Sink { put(animal: Animal): void } declare const dogSink: { put<T extends Dog>(dog: T): void }; const sink: Sink = dogSink;`, "dogSink"},
+		"a class's generic method":               {animals + `interface Sink { put(animal: Animal): void } class Kennel { put<T extends Dog>(dog: T): void { dog.bark(); } } const sink: Sink = new Kennel();`, "new Kennel()"},
+		"two generic methods, a plain parameter": {animals + `interface Sink { put<T>(animal: Animal, tag: T): void } declare const dogSink: { put<U>(dog: Dog, tag: U): void }; const sink: Sink = dogSink;`, "dogSink"},
+		// A default takes `undefined` as well, and still not a Cat.
+		"a defaulted parameter": {animals + `interface Sink { put(animal?: Animal): void } class Kennel { put(dog: Dog = rex): void { dog.bark(); } } const sink: Sink = new Kennel();`, "new Kennel()"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -311,8 +318,23 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 		"the same parameter":  animals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(animal: Animal) { animal.name; } };`,
 		"no parameter":        `interface Clock { now(): number } const clock: Clock = { now() { return 1; } };`,
 		"a held wider method": animals + `interface DogSink { put(dog: Dog): void } declare const anySink: { put(animal: Animal): void }; const sink: DogSink = anySink;`,
-		// Two generic signatures' type parameters are unrelated, so their parameters are not paired.
-		"a generic method": animals + `const dogs: Promise<Dog> = Promise.resolve(rex); const all: Promise<Animal> = dogs;`,
+		// #bbtfx99: two generic signatures are related by instantiating one in the other's context, so one `T` is never
+		// paired with another. Promise's `then` is the same `then` under two promises; g4 and n2 were false findings on
+		// main, a literal's generic method paired with its target's as they stood, and both run clean in Node.
+		"Promise's then":               animals + `const dogs: Promise<Dog> = Promise.resolve(rex); const all: Promise<Animal> = dogs;`,
+		"a generic identity method":    animals + `interface Sink { put<T extends Animal>(animal: T): T } const sink: Sink = { put<T extends Animal>(animal: T): T { return animal; } };`,
+		"a wider generic method":       animals + `interface DogSink { put<T extends Dog>(dog: T): void } const sink: DogSink = { put<T extends Animal>(animal: T) { animal.name; } };`,
+		"an unconstrained generic one": animals + `interface Sink { put(animal: Animal): void } declare const echo: { put<T>(value: T): void }; const sink: Sink = echo;`,
+		// Inferred as a Dog from the target, as tsc infers it, so the callback takes a Dog on both sides. Read at its
+		// constraint instead, it would take an Animal, and the target's callback taking a Dog would look narrower.
+		"an inferred type argument": animals + `interface DogSink { put(dog: Dog, then: (dog: Dog) => void): void } declare const sink: { put<T extends Animal>(animal: T, then: (animal: T) => void): void }; const dogSink: DogSink = sink;`,
+		// A generic function's two signatures are related the same way, so its Promise<Row[]> is one `Row` on both sides
+		// when it reaches `then` (DrizzleAdapterSql's executeRows on api).
+		"a generic function property": `interface Adapter { executeRows: <Row>(query: string) => Promise<Row[]> } class Sql { executeRows<Row>(query: string): Promise<Row[]> { return Promise.resolve([]); } } const adapter: Adapter = new Sql();`,
+		// The parameter is judged whole: below `then`'s callback is the promise's value, here a literal nobody else holds.
+		"a promise's value": `const done: Promise<{ result: string }> = Promise.resolve({ result: 'ok' as const });`,
+		// A default takes what the wider type's `?` passes (OrmDatabase's increment on api).
+		"a defaulted parameter": `interface Counter { add(value?: number): void } class Tally { add(value = 1): void { value; } } const counter: Counter = new Tally();`,
 		// A method's return is not paired, as no method was before shape 5: an iterator's next() hands back a fresh
 		// result each call, and was 276 findings on the consumers when it was.
 		"a method's return": animals + `interface Source { items(): Animal[] } declare const dogs: { items(): Dog[] }; const source: Source = dogs;`,

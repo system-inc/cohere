@@ -54,6 +54,9 @@ type Pair struct {
 	// both ways, and those are the hole; what a method returns is no slot of the method's.
 	Method          bool
 	MethodParameter bool
+	// Defaulted is a parameter pair whose Target, the parameter the value is passed to, has a default, and so takes
+	// `undefined` too (#bbtfx99): `increment(..., value = 1)` is `value: number` to the checker.
+	Defaulted bool
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -87,7 +90,8 @@ const maximumDepth = 8
 //	ReadonlyMap,            the type arguments, read-only
 //	ReadonlySet
 //	functions               a single call signature each: the return, and the parameters with source
-//	                        and target swapped, since a parameter is written by the caller
+//	                        and target swapped, since a parameter is written by the caller; a generic
+//	                        source first instantiated in the target's context, as tsc relates them
 //	objects                 each property of the target the source also has, by name, mutable unless
 //	                        the target's property is readonly; methods are skipped, unless Methods asks
 //	                        for them, when a target method pairs as a function, never a mutable slot
@@ -533,7 +537,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	targetSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindCall)
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
-		targetSignature, sourceSignature := targetSignatures[0], sourceSignatures[0]
+		sourceSignature, targetSignature := w.inContextOf(sourceSignatures[0], targetSignatures[0])
 		if !pair.Method {
 			if found, wrong := w.into(pair, Pair{
 				Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
@@ -554,6 +558,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 				Source:          checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
 				Target:          checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
 				MethodParameter: pair.Method,
+				Defaulted:       hasInitializer(sourceParameters[index]),
 			}, Step{Kind: StepParameter, Name: sourceParameters[index].Name, Index: index}, depth); wrong {
 				return found, true
 			}
@@ -578,12 +583,6 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			if sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, source, property.Name); sourceProperty != nil {
 				sourceMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
 				targetMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
-				// Two generic signatures' parameters are each in their own type parameters, which no pairing
-				// unifies: Promise's `then<TResult1, TResult2>` seen under two promises paired one TResult1 with
-				// the other's, 3,287 findings on the consumers, the shape #53w68gt measured for `clone<T>`.
-				if w.isGenericFunction(sourceMethod) || w.isGenericFunction(targetMethod) {
-					continue
-				}
 				if found, wrong := w.into(pair, Pair{Source: sourceMethod, Target: targetMethod, Method: true},
 					Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
 					return found, true
@@ -609,11 +608,22 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	return Pair{}, false
 }
 
-// isGenericFunction is a type with a call signature that declares type parameters of its own.
-func (w *Walker) isGenericFunction(t *checker.Type) bool {
-	return slices.ContainsFunc(checker.Checker_getSignaturesOfType(w.typeChecker, t, checker.SignatureKindCall), func(signature *checker.Signature) bool {
-		return len(signature.TypeParameters()) > 0
-	})
+/*
+ * inContextOf is two signatures as tsc relates them (compareSignaturesRelated, #bbtfx99): a source with type
+ * parameters of its own is instantiated in the context of the target's canonical signature, its type arguments
+ * inferred from the target's parameters and return. Each signature's parts are otherwise in its own type
+ * parameters, and pairing them as they stand paired one `T` with an unrelated other: Promise's
+ * `then<TResult1, TResult2>` seen under two promises was 3,287 findings on the consumers, the shape #53w68gt measured
+ * for `clone<T>`, and a generic function's `Promise<RowType[]>` reached `then` with two unrelated `RowType`s. A
+ * target alone with type parameters is compared as it stands, as tsc compares it.
+ */
+func (w *Walker) inContextOf(source *checker.Signature, target *checker.Signature) (*checker.Signature, *checker.Signature) {
+	if len(source.TypeParameters()) == 0 || slices.Equal(source.TypeParameters(), target.TypeParameters()) {
+		return source, target
+	}
+	target = checker.Checker_getCanonicalSignature(w.typeChecker, target)
+	// No inference context and no comparer, as tsc's relater passes: the comparer is then assignability.
+	return checker.Checker_instantiateSignatureInContextOf(w.typeChecker, source, target, nil, nil), target
 }
 
 func (w *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
@@ -664,6 +674,34 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
 		}
 	}
 	return false
+}
+
+// hasInitializer is a parameter declared with a default, `value = 1`, which a caller may leave out or pass
+// `undefined` to though its type does not say so: tsc's getTypeOfParameter adds the `undefined` for it.
+func hasInitializer(parameter *ast.Symbol) bool {
+	declaration := parameter.ValueDeclaration
+	return declaration != nil && declaration.Kind == ast.KindParameter &&
+		declaration.AsParameterDeclaration().Initializer != nil
+}
+
+// IsAssignableToParameter is source assignable to a parameter of type target, which takes `undefined` as well when
+// it is Defaulted: then every member of source but `undefined` must be assignable.
+func (w *Walker) IsAssignableToParameter(source *checker.Type, target *checker.Type, defaulted bool) bool {
+	if w.IsAssignable(source, target) {
+		return true
+	}
+	if !defaulted {
+		return false
+	}
+	if source.Flags()&checker.TypeFlagsUnion == 0 {
+		return source.Flags()&checker.TypeFlagsUndefined != 0
+	}
+	for _, member := range source.Types() {
+		if member.Flags()&checker.TypeFlagsUndefined == 0 && !w.IsAssignable(member, target) {
+			return false
+		}
+	}
+	return true
 }
 
 // isRestParameter is a parameter declared `...name`.

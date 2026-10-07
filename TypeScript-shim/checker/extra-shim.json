@@ -42,7 +42,9 @@
 			"getSignatureFromDeclaration",
 			"getTypeOfAccessors",
 			"getNonMissingTypeOfSymbol",
-			"instantiateType"
+			"instantiateType",
+			"getCanonicalSignature",
+			"instantiateSignatureInContextOf"
 		]
 	},
 	"ExtraFields": {

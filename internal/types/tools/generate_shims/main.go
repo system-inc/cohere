@@ -35,7 +35,8 @@ type ExtraShim struct {
 	// and fails at the caller. Before landing a sync, find each name on the new pin
 	// (`git grep '^func (c \*Checker) <name>('`) and read its callers if the signature moved. The
 	// newest, for lint's adamic rules: getNonMissingTypeOfSymbol (#sp4xwtj), instantiateType and
-	// newTypeMapper (#ncheh9w), each checked on d92d9bfee.
+	// newTypeMapper (#ncheh9w), getCanonicalSignature and instantiateSignatureInContextOf (#bbtfx99), each
+	// checked on d92d9bfee.
 	ExtraFunctions []string
 	ExtraMethods   map[string]([]string)
 
