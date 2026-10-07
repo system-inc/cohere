@@ -187,6 +187,51 @@ const open: { readonly kennel: { pet: Animal } } = yard;`, "yard"},
 	}
 }
 
+// TestInvariantMutableFiresWhereADestructuringAssignmentWidens: shape 2 of #gvzdft9, six-probes.tgz's s2. Each
+// target of an assignment pattern is a slot the value's part is put into, so `[animals] = [dogs]` is
+// `animals = dogs`; tsc 6.0.3 accepts it, and Node throws `dogs[1].bark is not a function`.
+func TestInvariantMutableFiresWhereADestructuringAssignmentWidens(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"an array pattern from a literal":  {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; [all] = [dogs];`, "dogs"},
+		"an array pattern from a tuple":    {animals + `declare const pair: [Dog[], number]; let all: Animal[] = []; [all] = pair;`, "pair"},
+		"an object pattern":                {animals + `declare const holder: { pets: Dog[] }; let all: Animal[] = []; ({ pets: all } = holder);`, "holder"},
+		"a shorthand in an object pattern": {animals + `declare const holder: { pets: Dog[] }; let pets: Animal[] = []; ({ pets } = holder);`, "holder"},
+		"a nested pattern":                 {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; [[all]] = [[dogs]];`, "dogs"},
+		"an object pattern from a literal": {animals + `const dogs: Dog[] = [rex]; let all: Animal[] = []; ({ pets: all } = { pets: dogs });`, "dogs"},
+		// Contextually typed as the literal's own elements, so reported once, by the literal's finder.
+		"after a spread in a literal value": {animals + `const dogs: Dog[] = [rex]; declare const cats: Animal[][]; let all: Animal[] = []; [all] = [...cats, dogs];`, "dogs"},
+		"a nested pattern from a tuple":     {animals + `declare const pair: [Dog[]]; let all: Animal[] = []; [[all]] = [pair];`, "pair"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "mutableWidening")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough: shape 2's near-misses.
+func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		"the same type":     animals + `const dogs: Dog[] = [rex]; let same: Dog[] = []; [same] = [dogs];`,
+		"a readonly target": animals + `const dogs: Dog[] = [rex]; let view: readonly Animal[] = []; [view] = [dogs];`,
+		"a fresh element":   animals + `let all: Animal[] = []; [all] = [[rex]];`,
+		// A rest element is an array the pattern builds, no one else's.
+		"a rest element": animals + `const dogs: Dog[] = [rex]; let rest: Animal[] = []; [...rest] = dogs;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
 // TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
 func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
 	t.Parallel()

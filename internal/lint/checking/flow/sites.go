@@ -45,6 +45,7 @@ type Site struct {
 //
 //	const x: T = e            the annotation
 //	x = e                     the assigned-to expression's type
+//	[a, { b }] = e            each target of the pattern, with the part of e it receives
 //	class { p: T = e }        the annotation
 //	f(x: T = e)               the annotation, and a defaulted binding element likewise
 //	f(e), new C(e)            the argument's contextual type: the resolved parameter, instantiated
@@ -102,8 +103,9 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 			return
 		}
 		left := ast.SkipParentheses(binary.Left)
-		// A literal on the left is a destructuring pattern, whose parts are bindings, not slots.
+		// A literal on the left is a destructuring pattern: each target in it is a slot of its own.
 		if left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression {
+			w.destructured(left, binary.Right, w.typeChecker.GetTypeAtLocation(binary.Right))
 			return
 		}
 		w.offer(binary.Right, w.typeChecker.GetTypeAtLocation(binary.Left))
@@ -175,6 +177,106 @@ func (w *Walker) offer(expression *ast.Node, target *checker.Type) {
 	}
 	w.sites = append(w.sites, Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
 		NewContainer: isNewContainer(expression)})
+}
+
+// offerPart adds the site of a part of node's value flowing into target, when the part has no expression of its
+// own: `[animals] = pair` puts pair's first element into animals, reported at pair.
+func (w *Walker) offerPart(node *ast.Node, source *checker.Type, target *checker.Type) {
+	if node == nil || source == nil || target == nil || source == target || !w.hasObjectPart(target) {
+		return
+	}
+	w.sites = append(w.sites, Site{Node: node, Source: source, Target: target})
+}
+
+/*
+ * destructured offers each target of an assignment pattern with the part of the value it receives (#gvzdft9):
+ * `[all] = pair` puts pair's first element into all as surely as `all = pair[0]` does, and pushing a cat through
+ * all then fills the dogs pair held (a TypeError in Node). An element pairs by position and a property by name,
+ * read off the value's type, and the site is reported at the value.
+ *
+ * Only a value that is no literal. A literal's own elements and properties are contextually typed by the pattern,
+ * so the ArrayLiteralExpression and PropertyAssignment finders already offer each of them, with everything below
+ * it and past a spread too: `[all] = [dogs]` was always reported. A rest element or spread takes an array or
+ * object of what is left, no one part, and is not paired. A default (`[a = d] = ...`) is an assignment of its
+ * own, which the BinaryExpression finder offers.
+ */
+func (w *Walker) destructured(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
+	if kind := ast.SkipParentheses(value).Kind; kind == ast.KindArrayLiteralExpression || kind == ast.KindObjectLiteralExpression {
+		return
+	}
+	w.destructuredParts(pattern, value, valueType)
+}
+
+// destructuredParts offers the targets of pattern with the parts of valueType, reported at value.
+func (w *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
+	pattern = ast.SkipParentheses(pattern)
+	switch pattern.Kind {
+	case ast.KindArrayLiteralExpression:
+		for index, element := range pattern.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindSpreadElement {
+				return
+			}
+			if element.Kind != ast.KindOmittedExpression {
+				w.destructuredTarget(element, value, w.destructuredElement(valueType, index))
+			}
+		}
+	case ast.KindObjectLiteralExpression:
+		for _, property := range pattern.AsObjectLiteralExpression().Properties.Nodes {
+			var name, target *ast.Node
+			switch property.Kind {
+			case ast.KindPropertyAssignment:
+				name, target = property.Name(), property.AsPropertyAssignment().Initializer
+			case ast.KindShorthandPropertyAssignment:
+				name, target = property.Name(), property.Name()
+			default:
+				// A spread assignment takes the rest, no one property.
+				continue
+			}
+			if name == nil || name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral {
+				continue
+			}
+			w.destructuredTarget(target, value, w.destructuredProperty(valueType, name.Text()))
+		}
+	}
+}
+
+// destructuredTarget offers one target of a pattern: a nested pattern is destructured again with its part's
+// type, and anything else is a slot the part is put into.
+func (w *Walker) destructuredTarget(target *ast.Node, value *ast.Node, partType *checker.Type) {
+	target = ast.SkipParentheses(target)
+	if target.Kind == ast.KindBinaryExpression && target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
+		target = ast.SkipParentheses(target.AsBinaryExpression().Left)
+	}
+	if target.Kind == ast.KindArrayLiteralExpression || target.Kind == ast.KindObjectLiteralExpression {
+		w.destructuredParts(target, value, partType)
+		return
+	}
+	w.offerPart(value, partType, w.typeChecker.GetTypeAtLocation(target))
+}
+
+// destructuredElement is the element at index of an array or tuple value's type.
+func (w *Walker) destructuredElement(valueType *checker.Type, index int) *checker.Type {
+	switch {
+	case valueType == nil:
+		return nil
+	case checker.IsTupleType(valueType):
+		return w.typeArgument(valueType, index)
+	case checker.Checker_isArrayType(w.typeChecker, valueType):
+		return w.typeArgument(valueType, 0)
+	}
+	return nil
+}
+
+// destructuredProperty is the type of the property name of an object value's type.
+func (w *Walker) destructuredProperty(valueType *checker.Type, name string) *checker.Type {
+	if valueType == nil || valueType.Flags()&checker.TypeFlagsObject == 0 {
+		return nil
+	}
+	property := checker.Checker_getPropertyOfType(w.typeChecker, valueType, name)
+	if property == nil {
+		return nil
+	}
+	return checker.Checker_getTypeOfSymbol(w.typeChecker, property)
 }
 
 func (w *Walker) annotated(typeNode *ast.Node, expression *ast.Node) {
@@ -315,7 +417,8 @@ func isNewContainer(expression *ast.Node) bool {
 }
 
 // IsDestructuringTarget is a literal standing for a destructuring pattern on the left of an `=`, directly
-// or nested inside another literal that is. Its properties and elements are bindings, not slots.
+// or nested inside another literal that is. Its properties and elements are targets a value is put into, not
+// values of their own, so destructured offers them rather than the literal finders.
 func IsDestructuringTarget(node *ast.Node) bool {
 	for current := node; current != nil; {
 		parent := current.Parent
