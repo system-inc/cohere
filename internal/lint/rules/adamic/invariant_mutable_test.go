@@ -129,8 +129,9 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		// handler could be written into; every element seen as an Element reported onfullscreenchange that way.
 		"a union slot": `interface Handler { readonly run: (label: string) => string } interface SameHandler { readonly run: (label: string) => string } declare const source: { onEvent: Handler | null }; const wide: { onEvent: SameHandler | null } = source;`,
 		// t1b on #drbrp8c: what the wider slot can hold is assignable back, so writing it is safe. The two slot
-		// types differ (one is readonly), so identity would report it.
-		"a slot assignable back": `declare const source: { pet: { readonly name: string } }; const wide: { pet: { name: string } } = source;`,
+		// types differ (one is readonly), so identity would report it. The readonly is the target's: the source's
+		// `readonly name` made writable is shape 1 of #gvzdft9, a hole of its own.
+		"a slot assignable back": `declare const source: { pet: { name: string } }; const wide: { pet: { readonly name: string } } = source;`,
 		"an any element":         `declare const loose: any[]; const strict: string[] = loose;`,
 		"a new array from map":   animals + `const dogs: Dog[] = [rex]; const all: Animal[] = dogs.map((dog) => dog);`,
 		"a new map":              animals + `const all: Map<string, Animal> = new Map<string, Dog>([['Rex', rex]]);`,
@@ -150,6 +151,53 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a class constructor's prototype":               `class Form { readonly kind = 'Form'; } type ClassType = (new () => object) & { prototype: object }; const resolve: () => typeof Form = () => Form; const wide: () => ClassType = resolve;`,
 		"a branded primitive":                           `declare const brand: unique symbol; type Slot = string & { readonly [brand]?: () => 'value' }; const text: Slot = 'Hello'; const wide: string & { readonly [brand]?: () => string } = text;`,
 		"an intersection with the same array":           animals + `declare const tagged: Animal[] & { readonly tag: 'kennel' }; const wide: Animal[] & { readonly tag: string } = tagged;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
+// TestInvariantMutableFiresWhereAReadOnlySlotIsMadeWritable: shape 1 of #gvzdft9, six-probes.tgz's s1. A
+// read-only property is covariant, so it may hold a Dog behind `Animal`, and a writable view of it lets a Cat in;
+// tsc 6.0.3 accepts it, and Node throws `bark is not a function`.
+func TestInvariantMutableFiresWhereAReadOnlySlotIsMadeWritable(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"the same type, read-only then writable": {animals + `
+const kennel: { readonly pet: Dog } = { pet: rex };
+const view: { readonly pet: Animal } = kennel;
+const pen: { pet: Animal } = view;`, "view"},
+		"one level down": {animals + `
+declare const yard: { readonly kennel: { readonly pet: Animal } };
+const open: { readonly kennel: { pet: Animal } } = yard;`, "yard"},
+		// six-probes.tgz's s1b: a read-only string may hold a literal, so `sounds[dog.kind]` stops being a function.
+		"a primitive, under a slot assignable back": {`declare const source: { pet: { readonly name: string } }; const wide: { pet: { name: string } } = source;`, "source"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "readonlyMadeWritable")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
+func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		"read-only both sides":        animals + `declare const kennel: { readonly pet: Animal }; const view: { readonly pet: Animal } = kennel;`,
+		"a literal type":              `declare const circle: { readonly kind: 'Circle' }; const shape: { kind: 'Circle' } = circle;`,
+		"null":                        `declare const empty: { readonly next: null }; const node: { next: null } = empty;`,
+		"a writable source":           animals + `declare const kennel: { pet: Animal }; const pen: { pet: Animal } = kennel;`,
+		"a fresh literal of the view": animals + `const pen: { pet: Animal } = { pet: rex };`,
+		// s1c: a library getter throws on the write before anything is stored.
+		"a library getter": `const pattern = /dog/; const view: { source: string } = pattern;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

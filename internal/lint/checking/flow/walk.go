@@ -36,11 +36,18 @@ type Step struct {
 // `readonly` can be written through the target's name, so whatever the source put there must be exactly
 // what the target says. A `readonly` slot is read-only through the target, so a narrower source is fine
 // there, and only the slots beneath it can still be holes.
+//
+// SourceReadonly is the source's own slot being `readonly`, read off the source's property. A read-only slot is
+// covariant, so the value behind `readonly pet: Animal` may be a Dog, and a mutable target slot over it lets
+// the wider type write a Cat there (#gvzdft9). tsc refuses a read-only array, tuple or map as its mutable form,
+// so only a property sets it, and SourceProperty is that property, for a judge that asks where it was declared.
 type Pair struct {
-	Source  *checker.Type
-	Target  *checker.Type
-	Path    []Step
-	Mutable bool
+	Source         *checker.Type
+	Target         *checker.Type
+	Path           []Step
+	Mutable        bool
+	SourceReadonly bool
+	SourceProperty *ast.Symbol
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -226,7 +233,20 @@ func (w *Walker) meet(key [2]*checker.Type) bool {
 }
 
 func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
-	if pair.Source == nil || pair.Target == nil || pair.Source == pair.Target || depth > maximumDepth {
+	if pair.Source == nil || pair.Target == nil || depth > maximumDepth {
+		return Pair{}, false
+	}
+	if pair.Source == pair.Target {
+		// Two of one type have no part that differs, so the walk goes no further. The slot itself is still
+		// judged when a read-only source slot is made writable here: the value behind it may be narrower than
+		// the one type both name.
+		if !pair.Mutable || !pair.SourceReadonly {
+			return Pair{}, false
+		}
+		if wrong, _ := w.judge(pair); wrong {
+			pair.Path = slices.Clone(pair.Path)
+			return pair, true
+		}
 		return Pair{}, false
 	}
 	if w.meet([2]*checker.Type{pair.Source, pair.Target}) {
@@ -532,9 +552,11 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			continue
 		}
 		if found, wrong := w.into(pair, Pair{
-			Source:  checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
-			Target:  checker.Checker_getTypeOfSymbol(w.typeChecker, property),
-			Mutable: ownSlotsShared && !readonly,
+			Source:         checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
+			Target:         checker.Checker_getTypeOfSymbol(w.typeChecker, property),
+			Mutable:        ownSlotsShared && !readonly,
+			SourceReadonly: checker.Checker_isReadonlySymbol(w.typeChecker, sourceProperty),
+			SourceProperty: sourceProperty,
 		}, Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
 			return found, true
 		}

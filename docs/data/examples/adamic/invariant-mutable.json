@@ -19,6 +19,7 @@
         "source": "declare const loose: any[]; const strict: string[] = loose;\n"
     },
     "assertedMessageIds": [
-        "mutableWidening"
+        "mutableWidening",
+        "readonlyMadeWritable"
     ]
 }

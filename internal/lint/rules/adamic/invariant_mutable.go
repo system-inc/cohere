@@ -11,8 +11,11 @@ import (
 	"github.com/system-inc/cohere/policy"
 )
 
-// invariantMutableText is the rule's message, whose wording lives in `policy/messages/invariant-mutable.json`.
-var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutableWidening")
+// The rule's messages, whose wording lives in `policy/messages/invariant-mutable.json`.
+var (
+	invariantMutableText     = policy.MessageOf("adamic/invariant-mutable", "mutableWidening")
+	readonlyMadeWritableText = policy.MessageOf("adamic/invariant-mutable", "readonlyMadeWritable")
+)
 
 /*
  * InvariantMutable reports a value seen through a wider type at a place that type lets you write (#drbrp8c).
@@ -41,6 +44,11 @@ var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutable
  * narrowed the wrong way, and leaves alone a slot whose two types differ only where writing back is safe, as
  * a DOM event handler's `this` does on every element seen as `Element`.
  *
+ * A read-only source slot made writable is the same hole one step removed (#gvzdft9): `readonly pet: Animal`
+ * is covariant, so it may hold a Dog, and `{ pet: Animal }` over it writes a Cat there. tsc accepts a read-only
+ * property as a writable one, though it refuses `readonly T[]` as `T[]`, so the rule reports the property
+ * whatever its two types are; readonlyMadeWritable says where not.
+ *
  * It began as identity, by the checker's identity relation, and the four consumers measured why not: an
  * `HTMLElement` seen as an `Element` reported its event handler slots, which differ only in `this` and are
  * safe to write back. `{ x }` against `{ x; y?: number }` is mutually assignable, and that hole is
@@ -57,6 +65,7 @@ var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutable
 var InvariantMutable = rule.Rule{
 	Name:             "adamic/invariant-mutable",
 	NeedsTypeChecker: true,
+	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
@@ -72,6 +81,9 @@ var InvariantMutable = rule.Rule{
 			if !pair.Mutable {
 				return false, true
 			}
+			if readonlyMadeWritable(ctx.Program, pair) {
+				return true, true
+			}
 			// Writing through the wider type stores a target value where the original reads a source
 			// value, so every target value must be a source value too.
 			return !walker.IsAssignable(pair.Target, pair.Source), true
@@ -82,9 +94,13 @@ var InvariantMutable = rule.Rule{
 			if !wrong {
 				return
 			}
+			handle, id := invariantMutableText, "mutableWidening"
+			if readonlyMadeWritable(ctx.Program, found) && walker.IsAssignable(found.Target, found.Source) {
+				handle, id = readonlyMadeWritableText, "readonlyMadeWritable"
+			}
 			ctx.ReportNode(site.Node, rule.Message{
-				Id: "mutableWidening",
-				Description: invariantMutableText.Render(map[string]string{
+				Id: id,
+				Description: handle.Render(map[string]string{
 					"source":     type_checking.StableTypeText(typeChecker, site.Source),
 					"target":     type_checking.StableTypeText(typeChecker, site.Target),
 					"slot":       slotText(ctx.SourceFile, site.Node, found.Path),
@@ -94,6 +110,28 @@ var InvariantMutable = rule.Rule{
 			})
 		})
 	},
+}
+
+/*
+ * readonlyMadeWritable is a read-only source slot under a writable target slot (#gvzdft9): the value behind
+ * `readonly pet: Animal` may be a Dog, since a read-only slot is covariant, and the writable view stores any
+ * Animal there. Not when the slot's type is a unit type (a literal, `null`), which holds nothing narrower, and
+ * not when the property is declared in TypeScript's default library: `readonly` there is a WebIDL readonly
+ * attribute or an accessor with no setter, and a write through any view throws in strict code before anything
+ * is stored (Node: `Cannot set property readable of #<TransformStream> which has only a getter`), as a class's
+ * `prototype` does (#b9a0wgy). Measured on the consumers, TransformStream's `readable` seen through
+ * pipeThrough's ReadableWritablePair and SVG's `className` seen as an Element's were 17 of a 24-finding sample.
+ */
+func readonlyMadeWritable(program rule.Program, pair flow.Pair) bool {
+	if !pair.SourceReadonly || pair.Source.Flags()&checker.TypeFlagsUnit != 0 || pair.SourceProperty == nil {
+		return false
+	}
+	for _, declaration := range pair.SourceProperty.Declarations {
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && program != nil && type_checking.IsSourceFileDefaultLibrary(program, file) {
+			return false
+		}
+	}
+	return true
 }
 
 // slotText names the mutable slot as a reader would reach it from the expression: `dogs[]`,
