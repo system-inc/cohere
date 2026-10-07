@@ -37,6 +37,20 @@ type Site struct {
 	// four consumers, most of what invariant-mutable reported before this was an array a `.map` had just
 	// built, seen as a wider array (#drbrp8c).
 	NewContainer bool
+
+	// Overridden are the target's own properties the value does not reach: a spread's, written again after it
+	// in the literal (`{ ...holder, pets: [] }`), whose value is the later one's. The walk does not pair them at
+	// the top.
+	Overridden []string
+
+	// FreshElements is a NewContainer whose elements were made here too: a `.map` whose callback returns only
+	// fresh literals. The elements' own slots are no one else's either, and what they hold may still be shared.
+	FreshElements bool
+
+	// Spread is a spread into a literal (offerSpread). It is invariant-mutable's: no-optional-widening and
+	// nominal-class read a target's properties whole, past Overridden, and whether a spread is a hole of theirs
+	// is not measured yet, so they pass it by.
+	Spread bool
 }
 
 // Listeners returns the listeners that find every site in the walker's file and hand each to visit.
@@ -52,6 +66,8 @@ type Site struct {
 //	return e, (): T => e      the function's annotated return type; an unannotated, async or
 //	                          generator function has no slot to compare against
 //	{ p: e }, { p }, [e]      the contextual type of the property or element
+//	{ ...e }, [...e]          the literal's contextual type, as a new container: the literal's own slots are
+//	                          new, and what they hold is e's
 //	e as T, <T>e              an upcast: e's type is assignable to T and not T itself
 //
 // A site whose source and target are the same type is never handed over: nothing below can differ, and
@@ -160,6 +176,8 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 			w.contextual(element)
 		}
 	},
+	ast.KindSpreadAssignment:        (*Walker).offerSpread,
+	ast.KindSpreadElement:           (*Walker).offerSpread,
 	ast.KindAsExpression:            (*Walker).offerUpcast,
 	ast.KindTypeAssertionExpression: (*Walker).offerUpcast,
 }
@@ -307,6 +325,101 @@ func (w *Walker) arguments(call *ast.Node) {
 		}
 		w.offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(w.typeChecker, call, index))
 	}
+}
+
+/*
+ * offerSpread hands over a spread into an object or array literal (#gvzdft9): `{ ...holder }` copies holder's
+ * properties, not what they hold, so `view.pets` is holder's own array, and a Cat pushed through a wider view
+ * fills it (six-interface.tgz's s3; `[...pens]` shares pens' inner arrays the same way, s3b). The literal was
+ * judged at its top only, as fresh, so nothing below a spread was. The spread's value is related to the literal's
+ * contextual type as a new container: the literal's own slots are new, and the walk goes on into what they hold.
+ * A property written again after an object spread holds the later value, so it is not paired (s3c: sound in
+ * Node). A spread in a call's arguments or in a destructuring pattern is no literal's.
+ */
+func (w *Walker) offerSpread(node *ast.Node) {
+	literal := node.Parent
+	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression && literal.Kind != ast.KindArrayLiteralExpression || IsDestructuringTarget(literal) {
+		return
+	}
+	expression := node.Expression()
+	target := checker.Checker_getContextualType(w.typeChecker, literal, checker.ContextFlagsNone)
+	if expression == nil || target == nil || !w.hasObjectPart(target) || isFresh(expression) {
+		return
+	}
+	source := w.typeChecker.GetTypeAtLocation(expression)
+	if source == nil || source == target {
+		return
+	}
+	var overridden []string
+	if literal.Kind == ast.KindObjectLiteralExpression {
+		overridden = w.writtenAfter(literal, node)
+	}
+	w.sites = append(w.sites, Site{Node: expression, Source: source, Target: target, NewContainer: true,
+		FreshElements: mapsToFresh(expression), Overridden: overridden, Spread: true})
+}
+
+/*
+ * mapsToFresh is a `.map` whose callback returns only fresh literals, so the array it builds holds objects
+ * nobody else does: `[...rows.map((row) => ({ section: 'doctrine' }))]` seen as a wider row type writes into a
+ * row made a moment ago. Measured on the consumers, 10 of the first 30 spread findings were this shape. A
+ * callback returning anything else may return what someone holds (`.map((row) => row)`, any `.filter`).
+ */
+func mapsToFresh(expression *ast.Node) bool {
+	expression = ast.SkipParentheses(expression)
+	if expression.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := ast.SkipParentheses(expression.Expression())
+	if callee.Kind != ast.KindPropertyAccessExpression || callee.AsPropertyAccessExpression().Name().Text() != "map" {
+		return false
+	}
+	arguments := expression.Arguments()
+	if len(arguments) == 0 {
+		return false
+	}
+	callback := ast.SkipParentheses(arguments[0])
+	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
+		return false
+	}
+	body := callback.Body()
+	if body == nil {
+		return false
+	}
+	if !ast.IsBlock(body) {
+		return isFresh(body)
+	}
+	returnsFresh, returns := true, 0
+	ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+		returns++
+		if returned := statement.AsReturnStatement().Expression; returned == nil || !isFresh(returned) {
+			returnsFresh = false
+		}
+		return !returnsFresh
+	})
+	return returnsFresh && returns > 0
+}
+
+// writtenAfter is the names an object literal writes after spread: its own properties by name, and a later
+// spread's properties that are not optional, which surely overwrite.
+func (w *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string {
+	properties := literal.AsObjectLiteralExpression().Properties.Nodes
+	var names []string
+	for _, property := range properties[slices.Index(properties, spread)+1:] {
+		if property.Kind == ast.KindSpreadAssignment {
+			if later := w.typeChecker.GetTypeAtLocation(property.Expression()); later != nil && later.Flags()&checker.TypeFlagsObject != 0 {
+				for _, symbol := range checker.Checker_getPropertiesOfType(w.typeChecker, later) {
+					if symbol.Flags&ast.SymbolFlagsOptional == 0 {
+						names = append(names, symbol.Name)
+					}
+				}
+			}
+			continue
+		}
+		if name := property.Name(); name != nil && (name.Kind == ast.KindIdentifier || name.Kind == ast.KindStringLiteral) {
+			names = append(names, name.Text())
+		}
+	}
+	return names
 }
 
 // offerUpcast hands over a cast that only widens. A downcast is no flow at all, since the value is not

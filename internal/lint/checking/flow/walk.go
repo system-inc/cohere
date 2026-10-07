@@ -123,13 +123,14 @@ func (w *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pair, bo
 		wrong, _ := judge(top)
 		return top, wrong
 	}
-	w.judge, w.newContainer, w.objectIntersections = judge, site.NewContainer, options.ObjectIntersections
+	w.judge, w.newContainer, w.freshElements = judge, site.NewContainer, site.FreshElements
+	w.objectIntersections, w.overridden = options.ObjectIntersections, site.Overridden
 	w.visited, w.path = w.visited[:0], w.path[:0]
 	if len(w.visitedSet) > 0 {
 		clear(w.visitedSet)
 	}
 	found, wrong := w.relate(top, 0)
-	w.judge = nil
+	w.judge, w.overridden = nil, nil
 	return found, wrong
 }
 
@@ -149,7 +150,11 @@ type Walker struct {
 	// Site.NewContainer.
 	judge               Judge
 	newContainer        bool
+	freshElements       bool
 	objectIntersections bool
+	// overridden is the walk in progress's top-level target properties the value does not reach. See
+	// Site.Overridden.
+	overridden []string
 
 	// visited is the pairs this walk has met, in a slice while it is short and in visitedSet as well past
 	// visitedListLimit: most walks meet a handful, and a map made for each walk was a quarter of the rules'
@@ -452,8 +457,10 @@ func (w *Walker) into(pair Pair, part Pair, step Step, depth int) (Pair, bool) {
 func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	source, target := pair.Source, pair.Target
 	// The slots of a container the site just built are no one else's, so writing through the wider type
-	// reaches only this value. Its parts' own slots keep their mutability.
-	ownSlotsShared := !(w.newContainer && len(pair.Path) == 0)
+	// reaches only this value. Its parts' own slots keep their mutability, unless the site built its elements
+	// too (Site.FreshElements), whose own slots are then no one else's either.
+	ownSlotsShared := !(w.newContainer && len(pair.Path) == 0) &&
+		!(w.freshElements && len(pair.Path) == 1 && pair.Path[0].Kind == StepElement)
 
 	if checker.Checker_isArrayType(w.typeChecker, target) {
 		targetElement := w.typeArgument(target, 0)
@@ -543,7 +550,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	isConstructor := len(checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
 		len(checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindConstruct)) > 0
 	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, target) {
-		if property.Flags&ast.SymbolFlagsMethod != 0 {
+		if property.Flags&ast.SymbolFlagsMethod != 0 || len(pair.Path) == 0 && slices.Contains(w.overridden, property.Name) {
 			continue
 		}
 		readonly := checker.Checker_isReadonlySymbol(w.typeChecker, property) || (isConstructor && property.Name == "prototype")
