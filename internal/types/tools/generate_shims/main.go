@@ -25,6 +25,17 @@ import (
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
+	// ExtraFunctions and ExtraMethods name upstream's unexported functions and methods to re-export by
+	// `//go:linkname`, with no mirror, so the risk is the signature rather than a layout.
+	//
+	// # An upstream sync re-checks every name here
+	//
+	// A linkname binds by name and the declaration carries the signature it expects, so a sync that
+	// renames one fails the link, and one that changes its parameters regenerates a new declaration
+	// and fails at the caller. Before landing a sync, find each name on the new pin
+	// (`git grep '^func (c \*Checker) <name>('`) and read its callers if the signature moved. The
+	// newest, for lint's adamic rules: getNonMissingTypeOfSymbol (#sp4xwtj), instantiateType and
+	// newTypeMapper (#ncheh9w), each checked on d92d9bfee.
 	ExtraFunctions []string
 	ExtraMethods   map[string]([]string)
 

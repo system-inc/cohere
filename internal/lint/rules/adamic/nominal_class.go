@@ -1,6 +1,8 @@
 package adamic
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking/flow"
@@ -38,10 +40,12 @@ var (
  * # How
  *
  * At every pair the file's flow.Walker relates, when the target is a class instance type, the source must be an
- * instance of that class or of one derived from it, and for the class itself every type argument must be
- * identical. A derived generic class seen as its generic base is accepted without comparing arguments,
- * since mapping them through the heritage clause is not built; Adamic 0.1 has no `extends`, so this is a
- * gap only outside it, and it is named here rather than guessed at.
+ * instance of that class or of one derived from it, and every type argument of the class must be identical.
+ * For a derived class that means the arguments it gives the class through its heritage (#ncheh9w): a
+ * `class DogBox extends Box<Dog>` is a Box<Dog>, and a `Crate<Dog>` of `class Crate<T> extends Box<T>` is one
+ * too, so either seen as a Box<Animal> takes a Cat into the dog's box, as Box<Dog> itself does. The bases are
+ * mapped the way TypeScript maps a reference's own (resolveObjectTypeMembers): the declared class's type
+ * parameters and `this`, to the reference's arguments, through instantiateType.
  *
  * The rule owns a class instance whole, so it does not descend into one, and invariant-mutable does not
  * either: one hole, one finding.
@@ -118,12 +122,18 @@ func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *
 	case flags&checker.TypeFlagsUnion != 0:
 		return nominalUndecided
 	case flags&checker.TypeFlagsIntersection != 0:
+		// One member that is an instance makes the intersection one. Failing that, a member that is an instance
+		// with other type arguments says so, as a `DogBox & { tag: string }` seen as a Box<Animal> is one.
+		verdict := nominalNotAnInstance
 		for _, member := range source.Types() {
-			if nominalVerdict(typeChecker, member, target) == nominalAccepted {
+			switch nominalVerdict(typeChecker, member, target) {
+			case nominalAccepted:
 				return nominalAccepted
+			case nominalTypeArgumentsDiffer:
+				verdict = nominalTypeArgumentsDiffer
 			}
 		}
-		return nominalNotAnInstance
+		return verdict
 	case flags&checker.TypeFlagsTypeParameter != 0:
 		// `this` inside a class, or a parameter constrained by one: judged by its constraint.
 		constraint := checker.Checker_getBaseConstraintOfType(typeChecker, source)
@@ -137,22 +147,85 @@ func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *
 	}
 	targetClass := classSymbol(target)
 	if classSymbol(source) == targetClass {
-		sourceArguments := checker.Checker_getTypeArguments(typeChecker, source)
-		targetArguments := checker.Checker_getTypeArguments(typeChecker, target)
-		if len(sourceArguments) != len(targetArguments) {
-			return nominalTypeArgumentsDiffer
-		}
-		for index := range sourceArguments {
-			if !checker.Checker_isTypeIdenticalTo(typeChecker, sourceArguments[index], targetArguments[index]) {
-				return nominalTypeArgumentsDiffer
-			}
-		}
-		return nominalAccepted
+		return typeArgumentsVerdict(typeChecker, source, target)
 	}
-	if derivesFrom(typeChecker, declaredClassType(typeChecker, source), targetClass, map[*ast.Symbol]bool{}) {
-		return nominalAccepted
+	if verdict, found := inheritedVerdict(typeChecker, source, target, targetClass, map[*ast.Symbol]bool{}); found {
+		return verdict
 	}
 	return nominalNotAnInstance
+}
+
+// typeArgumentsVerdict judges an instance of the target's own class: every type argument identical.
+func typeArgumentsVerdict(typeChecker *checker.Checker, source *checker.Type, target *checker.Type) nominal {
+	sourceArguments := checker.Checker_getTypeArguments(typeChecker, source)
+	targetArguments := checker.Checker_getTypeArguments(typeChecker, target)
+	if len(sourceArguments) != len(targetArguments) {
+		return nominalTypeArgumentsDiffer
+	}
+	for index := range sourceArguments {
+		if !checker.Checker_isTypeIdenticalTo(typeChecker, sourceArguments[index], targetArguments[index]) {
+			return nominalTypeArgumentsDiffer
+		}
+	}
+	return nominalAccepted
+}
+
+// inheritedVerdict walks an instance's bases, with its own type arguments mapped into them, for the target's class,
+// and judges the base it reaches as an instance of that class. found is false when no base is the class.
+func inheritedVerdict(typeChecker *checker.Checker, instance *checker.Type, target *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) (verdict nominal, found bool) {
+	bases, mapped := instantiatedBases(typeChecker, instance)
+	for _, base := range bases {
+		baseClass := classSymbol(base)
+		if baseClass == nil || seen[baseClass] {
+			continue
+		}
+		if baseClass == targetClass {
+			if !mapped {
+				// Arguments that could not be mapped are not compared, rather than compared in the derived class's
+				// own parameters, which would differ from any argument.
+				return nominalAccepted, true
+			}
+			return typeArgumentsVerdict(typeChecker, base, target), true
+		}
+		seen[baseClass] = true
+		if verdict, found := inheritedVerdict(typeChecker, base, target, targetClass, seen); found {
+			return verdict, true
+		}
+	}
+	return nominalNotAnInstance, false
+}
+
+// instantiatedBases is a class instance's base types with the instance's type arguments in place of the class's
+// type parameters, as TypeScript resolves a reference's inherited members: the declared class's parameters and
+// its `this`, mapped to the reference's arguments padded with the reference itself as `this`. A class that is not
+// a reference to a generic one, or the generic declaration itself, has its bases in its own terms already. mapped
+// is false when the arguments do not line up with the parameters, which TypeScript itself never produces.
+func instantiatedBases(typeChecker *checker.Checker, instance *checker.Type) (bases []*checker.Type, mapped bool) {
+	declared := declaredClassType(typeChecker, instance)
+	if declared == nil || declared.ObjectFlags()&(checker.ObjectFlagsClass|checker.ObjectFlagsInterface) == 0 {
+		return nil, true
+	}
+	bases = checker.Checker_getBaseTypes(typeChecker, declared)
+	if declared == instance || len(bases) == 0 {
+		return bases, true
+	}
+	parameters := declared.AsInterfaceType().TypeParameters()
+	if thisType := declared.AsInterfaceType().ThisType(); thisType != nil {
+		parameters = append(slices.Clip(parameters), thisType)
+	}
+	arguments := checker.Checker_getTypeArguments(typeChecker, instance)
+	if len(arguments) == len(parameters)-1 {
+		arguments = append(slices.Clip(arguments), instance)
+	}
+	if len(arguments) != len(parameters) {
+		return bases, false
+	}
+	mapper := checker.NewTypeMapper(parameters, arguments)
+	instantiated := make([]*checker.Type, len(bases))
+	for index, base := range bases {
+		instantiated[index] = checker.Checker_instantiateType(typeChecker, base, mapper)
+	}
+	return instantiated, true
 }
 
 // classSymbol is the class an instance type is an instance of.

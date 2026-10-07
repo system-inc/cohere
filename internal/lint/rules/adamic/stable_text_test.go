@@ -148,3 +148,22 @@ func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(t *testi
 		})
 	}
 }
+
+// TestASymbolKeyedMemberPrintsWithoutItsCreationId: a member keyed by a unique symbol reads `[brand]` in both relation
+// rules' text, never typescript-go's internal `\xfe@brand@id`, whose id is the symbol's creation order (#z9jcxp1).
+func TestASymbolKeyedMemberPrintsWithoutItsCreationId(t *testing.T) {
+	t.Parallel()
+	messages := relationMessages(t, map[string]string{
+		"Another.ts": "export {};\n",
+		"Case.ts":    "declare const brand: unique symbol; declare const narrow: { x: number }; function draw(point: { x: number; [brand]?: string }): void {} draw(narrow);\n",
+	}, false)
+	message := messages[NoOptionalWidening.Name]
+	for _, want := range []string{"seen here as '{ x: number; [brand]?: string; }'", "the optional property `[brand]`"} {
+		if !strings.Contains(message, want) {
+			t.Errorf("want %q in:\n  %q", want, message)
+		}
+	}
+	if strings.Contains(message, "\xfe") || strings.Contains(message, `\xfe`) {
+		t.Errorf("the internal name reached the text:\n  %q", message)
+	}
+}

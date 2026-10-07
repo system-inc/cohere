@@ -1,6 +1,7 @@
 {
 	"ExtraFunctions": [
-		"isNonDeferredTypeReference"
+		"isNonDeferredTypeReference",
+		"newTypeMapper"
 	],
 	"ExtraMethods": {
 		"Checker": [
@@ -40,7 +41,8 @@
 			"maybeTypeOfKind",
 			"getSignatureFromDeclaration",
 			"getTypeOfAccessors",
-			"getNonMissingTypeOfSymbol"
+			"getNonMissingTypeOfSymbol",
+			"instantiateType"
 		]
 	},
 	"ExtraFields": {

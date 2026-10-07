@@ -160,6 +160,9 @@ func Checker_getApparentType(recv *checker.Checker, t *checker.Type) *checker.Ty
 //go:linkname Checker_getTypeArguments github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeArguments
 func Checker_getTypeArguments(recv *checker.Checker, t *checker.Type) []*checker.Type
 
+//go:linkname Checker_instantiateType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).instantiateType
+func Checker_instantiateType(recv *checker.Checker, t *checker.Type, m *checker.TypeMapper) *checker.Type
+
 //go:linkname Checker_getTypeFromTypeNode github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeFromTypeNode
 func Checker_getTypeFromTypeNode(recv *checker.Checker, node *ast.Node) *checker.Type
 
@@ -1485,3 +1488,6 @@ const WideningKindNormal = checker.WideningKindNormal
 
 //go:linkname IsNonDeferredTypeReference github.com/microsoft/TypeScript/tsc/internal/checker.isNonDeferredTypeReference
 func IsNonDeferredTypeReference(t *checker.Type) bool
+
+//go:linkname NewTypeMapper github.com/microsoft/TypeScript/tsc/internal/checker.newTypeMapper
+func NewTypeMapper(sources []*checker.Type, targets []*checker.Type) *checker.TypeMapper
