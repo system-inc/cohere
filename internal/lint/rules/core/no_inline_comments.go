@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -94,13 +95,15 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 var NoInlineComments = rule.Rule{
 	Name: "no-inline-comments",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		var ignorePattern *regexp.Regexp
+		var ignorePattern *esregexp.RegExp
 		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](options); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
-			// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which
-			// reports MORE rather than less. Upstream's `new RegExp` throws and takes every other
-			// rule's verdict on that file with it, because the walk recovers per file.
-			if compiled, err := regexp.Compile(resolved.IgnorePattern); err == nil {
+			// Upstream's `new RegExp(ignorePattern, "u")`, read as JavaScript reads it: RE2 refuses a
+			// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
+			// (#7mztrdd). A pattern that does not compile is dropped rather than crashing the run,
+			// which reports MORE rather than less. Upstream's `new RegExp` throws and takes every
+			// other rule's verdict on that file with it, because the walk recovers per file.
+			if compiled, err := esregexp.Compile(resolved.IgnorePattern, "u"); err == nil {
 				ignorePattern = compiled
 			}
 		}
@@ -135,7 +138,7 @@ func noInlineCommentsIsInline(
 	ctx rule.Context,
 	lines []string,
 	comment *comments.Comment,
-	ignorePattern *regexp.Regexp,
+	ignorePattern *esregexp.RegExp,
 ) bool {
 	if comment.StartLine < 0 || comment.StartLine >= len(lines) ||
 		comment.EndLine < 0 || comment.EndLine >= len(lines) {
@@ -167,8 +170,9 @@ func noInlineCommentsIsInline(
 
 	body := noInlineCommentsBody(comment)
 
-	// The user's escape hatch, tested against the inner text.
-	if ignorePattern != nil && ignorePattern.MatchString(body) {
+	// The user's escape hatch, tested against the inner text. A match that overruns the time bound
+	// excuses too: no answer here is a report.
+	if ignorePattern != nil && ignorePattern.TestOrTimeout(body) {
 		return false
 	}
 

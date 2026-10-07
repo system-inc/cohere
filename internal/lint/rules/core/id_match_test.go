@@ -115,6 +115,11 @@ func TestIdMatchFires(t *testing.T) {
 		{source: "\n            const foo = {\n                [a]: 1,\n            };\n            ", settings: idMatchOf("^[^a]", map[string]bool{"properties": false, "onlyDeclarations": false}), findings: []string{messageIdMatchNotMatch.Id}},
 		{source: "import('foo.json', { with: { [type]: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
 		{source: "import('foo.json', { with: { type: json } })", settings: idMatchOf("^foo", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
+		// #7mztrdd, beyond the corpus: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2
+		// refused these, so they did not even decode. In Node, new RegExp("^(?!.*_)", "u") tests false on foo_bar and
+		// new RegExp("^\\w+(?<!_)$", "u") tests false on foo_, so both names are reported.
+		{source: "var foo_bar = 1;", settings: idMatchOf("^(?!.*_)", nil), findings: []string{messageIdMatchNotMatch.Id}},
+		{source: "var foo_ = 1;", settings: idMatchOf("^\\w+(?<!_)$", nil), findings: []string{messageIdMatchNotMatch.Id}},
 	}
 
 	for _, testCase := range cases {
@@ -188,6 +193,10 @@ func TestIdMatchStaysSilent(t *testing.T) {
 		{source: "import('foo.json', { with: { type: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
 		{source: "import('foo.json', { 'with': { type: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
 		{source: "import('foo.json', { with: { type } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
+		// #7mztrdd, beyond the corpus: the same lookahead and lookbehind as in TestIdMatchFires, on names they match.
+		// In Node, new RegExp("^(?!.*_)", "u") tests true on fooBar and new RegExp("^\\w+(?<!_)$", "u") tests true on foo.
+		{source: "var fooBar = 1;", settings: idMatchOf("^(?!.*_)", nil)},
+		{source: "var foo = 1;", settings: idMatchOf("^\\w+(?<!_)$", nil)},
 	}
 
 	for _, testCase := range cases {
@@ -254,6 +263,13 @@ func TestIdMatchSpansAndMessages(t *testing.T) {
 			settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}),
 			spans:    []string{"#no_under"},
 			messages: []string{"Identifier '#no_under' does not match the pattern '^[^_]+$'."},
+		},
+		{
+			// The message quotes the pattern as its user wrote it, lookahead and all (#7mztrdd).
+			source:   "var foo_bar = 1;",
+			settings: idMatchOf("^(?!.*_)", nil),
+			spans:    []string{"foo_bar"},
+			messages: []string{"Identifier 'foo_bar' does not match the pattern '^(?!.*_)'."},
 		},
 	}
 

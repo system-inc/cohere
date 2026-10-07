@@ -1,12 +1,12 @@
 package core
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -84,7 +84,7 @@ var NoFallthrough = rule.Rule{
 	Name: "no-fallthrough",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		parsed, _ := rule.OptionsAs[NoFallthroughOptions](options)
-		matchesFallthroughComment := fallthroughCommentMatcher(parsed.CommentPattern)
+		excusesFallthrough, namesFallthrough := fallthroughCommentMatchers(parsed.CommentPattern)
 
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -109,7 +109,7 @@ var NoFallthrough = rule.Rule{
 						// comment left behind by a later `break` is a nuisance rather than a bug.
 						if parsed.ReportUnusedFallthroughComment {
 							if commentRange, found := fallthroughCommentBetween(ctx, clause,
-								nextClauseStart, matchesFallthroughComment); found {
+								nextClauseStart, namesFallthrough); found {
 								ctx.ReportRange(commentRange, rule.Message{
 									Id: "unusedFallthroughComment",
 									Description: "This comment says the case falls through, but " +
@@ -133,7 +133,7 @@ var NoFallthrough = rule.Rule{
 					}
 
 					if _, found := fallthroughCommentBetween(ctx, clause, nextClauseStart,
-						matchesFallthroughComment); found {
+						excusesFallthrough); found {
 						continue
 					}
 
@@ -156,31 +156,38 @@ var NoFallthrough = rule.Rule{
 	},
 }
 
-// fallthroughCommentMatcher builds the predicate deciding whether a comment excuses a fallthrough.
+// fallthroughCommentMatchers builds the predicates deciding whether a comment says a case falls through,
+// one for each way the answer is used: excuses for a fallthrough it spares, names for an unused comment it
+// reports. They differ only on a user's pattern whose match overruns the time bound, which spares a
+// fallthrough and reports nothing, since in either use no answer must not become a report.
 //
 // The default set is oxc's four exact spellings rather than ESLint's `/falls?\s?through/iu`, which
 // is a real divergence between the two upstreams and is reproduced rather than resolved: oxc fails
 // `/* falling through */` and ESLint's pattern would pass it, and that input is in oxc's corpus as
 // a fail case. Following ESLint here would turn one of the imported fail fixtures green.
-func fallthroughCommentMatcher(pattern string) func(string) bool {
+func fallthroughCommentMatchers(pattern string) (excuses func(string) bool, names func(string) bool) {
 	if pattern != "" {
-		// oxc prepends `(?iu)`, so a lower-case pattern matches an upper-case comment. The `u` flag
-		// has no Go equivalent and needs none: Go's regexp is Unicode-aware by default and its
-		// classes already match what the Rust crate's `u` turns on.
-		if compiled, compileError := regexp.Compile("(?i)" + pattern); compileError == nil {
-			return func(comment string) bool { return compiled.MatchString(comment) }
+		// oxc prepends `(?iu)`, so a lower-case pattern matches an upper-case comment, and the `i`
+		// is kept. The dialect is JavaScript's rather than the Rust crate's or RE2's: the pattern
+		// was written for ESLint's `new RegExp(commentPattern, "u")`, so it compiles as
+		// `new RegExp(pattern, "iu")`, oxc's case-insensitivity read the way JavaScript reads it.
+		// RE2 refused a lookaround or a backreference its user wrote, and read `\s` and `\b`
+		// differently (#7mztrdd).
+		if compiled, compileError := esregexp.Compile(pattern, "iu"); compileError == nil {
+			return compiled.TestOrTimeout, compiled.Test
 		}
 		// A pattern that will not compile falls through to the default set. Treating it as
 		// "matches everything" would take the rule silent across every file the option touches,
 		// which is the failure mode a misconfiguration must not be able to cause.
 	}
-	return func(comment string) bool {
+	exact := func(comment string) bool {
 		switch strings.ToLower(text.TrimWhitespace(comment)) {
 		case "falls through", "fall through", "fallsthrough", "fallthrough":
 			return true
 		}
 		return false
 	}
+	return exact, exact
 }
 
 // fallthroughCommentBetween finds the comment, if any, that excuses falling out of a clause.

@@ -121,6 +121,10 @@ func TestObjectShorthandFires(t *testing.T) {
 		{source: "var x = { bar: function() {} }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"foo\"}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = { bar() {} }"), declinesRepair: false},
 		{source: "var x = { [foo]: function() {} }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"foo\"}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = { [foo]() {} }"), declinesRepair: false},
 		{source: "var x = { foo: foo }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^foo$\"}]"), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = { foo }"), declinesRepair: false},
+		// #7mztrdd: controls for the JavaScript-read patterns below. In Node, new RegExp("^a(?=bar)", "u") tests false on
+		// afoob and new RegExp("^foo\\sbar$", "u") tests false on "foo\u00a0baz", so the method is still reported.
+		{source: "var x = { afoob: function() {} }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^a(?=bar)\"}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = { afoob() {} }"), declinesRepair: false},
+		{source: "var x = { 'foo\u00a0baz': function() {} }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^foo\\\\sbar$\"}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = { 'foo\u00a0baz'() {} }"), declinesRepair: false},
 		{source: "var x = {a: a}", settings: objectShorthandOf("[\"always\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {a}"), declinesRepair: false},
 		{source: "var x = {a: function(){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {a(){}}"), declinesRepair: false},
 		{source: "var x = {[a]: function(){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {[a](){}}"), declinesRepair: false},
@@ -292,6 +296,12 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 		{source: "var x = { afoob: function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"foo\"}]")},
 		{source: "var x = { afoob: function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^.foo.$\"}]")},
 		{source: "var x = { '\U0001f44dfoo\U0001f44d': function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^.foo.$\"}]")},
+		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
+		// lookbehind, so these did not even decode; in Node both test true on afoob. RE2's `\s` is ASCII only, while in Node
+		// new RegExp("^foo\\sbar$", "u") tests true on "foo\u00a0bar".
+		{source: "var x = { afoob: function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^a(?=foob)\"}]")},
+		{source: "var x = { afoob: function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"(?<=a)foob$\"}]")},
+		{source: "var x = { 'foo\u00a0bar': function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^foo\\\\sbar$\"}]")},
 		{source: "var x = {'a': function(){}}", settings: objectShorthandOf("[\"always\", {\"avoidQuotes\": true}]")},
 		{source: "var x = {['a']: function(){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]")},
 		{source: "var x = {'y': y}", settings: objectShorthandOf("[\"properties\", {\"avoidQuotes\": true}]")},

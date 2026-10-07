@@ -1,10 +1,10 @@
 package tailwind
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
@@ -320,10 +320,14 @@ func rebuildClass(parts candidateParts, root string) string {
 
 // ignorePattern is one compiled entry from the rule's `ignore` option.
 type ignorePattern struct {
-	pattern *regexp.Regexp
+	pattern *esregexp.RegExp
 }
 
 // compileIgnorePatterns turns the configured expressions into matchers.
+//
+// Each is upstream's `new RegExp(pattern)` with no flags, through getCachedRegex, read as JavaScript
+// reads it: RE2 refuses a lookaround or a backreference its user wrote, and reads `\s` and `\b`
+// differently (#7mztrdd).
 //
 // An unparseable expression is skipped rather than fatal, matching how the class-literal reader
 // handles its own patterns: a rule that refuses to run because one regular expression in a config
@@ -331,7 +335,7 @@ type ignorePattern struct {
 func compileIgnorePatterns(patterns []string) []*ignorePattern {
 	compiled := make([]*ignorePattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		expression, err := regexp.Compile(pattern)
+		expression, err := esregexp.Compile(pattern, "")
 		if err != nil {
 			continue
 		}
@@ -346,7 +350,8 @@ func compileIgnorePatterns(patterns []string) []*ignorePattern {
 // one regular expression test rather than participating in a collapse that then has to be discarded.
 func isIgnored(className string, ignored []*ignorePattern) bool {
 	for _, entry := range ignored {
-		if entry.pattern.MatchString(className) {
+		// A match that overruns the time bound exempts too: no answer here is a report.
+		if entry.pattern.TestOrTimeout(className) {
 			return true
 		}
 	}

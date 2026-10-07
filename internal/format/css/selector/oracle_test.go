@@ -27,12 +27,17 @@ import (
 // key but parent, sorted, a key the library wrote as undefined dumping as "<undefined>". A css input is
 // parsed with the fork's postcss 8.5.16 first, and each selector Prettier would hand parseSelector (a
 // rule's raw selector, and the params of custom-selector, extend, nest and at-root) becomes a record of
-// its own, so the Go side reads the selector text from the record. Offsets are UTF-16 there; the Go
+// its own, so the Go side reads the selector text from the record. The stylesheet is parsed the way
+// Prettier's parser-postcss.js parses it, front matter first replaced by the fork's own parseFrontMatter, and
+// a stylesheet postcss refuses on that path dumps one record naming the refusal, since Prettier refuses the
+// file and hands parseSelector nothing from it. Offsets are UTF-16 there; the Go
 // side converts its byte offsets back before comparing. An error dumps as its message. Strings dump
 // through toWellFormed, the one place Go cannot follow (see wtf8.go), and NaN dumps as JSON's null.
 const selectorParseScript = `
 import { createRequire } from "node:module";
 import { writeSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { parseFrontMatter } = await import(pathToFileURL(process.cwd() + "/src/main/front-matter/index.js").href);
 // Synchronous, so the records before a selector the library hangs on reach the Go side.
 function out(s) {
   const b = Buffer.from(s); let o = 0;
@@ -62,7 +67,7 @@ function parseOne(text) {
 }
 function selectorsOf(css) {
   const out = [];
-  postcss.parse(css).walk((node) => {
+  postcss.parse(parseFrontMatter(css).content).walk((node) => {
     if (typeof node.selector === "string") {
       let selector = node.raws.selector ? (node.raws.selector.scss ?? node.raws.selector.raw) : node.selector;
       if (node.raws.between && node.raws.between.trim().length > 0) selector += node.raws.between;
@@ -89,7 +94,15 @@ process.stdin.on("end", () => {
   for (const line of input.split("\n").filter(Boolean)) {
     const { name, text, css } = JSON.parse(line);
     if (css) {
-      selectorsOf(text).forEach((selector, index) => {
+      let selectors;
+      try {
+        selectors = selectorsOf(text);
+      } catch (e) {
+        if (!e || e.name !== "CssSyntaxError") throw e;
+        out(JSON.stringify({ name, corpus: true, cssError: e.reason }) + "\n");
+        continue;
+      }
+      selectors.forEach((selector, index) => {
         out(JSON.stringify({ name: name + " #" + index, text: selector, corpus: true, ...parseOne(selector) }) + "\n");
       });
     } else {
@@ -297,25 +310,31 @@ var selectorFixtures = []selectorFixture{
 // TestParseAgreesWithPostcssSelectorParser is the parser's acceptance test: for every selector
 // Prettier would parse in the corpus's .css files, and every inline fixture, the Go tree must equal
 // postcss-selector-parser 2.2.3's, property for property, and a refusal must be a refusal on both sides
-// with the same message. Off unless COHERE_PRETTIER_FORK names the fork (whose node_modules hold the
-// library and postcss) and COHERE_CSS_CORPORA lists .css files or directories to walk (colon-separated,
-// node_modules skipped).
+// with the same message. The corpus is always Prettier's own CSS fixtures, vendored in
+// ../testdata/prettier/css, plus any .css files or directories COHERE_CSS_CORPORA lists (colon-separated,
+// node_modules skipped). Off unless COHERE_PRETTIER_FORK names the fork, whose node_modules hold the
+// library and postcss; the gate sets it. Before #cr45gcp the vendored fixtures were read only when
+// COHERE_CSS_CORPORA was set, which the gate never does, so the gate skipped this test whole.
+//
+// A stylesheet Prettier itself refuses gives no selectors to compare. The vendored ones that do are named
+// in prettierRefusedFixtures, and a vendored stylesheet refused but not named there, or named there and
+// parsed, fails the test.
 //
 // A corpus selector the library cannot parse is counted, and the test fails if that count passes a
 // tenth of the corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 // The inline fixtures each say which way the library must go.
 func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	t.Parallel()
-	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if corpora == "" {
-		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-selector-parser")
-	}
 	root := corpus.PrettierFork.Root(t)
 
 	type input = oracleInput
 	var inputs []input
 	corpusFiles := 0
-	for _, corpus := range strings.Split(corpora, ":") {
+	vendored, err := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, corpus := range append([]string{vendored}, strings.Split(os.Getenv("COHERE_CSS_CORPORA"), ":")...) {
 		corpus = strings.TrimSpace(corpus)
 		if corpus == "" {
 			continue
@@ -350,7 +369,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s", corpora)
+		t.Fatalf("no .css files under %s or COHERE_CSS_CORPORA", vendored)
 	}
 	malformed := map[string]bool{}
 	for _, fixture := range selectorFixtures {
@@ -371,10 +390,15 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			t.Errorf(format, arguments...)
 		}
 	}
+	refusedFiles := map[string]string{}
 	for _, each := range records {
 		name, _ := each["name"].(string)
 		text, _ := each["text"].(string)
 		isCorpus, _ := each["corpus"].(bool)
+		if cssError, isRefusedFile := each["cssError"].(string); isRefusedFile {
+			refusedFiles[name] = cssError
+			continue
+		}
 		if isCorpus {
 			if seenCorpusText[text] {
 				corpusDuplicates++
@@ -418,14 +442,37 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			t.Errorf("the oracle printed nothing for fixture %q", fixture.name)
 		}
 	}
-	t.Logf("%d corpus files gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
-		corpusFiles, corpusSelectors, corpusDuplicates, len(selectorFixtures), identical, refusedByBoth, different, corpusRefused)
+	for name, cssError := range refusedFiles {
+		relative, inside := strings.CutPrefix(name, vendored+string(filepath.Separator))
+		if !inside {
+			continue // a COHERE_CSS_CORPORA file Prettier refuses has no selectors, which is all it means
+		}
+		if _, named := prettierRefusedFixtures[filepath.ToSlash(relative)]; !named {
+			t.Errorf("%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures", relative, cssError)
+		}
+	}
+	for relative, reason := range prettierRefusedFixtures {
+		if _, refused := refusedFiles[filepath.Join(vendored, filepath.FromSlash(relative))]; !refused {
+			t.Errorf("%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list", relative, reason)
+		}
+	}
+	t.Logf("%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
+		corpusFiles, len(refusedFiles), corpusSelectors, corpusDuplicates, len(selectorFixtures), identical, refusedByBoth, different, corpusRefused)
 	if corpusSelectors == 0 {
 		t.Errorf("the corpus gave no selectors")
 	}
 	if corpusRefused > corpusSelectors/10 {
 		t.Errorf("the library refused %d of %d corpus selectors; the comparison is thinner than it looks", corpusRefused, corpusSelectors)
 	}
+}
+
+// prettierRefusedFixtures are the vendored fixtures Prettier's own parse refuses, front matter stripped as
+// parser-postcss.js strips it, so they hold no selectors to compare: the path under testdata/prettier/css,
+// and why. @system_adamic_integration's guard on the same fixtures names the same three (#cr45gcp).
+var prettierRefusedFixtures = map[string]string{
+	"_errors_/less-syntax.css": "an error fixture by design: a Less mixin call, which the css parser refuses",
+	"_errors_/scss-syntax.css": "an error fixture by design: Sass interpolation, which the css parser refuses",
+	"range/issue2267.css":      "a range fixture: its <<<PRETTIER_RANGE_END>>> marker is stripped by Prettier's test harness, never by Prettier",
 }
 
 // oracleInput is one line of the oracle script's input: a selector, or with CSS a stylesheet whose

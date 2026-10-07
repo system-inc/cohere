@@ -67,6 +67,22 @@ var defaultCaseFiresCases = []defaultCaseCase{
 		options: "{\"commentPattern\": \".?\"}",
 		ids:     []string{"missingDefaultCase"},
 	},
+	{
+		// #7mztrdd: the control for lookahead-1 below. In Node, new RegExp("^skip(?= default$)", "u")
+		// tests false on "skip default now", so the switch still reports.
+		name:    "lookahead-control",
+		source:  "switch (a) { case 1: break; \n // skip default now \n }",
+		options: "{\"commentPattern\": \"^skip(?= default$)\"}",
+		ids:     []string{"missingDefaultCase"},
+	},
+	{
+		// #7mztrdd: the control for lookbehind-1 below. In Node, new RegExp("(?<=skip )default$", "u")
+		// tests false on "keep default", so the switch still reports.
+		name:    "lookbehind-control",
+		source:  "switch (a) { case 1: break; \n // keep default \n }",
+		options: "{\"commentPattern\": \"(?<=skip )default$\"}",
+		ids:     []string{"missingDefaultCase"},
+	},
 }
 
 // defaultCaseSilentCases are the rows upstream is clean on.
@@ -155,6 +171,26 @@ var defaultCaseSilentCases = []defaultCaseCase{
 		name:    "valid-16",
 		source:  "switch (a) { case 1: break; \n// \n }",
 		options: "{\"commentPattern\": \".?\"}",
+	},
+	// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(commentPattern, "u")`. RE2
+	// refuses a lookahead and a lookbehind, so these fell back to the default pattern and the switch
+	// reported; in Node both test true on "skip default".
+	{
+		name:    "lookahead-1",
+		source:  "switch (a) { case 1: break; \n // skip default \n }",
+		options: "{\"commentPattern\": \"^skip(?= default$)\"}",
+	},
+	{
+		name:    "lookbehind-1",
+		source:  "switch (a) { case 1: break; \n // skip default \n }",
+		options: "{\"commentPattern\": \"(?<=skip )default$\"}",
+	},
+	// #7mztrdd: JavaScript's `\s` matches U+00A0, RE2's does not. In Node, new RegExp("^no\\sdefault$", "u")
+	// tests true on "no\u00a0default".
+	{
+		name:    "nbsp-whitespace-1",
+		source:  "switch (a) { case 1: break; \n // no\u00a0default \n }",
+		options: "{\"commentPattern\": \"^no\\\\sdefault$\"}",
 	},
 }
 

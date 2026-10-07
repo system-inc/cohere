@@ -20,7 +20,7 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
 	}{
 		{"default", noWarningCommentsDefaultTerms, NoWarningCommentsStart, nil},
 		{"decorated", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "/"}},
-		// `-` between two decoration characters spells a range in the class: `*` to `/` takes in `+`.
+		// `-` is escaped as upstream escapes it, so it is one more character and `+` between `*` and `/` is not skipped.
 		{"a range in the decoration", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "-", "/"}},
 		// `k` folds to the Kelvin sign and `s` to the long s, so a decoration of either skips both cases.
 		{"a decoration that folds", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"k"}},
@@ -33,6 +33,8 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
 		"\v todo", " todo", "* todo", "** todo", "*/ todo", "+ todo", ", todo", "k todo", "K todo",
 		"K todo", "Kelvin", "Kelvin", "ſtop", "Stop", "stop", "日本", "\xff todo", "todos",
 		"*todo", "* *todo", " fixme", "  fixme",
+		// JavaScript's `\s` past Go's five (#7mztrdd), and a `-` decoration.
+		"\u00a0todo", "\ufeff todo", "\u2028todo", "\u3000 fixme", "- todo", "-+ todo",
 	}
 
 	skipped := 0
@@ -46,7 +48,7 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
 					continue
 				}
 				skipped++
-				if matcher.MatchString(value) {
+				if matcher.Test(value) {
 					t.Errorf("%s: the check skips %q on %q, which its pattern %s matches",
 						configuration.name, compiled.terms[index], value, matcher)
 				}

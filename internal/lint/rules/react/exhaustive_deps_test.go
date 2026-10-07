@@ -529,6 +529,20 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 		{"an empty pattern names nothing", `{"additionalHooks": ""}`,
 			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
 			nil},
+		// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(additionalHooks)`. RE2
+		// refuses a lookahead and a lookbehind, so these disabled the extension. In Node
+		// /^use(?=Custom)/ and /(?<=use)Custom/ both test true on useCustomEffect.
+		{"a lookahead pattern names a hook", `{"additionalHooks": "^use(?=Custom)"}`,
+			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
+			[]string{"exhaustiveDepsMissing"}},
+		{"a lookbehind pattern names a hook", `{"additionalHooks": "(?<=use)Custom"}`,
+			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
+			[]string{"exhaustiveDepsMissing"}},
+		// The control: in Node /^use(?=Other)/ tests false on useCustomEffect, so the hook is not
+		// checked and the pattern is proven to be tested rather than naming everything.
+		{"a lookahead pattern that does not match names nothing", `{"additionalHooks": "^use(?=Other)"}`,
+			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
+			nil},
 		{"a malformed pattern disables the extension rather than failing the run",
 			`{"additionalHooks": "["}`,
 			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
