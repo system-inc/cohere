@@ -68,8 +68,9 @@ func skip(matches func(rune) bool) func(text string, startIndex int, backwards b
 	}
 }
 
-// isJavaScriptWhitespace is JavaScript's \s: WhiteSpace and LineTerminator in ECMA-262.
-func isJavaScriptWhitespace(character rune) bool {
+// IsJavaScriptWhitespace is JavaScript's \s, and what String.prototype.trim removes: WhiteSpace and
+// LineTerminator in ECMA-262.
+func IsJavaScriptWhitespace(character rune) bool {
 	switch character {
 	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
 		return true
@@ -79,7 +80,7 @@ func isJavaScriptWhitespace(character rune) bool {
 
 var (
 	// SkipWhitespace is upstream's skipWhitespace, skip(/\s/).
-	SkipWhitespace = skip(isJavaScriptWhitespace)
+	SkipWhitespace = skip(IsJavaScriptWhitespace)
 	// SkipSpaces is upstream's skipSpaces, skip(" \t").
 	SkipSpaces = skip(func(character rune) bool { return character == ' ' || character == '\t' })
 	// SkipToLineEnd is upstream's skipToLineEnd, skip(",; \t").

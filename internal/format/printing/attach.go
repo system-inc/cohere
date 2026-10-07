@@ -281,7 +281,7 @@ func childNodes[N Node[N]](node N, visitorKeys func(N) []string) []N {
 // isAllEmptyAndNoLineBreak is upstream's !/[\S\n  ]/.test(text): only non-newline whitespace.
 func isAllEmptyAndNoLineBreak(text string) bool {
 	for _, character := range text {
-		if character == '\n' || character == 0x2028 || character == 0x2029 || !isJavaScriptWhitespace(character) {
+		if character == '\n' || character == 0x2028 || character == 0x2029 || !IsJavaScriptWhitespace(character) {
 			return false
 		}
 	}
@@ -377,7 +377,7 @@ func isGap[N Node[N]](gap string, options *Options[N]) bool {
 		}
 	}
 	return strings.IndexFunc(gap, func(character rune) bool {
-		return character != '(' && !isJavaScriptWhitespace(character)
+		return character != '(' && !IsJavaScriptWhitespace(character)
 	}) < 0
 }
 
