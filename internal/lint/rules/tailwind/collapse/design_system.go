@@ -494,9 +494,10 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	}
 	// The repository's `@custom-variant` names register after the framework's, which is upstream's
 	// order and the reason a redefinition keeps its original position: Register updates in place
-	// and never reassigns Order. Sorted so a run is reproducible — a map range would assign
-	// appended orders in a different sequence every run, and those orders are a sort key.
-	for _, name := range sortedKeys(collector.customVariants) {
+	// and never reassigns Order. In the order the stylesheets declared them, as upstream registers
+	// them: two new names sort by declaration, so `sidebar` declared before `panel` sorts first. They
+	// were registered alphabetically until #f598zk0 compared the synthetic case built to show it.
+	for _, name := range collector.customVariantOrder {
 		variants.Register(name, ParsedVariantKindStatic)
 	}
 
@@ -580,6 +581,9 @@ type stylesheetCollector struct {
 	staticUtilityNodes map[string][]*Node
 	utilityRoots       map[string]map[UtilityKind]bool
 	customVariants     map[string]bool
+	// customVariantOrder is customVariants in the order the walk first declared each, which is the
+	// order upstream registers them in and so the order they sort in.
+	customVariantOrder []string
 }
 
 func (collector *stylesheetCollector) loadFile(path string) error {
@@ -834,19 +838,8 @@ func (collector *stylesheetCollector) ingestCustomVariant(node *Node) {
 	if name == "" {
 		return
 	}
-	collector.customVariants[name] = true
-}
-
-// sortedKeys returns a map's keys in a stable order.
-//
-// Not a general helper reaching for a shelf: it exists because registration order is a sort key,
-// and a map range would hand appended variants a different order on every run. That is the kind of
-// nondeterminism that passes every test that sorts before comparing.
-func sortedKeys(set map[string]bool) []string {
-	keys := make([]string, 0, len(set))
-	for key := range set {
-		keys = append(keys, key)
+	if !collector.customVariants[name] {
+		collector.customVariantOrder = append(collector.customVariantOrder, name)
 	}
-	sort.Strings(keys)
-	return keys
+	collector.customVariants[name] = true
 }

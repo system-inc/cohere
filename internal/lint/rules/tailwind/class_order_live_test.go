@@ -10,6 +10,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // The acceptance suite for the live class-order sort, measured against the engine's own answers.
@@ -45,6 +46,7 @@ type classOrderLiveCorpus struct {
 		Name       string `json:"name"`
 		Source     string `json:"source"`
 		EntryPath  string `json:"entryPath"`
+		Input      string `json:"input"`
 		ClassOrder *struct {
 			Sorted []string `json:"sorted"`
 		} `json:"classOrder"`
@@ -57,11 +59,22 @@ type classOrderLiveCorpus struct {
 	} `json:"cases"`
 }
 
-// classOrderLiveList is one engine-sorted class list, with the design system it was captured against.
+// classOrderLiveList is one engine-sorted class list, with the design system it was captured against:
+// a repository's stylesheet for a corpus case, or the stylesheet a synthetic case carries as text.
 type classOrderLiveList struct {
 	name      string
 	entryPath string
+	input     string
 	sorted    []string
+}
+
+// systemKey names the design system a list was sorted against, so the measurement finds it whichever
+// way it was built.
+func (list classOrderLiveList) systemKey() string {
+	if list.entryPath != "" {
+		return list.entryPath
+	}
+	return "input:" + list.input
 }
 
 // classOrderLiveLoadCorpus reads the fixture and flattens it to the lists this suite sorts.
@@ -94,6 +107,7 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 			lists = append(lists, classOrderLiveList{
 				name:      aCase.Name,
 				entryPath: aCase.EntryPath,
+				input:     aCase.Input,
 				sorted:    aCase.ClassOrder.Sorted,
 			})
 		}
@@ -104,6 +118,7 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 			lists = append(lists, classOrderLiveList{
 				name:      classList.Name,
 				entryPath: aCase.EntryPath,
+				input:     aCase.Input,
 				sorted:    classList.ClassOrder.Sorted,
 			})
 		}
@@ -193,7 +208,7 @@ func classOrderLiveMeasure(
 
 	measurement := classOrderLiveMeasurement{}
 	for _, list := range lists {
-		designSystem, hasSystem := systems[list.entryPath]
+		designSystem, hasSystem := systems[list.systemKey()]
 		if !hasSystem || designSystem.Err != nil {
 			continue
 		}
@@ -252,6 +267,65 @@ func classOrderLiveMeasure(
 		}
 	}
 	return measurement
+}
+
+// TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases is the half of the acceptance test the corpus
+// never ran (#f598zk0). The synthetic cases are the ones built to separate the depth-first rule from the
+// mask, and they carry their design system as stylesheet text rather than an entry path, so the corpus
+// test, which loads systems by entry path, dropped every one of them: they were captured and never
+// compared. Each is loaded here from its own stylesheet over the vendored tailwindcss, so they run on
+// every machine.
+func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(t *testing.T) {
+	t.Parallel()
+	var synthetic []classOrderLiveList
+	for _, list := range classOrderLiveLoadCorpus(t) {
+		if list.entryPath == "" {
+			synthetic = append(synthetic, list)
+		}
+	}
+	if len(synthetic) == 0 {
+		t.Fatal("the fixture holds no synthetic class lists, so this compares nothing")
+	}
+
+	systems := map[string]DesignSystemResult{}
+	for _, list := range synthetic {
+		if _, built := systems[list.systemKey()]; built {
+			continue
+		}
+		if list.input == "" {
+			t.Fatalf("%s has neither an entry path nor a stylesheet, so nothing says which system sorted it", list.name)
+		}
+		entryPoint := filepath.Join(t.TempDir(), "theme.css")
+		if err := os.WriteFile(entryPoint, []byte(list.input), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+			EntryPoint:          entryPoint,
+			TailwindPackageRoot: vendored.TailwindPackageRoot(),
+		})
+		if err != nil {
+			t.Fatalf("%s: loading its stylesheet: %v", list.name, err)
+		}
+		systems[list.systemKey()] = DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+	}
+
+	measurement := classOrderLiveMeasure(t, synthetic, systems)
+	t.Logf("synthetic cases vs the engine: %d disagreeing pairs of %d compared pairs across %d lists on %d stylesheets (%d classes placed, %d lists declined)",
+		measurement.disagreeingPairs, measurement.comparedPairs, measurement.lists, len(systems),
+		measurement.placedClasses, measurement.listsSkipped)
+	for _, example := range measurement.examples {
+		t.Log("  " + example)
+	}
+
+	// Every synthetic list is placed, or the zero below would be measuring the ones the rule gave up on.
+	if measurement.lists != len(synthetic) || measurement.listsSkipped != 0 {
+		t.Errorf("the rule placed %d of %d synthetic lists and declined %d; every one of them is built to be placed",
+			measurement.lists, len(synthetic), measurement.listsSkipped)
+	}
+	if measurement.disagreeingPairs != 0 {
+		t.Errorf("the live rule disagrees with the engine on %d of %d pairs across %d synthetic lists",
+			measurement.disagreeingPairs, measurement.comparedPairs, measurement.disagreeingLists)
+	}
 }
 
 // classOrderLiveReversed returns a class list back to front.

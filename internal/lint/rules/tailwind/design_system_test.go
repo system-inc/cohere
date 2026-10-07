@@ -548,7 +548,7 @@ func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(t *testing
 // passes every test comparing sorted output and produces a different class order on each lint.
 //
 // This exists because a weaker version of it did not catch the mutation. With the two variants the
-// main fixture declares, a map range agrees with sorted order often enough to look stable; twelve
+// main fixture declares, a map range agrees with declaration order often enough to look stable; twelve
 // names make disagreement essentially certain, and ten loads make a single lucky ordering not
 // enough to pass.
 func TestDesignSystemVariantRegistrationOrderIsDeterministic(t *testing.T) {
@@ -590,19 +590,20 @@ func TestDesignSystemVariantRegistrationOrderIsDeterministic(t *testing.T) {
 		return orders
 	}
 
-	// Alphabetical, because that is what sortedKeys guarantees and what a map range would not.
+	// In declaration order, which is upstream's, and which a map range would not give. The names are
+	// declared in reverse alphabetical order, so a registration that sorted them, as this did until
+	// #f598zk0's synthetic class-order case caught it, fails here too.
 	first := orderOf()
 	for index := 1; index < len(names); index++ {
-		earlier := names[len(names)-1-(index-1)]
-		later := names[len(names)-1-index]
+		earlier, later := names[index-1], names[index]
 		if first[earlier] >= first[later] {
 			t.Fatalf("`%s` (order %d) should register before `%s` (order %d): registration walks "+
-				"the names in sorted order, and a map range would not",
+				"the names in the order they were declared, and neither a map range nor a sort would",
 				earlier, first[earlier], later, first[later])
 		}
 	}
 
-	// Ten loads, because a single map range can agree with sorted order by luck and a test that
+	// Ten loads, because a single map range can agree with declaration order by luck and a test that
 	// ran once would call that stability.
 	for attempt := range 10 {
 		again := orderOf()
