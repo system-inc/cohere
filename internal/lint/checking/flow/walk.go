@@ -48,6 +48,12 @@ type Pair struct {
 	Mutable        bool
 	SourceReadonly bool
 	SourceProperty *ast.Symbol
+
+	// Method is a pair of two methods' types (WalkOptions.Methods, or a literal's method site): the walk pairs
+	// their parameters only, each a MethodParameter, and not their returns. tsc compares a method's parameters
+	// both ways, and those are the hole; what a method returns is no slot of the method's.
+	Method          bool
+	MethodParameter bool
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -83,8 +89,8 @@ const maximumDepth = 8
 //	functions               a single call signature each: the return, and the parameters with source
 //	                        and target swapped, since a parameter is written by the caller
 //	objects                 each property of the target the source also has, by name, mutable unless
-//	                        the target's property is readonly; methods are skipped, as their variance is
-//	                        method-signature-style's and nominal-class's business
+//	                        the target's property is readonly; methods are skipped, unless Methods asks
+//	                        for them, when a target method pairs as a function, never a mutable slot
 //	unions                  a source union pairs each member; a target union pairs the members the
 //	                        source is assignable to, and passes when any one of them passes
 //	intersections           a target intersection pairs its array, tuple and container members with
@@ -114,17 +120,24 @@ type WalkOptions struct {
 	// 2,900 false no-optional-widening findings per frontend (#53w68gt). An intersection with a primitive
 	// member (a brand) is never paired this way: its object member is a phantom.
 	ObjectIntersections bool
+
+	// Methods pairs a target's methods as functions (#gvzdft9 shape 5): tsc compares a method's parameters
+	// in both directions, so `{ put(dog: Dog) }` passes as `{ put(animal: Animal): void }`, and a Cat passed
+	// through the wider type reaches a method that reads it as a Dog, a TypeError in Node. invariant-mutable
+	// asks for it and judges the parameters. The other rules don't: a method's class-typed parameter would
+	// be the same hole again for nominal-class.
+	Methods bool
 }
 
 // WalkWith is Walk with options.
 func (w *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pair, bool) {
-	top := Pair{Source: site.Source, Target: site.Target}
+	top := Pair{Source: site.Source, Target: site.Target, Method: site.Method}
 	if site.Fresh {
 		wrong, _ := judge(top)
 		return top, wrong
 	}
 	w.judge, w.newContainer, w.freshElements = judge, site.NewContainer, site.FreshElements
-	w.objectIntersections, w.overridden = options.ObjectIntersections, site.Overridden
+	w.objectIntersections, w.methods, w.overridden = options.ObjectIntersections, options.Methods, site.Overridden
 	w.visited, w.path = w.visited[:0], w.path[:0]
 	if len(w.visitedSet) > 0 {
 		clear(w.visitedSet)
@@ -152,6 +165,7 @@ type Walker struct {
 	newContainer        bool
 	freshElements       bool
 	objectIntersections bool
+	methods             bool
 	// overridden is the walk in progress's top-level target properties the value does not reach. See
 	// Site.Overridden.
 	overridden []string
@@ -273,7 +287,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -286,7 +300,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.IsAssignable(pair.Source, member) {
 				continue
 			}
-			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1)
+			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -520,11 +534,13 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
 		targetSignature, sourceSignature := targetSignatures[0], sourceSignatures[0]
-		if found, wrong := w.into(pair, Pair{
-			Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
-			Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
-		}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
-			return found, true
+		if !pair.Method {
+			if found, wrong := w.into(pair, Pair{
+				Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
+				Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
+			}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
+				return found, true
+			}
 		}
 		sourceParameters := checker.Signature_parameters(sourceSignature)
 		targetParameters := checker.Signature_parameters(targetSignature)
@@ -535,8 +551,9 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 				break
 			}
 			if found, wrong := w.into(pair, Pair{
-				Source: checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
-				Target: checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
+				Source:          checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
+				Target:          checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
+				MethodParameter: pair.Method,
 			}, Step{Kind: StepParameter, Name: sourceParameters[index].Name, Index: index}, depth); wrong {
 				return found, true
 			}
@@ -550,7 +567,28 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	isConstructor := len(checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
 		len(checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindConstruct)) > 0
 	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, target) {
-		if property.Flags&ast.SymbolFlagsMethod != 0 || len(pair.Path) == 0 && slices.Contains(w.overridden, property.Name) {
+		if len(pair.Path) == 0 && slices.Contains(w.overridden, property.Name) {
+			continue
+		}
+		if property.Flags&ast.SymbolFlagsMethod != 0 {
+			if !w.methods {
+				continue
+			}
+			// A method is a function the caller passes into, never a slot the walk writes: see WalkOptions.
+			if sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, source, property.Name); sourceProperty != nil {
+				sourceMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
+				targetMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
+				// Two generic signatures' parameters are each in their own type parameters, which no pairing
+				// unifies: Promise's `then<TResult1, TResult2>` seen under two promises paired one TResult1 with
+				// the other's, 3,287 findings on the consumers, the shape #53w68gt measured for `clone<T>`.
+				if w.isGenericFunction(sourceMethod) || w.isGenericFunction(targetMethod) {
+					continue
+				}
+				if found, wrong := w.into(pair, Pair{Source: sourceMethod, Target: targetMethod, Method: true},
+					Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
+					return found, true
+				}
+			}
 			continue
 		}
 		readonly := checker.Checker_isReadonlySymbol(w.typeChecker, property) || (isConstructor && property.Name == "prototype")
@@ -569,6 +607,13 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		}
 	}
 	return Pair{}, false
+}
+
+// isGenericFunction is a type with a call signature that declares type parameters of its own.
+func (w *Walker) isGenericFunction(t *checker.Type) bool {
+	return slices.ContainsFunc(checker.Checker_getSignaturesOfType(w.typeChecker, t, checker.SignatureKindCall), func(signature *checker.Signature) bool {
+		return len(signature.TypeParameters()) > 0
+	})
 }
 
 func (w *Walker) typeArgument(t *checker.Type, index int) *checker.Type {

@@ -91,8 +91,8 @@ var NoOptionalWidening = rule.Rule{
 			return false, true
 		}
 		return walker.Listeners(func(site flow.Site) {
-			if site.Spread {
-				// A spread into a literal is invariant-mutable's; see flow.Site.Spread.
+			if site.Spread || site.Method {
+				// A spread into a literal and a literal's method are invariant-mutable's; see flow.Site.
 				return
 			}
 			if site.Fresh {

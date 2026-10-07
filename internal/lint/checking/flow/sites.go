@@ -47,6 +47,9 @@ type Site struct {
 	// fresh literals. The elements' own slots are no one else's either, and what they hold may still be shared.
 	FreshElements bool
 
+	// Method is an object literal's method (offerMethod). Like Spread, it is invariant-mutable's alone.
+	Method bool
+
 	// Spread is a spread into a literal (offerSpread). It is invariant-mutable's: no-optional-widening and
 	// nominal-class read a target's properties whole, past Overridden, and whether a spread is a hole of theirs
 	// is not measured yet, so they pass it by.
@@ -176,6 +179,7 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 			w.contextual(element)
 		}
 	},
+	ast.KindMethodDeclaration:       (*Walker).offerMethod,
 	ast.KindSpreadAssignment:        (*Walker).offerSpread,
 	ast.KindSpreadElement:           (*Walker).offerSpread,
 	ast.KindAsExpression:            (*Walker).offerUpcast,
@@ -325,6 +329,36 @@ func (w *Walker) arguments(call *ast.Node) {
 		}
 		w.offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(w.typeChecker, call, index))
 	}
+}
+
+/*
+ * offerMethod hands over an object literal's method against the property the literal's contextual type gives
+ * it (#gvzdft9 shape 5): `const sink: Sink = { put(dog: Dog) { ... } }` is a fresh literal, judged at its top
+ * only, so its method was never related to Sink's `put(animal: Animal)`. A method written as a property
+ * (`put: (dog) => ...`) is a PropertyAssignment the contextual finder already offers.
+ */
+func (w *Walker) offerMethod(node *ast.Node) {
+	literal, name := node.Parent, node.Name()
+	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression || name == nil || IsDestructuringTarget(literal) {
+		return
+	}
+	if name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral {
+		return
+	}
+	contextual := checker.Checker_getContextualType(w.typeChecker, literal, checker.ContextFlagsNone)
+	if contextual == nil || contextual.Flags()&checker.TypeFlagsObject == 0 {
+		return
+	}
+	property := checker.Checker_getPropertyOfType(w.typeChecker, contextual, name.Text())
+	if property == nil {
+		return
+	}
+	target := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
+	source := w.typeChecker.GetTypeAtLocation(node)
+	if source == nil || target == nil || source == target || !w.hasObjectPart(target) {
+		return
+	}
+	w.sites = append(w.sites, Site{Node: name, Source: source, Target: target, Method: true})
 }
 
 /*

@@ -15,6 +15,7 @@ import (
 var (
 	invariantMutableText     = policy.MessageOf("adamic/invariant-mutable", "mutableWidening")
 	readonlyMadeWritableText = policy.MessageOf("adamic/invariant-mutable", "readonlyMadeWritable")
+	methodParameterText      = policy.MessageOf("adamic/invariant-mutable", "methodParameterNarrowed")
 )
 
 /*
@@ -78,6 +79,13 @@ var InvariantMutable = rule.Rule{
 			if isClassInstance(pair.Target) {
 				return false, false
 			}
+			// A method's parameter is written by the caller, so whatever the wider type passes must be something
+			// the method reads: the target's parameter type (the pair's Source) assignable to the source's. tsc
+			// compares a method's parameters both ways (#gvzdft9 shape 5); a function's it already checks one way
+			// under strictFunctionTypes, so only a method's are judged here.
+			if pair.MethodParameter {
+				return !walker.IsAssignable(pair.Source, pair.Target), true
+			}
 			if !pair.Mutable {
 				return false, true
 			}
@@ -90,12 +98,15 @@ var InvariantMutable = rule.Rule{
 		}
 		return walker.Listeners(func(site flow.Site) {
 			// Object intersections are this rule's to pair, and no other's (#b9a0wgy).
-			found, wrong := walker.WalkWith(site, judge, flow.WalkOptions{ObjectIntersections: true})
+			found, wrong := walker.WalkWith(site, judge, flow.WalkOptions{ObjectIntersections: true, Methods: true})
 			if !wrong {
 				return
 			}
 			handle, id := invariantMutableText, "mutableWidening"
-			if readonlyMadeWritable(ctx.Program, found) && walker.IsAssignable(found.Target, found.Source) {
+			switch {
+			case found.MethodParameter:
+				handle, id = methodParameterText, "methodParameterNarrowed"
+			case readonlyMadeWritable(ctx.Program, found) && walker.IsAssignable(found.Target, found.Source):
 				handle, id = readonlyMadeWritableText, "readonlyMadeWritable"
 			}
 			ctx.ReportNode(site.Node, rule.Message{

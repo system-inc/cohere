@@ -8,6 +8,9 @@
     },
     "readonlyMadeWritable": {
       "text": "'{{source}}' is seen here as '{{target}}', and `{{slot}}` is read-only in the original but writable here. A read-only slot is only ever read, so the '{{sourcePart}}' it holds can be a narrower value, and writing any '{{targetPart}}' through this view leaves the original holding what it never allowed: TypeScript accepts this, and it can be a TypeError at runtime. Keep the slot `readonly` in the target type, or copy the value ({ ...record })."
+    },
+    "methodParameterNarrowed": {
+      "text": "'{{source}}' is seen here as '{{target}}', and `{{slot}}` takes only a '{{targetPart}}' where the wider type passes any '{{sourcePart}}': TypeScript compares a method's parameters in both directions, so it accepts this, and a call through the wider type is a TypeError at runtime. Write the member as a property in the wider type (`put: (animal: Animal) => void`), which TypeScript checks one way, or take the wider parameter."
     }
   }
 }

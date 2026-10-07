@@ -280,6 +280,50 @@ func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(t *testing.
 	}
 }
 
+// TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter: shape 5 of #gvzdft9, six-interface.tgz's s5 and
+// s5b. tsc compares a method's parameters in both directions, so a method taking only a Dog passes as one taking
+// any Animal; tsc 6.0.3 accepts it, and a Cat passed through the wider type is `bark is not a function` in Node.
+func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"a literal's method":           {animals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(dog: Dog) { dog.bark(); } };`, "put"},
+		"a held object's method":       {animals + `interface Sink { put(animal: Animal): void } declare const dogSink: { put(dog: Dog): void }; const sink: Sink = dogSink;`, "dogSink"},
+		"a function where a method is": {animals + `interface Sink { put(animal: Animal): void } declare const dogSink: { put: (dog: Dog) => void }; const sink: Sink = dogSink;`, "dogSink"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "methodParameterNarrowed")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven: shape 5's near-misses.
+func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		// s5c: a wider parameter takes whatever the view passes.
+		"a wider parameter":   animals + `interface DogSink { put(dog: Dog): void } const sink: DogSink = { put(animal: Animal) { animal.name; } };`,
+		"the same parameter":  animals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(animal: Animal) { animal.name; } };`,
+		"no parameter":        `interface Clock { now(): number } const clock: Clock = { now() { return 1; } };`,
+		"a held wider method": animals + `interface DogSink { put(dog: Dog): void } declare const anySink: { put(animal: Animal): void }; const sink: DogSink = anySink;`,
+		// Two generic signatures' type parameters are unrelated, so their parameters are not paired.
+		"a generic method": animals + `const dogs: Promise<Dog> = Promise.resolve(rex); const all: Promise<Animal> = dogs;`,
+		// A method's return is not paired, as no method was before shape 5: an iterator's next() hands back a fresh
+		// result each call, and was 276 findings on the consumers when it was.
+		"a method's return": animals + `interface Source { items(): Animal[] } declare const dogs: { items(): Dog[] }; const source: Source = dogs;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
 // TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
 func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
 	t.Parallel()

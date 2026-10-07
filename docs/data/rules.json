@@ -4432,6 +4432,7 @@
             "category": "adamic",
             "typeAware": true,
             "messageIds": [
+                "methodParameterNarrowed",
                 "mutableWidening",
                 "readonlyMadeWritable"
             ],
