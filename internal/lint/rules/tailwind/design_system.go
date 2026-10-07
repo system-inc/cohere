@@ -128,6 +128,9 @@ type DesignSystemLocation struct {
 	Cwd string
 	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
 	ConfigPath string
+	// Tsconfig is upstream's `tsconfig`, as written. It never chooses the stylesheet, only how its
+	// imports resolve, so it leaves a location default.
+	Tsconfig string
 }
 
 // isDefault reports whether no option named a location, so the project's own stylesheet is used.
@@ -226,9 +229,14 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 		}
 	}
 
+	resolve, err := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
+	if err != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	}
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
+		Resolve:             resolve,
 	})
 	if err != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Err: err}

@@ -15,8 +15,9 @@ import (
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
-// TailwindLocationOptions are upstream's options that say where Tailwind and its stylesheet are,
-// shared by every better-tailwindcss rule: `entryPoint`, `tailwindConfig` and `cwd`.
+// TailwindLocationOptions are upstream's options that say where Tailwind and its stylesheet are, and how
+// the stylesheet's imports resolve, shared by every better-tailwindcss rule: `entryPoint`,
+// `tailwindConfig`, `cwd` and `tsconfig` (see tsconfig_paths.go for the last).
 //
 // Upstream resolves all three in `getTailwindConfigPath` (utils/context.js at 4.7.0). `cwd` is
 // resolved against the directory ESLint runs from and is where `tailwindcss` is resolved from. The
@@ -30,6 +31,7 @@ type TailwindLocationOptions struct {
 	EntryPoint     string `json:"entryPoint"`
 	TailwindConfig string `json:"tailwindConfig"`
 	Cwd            string `json:"cwd"`
+	Tsconfig       string `json:"tsconfig"`
 
 	// anchor is the directory the config was written in, which stands for ESLint's working directory,
 	// set by the decoder from rule.OptionsBase.
@@ -42,7 +44,7 @@ func (options TailwindLocationOptions) Location() DesignSystemLocation {
 	if configPath == "" {
 		configPath = options.TailwindConfig
 	}
-	return DesignSystemLocation{Anchor: options.anchor, Cwd: options.Cwd, ConfigPath: configPath}
+	return DesignSystemLocation{Anchor: options.anchor, Cwd: options.Cwd, ConfigPath: configPath, Tsconfig: options.Tsconfig}
 }
 
 // anchorAt records where the config was written. Promoted onto every options struct that embeds
@@ -262,7 +264,7 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 		_ = json.Unmarshal(written[key], &value)
 		return value
 	}
-	location := TailwindLocationOptions{EntryPoint: read("entryPoint"), TailwindConfig: read("tailwindConfig"), Cwd: read("cwd")}
+	location := TailwindLocationOptions{EntryPoint: read("entryPoint"), TailwindConfig: read("tailwindConfig"), Cwd: read("cwd"), Tsconfig: read("tsconfig")}
 	location.anchorAt(anchor)
 	named := location.Location()
 	return named, !named.isDefault()
@@ -280,9 +282,14 @@ func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS
 		return DesignSystemResult{Err: err}
 	}
 
+	resolve, err := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
+	if err != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	}
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
+		Resolve:             resolve,
 	})
 	if err != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
@@ -291,6 +298,38 @@ func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS
 		fileSystem.Stat(tspath.RootedPath(stylesheet))
 	}
 	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+}
+
+// cwdFrom is upstream's `ctx.cwd` for this location: the anchor, or the project root when there is none,
+// with `cwd` resolved against it when written.
+func (location DesignSystemLocation) cwdFrom(projectRoot string) string {
+	anchor := location.Anchor
+	if anchor == "" {
+		anchor = projectRoot
+	}
+	if location.Cwd != "" {
+		return resolvePath(anchor, location.Cwd)
+	}
+	return anchor
+}
+
+// stylesheetResolverAt is the resolver a design system's `@import`s go through: the installed
+// tailwindcss's, with the tsconfig upstream would find from cwd in front of it. Every question about
+// the disk goes through fileSystem, so the tsconfig, everything it extends and every path it maps are
+// inputs the run cache signs.
+func stylesheetResolverAt(cwd string, configured string, packageRoot string, fileSystem *rule.RecordingFS) (tailwindengine.StylesheetResolver, error) {
+	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
+	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }
+	next := tailwindengine.NodeStylesheetResolver(packageRoot)
+	configPath := findTsconfig(cwd, configured, fileExists)
+	if configPath == "" {
+		return next, nil
+	}
+	mapping, err := loadTsconfigPaths(configPath, readFile, fileExists)
+	if err != nil {
+		return nil, err
+	}
+	return tsconfigStylesheetResolver(mapping, next, readFile, fileExists), nil
 }
 
 // findPathRecursive is upstream's search (async-utils/fs.js at 4.7.0) for one path: the path resolved

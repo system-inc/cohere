@@ -27,6 +27,7 @@ var tsDecisionsAllowed = map[string]string{
 	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
 	"command/formatter_comparison/main.go: .ts":                        "the comparison tool's corpus walk, which has no program",
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",
+	"internal/lint/rules/tailwind/tsconfig_paths.go: .ts":              "tsconfig-paths-webpack-plugin's default extensions, which better-tailwindcss keeps; it resolves a stylesheet import and has never heard of .a",
 
 	// One file, by its house name: a pinned file is that file, never an Adamic one.
 	"internal/lint/rules/base/consistency_no_hand_built_declared_error.go: /BaseError.ts":        "Base's own BaseError.ts",

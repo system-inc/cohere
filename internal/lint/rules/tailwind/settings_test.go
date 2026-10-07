@@ -22,6 +22,7 @@ var settingsSamples = map[string][2]string{
 	"entryPoint":             {`"./settings.css"`, `"./options.css"`},
 	"tailwindConfig":         {`"./settings.css"`, `"./options.css"`},
 	"cwd":                    {`"settings"`, `"options"`},
+	"tsconfig":               {`"settings.json"`, `"options.json"`},
 	"attributes":             {`["fromSettings"]`, `["fromOptions"]`},
 	"callees":                {`["fromSettings"]`, `["fromOptions"]`},
 	"variables":              {`["fromSettings"]`, `["fromOptions"]`},
@@ -167,7 +168,7 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(t *testing.T) {
 		name, block, refused string
 	}{
 		{"an upstream option not ported yet", `{"selectors": []}`, `"selectors"`},
-		{"another not ported yet", `{"tsconfig": "tsconfig.json"}`, `"tsconfig"`},
+		{"another not ported yet", `{"messageStyle": "compact"}`, `"messageStyle"`},
 		{"no option at all", `{"callees": ["cn"], "calees": ["cn"]}`, `"calees"`},
 		{"not an object", `["cn"]`, "expected an object"},
 	}
