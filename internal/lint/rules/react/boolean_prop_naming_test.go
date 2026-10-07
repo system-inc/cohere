@@ -53,6 +53,11 @@ func TestBooleanPropNamingStaysSilent(t *testing.T) {
 		{"upstream valid 36", "\n        type Props = {\n          isEnabled: boolean\n        } & ({\n          hasLOL: boolean\n        } | {\n          isLOL: boolean\n        })\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
 		{"upstream valid 37", "\n        export const DataRow = (props: { label: string; value: string; } & React.HTMLAttributes<HTMLDivElement>) => {\n            const { label, value, ...otherProps } = props;\n            return (\n                <div {...otherProps}>\n                    <span>{label}</span>\n                    <span>{value}</span>\n                </div>\n            );\n        };\n      ", BooleanPropNamingOptions{Rule: "(^(is|has|should|without)[A-Z]([A-Za-z0-9]?)+|disabled|required|checked|defaultChecked)", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
 		{"upstream valid 38", "\n        // Strip @jsx comments, see https://github.com/microsoft/fluentui/issues/29126\n        const resultCode = result.code\n          .replace('/** @jsxRuntime automatic */', '')\n          .replace('/** @jsxImportSource @fluentui/react-jsx-runtime */', '');\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
+		// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(config.rule)`. RE2 refuses a
+		// lookahead and a lookbehind, so these did not even compile. In Node /^(?=is[A-Z])/ and
+		// /(?<=^is)[A-Z]/ both test true on isSomething.
+		{"a lookahead pattern passes a matching name", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^(?=is[A-Z])", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
+		{"a lookbehind pattern passes a matching name", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "(?<=^is)[A-Z]", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -114,6 +119,11 @@ func TestBooleanPropNamingFires(t *testing.T) {
 		}},
 		{"upstream invalid 21", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: "It is better if your prop ({{ propName }}) matches this pattern: ({{ pattern }})"}, []string{
 			"It is better if your prop (something) matches this pattern: (^is[A-Z]([A-Za-z0-9]?)+)",
+		}},
+		// #7mztrdd, the control: in Node /^(?=is[A-Z])/ tests false on something, so the lookahead is
+		// tested rather than excusing every name, and the message quotes the pattern as written.
+		{"a lookahead pattern reports a name it does not match", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^(?=is[A-Z])", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
+			"Prop name `something` doesn’t match rule `^(?=is[A-Z])`",
 		}},
 		{"upstream invalid 22", "\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.bool.isRequired},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
 			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
@@ -331,6 +341,12 @@ func TestDecodeBooleanPropNamingOptions(t *testing.T) {
 			name: "a custom message", raw: `{"message": "bad {{ propName }}"}`,
 			wantRule: DefaultBooleanPropNamingRulePattern, wantPropTypeNames: []string{"bool"},
 			wantMessage: "bad {{ propName }}",
+		},
+		{
+			// #7mztrdd: RE2 refused a lookahead, so this was an error. Node compiles /^(?=is[A-Z])/.
+			name: "a lookahead pattern compiles as JavaScript reads it",
+			raw:  `{"rule": "^(?=is[A-Z])"}`, wantRule: "^(?=is[A-Z])",
+			wantPropTypeNames: []string{"bool"},
 		},
 		{name: "an uncompilable pattern is an error", raw: `{"rule": "^(["}`, wantErr: true},
 		{name: "a wrong type is an error", raw: `{"validateNested": "yes"}`, wantErr: true},

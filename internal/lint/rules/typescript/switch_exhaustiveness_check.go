@@ -1,7 +1,6 @@
 package typescript
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -207,10 +207,12 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		}
 		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
 		// when the rule is created. Here it matches no comment, which leaves the real default clause
-		// the only default, the reading that reports rather than the one that silences.
+		// the only default, the reading that reports rather than the one that silences. A valid one is
+		// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
+		// `\s` and `\b` mean what they mean upstream (#7mztrdd).
 		commentPattern := defaultCaseCommentPattern
 		if opts.DefaultCaseCommentPattern != nil {
-			commentPattern, _ = regexp.Compile(*opts.DefaultCaseCommentPattern)
+			commentPattern, _ = esregexp.Compile(*opts.DefaultCaseCommentPattern, "u")
 		}
 
 		isLiteralLikeType := func(t *checker.Type) bool {
@@ -291,7 +293,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				MissingLiteralBranchTypes: missingLiteralBranchTypes,
 			}
 			if defaultCase == nil {
-				metadata.DefaultCaseComment = defaultCaseComment(ctx, node, commentPattern)
+				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(ctx, node, commentPattern)
 			}
 			return metadata
 		}
@@ -319,7 +321,9 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				!metadata.ContainsNonLiteralType {
 				if metadata.DefaultCase != nil {
 					ctx.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
-				} else {
+				} else if !metadata.DefaultCaseCommentOverran {
+					// A comment taken as the default only because its match overran is no answer, and no
+					// answer is not a report here.
 					ctx.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
 				}
 			}
@@ -367,7 +371,10 @@ type switchMetadata struct {
 	DefaultCase *ast.CaseOrDefaultClause
 	// DefaultCaseComment is the comment standing in for a default clause, when there is no clause and
 	// the last comment after the last case matches the pattern; nil otherwise.
-	DefaultCaseComment        *comments.Comment
+	DefaultCaseComment *comments.Comment
+	// DefaultCaseCommentOverran is a DefaultCaseComment taken because its pattern's match overran the time
+	// bound (esregexp.MatchTimeout) rather than matched: it spares a missing default, and is not reported.
+	DefaultCaseCommentOverran bool
 	MissingLiteralBranchTypes []*checker.Type
 	// TODO: add support for fixed (symbolname is used only for fixes)
 	// SymbolName string
@@ -378,8 +385,9 @@ func (metadata *switchMetadata) hasDefaultCase() bool {
 	return metadata.DefaultCase != nil || metadata.DefaultCaseComment != nil
 }
 
-// defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`.
-var defaultCaseCommentPattern = regexp.MustCompile(`(?i)^no default$`)
+// defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`, compiled
+// with its own flags so it folds case as JavaScript does (#7mztrdd).
+var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 
 // defaultCaseComment is upstream's getCommentDefaultCase: the LAST comment between the end of the last
 // case clause and the switch's closing brace, when its text, delimiters stripped and trimmed, matches
@@ -396,14 +404,14 @@ var defaultCaseCommentPattern = regexp.MustCompile(`(?i)^no default$`)
 //	// no default here                        not          the default pattern is anchored at both ends
 //
 // An empty pattern matches every comment, as `new RegExp(”)` does upstream.
-func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, pattern *regexp.Regexp) *comments.Comment {
+func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, pattern *esregexp.RegExp) (*comments.Comment, bool) {
 	if pattern == nil {
-		return nil
+		return nil, false
 	}
 	caseBlock := statement.CaseBlock
 	clauses := caseBlock.AsCaseBlock().Clauses.Nodes
 	if len(clauses) == 0 {
-		return nil
+		return nil, false
 	}
 	after, closingBrace := clauses[len(clauses)-1].End(), caseBlock.End()-1
 	var last *comments.Comment
@@ -414,16 +422,19 @@ func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, patter
 		}
 	}
 	if last == nil {
-		return nil
+		return nil, false
 	}
 	value := last.Text[2:]
 	if last.IsBlock {
 		value = strings.TrimSuffix(value, "*/")
 	}
-	if !pattern.MatchString(text.TrimWhitespace(value)) {
-		return nil
+	// A match that overruns the time bound counts as the default case too, since the comment excuses a
+	// missing default and no answer here would be a report; overran says so, for the one use that reports.
+	matched, overran := pattern.TestOrError(text.TrimWhitespace(value))
+	if !matched && overran == nil {
+		return nil, false
 	}
-	return last
+	return last, !matched
 }
 
 // SwitchExhaustivenessCheckOptions is the configuration surface, named once so the registration and

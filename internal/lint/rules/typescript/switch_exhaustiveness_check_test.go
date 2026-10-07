@@ -1452,9 +1452,22 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(t *testing.T) {
 		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\n}", nil},
 		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n}\n// no default", []string{"switchIsNotExhaustive v"}},
 		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\ndeclare const w: number;\nswitch (v) {\n  case 0:\n    switch (w) {\n      case 1:\n        break;\n      // no default\n    }\n}", []string{"switchIsNotExhaustive v"}},
+		// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(pattern, 'u')`. RE2 refuses a
+		// lookahead, so this pattern compiled to nothing and the comment never counted. In Node,
+		// new RegExp("^no default(?= because)", "u") tests true on "no default because exhaustive".
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default because exhaustive\n}", nil},
+		// #7mztrdd: the control for the row above. In Node the same pattern tests false on
+		// "no default since exhaustive", so the switch still reports.
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default since exhaustive\n}", []string{"switchIsNotExhaustive v"}},
+		// #7mztrdd: a lookbehind, which RE2 refuses too. In Node, new RegExp("(?<=^intentionally )no default$", "u")
+		// tests true on "intentionally no default".
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"(?<=^intentionally )no default$\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // intentionally no default\n}", nil},
+		// #7mztrdd: JavaScript's `\s` takes U+00A0. In Node, new RegExp("^skip\\sdefault", "u") tests true on
+		// "skip\u00a0default".
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\u00a0default\n}", nil},
 	}
-	if len(cases) != 31 {
-		t.Fatalf("%d rows, and 31 were replayed", len(cases))
+	if len(cases) != 35 {
+		t.Fatalf("%d rows, and 35 were written: 31 replayed through 8.71.0 and 4 pattern rows checked in Node", len(cases))
 	}
 
 	for _, testCase := range cases {
@@ -1811,4 +1824,28 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran: a user's pattern whose match overruns the time
+// bound (#7mztrdd) is no answer. It may spare a missing default, and must not be reported as the dangerous default
+// case it would be had it matched. `(a|aa)+$` against a long run of `a` backtracks past the bound.
+func TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran(t *testing.T) {
+	t.Parallel()
+	source := `
+declare const myBoolean: boolean;
+
+switch (myBoolean) {
+  case true:
+  case false: {
+    break;
+  }
+  // ` + strings.Repeat("a", 64) + `b
+}
+`
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
+		SwitchExhaustivenessCheckOptions{
+			AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+			RequireDefaultForNonUnion:           type_checking.Ref(false),
+			DefaultCaseCommentPattern:           type_checking.Ref("(a|aa)+$"),
+		}))
 }

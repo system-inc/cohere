@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -56,6 +57,21 @@ func TestNoFallthroughFires(t *testing.T) {
 			"a custom pattern the comment does not match",
 			"switch(foo) { case 0: a();\n/* no break */\ncase 1: b(); }",
 			NoFallthroughOptions{CommentPattern: "break omitted"},
+			[]string{"case"},
+		},
+		// #7mztrdd: the controls for the lookaround cases in the silent table. In Node,
+		// /^no break(?=:)/iu tests false on "no break here" and /(?<=no )break/iu on "break", so
+		// both still report.
+		{
+			"a custom lookahead pattern the comment does not match",
+			"switch(foo) { case 0: a(); /* no break here */ case 1: b(); }",
+			NoFallthroughOptions{CommentPattern: `^no break(?=:)`},
+			[]string{"case"},
+		},
+		{
+			"a custom lookbehind pattern the comment does not match",
+			"switch(foo) { case 0: a(); /* break */ case 1: b(); }",
+			NoFallthroughOptions{CommentPattern: `(?<=no )break`},
 			[]string{"case"},
 		},
 		// The last comment before the next clause is the one that decides, so a matching comment
@@ -225,6 +241,26 @@ func TestNoFallthroughStaysSilent(t *testing.T) {
 			"a custom pattern matching two different comments",
 			"switch(foo) { case 0: a(); /* caution: break is omitted intentionally */ case 1: b(); /* break omitted */ default: c(); }",
 			NoFallthroughOptions{CommentPattern: `break[\s\w]+omitted`},
+		},
+		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "iu")`. RE2 refused a
+		// lookahead and a lookbehind, so these fell back to the default set and reported. In Node,
+		// /^no break(?=:)/iu tests true on "no break: b() needs it" and /(?<=no )break/iu on "no break".
+		{
+			"a custom pattern with a lookahead",
+			"switch(foo) { case 0: a(); /* no break: b() needs it */ case 1: b(); }",
+			NoFallthroughOptions{CommentPattern: `^no break(?=:)`},
+		},
+		{
+			"a custom pattern with a lookbehind",
+			"switch(foo) { case 0: a(); /* no break */ case 1: b(); }",
+			NoFallthroughOptions{CommentPattern: `(?<=no )break`},
+		},
+		// #7mztrdd: JavaScript's `\s` takes U+00A0 and RE2's did not. In Node, /no\sbreak/iu tests true on
+		// "no\u00a0break".
+		{
+			"a custom pattern whose \\s matches a no-break space",
+			"switch(foo) { case 0: a(); /* no\u00a0break */ case 1: b(); }",
+			NoFallthroughOptions{CommentPattern: `no\sbreak`},
 		},
 		{
 			"an empty clause with blank lines and allowEmptyCase on",
@@ -476,4 +512,19 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: a();\ncase 1: b() }"), "case")
 	})
+}
+
+// TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay: a user's pattern whose match overruns the time bound
+// (#7mztrdd) is no answer, which neither use may turn into a report: it spares a fallthrough, and names no unused
+// fallthrough comment. `(a|aa)+$` against a long run of `a` backtracks past the bound.
+func TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay(t *testing.T) {
+	t.Parallel()
+	excuses, names := fallthroughCommentMatchers("(a|aa)+$")
+	comment := strings.Repeat("a", 64) + "b"
+	if !excuses(comment) {
+		t.Error("an overrun did not spare the fallthrough, so no answer became a report")
+	}
+	if names(comment) {
+		t.Error("an overrun named an unused fallthrough comment, so no answer became a report")
+	}
 }

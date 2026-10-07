@@ -534,6 +534,35 @@ func TestIgnoredClassesAreExempt(t *testing.T) {
 	}
 }
 
+// TestIgnorePatternsReadAsJavaScript is #7mztrdd: an ignore pattern is upstream's `new RegExp(pattern)`
+// with no flags, read as JavaScript reads it. RE2 refuses a lookahead and a lookbehind, so under it
+// these patterns were skipped as uncompilable and exempted nothing.
+func TestIgnorePatternsReadAsJavaScript(t *testing.T) {
+	t.Parallel()
+
+	// In Node `/^px-(?=4$)/.test("px-4")` and `/(?<=^p)x-4$/.test("px-4")` are both true, so px-4
+	// is exempt and py-4 has nothing to collapse with.
+	for _, pattern := range []string{`^px-(?=4$)`, `(?<=^p)x-4$`} {
+		result := runCanonicalFixtureWithOptions(t, "Component.tsx",
+			`const element = <div className="px-4 py-4" />;`,
+			EnforceCanonicalClassesOptions{Ignore: []string{pattern}})
+		if len(result.Diagnostics) != 0 {
+			t.Errorf("ignore %q should exempt px-4, got %d findings", pattern, len(result.Diagnostics))
+		}
+	}
+
+	// The control: in Node `/^px-(?=4$)/.test("px-2")` and `.test("py-2")` are both false, so the
+	// same pattern exempts neither class here and the pair still collapses. Without this the case
+	// above could pass because the pattern excused everything.
+	control := runCanonicalFixtureWithOptions(t, "Component.tsx",
+		`const element = <div className="px-2 py-2" />;`,
+		EnforceCanonicalClassesOptions{Ignore: []string{`^px-(?=4$)`}})
+	if len(control.Diagnostics) != 1 {
+		t.Errorf("a lookahead that matches neither class should exempt neither, got %d findings",
+			len(control.Diagnostics))
+	}
+}
+
 // TestCanonicalCollapseOption is upstream's `collapse`, each way, on upstream's own case: on by default
 // `w-10 h-10` is `size-10`, and off nothing this rule reports remains.
 func TestCanonicalCollapseOption(t *testing.T) {

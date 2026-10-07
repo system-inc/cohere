@@ -75,6 +75,10 @@ func TestNoParamReassignFires(t *testing.T) {
 		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
 		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
 		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^B.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
+		// #7mztrdd controls: the lookaround patterns that excuse in the silent table, on names they do not match. In
+		// Node, /^(?!un)/u tests false on unsafe and /(?<=^my)Foo$/u tests false on yourFoo.
+		{"function foo(unsafe) { unsafe.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'unsafe'.", 23, 29},
+		{"function foo(yourFoo) { yourFoo.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'yourFoo'.", 24, 31},
 		{"function foo(bar) { ({foo: bar.a} = {}); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
 		{"function foo(a) { ({a} = obj); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 20, 21},
 		{"function foo(a) { ([...a] = obj); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 23, 24},
@@ -162,6 +166,11 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 		{"function foo(aFoo) { delete aFoo.b; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
 		{"function foo(a, z) { aFoo.b = 0; x.y = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$", "^x.*$"]}`)},
 		{"function foo(aFoo) { aFoo.b.c = 0;}", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
+		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
+		// lookbehind, so these were dropped and the write reported; in Node /^(?!un)/u tests true on safe and
+		// /(?<=^my)Foo$/u tests true on myFoo.
+		{"function foo(safe) { safe.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`)},
+		{"function foo(myFoo) { myFoo.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`)},
 		{"function foo(a) { ({ [a]: variable } = value) }", decodedParamOptions(t, `{"props": true}`)},
 		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(t, `{"props": false}`)},
 		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(t, `{"props": false}`)},
@@ -503,16 +512,26 @@ func TestNoParamReassignOptions(t *testing.T) {
 		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
 	})
 
-	t.Run("a pattern Go accepts and JavaScript does not is still a pattern", func(t *testing.T) {
+	t.Run("a pattern RE2 refuses is read as JavaScript reads it", func(t *testing.T) {
 		t.Parallel()
-		// The two dialects are not the same. Upstream compiles with the Unicode flag and this
-		// compiles with RE2, which has no backreferences and no lookaround, so a pattern using
-		// either is dropped here and honoured there. No corpus case uses one, and the divergence is
-		// recorded rather than papered over.
+		// Each pattern is upstream's `new RegExp(pattern, "u")`. RE2 has no lookaround, so this
+		// pattern used to be dropped and the write reported; now it is honoured as it is upstream
+		// (#7mztrdd). In Node, /^(?!x)a$/u tests true on a, so the write to `a` is excused.
 		options := decodedParamOptions(t,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(?!x)a$"]}`)
 		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			propertyWrite, options)
+		rule_testing.ExpectClean(t, result)
+	})
+
+	t.Run("lookahead-control", func(t *testing.T) {
+		t.Parallel()
+		// The same pattern on a name it does not match, so the case above proves the pattern is
+		// tested rather than excusing everything. In Node, /^(?!x)a$/u tests false on xa.
+		options := decodedParamOptions(t,
+			`{"props": true, "ignorePropertyModificationsForRegex": ["^(?!x)a$"]}`)
+		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+			"function foo(xa) { xa.b = 0; }", options)
 		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
 	})
 

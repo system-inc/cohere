@@ -12,6 +12,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -200,7 +201,7 @@ func noWarningCommentsMatchers(
 	}
 
 	skip, leadsAreExact := noWarningCommentsStartSkip(location, decoration)
-	matchers := make([]*regexp.Regexp, 0, len(terms))
+	matchers := make([]*esregexp.RegExp, 0, len(terms))
 	matched := make([]string, 0, len(terms))
 	leads := make([]rune, 0, len(terms))
 	for _, term := range terms {
@@ -223,7 +224,7 @@ func noWarningCommentsMatchers(
 
 // noWarningCommentsCompiled is one configuration's compiled patterns and what they are checked with.
 type noWarningCommentsCompiled struct {
-	matchers []*regexp.Regexp
+	matchers []*esregexp.RegExp
 
 	// terms are the terms that compiled, aligned with the matchers, so the message can name the term
 	// that matched rather than the term at the same index in the configured list. Those two lists
@@ -235,7 +236,7 @@ type noWarningCommentsCompiled struct {
 	// the pattern. See noWarningCommentsStartSkip.
 	leads []rune
 
-	// skip is the characters the Start prefix passes over, ASCII whitespace and the decoration.
+	// skip is the decoration characters the Start prefix passes over, besides JavaScript's whitespace.
 	skip []rune
 }
 
@@ -253,20 +254,18 @@ const noWarningCommentsNoLead rune = -1
 // The check is exact only where the prefix is plain. Under Anywhere there is no anchor, so it never
 // applies. The class is case-insensitive like the rest of the pattern, so a decoration character with
 // a case fold of its own would skip its other case too; rather than mirror that, such a configuration
-// runs every pattern, and so does one with a `-` in it. `\s` is Go's, four ASCII control characters
-// and the space, the same class the pattern compiles (the gap from JavaScript's is #tez6dna's, and
-// moving it here would change findings). TestNoWarningCommentsLeadAnswersAsThePatternDoes holds the
-// check to the bare pattern across these shapes.
+// runs every pattern. `\s` is JavaScript's, the 25 code points text.IsWhitespace names, since the
+// pattern is compiled as JavaScript reads it (#7mztrdd), and a `-` is escaped as upstream escapes it, so
+// it is one more character rather than a range. TestNoWarningCommentsLeadAnswersAsThePatternDoes holds
+// the check to the bare pattern across these shapes.
 func noWarningCommentsStartSkip(location NoWarningCommentsLocation, decoration []string) ([]rune, bool) {
 	if location != NoWarningCommentsStart {
 		return nil, false
 	}
-	skip := []rune{'\t', '\n', '\f', '\r', ' '}
+	skip := []rune{}
 	for _, entry := range decoration {
 		for _, character := range entry {
-			// QuoteMeta leaves `-` alone, so between two decoration characters it spells a range
-			// in the class, and the pattern skips characters this set would not.
-			if character == '-' || unicode.SimpleFold(character) != character {
+			if unicode.SimpleFold(character) != character {
 				return nil, false
 			}
 			skip = append(skip, character)
@@ -284,17 +283,22 @@ func noWarningCommentsLeadOf(term string, skip []rune, leadsAreExact bool) rune 
 		return noWarningCommentsNoLead
 	}
 	lead, _ := utf8.DecodeRuneInString(term)
-	if slices.Contains(skip, lead) {
+	if noWarningCommentsSkipped(lead, skip) {
 		return noWarningCommentsNoLead
 	}
 	return lead
+}
+
+// noWarningCommentsSkipped is a character the Start prefix `^[\s<decoration>]*` passes over.
+func noWarningCommentsSkipped(character rune, skip []rune) bool {
+	return text.IsWhitespace(character) || slices.Contains(skip, character)
 }
 
 // noWarningCommentsFirstUnskipped is the first character of a comment past the skipped ones, as the
 // pattern reads it (an invalid byte is utf8.RuneError, in both), and false when nothing is left.
 func noWarningCommentsFirstUnskipped(value string, skip []rune) (rune, bool) {
 	for _, character := range value {
-		if !slices.Contains(skip, character) {
+		if !noWarningCommentsSkipped(character, skip) {
 			return character, true
 		}
 	}
@@ -332,7 +336,8 @@ func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled
 				(!hasFirst || !noWarningCommentsFoldEqual(lead, first)) {
 				continue
 			}
-			if !matcher.MatchString(value) {
+			// A match that overruns the time bound reports nothing: a match here is the report.
+			if !matcher.Test(value) {
 				continue
 			}
 			if !selfDirectiveChecked {
@@ -425,21 +430,21 @@ func noWarningCommentsIsSelfDirective(value string) bool {
 //	the term     escaped, so a term containing regex punctuation matches literally.
 //	the suffix   a word boundary, again only when the term ENDS with a word character.
 //
-// The flags are case-insensitive. Upstream also passes `u`, which for this pattern changes only how
-// `\b` is computed, and both engines compute it over ASCII word characters -- measured across six
-// non-ASCII shapes rather than assumed, since a difference there would move every term adjacent to
-// an accented letter.
+// The flags are upstream's `iu`, and the pattern is compiled as JavaScript reads it (#7mztrdd): `\s`
+// takes in the no-break space and the other 20 JavaScript adds to Go's five, `\b` is drawn over
+// ASCII word characters, and the case folds are JavaScript's. The term and the decoration are escaped
+// as upstream's escape-string-regexp escapes them, `-` included.
 func noWarningCommentsMatcherFor(
 	term string,
 	location NoWarningCommentsLocation,
 	decoration []string,
-) (*regexp.Regexp, error) {
-	escaped := regexp.QuoteMeta(term)
+) (*esregexp.RegExp, error) {
+	escaped := noWarningCommentsEscape(term)
 
 	prefix := ""
 	switch {
 	case location == NoWarningCommentsStart:
-		prefix = "^[\\s" + regexp.QuoteMeta(strings.Join(decoration, "")) + "]*"
+		prefix = "^[\\s" + noWarningCommentsEscape(strings.Join(decoration, "")) + "]*"
 	case noWarningCommentsBeginsWithWordCharacter(term):
 		prefix = "\\b"
 	}
@@ -449,7 +454,13 @@ func noWarningCommentsMatcherFor(
 		suffix = "\\b"
 	}
 
-	return regexp.Compile("(?i)" + prefix + escaped + suffix)
+	return esregexp.Compile(prefix+escaped+suffix, "iu")
+}
+
+// noWarningCommentsEscape is upstream's escape-string-regexp: every regexp syntax character behind a
+// backslash, and `-` as `\x2d`, which in a class is one character rather than a range.
+func noWarningCommentsEscape(value string) string {
+	return strings.ReplaceAll(regexp.QuoteMeta(value), "-", `\x2d`)
 }
 
 // noWarningCommentsBeginsWithWordCharacter is upstream's `/^\w/u` test on the term.

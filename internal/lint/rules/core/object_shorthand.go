@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -44,7 +44,7 @@ type ObjectShorthandSettings struct {
 	// IgnoreConstructors exempts a method whose name looks like a constructor.
 	IgnoreConstructors bool
 	// MethodsIgnorePattern exempts a method whose name matches, or nil for none.
-	MethodsIgnorePattern *regexp.Regexp
+	MethodsIgnorePattern *esregexp.RegExp
 	// MethodsIgnorePatternText is the pattern as written, kept only for the decoder's own test.
 	MethodsIgnorePatternText string
 	// AvoidExplicitReturnArrows converts an arrow with a block body into a method.
@@ -138,7 +138,10 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		settings.AvoidExplicitReturnArrows = *wire.AvoidExplicitReturnArrows
 	}
 	if wire.MethodsIgnorePattern != nil && *wire.MethodsIgnorePattern != "" {
-		compiled, err := regexp.Compile(*wire.MethodsIgnorePattern)
+		// Upstream's `new RegExp(PARAMS.methodsIgnorePattern, "u")`, read as JavaScript reads it: RE2
+		// refuses a lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
+		// (#7mztrdd).
+		compiled, err := esregexp.Compile(*wire.MethodsIgnorePattern, "u")
 		if err != nil {
 			return settings, fmt.Errorf(
 				"object-shorthand methodsIgnorePattern %q does not compile: %w",
@@ -345,8 +348,9 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 				return
 			}
 			if settings.MethodsIgnorePattern != nil {
+				// A match that overruns the time bound exempts too: no answer here is a report.
 				if name, ok := property.Name(assignment.Name(), property.Static); ok &&
-					settings.MethodsIgnorePattern.MatchString(name) {
+					settings.MethodsIgnorePattern.TestOrTimeout(name) {
 					return
 				}
 			}

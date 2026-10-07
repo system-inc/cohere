@@ -75,6 +75,9 @@ func TestNoRequireImportsFires(t *testing.T) {
 		{sourceText: "const m = require(path.join(dir, file));", options: "", findings: 1},
 		{sourceText: "class Foo {\n            require(module: string) {\n                return require(module);\n            }\n            }", options: "", findings: 1},
 		{sourceText: "class Foo {\n            require(module: string) {\n                return require('foo');\n            }\n            }", options: "", findings: 1},
+		// #7mztrdd: the control for the lookbehind rows in TestNoRequireImportsStaysSilent. In Node,
+		// new RegExp("(?<=/)package\\.json$", "u") tests false on "package.json", so the require still reports.
+		{sourceText: "const pkg = require('package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }", findings: 1},
 	}
 
 	for _, testCase := range cases {
@@ -126,6 +129,14 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 		{sourceText: "\n            let require = bazz;\n            require('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
 		{sourceText: "\n            let require = bazz;\n            require?.('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
 		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                  ", options: "{ \"allowAsImport\": true }"},
+		// #7mztrdd: an allow pattern is read as JavaScript reads it, `new RegExp(pattern, 'u')`. RE2 refuses a
+		// lookbehind, so this pattern was dropped and permitted nothing. In Node,
+		// new RegExp("(?<=/)package\\.json$", "u") tests true on "./package.json".
+		{sourceText: "const pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
+		{sourceText: "import pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
+		// #7mztrdd: JavaScript's `\s` takes U+00A0. In Node, new RegExp("^my\\smodule$", "u") tests true on
+		// "my\u00a0module".
+		{sourceText: "const m = require('my\u00a0module');", options: "{ \"allow\": [\"^my\\\\smodule$\"] }"},
 	}
 
 	for _, testCase := range cases {
@@ -415,26 +426,46 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 		if len(options.Allow) != 2 {
 			t.Fatalf("compiled %d patterns, want 2", len(options.Allow))
 		}
-		if !options.Allow[0].MatchString("../packages/package.json") {
+		if !options.Allow[0].Test("../packages/package.json") {
 			t.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
-		if options.Allow[0].MatchString("./package.jsonc") {
+		if options.Allow[0].Test("./package.jsonc") {
 			t.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
 
-	t.Run("a pattern Go cannot compile is dropped rather than failing the run", func(t *testing.T) {
+	// #7mztrdd: a lookbehind used to be the pattern dropped here, because RE2 refuses one. It is
+	// read as JavaScript reads it now, and in Node new RegExp("(?<=x)y", "u") tests true on "xy".
+	t.Run("a pattern RE2 refuses compiles as JavaScript", func(t *testing.T) {
 		t.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
-			json.RawMessage(`{ "allow": ["(?<=x)y", "^ok$"] }`))
+			json.RawMessage(`{ "allow": ["(?<=x)y"] }`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 1 {
-			t.Fatalf("kept %d patterns, want 1; RE2 has no lookbehind", len(options.Allow))
+			t.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
 		}
-		if !options.Allow[0].MatchString("ok") {
+		if !options.Allow[0].Test("xy") {
+			t.Error("the lookbehind did not match a path JavaScript matches")
+		}
+	})
+
+	// In Node, new RegExp("(", "u") throws "Unterminated group", which is what upstream does at
+	// rule creation; here the entry is dropped.
+	t.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(t *testing.T) {
+		t.Parallel()
+		decoded, err := DecodeNoRequireImportsOptions(
+			json.RawMessage(`{ "allow": ["(", "^ok$"] }`))
+		if err != nil {
+			t.Fatalf("decoding: %v", err)
+		}
+		options, _ := decoded.(NoRequireImportsOptions)
+		if len(options.Allow) != 1 {
+			t.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
+		}
+		if !options.Allow[0].Test("ok") {
 			t.Error("the surviving pattern is not the compilable one")
 		}
 	})

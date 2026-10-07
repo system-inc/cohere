@@ -2,9 +2,9 @@ package core
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -24,7 +24,7 @@ type IdLengthSettings struct {
 	// Exceptions are names exempted verbatim.
 	Exceptions map[string]bool
 	// ExceptionPatterns are compiled regular expressions; a name matching any of them is exempt.
-	ExceptionPatterns []*regexp.Regexp
+	ExceptionPatterns []*esregexp.RegExp
 }
 
 // DefaultIdLengthSettings is upstream's `defaultOptions`, spelled out because the zero value of the
@@ -88,9 +88,9 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 		}
 	}
 	for _, pattern := range wire.ExceptionPatterns {
-		// Upstream compiles with the `u` flag, which makes the pattern operate on code points.
-		// Go's regexp is already code-point oriented, so there is no flag to add.
-		compiled, err := regexp.Compile(pattern)
+		// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
+		// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
+		compiled, err := esregexp.Compile(pattern, "u")
 		if err != nil {
 			return settings, fmt.Errorf("id-length exceptionPattern %q does not compile: %w", pattern, err)
 		}
@@ -220,7 +220,8 @@ func checkIdLengthName(ctx rule.Context, node *ast.Node, settings IdLengthSettin
 		return
 	}
 	for _, pattern := range settings.ExceptionPatterns {
-		if pattern.MatchString(name) {
+		// A match that overruns the time bound exempts too: no answer here is a report.
+		if pattern.TestOrTimeout(name) {
 			return
 		}
 	}

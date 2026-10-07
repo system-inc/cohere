@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -112,10 +113,10 @@ var sortCompShapePredicates = map[string]bool{
 // Upstream writes `/\/(.*)\/([gimsuy]*)/` and applies it with `String.prototype.match`, which is
 // UNANCHORED: an entry like `foo/on.*/bar` matches, capturing `on.*`. That is reproduced with
 // `FindStringSubmatch` rather than tightened to a full-string match, because tightening it would
-// make a rule that silently disagrees with upstream on an input no corpus case writes. Go's regexp
-// is RE2 and rejects the backtracking constructs Go does not support, which is why a pattern that
-// fails to compile is treated as "matches nothing" rather than panicking; upstream's `new RegExp`
-// would throw there and take the whole lint run down.
+// make a rule that silently disagrees with upstream on an input no corpus case writes. The captured
+// body is compiled as JavaScript reads it (see `sortCompCompilePattern`), and one that still fails to
+// compile is treated as "matches nothing" rather than panicking; upstream's `new RegExp` would throw
+// there and take the whole lint run down.
 var sortCompRegexPattern = regexp.MustCompile(`/(.*)/([gimsuy]*)`)
 
 // DefaultSortCompOptions is the unconfigured answer.
@@ -539,28 +540,21 @@ func sortCompGroupMatches(group string, member sortCompMember) bool {
 	}
 
 	// Upstream's `currentGroup.match(regExpRegExp)` is unanchored, so this reproduces the same
-	// permissiveness. A pattern Go's RE2 cannot compile is treated as matching nothing rather than
+	// permissiveness. A pattern that does not compile is treated as matching nothing rather than
 	// panicking: upstream's `new RegExp` would throw and take the run down, and a rule that crashes
 	// costs every OTHER rule its verdict on that file because the walk recovers per file.
 	//
-	// # The RE2 gap, measured rather than assumed
+	// The pattern is read as JavaScript reads it, so lookaround and backreferences compile and take
+	// effect (#7mztrdd). Upstream's invalid[9] orders by
+	// `^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$`, which RE2 refused, and now names
+	// the same partner upstream does.
 	//
-	// Go's regexp is RE2 and has no lookaround or backreferences, so a JavaScript order pattern
-	// using either compiles upstream and is dropped here. `core/no-param-reassign` takes the same
-	// drop for the same reason and states it the same way, and the direction is deliberate: a
-	// dropped pattern demotes its members to `everything-else`, which reports MORE rather than
-	// less, and over-reporting is visible where under-reporting hides.
-	//
-	// Measured across this rule's whole corpus: 13 order entries are regex patterns and exactly ONE
-	// uses lookaround, `^(get|set)(?!(InitialState$|DefaultProps$|ChildContext$)).+$` in the case
-	// recorded as `sortCompRe2LookaroundCase`. On that input the rule reports the same COUNT and the
-	// same offending member as upstream and names a different partner in the message, because the
-	// members the dropped pattern would have grouped fall through to `everything-else`. That case is
-	// pinned in the test with both verdicts written out, rather than removed to make the suite
-	// green.
+	// A match only decides which group the member belongs to; it neither causes nor suppresses a
+	// report by itself. So `Test` is used, and a match that overruns the time bound counts as no
+	// match: the member falls to its default group, exactly as an uncompilable pattern sends it.
 	if submatches := sortCompRegexPattern.FindStringSubmatch(group); submatches != nil {
 		pattern, compiled := sortCompCompilePattern(submatches[1], submatches[2])
-		if compiled && pattern.MatchString(member.name) {
+		if compiled && pattern.Test(member.name) {
 			return true
 		}
 		return false
@@ -569,24 +563,12 @@ func sortCompGroupMatches(group string, member sortCompMember) bool {
 	return group == member.name
 }
 
-// sortCompCompilePattern builds a Go regexp from upstream's captured body and flags.
-//
-// Only `i`, `s` and `m` have Go equivalents; `g` and `y` are stateful match modifiers that mean
-// nothing for a single `test()` call, and `u` is Unicode mode, which Go's regexp is always in. So
-// the three that change a match are translated and the three that do not are dropped, which is the
-// same set of behaviours upstream's `new RegExp(body, flags).test(name)` has.
-func sortCompCompilePattern(body string, flags string) (*regexp.Regexp, bool) {
-	inline := ""
-	for _, flag := range flags {
-		switch flag {
-		case 'i', 's', 'm':
-			inline += string(flag)
-		}
-	}
-	if inline != "" {
-		body = "(?" + inline + ")" + body
-	}
-	pattern, err := regexp.Compile(body)
+// sortCompCompilePattern is upstream's `new RegExp(isRegExp[1], isRegExp[2])`: the captured body
+// under the user's own flags, passed through as written and read as JavaScript reads them
+// (#7mztrdd). A flag the compiler refuses, or one given twice, is a pattern that does not compile,
+// which is the same "matches nothing" answer an unreadable body gets.
+func sortCompCompilePattern(body string, flags string) (*esregexp.RegExp, bool) {
+	pattern, err := esregexp.Compile(body, flags)
 	if err != nil {
 		return nil, false
 	}

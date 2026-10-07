@@ -1,9 +1,8 @@
 package typescript
 
 import (
-	"regexp"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -17,9 +16,9 @@ type NoRequireImportsOptions struct {
 	// pulls the whole package tree into the program. The same escape hatch covers any JSON in a
 	// toolchain without JSON modules.
 	//
-	// Upstream compiles each string with the `u` flag; see compileAllowPatterns for what that
-	// costs us and what it does not.
-	Allow []*regexp.Regexp
+	// Upstream compiles each string with the `u` flag; see DecodeNoRequireImportsOptions for how
+	// that is read here.
+	Allow []*esregexp.RegExp
 
 	// AllowAsImport permits `import name = require('path')` while still reporting a bare call.
 	//
@@ -346,10 +345,12 @@ func requiredPathForAllow(ctx rule.Context, argument *ast.Node) (string, bool) {
 	}
 }
 
-// matchesAnyAllowPattern reports whether a path matches any configured allow pattern.
-func matchesAnyAllowPattern(allow []*regexp.Regexp, path string) bool {
+// matchesAnyAllowPattern reports whether a path matches any configured allow pattern. A match that
+// overruns the time bound allows the path too: a match here silences a report, so no answer would be
+// a report (#7mztrdd).
+func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string) bool {
 	for _, pattern := range allow {
-		if pattern.MatchString(path) {
+		if pattern.TestOrTimeout(path) {
 			return true
 		}
 	}
@@ -358,13 +359,13 @@ func matchesAnyAllowPattern(allow []*regexp.Regexp, path string) bool {
 
 // DecodeNoRequireImportsOptions compiles the `allow` strings once, at configuration time.
 //
-// Upstream compiles each pattern with JavaScript's `u` flag. Go's `regexp` is RE2 and always treats
-// the pattern as UTF-8, so the Unicode half of that flag is already the behavior here. What RE2 does
-// not have is backtracking, so a pattern using a backreference or a lookaround fails to compile.
-// Such a pattern is dropped rather than failing the run, because a linter that refuses to start over
-// one malformed entry in a configuration file reports a clean tree, which is the failure this tool
-// exists to remove. The dropped pattern simply permits nothing, so the rule stays strict rather than
-// silently going permissive.
+// Upstream compiles each pattern with `new RegExp(pattern, 'u')`, and so does this, read as
+// JavaScript reads it: a backreference or a lookaround its user wrote compiles, and `\s` and `\b`
+// mean what they mean upstream (#7mztrdd). A pattern JavaScript itself rejects, where upstream throws,
+// is dropped rather than failing the run, because a linter that refuses to start over one malformed
+// entry in a configuration file reports a clean tree, which is the failure this tool exists to
+// remove. The dropped pattern simply permits nothing, so the rule stays strict rather than silently
+// going permissive.
 func DecodeNoRequireImportsOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
 	if err != nil {
@@ -375,7 +376,7 @@ func DecodeNoRequireImportsOptions(raw []byte) (any, error) {
 
 	options := NoRequireImportsOptions{AllowAsImport: wire.AllowAsImport}
 	for _, pattern := range wire.Allow {
-		compiled, compileError := regexp.Compile(pattern)
+		compiled, compileError := esregexp.Compile(pattern, "u")
 		if compileError != nil {
 			continue
 		}

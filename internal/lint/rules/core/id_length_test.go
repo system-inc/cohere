@@ -222,6 +222,10 @@ func TestIdLengthStaysSilent(t *testing.T) {
 		{source: "function BEFORE_send() {};", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\", \"^A\", \"^Z\"]}")},
 		{source: "function BEFORE_send() {};", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^A\", \"^BEFORE_\", \"^Z\"]}")},
 		{source: "var x = 1 ;", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"[x-z]\"]}")},
+		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
+		// lookbehind, so these did not even decode; in Node both test true on BEFORE_send.
+		{source: "function BEFORE_send() {};", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^(?=BEFORE_)\"]}")},
+		{source: "function BEFORE_send() {};", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"(?<=_)send$\"]}")},
 		{source: "class Foo { #xyz() {} }", settings: nil},
 		{source: "class Foo { xyz = 1 }", settings: nil},
 		{source: "class Foo { #xyz = 1 }", settings: nil},
