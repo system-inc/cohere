@@ -13,6 +13,7 @@
     "--color-emerald",
     "--color-fuchsia",
     "--color-neutral",
+    "--color-surface",
     "--color-indigo",
     "--color-orange",
     "--color-purple",
@@ -41,6 +42,7 @@
     "--color-pink",
     "--color-rose",
     "--color-teal",
+    "--color-tone",
     "--color-zinc",
     "--percentage",
     "--color-ink",
@@ -363,7 +365,10 @@
       "white",
       "brand",
       "ink-strong",
-      "ink-soft"
+      "ink-soft",
+      "tone-1",
+      "tone-4",
+      "surface-2"
     ],
     "--color-red": [
       "50",
@@ -936,6 +941,13 @@
     "--color-ink": [
       "strong",
       "soft"
+    ],
+    "--color-tone": [
+      "1",
+      "4"
+    ],
+    "--color-surface": [
+      "2"
     ]
   },
   "propertyOrder": [

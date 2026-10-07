@@ -2,6 +2,7 @@ package tailwind
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
@@ -28,6 +29,25 @@ func publicThemeSystem(t *testing.T) DesignSystemResult {
 		t.Fatalf("loading the public theme: %v", err)
 	}
 	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+}
+
+// themeSystems are the public theme and ahra's, for an assertion whose expectations were measured on
+// both and agree (#f598zk0, tier C): it runs the same expectations on each, the public one everywhere and
+// ahra's opt-in through its corpus.
+var themeSystems = []engineSystem{
+	{name: "public", load: publicThemeSystem},
+	{name: "ahra", load: classOrderLiveRepositorySystem},
+}
+
+// forEachThemeSystem runs an assertion once per theme system, each as its own subtest.
+func forEachThemeSystem(t *testing.T, run func(t *testing.T, designSystem DesignSystemResult)) {
+	t.Helper()
+	for _, system := range themeSystems {
+		t.Run(system.name, func(t *testing.T) {
+			t.Parallel()
+			run(t, system.load(t))
+		})
+	}
 }
 
 // TestClassOrderReadsTheRepositoryOnThePublicTheme is TestClassOrderLiveReadsTheRepositoryRatherThanATable's
@@ -110,6 +130,83 @@ func TestRepositoryNamesAreNoLongerVouchedForOnThePublicThemes(t *testing.T) {
 		if classExistsIn(name, independent) {
 			t.Errorf("%s is known on the independent theme, which never declares it, so something vouches for it "+
 				"beyond the repository", name)
+		}
+	}
+}
+
+// TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme is TestClassOrderRanksByTheReadingThatCompiles'
+// twin (#f598zk0, tier C). The wanted orders are Prettier's Tailwind plugin (0.8.1) over the public
+// theme, measured the way the original's were over ahra's: each list formatted as a className with
+// tailwindStylesheet set to collapse/testdata/public_theme/theme.css.
+//
+// `shadow--0` reads first as the theme's `@utility shadow--*` with value `0`, needing a `--shadow-0` the
+// theme does not declare, and second as the framework's `shadow` with value `-0`, which finds
+// `--shadow--0`. `hover:tone--0-4` reads only as `@utility tone--*` with value `0-4`, which no
+// `--color-tone-*` key answers, so it ranks as a null.
+func TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	designSystem := publicThemeSystem(t)
+
+	for _, testCase := range []struct {
+		input, want []string
+	}{
+		{[]string{"shadow--0", "surface--2", "edge--1", "border"}, []string{"border", "edge--1", "surface--2", "shadow--0"}},
+		{[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"}, []string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"}},
+		{[]string{"flex", "dark:bg-transparent", "hover:tone--0-4"}, []string{"hover:tone--0-4", "flex", "dark:bg-transparent"}},
+	} {
+		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
+		if !decided {
+			t.Errorf("%v was declined; every class in it has an engine answer", testCase.input)
+			continue
+		}
+		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
+			t.Errorf("%v ordered as %v, the plugin writes %v", testCase.input, ordered, testCase.want)
+		}
+	}
+}
+
+// TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme is
+// TestClassExistenceAsksTheEvaluatorForRepositoryRoots' twin. The answers are the engine's
+// `candidatesToCss` over the public theme: `tone--0-4` has no `--color-tone-0-4`, `surface--2/50` puts a
+// modifier on a utility that takes none, `shadow--0` is reached only by its second reading, and
+// `prose-flow` declares nothing at its own level and still generates CSS.
+func TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	designSystem := publicThemeSystem(t)
+
+	for _, dead := range []string{"tone--0-4", "hover:tone--0-4", "surface--2/50"} {
+		if classExistsIn(dead, designSystem.System) {
+			t.Errorf("%q generates no CSS and was read as existing", dead)
+		}
+	}
+	for _, live := range []string{"tone--1", "tone--4", "surface--2", "shadow--0", "hover:shadow--3", "prose-flow"} {
+		if !classExistsIn(live, designSystem.System) {
+			t.Errorf("%q generates CSS and was read as unknown", live)
+		}
+	}
+}
+
+// TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme is TestRepositoryUtilityRootsAreNeverReported's
+// twin, and fails where the original skips: every class here reads as a root the theme declares by
+// `@utility`, so each one is checked, and a theme that stopped declaring them is a failure rather than a
+// skip.
+func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(t *testing.T) {
+	t.Parallel()
+	system := publicThemeSystem(t).System
+
+	for _, className := range []string{"shadow--3", "tone--1", "edge--1", "surface--2"} {
+		candidates := tailwindengine.ParseCandidate(className, system)
+		if len(candidates) == 0 {
+			t.Errorf("%s does not parse, so it checks nothing", className)
+			continue
+		}
+		if !system.DeclaresFunctionalUtility(candidates[0].Root) {
+			t.Errorf("%s reads as %q, which the public theme does not declare by `@utility`", className, candidates[0].Root)
+			continue
+		}
+		if !classExistsIn(className, system) {
+			t.Errorf("%s reads as the theme's root %q and is reported, which is a false positive on a declared utility",
+				className, candidates[0].Root)
 		}
 	}
 }

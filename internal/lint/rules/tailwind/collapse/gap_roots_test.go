@@ -9,7 +9,9 @@ import (
 // gapRootResolutionCases is what the engine answers for each class, measured rather than reasoned.
 //
 // Every entry came from `designSystem.candidatesToCss([class])` on ahra's live design system, where
-// `null` is the engine refusing to compile the class at all. That is the question `no-unknown-classes`
+// `null` is the engine refusing to compile the class at all. All 120 were measured again the same way on
+// testdata/public_theme and the engine answers each one identically there (#f598zk0), so the map holds
+// for both, and the test runs on both. That is the question `no-unknown-classes`
 // needs answered and the one these descriptions exist to answer in Go.
 //
 // Chosen to reach each arm rather than to be large. For every family: a bare root, a theme hit, a
@@ -110,10 +112,26 @@ var gapRootResolutionCases = map[string]bool{
 // than a restatement. That is the same discipline the three emitter slices were held to.
 func TestGapRootDescriptionsResolveWhatTheEngineCompiles(t *testing.T) {
 	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].spelling)
-	if system == nil {
-		t.Skip("no design system loaded")
+	for _, gapSystem := range []struct {
+		name string
+		load func(t *testing.T) *LoadedDesignSystem
+	}{
+		{name: "public", load: publicThemeSystem},
+		{name: "ahra", load: func(t *testing.T) *LoadedDesignSystem {
+			system, _ := liveTableFor(t, corpusRepositories[0].spelling)
+			return system
+		}},
+	} {
+		t.Run(gapSystem.name, func(t *testing.T) {
+			t.Parallel()
+			expectGapRootDescriptionsResolve(t, gapSystem.load(t))
+		})
 	}
+}
+
+// expectGapRootDescriptionsResolve compares every case with what the descriptions resolve on one system.
+func expectGapRootDescriptionsResolve(t *testing.T, system *LoadedDesignSystem) {
+	t.Helper()
 
 	var agreed, unparsed, undescribed int
 	var disagreements []string

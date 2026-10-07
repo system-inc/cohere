@@ -1,0 +1,42 @@
+/*
+ * Roots that end in a dash, the shape a repository's own numbered scales take (#f598zk0).
+ *
+ * `tone--4` is root `tone-` with value `4`, a root no framework description covers, so a rule asking the
+ * framework about it would report a class the engine compiles. `shadow--*` also collides with the
+ * framework's `shadow`: `shadow--0` reads first as this root with value `0`, which needs a `--shadow-0`
+ * nobody declared, and second as `shadow` with value `-0`, which finds `--shadow--0`. So existence and
+ * class order have to take the reading that compiles rather than the first one.
+ */
+@theme {
+    --color-tone-1: #e5e7eb;
+    --color-tone-4: #6b7280;
+    --color-surface-2: #f3f4f6;
+
+    --shadow---3: 0 1px 2px 0 #0000000d;
+    --shadow--0: 0 1px 4px 0 #0000001a;
+    --shadow--3: 0 1px 12px 0 #0000001a;
+    --shadow--6: 0 6px 16px 0 #00000026;
+}
+
+@utility tone--* {
+    color: --value(--color-tone-*, [color]);
+}
+@utility surface--* {
+    background-color: --value(--color-surface-*, [color]);
+}
+@utility edge--* {
+    border-color: --value(--color-tone-*, [color]);
+}
+@utility shadow--* {
+    box-shadow: --value(--shadow-*, [box-shadow]);
+}
+
+/* Static, with nested rules only: a class that exists though it declares nothing at its own level. */
+@utility prose-flow {
+    & p {
+        margin: 1em 0;
+    }
+    & p:first-child {
+        margin-top: 0;
+    }
+}

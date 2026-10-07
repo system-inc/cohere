@@ -3,8 +3,8 @@
   "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
   "groundTruth": "compileAstNodes propertySort, via readingOf",
   "rootCount": 26,
-  "caseCount": 4651,
-  "answered": 4153,
+  "caseCount": 4690,
+  "answered": 4192,
   "rejected": 498,
   "distinctByRoot": {
     "@container": [
@@ -3671,6 +3671,18 @@
     },
     {
       "root": "bg",
+      "className": "bg-surface-2",
+      "parsedRoot": "bg",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          198
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "bg",
       "className": "bg-taupe-50",
       "parsedRoot": "bg",
       "fromRegistry": true,
@@ -3924,6 +3936,30 @@
     {
       "root": "bg",
       "className": "bg-teal-950",
+      "parsedRoot": "bg",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          198
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "bg",
+      "className": "bg-tone-1",
+      "parsedRoot": "bg",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          198
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "bg",
+      "className": "bg-tone-4",
       "parsedRoot": "bg",
       "fromRegistry": true,
       "reading": {
@@ -8583,6 +8619,18 @@
     },
     {
       "root": "decoration",
+      "className": "decoration-surface-2",
+      "parsedRoot": "decoration",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          303
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "decoration",
       "className": "decoration-taupe-50",
       "parsedRoot": "decoration",
       "fromRegistry": true,
@@ -8836,6 +8884,30 @@
     {
       "root": "decoration",
       "className": "decoration-teal-950",
+      "parsedRoot": "decoration",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          303
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "decoration",
+      "className": "decoration-tone-1",
+      "parsedRoot": "decoration",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          303
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "decoration",
+      "className": "decoration-tone-4",
       "parsedRoot": "decoration",
       "fromRegistry": true,
       "reading": {
@@ -12359,6 +12431,18 @@
     },
     {
       "root": "drop-shadow",
+      "className": "drop-shadow-surface-2",
+      "parsedRoot": "drop-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          333
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "drop-shadow",
       "className": "drop-shadow-taupe-50",
       "parsedRoot": "drop-shadow",
       "fromRegistry": true,
@@ -12612,6 +12696,30 @@
     {
       "root": "drop-shadow",
       "className": "drop-shadow-teal-950",
+      "parsedRoot": "drop-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          333
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "drop-shadow",
+      "className": "drop-shadow-tone-1",
+      "parsedRoot": "drop-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          333
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "drop-shadow",
+      "className": "drop-shadow-tone-4",
       "parsedRoot": "drop-shadow",
       "fromRegistry": true,
       "reading": {
@@ -16422,6 +16530,18 @@
     },
     {
       "root": "fill",
+      "className": "fill-surface-2",
+      "parsedRoot": "fill",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          265
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "fill",
       "className": "fill-taupe-50",
       "parsedRoot": "fill",
       "fromRegistry": true,
@@ -16675,6 +16795,30 @@
     {
       "root": "fill",
       "className": "fill-teal-950",
+      "parsedRoot": "fill",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          265
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "fill",
+      "className": "fill-tone-1",
+      "parsedRoot": "fill",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          265
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "fill",
+      "className": "fill-tone-4",
       "parsedRoot": "fill",
       "fromRegistry": true,
       "reading": {
@@ -21503,6 +21647,18 @@
     },
     {
       "root": "inset-ring",
+      "className": "inset-ring-surface-2",
+      "parsedRoot": "inset-ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          323
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-ring",
       "className": "inset-ring-taupe-50",
       "parsedRoot": "inset-ring",
       "fromRegistry": true,
@@ -21756,6 +21912,30 @@
     {
       "root": "inset-ring",
       "className": "inset-ring-teal-950",
+      "parsedRoot": "inset-ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          323
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-ring",
+      "className": "inset-ring-tone-1",
+      "parsedRoot": "inset-ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          323
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-ring",
+      "className": "inset-ring-tone-4",
       "parsedRoot": "inset-ring",
       "fromRegistry": true,
       "reading": {
@@ -25251,6 +25431,18 @@
     },
     {
       "root": "inset-shadow",
+      "className": "inset-shadow-surface-2",
+      "parsedRoot": "inset-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          321
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-shadow",
       "className": "inset-shadow-taupe-50",
       "parsedRoot": "inset-shadow",
       "fromRegistry": true,
@@ -25504,6 +25696,30 @@
     {
       "root": "inset-shadow",
       "className": "inset-shadow-teal-950",
+      "parsedRoot": "inset-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          321
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-shadow",
+      "className": "inset-shadow-tone-1",
+      "parsedRoot": "inset-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          321
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inset-shadow",
+      "className": "inset-shadow-tone-4",
       "parsedRoot": "inset-shadow",
       "fromRegistry": true,
       "reading": {
@@ -29253,6 +29469,18 @@
     },
     {
       "root": "outline",
+      "className": "outline-surface-2",
+      "parsedRoot": "outline",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          329
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "outline",
       "className": "outline-taupe-50",
       "parsedRoot": "outline",
       "fromRegistry": true,
@@ -29506,6 +29734,30 @@
     {
       "root": "outline",
       "className": "outline-teal-950",
+      "parsedRoot": "outline",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          329
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "outline",
+      "className": "outline-tone-1",
+      "parsedRoot": "outline",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          329
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "outline",
+      "className": "outline-tone-4",
       "parsedRoot": "outline",
       "fromRegistry": true,
       "reading": {
@@ -33039,6 +33291,18 @@
     },
     {
       "root": "ring",
+      "className": "ring-surface-2",
+      "parsedRoot": "ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          319
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring",
       "className": "ring-taupe-50",
       "parsedRoot": "ring",
       "fromRegistry": true,
@@ -33292,6 +33556,30 @@
     {
       "root": "ring",
       "className": "ring-teal-950",
+      "parsedRoot": "ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          319
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring",
+      "className": "ring-tone-1",
+      "parsedRoot": "ring",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          319
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring",
+      "className": "ring-tone-4",
       "parsedRoot": "ring",
       "fromRegistry": true,
       "reading": {
@@ -36808,6 +37096,18 @@
     },
     {
       "root": "ring-offset",
+      "className": "ring-offset-surface-2",
+      "parsedRoot": "ring-offset",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          325
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring-offset",
       "className": "ring-offset-taupe-50",
       "parsedRoot": "ring-offset",
       "fromRegistry": true,
@@ -37061,6 +37361,30 @@
     {
       "root": "ring-offset",
       "className": "ring-offset-teal-950",
+      "parsedRoot": "ring-offset",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          325
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring-offset",
+      "className": "ring-offset-tone-1",
+      "parsedRoot": "ring-offset",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          325
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "ring-offset",
+      "className": "ring-offset-tone-4",
       "parsedRoot": "ring-offset",
       "fromRegistry": true,
       "reading": {
@@ -41328,6 +41652,18 @@
     },
     {
       "root": "shadow",
+      "className": "shadow-surface-2",
+      "parsedRoot": "shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          317
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "shadow",
       "className": "shadow-taupe-50",
       "parsedRoot": "shadow",
       "fromRegistry": true,
@@ -41581,6 +41917,30 @@
     {
       "root": "shadow",
       "className": "shadow-teal-950",
+      "parsedRoot": "shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          317
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "shadow",
+      "className": "shadow-tone-1",
+      "parsedRoot": "shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          317
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "shadow",
+      "className": "shadow-tone-4",
       "parsedRoot": "shadow",
       "fromRegistry": true,
       "reading": {
@@ -45092,6 +45452,18 @@
     },
     {
       "root": "stroke",
+      "className": "stroke-surface-2",
+      "parsedRoot": "stroke",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          266
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "stroke",
       "className": "stroke-taupe-50",
       "parsedRoot": "stroke",
       "fromRegistry": true,
@@ -45345,6 +45717,30 @@
     {
       "root": "stroke",
       "className": "stroke-teal-950",
+      "parsedRoot": "stroke",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          266
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "stroke",
+      "className": "stroke-tone-1",
+      "parsedRoot": "stroke",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          266
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "stroke",
+      "className": "stroke-tone-4",
       "parsedRoot": "stroke",
       "fromRegistry": true,
       "reading": {
@@ -48979,6 +49375,18 @@
     },
     {
       "root": "text",
+      "className": "text-surface-2",
+      "parsedRoot": "text",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          297
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "text",
       "className": "text-taupe-50",
       "parsedRoot": "text",
       "fromRegistry": true,
@@ -49232,6 +49640,30 @@
     {
       "root": "text",
       "className": "text-teal-950",
+      "parsedRoot": "text",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          297
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "text",
+      "className": "text-tone-1",
+      "parsedRoot": "text",
+      "fromRegistry": true,
+      "reading": {
+        "order": [
+          297
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "text",
+      "className": "text-tone-4",
       "parsedRoot": "text",
       "fromRegistry": true,
       "reading": {
@@ -52284,6 +52716,16 @@
     },
     {
       "root": "text-shadow",
+      "className": "text-shadow-surface-2",
+      "parsedRoot": "text-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "text-shadow",
       "className": "text-shadow-taupe-50",
       "parsedRoot": "text-shadow",
       "fromRegistry": true,
@@ -52495,6 +52937,26 @@
     {
       "root": "text-shadow",
       "className": "text-shadow-teal-950",
+      "parsedRoot": "text-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "text-shadow",
+      "className": "text-shadow-tone-1",
+      "parsedRoot": "text-shadow",
+      "fromRegistry": true,
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "text-shadow",
+      "className": "text-shadow-tone-4",
       "parsedRoot": "text-shadow",
       "fromRegistry": true,
       "reading": {

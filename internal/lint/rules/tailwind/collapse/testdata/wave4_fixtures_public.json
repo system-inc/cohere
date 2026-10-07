@@ -3,8 +3,8 @@
   "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
   "groundTruth": "compileAstNodes propertySort, via readingOf",
   "rootCount": 22,
-  "caseCount": 2947,
-  "answered": 2594,
+  "caseCount": 2965,
+  "answered": 2612,
   "rejected": 353,
   "distinctByRoot": {
     "accent": [
@@ -2812,6 +2812,17 @@
     },
     {
       "root": "accent",
+      "className": "accent-surface-2",
+      "parsedRoot": "accent",
+      "reading": {
+        "order": [
+          310
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "accent",
       "className": "accent-taupe-50",
       "parsedRoot": "accent",
       "reading": {
@@ -3044,6 +3055,28 @@
     {
       "root": "accent",
       "className": "accent-teal-950",
+      "parsedRoot": "accent",
+      "reading": {
+        "order": [
+          310
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "accent",
+      "className": "accent-tone-1",
+      "parsedRoot": "accent",
+      "reading": {
+        "order": [
+          310
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "accent",
+      "className": "accent-tone-4",
       "parsedRoot": "accent",
       "reading": {
         "order": [
@@ -8775,6 +8808,17 @@
     },
     {
       "root": "caret",
+      "className": "caret-surface-2",
+      "parsedRoot": "caret",
+      "reading": {
+        "order": [
+          309
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "caret",
       "className": "caret-taupe-50",
       "parsedRoot": "caret",
       "reading": {
@@ -9007,6 +9051,28 @@
     {
       "root": "caret",
       "className": "caret-teal-950",
+      "parsedRoot": "caret",
+      "reading": {
+        "order": [
+          309
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "caret",
+      "className": "caret-tone-1",
+      "parsedRoot": "caret",
+      "reading": {
+        "order": [
+          309
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "caret",
+      "className": "caret-tone-4",
       "parsedRoot": "caret",
       "reading": {
         "order": [
@@ -12175,6 +12241,17 @@
     },
     {
       "root": "divide",
+      "className": "divide-surface-2",
+      "parsedRoot": "divide",
+      "reading": {
+        "order": [
+          139
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "divide",
       "className": "divide-taupe-50",
       "parsedRoot": "divide",
       "reading": {
@@ -12407,6 +12484,28 @@
     {
       "root": "divide",
       "className": "divide-teal-950",
+      "parsedRoot": "divide",
+      "reading": {
+        "order": [
+          139
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "divide",
+      "className": "divide-tone-1",
+      "parsedRoot": "divide",
+      "reading": {
+        "order": [
+          139
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "divide",
+      "className": "divide-tone-4",
       "parsedRoot": "divide",
       "reading": {
         "order": [
@@ -18295,6 +18394,17 @@
     },
     {
       "root": "placeholder",
+      "className": "placeholder-surface-2",
+      "parsedRoot": "placeholder",
+      "reading": {
+        "order": [
+          308
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "placeholder",
       "className": "placeholder-taupe-50",
       "parsedRoot": "placeholder",
       "reading": {
@@ -18527,6 +18637,28 @@
     {
       "root": "placeholder",
       "className": "placeholder-teal-950",
+      "parsedRoot": "placeholder",
+      "reading": {
+        "order": [
+          308
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "placeholder",
+      "className": "placeholder-tone-1",
+      "parsedRoot": "placeholder",
+      "reading": {
+        "order": [
+          308
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "placeholder",
+      "className": "placeholder-tone-4",
       "parsedRoot": "placeholder",
       "reading": {
         "order": [
@@ -21695,6 +21827,17 @@
     },
     {
       "root": "scrollbar-thumb",
+      "className": "scrollbar-thumb-surface-2",
+      "parsedRoot": "scrollbar-thumb",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-thumb",
       "className": "scrollbar-thumb-taupe-50",
       "parsedRoot": "scrollbar-thumb",
       "reading": {
@@ -21927,6 +22070,28 @@
     {
       "root": "scrollbar-thumb",
       "className": "scrollbar-thumb-teal-950",
+      "parsedRoot": "scrollbar-thumb",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-thumb",
+      "className": "scrollbar-thumb-tone-1",
+      "parsedRoot": "scrollbar-thumb",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-thumb",
+      "className": "scrollbar-thumb-tone-4",
       "parsedRoot": "scrollbar-thumb",
       "reading": {
         "order": [
@@ -25095,6 +25260,17 @@
     },
     {
       "root": "scrollbar-track",
+      "className": "scrollbar-track-surface-2",
+      "parsedRoot": "scrollbar-track",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-track",
       "className": "scrollbar-track-taupe-50",
       "parsedRoot": "scrollbar-track",
       "reading": {
@@ -25327,6 +25503,28 @@
     {
       "root": "scrollbar-track",
       "className": "scrollbar-track-teal-950",
+      "parsedRoot": "scrollbar-track",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-track",
+      "className": "scrollbar-track-tone-1",
+      "parsedRoot": "scrollbar-track",
+      "reading": {
+        "order": [
+          107
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "scrollbar-track",
+      "className": "scrollbar-track-tone-4",
       "parsedRoot": "scrollbar-track",
       "reading": {
         "order": [
