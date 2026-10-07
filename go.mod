@@ -18,6 +18,10 @@ replace (
 	github.com/microsoft/TypeScript/tsc/shim/vfs => ./TypeScript-shim/vfs
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs => ./TypeScript-shim/vfs/cachedvfs
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs => ./TypeScript-shim/vfs/osvfs
+
+	// The single static assignment form cohere's high-level IR and Adamic's flow graph share, a
+	// module of its own so Adamic can import it through its cohere submodule (#ejcnkja).
+	github.com/system-inc/cohere/static_single_assignment => ./static_single_assignment
 )
 
 require (
@@ -36,6 +40,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
+	github.com/system-inc/cohere/static_single_assignment v0.0.0
 
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
@@ -43,6 +48,10 @@ require (
 	// 21.8% of tracked files diverge from our fork after every settings-reachable fix. The only thing
 	// that reproduces our formatter is our formatter, and goja is what runs it in-process.
 	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
+
+	// cohere-dev reads go.work and each module's go.mod with the parser go itself uses, to gate every
+	// module the repository builds (command/cohere-dev/workspace.go).
+	golang.org/x/mod v0.39.0
 	golang.org/x/sys v0.47.0
 
 	// Tests only: the registry's option-decoding guard loads the rules tree with type information,
@@ -55,7 +64,6 @@ require (
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
-	golang.org/x/mod v0.39.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 )

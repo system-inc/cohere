@@ -890,7 +890,7 @@ func dominatedByOtherReactiveScope(function *Function, dominance *dominanceTree,
 		if !ok || identity.GroupOf(candidate.Scope) == targetGroup {
 			continue
 		}
-		if dominance.dominates(block.Id, targetBlock) {
+		if dominance.Dominates(block.Id, targetBlock) {
 			return true
 		}
 	}

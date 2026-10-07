@@ -8,9 +8,13 @@
 //  3. Every instruction and terminal has a nonzero, monotonically increasing EvaluationOrder.
 //
 // They are re-established by calling Finalize, which any pass that restructures the graph must do.
+//
+// The passes themselves are static_single_assignment's, which this IR shares with Adamic's flow graph.
+// What lives here is ssaGraph, this IR's side of that module's Graph: how it reads and writes a
+// Function, a BasicBlock and a Place.
 package high_level_intermediate_representation
 
-import "sync"
+import "github.com/system-inc/cohere/static_single_assignment"
 
 // Finalize brings a freshly lowered function into the state every pass assumes.
 //
@@ -28,185 +32,14 @@ func Finalize(function *Function) {
 
 // ReversePostorder reorders Function.Blocks into reverse postorder and drops unreachable blocks.
 //
-// # Why unreachable blocks are dropped here and kept in controlflow
-//
-// `controlflow` keeps them, because a rule may want to ask what would have run after a `return`.
-// This drops them, because a value defined only in a block control never reaches is a value no
-// analysis should see: single-assignment construction over an unreachable definition produces a phi
-// operand from a predecessor that cannot execute, and every effect derived from it is fiction.
-//
-// A pass wanting the unreachable code should read the AST, or the other graph. This one is for
-// reasoning about what runs.
-//
-// The traversal is upstream's `getReversePostorderedBlocks`: visit a structural fallthrough first,
-// then the real successors in reverse order. Postorder is reversed at the end, so that puts loop
-// bodies and conditional arms before their continuation in the final slice. That ordering is more
-// than presentation. Evaluation order is assigned from this slice, and mutable-range inference
-// must see a mutation in a loop body before a read after the loop.
-//
-// A fallthrough is visited initially as structural rather than executable. If no real edge reaches
-// it, upstream retains its block id as an empty Unreachable block; if a real edge reaches it later,
-// the same block is revisited as executable. Keeping those two states separate prevents a
-// fallthrough link from manufacturing a control-flow edge while still preserving the structured
-// terminal's required target.
+// Upstream's `getReversePostorderedBlocks`, a structural fallthrough visited first so loop bodies and
+// conditional arms precede their continuation, and a fallthrough nothing real reaches kept as an empty
+// Unreachable block. static_single_assignment.ReversePostorder carries the reasoning.
 func ReversePostorder(function *Function) {
 	if function == nil {
 		return
 	}
-	scratch := reversePostorderScratchPool.Get().(*reversePostorderScratch)
-	postorder := scratch.postorder[:0]
-
-	// The three sets are dense slices over block ids rather than maps, and the walk keeps its frames
-	// and their successors in two flat buffers rather than a frame and two slices per block. The
-	// traversal is unchanged; only where its bookkeeping lives moved, because this runs for every
-	// lowered function and the per-block allocations were a million objects on a cold ahra run
-	// (#rwsffzm). Ids are bounded by `nextBlock`, and by the largest id in the table for a function
-	// built by hand without `NewFunction`.
-	bound := int(function.nextBlock)
-	for id := range function.blocksById {
-		if int(id) >= bound {
-			bound = int(id) + 1
-		}
-	}
-	visited := clearedFlags(scratch.visited, bound)
-	used := clearedFlags(scratch.used, bound)
-	usedFallthroughs := clearedFlags(scratch.usedFallthroughs, bound)
-	inRange := func(id BlockId) bool { return int(id) < bound }
-
-	type successor = reversePostorderSuccessor
-	type frame = reversePostorderFrame
-	successors := scratch.successors[:0]
-	real := scratch.real[:0]
-	stack := scratch.stack[:0]
-	// The buffers go back to the pool however this returns, with every pointer they held cleared, so a
-	// pooled buffer never keeps a function's blocks alive.
-	defer func() {
-		clear(postorder[:cap(postorder)])
-		clear(stack[:cap(stack)])
-		scratch.postorder, scratch.successors, scratch.real, scratch.stack = postorder, successors, real, stack
-		scratch.visited, scratch.used, scratch.usedFallthroughs = visited, used, usedFallthroughs
-		reversePostorderScratchPool.Put(scratch)
-	}()
-	collect := func(next BlockId) { real = append(real, next) }
-	enter := func(id BlockId, isUsed bool) (frame, bool) {
-		if !inRange(id) {
-			return frame{}, false
-		}
-		wasUsed := used[id]
-		wasVisited := visited[id]
-		visited[id] = true
-		if isUsed {
-			used[id] = true
-		}
-		if wasVisited && (wasUsed || !isUsed) {
-			return frame{}, false
-		}
-
-		block, ok := function.Block(id)
-		if !ok {
-			return frame{}, false
-		}
-		start := len(successors)
-		if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
-			if isUsed && inRange(fallthroughBlock) {
-				usedFallthroughs[fallthroughBlock] = true
-			}
-			successors = append(successors, successor{id: fallthroughBlock, isUsed: false})
-		}
-		real = real[:0]
-		EachSuccessor(block.Terminal, collect)
-		for index := len(real) - 1; index >= 0; index-- {
-			successors = append(successors, successor{id: real[index], isUsed: isUsed})
-		}
-		return frame{block: block, start: start, end: len(successors), next: start, ownsAppend: !wasVisited}, true
-	}
-
-	entry, ok := enter(function.Entry, true)
-	if !ok {
-		return
-	}
-	stack = append(stack, entry)
-
-	for len(stack) > 0 {
-		top := &stack[len(stack)-1]
-		if top.next == top.end {
-			if top.ownsAppend {
-				postorder = append(postorder, top.block)
-			}
-			successors = successors[:top.start]
-			stack = stack[:len(stack)-1]
-			continue
-		}
-		next := successors[top.next]
-		top.next++
-		if child, ok := enter(next.id, next.isUsed); ok {
-			stack = append(stack, child)
-		}
-	}
-
-	blocks := make([]*BasicBlock, 0, len(postorder))
-	for index := len(postorder) - 1; index >= 0; index-- {
-		block := postorder[index]
-		switch {
-		case inRange(block.Id) && used[block.Id]:
-			blocks = append(blocks, block)
-		case inRange(block.Id) && usedFallthroughs[block.Id]:
-			placeholder := &BasicBlock{
-				Id:           block.Id,
-				Kind:         block.Kind,
-				Terminal:     &Unreachable{},
-				Predecessors: append([]BlockId(nil), block.Predecessors...),
-			}
-			blocks = append(blocks, placeholder)
-			function.blocksById[block.Id] = placeholder
-		}
-	}
-	function.Blocks = blocks
-
-	for id := range function.blocksById {
-		if !inRange(id) || (!used[id] && !usedFallthroughs[id]) {
-			delete(function.blocksById, id)
-		}
-	}
-}
-
-// reversePostorderSuccessor is one edge ReversePostorder will follow, and whether it is executable.
-type reversePostorderSuccessor struct {
-	id     BlockId
-	isUsed bool
-}
-
-// reversePostorderFrame is one block on ReversePostorder's walk stack.
-type reversePostorderFrame struct {
-	block *BasicBlock
-	// successors are this frame's entries in the shared buffer, from start to end. A child's entries
-	// are appended after them and truncated away when the child is popped, so the buffer is a stack in
-	// step with the frames.
-	start, end, next int
-	ownsAppend       bool
-}
-
-// reversePostorderScratch is ReversePostorder's working memory, kept between calls. It runs once per
-// lowered function, and its stack, its postorder and its three sets were 22 MB of a cold ahra run,
-// allocated and dropped every call (#p4h0p54). Only the ordered block list it returns needs to be new.
-type reversePostorderScratch struct {
-	postorder                       []*BasicBlock
-	visited, used, usedFallthroughs []bool
-	successors                      []reversePostorderSuccessor
-	real                            []BlockId
-	stack                           []reversePostorderFrame
-}
-
-var reversePostorderScratchPool = sync.Pool{New: func() any { return new(reversePostorderScratch) }}
-
-// clearedFlags is flags resized to length, all false, reusing its array when it is long enough.
-func clearedFlags(flags []bool, length int) []bool {
-	if cap(flags) < length {
-		return make([]bool, length)
-	}
-	flags = flags[:length]
-	clear(flags)
-	return flags
+	static_single_assignment.ReversePostorder(ssaGraph{}, function)
 }
 
 // MarkPredecessors recomputes every block's Predecessors from the real edges.
@@ -217,23 +50,7 @@ func clearedFlags(flags []bool, length int) []bool {
 // block join by asking each predecessor what it holds, and a missing or spurious predecessor is a
 // wrong phi rather than a crash.
 func MarkPredecessors(function *Function) {
-	for _, block := range function.Blocks {
-		block.Predecessors = block.Predecessors[:0]
-	}
-	for _, block := range function.Blocks {
-		seen := map[BlockId]bool{}
-		EachSuccessor(block.Terminal, func(id BlockId) {
-			if seen[id] {
-				return
-			}
-			seen[id] = true
-			successor, ok := function.Block(id)
-			if !ok {
-				return
-			}
-			successor.Predecessors = append(successor.Predecessors, block.Id)
-		})
-	}
+	static_single_assignment.MarkPredecessors(ssaGraph{}, function)
 }
 
 // MarkEvaluationOrder assigns each instruction and terminal its position in evaluation order.
@@ -245,15 +62,7 @@ func MarkPredecessors(function *Function) {
 // Starts at 1: zero means unassigned, and a pass that reads an order of zero has found a block the
 // finalizer did not reach.
 func MarkEvaluationOrder(function *Function) {
-	order := EvaluationOrder(1)
-	for _, block := range function.Blocks {
-		for _, instructionId := range block.Instructions {
-			function.Instructions[instructionId].Order = order
-			order++
-		}
-		setTerminalOrder(block.Terminal, order)
-		order++
-	}
+	static_single_assignment.MarkEvaluationOrder(ssaGraph{}, function)
 }
 
 func setTerminalOrder(terminal Terminal, order EvaluationOrder) {
@@ -301,4 +110,170 @@ func setTerminalOrder(terminal Terminal, order EvaluationOrder) {
 	case *Scope:
 		t.Order = order
 	}
+}
+
+// ssaGraph is this IR's side of static_single_assignment.Graph.
+//
+// Where the two IRs that share the module differ, this is cohere's answer: a structured terminal's
+// fallthrough is reported as one, MaybeThrow's handler as an exceptional edge, a StoreContext as a
+// context store, and the Returns place is the function's own. Each method is a field read or the
+// visitor this package already has, so the passes see exactly what they read before they moved.
+type ssaGraph struct{}
+
+func (ssaGraph) Entry(function *Function) BlockId { return function.Entry }
+
+func (ssaGraph) BlockBound(function *Function) int {
+	// Ids are bounded by `nextBlock`, and by the largest id in the table for a function built by
+	// hand without `NewFunction`.
+	bound := int(function.nextBlock)
+	for id := range function.blocksById {
+		if int(id) >= bound {
+			bound = int(id) + 1
+		}
+	}
+	return bound
+}
+
+func (ssaGraph) Block(function *Function, id BlockId) (*BasicBlock, bool) { return function.Block(id) }
+
+func (ssaGraph) Blocks(function *Function) []*BasicBlock { return function.Blocks }
+
+func (ssaGraph) SetBlocks(function *Function, blocks []*BasicBlock) { function.Blocks = blocks }
+
+func (ssaGraph) Retain(function *Function, keep func(id BlockId) bool) {
+	for id := range function.blocksById {
+		if !keep(id) {
+			delete(function.blocksById, id)
+		}
+	}
+}
+
+func (ssaGraph) Placeholder(function *Function, block *BasicBlock) *BasicBlock {
+	placeholder := &BasicBlock{
+		Id:           block.Id,
+		Kind:         block.Kind,
+		Terminal:     &Unreachable{},
+		Predecessors: append([]BlockId(nil), block.Predecessors...),
+	}
+	function.blocksById[block.Id] = placeholder
+	return placeholder
+}
+
+func (ssaGraph) Id(block *BasicBlock) BlockId { return block.Id }
+
+func (ssaGraph) Predecessors(block *BasicBlock) []BlockId { return block.Predecessors }
+
+func (ssaGraph) SetPredecessors(block *BasicBlock, predecessors []BlockId) {
+	block.Predecessors = predecessors
+}
+
+func (ssaGraph) Phis(block *BasicBlock) []*Phi { return block.Phis }
+
+func (ssaGraph) SetPhis(block *BasicBlock, phis []*Phi) { block.Phis = phis }
+
+// EachEdge reports the structural fallthrough first, then EachSuccessor's real edges in its order,
+// with MaybeThrow's handler marked exceptional. Try's handler is a real edge: it leaves the block
+// holding the Try, before the try body runs, so nothing in that block can throw on the way.
+func (ssaGraph) EachEdge(block *BasicBlock, visit func(successor BlockId, edge static_single_assignment.Edge)) {
+	if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
+		visit(fallthroughBlock, static_single_assignment.Fallthrough)
+	}
+	handler := InvalidBlock
+	if maybeThrow, ok := block.Terminal.(*MaybeThrow); ok {
+		handler = maybeThrow.Handler
+	}
+	EachSuccessor(block.Terminal, func(successor BlockId) {
+		if HasBlock(handler) && successor == handler {
+			visit(successor, static_single_assignment.Exceptional)
+			return
+		}
+		visit(successor, static_single_assignment.Real)
+	})
+}
+
+func (ssaGraph) EndsInReturn(block *BasicBlock) bool {
+	_, returns := block.Terminal.(*Return)
+	return returns
+}
+
+func (ssaGraph) InstructionCount(function *Function, block *BasicBlock) int {
+	return len(block.Instructions)
+}
+
+func (ssaGraph) EachInstructionPlace(function *Function, block *BasicBlock, index int,
+	visit func(place *Place, role static_single_assignment.Role)) {
+	EachInstructionPlacePointer(function.Instructions[block.Instructions[index]], func(place *Place, role PlaceRole) {
+		visit(place, ssaRole(role))
+	})
+}
+
+func (ssaGraph) IsContextStore(function *Function, block *BasicBlock, index int) bool {
+	_, isContextStore := function.Instructions[block.Instructions[index]].Value.(*StoreContext)
+	return isContextStore
+}
+
+func (ssaGraph) ContextStoreDefines(function *Function, block *BasicBlock, index int, place Place) bool {
+	return place.Identifier == function.Instructions[block.Instructions[index]].LValue.Identifier
+}
+
+func (ssaGraph) SetInstructionOrder(function *Function, block *BasicBlock, index int, order EvaluationOrder) {
+	function.Instructions[block.Instructions[index]].Order = order
+}
+
+func (ssaGraph) EachTerminalPlace(block *BasicBlock, visit func(place *Place, role static_single_assignment.Role)) {
+	EachTerminalPlacePointer(block.Terminal, func(place *Place, role PlaceRole) {
+		visit(place, ssaRole(role))
+	})
+}
+
+func (ssaGraph) SetTerminalOrder(block *BasicBlock, order EvaluationOrder) {
+	setTerminalOrder(block.Terminal, order)
+}
+
+func (ssaGraph) Params(function *Function) []Place { return function.Params }
+
+func (ssaGraph) Returns(function *Function) *Place { return &function.Returns }
+
+func (ssaGraph) Declaration(function *Function, identifier IdentifierId) DeclarationId {
+	return function.Identifiers[identifier].Declaration
+}
+
+func (ssaGraph) Contextual(function *Function, declaration DeclarationId) bool {
+	return function.ContextDeclarations[declaration]
+}
+
+// Mint creates a new value carrying the same source binding as the original.
+//
+// The DeclarationId is preserved, which is the whole point: after renaming, "which variable is
+// this" is answered by the declaration and "which value is this" by the identifier, and a pass can
+// ask either.
+func (ssaGraph) Mint(function *Function, original IdentifierId) IdentifierId {
+	source := function.Identifiers[original]
+	return function.NewIdentifier(source.Name, source.Node, source.Declaration).Id
+}
+
+func (ssaGraph) Named(function *Function, identifier IdentifierId) bool {
+	return function.Identifiers[identifier].Name != ""
+}
+
+func (ssaGraph) PlaceString(function *Function, identifier IdentifierId) string {
+	return function.PlaceString(Place{Identifier: identifier})
+}
+
+func (ssaGraph) IdentifierOf(place Place) IdentifierId { return place.Identifier }
+
+// WithIdentifier keeps the place's effect, reactivity and range, which is what every renamed place
+// and phi operand carried before the passes moved.
+func (ssaGraph) WithIdentifier(place Place, identifier IdentifierId) Place {
+	place.Identifier = identifier
+	return place
+}
+
+// ssaRole is the module's two roles from this IR's three: a receiver is read, as every pass here has
+// always treated it.
+func ssaRole(role PlaceRole) static_single_assignment.Role {
+	if role == PlaceRoleDefine {
+		return static_single_assignment.Define
+	}
+	return static_single_assignment.Use
 }

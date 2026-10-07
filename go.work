@@ -3,4 +3,5 @@ go 1.27
 use (
 	.
 	./TypeScript/tsc
+	./static_single_assignment
 )

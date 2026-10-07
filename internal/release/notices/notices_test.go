@@ -70,7 +70,7 @@ func TestEveryGoModRequirementIsCredited(t *testing.T) {
 	notices := committed(t, ThirdPartyNoticesFileName)
 	credited := 0
 	for _, requirement := range goMod.Require {
-		if strings.HasPrefix(requirement.Path, compilerModulePrefix) {
+		if strings.HasPrefix(requirement.Path, compilerModulePrefix) || isCohere(requirement.Path) {
 			continue
 		}
 		if !strings.Contains(notices, "\n### "+requirement.Path+"\n") {

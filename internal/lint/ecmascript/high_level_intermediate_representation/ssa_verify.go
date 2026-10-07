@@ -26,36 +26,29 @@
 //
 // `internal/utilities/control_flow_graph.AnalyzeDominators` is generic over that package's `Graph[E]`, not
 // over `Function`, so it cannot be pointed at this. Rather than materialise a parallel graph to
-// borrow it, the same Cooper-Harvey-Kennedy fixed point is run here over `Function.Blocks`. It is
-// twenty lines because reverse postorder is already established, and being a second implementation
-// is acceptable for a checker: a checker that shares an implementation with the thing it checks can
+// borrow it, the same Cooper-Harvey-Kennedy fixed point is run over `Function.Blocks`. It is twenty
+// lines because reverse postorder is already established, and being a second implementation is
+// acceptable for a checker: a checker that shares an implementation with the thing it checks can
 // agree with it and both be wrong.
+//
+// The verifier and its dominance are static_single_assignment's, which this IR shares with Adamic's
+// flow graph. The context-store exemption upstream's invariant implies is there too, asked of this IR
+// through ssaGraph.ContextStoreDefines.
 package high_level_intermediate_representation
 
-import "fmt"
+import "github.com/system-inc/cohere/static_single_assignment"
 
 // SSAViolation is one broken invariant.
-type SSAViolation struct {
-	// Kind is which invariant broke.
-	Kind SSAViolationKind
-	// Identifier is the value involved.
-	Identifier IdentifierId
-	// Block is where the violating use or duplicate definition sits.
-	Block BlockId
-	// Detail is a human-readable explanation naming both ends.
-	Detail string
-}
-
-func (v SSAViolation) String() string { return v.Detail }
+type SSAViolation = static_single_assignment.SSAViolation
 
 // SSAViolationKind is which of the two invariants a violation breaks.
-type SSAViolationKind uint8
+type SSAViolationKind = static_single_assignment.SSAViolationKind
 
 const (
 	// SSAViolationMultipleDefinitions is a value written more than once.
-	SSAViolationMultipleDefinitions SSAViolationKind = iota
+	SSAViolationMultipleDefinitions = static_single_assignment.SSAViolationMultipleDefinitions
 	// SSAViolationUseNotDominated is a use the definition does not dominate.
-	SSAViolationUseNotDominated
+	SSAViolationUseNotDominated = static_single_assignment.SSAViolationUseNotDominated
 )
 
 // VerifySSA checks that a function is in single static assignment form and returns every violation.
@@ -66,276 +59,29 @@ const (
 //
 // Nested functions are not descended into; call it per function.
 func VerifySSA(function *Function) []SSAViolation {
-	if function == nil || len(function.Blocks) == 0 {
+	if function == nil {
 		return nil
 	}
-
-	var violations []SSAViolation
-	dominance := computeDominance(function)
-
-	// Where each value is defined. A parameter is defined at the entry block.
-	definedIn := map[IdentifierId]BlockId{}
-	// Position within the block, so a use earlier in the same block than its definition is caught.
-	definedAt := map[IdentifierId]int{}
-
-	recordDefinition := func(id IdentifierId, blockId BlockId, position int) {
-		if previous, exists := definedIn[id]; exists {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationMultipleDefinitions,
-				Identifier: id,
-				Block:      blockId,
-				Detail: fmt.Sprintf("value %s is defined in bb%d and again in bb%d",
-					function.PlaceString(Place{Identifier: id}), previous, blockId),
-			})
-			return
-		}
-		definedIn[id] = blockId
-		definedAt[id] = position
-	}
-
-	for index := range function.Params {
-		recordDefinition(function.Params[index].Identifier, function.Entry, -1)
-	}
-
-	for _, block := range function.Blocks {
-		// A phi's result is defined at the top of its block, before every instruction.
-		for _, phi := range block.Phis {
-			recordDefinition(phi.Place.Identifier, block.Id, -1)
-		}
-		for position, instructionId := range block.Instructions {
-			instruction := function.Instructions[instructionId]
-			// # A context binding is written many times, and upstream's invariant never sees it
-			//
-			// `AssertConsistentIdentifiers.ts:43` asserts "Expected lvalues to be assigned exactly
-			// once" against `instr.lvalue.identifier` -- the instruction's own temporary. A
-			// `StoreContext` writes its binding through a different field, `value.lvalue.place`,
-			// which is never added to that set. So upstream's context binding, written at its
-			// declaration and again at every reassignment, does not trip its own check.
-			//
-			// Measured on the pinned build: both writes name `lvalueId=2`, one `kind=Let` and one
-			// `kind=Reassign`, and the invariant passes.
-			//
-			// This walk records every `PlaceRoleDefine`, which includes a store's inner lvalue, so
-			// the same binding reads as defined twice. Narrowed to match upstream's subject rather
-			// than widened generally: an ordinary `StoreLocal` still reports, and only the place a
-			// context store writes through is exempt.
-			_, isContextStore := instruction.Value.(*StoreContext)
-			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
-				if role != PlaceRoleDefine {
-					return
-				}
-				if isContextStore && place.Identifier != instruction.LValue.Identifier {
-					return
-				}
-				recordDefinition(place.Identifier, block.Id, position)
-			})
-		}
-		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-			if role == PlaceRoleDefine {
-				recordDefinition(place.Identifier, block.Id, len(block.Instructions))
-			}
-		})
-	}
-
-	// checkUse verifies one use sitting in useBlock at usePosition.
-	checkUse := func(id IdentifierId, useBlock BlockId, usePosition int, what string) {
-		definitionBlock, defined := definedIn[id]
-		if !defined {
-			// Never defined in this function: a global, an import, or a capture. Not a violation;
-			// SSA says nothing about values this function does not define.
-			return
-		}
-		if definitionBlock == useBlock {
-			if definedAt[id] > usePosition {
-				violations = append(violations, SSAViolation{
-					Kind:       SSAViolationUseNotDominated,
-					Identifier: id,
-					Block:      useBlock,
-					Detail: fmt.Sprintf("%s in bb%d reads %s before it is defined in the same block",
-						what, useBlock, function.PlaceString(Place{Identifier: id})),
-				})
-			}
-			return
-		}
-		if !dominance.dominates(definitionBlock, useBlock) {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationUseNotDominated,
-				Identifier: id,
-				Block:      useBlock,
-				Detail: fmt.Sprintf("%s in bb%d reads %s defined in bb%d, which does not dominate bb%d",
-					what, useBlock, function.PlaceString(Place{Identifier: id}), definitionBlock, useBlock),
-			})
-		}
-	}
-
-	for _, block := range function.Blocks {
-		// A phi operand is read on the edge from its predecessor, so it must be dominated by the
-		// PREDECESSOR's exit rather than by the phi's own block. See the file comment.
-		for _, phi := range block.Phis {
-			for _, predecessorId := range PhiOperandsInOrder(phi) {
-				operand := phi.Operands.At(predecessorId)
-				predecessor, ok := function.Block(predecessorId)
-				if !ok {
-					continue
-				}
-				checkUse(operand.Identifier, predecessorId, len(predecessor.Instructions),
-					fmt.Sprintf("phi operand for bb%d", predecessorId))
-			}
-		}
-		for position, instructionId := range block.Instructions {
-			instruction := function.Instructions[instructionId]
-			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
-				if role != PlaceRoleDefine {
-					checkUse(place.Identifier, block.Id, position, "instruction")
-				}
-			})
-		}
-		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-			if role != PlaceRoleDefine {
-				checkUse(place.Identifier, block.Id, len(block.Instructions), "terminal")
-			}
-		})
-	}
-
-	return violations
+	return static_single_assignment.VerifySSA(ssaGraph{}, function)
 }
 
-// SSAStats counts what a verification actually had to look at.
-//
-// This exists because an empty violation list is exactly what a vacuous check returns. A function
-// with no phis and no renamed values passes `VerifySSA` perfectly while proving nothing, and that
-// is the failure mode this whole package has been bitten by twice. A caller reporting a clean run
-// should report these numbers alongside it.
-type SSAStats struct {
-	// Phis is how many merge points were placed.
-	Phis int
-	// NamedValues is how many defined values carry a source name rather than being a temporary.
-	// Zero here means no source variable was ever resolved, so nothing was renamed.
-	NamedValues int
-	// Uses is how many use sites were checked for dominance.
-	Uses int
-}
+// SSAStats counts what a verification actually had to look at. An empty violation list is exactly
+// what a vacuous check returns, so a caller reporting a clean run should report these alongside it.
+type SSAStats = static_single_assignment.SSAStats
 
 // CollectSSAStats measures one function.
 func CollectSSAStats(function *Function) SSAStats {
-	var stats SSAStats
 	if function == nil {
-		return stats
+		return SSAStats{}
 	}
-	seen := map[IdentifierId]bool{}
-	note := func(place Place) {
-		if seen[place.Identifier] {
-			return
-		}
-		seen[place.Identifier] = true
-		if function.Identifiers[place.Identifier].Name != "" {
-			stats.NamedValues++
-		}
-	}
-	for _, block := range function.Blocks {
-		stats.Phis += len(block.Phis)
-		for _, phi := range block.Phis {
-			note(phi.Place)
-		}
-		for _, instructionId := range block.Instructions {
-			EachInstructionPlace(function.Instructions[instructionId], func(place Place, role PlaceRole) {
-				if role == PlaceRoleDefine {
-					note(place)
-					return
-				}
-				stats.Uses++
-			})
-		}
-		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-			if role != PlaceRoleDefine {
-				stats.Uses++
-			}
-		})
-	}
-	return stats
+	return static_single_assignment.CollectSSAStats(ssaGraph{}, function)
 }
 
 // dominanceTree is the immediate-dominator array over Function.Blocks, by position in that slice.
-type dominanceTree struct {
-	// position maps a block id to its index in Function.Blocks, which is reverse postorder.
-	position map[BlockId]int
-	// immediate[i] is the index of block i's immediate dominator; the entry is its own.
-	immediate []int
-}
+type dominanceTree = static_single_assignment.Dominance
 
-// computeDominance runs Cooper-Harvey-Kennedy over the function's blocks.
-//
-// Function.Blocks is already in reverse postorder with unreachable blocks removed, which is the
-// precondition the algorithm needs and the reason this is short.
+// computeDominance runs Cooper-Harvey-Kennedy over the function's blocks, which are already in
+// reverse postorder with unreachable blocks removed.
 func computeDominance(function *Function) *dominanceTree {
-	tree := &dominanceTree{position: make(map[BlockId]int, len(function.Blocks))}
-	for index, block := range function.Blocks {
-		tree.position[block.Id] = index
-	}
-	tree.immediate = make([]int, len(function.Blocks))
-	for index := range tree.immediate {
-		tree.immediate[index] = -1
-	}
-	if len(function.Blocks) == 0 {
-		return tree
-	}
-	tree.immediate[0] = 0
-
-	intersect := func(a, b int) int {
-		for a != b {
-			for a > b {
-				a = tree.immediate[a]
-			}
-			for b > a {
-				b = tree.immediate[b]
-			}
-		}
-		return a
-	}
-
-	for changed := true; changed; {
-		changed = false
-		for index := 1; index < len(function.Blocks); index++ {
-			newImmediate := -1
-			for _, predecessorId := range function.Blocks[index].Predecessors {
-				predecessorIndex, ok := tree.position[predecessorId]
-				if !ok || tree.immediate[predecessorIndex] == -1 {
-					continue
-				}
-				if newImmediate == -1 {
-					newImmediate = predecessorIndex
-				} else {
-					newImmediate = intersect(predecessorIndex, newImmediate)
-				}
-			}
-			if newImmediate != -1 && tree.immediate[index] != newImmediate {
-				tree.immediate[index] = newImmediate
-				changed = true
-			}
-		}
-	}
-	return tree
-}
-
-// dominates reports whether every path from the entry to block passes through dominator.
-//
-// A block dominates itself, the standard convention.
-func (t *dominanceTree) dominates(dominator, block BlockId) bool {
-	target, ok := t.position[dominator]
-	if !ok {
-		return false
-	}
-	index, ok := t.position[block]
-	if !ok {
-		return false
-	}
-	for {
-		if index == target {
-			return true
-		}
-		if index == 0 || t.immediate[index] == -1 {
-			return false
-		}
-		index = t.immediate[index]
-	}
+	return static_single_assignment.ComputeDominance(ssaGraph{}, function)
 }

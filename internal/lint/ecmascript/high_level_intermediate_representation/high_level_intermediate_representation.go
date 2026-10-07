@@ -147,10 +147,10 @@ package high_level_intermediate_representation
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // BlockId identifies a basic block within one Function.
@@ -159,7 +159,10 @@ import (
 // held in reverse postorder after lowering completes, so a walk that wants execution order iterates
 // the slice, and one that wants to address a specific block holds the id. The two are deliberately
 // different types of thing: an index into `Blocks` moves when the order changes, an id does not.
-type BlockId uint32
+//
+// Defined in static_single_assignment, which this IR and Adamic's flow graph share, as are
+// IdentifierId, DeclarationId, EvaluationOrder and the phi types.
+type BlockId = static_single_assignment.BlockId
 
 // InstructionId indexes Function.Instructions.
 //
@@ -174,14 +177,14 @@ type InstructionId uint32
 // Two places with the same IdentifierId are the same value: not equal, the same. That is the
 // property the whole IR exists to provide, and it is what lets a later pass ask whether the object
 // mutated here is the object passed there without re-deriving aliasing from syntax.
-type IdentifierId uint32
+type IdentifierId = static_single_assignment.IdentifierId
 
 // DeclarationId names one source-level binding across all the values it takes.
 //
 // One `let` reassigned three times is three IdentifierIds and one DeclarationId. Single-assignment
 // construction will mint further IdentifierIds against the same DeclarationId, so a pass that wants
 // "this variable" rather than "this value" asks for the DeclarationId and keeps working afterwards.
-type DeclarationId uint32
+type DeclarationId = static_single_assignment.DeclarationId
 
 // FunctionId indexes Function.Functions, the nested functions lowered within this one.
 //
@@ -197,7 +200,7 @@ type FunctionId uint32
 // instruction and a terminal, which a table index cannot answer.
 //
 // Assigned by a walk in reverse postorder after lowering. Zero means unassigned.
-type EvaluationOrder uint32
+type EvaluationOrder = static_single_assignment.EvaluationOrder
 
 // InvalidBlock is the zero BlockId used where a terminal has no such successor.
 //
@@ -400,69 +403,14 @@ func (k BlockKind) String() string {
 }
 
 // Phi is a merge: the value of Place at the top of a block, given which predecessor control came
-// from.
-//
-// Operands holds one entry per entry in the block's Predecessors, kept sorted by predecessor block id,
-// so ranging it is deterministic and is the order `PhiOperandsInOrder` has always given.
-//
-// It was a `map[BlockId]Place`, kept for the lookup "what came from THIS predecessor". A phi has two or
-// three operands, where a map's smallest allocation holds eight and a linear scan beats a hash, so the
-// map cost 41 MB over 533K phis on a cold ahra run for nothing a short sorted slice cannot answer
-// (#p4h0p54). The lookup is `Operands.At` or `Operands.Get`.
-type Phi struct {
-	Place    Place
-	Operands PhiOperands
-}
+// from. Its operands are a short slice sorted by predecessor; static_single_assignment.Phi says why.
+type Phi = static_single_assignment.Phi[Place]
 
 // PhiOperand is the value a phi takes when control arrives from Predecessor.
-type PhiOperand struct {
-	Predecessor BlockId
-	Place       Place
-}
+type PhiOperand = static_single_assignment.PhiOperand[Place]
 
 // PhiOperands is a phi's operands, sorted by predecessor block id with at most one entry each.
-type PhiOperands []PhiOperand
-
-// index is where predecessor's entry is, or where it would go, and whether it is there.
-func (operands PhiOperands) index(predecessor BlockId) (int, bool) {
-	for index, operand := range operands {
-		if operand.Predecessor >= predecessor {
-			return index, operand.Predecessor == predecessor
-		}
-	}
-	return len(operands), false
-}
-
-// Get is the operand from predecessor, and whether there is one.
-func (operands PhiOperands) Get(predecessor BlockId) (Place, bool) {
-	if index, found := operands.index(predecessor); found {
-		return operands[index].Place, true
-	}
-	return Place{}, false
-}
-
-// At is the operand from predecessor, or the zero Place when there is none, as the map's index was.
-func (operands PhiOperands) At(predecessor BlockId) Place {
-	place, _ := operands.Get(predecessor)
-	return place
-}
-
-// Set makes place the operand from predecessor, replacing one already there.
-func (operands *PhiOperands) Set(predecessor BlockId, place Place) {
-	index, found := operands.index(predecessor)
-	if found {
-		(*operands)[index].Place = place
-		return
-	}
-	*operands = slices.Insert(*operands, index, PhiOperand{Predecessor: predecessor, Place: place})
-}
-
-// Delete removes the operand from predecessor, if there is one.
-func (operands *PhiOperands) Delete(predecessor BlockId) {
-	if index, found := operands.index(predecessor); found {
-		*operands = slices.Delete(*operands, index, index+1)
-	}
-}
+type PhiOperands = static_single_assignment.PhiOperands[Place]
 
 // Instruction is one operation: a value computed and stored into an lvalue.
 //
