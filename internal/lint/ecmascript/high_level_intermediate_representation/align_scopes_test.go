@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 	"testing"
@@ -15,24 +16,24 @@ type tagged struct {
 
 // scopeRangeMap, mergedRangeMap and alignedRangeMap adapt the three result shapes to the one input
 // `scopeNestingItems` takes, so the assertion is computed the same way for all three.
-func scopeRangeMap(scopes *ReactiveScopes) map[ScopeId]MutableRange {
-	out := map[ScopeId]MutableRange{}
+func scopeRangeMap(scopes *ReactiveScopes) map[ScopeId]mutation_aliasing.MutableRange {
+	out := map[ScopeId]mutation_aliasing.MutableRange{}
 	for _, id := range scopes.Ids() {
 		out[id] = scopes.RangeOf(id)
 	}
 	return out
 }
 
-func mergedRangeMap(merged *MergedScopes) map[ScopeId]MutableRange {
-	out := map[ScopeId]MutableRange{}
+func mergedRangeMap(merged *MergedScopes) map[ScopeId]mutation_aliasing.MutableRange {
+	out := map[ScopeId]mutation_aliasing.MutableRange{}
 	for _, id := range merged.Ids() {
 		out[id] = merged.RangeOf(id)
 	}
 	return out
 }
 
-func alignedRangeMap(aligned *AlignedScopes) map[ScopeId]MutableRange {
-	out := map[ScopeId]MutableRange{}
+func alignedRangeMap(aligned *AlignedScopes) map[ScopeId]mutation_aliasing.MutableRange {
+	out := map[ScopeId]mutation_aliasing.MutableRange{}
 	for _, id := range aligned.Ids() {
 		out[id] = aligned.RangeOf(id)
 	}
@@ -93,7 +94,7 @@ func violationsByKind(scopes, blocks []nestingItem) (scopeInBlock, blockInScope,
 func widenedTableFrom(scopes *ReactiveScopes, aligned *AlignedScopes) *ReactiveScopes {
 	widened := &ReactiveScopes{
 		byIdentifier: scopes.byIdentifier,
-		ranges:       make(map[ScopeId]MutableRange, scopes.Len()),
+		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Len()),
 		members:      scopes.members,
 		order:        scopes.order,
 	}
@@ -125,7 +126,7 @@ func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 	componentFunctions, componentScopeInBlock, componentBlockInScope := 0, 0, 0
 	finalScopeInBlock, finalBlockInScope, finalBlockInBlock := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		scopesBefore += scopes.Len()
 		blocks := programBlockSubtrees(function)
@@ -236,7 +237,7 @@ func TestAlignMustRunBeforeTheMerge(t *testing.T) {
 	naiveFull, naiveScope, naiveUnions := 0, 0, 0
 	upstreamFull, upstreamScope, upstreamUnions := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		blocks := programBlockSubtrees(function)
 
 		// The naive order: merge first, then align the merged table. Expressed by handing the
@@ -246,7 +247,7 @@ func TestAlignMustRunBeforeTheMerge(t *testing.T) {
 		naiveUnions += merged.Unions()
 		mergedTable := &ReactiveScopes{
 			byIdentifier: scopes.byIdentifier,
-			ranges:       map[ScopeId]MutableRange{},
+			ranges:       map[ScopeId]mutation_aliasing.MutableRange{},
 			members:      scopes.members,
 			order:        merged.Ids(),
 		}
@@ -302,7 +303,7 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 
 	// A construct whose terminal sits at 5 and whose fallthrough begins at 9, so an active scope
 	// starting after 5 has its start minimised back to 5 and its end pushed out to 9.
-	build := func(scopeRange MutableRange) (*Function, *ReactiveScopes) {
+	build := func(scopeRange mutation_aliasing.MutableRange) (*Function, *ReactiveScopes) {
 		return buildAlignCase(t, alignCase{
 			scope:        scopeRange,
 			terminalId:   5,
@@ -313,12 +314,12 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		start MutableRange
-		want  MutableRange
+		start mutation_aliasing.MutableRange
+		want  mutation_aliasing.MutableRange
 	}{
-		{"start after the construct is minimised back", MutableRange{7, 15}, MutableRange{5, 15}},
-		{"start already earlier is left alone", MutableRange{3, 15}, MutableRange{3, 15}},
-		{"an unset start stays zero rather than being widened", MutableRange{0, 15}, MutableRange{0, 15}},
+		{"start after the construct is minimised back", mutation_aliasing.MutableRange{Start: 7, End: 15}, mutation_aliasing.MutableRange{Start: 5, End: 15}},
+		{"start already earlier is left alone", mutation_aliasing.MutableRange{Start: 3, End: 15}, mutation_aliasing.MutableRange{Start: 3, End: 15}},
+		{"an unset start stays zero rather than being widened", mutation_aliasing.MutableRange{Start: 0, End: 15}, mutation_aliasing.MutableRange{Start: 0, End: 15}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -334,9 +335,9 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 	// A fully unset scope never becomes active, because activity is `end > startingId` and an end of
 	// zero fails that for every block. It must come back untouched rather than widened to the
 	// construct, which is what an implementation missing the activity filter would produce.
-	function, scopes := build(MutableRange{0, 0})
+	function, scopes := build(mutation_aliasing.MutableRange{Start: 0, End: 0})
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
-	if got := aligned.RangeOf(1); got != (MutableRange{0, 0}) {
+	if got := aligned.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 0, End: 0}) {
 		t.Errorf("a fully unset scope aligned to %v; it should never become active at all", got)
 	}
 }
@@ -350,9 +351,9 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 func TestAlignExcludesBranchTerminals(t *testing.T) {
 	t.Parallel()
 
-	widened := func(makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) MutableRange {
+	widened := func(makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) mutation_aliasing.MutableRange {
 		function, scopes := buildAlignCaseWithTerminal(t, alignCase{
-			scope:        MutableRange{4, 6},
+			scope:        mutation_aliasing.MutableRange{Start: 4, End: 6},
 			terminalId:   5,
 			useAt:        4,
 			fallthroughs: 9,
@@ -363,14 +364,14 @@ func TestAlignExcludesBranchTerminals(t *testing.T) {
 	ifRange := widened(func(ft static_single_assignment.BlockId) Terminal {
 		return &If{Consequent: 2, Alternate: ft, Fallthrough: ft, Order: 5}
 	})
-	if ifRange != (MutableRange{4, 9}) {
+	if ifRange != (mutation_aliasing.MutableRange{Start: 4, End: 9}) {
 		t.Errorf("an `if` widened to %v, want [4,9); the fallthrough push did not fire", ifRange)
 	}
 
 	branchRange := widened(func(ft static_single_assignment.BlockId) Terminal {
 		return &Branch{Consequent: 2, Alternate: ft, Fallthrough: ft, Order: 5}
 	})
-	if branchRange != (MutableRange{4, 6}) {
+	if branchRange != (mutation_aliasing.MutableRange{Start: 4, End: 6}) {
 		t.Errorf("a `branch` widened to %v, want [4,6) unchanged; upstream excludes branch "+
 			"terminals from the fallthrough widening", branchRange)
 	}
@@ -394,13 +395,13 @@ func TestAlignPushFilterDeclinesAScopeThatEndedBeforeTheTerminal(t *testing.T) {
 	// The scope reads at 2 and ends at 3, so it is active when the block begins (its end exceeds the
 	// block's first instruction at 2) and dead by the terminal at 5. The fallthrough begins at 9.
 	function, scopes := buildAlignCase(t, alignCase{
-		scope:        MutableRange{2, 3},
+		scope:        mutation_aliasing.MutableRange{Start: 2, End: 3},
 		terminalId:   5,
 		useAt:        2,
 		fallthroughs: 9,
 	})
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
-	if got := aligned.RangeOf(1); got != (MutableRange{2, 3}) {
+	if got := aligned.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 2, End: 3}) {
 		t.Errorf("a scope that ended at 3, before the terminal at 5, aligned to %v; the "+
 			"`end > terminal` filter should have declined it rather than dragging its end out to "+
 			"the fallthrough", got)
@@ -421,7 +422,7 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
 	t.Parallel()
 
 	_, scopes := buildAlignCase(t, alignCase{
-		scope:        MutableRange{4, 6},
+		scope:        mutation_aliasing.MutableRange{Start: 4, End: 6},
 		terminalId:   5,
 		useAt:        4,
 		fallthroughs: 9,
@@ -433,7 +434,7 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
 		activeSet:       map[ScopeId]bool{},
 		seen:            map[ScopeId]bool{},
 		valueBlockNodes: map[static_single_assignment.BlockId]*valueBlockNode{},
-		ranges:          map[ScopeId]MutableRange{1: {4, 6}},
+		ranges:          map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 4, End: 6}},
 		scopes:          scopes,
 	}
 	scopedPlace := Place{Identifier: 1}
@@ -451,7 +452,7 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
 	state.recordPlace(5, scopedPlace, wide)
 	afterSecond := state.ranges[1]
 
-	if afterFirst != (MutableRange{3, 7}) {
+	if afterFirst != (mutation_aliasing.MutableRange{Start: 3, End: 7}) {
 		t.Fatalf("the first sighting widened the scope to %v, want [3,7); the value-block "+
 			"mechanism did not fire and nothing below measures the gate", afterFirst)
 	}
@@ -521,7 +522,7 @@ func TestAlignGotoSkipsTheInnermostOpenConstruct(t *testing.T) {
 	// back-reference look like two chances to widen the same scope, and they are not: a scope narrow
 	// enough to be skipped by the goto test is usually also narrow enough to be retired before the
 	// pop.
-	if got := aligned.RangeOf(1); got != (MutableRange{7, 9}) {
+	if got := aligned.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 7, End: 9}) {
 		t.Errorf("the scope aligned to %v, want [7,9) unchanged; a goto to the INNERMOST open "+
 			"fallthrough is skipped, and this scope is retired by the activity filter before the "+
 			"fallthrough pop can reach it", got)
@@ -547,13 +548,13 @@ func TestAlignDeclinesAPlaceReadOutsideItsScope(t *testing.T) {
 	t.Parallel()
 
 	function, scopes := buildAlignCase(t, alignCase{
-		scope:        MutableRange{9, 12},
+		scope:        mutation_aliasing.MutableRange{Start: 9, End: 12},
 		terminalId:   8,
 		useAt:        7,
 		fallthroughs: 20,
 	})
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
-	if got := aligned.RangeOf(1); got != (MutableRange{9, 12}) {
+	if got := aligned.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 9, End: 12}) {
 		t.Errorf("a scope of [9,12) read at 7, before its own range opens, aligned to %v; the "+
 			"place should never have activated it", got)
 	}
@@ -572,7 +573,7 @@ func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
 	skipWithoutCorpus(t)
 	branchReuse, nonBranchReuse, branchesWithFallthrough := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		seen := map[static_single_assignment.BlockId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {
@@ -623,7 +624,7 @@ func TestAlignReDerivesMemberRanges(t *testing.T) {
 	skipWithoutCorpus(t)
 	members, differing, wider, narrower := 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned := AlignReactiveScopesToBlockScopes(function, scopes)
 		stale, fresh := scopes.MemberRanges(), aligned.MemberRanges()
 		for _, scope := range scopes.Ids() {
@@ -672,7 +673,7 @@ func TestAlignPreservesScopeWidthAndMembership(t *testing.T) {
 	oneNarrow, oneWide, manyNarrow, manyWide := 0, 0, 0, 0
 	var widths []int
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, table *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, table *ReactiveScopes) {
 		_, merged := AlignThenMergeReactiveScopes(function, table)
 		for _, id := range merged.Ids() {
 			scopeRange := merged.RangeOf(id)
@@ -738,7 +739,7 @@ func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
 		return false
 	}
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		// The control: on the UNALIGNED table the two spellings must agree, which is what makes a
 		// difference on the aligned table attributable to the comparator rather than to the local
 		// copy of the sweep having drifted from the real one.
@@ -808,7 +809,7 @@ func TestReactReversePostorderClosesFallthroughSelfNesting(t *testing.T) {
 	withScopes, withoutScopes := 0, 0
 
 	// The whole corpus, deliberately: this is a graph invariant rather than a React-domain metric.
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		blocks := programBlockSubtrees(function)
 		_, merged := AlignThenMergeReactiveScopes(function, scopes)
 		withScopes += blockNestingViolations(scopeNestingItems(mergedRangeMap(merged)), blocks)
@@ -851,7 +852,7 @@ func TestAlignIsASingleSweep(t *testing.T) {
 	skipWithoutCorpus(t)
 	blocksOverall, blocksWithScopes, visits, functionsWithoutScopes := 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		blocks := 0
 		for _, block := range function.Blocks {
 			if block != nil {
@@ -894,7 +895,7 @@ func TestAlignIsDeterministic(t *testing.T) {
 	skipWithoutCorpus(t)
 	compared := 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		first := AlignReactiveScopesToBlockScopes(function, scopes)
 		second := AlignReactiveScopesToBlockScopes(function, scopes)
 		if first.Len() != second.Len() || first.Widened() != second.Widened() {

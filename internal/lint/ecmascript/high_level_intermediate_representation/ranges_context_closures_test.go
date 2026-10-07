@@ -3,6 +3,8 @@ package high_level_intermediate_representation
 import (
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
 func TestManualMemoizationPreservesMixedCaptureConditionalCall(t *testing.T) {
@@ -53,7 +55,7 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			function, effects := effectsFor(t, "function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }")
-			state, _ := buildAliasingGraph(function, effects)
+			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
 			closures := 0
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -63,7 +65,7 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
 					continue
 				}
 				closures++
-				if got := state.immutable[instruction.LValue.Identifier] == EffectValueFrozen; got != testCase.frozen {
+				if got := aliasingGraph.Kind(instruction.LValue.Identifier) == mutation_aliasing.EffectValueFrozen; got != testCase.frozen {
 					t.Errorf("closure frozen=%t, want %t", got, testCase.frozen)
 				}
 			}

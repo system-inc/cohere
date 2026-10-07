@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 	"testing"
@@ -19,18 +20,22 @@ import (
 type mergeCase struct {
 	name string
 	// scopes are [start, end) in scope-id order starting at 1.
-	scopes []MutableRange
-	// instructions are {order, lvalueScope, useScope}; a scope index of 0 means no scope.
+	scopes []mutation_aliasing.
+		// instructions are {order, lvalueScope, useScope}; a scope index of 0 means no scope.
+		MutableRange
+
 	instructions [][3]int
 	terminal     static_single_assignment.EvaluationOrder
 	// terminalScope, when non-zero, gives the terminal a Return carrying a place in that scope.
 	// Zero leaves the terminal an Unreachable with no operands.
 	terminalScope int
-	terminalRange MutableRange
-	// wantGroups maps each scope id to the id it should end up in.
+	terminalRange mutation_aliasing.
+		// wantGroups maps each scope id to the id it should end up in.
+		MutableRange
+
 	wantGroups map[ScopeId]ScopeId
 	// wantRanges is the range each surviving scope should carry.
-	wantRanges map[ScopeId]MutableRange
+	wantRanges map[ScopeId]mutation_aliasing.MutableRange
 }
 
 func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScopes) {
@@ -39,7 +44,7 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 	function := &Function{}
 	scopes := &ReactiveScopes{
 		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
-		ranges:       map[ScopeId]MutableRange{},
+		ranges:       map[ScopeId]mutation_aliasing.MutableRange{},
 		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
 	for index, scopeRange := range testCase.scopes {
@@ -109,41 +114,41 @@ func TestMergeMatchesReact(t *testing.T) {
 			// Two scopes overlapping without nesting. Scope 1 ends at 5 while scope 2 is open, so
 			// scope 2 is above it on the stack and both are unioned into scope 1, widened to [1,8).
 			name:         "overlapNonNested",
-			scopes:       []MutableRange{{1, 5}, {3, 8}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 5}, {Start: 3, End: 8}},
 			instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}},
 			terminal:     9,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 1},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 8}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 8}},
 		},
 		{
 			// Properly nested with no interleaving use: nothing merges and no range moves.
 			name:         "properlyNested",
-			scopes:       []MutableRange{{1, 9}, {3, 5}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 5}},
 			instructions: [][3]int{{1, 1, 0}, {3, 2, 0}},
 			terminal:     10,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 2},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 9}, 2: {3, 5}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 9}, 2: {Start: 3, End: 5}},
 		},
 		{
 			// The case that separates this pass from a pairwise overlap rule. The ranges nest, but
 			// scope 1's value is read at 4 while scope 2 sits above it, so they union. React widens
 			// nothing here, because scope 2's range is already inside scope 1's.
 			name:         "nestedButInterleavedUse",
-			scopes:       []MutableRange{{1, 9}, {3, 5}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 5}},
 			instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}},
 			terminal:     10,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 1},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 9}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 9}},
 		},
 		{
 			// Two scopes starting together and ending together cannot nest either way, so the start
 			// branch unions them directly rather than waiting for an end or a use.
 			name:         "sameStartSameEnd",
-			scopes:       []MutableRange{{2, 6}, {2, 6}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 2, End: 6}, {Start: 2, End: 6}},
 			instructions: [][3]int{{2, 1, 2}},
 			terminal:     7,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 1},
-			wantRanges:   map[ScopeId]MutableRange{1: {2, 6}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 2, End: 6}},
 		},
 		{
 			// Three scopes ending at the SAME position with different starts. The closing order is
@@ -152,11 +157,11 @@ func TestMergeMatchesReact(t *testing.T) {
 			// exercises `sortByStartDescending` on a real multi-scope group: 11 end positions on
 			// the corpus hold more than one scope, up to 5 of them.
 			name:         "threeEndTogether",
-			scopes:       []MutableRange{{1, 9}, {3, 9}, {5, 9}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 9}, {Start: 5, End: 9}},
 			instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {5, 3, 0}, {6, 0, 1}},
 			terminal:     10,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 1, 3: 1},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 9}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 9}},
 		},
 		{
 			// Two scopes sharing an end with a third nested strictly inside both. Nothing merges:
@@ -164,11 +169,11 @@ func TestMergeMatchesReact(t *testing.T) {
 			// are each on top of the stack in turn. React's own answer, and it is the negative
 			// control for the case above -- a shared end alone does not force a union.
 			name:         "sharedEndWithInterleave",
-			scopes:       []MutableRange{{1, 7}, {2, 7}, {3, 5}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 7}, {Start: 2, End: 7}, {Start: 3, End: 5}},
 			instructions: [][3]int{{1, 1, 0}, {2, 2, 0}, {3, 3, 0}},
 			terminal:     8,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 2, 3: 3},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 7}, 2: {2, 7}, 3: {3, 5}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 7}, 2: {Start: 2, End: 7}, 3: {Start: 3, End: 5}},
 		},
 		{
 			// The case that makes the CLOSING ORDER load-bearing, minimised from the one function on
@@ -183,11 +188,11 @@ func TestMergeMatchesReact(t *testing.T) {
 			// shared-end case here either unions under both orderings or holds one scope per
 			// position.
 			name:         "sharedEndReversedStack",
-			scopes:       []MutableRange{{5, 9}, {3, 9}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 5, End: 9}, {Start: 3, End: 9}},
 			instructions: [][3]int{{3, 2, 0}, {5, 1, 0}},
 			terminal:     10,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 2},
-			wantRanges:   map[ScopeId]MutableRange{1: {5, 9}, 2: {3, 9}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 5, End: 9}, 2: {Start: 3, End: 9}},
 		},
 		{
 			// The union arrives through the TERMINAL rather than through an instruction. Scope 1 is
@@ -201,22 +206,22 @@ func TestMergeMatchesReact(t *testing.T) {
 			// So this is a genuine blind spot rather than an unreachable branch, and only a
 			// synthetic case can pin it.
 			name:          "terminalOperandUnions",
-			scopes:        []MutableRange{{1, 9}, {3, 9}},
+			scopes:        []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 9}},
 			instructions:  [][3]int{{1, 1, 0}, {3, 2, 0}},
 			terminal:      6,
 			terminalScope: 1,
 			wantGroups:    map[ScopeId]ScopeId{1: 1, 2: 1},
-			wantRanges:    map[ScopeId]MutableRange{1: {1, 9}},
+			wantRanges:    map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 9}},
 		},
 		{
 			// Disjoint scopes never interact: the first leaves the stack before the second is
 			// pushed, so no union can see both.
 			name:         "disjoint",
-			scopes:       []MutableRange{{1, 3}, {5, 8}},
+			scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 3}, {Start: 5, End: 8}},
 			instructions: [][3]int{{1, 1, 0}, {5, 2, 0}},
 			terminal:     9,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 2},
-			wantRanges:   map[ScopeId]MutableRange{1: {1, 3}, 2: {5, 8}},
+			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 3}, 2: {Start: 5, End: 8}},
 		},
 	}
 
@@ -255,7 +260,7 @@ func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
 	t.Parallel()
 
 	function, scopes := buildMergeCase(t, mergeCase{
-		scopes:       []MutableRange{{1, 9}, {3, 5}},
+		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 5}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}},
 		terminal:     10,
 	})
@@ -266,7 +271,7 @@ func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
 			"is what a pairwise range comparison would also conclude", merged.Len())
 	}
 	// And the ranges genuinely nest, which is what makes this a control rather than a duplicate.
-	outer, inner := MutableRange{1, 9}, MutableRange{3, 5}
+	outer, inner := mutation_aliasing.MutableRange{Start: 1, End: 9}, mutation_aliasing.MutableRange{Start: 3, End: 5}
 	if !(outer.Start <= inner.Start && inner.End <= outer.End) {
 		t.Fatal("this case no longer nests, so it stopped separating the two spellings")
 	}
@@ -283,7 +288,7 @@ func TestMergeSkipsDegenerateScopes(t *testing.T) {
 	t.Parallel()
 
 	function, scopes := buildMergeCase(t, mergeCase{
-		scopes:       []MutableRange{{0, 0}, {1, 5}, {3, 8}},
+		scopes:       []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 1, End: 5}, {Start: 3, End: 8}},
 		instructions: [][3]int{{1, 2, 1}, {3, 3, 0}, {4, 0, 2}},
 		terminal:     9,
 	})
@@ -292,7 +297,7 @@ func TestMergeSkipsDegenerateScopes(t *testing.T) {
 	if got := merged.GroupOf(1); got != 1 {
 		t.Errorf("the unset scope merged into %d; it must never enter the sweep at all", got)
 	}
-	if got := merged.RangeOf(1); got != (MutableRange{0, 0}) {
+	if got := merged.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 0, End: 0}) {
 		t.Errorf("the unset scope's range moved to [%d,%d)", got.Start, got.End)
 	}
 	// The control: the two real scopes around it must still merge, or this test would pass on a
@@ -313,7 +318,7 @@ func TestMergeConservesMembership(t *testing.T) {
 	t.Parallel()
 
 	function, scopes := buildMergeCase(t, mergeCase{
-		scopes:       []MutableRange{{1, 5}, {3, 8}, {10, 12}},
+		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 5}, {Start: 3, End: 8}, {Start: 10, End: 12}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {10, 3, 0}},
 		terminal:     13,
 	})
@@ -354,7 +359,7 @@ func TestMergeIsASingleSweep(t *testing.T) {
 	t.Parallel()
 
 	testCase := mergeCase{
-		scopes:       []MutableRange{{1, 5}, {3, 8}},
+		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 5}, {Start: 3, End: 8}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {5, 0, 2}},
 		terminal:     9,
 	}
@@ -424,11 +429,11 @@ func mergeCorpusStats(t *testing.T, limit int) (functions, before, after, unions
 	nestingBefore, nestingAfter int) {
 	t.Helper()
 
-	forEachCorpusFunction(t, limit, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, limit, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		before += scopes.Len()
 
-		beforeRanges := map[ScopeId]MutableRange{}
+		beforeRanges := map[ScopeId]mutation_aliasing.MutableRange{}
 		for _, scope := range scopes.Ids() {
 			scopeRange := scopes.RangeOf(scope)
 			beforeRanges[scope] = scopeRange
@@ -442,7 +447,7 @@ func mergeCorpusStats(t *testing.T, limit int) (functions, before, after, unions
 		after += merged.Len()
 		unions += merged.Unions()
 
-		afterRanges := map[ScopeId]MutableRange{}
+		afterRanges := map[ScopeId]mutation_aliasing.MutableRange{}
 		for _, scope := range merged.Ids() {
 			scopeRange := merged.RangeOf(scope)
 			afterRanges[scope] = scopeRange
@@ -464,7 +469,7 @@ func mergeCorpusStats(t *testing.T, limit int) (functions, before, after, unions
 }
 
 // countNonNestedPairs counts scope pairs that overlap without one containing the other.
-func countNonNestedPairs(ranges map[ScopeId]MutableRange) int {
+func countNonNestedPairs(ranges map[ScopeId]mutation_aliasing.MutableRange) int {
 	ids := make([]ScopeId, 0, len(ranges))
 	for id := range ranges {
 		ids = append(ids, id)
@@ -563,7 +568,7 @@ func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
 	var oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore int
 	var oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter int
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		for _, scope := range scopes.Ids() {
 			scopeRange := scopes.RangeOf(scope)
 			classify(int(scopeRange.End-scopeRange.Start), len(scopes.MembersOf(scope)),
@@ -652,7 +657,7 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 	_, _, _, _, _, _, _, _, _, nestingBefore, nestingAfter := mergeCorpusStats(t, 400)
 
 	blocksAlone := 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		blocksAlone += blockNestingViolations(nil, programBlockSubtrees(function))
 	})
 
@@ -686,7 +691,7 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	skipWithoutCorpus(t)
 	withoutGate, withGate, candidates := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		withoutGate += MergeOverlappingReactiveScopes(function, scopes).Unions()
 		withGate += unionsSkippingFunctionOperands(function, scopes)
 		for _, block := range function.Blocks {
@@ -792,7 +797,7 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 
 	skipWithoutCorpus(t)
 	functions, violations := 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		var last static_single_assignment.EvaluationOrder
 		for _, block := range function.Blocks {
@@ -839,7 +844,7 @@ func TestMergeIsDeterministic(t *testing.T) {
 
 	skipWithoutCorpus(t)
 	functions, mismatches, merges := 0, 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		first := MergeOverlappingReactiveScopes(function, scopes)
 		second := MergeOverlappingReactiveScopes(function, scopes)
@@ -881,7 +886,7 @@ func TestMergeSortComparatorReachability(t *testing.T) {
 	skipWithoutCorpus(t)
 	startPositions, sharedStarts, endPositions, sharedEnds, widestEndGroup := 0, 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		starts, ends := collectScopeInfo(function, scopes)
 		for _, group := range starts {
 			startPositions++
@@ -928,7 +933,7 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 
 	// The synthetic half: a scope that appears nowhere but the terminal must still be registered.
 	function, scopes := buildMergeCase(t, mergeCase{
-		scopes:        []MutableRange{{1, 9}, {3, 12}},
+		scopes:        []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 12}},
 		instructions:  [][3]int{{1, 1, 0}},
 		terminal:      3,
 		terminalScope: 2,
@@ -961,7 +966,7 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 	// The corpus half: the measurement that explains the survivor.
 	skipWithoutCorpus(t)
 	onlyTerminal, total := 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		fromInstruction, fromTerminal := map[ScopeId]bool{}, map[ScopeId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {

@@ -1,22 +1,25 @@
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import (
+	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/static_single_assignment"
+)
 
-func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[static_single_assignment.IdentifierId]EffectValueKind) bool {
+func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) bool {
 	if hasReadOnlyClosureEffects(function, map[*Function]bool{}) {
 		return true
 	}
 	if function == nil || len(function.Context) != len(captures) {
 		return false
 	}
-	contextKinds := map[static_single_assignment.IdentifierId]EffectValueKind{}
+	contextKinds := map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind{}
 	hasMixedCapture := false
 	for index, capture := range captures {
 		kind, known := kinds[capture.Identifier]
-		if !known || kind == EffectValueMutable || kind == EffectValueGlobal {
+		if !known || kind == mutation_aliasing.EffectValueMutable || kind == mutation_aliasing.EffectValueGlobal {
 			return false
 		}
-		hasMixedCapture = hasMixedCapture || kind == EffectValueMaybeFrozen
+		hasMixedCapture = hasMixedCapture || kind == mutation_aliasing.EffectValueMaybeFrozen
 		contextKinds[function.Context[index].Identifier] = kind
 	}
 	if !hasMixedCapture {
@@ -53,13 +56,14 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 			}
 		}
 		for _, effect := range effects.Get(instruction.Id) {
-			if effect.Kind == AliasingEffectFreeze {
+			if effect.Kind == mutation_aliasing.AliasingEffectFreeze {
 				return false
 			}
 		}
 	}
-	_, mutations := buildAliasingGraphWithContextKinds(function, effects, contextKinds)
-	return len(mutations) == 0
+	graph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function,
+		mutation_aliasing.Options{ContextKinds: contextKinds})
+	return graph.MutationCount() == 0
 }
 
 func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool {
@@ -86,7 +90,7 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 			}
 		}
 		for _, effect := range effects.Get(instruction.Id) {
-			if effect.Kind.IsMutation() || effect.Kind == AliasingEffectFreeze {
+			if effect.Kind.IsMutation() || effect.Kind == mutation_aliasing.AliasingEffectFreeze {
 				return false
 			}
 		}

@@ -81,6 +81,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 )
@@ -344,7 +345,7 @@ func (h *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) 
 // The second is the load-bearing one and it is a deduction rather than an assumption: if
 // `props.a.b` executed without throwing, then `props.a` was not nullish at that point, so `props.a`
 // is hoistable to anywhere that dominates it.
-func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *MutableRanges,
+func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *mutation_aliasing.MutableRanges,
 	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry,
 	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) map[static_single_assignment.BlockId]map[int]bool {
 	known := map[int]bool{}
@@ -570,7 +571,7 @@ func maybeNonNullInInstruction(value InstructionValue,
 // single instruction describes a value written once and never mutated, which is immutable for this
 // purpose despite having a non-empty range.
 func isImmutableAtInstruction(function *Function, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
-	ranges *MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
+	ranges *mutation_aliasing.MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
 	if isKnownImmutableParameter(function, id) {
 		return true
 	}
@@ -823,7 +824,7 @@ func sameNodeSet(a, b map[int]bool) bool {
 // first, exactly as `CollectScopeDependencies` does. The result is keyed by SCOPE, taking each
 // scope's set from the block its terminal names as the body -- upstream's `keyByScopeId`.
 func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
-	identity ScopeIdentity, ranges *MutableRanges,
+	identity ScopeIdentity, ranges *mutation_aliasing.MutableRanges,
 	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency,
 ) map[ScopeId][]ReactiveScopeDependency {
 	analysis := analyseHoistableLoads(function, scopes, identity, ranges, hoistableFromOptionals)
@@ -902,7 +903,7 @@ func dominatedByOtherReactiveScope(function *Function, dominance *static_single_
 
 // analyseHoistableLoads runs the whole analysis, returning the per-block answer.
 func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
-	identity ScopeIdentity, ranges *MutableRanges,
+	identity ScopeIdentity, ranges *mutation_aliasing.MutableRanges,
 	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) *HoistableAnalysis {
 	if function == nil || scopes == nil || identity == nil || ranges == nil {
 		return nil
@@ -979,7 +980,7 @@ func hoistableTreeFor(paths []ReactiveScopeDependency) (map[static_single_assign
 // sides -- `lower.go:319`, measured across the corpus with zero mismatches -- so the translation is
 // a zip. A path rooted anywhere else is inner-local and is dropped rather than guessed at.
 func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
-	invoked AssumedInvokedFunctions, ranges *MutableRanges,
+	invoked AssumedInvokedFunctions, ranges *mutation_aliasing.MutableRanges,
 	identity ScopeIdentity, scopes *ReactiveScopes, order static_single_assignment.EvaluationOrder,
 	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) []ReactiveScopeDependency {
 	if !invoked[expression.Function] || int(expression.Function) >= len(parent.Functions) {

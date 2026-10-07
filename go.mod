@@ -22,6 +22,10 @@ replace (
 	// The single static assignment form cohere's high-level IR and Adamic's flow graph share, a
 	// module of its own so Adamic can import it through its cohere submodule (#ejcnkja).
 	github.com/system-inc/cohere/static_single_assignment => ./static_single_assignment
+
+	// React's mutation and aliasing model, the effect vocabulary and the mutable ranges inferred from
+	// it, shared with Adamic the same way (#kr2yp54).
+	github.com/system-inc/cohere/mutation_aliasing => ./mutation_aliasing
 )
 
 require (
@@ -40,6 +44,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
+	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
 
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing

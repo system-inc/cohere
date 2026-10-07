@@ -87,6 +87,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 )
@@ -114,12 +115,14 @@ type ScopeIdentity interface {
 	// with no scope. An unmerged scope maps to itself.
 	GroupOf(scope ScopeId) ScopeId
 	// RangeOf gives the surviving scope's final range, after alignment and merging.
-	RangeOf(scope ScopeId) MutableRange
+	RangeOf(scope ScopeId) mutation_aliasing.
+
+		// MergedScopeIdentity resolves scope identity through an align-then-merge result.
+		//
+		// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
+		MutableRange
 }
 
-// MergedScopeIdentity resolves scope identity through an align-then-merge result.
-//
-// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
 type MergedScopeIdentity struct {
 	Aligned *AlignedScopes
 	Merged  *MergedScopes
@@ -141,7 +144,7 @@ func (m MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
 
 // RangeOf returns the surviving scope's range, preferring the merged table and falling back to the
 // aligned one for a scope the merge did not touch.
-func (m MergedScopeIdentity) RangeOf(scope ScopeId) MutableRange {
+func (m MergedScopeIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	if m.Merged != nil {
 		if bounds := m.Merged.RangeOf(scope); bounds.Start != bounds.End {
 			return bounds
@@ -150,7 +153,7 @@ func (m MergedScopeIdentity) RangeOf(scope ScopeId) MutableRange {
 	if m.Aligned != nil {
 		return m.Aligned.RangeOf(scope)
 	}
-	return MutableRange{}
+	return mutation_aliasing.MutableRange{}
 }
 
 // ScopeTerminalsGap names a rule this pass cannot apply, for a caller that needs to know.
@@ -395,7 +398,7 @@ func fixScopeRanges(function *Function, scopes *ReactiveScopes, identity ScopeId
 	if function == nil {
 		return
 	}
-	updated := map[ScopeId]MutableRange{}
+	updated := map[ScopeId]mutation_aliasing.MutableRange{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -414,7 +417,7 @@ func fixScopeRanges(function *Function, scopes *ReactiveScopes, identity ScopeId
 				end = first.Order
 			}
 		}
-		updated[terminal.Scope] = MutableRange{Start: terminal.Order, End: end}
+		updated[terminal.Scope] = mutation_aliasing.MutableRange{Start: terminal.Order, End: end}
 	}
 	if len(updated) == 0 {
 		return

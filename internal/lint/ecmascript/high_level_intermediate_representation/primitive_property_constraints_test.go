@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"strings"
 	"testing"
 )
@@ -97,7 +98,7 @@ func assertPrimitivePropertyRead(t *testing.T, function *Function, property stri
 			t.Errorf("property %s primitive=%t, want %t", property, got, want)
 		}
 		list := effects.Get(instruction.Id)
-		primitive := len(list) == 1 && list[0].Kind == AliasingEffectCreate && list[0].Value == EffectValuePrimitive
+		primitive := len(list) == 1 && list[0].Kind == mutation_aliasing.AliasingEffectCreate && list[0].Value == mutation_aliasing.EffectValuePrimitive
 		if primitive != want {
 			t.Errorf("property %s effects=%v, want primitive=%t", property, list, want)
 		}

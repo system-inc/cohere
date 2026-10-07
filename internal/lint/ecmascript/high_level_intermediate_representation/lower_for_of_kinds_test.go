@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
@@ -74,18 +75,18 @@ after();
 			if target == nil {
 				t.Fatal("the fixture did not produce the target instruction")
 			}
-			original := MutableRange{Start: target.Order, End: target.Order + 1}
+			original := mutation_aliasing.MutableRange{Start: target.Order, End: target.Order + 1}
 			expected := original
 			if location == "initializer" || location == "test" {
 				body, _ := function.Block(loop.Loop)
 				continuation, _ := function.Block(loop.Fallthrough)
 				original.End = startingIdOf(function, body) + 1
-				expected = MutableRange{Start: TerminalOrder(loop), End: startingIdOf(function, continuation)}
+				expected = mutation_aliasing.MutableRange{Start: TerminalOrder(loop), End: startingIdOf(function, continuation)}
 			}
 			identifier := target.LValue.Identifier
 			scopes := &ReactiveScopes{
 				byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{identifier: 1},
-				ranges:       map[ScopeId]MutableRange{1: original},
+				ranges:       map[ScopeId]mutation_aliasing.MutableRange{1: original},
 				members:      map[ScopeId][]static_single_assignment.IdentifierId{1: {identifier}},
 				order:        []ScopeId{1},
 			}

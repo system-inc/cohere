@@ -107,7 +107,10 @@
 // a `Function` is the unit every other pass in this package takes. See `ScopeId`.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import (
+	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/static_single_assignment"
+)
 
 // ScopeId names one reactive scope within one function.
 //
@@ -172,7 +175,7 @@ func ScopeGaps() []ScopeGap {
 // The zero value is an empty table and is ready to read: every lookup answers "no scope".
 type ReactiveScopes struct {
 	byIdentifier map[static_single_assignment.IdentifierId]ScopeId
-	ranges       map[ScopeId]MutableRange
+	ranges       map[ScopeId]mutation_aliasing.MutableRange
 	members      map[ScopeId][]static_single_assignment.IdentifierId
 	order        []ScopeId
 }
@@ -193,9 +196,9 @@ func (s *ReactiveScopes) ScopeOf(id static_single_assignment.IdentifierId) Scope
 //
 // This is the HULL of the member ranges, and after this pass it is also every member's own range.
 // See the package comment for why the two are equal here and are not guaranteed to stay equal.
-func (s *ReactiveScopes) RangeOf(scope ScopeId) MutableRange {
+func (s *ReactiveScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	if s == nil || s.ranges == nil {
-		return MutableRange{}
+		return mutation_aliasing.MutableRange{}
 	}
 	return s.ranges[scope]
 }
@@ -258,7 +261,7 @@ func AssignReactiveScopes(function *Function) *ReactiveScopes {
 // which is upstream's `identifier.mutableRange = scope.range`. The input table is not modified;
 // `MemberRanges` below is the rewritten view, kept separate so a caller can still see what a value's
 // range was before entanglement widened it.
-func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set *DisjointSet) *ReactiveScopes {
+func AssignReactiveScopesWithSets(function *Function, ranges *mutation_aliasing.MutableRanges, set *DisjointSet) *ReactiveScopes {
 	scopes := &ReactiveScopes{}
 	if function == nil || set == nil {
 		return scopes
@@ -270,7 +273,7 @@ func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set
 	}
 
 	scopes.byIdentifier = map[static_single_assignment.IdentifierId]ScopeId{}
-	scopes.ranges = map[ScopeId]MutableRange{}
+	scopes.ranges = map[ScopeId]mutation_aliasing.MutableRange{}
 	scopes.members = map[ScopeId][]static_single_assignment.IdentifierId{}
 
 	// Ids start at 1 because zero is the absent scope. Upstream starts at 0 and distinguishes
@@ -332,7 +335,7 @@ func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set
 		// equivalence is recorded so a reader who notices the redundancy finds the measurement
 		// instead of re-deriving it, and so that a future change to the adoption branch is known to
 		// make this load-bearing again.
-		var hull MutableRange
+		var hull mutation_aliasing.MutableRange
 		for index, id := range class {
 			memberRange := ranges.Get(id)
 			if index == 0 {
@@ -373,15 +376,15 @@ func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set
 // pre-entanglement range is unrecoverable afterwards; here both are available, which costs one map
 // and lets a consumer ask which of the two it wants. Nothing upstream needs the old value, so this
 // is a capability rather than a divergence in what the pass decides.
-func (s *ReactiveScopes) MemberRanges() *MutableRanges {
-	result := &MutableRanges{}
+func (s *ReactiveScopes) MemberRanges() *mutation_aliasing.MutableRanges {
+	result := &mutation_aliasing.MutableRanges{}
 	if s == nil {
 		return result
 	}
 	for _, scope := range s.order {
 		hull := s.ranges[scope]
 		for _, id := range s.members[scope] {
-			result.set(id, hull)
+			result.Set(id, hull)
 		}
 	}
 	return result

@@ -6,63 +6,6 @@ import (
 	"testing"
 )
 
-func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range []struct {
-		name        string
-		left, right EffectValueKind
-		want        EffectValueKind
-		unseen      bool
-	}{
-		{"frozen mutable", EffectValueFrozen, EffectValueMutable, EffectValueMaybeFrozen, false},
-		{"mutable frozen", EffectValueMutable, EffectValueFrozen, EffectValueMaybeFrozen, false},
-		{"mixed primitive", EffectValueMaybeFrozen, EffectValuePrimitive, EffectValueMaybeFrozen, false},
-		{"mixed global", EffectValueMaybeFrozen, EffectValueGlobal, EffectValueMaybeFrozen, false},
-		{"mixed frozen", EffectValueMaybeFrozen, EffectValueFrozen, EffectValueMaybeFrozen, false},
-		{"frozen primitive", EffectValueFrozen, EffectValuePrimitive, EffectValueFrozen, false},
-		{"frozen global", EffectValueFrozen, EffectValueGlobal, EffectValueFrozen, false},
-		{"global primitive", EffectValueGlobal, EffectValuePrimitive, EffectValueGlobal, false},
-		{"global mutable", EffectValueGlobal, EffectValueMutable, EffectValueMutable, false},
-		{"primitive mutable", EffectValuePrimitive, EffectValueMutable, EffectValueMutable, false},
-		{"unvisited predecessor", EffectValueFrozen, EffectValueMutable, EffectValueMutable, true},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			state := newAliasingState()
-			for index, kind := range []EffectValueKind{testCase.left, testCase.right} {
-				place := Place{Identifier: static_single_assignment.IdentifierId(index + 1)}
-				state.create(place, aliasingNodeObject)
-				if kind != EffectValueMutable {
-					state.markImmutable(place.Identifier, kind)
-				}
-			}
-			phi := &Phi{Place: Place{Identifier: 3}, Operands: PhiOperands{
-				{Predecessor: 1, Place: Place{Identifier: 1}}, {Predecessor: 2, Place: Place{Identifier: 2}},
-			}}
-			state.derivePhiImmutable(phi, map[static_single_assignment.BlockId]bool{1: true, 2: !testCase.unseen})
-			if got := state.immutable[3]; got != testCase.want {
-				t.Fatalf("phi kind=%s, want %s", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestFreezeRetainsAlreadyImmutableKinds(t *testing.T) {
-	t.Parallel()
-	for _, kind := range []EffectValueKind{EffectValuePrimitive, EffectValueGlobal, EffectValueFrozen} {
-		t.Run(kind.String(), func(t *testing.T) {
-			t.Parallel()
-			state := newAliasingState()
-			place := Place{Identifier: 1}
-			state.create(place, aliasingNodeObject)
-			state.markImmutable(place.Identifier, kind)
-			if state.freeze(place.Identifier) || state.immutable[place.Identifier] != kind {
-				t.Fatalf("freeze changed %s to %s", kind, state.immutable[place.Identifier])
-			}
-		})
-	}
-}
-
 func TestManualMemoizationPreservesMixedValueClosure(t *testing.T) {
 	t.Parallel()
 	const source = `import React from 'react';

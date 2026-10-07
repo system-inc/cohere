@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
 func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
@@ -55,10 +56,10 @@ func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
 							visited++
 							var frozenResult, frozenArgument bool
 							for _, effect := range effects.Get(instruction.Id) {
-								if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
-									frozenResult = effect.Value == EffectValueFrozen
+								if effect.Kind == mutation_aliasing.AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
+									frozenResult = effect.Value == mutation_aliasing.EffectValueFrozen
 								}
-								frozenArgument = frozenArgument || effect.Kind == AliasingEffectFreeze
+								frozenArgument = frozenArgument || effect.Kind == mutation_aliasing.AliasingEffectFreeze
 							}
 							if frozenResult != testCase.frozen || frozenArgument != testCase.frozen {
 								t.Errorf("frozen result=%t argument=%t; want both %t", frozenResult, frozenArgument, testCase.frozen)

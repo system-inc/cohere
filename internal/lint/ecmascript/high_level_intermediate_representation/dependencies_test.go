@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -663,7 +664,7 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 
 	total, known, differing := 0, 0, 0
 
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)
@@ -712,7 +713,7 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 	// contained within -- or equal to -- that scope's range. An origin naming an enclosing scope is
 	// the outermost-entry bug; an origin naming an unrelated scope is the holding-scope bug.
 	containmentViolations := 0
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)

@@ -126,6 +126,7 @@ import (
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
@@ -327,7 +328,7 @@ func FindDisjointMutableValues(function *Function) *DisjointSet {
 // total order independent of the walk that reads it. The `declarations` map below is the one piece
 // of state that carries across instructions, and it is order-sensitive in exactly the way upstream's
 // is -- first writer wins -- so it is populated by the same walk upstream uses.
-func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRanges) *DisjointSet {
+func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_aliasing.MutableRanges) *DisjointSet {
 	scopeIdentifiers := &DisjointSet{}
 	if function == nil {
 		return scopeIdentifiers
@@ -347,7 +348,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 	}
 
 	for _, block := range function.Blocks {
-		firstOrder := blockFirstOrder(function, block)
+		firstOrder := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 
 		for _, phi := range block.Phis {
 			phiRange := ranges.Get(phi.Place.Identifier)
@@ -468,7 +469,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 // when it is still mutable here. Factored rather than duplicated so the two cannot drift.
 func appendStore(
 	function *Function,
-	ranges *MutableRanges,
+	ranges *mutation_aliasing.MutableRanges,
 	instruction *Instruction,
 	declareIdentifier func(Place),
 	operands []static_single_assignment.IdentifierId,
@@ -490,7 +491,7 @@ func appendStore(
 // range, but a range legitimately STARTING at zero would pass `inRange` while naming a value with no
 // definition point. Upstream carries both and so does this.
 func appendMutableOperand(
-	ranges *MutableRanges,
+	ranges *mutation_aliasing.MutableRanges,
 	instruction *Instruction,
 	operands []static_single_assignment.IdentifierId,
 	operand Place,
@@ -510,7 +511,7 @@ func appendMutableOperand(
 // remaining roles, Use and Receiver, are exactly upstream's operand set.
 func appendMutableOperands(
 	instruction *Instruction,
-	ranges *MutableRanges,
+	ranges *mutation_aliasing.MutableRanges,
 	operands []static_single_assignment.IdentifierId,
 ) []static_single_assignment.IdentifierId {
 	EachPlace(instruction.Value, func(place Place, role PlaceRole) {
@@ -611,7 +612,7 @@ func callResultIsPrimitive(function *Function, producers *calleeProducers, instr
 		name = taggedTemplateCalleeSyntaxName(instruction)
 	}
 	signature, known := lookupSignature(function, producers, instruction, name)
-	return known && signature.Result == EffectValuePrimitive
+	return known && signature.Result == mutation_aliasing.EffectValuePrimitive
 }
 
 // taggedTemplateCalleeSyntaxName covers the call form `calleeSyntaxName` does not inspect.

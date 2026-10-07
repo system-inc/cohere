@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
 const effectHookDeclarations = `declare module 'react' {
@@ -75,22 +76,22 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 									t.Errorf("origin=%+v; want React hook=%t", origin, testCase.frozen)
 								}
 								frozen := 0
-								result := EffectValueMutable
+								result := mutation_aliasing.EffectValueMutable
 								for _, effect := range effects.Get(instruction.Id) {
-									if effect.Kind == AliasingEffectFreeze {
+									if effect.Kind == mutation_aliasing.AliasingEffectFreeze {
 										frozen++
 									}
-									if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
+									if effect.Kind == mutation_aliasing.AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
 										result = effect.Value
 									}
 								}
 								wantFrozen := 0
-								wantResult := EffectValueMutable
+								wantResult := mutation_aliasing.EffectValueMutable
 								if testCase.frozen || testCase.name == "unrelated" {
 									wantFrozen = 2
-									wantResult = EffectValueFrozen
+									wantResult = mutation_aliasing.EffectValueFrozen
 									if hook == "useEffect" && testCase.frozen {
-										wantResult = EffectValuePrimitive
+										wantResult = mutation_aliasing.EffectValuePrimitive
 									}
 								}
 								if frozen != wantFrozen || result != wantResult {

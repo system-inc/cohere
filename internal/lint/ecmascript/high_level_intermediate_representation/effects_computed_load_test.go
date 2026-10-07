@@ -3,6 +3,8 @@ package high_level_intermediate_representation
 import (
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
 func TestManualMemoizationPreservesComputedFrozenRead(t *testing.T) {
@@ -39,15 +41,15 @@ func TestComputedLoadCopiesReceiverKind(t *testing.T) {
 	t.Parallel()
 	for _, testCase := range []struct {
 		name string
-		want EffectValueKind
+		want mutation_aliasing.EffectValueKind
 	}{
-		{"Component", EffectValueFrozen},
-		{"ordinary", EffectValueMutable},
+		{"Component", mutation_aliasing.EffectValueFrozen},
+		{"ordinary", mutation_aliasing.EffectValueMutable},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			function, effects := effectsFor(t, "function "+testCase.name+"(items, key) { return items[key]; }")
-			state, _ := buildAliasingGraph(function, effects)
+			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
 			matched := 0
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -59,10 +61,10 @@ func TestComputedLoadCopiesReceiverKind(t *testing.T) {
 				}
 				matched++
 				list := effects.Get(instruction.Id)
-				if len(list) == 0 || list[0].Kind != AliasingEffectCreateFrom || list[0].From.Identifier != load.Object.Identifier {
+				if len(list) == 0 || list[0].Kind != mutation_aliasing.AliasingEffectCreateFrom || list[0].From.Identifier != load.Object.Identifier {
 					t.Errorf("computed load effects=%v, want CreateFrom receiver", list)
 				}
-				if got := state.immutable[instruction.LValue.Identifier]; got != testCase.want {
+				if got := aliasingGraph.Kind(instruction.LValue.Identifier); got != testCase.want {
 					t.Errorf("computed kind=%s, want %s", got, testCase.want)
 				}
 			}
