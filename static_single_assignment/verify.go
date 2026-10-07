@@ -26,10 +26,10 @@
 //
 // `internal/utilities/control_flow_graph.AnalyzeDominators` is generic over that package's `Graph[E]`,
 // not over an IR's function, so it cannot be pointed at this. Rather than materialise a parallel
-// graph to borrow it, the same Cooper-Harvey-Kennedy fixed point is run here over the block slice.
-// It is twenty lines because reverse postorder is already established, and being a second
-// implementation is acceptable for a checker: a checker that shares an implementation with the
-// thing it checks can agree with it and both be wrong.
+// graph to borrow it, the same Cooper-Harvey-Kennedy fixed point is run here, over a reverse
+// postorder of the real edges that ComputeDominance makes for itself (it says why the block slice
+// isn't one). Being a second implementation is acceptable for a checker: a checker that shares an
+// implementation with the thing it checks can agree with it and both be wrong.
 package static_single_assignment
 
 import "fmt"
@@ -48,7 +48,8 @@ type SSAViolation struct {
 
 func (v SSAViolation) String() string { return v.Detail }
 
-// SSAViolationKind is which of the two invariants a violation breaks.
+// SSAViolationKind is which invariant a violation breaks: one of the two single assignment states, or
+// the precondition Construct rests on.
 type SSAViolationKind uint8
 
 const (
@@ -56,6 +57,9 @@ const (
 	SSAViolationMultipleDefinitions SSAViolationKind = iota
 	// SSAViolationUseNotDominated is a use the definition does not dominate.
 	SSAViolationUseNotDominated
+	// SSAViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules out
+	// and Construct refuses.
+	SSAViolationEntryHasPredecessors
 )
 
 // VerifySSA checks that a function is in single static assignment form and returns every violation.
@@ -72,6 +76,14 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	}
 
 	var violations []SSAViolation
+	if entry, predecessors, entered := entryPredecessors(graph, function); entered {
+		violations = append(violations, SSAViolation{
+			Kind:  SSAViolationEntryHasPredecessors,
+			Block: entry,
+			Detail: fmt.Sprintf("the entry block bb%d has predecessors %v, and no edge may enter it",
+				entry, predecessors),
+		})
+	}
 	dominance := ComputeDominance(graph, function)
 
 	// Where each value is defined. A parameter is defined at the entry block.
@@ -275,18 +287,33 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 
 // Dominance is the immediate-dominator array over a function's block slice, by position in it.
 type Dominance struct {
-	// position maps a block id to its index in the block slice, which is reverse postorder.
+	// position maps a block id to its index in the order ComputeDominance made: a reverse postorder of
+	// the real edges from the entry, then the blocks they don't reach.
 	position map[BlockId]int
-	// immediate[i] is the index of block i's immediate dominator; the entry is its own.
+	// immediate[i] is the index of block i's immediate dominator; the entry is its own, and a block the
+	// real edges don't reach has none (-1), dominated by nothing but itself.
 	immediate []int
 }
 
 // ComputeDominance runs Cooper-Harvey-Kennedy over the function's blocks.
 //
-// The block slice is already in reverse postorder with unreachable blocks removed, which is the
-// precondition the algorithm needs and the reason this is short.
+// # Why it orders the blocks itself rather than reading the block slice
+//
+// The algorithm needs every block after some predecessor of it, so that each immediate dominator comes
+// before its block and intersect's walk up the tree ends where it should. A reverse postorder of the
+// real edges guarantees that. The block slice is not always one: ReversePostorder visits a structural
+// fallthrough first, as upstream does, and keeps a block where the fallthrough first reached it, so a
+// loop that a fallthrough reaches before its back edge sits ahead of every real predecessor it has. Over
+// the slice, the fixed point then settled on too few dominators: 8 of 2,000 generated graphs disagreed
+// with dominance computed as plain set intersection, among them a block every path reaches through
+// three others that was dominated, the answer said, by the entry and one of them (#6v4a54x). The slice's
+// order is what evaluation order and every other pass rely on, so it stays, and this pass walks the
+// real edges itself.
+//
+// Blocks the real edges don't reach (a fallthrough's placeholder) follow the reverse postorder, in the
+// slice's order, with no dominator but themselves.
 func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) *Dominance {
-	blocks := graph.Blocks(function)
+	blocks, reached := realReversePostorder(graph, function)
 	tree := &Dominance{position: make(map[BlockId]int, len(blocks))}
 	for index, block := range blocks {
 		tree.position[graph.Id(block)] = index
@@ -295,10 +322,11 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 	for index := range tree.immediate {
 		tree.immediate[index] = -1
 	}
-	if len(blocks) == 0 {
+	if reached == 0 {
 		return tree
 	}
 	tree.immediate[0] = 0
+	blocks = blocks[:reached]
 
 	intersect := func(a, b int) int {
 		for a != b {
@@ -334,6 +362,74 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 		}
 	}
 	return tree
+}
+
+// realReversePostorder is the function's blocks in a reverse postorder of the real edges from its entry,
+// then the blocks those edges don't reach, in the block slice's order; and how many the edges reach.
+// Fallthroughs are not edges. Exceptional edges are real ones, as everywhere in this module.
+func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) ([]B, int) {
+	slice := graph.Blocks(function)
+	visited := make(map[BlockId]bool, len(slice))
+	postorder := make([]B, 0, len(slice))
+	type frame struct {
+		block      B
+		successors []BlockId
+		next       int
+	}
+	var stack []frame
+	scratch := edgeScratchPool.Get().(*edgeScratch)
+	defer edgeScratchPool.Put(scratch)
+	enter := func(id BlockId) {
+		block, ok := graph.Block(function, id)
+		if !ok || visited[id] {
+			return
+		}
+		visited[id] = true
+		var successors []BlockId
+		for _, edge := range edgesOf(graph, block, scratch) {
+			if edge.edge != Fallthrough {
+				successors = append(successors, edge.successor)
+			}
+		}
+		stack = append(stack, frame{block: block, successors: successors})
+	}
+
+	enter(graph.Entry(function))
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		if top.next == len(top.successors) {
+			postorder = append(postorder, top.block)
+			stack = stack[:len(stack)-1]
+			continue
+		}
+		next := top.successors[top.next]
+		top.next++
+		enter(next)
+	}
+
+	order := make([]B, 0, len(slice))
+	for index := len(postorder) - 1; index >= 0; index-- {
+		order = append(order, postorder[index])
+	}
+	for _, block := range slice {
+		if !visited[graph.Id(block)] {
+			order = append(order, block)
+		}
+	}
+	return order, len(postorder)
+}
+
+// entryPredecessors reports the entry block and its predecessors when it has any, which Graph.Entry
+// rules out: Construct's lookup walks back through predecessors until a block has none, and an entry
+// some edge enters can put it on a cycle that never ends.
+func entryPredecessors[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) (BlockId, []BlockId, bool) {
+	entry := graph.Entry(function)
+	block, ok := graph.Block(function, entry)
+	if !ok {
+		return entry, nil, false
+	}
+	predecessors := graph.Predecessors(block)
+	return entry, predecessors, len(predecessors) > 0
 }
 
 // Dominates reports whether every path from the entry to block passes through dominator.
