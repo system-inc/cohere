@@ -309,6 +309,31 @@ func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) 
 	}
 }
 
+// TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds: #y0ejf6a, return-probe.tgz's r1 to r4. A method hands back
+// a container its object still holds, so a Cat pushed through the wider return fills it; tsc 6.0.3 accepts each, and
+// Node throws `bark is not a function`.
+func TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+	}{
+		"a class's field":       {animals + `interface Pound { all(): Animal[] } class Kennel { dogs: Dog[] = [rex]; all(): Dog[] { return this.dogs; } } const pound: Pound = new Kennel();`, "new Kennel()"},
+		"a literal's method":    {animals + `interface Pound { all(): Animal[] } const dogs: Dog[] = [rex]; const pound: Pound = { all() { return dogs; } };`, "all"},
+		"a map":                 {animals + `interface Registry { byName(): Map<string, Animal> } class Kennel { names = new Map<string, Dog>(); byName(): Map<string, Dog> { return this.names; } } const registry: Registry = new Kennel();`, "new Kennel()"},
+		"an interface's method": {animals + `interface Pound { all(): Animal[] } declare const dogPound: { all(): Dog[] }; const pound: Pound = dogPound;`, "dogPound"},
+		// One return that builds and one that does not: the method can hand back what it holds.
+		"one return of two held": {animals + `interface Pound { all(fresh: boolean): Animal[] } class Kennel { dogs: Dog[] = [rex]; all(fresh: boolean): Dog[] { if(fresh) { return []; } return this.dogs; } } const pound: Pound = new Kennel();`, "new Kennel()"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, "mutableWidening")
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
 // TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven: shape 5's near-misses.
 func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) {
 	t.Parallel()
@@ -335,9 +360,15 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 		"a promise's value": `const done: Promise<{ result: string }> = Promise.resolve({ result: 'ok' as const });`,
 		// A default takes what the wider type's `?` passes (OrmDatabase's increment on api).
 		"a defaulted parameter": `interface Counter { add(value?: number): void } class Tally { add(value = 1): void { value; } } const counter: Counter = new Tally();`,
-		// A method's return is not paired, as no method was before shape 5: an iterator's next() hands back a fresh
-		// result each call, and was 276 findings on the consumers when it was.
-		"a method's return": animals + `interface Source { items(): Animal[] } declare const dogs: { items(): Dog[] }; const source: Source = dogs;`,
+		// #y0ejf6a's near-misses, return-probe.tgz's n1 to n4: a read-only return, a method building what it returns, and
+		// the library's iterator, whose next() hands back a new result each call (276 findings on the consumers when a
+		// method's return was first paired).
+		"a readonly return":              animals + `interface Pound { all(): readonly Animal[] } class Kennel { dogs: Dog[] = [rex]; all(): Dog[] { return this.dogs; } } const pound: Pound = new Kennel();`,
+		"a copy returned":                animals + `interface Pound { all(): Animal[] } class Kennel { dogs: Dog[] = [rex]; all(): Dog[] { return this.dogs.slice(); } } const pound: Pound = new Kennel();`,
+		"a literal returned":             animals + `interface Pound { all(): Animal[] } class Kennel { all(): Dog[] { return [rex]; } } const pound: Pound = new Kennel();`,
+		"a literal returned, or nothing": animals + `interface Pound { all(): Animal[] | undefined } class Kennel { all(): Dog[] | undefined { return [rex]; } } const pound: Pound = new Kennel();`,
+		"a literal's method building":    animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
+		"an iterator's next()":           animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

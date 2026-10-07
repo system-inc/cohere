@@ -56,8 +56,10 @@ var (
  * and judges their parameters one way, a function's being tsc's own under strictFunctionTypes. A generic method is
  * related as tsc relates it (#bbtfx99): one with type parameters of its own is instantiated in the context of the
  * other, so `{ put<T extends Dog>(dog: T) }` as `{ put(animal: Animal) }` is a Dog parameter under an Animal one,
- * and Promise's `then` is the same `then` under two promises. A method's return is not paired, as no method was
- * before.
+ * and Promise's `then` is the same `then` under two promises. A method's return is paired as a function's is
+ * (#y0ejf6a): `all(): Dog[] { return this.dogs }` seen as `all(): Animal[]` hands out the array the object still
+ * holds. A method whose every return is a literal or a new container builds what it returns, and the library's
+ * methods are taken to (an iterator's `next()`), so those returns' own slots are no one else's.
  *
  * It began as identity, by the checker's identity relation, and the four consumers measured why not: an
  * `HTMLElement` seen as an `Element` reported its event handler slots, which differ only in `this` and are

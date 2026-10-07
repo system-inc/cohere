@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -50,13 +51,17 @@ type Pair struct {
 	SourceProperty *ast.Symbol
 
 	// Method is a pair of two methods' types (WalkOptions.Methods, or a literal's method site): the walk pairs
-	// their parameters only, each a MethodParameter, and not their returns. tsc compares a method's parameters
-	// both ways, and those are the hole; what a method returns is no slot of the method's.
+	// their parameters, each a MethodParameter, since tsc compares a method's parameters both ways, and their
+	// returns, as a function's, Built when the method builds what it returns.
 	Method          bool
 	MethodParameter bool
 	// Defaulted is a parameter pair whose Target, the parameter the value is passed to, has a default, and so takes
 	// `undefined` too (#bbtfx99): `increment(..., value = 1)` is `value: number` to the checker.
 	Defaulted bool
+
+	// Built is a method's return the method builds each call (returnsBuilt). Its own slots are no one else's, as
+	// a Site's NewContainer's are, and what it holds may still be shared, so the walk goes on into it.
+	Built bool
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -291,7 +296,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -304,7 +309,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.IsAssignable(pair.Source, member) {
 				continue
 			}
-			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method}, depth+1)
+			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -333,7 +338,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -344,7 +349,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.isSlotContainer(member) || !w.IsAssignable(member, pair.Target) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -477,7 +482,7 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	// The slots of a container the site just built are no one else's, so writing through the wider type
 	// reaches only this value. Its parts' own slots keep their mutability, unless the site built its elements
 	// too (Site.FreshElements), whose own slots are then no one else's either.
-	ownSlotsShared := !(w.newContainer && len(pair.Path) == 0) &&
+	ownSlotsShared := !pair.Built && !(w.newContainer && len(pair.Path) == 0) &&
 		!(w.freshElements && len(pair.Path) == 1 && pair.Path[0].Kind == StepElement)
 
 	if checker.Checker_isArrayType(w.typeChecker, target) {
@@ -538,13 +543,14 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
 		sourceSignature, targetSignature := w.inContextOf(sourceSignatures[0], targetSignatures[0])
-		if !pair.Method {
-			if found, wrong := w.into(pair, Pair{
-				Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
-				Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
-			}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
-				return found, true
-			}
+		// A method's return is paired as a function's is (#y0ejf6a): `all(): Dog[] { return this.dogs }` seen as
+		// `all(): Animal[]` hands out the array its object still holds. Unless the method builds what it returns.
+		if found, wrong := w.into(pair, Pair{
+			Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
+			Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
+			Built:  pair.Method && returnsBuilt(source),
+		}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
+			return found, true
 		}
 		sourceParameters := checker.Signature_parameters(sourceSignature)
 		targetParameters := checker.Signature_parameters(targetSignature)
@@ -676,6 +682,52 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
 	return false
 }
 
+/*
+ * returnsBuilt is a method that builds what it returns (#y0ejf6a): each of its declarations' returns is a literal or
+ * a new container (isFresh, isNewContainer), so nobody else holds the value: `return this.dogs.slice()`, `return
+ * [rex]`. A method declared with no body in a declaration file is the library's, whose returns are taken as built:
+ * an iterator's `next()` hands back a new result each call, and was 276 findings on the consumers when a method's
+ * return was first paired (#gvzdft9). One with no body in the project's own source, an interface's, is not, since
+ * whatever implements it may hand back what it holds.
+ */
+func returnsBuilt(method *checker.Type) bool {
+	symbol := method.Symbol()
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		body := declaration.Body()
+		if body == nil {
+			if sourceFile := ast.GetSourceFileOfNode(declaration); sourceFile == nil || !sourceFile.IsDeclarationFile {
+				return false
+			}
+			continue
+		}
+		if !ast.IsBlock(body) {
+			if !isBuilt(body) {
+				return false
+			}
+			continue
+		}
+		built := true
+		ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+			if returned := statement.AsReturnStatement().Expression; returned != nil && !isBuilt(returned) {
+				built = false
+			}
+			return !built
+		})
+		if !built {
+			return false
+		}
+	}
+	return true
+}
+
+// isBuilt is an expression whose value is made right here, whole or as a new container.
+func isBuilt(expression *ast.Node) bool {
+	return isFresh(expression) || isNewContainer(expression)
+}
+
 // hasInitializer is a parameter declared with a default, `value = 1`, which a caller may leave out or pass
 // `undefined` to though its type does not say so: tsc's getTypeOfParameter adds the `undefined` for it.
 func hasInitializer(parameter *ast.Symbol) bool {
@@ -728,7 +780,16 @@ func PathText(path []Step) string {
 				text.WriteString("[]")
 			}
 		case StepProperty:
-			text.WriteString("." + step.Name)
+			// A symbol's or a quoted name is bracketed, never its internal name: `\xfe@iterator@224` carries a
+			// creation id that differs run to run (#y0ejf6a).
+			switch name := type_checking.StablePropertyName(step.Name); {
+			case strings.HasPrefix(name, "["):
+				text.WriteString(name)
+			case strings.HasPrefix(name, `"`):
+				text.WriteString("[" + name + "]")
+			default:
+				text.WriteString("." + name)
+			}
 		case StepTypeArgument:
 			text.WriteString("<" + step.Name + " " + containerArgumentName(step.Name, step.Index) + ">")
 		case StepReturn:
