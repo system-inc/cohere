@@ -20,19 +20,15 @@ import (
 type mergeCase struct {
 	name string
 	// scopes are [start, end) in scope-id order starting at 1.
-	scopes []mutation_aliasing.
-		// instructions are {order, lvalueScope, useScope}; a scope index of 0 means no scope.
-		MutableRange
-
+	scopes []mutation_aliasing.MutableRange
+	// instructions are {order, lvalueScope, useScope}; a scope index of 0 means no scope.
 	instructions [][3]int
 	terminal     static_single_assignment.EvaluationOrder
 	// terminalScope, when non-zero, gives the terminal a Return carrying a place in that scope.
 	// Zero leaves the terminal an Unreachable with no operands.
 	terminalScope int
-	terminalRange mutation_aliasing.
-		// wantGroups maps each scope id to the id it should end up in.
-		MutableRange
-
+	terminalRange mutation_aliasing.MutableRange
+	// wantGroups maps each scope id to the id it should end up in.
 	wantGroups map[ScopeId]ScopeId
 	// wantRanges is the range each surviving scope should carry.
 	wantRanges map[ScopeId]mutation_aliasing.MutableRange

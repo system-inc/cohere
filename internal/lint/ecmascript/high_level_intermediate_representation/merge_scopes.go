@@ -385,11 +385,9 @@ type mergeSweepState struct {
 	activeScopes []ScopeId
 	starts       []scopesAtPosition
 	ends         []scopesAtPosition
-	rangeOf      func(ScopeId) mutation_aliasing.
+	rangeOf      func(ScopeId) mutation_aliasing.MutableRange
 
-		// visits counts instruction positions handled, for the termination test only.
-		MutableRange
-
+	// visits counts instruction positions handled, for the termination test only.
 	visits int
 }
 
