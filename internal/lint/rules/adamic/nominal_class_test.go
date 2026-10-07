@@ -19,6 +19,16 @@ class Box<Item> {
 }
 `
 
+// heritage is shelters with Box's subclasses (#ncheh9w): one fixing its argument, one passing its own through,
+// one fixing that one's, and one passing an array of its own. heritage-probes.tgz on the task runs the first two
+// in Node: seen as a Box<Animal>, a Cat put in, and the dog's `bark` is not a function.
+const heritage = shelters + `
+class DogBox extends Box<Dog> {}
+class Crate<Contents> extends Box<Contents> {}
+class DogCrate extends Crate<Dog> {}
+class Pen<Member> extends Box<Member[]> {}
+`
+
 // TestNominalClassFiresOnEveryProvenHole: each case is accepted by tsc 6.0.3 and fails on Node.
 func TestNominalClassFiresOnEveryProvenHole(t *testing.T) {
 	t.Parallel()
@@ -38,6 +48,13 @@ func TestNominalClassFiresOnEveryProvenHole(t *testing.T) {
 		"an empty class takes anything": {`class Token {} const token: Token = 42;`, "notAnInstance", "42"},
 		// Strict on `any` too: a Box<any> seen as a Box<Dog> is the same hole the any opened, reported where it is used.
 		"an any type argument": {shelters + `declare const loose: Box<any>; const strict: Box<Dog> = loose;`, "typeArgumentsDiffer", "loose"},
+		// heritage-probes.tgz: a subclass gives Box its arguments, and those are what must be identical (#ncheh9w).
+		"a subclass fixing another argument":          {heritage + `const animalBox: Box<Animal> = new DogBox(rex);`, "typeArgumentsDiffer", "new DogBox(rex)"},
+		"a generic subclass passing another argument": {heritage + `const animalBox: Box<Animal> = new Crate<Dog>(rex);`, "typeArgumentsDiffer", "new Crate<Dog>(rex)"},
+		"two levels of subclass":                      {heritage + `const animalBox: Box<Animal> = new DogCrate(rex);`, "typeArgumentsDiffer", "new DogCrate(rex)"},
+		"an argument mapped into another type":        {heritage + `const animalBox: Box<Animal[]> = new Pen<Dog>([rex]);`, "typeArgumentsDiffer", "new Pen<Dog>([rex])"},
+		// api's drizzle adapters: an intersection whose member is the subclass says the arguments differ.
+		"a subclass in an intersection": {heritage + `declare const tagged: DogBox & { readonly tag: string }; const animalBox: Box<Animal> = tagged;`, "typeArgumentsDiffer", "tagged"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -60,6 +77,12 @@ func TestNominalClassStaysCleanOnInstancesAndInterfaces(t *testing.T) {
 		"a subclass":                `class Base { readonly id = 1; } class Derived extends Base { readonly extra = 2; } const base: Base = new Derived();`,
 		"this":                      `class Chain { next(): Chain { return this; } }`,
 		"a union of instances":      shelters + `declare const either: AnimalShelter | undefined; const maybe: AnimalShelter | undefined = either;`,
+		// The heritage near-misses (#ncheh9w): the argument the subclass gives, and a read-only view, not a class.
+		"a subclass fixing the same argument":          heritage + `const dogs: Box<Dog> = new DogBox(rex);`,
+		"a generic subclass passing the same argument": heritage + `const dogs: Box<Dog> = new Crate<Dog>(rex);`,
+		"two levels with the same argument":            heritage + `const dogs: Box<Dog> = new DogCrate(rex); const crate: Crate<Dog> = new DogCrate(rex);`,
+		"an argument mapped the same way":              heritage + `const dogs: Box<Dog[]> = new Pen<Dog>([rex]);`,
+		"a read-only view of a subclass":               heritage + `const view: { readonly get: () => Animal } = new DogBox(rex);`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
