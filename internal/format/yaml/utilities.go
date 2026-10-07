@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // src/language-yaml/utilities.js.
@@ -33,20 +34,10 @@ func childAt(node *unist.Node, index int) *unist.Node {
 // mappingKey or mappingValue.
 func contentOf(node *unist.Node) *unist.Node { return childAt(node, 0) }
 
-// isJavaScriptWhitespace is JavaScript's \s, which is also the set String.prototype.trim removes:
-// WhiteSpace and LineTerminator in ECMA-262.
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
-}
-
 // trim, trimStart and trimEnd are JavaScript's String.prototype methods of those names.
-func trim(text string) string      { return strings.TrimFunc(text, isJavaScriptWhitespace) }
-func trimStart(text string) string { return strings.TrimLeftFunc(text, isJavaScriptWhitespace) }
-func trimEnd(text string) string   { return strings.TrimRightFunc(text, isJavaScriptWhitespace) }
+func trim(text string) string      { return strings.TrimFunc(text, ecmascripttext.IsWhitespace) }
+func trimStart(text string) string { return strings.TrimLeftFunc(text, ecmascripttext.IsWhitespace) }
+func trimEnd(text string) string   { return strings.TrimRightFunc(text, ecmascripttext.IsWhitespace) }
 
 // isNextLineEmpty is upstream's isNextLineEmpty: from the node's last character, is the line after the
 // node's line empty?
@@ -69,7 +60,7 @@ func isNextLineEmpty(node *unist.Node, text string) bool {
 			newlineCount++
 		}
 
-		if newlineCount == 1 && !isJavaScriptWhitespace(character) {
+		if newlineCount == 1 && !ecmascripttext.IsWhitespace(character) {
 			return false
 		}
 
@@ -407,13 +398,13 @@ func everyLineBlank(words []string) bool {
 // startsWithJavaScriptWhitespace is /^\s/.test(text).
 func startsWithJavaScriptWhitespace(text string) bool {
 	character, width := utf8.DecodeRuneInString(text)
-	return width > 0 && isJavaScriptWhitespace(character)
+	return width > 0 && ecmascripttext.IsWhitespace(character)
 }
 
 // endsWithJavaScriptWhitespace is /\s$/.test(text), $ without the m flag being the very end.
 func endsWithJavaScriptWhitespace(text string) bool {
 	character, width := utf8.DecodeLastRuneInString(text)
-	return width > 0 && isJavaScriptWhitespace(character)
+	return width > 0 && ecmascripttext.IsWhitespace(character)
 }
 
 // startsOrEndsWithJavaScriptWhitespace is /^\s|\s$/.test(text).

@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/printing"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 func printUnit(unit string) string {
@@ -396,18 +397,10 @@ func isNextLineEmpty(text string, startIndex int) bool {
 // javaScriptWhitespaceClass is JavaScript's \s as a Go character class: WhiteSpace and LineTerminator.
 const javaScriptWhitespaceClass = `[\t\n\v\f\r \x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]`
 
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
-}
-
 // trim, trimStart and trimEnd are String.prototype.trim and its halves.
-func trim(value string) string      { return strings.TrimFunc(value, isJavaScriptWhitespace) }
-func trimStart(value string) string { return strings.TrimLeftFunc(value, isJavaScriptWhitespace) }
-func trimEnd(value string) string   { return strings.TrimRightFunc(value, isJavaScriptWhitespace) }
+func trim(value string) string      { return strings.TrimFunc(value, ecmascripttext.IsWhitespace) }
+func trimStart(value string) string { return strings.TrimLeftFunc(value, ecmascripttext.IsWhitespace) }
+func trimEnd(value string) string   { return strings.TrimRightFunc(value, ecmascripttext.IsWhitespace) }
 
 // toLowerCase is String.prototype.toLowerCase. Go's ToLower maps U+0130 to a bare i where JavaScript's
 // special casing gives i followed by U+0307. JavaScript's final-sigma rule (a capital sigma at the end
