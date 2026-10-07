@@ -11,6 +11,9 @@
 package tailwind
 
 import (
+	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -34,8 +37,12 @@ type ClassLiteral struct {
 	Origin ClassLiteralOrigin
 	// Edges says which of the literal's ends will touch class text once it is substituted into a
 	// template's hole, so that the whitespace at that end is all that separates two classes. See
-	// holeEdges.
+	// holeEdges. A  operand's edges touch what it is concatenated with, upstream's
+	// isConcatenatedLeft and isConcatenatedRight.
 	Edges classValueEdges
+	// Concatenated is which of the literal's ends a  joins to another value, the half of Edges that
+	// no-concatenated-classes reports.
+	Concatenated classValueEdges
 }
 
 // ClassLiteralOrigin is where a class string was written.
@@ -52,77 +59,48 @@ const (
 	ClassLiteralOriginVariable ClassLiteralOrigin = "Variable"
 )
 
-// ClassLiteralSettings names the three surfaces where class strings are written, each as upstream's
-// name patterns.
+// ClassLiteralSettings is the selectors a rule reads class strings through, upstream's flat
+// `selectors` after its legacy options and settings have merged into them.
 //
-// All three matter, and that is not obvious. On the ahra tree the attribute surface holds 7,773
-// literals and the other two hold 2,192, so a rule that reads only JSX attributes silently covers
-// 78% of the class surface while reporting a clean tree for the rest. Every rule in this package
-// reads through this type for that reason.
-//
-// Every pattern is a JavaScript regular expression that must match the whole name, upstream's
-// matchesName (utils/utils.js at 4.7.0): its first match, and that match is the name. An attribute
-// pattern and name are both lowercased first, as getLiteralsByJSXAttribute does.
+// Every surface matters, and that is not obvious. On the ahra tree the attribute surface holds 7,773
+// literals and the others hold 2,192, so a rule that reads only JSX attributes silently covers 78% of
+// the class surface while reporting a clean tree for the rest. Every rule in this package reads
+// through this type for that reason.
 type ClassLiteralSettings struct {
-	// AttributePatterns match the JSX attributes that carry classes, `class` and `className` by default.
-	AttributePatterns []string
-	// CalleeNamePatterns match a call's name, the identifier or the property a member call ends in,
-	// and CalleePathPatterns match its dotted path, `twc.div` for `twc.div(...)`. A callee matching
-	// either is read, which is upstream's selector `name` and `path`.
-	CalleeNamePatterns []string
-	CalleePathPatterns []string
-	// VariablePatterns match variable names whose string initializers are classes.
-	VariablePatterns []string
+	Selectors []Selector
 }
 
 // DefaultClassLiteralSettings is upstream 4.7.0's default selectors (options/default-options.js),
-// the half of them that read strings: the attribute, callee and variable selectors whose matchers
-// read strings, or that have none.
+// embedded from the installed package by tools/generate_class_literals.
 //
-// The other half is not ported yet and is named here so no one reads this as complete (#gj5nm6e,
-// unit 6): object keys (`cn({ 'p-2': on })`, `classList`, `objstr`), object values at a path (cva and
-// tv `variants`, `compoundVariants`, `slots`, `base`, and clb), the strings a function returns
-// (twc and twx), and tagged templates (twc`...`). Nor is upstream's string matcher's walk ported
-// exactly: these rules read the strings in a value position of an argument, and upstream reads every
-// string nested under it.
+// Tag selectors and anonymousFunctionReturn matchers are among them and not ported yet (#btxd64n unit
+// 6b): `twc.div`...“, `twc.div(() => '...')`, and `export default` as the variable `default` go
+// unread until they are.
 //
 // Defaults rather than a required option, because a rule that declines every file when unconfigured
 // is indistinguishable from a rule with nothing to report. A project writing its own `attributes`,
 // `callees` or `variables`, in a rule's options or in settings["better-tailwindcss"], replaces that
-// kind's defaults whole, as upstream's legacy selectors do. Our own repositories name
+// kind's selectors whole, as upstream's legacy options do. Our own repositories name
 // `mergeClassNames` and `createVariantClassNames` there.
 func DefaultClassLiteralSettings() ClassLiteralSettings {
-	return ClassLiteralSettings{
-		AttributePatterns: []string{
-			`^class(?:Name)?$`,
-			`^class:.*$`,
-			`(?:^\[class\]$)|(?:^\[ngClass\]$)`,
-			`(?:^\[class\..*\]$)`,
-			`^v-bind:class$`,
-			`^class:list$`,
-		},
-		CalleeNamePatterns: []string{
-			`^cc$`, `^clsx$`, `^cn$`, `^cnb$`, `^ctl$`, `^cva$`, `^cx$`, `^dcnb$`, `^tv$`, `^twJoin$`, `^twMerge$`,
-		},
-		CalleePathPatterns: []string{`^twc\.\w+`, `^twx\.\w+`},
-		VariablePatterns:   []string{`^classNames?$`, `^classes$`, `^styles?$`},
-	}
+	return ClassLiteralSettings{Selectors: DefaultSelectors()}
 }
 
-// TailwindClassLiteralOptions are upstream's legacy selector options, which every better-tailwindcss
-// rule accepts: `attributes`, `callees` and `variables`, each a list of name patterns.
+// TailwindClassLiteralOptions are the selector options every better-tailwindcss rule accepts: the flat
+// `selectors`, and the legacy `attributes`, `callees` and `variables`, each a list of names, or of
+// names with their matchers.
 //
-// A kind that is written replaces that kind's defaults whole, an empty list included, which then reads
-// nothing of that kind; a kind not written keeps its defaults. That is upstream's createRule: a legacy
-// kind drops every default selector of the kind (`hasCalleeOverride` and its siblings). A legacy callee
-// is upstream's `{name, path}` with both set to the pattern, so it matches a call by either.
+// A legacy kind that is written replaces that kind's selectors whole, an empty list included, which
+// then reads nothing of that kind; a kind not written keeps the flat selectors of its kind, upstream's
+// defaults when `selectors` is not written. That is upstream's createRule (mergeSelectors).
 //
-// Not ported yet: a legacy entry's matcher form, `[name, [{match}]]`, and `tags`, both unit 6 of
-// #gj5nm6e, refused until then.
+// Not ported yet: `tags`, refused by name until #btxd64n unit 6b, and a selector of kind tag or with
+// an anonymousFunctionReturn matcher, refused by checkSelectors until then.
 type TailwindClassLiteralOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	Selectors  *[]Selector      `json:"selectors"`
+	Attributes []LegacySelector `json:"attributes"`
+	Callees    []LegacySelector `json:"callees"`
+	Variables  []LegacySelector `json:"variables"`
 
 	// surfaces is these options compiled, set once by the decoder, so a rule asking on every file reads
 	// a pointer rather than rebuilding the settings and their key. Nil on options a test builds by hand,
@@ -139,26 +117,22 @@ func (options TailwindClassLiteralOptions) ClassLiteralSurfaces() *ClassLiteralS
 	return ClassLiteralSurfacesFor(options.ClassLiteralSettings())
 }
 
-// compileClassLiterals compiles the options once, after the decoder has merged the settings into them.
-// Promoted onto every options struct that embeds TailwindClassLiteralOptions, so the decoder can call it.
-func (options *TailwindClassLiteralOptions) compileClassLiterals() {
+// compileClassLiterals checks and compiles the options once, after the decoder has merged the settings
+// into them. Promoted onto every options struct that embeds TailwindClassLiteralOptions, so the decoder
+// can call it.
+func (options *TailwindClassLiteralOptions) compileClassLiterals() error {
+	if options.Selectors != nil {
+		if err := checkSelectors(*options.Selectors); err != nil {
+			return err
+		}
+	}
 	options.surfaces = ClassLiteralSurfacesFor(options.ClassLiteralSettings())
+	return nil
 }
 
-// ClassLiteralSettings is the defaults with every kind these options write put in place of its own.
+// ClassLiteralSettings is these options merged into one list of selectors, as upstream merges them.
 func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSettings {
-	settings := DefaultClassLiteralSettings()
-	if options.Attributes != nil {
-		settings.AttributePatterns = options.Attributes
-	}
-	if options.Callees != nil {
-		settings.CalleeNamePatterns = options.Callees
-		settings.CalleePathPatterns = options.Callees
-	}
-	if options.Variables != nil {
-		settings.VariablePatterns = options.Variables
-	}
-	return settings
+	return ClassLiteralSettings{Selectors: mergeSelectors(options.Selectors, options.Attributes, options.Callees, options.Variables)}
 }
 
 // ClassLiteralReader finds class-carrying strings in a file.
@@ -167,25 +141,114 @@ func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSe
 // settings once per run and which hands every rule reading a file with those settings the same reader,
 // so a node is read once however many rules listen to it. NewClassLiteralReader builds an unshared one, for a harness.
 type ClassLiteralReader struct {
-	attributes  *namePatterns
-	calleeNames *namePatterns
-	calleePaths *namePatterns
-	variables   *namePatterns
+	attributes *selectorGroup
+	callees    *selectorGroup
+	variables  *selectorGroup
 
 	// values holds what each node read as, for the one file this reader serves. Nil on a reader that
 	// is not bound to a file, which then reads every node afresh.
 	values map[*ast.Node]classValues
 }
 
-// namePatterns is one kind's patterns, compiled, with each name's answer remembered.
+// compiledSelector is one selector, its patterns and matchers compiled.
+type compiledSelector struct {
+	name *namePatterns
+	path *namePatterns
+	// matchers is nil for a selector with no matchers, which reads direct strings only.
+	matchers       []compiledMatcher
+	targetCall     *SelectorTarget
+	targetArgument *SelectorTarget
+}
+
+// selectorGroup is one kind's selectors, with each name's answer remembered: which of them it matches.
 //
 // The answers are a memo because names repeat and the patterns run on a backtracking engine: ahra's
-// attributes are almost all `className`, asked about on every JSX attribute in 3,978 files. The answer
-// is a pure function of the name, so the memo is shared by every worker reading with these settings.
+// attributes are almost all `className`, asked about on every JSX attribute in 3,978 files, and
+// upstream's defaults hold 25 callee selectors. An answer is a pure function of the name, so the memo
+// is shared by every worker reading with these settings.
+type selectorGroup struct {
+	selectors []compiledSelector
+	lowercase bool
+	hasPaths  bool
+	byName    sync.Map
+	byPath    sync.Map
+}
+
+func newSelectorGroup(selectors []Selector, kind SelectorKind) *selectorGroup {
+	group := &selectorGroup{lowercase: kind == SelectorKindAttribute}
+	for _, selector := range selectors {
+		if selector.Kind != kind {
+			continue
+		}
+		compiled := compiledSelector{
+			matchers:       compileMatchers(selector.Match),
+			targetCall:     selector.TargetCall,
+			targetArgument: selector.TargetArgument,
+		}
+		if compiled.targetCall == nil {
+			compiled.targetCall = selector.CallTarget
+		}
+		if selector.Name != "" {
+			compiled.name = newNamePatterns([]string{selector.Name}, group.lowercase)
+		}
+		if selector.Path != "" {
+			compiled.path = newNamePatterns([]string{selector.Path}, false)
+			group.hasPaths = true
+		}
+		group.selectors = append(group.selectors, compiled)
+	}
+	return group
+}
+
+// matching is the selectors a name, or a path, matches, by index. path is asked only when a selector
+// with a path did not match by name, since it is a new string for every member call in the file.
+func (group *selectorGroup) matching(name string, path func() string) []int {
+	if len(group.selectors) == 0 {
+		return nil
+	}
+	byName := group.answer(&group.byName, name, func(selector compiledSelector) *namePatterns { return selector.name })
+	if !group.hasPaths {
+		return byName
+	}
+	byPath := group.answer(&group.byPath, path(), func(selector compiledSelector) *namePatterns { return selector.path })
+	if len(byPath) == 0 {
+		return byName
+	}
+	merged := make([]int, 0, len(byName)+len(byPath))
+	for index := range group.selectors {
+		if slices.Contains(byName, index) || slices.Contains(byPath, index) {
+			merged = append(merged, index)
+		}
+	}
+	return merged
+}
+
+func (group *selectorGroup) answer(memo *sync.Map, name string, patternsOf func(compiledSelector) *namePatterns) []int {
+	if name == "" {
+		return nil
+	}
+	key := name
+	if group.lowercase {
+		key = strings.ToLower(name)
+	}
+	if answer, isAnswered := memo.Load(key); isAnswered {
+		return answer.([]int)
+	}
+	var answer []int
+	for index, selector := range group.selectors {
+		if patterns := patternsOf(selector); patterns != nil && patterns.matchesUnremembered(name) {
+			answer = append(answer, index)
+		}
+	}
+	memo.Store(key, answer)
+	return answer
+}
+
+// namePatterns is a selector's name patterns, compiled. Its answers are remembered by the selector
+// group that asks, once for all of the group's selectors.
 type namePatterns struct {
 	compiled  []*esregexp.RegExp
 	lowercase bool
-	answers   sync.Map
 }
 
 // newNamePatterns compiles patterns as JavaScript does. One that does not compile is skipped rather
@@ -206,29 +269,24 @@ func newNamePatterns(patterns []string, lowercase bool) *namePatterns {
 	return compiledPatterns
 }
 
-// matches reports whether any pattern matches the whole name, upstream's matchesName.
-func (patterns *namePatterns) matches(name string) bool {
+// matchesUnremembered reports whether any pattern matches the whole name, upstream's matchesName,
+// asking the patterns every time.
+func (patterns *namePatterns) matchesUnremembered(name string) bool {
 	if name == "" || len(patterns.compiled) == 0 {
 		return false
 	}
 	if patterns.lowercase {
 		name = strings.ToLower(name)
 	}
-	if answer, isAnswered := patterns.answers.Load(name); isAnswered {
-		return answer.(bool)
-	}
-	answer := false
 	for _, pattern := range patterns.compiled {
 		// The first match, and only if it is the name: `exec(name)[0] === name`. A pattern whose
 		// first match is shorter does not match, though a longer match exists, exactly as upstream.
 		match, err := pattern.Unwrap().FindStringMatch(name)
 		if err == nil && match != nil && match.RuneIndex == 0 && match.String() == name {
-			answer = true
-			break
+			return true
 		}
 	}
-	patterns.answers.Store(name, answer)
-	return answer
+	return false
 }
 
 // ClassLiteralSurfaces is one set of settings compiled for the run: the unbound reader each file binds,
@@ -294,29 +352,22 @@ func (surfaces *ClassLiteralSurfaces) bind() *ClassLiteralReader {
 	return &bound
 }
 
-// key is the settings as one string, every list kept in order and every name kept apart, so two
-// settings share a key only when they would read every node the same way.
+// key is the settings as one string, every selector in order with every field, so two settings share
+// a key only when they would read every node the same way. Built once per configuration selection.
 func (s ClassLiteralSettings) key() string {
-	var builder strings.Builder
-	for index, names := range [][]string{s.AttributePatterns, s.CalleeNamePatterns, s.CalleePathPatterns, s.VariablePatterns} {
-		if index > 0 {
-			builder.WriteByte(1)
-		}
-		for _, name := range names {
-			builder.WriteString(name)
-			builder.WriteByte(0)
-		}
+	encoded, err := json.Marshal(s.Selectors)
+	if err != nil {
+		panic(fmt.Sprintf("selectors that decoded do not encode: %v", err))
 	}
-	return builder.String()
+	return string(encoded)
 }
 
 // NewClassLiteralReader compiles the settings into a reader.
 func NewClassLiteralReader(settings ClassLiteralSettings) *ClassLiteralReader {
 	return &ClassLiteralReader{
-		attributes:  newNamePatterns(settings.AttributePatterns, true),
-		calleeNames: newNamePatterns(settings.CalleeNamePatterns, false),
-		calleePaths: newNamePatterns(settings.CalleePathPatterns, false),
-		variables:   newNamePatterns(settings.VariablePatterns, false),
+		attributes: newSelectorGroup(settings.Selectors, SelectorKindAttribute),
+		callees:    newSelectorGroup(settings.Selectors, SelectorKindCallee),
+		variables:  newSelectorGroup(settings.Selectors, SelectorKindVariable),
 	}
 }
 
@@ -366,8 +417,9 @@ type classTemplateValue struct {
 	node   *ast.Node
 	origin ClassLiteralOrigin
 	// edges says which of the template's outer ends touch class text, when it is itself inside
-	// another template's hole.
-	edges classValueEdges
+	// another template's hole or a  operand, and concatenated which a  joins.
+	edges        classValueEdges
+	concatenated classValueEdges
 }
 
 // classValuesIn returns what a node carries, read once per file when the reader is bound to one.
@@ -406,45 +458,80 @@ func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 	return classValues{}
 }
 
+// attributeValues is upstream's getLiteralsByJSXAttribute: every attribute selector whose name
+// matches, both lowercased, reads the attribute's value.
 func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 	attribute := node.AsJsxAttribute()
-	if attribute == nil {
+	if attribute == nil || attribute.Initializer == nil {
 		return classValues{}
 	}
 
 	// A namespaced attribute reads as `namespace:name`, which is what upstream's getAttributeName
 	// builds and what Text gives a JsxNamespacedName.
 	name := attribute.Name()
-	if name == nil || !r.attributes.matches(name.Text()) {
+	if name == nil {
 		return classValues{}
 	}
-
-	return classValuesUnder(attribute.Initializer, ClassLiteralOriginAttribute)
+	indices := r.attributes.matching(name.Text(), nil)
+	if len(indices) == 0 {
+		return classValues{}
+	}
+	matched := matchedNodes{}
+	for _, index := range indices {
+		readSelector(r.attributes.selectors[index], attribute.Initializer, &matched)
+	}
+	return classValuesOf(matched, ClassLiteralOriginAttribute)
 }
 
+// calleeValues is upstream's getLiteralsByESCallExpression: a call is read once, at the outermost
+// call of a curried chain, and named by the chain's first callee. Each callee selector matching that
+// name or path reads its target calls' target arguments.
 func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
-	call := node.AsCallExpression()
-	if call == nil || call.Expression == nil {
+	if parent := esParent(node); parent != nil && parent.Kind == ast.KindCallExpression &&
+		skipOuter(parent.AsCallExpression().Expression) == node {
+		return classValues{}
+	}
+	first := node
+	for callee := skipOuter(first.AsCallExpression().Expression); callee != nil && callee.Kind == ast.KindCallExpression; callee = skipOuter(callee.AsCallExpression().Expression) {
+		first = callee
+	}
+
+	// Upstream's getESCalleeName: a call is named by its identifier or the property a member call ends
+	// in, so `cn(...)` and `utils.cn(...)` are both `cn`, and its path is the dotted chain, `twc.div`.
+	callee := skipOuter(first.AsCallExpression().Expression)
+	if callee == nil {
+		return classValues{}
+	}
+	indices := r.callees.matching(calleeName(callee), func() string {
+		_, path := calleeNameAndPath(callee)
+		return path
+	})
+	if len(indices) == 0 {
 		return classValues{}
 	}
 
-	// Upstream's getESCalleeName: a call is named by its identifier or the property a member call
-	// ends in, so `cn(...)` and `utils.cn(...)` are both `cn`, and its path is the dotted chain,
-	// `twc.div`. A callee with neither is never read.
-	if call.Arguments == nil {
-		return classValues{}
+	// The chain, outermost call last, built only for a call some selector reads, since nearly none is.
+	chain := []*ast.Node{node}
+	for call := node; call != first; {
+		call = skipOuter(call.AsCallExpression().Expression)
+		chain = append(chain, call)
 	}
-	if !r.readsCallee(call.Expression) {
-		return classValues{}
+	slices.Reverse(chain)
+	matched := matchedNodes{}
+	for _, index := range indices {
+		selector := r.callees.selectors[index]
+		for _, call := range targetItems(chain, selector.targetCall, "first") {
+			for _, argument := range targetArguments(call.AsCallExpression().Arguments, selector.targetArgument) {
+				readSelector(selector, argument, &matched)
+			}
+		}
 	}
-
-	values := classValues{}
-	for _, argument := range call.Arguments.Nodes {
-		collectClassValues(argument, ClassLiteralOriginCallee, classValueEdges{}, &values)
-	}
-	return values
+	return classValuesOf(matched, ClassLiteralOriginCallee)
 }
 
+// variableValues is upstream's getLiteralsByESVariableDeclarator: a variable named by an identifier,
+// read through every variable selector its name matches. A selector with matchers skips an initializer
+// that is a call or a function, which a callee selector reads if anything does.
 func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	declaration := node.AsVariableDeclaration()
 	if declaration == nil || declaration.Initializer == nil {
@@ -455,26 +542,103 @@ func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return classValues{}
 	}
-
-	if !r.variables.matches(name.Text()) {
+	indices := r.variables.matching(name.Text(), nil)
+	if len(indices) == 0 {
 		return classValues{}
 	}
-
-	return classValuesUnder(declaration.Initializer, ClassLiteralOriginVariable)
+	matched := matchedNodes{}
+	for _, index := range indices {
+		selector := r.variables.selectors[index]
+		if selector.matchers != nil {
+			switch skipOuter(declaration.Initializer).Kind {
+			case ast.KindArrowFunction, ast.KindCallExpression, ast.KindFunctionExpression:
+				continue
+			}
+		}
+		readSelector(selector, declaration.Initializer, &matched)
+	}
+	return classValuesOf(matched, ClassLiteralOriginVariable)
 }
 
-// readsCallee reports whether a call's callee is one of these settings', by name or by path. The path
-// is built only when the name did not match and a path pattern could, since it is a new string for every
-// member call in the file.
-func (r *ClassLiteralReader) readsCallee(callee *ast.Node) bool {
-	if r.calleeNames.matches(calleeName(callee)) {
-		return true
+// readSelector reads one value through one selector: its matchers' walk, or with none, the value
+// itself when it is a string or a template.
+func readSelector(selector compiledSelector, value *ast.Node, matched *matchedNodes) {
+	if selector.matchers == nil {
+		readDirect(value, matched)
+		return
 	}
-	if len(r.calleePaths.compiled) == 0 {
-		return false
+	matchNodes(value, selector.matchers, matched)
+}
+
+// readDirect is upstream's getLiteralsByESExpression and getLiteralsByJSXAttributeValue: a string or a
+// template, or one inside a JSX expression's braces, and nothing nested.
+func readDirect(value *ast.Node, matched *matchedNodes) {
+	value = skipOuter(value)
+	if value == nil {
+		return
 	}
-	_, path := calleeNameAndPath(callee)
-	return r.calleePaths.matches(path)
+	switch value.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
+		matched.add(value)
+	case ast.KindJsxExpression:
+		if expression := value.AsJsxExpression().Expression; expression != nil {
+			readDirect(expression, matched)
+		}
+	}
+}
+
+// targetItems is upstream's getTargetItems: all of them, the first, the last, or one by index,
+// negative from the end, with defaultTarget when no target is written.
+func targetItems(items []*ast.Node, target *SelectorTarget, defaultTarget string) []*ast.Node {
+	if len(items) == 0 {
+		return nil
+	}
+	word := defaultTarget
+	if target != nil {
+		word = target.Word
+	}
+	switch word {
+	case "all":
+		return items
+	case "first":
+		return items[:1]
+	case "last":
+		return items[len(items)-1:]
+	}
+	index := target.Index
+	if index < 0 {
+		index += len(items)
+	}
+	if index < 0 || index >= len(items) {
+		return nil
+	}
+	return items[index : index+1]
+}
+
+// targetArguments is upstream's getTargetArguments: the arguments a target picks, each spread read as
+// what it spreads. An index counts the arguments as written, a spread as one.
+func targetArguments(arguments *ast.NodeList, target *SelectorTarget) []*ast.Node {
+	if arguments == nil || len(arguments.Nodes) == 0 {
+		return nil
+	}
+	unspread := func(argument *ast.Node) *ast.Node {
+		if argument.Kind == ast.KindSpreadElement {
+			return argument.AsSpreadElement().Expression
+		}
+		return argument
+	}
+	if target == nil || target.Word != "" {
+		expressions := make([]*ast.Node, 0, len(arguments.Nodes))
+		for _, argument := range arguments.Nodes {
+			expressions = append(expressions, unspread(argument))
+		}
+		return targetItems(expressions, target, "all")
+	}
+	picked := targetItems(arguments.Nodes, target, "all")
+	for index, argument := range picked {
+		picked[index] = unspread(argument)
+	}
+	return picked
 }
 
 // calleeName is calleeNameAndPath's name alone, which allocates nothing.
@@ -484,7 +648,7 @@ func calleeName(callee *ast.Node) string {
 		return callee.Text()
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
-		if access.Expression == nil || access.Expression.Kind == ast.KindSuperKeyword {
+		if access.Expression == nil || skipOuter(access.Expression).Kind == ast.KindSuperKeyword {
 			return ""
 		}
 		if access.Name() != nil && access.Name().Kind == ast.KindIdentifier {
@@ -492,11 +656,11 @@ func calleeName(callee *ast.Node) string {
 		}
 	case ast.KindElementAccessExpression:
 		access := callee.AsElementAccessExpression()
-		if access.Expression == nil || access.Expression.Kind == ast.KindSuperKeyword {
+		if access.Expression == nil || skipOuter(access.Expression).Kind == ast.KindSuperKeyword {
 			return ""
 		}
-		if access.ArgumentExpression != nil && access.ArgumentExpression.Kind == ast.KindStringLiteral {
-			return access.ArgumentExpression.Text()
+		if argument := skipOuter(access.ArgumentExpression); argument != nil && argument.Kind == ast.KindStringLiteral {
+			return argument.Text()
 		}
 	}
 	return ""
@@ -507,27 +671,20 @@ func calleeName(callee *ast.Node) string {
 // chain joined by dots, present only when every link in it has a name. `this.cn` has the name `cn` and
 // no path, and `super.cn` has neither. A computed access counts when its key is a plain string.
 func calleeNameAndPath(callee *ast.Node) (string, string) {
+	callee = skipOuter(callee)
 	switch callee.Kind {
 	case ast.KindIdentifier:
 		return callee.Text(), callee.Text()
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		property := calleeName(callee)
 		var object *ast.Node
-		property := ""
 		if callee.Kind == ast.KindPropertyAccessExpression {
-			access := callee.AsPropertyAccessExpression()
-			object = access.Expression
-			if access.Name() != nil && access.Name().Kind == ast.KindIdentifier {
-				property = access.Name().Text()
-			}
+			object = callee.AsPropertyAccessExpression().Expression
 		} else {
-			access := callee.AsElementAccessExpression()
-			object = access.Expression
-			if access.ArgumentExpression != nil && access.ArgumentExpression.Kind == ast.KindStringLiteral {
-				property = access.ArgumentExpression.Text()
-			}
+			object = callee.AsElementAccessExpression().Expression
 		}
-		if object == nil || object.Kind == ast.KindSuperKeyword || property == "" {
+		if property == "" {
 			return "", ""
 		}
 		_, objectPath := calleeNameAndPath(object)
@@ -539,103 +696,76 @@ func calleeNameAndPath(callee *ast.Node) (string, string) {
 	return "", ""
 }
 
-// classValuesUnder collects every string and template with holes in a value position under an
-// expression.
-func classValuesUnder(node *ast.Node, origin ClassLiteralOrigin) classValues {
+// classValuesOf is what a surface's selectors matched, in source order, each string with the edges
+// that touch other class text and each template with holes with its own.
+func classValuesOf(matched matchedNodes, origin ClassLiteralOrigin) classValues {
+	if len(matched) == 0 {
+		return classValues{}
+	}
+	slices.SortFunc(matched, func(left, right *ast.Node) int { return left.Pos() - right.Pos() })
 	values := classValues{}
-	collectClassValues(node, origin, classValueEdges{}, &values)
+	for _, node := range matched {
+		concatenated := concatenationEdges(node)
+		edges := holeEdgesOf(node)
+		edges.Leading = edges.Leading || concatenated.Leading
+		edges.Trailing = edges.Trailing || concatenated.Trailing
+		if node.Kind == ast.KindTemplateExpression {
+			values.templates = append(values.templates, classTemplateValue{node: node, origin: origin, edges: edges, concatenated: concatenated})
+			continue
+		}
+		literal := classLiteralFrom(node, origin)
+		literal.Edges = edges
+		literal.Concatenated = concatenated
+		values.literals = append(values.literals, literal)
+	}
 	return values
 }
 
-// collectClassValues walks the shapes a class value can arrive through, keeping the strings and the
-// templates with holes.
-//
-// `&&` contributes only its right side, because its left side is the result only when it is falsy,
-// and a class string is never falsy unless it is empty. `||` and `??` contribute both, since either
-// side can be the result. Anything else, a call, a member access, a comparison, is not a class list
-// and is not entered: in `cn(getSize('sm px-2'))` the string is an argument to a function nobody
-// named as a class callee.
-func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, edges classValueEdges, values *classValues) {
-	if node == nil {
-		return
-	}
-
-	switch node.Kind {
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		literal := classLiteralFrom(node, origin)
-		literal.Edges = edges
-		values.literals = append(values.literals, literal)
-
-	case ast.KindJsxExpression:
-		if expression := node.AsJsxExpression(); expression != nil {
-			collectClassValues(expression.Expression, origin, edges, values)
+// concatenationEdges is upstream's getStringConcatenationMeta: a value is concatenated on its left when
+// it, or anything around it, is the right side of a `+`, and on its right when the left side. Upstream
+// asks every ancestor up to the file, through calls too, and so does this.
+func concatenationEdges(node *ast.Node) classValueEdges {
+	edges := classValueEdges{}
+	for child, parent := node, esParent(node); parent != nil; child, parent = parent, esParent(parent) {
+		if operator, isBinary := isESBinaryExpression(parent); !isBinary || operator != ast.KindPlusToken {
+			continue
 		}
-
-	// `className={('flex flex')}` is legal and means exactly what the unparenthesized form means.
-	//
-	// typescript-go keeps parentheses as real nodes rather than discarding them, so a reader that
-	// unwraps only by the kinds it expects walks straight past them and finds nothing. That is a
-	// silent under-report on valid code: the rule stays green, the tree looks clean, and the
-	// finding never existed. All three rules in this package had it until a probe went looking.
-	//
-	// Recursive rather than a single unwrap, because `(('a'))` nests and the depth is the author's
-	// choice. Stripping is correct here precisely because these rules read a string's contents and
-	// parentheses cannot change them; it is not correct everywhere, and a rule whose verdict
-	// depends on the parse shape must not copy this.
-	case ast.KindParenthesizedExpression:
-		if parenthesized := node.AsParenthesizedExpression(); parenthesized != nil {
-			collectClassValues(parenthesized.Expression, origin, edges, values)
+		binary := parent.AsBinaryExpression()
+		if skipOuter(binary.Right) == child {
+			edges.Leading = true
 		}
-
-	case ast.KindAsExpression:
-		collectClassValues(node.AsAsExpression().Expression, origin, edges, values)
-
-	case ast.KindSatisfiesExpression:
-		collectClassValues(node.AsSatisfiesExpression().Expression, origin, edges, values)
-
-	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
-		collectClassValues(conditional.WhenTrue, origin, edges, values)
-		collectClassValues(conditional.WhenFalse, origin, edges, values)
-
-	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
-		if binary.OperatorToken == nil {
-			return
-		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindAmpersandAmpersandToken:
-			collectClassValues(binary.Right, origin, edges, values)
-		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			collectClassValues(binary.Left, origin, edges, values)
-			collectClassValues(binary.Right, origin, edges, values)
-		}
-
-	case ast.KindArrayLiteralExpression:
-		if elements := node.AsArrayLiteralExpression().Elements; elements != nil {
-			for _, element := range elements.Nodes {
-				collectClassValues(element, origin, edges, values)
-			}
-		}
-
-	case ast.KindTemplateExpression:
-		values.templates = append(values.templates, classTemplateValue{node: node, origin: origin, edges: edges})
-		template := node.AsTemplateExpression()
-		if template.Head == nil || template.TemplateSpans == nil {
-			return
-		}
-		spans := template.TemplateSpans.Nodes
-		before := template.Head.Text()
-		for index, spanNode := range spans {
-			span := spanNode.AsTemplateSpan()
-			if span == nil || span.Literal == nil {
-				continue
-			}
-			after := span.Literal.Text()
-			collectClassValues(span.Expression, origin, holeEdges(before, after, index == 0, index == len(spans)-1, edges), values)
-			before = after
+		if skipOuter(binary.Left) == child {
+			edges.Trailing = true
 		}
 	}
+	return edges
+}
+
+// holeEdgesOf is which ends of a value touch the text of the template whose hole holds it, from the
+// nearest hole above it, short of a boundary that starts another reading: a call, a function, a
+// declaration or an attribute. See holeEdges.
+func holeEdgesOf(node *ast.Node) classValueEdges {
+	for child, parent := node, node.Parent; parent != nil; child, parent = parent, parent.Parent {
+		switch parent.Kind {
+		case ast.KindCallExpression, ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindVariableDeclaration,
+			ast.KindJsxAttribute, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			return classValueEdges{}
+		case ast.KindTemplateSpan:
+			span := parent.AsTemplateSpan()
+			if span.Expression != child {
+				return classValueEdges{}
+			}
+			template := parent.Parent.AsTemplateExpression()
+			spans := template.TemplateSpans.Nodes
+			index := slices.Index(spans, parent)
+			before := template.Head.Text()
+			if index > 0 {
+				before = spans[index-1].AsTemplateSpan().Literal.Text()
+			}
+			return holeEdges(before, span.Literal.Text(), index == 0, index == len(spans)-1, holeEdgesOf(parent.Parent))
+		}
+	}
+	return classValueEdges{}
 }
 
 // classValueEdges says which ends of a value touch class text once it is substituted, so that the

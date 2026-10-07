@@ -23,6 +23,7 @@ var settingsSamples = map[string][2]string{
 	"tailwindConfig":         {`"./settings.css"`, `"./options.css"`},
 	"cwd":                    {`"settings"`, `"options"`},
 	"tsconfig":               {`"settings.json"`, `"options.json"`},
+	"selectors":              {`[{"kind":"attribute","name":"fromSettings"}]`, `[{"kind":"callee","name":"fromOptions"}]`},
 	"attributes":             {`["fromSettings"]`, `["fromOptions"]`},
 	"callees":                {`["fromSettings"]`, `["fromOptions"]`},
 	"variables":              {`["fromSettings"]`, `["fromOptions"]`},
@@ -137,7 +138,7 @@ func TestSettingsReachOnlyTheRulesThatDeclareThem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
 	}
-	if callees := decoded.(NoDuplicateClassesOptions).Callees; strings.Join(callees, ",") != "a,b" {
+	if callees := legacyNames(decoded.(NoDuplicateClassesOptions).Callees); callees != "a,b" {
 		t.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
 	}
 
@@ -146,10 +147,19 @@ func TestSettingsReachOnlyTheRulesThatDeclareThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	options := ordered.(EnforceConsistentClassOrderOptions)
-	if options.Order != "desc" || strings.Join(options.Callees, ",") != "c" {
+	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
 		t.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
 			options.Order, options.Callees)
 	}
+}
+
+// legacyNames is legacy selectors' names joined by commas.
+func legacyNames(selectors []LegacySelector) string {
+	names := make([]string, 0, len(selectors))
+	for _, selector := range selectors {
+		names = append(names, selector.Name)
+	}
+	return strings.Join(names, ",")
 }
 
 // The rule's own element is decoded strictly before anything merges, so its error names its own key.
@@ -167,7 +177,7 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(t *testing.T) {
 	testCases := []struct {
 		name, block, refused string
 	}{
-		{"an upstream option not ported yet", `{"selectors": []}`, `"selectors"`},
+		{"an upstream option not ported yet", `{"tags": []}`, `"tags"`},
 		{"another not ported yet", `{"messageStyle": "compact"}`, `"messageStyle"`},
 		{"no option at all", `{"callees": ["cn"], "calees": ["cn"]}`, `"calees"`},
 		{"not an object", `["cn"]`, "expected an object"},
@@ -221,6 +231,11 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 		`const element = <div class="flex flex" />;`,
 		// An attribute's pattern and name are both lowercased before matching, as upstream's are.
 		`const element = <div classname="flex flex" />;`,
+		// Object values at upstream's paths and object keys, ported in #btxd64n.
+		`const merged = clb({ base: 'flex flex' });`,
+		`const button = cva('p-2', { variants: { size: { sm: 'flex flex' } } });`,
+		`const card = tv({ slots: { header: 'flex flex' } });`,
+		`const merged = cn({ 'flex flex': open });`,
 	}
 	for _, source := range read {
 		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
@@ -228,7 +243,7 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 	unread := []string{
 		`const merged = mergeClassNames('flex flex');`,
 		`const buttonClassName = 'flex flex';`,
-		`const merged = clb({ base: 'flex flex' });`,
+		`const button = cva('p-2', { defaultVariants: { size: 'flex flex' } });`,
 	}
 	for _, source := range unread {
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded))
@@ -296,9 +311,23 @@ func TestNamesMatchAsUpstreamsMatchesName(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		patterns := newNamePatterns(testCase.patterns, testCase.lowercase)
-		for range 2 { // the second answer is the memo's
-			if got := patterns.matches(testCase.name); got != testCase.want {
-				t.Errorf("%v (lowercase %v) matching %q = %v, want %v",
+		if got := patterns.matchesUnremembered(testCase.name); got != testCase.want {
+			t.Errorf("%v (lowercase %v) matching %q = %v, want %v",
+				testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
+		}
+		// And through a selector group, twice, so the second answer is the group's memo.
+		kind := SelectorKindVariable
+		if testCase.lowercase {
+			kind = SelectorKindAttribute
+		}
+		var selectors []Selector
+		for _, pattern := range testCase.patterns {
+			selectors = append(selectors, Selector{Kind: kind, Name: pattern})
+		}
+		group := newSelectorGroup(selectors, kind)
+		for range 2 {
+			if got := len(group.matching(testCase.name, nil)) > 0; got != testCase.want {
+				t.Errorf("%v (lowercase %v) as selectors matching %q = %v, want %v",
 					testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
 			}
 		}

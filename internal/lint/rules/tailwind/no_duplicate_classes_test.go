@@ -287,12 +287,15 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 		`const className = 'rounded-md rounded-md';`,
 	}
 
-	attributeOnly := NewClassLiteralReader(ClassLiteralSettings{
-		AttributePatterns: DefaultClassLiteralSettings().AttributePatterns,
-		// Deliberately empty: this is the mistake being reproduced.
-		CalleeNamePatterns: nil,
-		VariablePatterns:   nil,
-	})
+	// The defaults' attribute selectors alone. Deliberately no callee or variable selector: this is the
+	// mistake being reproduced.
+	var attributeSelectors []Selector
+	for _, selector := range DefaultSelectors() {
+		if selector.Kind == SelectorKindAttribute {
+			attributeSelectors = append(attributeSelectors, selector)
+		}
+	}
+	attributeOnly := NewClassLiteralReader(ClassLiteralSettings{Selectors: attributeSelectors})
 
 	lost := 0
 	for _, source := range sourcesOnlyNonAttributeSurfacesCatch {

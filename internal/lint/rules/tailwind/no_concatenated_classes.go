@@ -13,7 +13,7 @@ import (
 func messageConcatenatedClass(fragment string) rule.Message {
 	return rule.Message{
 		Id: "concatenatedClass",
-		Description: "The fragment \"" + fragment + "\" is joined to an interpolated value with no " +
+		Description: "The fragment \"" + fragment + "\" is joined to a runtime value with no " +
 			"space between them, so the class name it forms never appears literally in the source. " +
 			"Tailwind finds classes by scanning text, so it will not generate this one and the style " +
 			"silently will not apply. Write the whole class names out and switch between them, rather " +
@@ -46,13 +46,15 @@ type NoConcatenatedClassesOptions struct {
 // whole rule: `flex ${extra}` is fine because `flex` is a complete class name that Tailwind can see,
 // while `px-${size}` is not because `px-` is not a class name at all.
 //
-// Measured against the upstream plugin rather than inferred from it, because two readings of the
-// name are wrong in opposite directions. Reporting every interpolated class literal would flag 141
-// literals in the ahra tree that are all fine. Reporting none, or reading `+` concatenation as the
-// same defect, misses the real thing: upstream stays silent on `'px-' + size` and on
-// `'bg-[' + color + ']'`, and fires only on template interpolation. A first version of the
-// measurement harness for this port reported four `+` findings on the real tree and every one was a
-// false positive.
+// Measured against the upstream plugin rather than inferred from it. Reporting every interpolated
+// class literal would flag 141 literals in the ahra tree that are all fine; upstream reports a seam,
+// not a template.
+//
+// A `+` is a seam too, `'px-' + size`, when the string is read at all (isConcatenatedLiteral). Only a
+// selector with matchers reaches a `+` operand: one with none reads a direct string and nothing
+// nested, so under ahra's legacy settings upstream was silent on `'px-' + size` and on
+// `'bg-[' + color + ']'`, and with its defaults it reports both. An earlier version of this comment
+// read that silence as upstream's rule, measured under those settings (#btxd64n).
 //
 // No fix, deliberately. The repair is to write out the class names the code is choosing between,
 // which means knowing which ones those are. A rule cannot know that, and a fix that guessed would

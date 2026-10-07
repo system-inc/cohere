@@ -8,14 +8,16 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
-// ClassTemplate is a template literal on a class surface, broken at its interpolation boundaries.
+// ClassTemplate is class text that meets a value known only at runtime, broken at those seams: a
+// template literal's holes, and a `+` joining a string to something else.
 //
 // This is deliberately a separate reading from ClassLiteral. A template is only partly knowable, so
 // rules that rewrite class text must not see it, and the reader that feeds them keeps excluding it.
 // Only a rule that reasons about the boundaries themselves wants this shape.
 type ClassTemplate struct {
+	// Node is the template, or the concatenated string.
 	Node *ast.Node
-	// Boundaries are the seams between static text and interpolation, in source order.
+	// Boundaries are the seams between static text and a runtime value, in source order.
 	Boundaries []TemplateBoundary
 	Origin     ClassLiteralOrigin
 }
@@ -44,109 +46,64 @@ const (
 	TemplateBoundarySideAfterHole TemplateBoundarySide = "AfterHole"
 )
 
-// ClassTemplatesIn returns the template literal a node carries on a class surface, if any.
+// ClassTemplatesIn returns every seam a node's class text has with a runtime value: each template
+// with holes the reader found, and each string a `+` joins to something, which upstream's
+// no-concatenated-classes reports alike (isConcatenatedLiteral).
 //
-// Mirrors ClassLiteralsIn's dispatch so that a rule reading templates covers the same three surfaces
-// a rule reading strings does. Anything else is a difference in coverage that nobody declared.
+// Read from the same reading as ClassLiteralsIn, so a rule reading seams covers exactly the strings a
+// rule reading classes does. Anything else is a difference in coverage that nobody declared.
 func (r *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
-	if node == nil {
-		return nil
+	values := r.classValuesIn(node)
+	var templates []ClassTemplate
+	for _, template := range values.templates {
+		if classTemplate, hasBoundaries := templateBoundaries(template); hasBoundaries {
+			templates = append(templates, classTemplate)
+		}
 	}
-
-	switch node.Kind {
-	case ast.KindJsxAttribute:
-		attribute := node.AsJsxAttribute()
-		if attribute == nil {
-			return nil
+	for _, literal := range values.literals {
+		if classTemplate, hasBoundaries := concatenationBoundaries(literal); hasBoundaries {
+			templates = append(templates, classTemplate)
 		}
-		name := attribute.Name()
-		if name == nil || !r.attributes.matches(name.Text()) {
-			return nil
-		}
-		return templatesFrom(templateExpressionOf(attribute.Initializer), ClassLiteralOriginAttribute)
-
-	case ast.KindCallExpression:
-		call := node.AsCallExpression()
-		if call == nil || call.Expression == nil || call.Arguments == nil {
-			return nil
-		}
-		if !r.readsCallee(call.Expression) {
-			return nil
-		}
-		var templates []ClassTemplate
-		for _, argument := range call.Arguments.Nodes {
-			templates = append(templates, templatesFrom(templateExpressionOf(argument), ClassLiteralOriginCallee)...)
-		}
-		return templates
-
-	case ast.KindVariableDeclaration:
-		declaration := node.AsVariableDeclaration()
-		if declaration == nil || declaration.Initializer == nil {
-			return nil
-		}
-		name := declaration.Name()
-		if name == nil || name.Kind != ast.KindIdentifier {
-			return nil
-		}
-		if !r.variables.matches(name.Text()) {
-			return nil
-		}
-		return templatesFrom(templateExpressionOf(declaration.Initializer), ClassLiteralOriginVariable)
 	}
-
-	return nil
+	return templates
 }
 
-// templateExpressionOf unwraps a template literal from the shapes it arrives in.
-//
-// A template with no substitutions is not returned: it has no interpolation boundary, so it is a
-// plain string as far as this reading is concerned and belongs to the string reader.
-func templateExpressionOf(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-
-	switch node.Kind {
-	case ast.KindTemplateExpression:
-		return node
-
-	case ast.KindJsxExpression:
-		expression := node.AsJsxExpression()
-		if expression == nil {
-			return nil
+// concatenationBoundaries is a concatenated string's seams: its first class when a `+` joins
+// something before it and no whitespace separates them, and its last when one joins something after.
+func concatenationBoundaries(literal ClassLiteral) (ClassTemplate, bool) {
+	classTemplate := ClassTemplate{Node: literal.Node, Origin: literal.Origin}
+	if literal.Concatenated.Leading {
+		if boundary, hasBoundary := boundaryAfterHole(literal.Text, literal.Range); hasBoundary {
+			classTemplate.Boundaries = append(classTemplate.Boundaries, boundary)
 		}
-		return templateExpressionOf(expression.Expression)
-
-	// Same omission as the string reader had: parentheses are real nodes here, so `{(`px-${s}`)}`
-	// is invisible to a reader that only knows the kinds it expects. See collectClassValues for why
-	// stripping is safe for these rules specifically and not a pattern to copy.
-	case ast.KindParenthesizedExpression:
-		parenthesized := node.AsParenthesizedExpression()
-		if parenthesized == nil {
-			return nil
-		}
-		return templateExpressionOf(parenthesized.Expression)
 	}
-
-	return nil
+	if literal.Concatenated.Trailing {
+		if boundary, hasBoundary := boundaryBeforeHole(literal.Text, literal.Range); hasBoundary {
+			classTemplate.Boundaries = append(classTemplate.Boundaries, boundary)
+		}
+	}
+	return classTemplate, len(classTemplate.Boundaries) > 0
 }
 
-// templatesFrom breaks a template into its boundaries.
+// templateBoundaries breaks a template into its boundaries.
 //
 // The head runs up to the first hole, and each span's literal runs from its own hole to the next, so
 // every span contributes a boundary on its left and, unless it is the last, one on its right. That
 // enumeration is the whole rule: a boundary is a defect exactly when no whitespace sits at the seam.
-func templatesFrom(node *ast.Node, origin ClassLiteralOrigin) []ClassTemplate {
-	if node == nil {
-		return nil
-	}
-
-	template := node.AsTemplateExpression()
+// A template that is itself a `+` operand has a seam at that outer end too.
+func templateBoundaries(value classTemplateValue) (ClassTemplate, bool) {
+	template := value.node.AsTemplateExpression()
 	if template == nil || template.Head == nil || template.TemplateSpans == nil {
-		return nil
+		return ClassTemplate{}, false
 	}
 
-	classTemplate := ClassTemplate{Node: node, Origin: origin}
+	classTemplate := ClassTemplate{Node: value.node, Origin: value.origin}
+
+	if value.concatenated.Leading {
+		if boundary, hasBoundary := boundaryAfterHole(template.Head.Text(), template.Head.Loc); hasBoundary {
+			classTemplate.Boundaries = append(classTemplate.Boundaries, boundary)
+		}
+	}
 
 	// The head faces the first hole on its right.
 	if boundary, hasBoundary := boundaryBeforeHole(template.Head.Text(), template.Head.Loc); hasBoundary {
@@ -166,18 +123,16 @@ func templatesFrom(node *ast.Node, origin ClassLiteralOrigin) []ClassTemplate {
 			classTemplate.Boundaries = append(classTemplate.Boundaries, boundary)
 		}
 
-		// And, unless this is the final span, the text also runs up to the next hole.
-		if index < len(spans)-1 {
+		// And, unless this is the final span, the text also runs up to the next hole, and the final
+		// span's to whatever a `+` joins after the template.
+		if index < len(spans)-1 || value.concatenated.Trailing {
 			if boundary, hasBoundary := boundaryBeforeHole(text, span.Literal.Loc); hasBoundary {
 				classTemplate.Boundaries = append(classTemplate.Boundaries, boundary)
 			}
 		}
 	}
 
-	if len(classTemplate.Boundaries) == 0 {
-		return nil
-	}
-	return []ClassTemplate{classTemplate}
+	return classTemplate, len(classTemplate.Boundaries) > 0
 }
 
 // boundaryBeforeHole reports the class fragment left touching an interpolation on its right.

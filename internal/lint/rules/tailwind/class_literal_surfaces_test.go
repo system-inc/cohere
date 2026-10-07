@@ -22,7 +22,7 @@ func surfacesOf(t *testing.T, decoded any) *ClassLiteralSurfaces {
 // surfaces, and never share one when they do not.
 func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(t *testing.T) {
 	t.Parallel()
-	handBuilt := ClassLiteralSurfacesFor(TailwindClassLiteralOptions{Attributes: []string{"tw"}}.ClassLiteralSettings())
+	handBuilt := ClassLiteralSurfacesFor(TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings())
 	if handBuilt == DefaultClassLiteralSurfaces() {
 		t.Fatal("settings reading the tw attribute share the defaults' surfaces")
 	}

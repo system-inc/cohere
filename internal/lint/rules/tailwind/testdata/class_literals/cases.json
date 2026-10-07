@@ -1,0 +1,248 @@
+[
+    {
+        "name": "cva: strings, variants, compoundVariants, and what it never reads",
+        "code": [
+            "const button = cva('base-a base-b', {",
+            "    variants: { intent: { primary: 'bg-blue-500 text-white', secondary: ['bg-white', 'text-black'] }, size: { sm: open ? 'p-1' : 'p-2' } },",
+            "    compoundVariants: [{ intent: 'primary', size: 'sm', class: 'uppercase' }, { intent: 'secondary', className: 'lowercase' }],",
+            "    defaultVariants: { intent: 'primary' },",
+            "});"
+        ]
+    },
+    {
+        "name": "tv: base, slots, variants, compoundVariants, compoundSlots",
+        "code": [
+            "const card = tv({",
+            "    base: 'rounded-md',",
+            "    slots: { header: 'p-4', body: ['p-2', 'gap-2'] },",
+            "    variants: { color: { red: { header: 'text-red-500' } } },",
+            "    compoundVariants: [{ color: 'red', class: { header: 'font-bold' } }],",
+            "    compoundSlots: [{ slots: ['header', 'body'], className: 'px-1' }],",
+            "    defaultVariants: { color: 'red' },",
+            "});"
+        ]
+    },
+    {
+        "name": "clb: base, variants, compoundVariants classes",
+        "code": [
+            "const box = clb({ base: 'flex', variants: { gap: { sm: 'gap-1' } }, compoundVariants: [{ gap: 'sm', classes: 'p-1' }], defaults: { gap: 'sm' } });"
+        ]
+    },
+    {
+        "name": "cn: the string matcher's walk",
+        "code": [
+            "const a = cn('one', open && 'two', open || 'three', 'four' || other, other ?? 'five', 'six' ?? other);",
+            "const b = cn(open ? 'seven' : 'eight', 'nine' + suffix, prefix + 'ten', size === 'eleven', ['twelve', ['thirteen']]);",
+            "const c = cn(`fourteen ${open ? 'fifteen' : ''} sixteen`, getSize('seventeen'), () => 'eighteen', map['nineteen'], map[`twenty`]);",
+            "const d = cn(new Thing('twentyone'), (open, 'twentytwo'), (value = 'twentythree'), typeof 'twentyfour', value! || 'twentyfive');",
+            "const e = cn(('twentysix'), 'twentyseven' as string, 'twentyeight' satisfies string, value as 'twentynine', <span title=\"thirty\" />);",
+            "const f = cn(...['thirtyone'], open ? 'a' : cond ? 'b' : 'c', ('x' && 'thirtytwo') || 'thirtythree', 'thirtyfour' in map);"
+        ]
+    },
+    {
+        "name": "cn: object keys and values",
+        "code": [
+            "const a = cn({ 'p-2 flex': open, plain: open, ['computed-literal']: open, [`computed-template`]: open, 7: open, nested: { 'deep-key': open } });",
+            "const b = cn({ value: 'object-value' }, ({ 'member-key': 1 })['member-key'], { 'method-key'() { return 'returned'; } }, { ...{ 'spread-key': open } });",
+            "const c = clsx({ 'clsx-key': open }, 'clsx-string');",
+            "const d = objstr({ 'objstr-key': open }, 'objstr-string');",
+            "const e = objstr({ ['objstr-computed']: open, [('objstr-parenthesized')]: open, [`objstr-template`]: open, 'objstr-method'() {}, get 'objstr-getter'() { return 1; } });",
+            "const f = <div classList={{ ['list-computed']: open, [`list-template`]: open }} />;"
+        ]
+    },
+    {
+        "name": "ancestors above the selector root",
+        "code": [
+            "if (cn('in-a-comparison') === expected) {}",
+            "const a = cn('in-a-test') ? 1 : 2;",
+            "const b = cn('in-a-logical-left') || fallback;",
+            "const c = fallback || cn('in-a-logical-right');",
+            "const d = open ? cn('in-a-branch') : null;",
+            "const e = { key: cn('in-an-object-value') };",
+            "const f = prefix + cn('concatenated-through-a-call');"
+        ]
+    },
+    {
+        "name": "the other default callees",
+        "code": [
+            "const a = [cc('cc-string', { 'cc-key': 1 }), cnb('cnb-string'), dcnb('dcnb-string'), ctl('ctl-string'), cx('cx-string'), twJoin('join'), twMerge('merge')];",
+            "const b = [utilities.cn('member-name'), this.cn('this-name'), cn?.('optional-call'), (cn)('parenthesized-callee'), cn!('non-null-callee')];",
+            "const c = twc.div('twc-path-string');",
+            "const d = notAClassHelper('not-read');"
+        ]
+    },
+    {
+        "name": "attributes",
+        "code": [
+            "const a = <div className=\"direct\" class=\"lowercase-class\" title=\"not-a-class\" />;",
+            "const b = <div className={open ? 'branch-a' : 'branch-b'} />;",
+            "const c = <div className={`template ${open ? 'hole' : ''} tail`} />;",
+            "const d = <div classList={{ 'list-key': open, other: 'list-value' }} />;",
+            "const e = <div class:list={['namespaced', { 'namespaced-key': open }]} />;",
+            "const f = <div CLASSNAME=\"uppercase-name\" className={{ 'object-key': open }} />;",
+            "const g = <div className={('parenthesized')} />;"
+        ]
+    },
+    {
+        "name": "variables",
+        "code": [
+            "const className = 'variable-direct';",
+            "const classNames = open ? 'variable-a' : 'variable-b';",
+            "const classes = ['variable-array'];",
+            "const styles = cn('callee-not-variable');",
+            "const style = () => 'arrow-not-read';",
+            "const notMatched = 'not-read';",
+            "let style2 = 'not-read-either';",
+            "const { className: destructured } = { className: 'pattern' };"
+        ]
+    },
+    {
+        "name": "legacy strings read direct arguments only",
+        "settings": {
+            "attributes": ["class", "className"],
+            "callees": ["mergeClassNames", "createVariantClassNames"],
+            "variables": [".*[Cc]lassName$", ".*[Cc]lassNames$"]
+        },
+        "code": [
+            "const a = mergeClassNames('direct', open && 'nested', `template ${x}`, ('parenthesized'));",
+            "const b = createVariantClassNames({ base: 'object-value' });",
+            "const buttonClassName = open ? 'branch' : 'other';",
+            "const linkClassName = 'variable-direct';",
+            "const c = <div className={open ? 'attribute-branch' : 'x'} class=\"attribute-direct\" />;",
+            "const d = cn('default-callee-dropped');",
+            "const e = twc.div('default-path-callee-dropped');"
+        ]
+    },
+    {
+        "name": "legacy matcher form",
+        "settings": {
+            "callees": [["mergeClassNames", [{ "match": "strings" }]], ["variantsOf", [{ "match": "objectValues", "pathPattern": "^variants" }, { "match": "objectKeys" }]]],
+            "variables": [[".*[Cc]lassName$", [{ "match": "strings" }]]]
+        },
+        "code": [
+            "const a = mergeClassNames('direct', open && 'nested', `template ${open ? 'hole' : ''}`, { key: 'not-a-string-match' });",
+            "const b = variantsOf({ variants: { a: 'variant-value' }, other: 'other-value', 'key-string': 1 });",
+            "const buttonClassName = open ? 'branch' : 'other';",
+            "const c = <div className={open ? 'default-attribute-kept' : 'x'} />;"
+        ]
+    },
+    {
+        "name": "flat selectors: targets",
+        "options": {
+            "selectors": [
+                { "kind": "callee", "name": "^first$", "targetArgument": "first" },
+                { "kind": "callee", "name": "^last$", "targetArgument": "last", "match": [{ "type": "strings" }] },
+                { "kind": "callee", "name": "^second$", "targetArgument": 1 },
+                { "kind": "callee", "name": "^penultimate$", "targetArgument": -2 },
+                { "kind": "callee", "name": "^curried$", "match": [{ "type": "strings" }] },
+                { "kind": "callee", "name": "^curriedAll$", "targetCall": "all", "match": [{ "type": "strings" }] },
+                { "kind": "callee", "name": "^curriedLast$", "callTarget": "last" },
+                { "kind": "callee", "name": "^curriedSecond$", "targetCall": 1, "targetArgument": 0 },
+                { "kind": "callee", "path": "^styled\\.\\w+$" }
+            ]
+        },
+        "code": [
+            "const a = first('a1', 'a2');",
+            "const b = last('b1', open && 'b2');",
+            "const c = second('c1', 'c2', 'c3');",
+            "const d = penultimate('d1', 'd2', 'd3');",
+            "const e = curried('e1')('e2');",
+            "const f = curriedAll('f1')('f2')('f3');",
+            "const g = curriedLast('g1')('g2');",
+            "const h = curriedSecond('h1')('h2', 'h3');",
+            "const i = styled.div('i1');",
+            "const j = styled.div.nested('j1');",
+            "const k = second(...['k1', 'k2'], 'k3');",
+            "const l = (curried('l1'))('l2');",
+            "const m = (curriedLast('m1'))('m2');"
+        ]
+    },
+    {
+        "name": "flat selectors: object paths",
+        "options": {
+            "selectors": [
+                { "kind": "callee", "name": "^paths$", "match": [{ "type": "objectValues", "path": "^a\\.b$" }] },
+                { "kind": "callee", "name": "^quoted$", "match": [{ "type": "objectValues", "path": "^\\[\"data-x\"\\]\\.y$" }] },
+                { "kind": "callee", "name": "^indexed$", "match": [{ "type": "objectValues", "path": "^list\\[1\\]\\.c$" }] },
+                { "kind": "callee", "name": "^partial$", "match": [{ "type": "objectValues", "path": "inner" }] },
+                { "kind": "callee", "name": "^keys$", "match": [{ "type": "objectKeys", "path": "^group\\." }] },
+                { "kind": "callee", "name": "^computed$", "match": [{ "type": "objectValues", "path": "^never$" }] },
+                { "kind": "callee", "name": "^numeric$", "match": [{ "type": "objectValues", "path": "^\\[\"1\"\\]$" }] }
+            ]
+        },
+        "code": [
+            "const a = paths({ a: { b: 'ab-value', c: 'ac-value' }, b: 'b-value' });",
+            "const b = quoted({ 'data-x': { y: 'quoted-value' } });",
+            "const c = indexed({ list: [{ c: 'index-0' }, { c: 'index-1' }] });",
+            "const d = partial({ outer: { inner: 'partial-a' }, innerMost: 'partial-b', other: 'partial-c' });",
+            "const e = keys({ group: { 'group-key': 1 }, 'top-key': 2 });",
+            "const f = computed({ [a.b]: 'computed-member-value', [name]: 'computed-identifier-value' });",
+            "const g = numeric({ 1: 'numeric-value' });",
+            "const h = paths({ a: ({ b: 'parenthesized-object' }) });",
+            "const i = paths({ a: open ? { b: 'conditional-object' } : null });"
+        ]
+    },
+    {
+        "name": "a strings matcher alone, inside object values",
+        "settings": {
+            "attributes": [["className", [{ "match": "strings" }]]],
+            "variables": [[".*[Cc]lassNames?$", [{ "match": "strings" }]]]
+        },
+        "code": [
+            "const a = { children: <span className=\"in-an-object-value\" /> };",
+            "const b = [<span className=\"in-an-array\" />];",
+            "const c = { render() { const className = 'in-a-method-body'; return className; } };",
+            "const d = { outer: { render() { const className = 'in-a-nested-method-body'; return className; }, get value() { const className = 'in-a-getter'; return className; } } };",
+            "const e = { outer: { ['computed' + 'Key']() { const className = 'in-a-computed-method'; return className; } } };",
+            "const f = { outer: class { method() { const className = 'in-a-class-method'; return className; } } };",
+            "const className = { outer: class { 'class-method-key'() {} }, list: [class { 'array-class-method-key'() {} }] };",
+            "const componentClassNames = new Set(['Component', 'PureComponent']);",
+            "const g = weightClassNames[weight ?? 'medium'];"
+        ]
+    },
+    {
+        "name": "a legacy kind drops that kind's flat selectors and keeps the rest",
+        "settings": {
+            "callees": ["onlyThis"]
+        },
+        "options": {
+            "selectors": [
+                { "kind": "callee", "name": "^dropped$" },
+                { "kind": "variable", "name": "^kept$" }
+            ]
+        },
+        "code": [
+            "const a = onlyThis('legacy-callee');",
+            "const b = dropped('flat-callee');",
+            "const kept = 'flat-variable';",
+            "const className = 'default-variable-dropped';"
+        ]
+    },
+    {
+        "name": "an empty selectors list reads nothing",
+        "options": { "selectors": [] },
+        "code": [
+            "const a = cn('nothing');",
+            "const className = 'nothing';",
+            "const b = <div className=\"nothing\" />;"
+        ]
+    },
+    {
+        "name": "concatenation",
+        "code": [
+            "const a = cn('left ' + middle + ' right', 'a' + ('b' + 'c'), `x ${y}` + 'z');",
+            "const className = 'variable ' + suffix;",
+            "const b = <div className={'attribute ' + suffix} />;"
+        ]
+    },
+    {
+        "name": "6b: tags, function returns, export default",
+        "pending": "6b",
+        "code": [
+            "const a = twc.div`tag-a`;",
+            "const b = twc.div(() => 'returned-a');",
+            "const c = twx.span((props) => { return 'returned-b'; });",
+            "const d = twc`no-path-tag`;"
+        ]
+    }
+]

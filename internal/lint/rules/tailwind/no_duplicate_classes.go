@@ -145,7 +145,7 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 		// parsing, and then nothing in it is fixed.
 		var fixes []rule.Fix
 		if tokenized {
-			fixes = repeatDeletions(tokens, className)
+			fixes = repeatDeletions(tokens, className, literal.Edges.Trailing)
 		}
 
 		ctx.Report(rule.Diagnostic{
@@ -232,6 +232,12 @@ func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
 				seenInRun[className] = true
 				continue
 			}
+			// A repeat ending a run whose end touches other text keeps its separator, as
+			// repeatDeletions does.
+			if segment.TrailingHole && tokenIndex == len(tokens)-1 {
+				found.fixes = append(found.fixes, rule.ReplaceRange(token.Range, ""))
+				continue
+			}
 			separator := tokens[tokenIndex-1].Range
 			if separator.End() == separator.Pos()+1 {
 				found.fixes = append(found.fixes, rule.ReplaceRange(core.NewTextRange(separator.Pos(), token.Range.End()), ""))
@@ -269,7 +275,11 @@ func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
 // Only the separator's first byte, because the rest of a long run is `no-unnecessary-whitespace`'s
 // to delete, and the two edits then meet end to start rather than overlapping (class_tokens.go). A
 // repeat always has a separator before it, since the occurrence it repeats came first.
-func repeatDeletions(tokens []classToken, className string) []rule.Fix {
+//
+// Except at the end of a literal whose end touches other class text, a template's beyond a hole or
+// a `+` operand: a repeat there keeps its separator, or the class before it would fuse with that
+// text, `'flex flex' + suffix` becoming `'flex' + suffix`. 4.7.0 writes `'flex ' + suffix`.
+func repeatDeletions(tokens []classToken, className string, trailingTouches bool) []rule.Fix {
 	fixes := []rule.Fix{}
 	seen := false
 	for index, token := range tokens {
@@ -278,6 +288,10 @@ func repeatDeletions(tokens []classToken, className string) []rule.Fix {
 		}
 		if !seen {
 			seen = true
+			continue
+		}
+		if trailingTouches && index == len(tokens)-1 {
+			fixes = append(fixes, rule.ReplaceRange(token.Range, ""))
 			continue
 		}
 		separator := tokens[index-1].Range

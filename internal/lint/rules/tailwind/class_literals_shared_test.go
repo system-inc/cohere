@@ -26,8 +26,7 @@ const sharedReaderSource = "const className = (open ? 'flex flex' : 'hidden') as
 
 func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	t.Parallel()
-	twSettings := DefaultClassLiteralSettings()
-	twSettings.AttributePatterns = []string{"tw"}
+	twSettings := TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
 
 	cache := rule.NewFileCache()
 	first := ClassLiteralSurfacesFor(DefaultClassLiteralSettings()).ReaderFor(cache)
@@ -43,9 +42,10 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	}
 
 	// Names that run together the same way are still different settings.
-	joined := ClassLiteralSettings{AttributePatterns: []string{"ab"}}
-	split := ClassLiteralSettings{AttributePatterns: []string{"a", "b"}}
-	moved := ClassLiteralSettings{AttributePatterns: []string{"a"}, CalleeNamePatterns: []string{"b"}}
+	attribute := func(name string) Selector { return Selector{Kind: SelectorKindAttribute, Name: name} }
+	joined := ClassLiteralSettings{Selectors: []Selector{attribute("ab")}}
+	split := ClassLiteralSettings{Selectors: []Selector{attribute("a"), attribute("b")}}
+	moved := ClassLiteralSettings{Selectors: []Selector{attribute("a"), {Kind: SelectorKindCallee, Name: "b"}}}
 	if joined.key() == split.key() || split.key() == moved.key() || joined.key() == moved.key() {
 		t.Fatalf("distinct settings share a key: %q %q %q", joined.key(), split.key(), moved.key())
 	}
@@ -70,8 +70,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 		t.Fatal("could not parse the fixture")
 	}
 
-	twSettings := DefaultClassLiteralSettings()
-	twSettings.AttributePatterns = []string{"tw"}
+	twSettings := TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
 
 	// Both readers share one file's cache, as two rules configured differently would.
 	cache := rule.NewFileCache()
@@ -86,8 +85,8 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 			for range 2 {
 				shared := bound.classValuesIn(node)
 				if expected := fresh.classValuesIn(node); !reflect.DeepEqual(shared, expected) {
-					t.Fatalf("settings %q: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
-						settings.AttributePatterns, node.Kind, shared, expected)
+					t.Fatalf("settings %s: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
+						settings.key(), node.Kind, shared, expected)
 				}
 			}
 			read += len(fresh.classValuesIn(node).literals)
@@ -100,8 +99,8 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 
 		// Proof the comparison saw class strings and the memo was used, not a vacuous agreement.
 		if read == 0 || len(bound.values) == 0 {
-			t.Fatalf("settings %q: read %d literals and remembered %d nodes; the fixture reached nothing",
-				settings.AttributePatterns, read, len(bound.values))
+			t.Fatalf("settings %s: read %d literals and remembered %d nodes; the fixture reached nothing",
+				settings.key(), read, len(bound.values))
 		}
 	}
 }

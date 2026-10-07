@@ -1,0 +1,1235 @@
+{
+    "plugin": "4.7.0",
+    "cases": [
+        {
+            "name": "cva: strings, variants, compoundVariants, and what it never reads",
+            "literals": [
+                {
+                    "start": 19,
+                    "end": 34,
+                    "text": "'base-a base-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 73,
+                    "end": 97,
+                    "text": "'bg-blue-500 text-white'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 111,
+                    "end": 121,
+                    "text": "'bg-white'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 123,
+                    "end": 135,
+                    "text": "'text-black'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 159,
+                    "end": 164,
+                    "text": "'p-1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 167,
+                    "end": 172,
+                    "text": "'p-2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 241,
+                    "end": 252,
+                    "text": "'uppercase'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 290,
+                    "end": 301,
+                    "text": "'lowercase'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "tv: base, slots, variants, compoundVariants, compoundSlots",
+            "literals": [
+                {
+                    "start": 28,
+                    "end": 40,
+                    "text": "'rounded-md'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 63,
+                    "end": 68,
+                    "text": "'p-4'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 77,
+                    "end": 82,
+                    "text": "'p-2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 84,
+                    "end": 91,
+                    "text": "'gap-2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 136,
+                    "end": 150,
+                    "text": "'text-red-500'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 214,
+                    "end": 225,
+                    "text": "'font-bold'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 292,
+                    "end": 298,
+                    "text": "'px-1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "clb: base, variants, compoundVariants classes",
+            "literals": [
+                {
+                    "start": 24,
+                    "end": 30,
+                    "text": "'flex'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 55,
+                    "end": 62,
+                    "text": "'gap-1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 109,
+                    "end": 114,
+                    "text": "'p-1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "cn: the string matcher's walk",
+            "literals": [
+                {
+                    "start": 13,
+                    "end": 18,
+                    "text": "'one'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 28,
+                    "end": 33,
+                    "text": "'two'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 43,
+                    "end": 50,
+                    "text": "'three'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 78,
+                    "end": 84,
+                    "text": "'five'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 123,
+                    "end": 130,
+                    "text": "'seven'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 133,
+                    "end": 140,
+                    "text": "'eight'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 142,
+                    "end": 148,
+                    "text": "'nine'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 168,
+                    "end": 173,
+                    "text": "'ten'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 195,
+                    "end": 203,
+                    "text": "'twelve'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 206,
+                    "end": 216,
+                    "text": "'thirteen'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 234,
+                    "end": 246,
+                    "text": "`fourteen ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 253,
+                    "end": 262,
+                    "text": "'fifteen'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 265,
+                    "end": 267,
+                    "text": "''",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 267,
+                    "end": 277,
+                    "text": "} sixteen`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 340,
+                    "end": 348,
+                    "text": "`twenty`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 375,
+                    "end": 386,
+                    "text": "'twentyone'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 396,
+                    "end": 407,
+                    "text": "'twentytwo'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 419,
+                    "end": 432,
+                    "text": "'twentythree'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 442,
+                    "end": 454,
+                    "text": "'twentyfour'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 466,
+                    "end": 478,
+                    "text": "'twentyfive'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 495,
+                    "end": 506,
+                    "text": "'twentysix'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 509,
+                    "end": 522,
+                    "text": "'twentyseven'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 534,
+                    "end": 547,
+                    "text": "'twentyeight'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 575,
+                    "end": 587,
+                    "text": "'twentynine'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 601,
+                    "end": 609,
+                    "text": "\"thirty\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 632,
+                    "end": 643,
+                    "text": "'thirtyone'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 653,
+                    "end": 656,
+                    "text": "'a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 666,
+                    "end": 669,
+                    "text": "'b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 672,
+                    "end": 675,
+                    "text": "'c'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 701,
+                    "end": 714,
+                    "text": "'thirtythree'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "cn: object keys and values",
+            "literals": [
+                {
+                    "start": 15,
+                    "end": 25,
+                    "text": "'p-2 flex'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 47,
+                    "end": 65,
+                    "text": "'computed-literal'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 75,
+                    "end": 94,
+                    "text": "`computed-template`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 122,
+                    "end": 132,
+                    "text": "'deep-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 224,
+                    "end": 236,
+                    "text": "'method-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 272,
+                    "end": 284,
+                    "text": "'spread-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 314,
+                    "end": 324,
+                    "text": "'clsx-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 334,
+                    "end": 347,
+                    "text": "'clsx-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 369,
+                    "end": 381,
+                    "text": "'objstr-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 429,
+                    "end": 446,
+                    "text": "'objstr-computed'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 457,
+                    "end": 479,
+                    "text": "'objstr-parenthesized'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 490,
+                    "end": 507,
+                    "text": "`objstr-template`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 516,
+                    "end": 531,
+                    "text": "'objstr-method'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 542,
+                    "end": 557,
+                    "text": "'objstr-getter'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 607,
+                    "end": 622,
+                    "text": "'list-computed'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 632,
+                    "end": 647,
+                    "text": "`list-template`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "ancestors above the selector root",
+            "literals": [
+                {
+                    "start": 150,
+                    "end": 170,
+                    "text": "'in-a-logical-right'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 193,
+                    "end": 206,
+                    "text": "'in-a-branch'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 236,
+                    "end": 256,
+                    "text": "'in-an-object-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 283,
+                    "end": 312,
+                    "text": "'concatenated-through-a-call'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "the other default callees",
+            "literals": [
+                {
+                    "start": 14,
+                    "end": 25,
+                    "text": "'cc-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 29,
+                    "end": 37,
+                    "text": "'cc-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 49,
+                    "end": 61,
+                    "text": "'cnb-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 69,
+                    "end": 82,
+                    "text": "'dcnb-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 89,
+                    "end": 101,
+                    "text": "'ctl-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 107,
+                    "end": 118,
+                    "text": "'cx-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 128,
+                    "end": 134,
+                    "text": "'join'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 145,
+                    "end": 152,
+                    "text": "'merge'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 180,
+                    "end": 193,
+                    "text": "'member-name'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 204,
+                    "end": 215,
+                    "text": "'this-name'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 223,
+                    "end": 238,
+                    "text": "'optional-call'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 246,
+                    "end": 268,
+                    "text": "'parenthesized-callee'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 314,
+                    "end": 331,
+                    "text": "'twc-path-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "attributes",
+            "literals": [
+                {
+                    "start": 25,
+                    "end": 33,
+                    "text": "\"direct\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 40,
+                    "end": 57,
+                    "text": "\"lowercase-class\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 115,
+                    "end": 125,
+                    "text": "'branch-a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 128,
+                    "end": 138,
+                    "text": "'branch-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 170,
+                    "end": 182,
+                    "text": "`template ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 189,
+                    "end": 195,
+                    "text": "'hole'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 198,
+                    "end": 200,
+                    "text": "''",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 200,
+                    "end": 207,
+                    "text": "} tail`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 241,
+                    "end": 251,
+                    "text": "'list-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 314,
+                    "end": 326,
+                    "text": "'namespaced'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 330,
+                    "end": 346,
+                    "text": "'namespaced-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 386,
+                    "end": 402,
+                    "text": "\"uppercase-name\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 469,
+                    "end": 484,
+                    "text": "'parenthesized'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "variables",
+            "literals": [
+                {
+                    "start": 18,
+                    "end": 35,
+                    "text": "'variable-direct'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 63,
+                    "end": 75,
+                    "text": "'variable-a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 78,
+                    "end": 90,
+                    "text": "'variable-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 109,
+                    "end": 125,
+                    "text": "'variable-array'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 146,
+                    "end": 167,
+                    "text": "'callee-not-variable'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "legacy strings read direct arguments only",
+            "literals": [
+                {
+                    "start": 26,
+                    "end": 34,
+                    "text": "'direct'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 54,
+                    "end": 66,
+                    "text": "`template ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 67,
+                    "end": 69,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 72,
+                    "end": 87,
+                    "text": "'parenthesized'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 225,
+                    "end": 242,
+                    "text": "'variable-direct'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 309,
+                    "end": 327,
+                    "text": "\"attribute-direct\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "legacy matcher form",
+            "literals": [
+                {
+                    "start": 26,
+                    "end": 34,
+                    "text": "'direct'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 44,
+                    "end": 52,
+                    "text": "'nested'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 54,
+                    "end": 66,
+                    "text": "`template ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 73,
+                    "end": 79,
+                    "text": "'hole'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 82,
+                    "end": 84,
+                    "text": "''",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 84,
+                    "end": 86,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 158,
+                    "end": 173,
+                    "text": "'variant-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 199,
+                    "end": 211,
+                    "text": "'key-string'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 250,
+                    "end": 258,
+                    "text": "'branch'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 261,
+                    "end": 268,
+                    "text": "'other'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 303,
+                    "end": 327,
+                    "text": "'default-attribute-kept'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 330,
+                    "end": 333,
+                    "text": "'x'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "flat selectors: targets",
+            "literals": [
+                {
+                    "start": 16,
+                    "end": 20,
+                    "text": "'a1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 58,
+                    "end": 62,
+                    "text": "'b2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 88,
+                    "end": 92,
+                    "text": "'c2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 129,
+                    "end": 133,
+                    "text": "'d2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 160,
+                    "end": 164,
+                    "text": "'e1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 194,
+                    "end": 198,
+                    "text": "'f1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 200,
+                    "end": 204,
+                    "text": "'f2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 206,
+                    "end": 210,
+                    "text": "'f3'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 241,
+                    "end": 245,
+                    "text": "'g2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 278,
+                    "end": 282,
+                    "text": "'h2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 312,
+                    "end": 316,
+                    "text": "'i1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 388,
+                    "end": 392,
+                    "text": "'k3'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 414,
+                    "end": 418,
+                    "text": "'l1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 458,
+                    "end": 462,
+                    "text": "'m2'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "flat selectors: object paths",
+            "literals": [
+                {
+                    "start": 26,
+                    "end": 36,
+                    "text": "'ab-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 106,
+                    "end": 120,
+                    "text": "'quoted-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 177,
+                    "end": 186,
+                    "text": "'index-1'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 230,
+                    "end": 241,
+                    "text": "'partial-a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 256,
+                    "end": 267,
+                    "text": "'partial-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 381,
+                    "end": 404,
+                    "text": "'computed-member-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 469,
+                    "end": 484,
+                    "text": "'numeric-value'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 516,
+                    "end": 538,
+                    "text": "'parenthesized-object'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "a strings matcher alone, inside object values",
+            "literals": [
+                {
+                    "start": 92,
+                    "end": 105,
+                    "text": "\"in-an-array\"",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 152,
+                    "end": 170,
+                    "text": "'in-a-method-body'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 245,
+                    "end": 270,
+                    "text": "'in-a-nested-method-body'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 325,
+                    "end": 338,
+                    "text": "'in-a-getter'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 429,
+                    "end": 451,
+                    "text": "'in-a-computed-method'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 534,
+                    "end": 553,
+                    "text": "'in-a-class-method'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 730,
+                    "end": 741,
+                    "text": "'Component'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 743,
+                    "end": 758,
+                    "text": "'PureComponent'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "a legacy kind drops that kind's flat selectors and keeps the rest",
+            "literals": [
+                {
+                    "start": 19,
+                    "end": 34,
+                    "text": "'legacy-callee'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 84,
+                    "end": 99,
+                    "text": "'flat-variable'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "an empty selectors list reads nothing",
+            "literals": []
+        },
+        {
+            "name": "concatenation",
+            "literals": [
+                {
+                    "start": 13,
+                    "end": 20,
+                    "text": "'left '",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 32,
+                    "end": 40,
+                    "text": "' right'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 42,
+                    "end": 45,
+                    "text": "'a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 49,
+                    "end": 52,
+                    "text": "'b'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 55,
+                    "end": 58,
+                    "text": "'c'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 61,
+                    "end": 66,
+                    "text": "`x ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 67,
+                    "end": 69,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 72,
+                    "end": 75,
+                    "text": "'z'",
+                    "concatenatedLeft": true,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 96,
+                    "end": 107,
+                    "text": "'variable '",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                },
+                {
+                    "start": 144,
+                    "end": 156,
+                    "text": "'attribute '",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": true
+                }
+            ]
+        },
+        {
+            "name": "6b: tags, function returns, export default",
+            "literals": [
+                {
+                    "start": 17,
+                    "end": 24,
+                    "text": "`tag-a`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 50,
+                    "end": 62,
+                    "text": "'returned-a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 104,
+                    "end": 116,
+                    "text": "'returned-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 135,
+                    "end": 148,
+                    "text": "`no-path-tag`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        }
+    ]
+}

@@ -32,7 +32,7 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 			want:   `const element = <div className={open && 'flex'} />;`,
 		},
 		{
-			name:   "both sides of ??",
+			name:   "the right side of ??",
 			source: `const element = <div className={override ?? 'p-2 p-2'} />;`,
 			want:   `const element = <div className={override ?? 'p-2'} />;`,
 		},
@@ -55,6 +55,24 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 			name:   "a callee argument's conditional",
 			source: `const merged = cn('p-2', open ? 'flex flex' : undefined);`,
 			want:   `const merged = cn('p-2', open ? 'flex' : undefined);`,
+		},
+		{
+			// Upstream's strings matcher reads a `+` operand, and keeps the space that separates it from
+			// what it joins: 4.7.0 writes `'flex ' + suffix` here, measured.
+			name:   "a string concatenated into another",
+			source: `const element = <div className={'flex flex' + suffix} />;`,
+			want:   `const element = <div className={'flex ' + suffix} />;`,
+		},
+		{
+			// The same at a template's text after a hole, where the old fix fused `flex` into `grid`.
+			name:   "a repeat ending a hole's string that touches the template's text",
+			source: "const element = <div className={`flex${open ? ' p-2 p-2' : ''}grid`} />;",
+			want:   "const element = <div className={`flex${open ? ' p-2 ' : ''}grid`} />;",
+		},
+		{
+			name:   "a repeat ending a template concatenated after",
+			source: "const element = <div className={`gap-2 ${open} p-2 p-2` + suffix} />;",
+			want:   "const element = <div className={`gap-2 ${open} p-2 ` + suffix} />;",
 		},
 		{
 			name:   "a variable's initializer behind as const",
@@ -91,12 +109,18 @@ func TestNonValueStringsAreNotRead(t *testing.T) {
 			source: `const element = <div className={'flex flex' && 'p-2'} />;`,
 		},
 		{
-			name:   "an argument to a function nobody named a class callee",
-			source: `const element = <div className={translate('hello hello')} />;`,
+			// Upstream reads no logical expression's left side, `||` and `??` included, though either
+			// can be the value.
+			name:   "the left side of ||",
+			source: `const element = <div className={'flex flex' || fallback} />;`,
 		},
 		{
-			name:   "a string concatenated into another",
-			source: `const element = <div className={'flex flex' + suffix} />;`,
+			name:   "a comparison inside a class callee",
+			source: `const merged = cn(size === 'sm sm' && 'p-2');`,
+		},
+		{
+			name:   "an argument to a function nobody named a class callee",
+			source: `const element = <div className={translate('hello hello')} />;`,
 		},
 		{
 			name:   "a conditional on an unrelated attribute",

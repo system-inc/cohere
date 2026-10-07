@@ -19,9 +19,17 @@ import (
 //	`${prefix} flex`         silent
 //	`flex ${a} gap-${b}`     1 finding   (only the `gap-` seam)
 //	`bg-[${color}]`          2 findings  (both seams)
-//	'px-' + size             silent      (string concatenation is out of scope)
-//	'bg-[' + color + ']'     silent
-//	'a ' + 'b'               silent
+//	'px-' + size             1 finding
+//	'bg-[' + color + ']'     2 findings
+//	'a ' + 'b'               1 finding   (`b`, which nothing separates from what comes before)
+//	'a ' + ' b'              silent
+//	`px-${a} m-1` + size     2 findings  (the hole's seam and the `+`'s)
+//	prefix + `p-2 ${a}`      1 finding
+//	'' + size                silent
+//
+// The `+` verdicts are 4.7.0 with its defaults, measured again for #btxd64n. They were recorded here
+// as silent, measured under ahra's legacy settings, whose selectors have no matchers and so never
+// reach a `+` operand.
 
 func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 	t.Parallel()
@@ -75,6 +83,39 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 			name:     "assigned to a class-named variable",
 			fileName: "Styles.ts",
 			source:   "const className = `rounded-${radius}`;",
+			wantIds:  []string{"concatenatedClass"},
+		},
+		{
+			name:     "string concatenation with a variable",
+			fileName: "Component.tsx",
+			source:   `const element = <div className={'px-' + size} />;`,
+			wantIds:  []string{"concatenatedClass"},
+		},
+		{
+			// The real-tree shape from TableHeaderCell.tsx.
+			name:     "arbitrary value by concatenation",
+			fileName: "Component.tsx",
+			source:   `const element = <div className={'bg-[' + color + ']'} />;`,
+			wantIds:  []string{"concatenatedClass", "concatenatedClass"},
+		},
+		{
+			// The real-tree shape from TableTheme.ts: two complete literals joined, the second with
+			// nothing before its first class.
+			name:     "two complete literals joined",
+			fileName: "Styles.ts",
+			source:   `const className = 'border-b border--2 ' + 'data-[state=selected]:x';`,
+			wantIds:  []string{"concatenatedClass"},
+		},
+		{
+			name:     "a template with a hole, concatenated after",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={`px-${a} m-1` + size} />;",
+			wantIds:  []string{"concatenatedClass", "concatenatedClass"},
+		},
+		{
+			name:     "a template concatenated before",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={prefix + `p-2 ${a}`} />;",
 			wantIds:  []string{"concatenatedClass"},
 		},
 	}
@@ -143,23 +184,15 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 			source:   "const element = <div className={`flex items-center`} />;",
 		},
 		{
-			// Out of scope, measured: upstream stays silent on `+` concatenation.
-			name:     "string concatenation with a variable",
-			fileName: "Component.tsx",
-			source:   `const element = <div className={'px-' + size} />;`,
-		},
-		{
-			// The real-tree shape that a first version of the measurement harness wrongly flagged,
-			// in TableHeaderCell.tsx.
-			name:     "arbitrary value by concatenation",
-			fileName: "Component.tsx",
-			source:   `const element = <div className={'bg-[' + color + ']'} />;`,
-		},
-		{
-			// The real-tree shape from TableTheme.ts: two complete literals joined.
-			name:     "two complete literals joined",
+			// Whitespace on both sides of the `+` is a clean seam.
+			name:     "two literals joined with whitespace at the seam",
 			fileName: "Styles.ts",
-			source:   `const className = 'border-b border--2 ' + 'data-[state=selected]:x';`,
+			source:   `const className = 'border-b ' + ' data-[state=selected]:x';`,
+		},
+		{
+			name:     "an empty string concatenated",
+			fileName: "Component.tsx",
+			source:   `const element = <div className={'' + size} />;`,
 		},
 		{
 			// Choosing between whole class names is the repair this rule wants, so it must not fire

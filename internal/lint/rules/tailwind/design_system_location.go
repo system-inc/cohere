@@ -65,7 +65,7 @@ func (options *TailwindLocationOptions) anchorAt(directory string) {
 func decodeTailwindOptionsAt[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
-	compileClassLiterals()
+	compileClassLiterals() error
 }]() func(raw []byte, base rule.OptionsBase) (any, error) {
 	var declared Options
 	keys := map[string]bool{}
@@ -111,8 +111,11 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 			anchor = base.ProjectRoot
 		}
 		Settled(&decoded).anchorAt(anchor)
-		// Compiled here, once per configuration selection, rather than by the rule on every file.
-		Settled(&decoded).compileClassLiterals()
+		// Checked and compiled here, once per configuration selection, rather than by the rule on every
+		// file.
+		if err := Settled(&decoded).compileClassLiterals(); err != nil {
+			return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+		}
 		return decoded, nil
 	}
 }
@@ -185,7 +188,7 @@ var tailwindOptionKeys = map[string]map[string]bool{}
 func tailwindRegistration[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
-	compileClassLiterals()
+	compileClassLiterals() error
 }](tailwindRule rule.Rule) rule.Registration {
 	var declared Options
 	keys := map[string]bool{}
