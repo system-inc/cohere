@@ -50,6 +50,14 @@ var (
  * property as a writable one, though it refuses `readonly T[]` as `T[]`, so the rule reports the property
  * whatever its two types are; readonlyMadeWritable says where not.
  *
+ * A method taking a narrower parameter than the wider type passes is the hole a caller opens (#gvzdft9 shape 5):
+ * tsc compares a method's parameters in both directions, so `{ put(dog: Dog) }` passes as `{ put(animal: Animal):
+ * void }`, and a Cat passed through the wider type reaches code reading a Dog. The rule asks the walk for methods
+ * and judges their parameters one way, a function's being tsc's own under strictFunctionTypes. Two gaps are named
+ * rather than guessed at. A generic method's parameters are not paired: each signature's parameters are in its
+ * own type parameters, which no pairing unifies without instantiating one signature against the other, so
+ * Promise's `then` read every promise as a hole. And a method's return is not paired, as no method was before.
+ *
  * It began as identity, by the checker's identity relation, and the four consumers measured why not: an
  * `HTMLElement` seen as an `Element` reported its event handler slots, which differ only in `this` and are
  * safe to write back. `{ x }` against `{ x; y?: number }` is mutually assignable, and that hole is
