@@ -62,9 +62,13 @@ const roots = [
  * `Fraction` rather than `Value`, and no probe in the original set carried a slash, so removing the
  * fraction guard entirely changed no answer anywhere. The engine reads `aspect-16/9` as `[41]#1`,
  * and adding the probes turned a table row that silently declined into a measured one.
+ *
+ * `-lg/none` for the same reason: `none` is the one modifier that resolves through the theme (a
+ * `--leading` key, so `text-lg/none` sets a line height), and with no probe carrying it, emptying
+ * `themedModifierValues` changed no answer here on any theme.
  */
 const probeSuffixes = ['', '-4', '-0', '-1', '-50', '-90', '-100', '-sm', '-none', '-linear',
-    '-[3px]', '-[var(--a)]', '-2.5', '-1.3', '/50', '-16/9', '-3/2', '-1.3/2', '-7/3', '-red-500', '-red-500/50', '-current', '-inherit', '-transparent', '-xs', '-2xl', '-md'];
+    '-[3px]', '-[var(--a)]', '-2.5', '-1.3', '/50', '-16/9', '-3/2', '-1.3/2', '-7/3', '-red-500', '-red-500/50', '-current', '-inherit', '-transparent', '-xs', '-2xl', '-md', '-lg/none'];
 
 const registryByRoot = new Map();
 for (const entry of designSystem.getClassList?.() ?? []) {

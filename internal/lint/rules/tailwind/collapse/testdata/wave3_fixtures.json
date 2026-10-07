@@ -3,9 +3,9 @@
   "entryPoint": "ahra:app/_theme/styles/theme.css",
   "groundTruth": "compileAstNodes propertySort, via readingOf",
   "rootCount": 26,
-  "caseCount": 8096,
-  "answered": 7621,
-  "rejected": 475,
+  "caseCount": 8122,
+  "answered": 7624,
+  "rejected": 498,
   "distinctByRoot": {
     "@container": [
       {
@@ -590,6 +590,13 @@
     },
     {
       "root": "@container",
+      "className": "@container-lg/none",
+      "parsedRoot": "@container",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "@container",
       "className": "-@container-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -800,6 +807,13 @@
     {
       "root": "backdrop-filter",
       "className": "backdrop-filter-md",
+      "parsedRoot": "backdrop-filter",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "backdrop-filter",
+      "className": "backdrop-filter-lg/none",
       "parsedRoot": "backdrop-filter",
       "fromRegistry": false,
       "reading": null
@@ -7726,6 +7740,13 @@
     },
     {
       "root": "bg",
+      "className": "bg-lg/none",
+      "parsedRoot": "bg",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "bg",
       "className": "-bg-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -8124,6 +8145,13 @@
     {
       "root": "bg-conic",
       "className": "bg-conic-md",
+      "parsedRoot": "bg-conic",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "bg-conic",
+      "className": "bg-conic-lg/none",
       "parsedRoot": "bg-conic",
       "fromRegistry": false,
       "reading": null
@@ -8632,6 +8660,13 @@
     },
     {
       "root": "bg-linear",
+      "className": "bg-linear-lg/none",
+      "parsedRoot": "bg-linear",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "bg-linear",
       "className": "-bg-linear-3",
       "parsedRoot": "-bg-linear",
       "fromRegistry": false,
@@ -8852,6 +8887,13 @@
     {
       "root": "bg-radial",
       "className": "bg-radial-md",
+      "parsedRoot": "bg-radial",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "bg-radial",
+      "className": "bg-radial-lg/none",
       "parsedRoot": "bg-radial",
       "fromRegistry": false,
       "reading": null
@@ -15809,6 +15851,13 @@
     {
       "root": "decoration",
       "className": "decoration-md",
+      "parsedRoot": "decoration",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "decoration",
+      "className": "decoration-lg/none",
       "parsedRoot": "decoration",
       "fromRegistry": false,
       "reading": null
@@ -22800,6 +22849,13 @@
     },
     {
       "root": "drop-shadow",
+      "className": "drop-shadow-lg/none",
+      "parsedRoot": "drop-shadow",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "drop-shadow",
       "className": "-drop-shadow-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -23114,6 +23170,13 @@
     {
       "root": "duration",
       "className": "duration-md",
+      "parsedRoot": "duration",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "duration",
+      "className": "duration-lg/none",
       "parsedRoot": "duration",
       "fromRegistry": false,
       "reading": null
@@ -30040,6 +30103,13 @@
     },
     {
       "root": "fill",
+      "className": "fill-lg/none",
+      "parsedRoot": "fill",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "fill",
       "className": "-fill-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -30250,6 +30320,13 @@
     {
       "root": "filter",
       "className": "filter-md",
+      "parsedRoot": "filter",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "filter",
+      "className": "filter-lg/none",
       "parsedRoot": "filter",
       "fromRegistry": false,
       "reading": null
@@ -30949,6 +31026,13 @@
     },
     {
       "root": "flex",
+      "className": "flex-lg/none",
+      "parsedRoot": "flex",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "flex",
       "className": "-flex-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -31293,6 +31377,13 @@
     {
       "root": "font",
       "className": "font-md",
+      "parsedRoot": "font",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "font",
+      "className": "font-lg/none",
       "parsedRoot": "font",
       "fromRegistry": false,
       "reading": null
@@ -38283,6 +38374,13 @@
     },
     {
       "root": "inset-ring",
+      "className": "inset-ring-lg/none",
+      "parsedRoot": "inset-ring",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "inset-ring",
       "className": "-inset-ring-3",
       "parsedRoot": "-inset",
       "fromRegistry": false,
@@ -45231,6 +45329,13 @@
     },
     {
       "root": "inset-shadow",
+      "className": "inset-shadow-lg/none",
+      "parsedRoot": "inset-shadow",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "inset-shadow",
       "className": "-inset-shadow-3",
       "parsedRoot": "-inset",
       "fromRegistry": false,
@@ -45436,6 +45541,13 @@
     {
       "root": "mask",
       "className": "mask-md",
+      "parsedRoot": "mask",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "mask",
+      "className": "mask-lg/none",
       "parsedRoot": "mask",
       "fromRegistry": false,
       "reading": null
@@ -52413,6 +52525,13 @@
     {
       "root": "outline",
       "className": "outline-md",
+      "parsedRoot": "outline",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "outline",
+      "className": "outline-lg/none",
       "parsedRoot": "outline",
       "fromRegistry": false,
       "reading": null
@@ -59403,6 +59522,13 @@
     },
     {
       "root": "ring",
+      "className": "ring-lg/none",
+      "parsedRoot": "ring",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "ring",
       "className": "-ring-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -66372,6 +66498,13 @@
     },
     {
       "root": "ring-offset",
+      "className": "ring-offset-lg/none",
+      "parsedRoot": "ring-offset",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "ring-offset",
       "className": "-ring-offset-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -66679,6 +66812,13 @@
     {
       "root": "rotate",
       "className": "rotate-md",
+      "parsedRoot": "rotate",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "rotate",
+      "className": "rotate-lg/none",
       "parsedRoot": "rotate",
       "fromRegistry": false,
       "reading": null
@@ -67048,6 +67188,13 @@
     {
       "root": "scale",
       "className": "scale-md",
+      "parsedRoot": "scale",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "scale",
+      "className": "scale-lg/none",
       "parsedRoot": "scale",
       "fromRegistry": false,
       "reading": null
@@ -74073,6 +74220,19 @@
     },
     {
       "root": "shadow",
+      "className": "shadow-lg/none",
+      "parsedRoot": "shadow",
+      "fromRegistry": false,
+      "reading": {
+        "order": [
+          315,
+          316
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "shadow",
       "className": "-shadow-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -81056,6 +81216,13 @@
     {
       "root": "stroke",
       "className": "stroke-md",
+      "parsedRoot": "stroke",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "stroke",
+      "className": "stroke-lg/none",
       "parsedRoot": "stroke",
       "fromRegistry": false,
       "reading": null
@@ -88125,6 +88292,19 @@
     },
     {
       "root": "text",
+      "className": "text-lg/none",
+      "parsedRoot": "text",
+      "fromRegistry": false,
+      "reading": {
+        "order": [
+          286,
+          287
+        ],
+        "count": 2
+      }
+    },
+    {
+      "root": "text",
       "className": "-text-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -93944,6 +94124,16 @@
     },
     {
       "root": "text-shadow",
+      "className": "text-shadow-lg/none",
+      "parsedRoot": "text-shadow",
+      "fromRegistry": false,
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "text-shadow",
       "className": "-text-shadow-3",
       "parsedRoot": null,
       "fromRegistry": false,
@@ -94154,6 +94344,13 @@
     {
       "root": "transform",
       "className": "transform-md",
+      "parsedRoot": "transform",
+      "fromRegistry": false,
+      "reading": null
+    },
+    {
+      "root": "transform",
+      "className": "transform-lg/none",
       "parsedRoot": "transform",
       "fromRegistry": false,
       "reading": null
