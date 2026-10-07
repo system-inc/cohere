@@ -59,9 +59,15 @@ type Pair struct {
 	// `undefined` too (#bbtfx99): `increment(..., value = 1)` is `value: number` to the checker.
 	Defaulted bool
 
-	// Built is a method's return the method builds each call (returnsBuilt). Its own slots are no one else's, as
+	// Built is a function's or method's return it builds each call (returnsBuilt). Its own slots are no one else's, as
 	// a Site's NewContainer's are, and what it holds may still be shared, so the walk goes on into it.
 	Built bool
+
+	// Literals are the literals a Built value is written as, when every way it is made is one (#jpdf48x): a
+	// validator returning `{ valid: false, errors: [{ path }] }`. A part is Built in turn when that part of every
+	// literal is a literal or a new container (partOf), so the walk knows how far down nobody else holds the value;
+	// past the first part that may be held, there are none.
+	Literals []*ast.Node
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -296,7 +302,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -309,7 +315,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.IsAssignable(pair.Source, member) {
 				continue
 			}
-			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built}, depth+1)
+			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -338,7 +344,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -349,7 +355,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !w.isSlotContainer(member) || !w.IsAssignable(member, pair.Target) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -490,12 +496,16 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		mutable := ownSlotsShared && !isNamed(target, "ReadonlyArray")
 		switch {
 		case checker.Checker_isArrayType(w.typeChecker, source):
-			return w.into(pair, Pair{Source: w.typeArgument(source, 0), Target: targetElement, Mutable: mutable},
-				Step{Kind: StepElement, Index: -1}, depth)
+			step := Step{Kind: StepElement, Index: -1}
+			built, literals := partOf(pair.Literals, step)
+			return w.into(pair, Pair{Source: w.typeArgument(source, 0), Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+				step, depth)
 		case checker.IsTupleType(source):
+			step := Step{Kind: StepElement, Index: -1}
+			built, literals := partOf(pair.Literals, step)
 			for _, element := range checker.Checker_getTypeArguments(w.typeChecker, source) {
-				if found, wrong := w.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable},
-					Step{Kind: StepElement, Index: -1}, depth); wrong {
+				if found, wrong := w.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+					step, depth); wrong {
 					return found, true
 				}
 			}
@@ -510,8 +520,10 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		sourceElements := checker.Checker_getTypeArguments(w.typeChecker, source)
 		targetElements := checker.Checker_getTypeArguments(w.typeChecker, target)
 		for index := 0; index < len(sourceElements) && index < len(targetElements); index++ {
-			if found, wrong := w.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable},
-				Step{Kind: StepElement, Index: index}, depth); wrong {
+			step := Step{Kind: StepElement, Index: index}
+			built, literals := partOf(pair.Literals, step)
+			if found, wrong := w.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable, Built: built, Literals: literals},
+				step, depth); wrong {
 				return found, true
 			}
 		}
@@ -543,12 +555,15 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
 		sourceSignature, targetSignature := w.inContextOf(sourceSignatures[0], targetSignatures[0])
-		// A method's return is paired as a function's is (#y0ejf6a): `all(): Dog[] { return this.dogs }` seen as
-		// `all(): Animal[]` hands out the array its object still holds. Unless the method builds what it returns.
+		built, literals := returnsBuilt(source)
+		// A function's return is paired, and a method's as a function's is (#y0ejf6a): `all(): Dog[] { return
+		// this.dogs }` seen as `all(): Animal[]` hands out the array its object still holds. Unless the function builds
+		// what it returns, every call, which nobody else then holds (#jpdf48x).
 		if found, wrong := w.into(pair, Pair{
-			Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
-			Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
-			Built:  pair.Method && returnsBuilt(source),
+			Source:   checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
+			Target:   checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
+			Built:    built,
+			Literals: literals,
 		}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
 			return found, true
 		}
@@ -601,13 +616,17 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		if sourceProperty == nil {
 			continue
 		}
+		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
+		built, literals := partOf(pair.Literals, step)
 		if found, wrong := w.into(pair, Pair{
 			Source:         checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
 			Target:         checker.Checker_getTypeOfSymbol(w.typeChecker, property),
 			Mutable:        ownSlotsShared && !readonly,
 			SourceReadonly: checker.Checker_isReadonlySymbol(w.typeChecker, sourceProperty),
 			SourceProperty: sourceProperty,
-		}, Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
+			Built:          built,
+			Literals:       literals,
+		}, step, depth); wrong {
 			return found, true
 		}
 	}
@@ -683,44 +702,135 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
 }
 
 /*
- * returnsBuilt is a method that builds what it returns (#y0ejf6a): each of its declarations' returns is a literal or
- * a new container (isFresh, isNewContainer), so nobody else holds the value: `return this.dogs.slice()`, `return
- * [rex]`. A method declared with no body in a declaration file is the library's, whose returns are taken as built:
- * an iterator's `next()` hands back a new result each call, and was 276 findings on the consumers when a method's
- * return was first paired (#gvzdft9). One with no body in the project's own source, an interface's, is not, since
- * whatever implements it may hand back what it holds.
+ * returnsBuilt is a function or method that builds what it returns (#y0ejf6a, #jpdf48x): each of its declarations'
+ * returns is a literal or a new container (isFresh, isNewContainer), so nobody else holds the value: `return
+ * this.dogs.slice()`, `return [rex]`, `() => [rex]`. One declared with no body in a declaration file is the
+ * library's, whose returns are taken as built: an iterator's `next()` hands back a new result each call, and was
+ * 276 findings on the consumers when a method's return was first paired (#gvzdft9). One with no body in the
+ * project's own source, an interface's or a function type's, is not, since whatever implements it may hand back
+ * what it holds.
  */
-func returnsBuilt(method *checker.Type) bool {
-	symbol := method.Symbol()
+func returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
+	symbol := function.Symbol()
 	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
+		return false, nil
 	}
+	var returned []*ast.Node
 	for _, declaration := range symbol.Declarations {
 		body := declaration.Body()
 		if body == nil {
 			if sourceFile := ast.GetSourceFileOfNode(declaration); sourceFile == nil || !sourceFile.IsDeclarationFile {
-				return false
+				return false, nil
 			}
+			// The library's value is built, and what is written in it is not in view.
+			returned = append(returned, nil)
 			continue
 		}
 		if !ast.IsBlock(body) {
-			if !isBuilt(body) {
-				return false
-			}
+			returned = append(returned, body)
 			continue
 		}
-		built := true
 		ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
-			if returned := statement.AsReturnStatement().Expression; returned != nil && !isBuilt(returned) {
-				built = false
+			if expression := statement.AsReturnStatement().Expression; expression != nil {
+				returned = append(returned, expression)
 			}
-			return !built
-		})
-		if !built {
 			return false
+		})
+	}
+	for _, expression := range returned {
+		if expression != nil && !isBuilt(expression) {
+			return false, nil
 		}
 	}
-	return true
+	return true, literalsOf(returned)
+}
+
+/*
+ * partOf is the part at step of a value written as literals: Built when that part of every literal is itself a
+ * literal or a new container, with the literals it is written as when every one is a literal. An array literal
+ * with a spread or a hole, or an object literal whose last write of the part is a shorthand, a method or an accessor,
+ * or comes before a spread or a computed name, may hold what someone else does there, so it is not Built. A literal
+ * that does not write the part at all puts nothing in it.
+ */
+func partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
+	if len(literals) == 0 {
+		return false, nil
+	}
+	var parts []*ast.Node
+	for _, literal := range literals {
+		switch {
+		case literal.Kind == ast.KindArrayLiteralExpression && step.Kind == StepElement:
+			elements := literal.AsArrayLiteralExpression().Elements.Nodes
+			for index, element := range elements {
+				if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
+					return false, nil
+				}
+				if step.Index < 0 || step.Index == index {
+					parts = append(parts, element)
+				}
+			}
+		case literal.Kind == ast.KindObjectLiteralExpression && step.Kind == StepProperty:
+			// The last write of the part is what the literal holds there: one after a spread overrides it, and a
+			// spread, a computed name, a shorthand, a method or an accessor after the last assignment may be what is.
+			var written *ast.Node
+			readable := true
+			for _, property := range literal.AsObjectLiteralExpression().Properties.Nodes {
+				name := property.Name()
+				switch {
+				case property.Kind == ast.KindSpreadAssignment:
+					readable = false
+				case name == nil || name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral:
+					readable = false
+				case name.Text() != step.Name:
+				case property.Kind == ast.KindPropertyAssignment:
+					written, readable = property.AsPropertyAssignment().Initializer, true
+				default:
+					readable = false
+				}
+			}
+			if !readable {
+				return false, nil
+			}
+			if written != nil {
+				parts = append(parts, written)
+			}
+		default:
+			return false, nil
+		}
+	}
+	for _, part := range parts {
+		if !isBuilt(part) {
+			return false, nil
+		}
+	}
+	return true, literalsOf(parts)
+}
+
+// literalsOf is the object and array literals expressions are, through parentheses and a conditional's branches, a
+// `null` or `undefined` adding none; nil when any is something else, or nothing is a literal.
+func literalsOf(expressions []*ast.Node) []*ast.Node {
+	var literals []*ast.Node
+	for _, expression := range expressions {
+		if expression == nil {
+			return nil
+		}
+		expression = ast.SkipParentheses(expression)
+		switch {
+		case expression.Kind == ast.KindObjectLiteralExpression || expression.Kind == ast.KindArrayLiteralExpression:
+			literals = append(literals, expression)
+		case expression.Kind == ast.KindConditionalExpression:
+			conditional := expression.AsConditionalExpression()
+			branches := literalsOf([]*ast.Node{conditional.WhenTrue, conditional.WhenFalse})
+			if branches == nil {
+				return nil
+			}
+			literals = append(literals, branches...)
+		case expression.Kind == ast.KindNullKeyword || expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
+		default:
+			return nil
+		}
+	}
+	return literals
 }
 
 // isBuilt is an expression whose value is made right here, whole or as a new container.

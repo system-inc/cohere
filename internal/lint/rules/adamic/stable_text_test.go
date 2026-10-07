@@ -18,11 +18,14 @@ import (
 // to it. TypeScript caches that member by name, per checker, with the declaration of whichever sibling it was first
 // made from, and prints members in declaration order (#dq881as). Met first in Another.ts, which comes before the
 // case in the program, the member prints first; met only in the case, it prints after the column's own members.
+// The function hands back rows it holds, so invariant-mutable reports it: one returning the literal itself builds what
+// it returns, which nobody else holds (#jpdf48x).
 var stableTextFiles = map[string]string{
 	"Another.ts": "export const others = [{ extra: 1 }, { note: 'other' }];\n",
 	"Case.ts": `interface Column { id: string; extra?: number; note?: string; label?: string }
+const rows = [{ id: 'a', note: 'first' }, { id: 'b', extra: 2 }];
 export const columns: () => Column[] = function() {
-	return [{ id: 'a', note: 'first' }, { id: 'b', extra: 2 }];
+	return rows;
 };
 `,
 }
@@ -87,8 +90,9 @@ func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(t *testing.T
 var nestedTextFiles = map[string]string{
 	"Another.ts": stableTextFiles["Another.ts"],
 	"Case.ts": `interface Column { meta?: unknown; id: string; extra?: number; note?: string; label?: string }
+const rows = [{ meta: [{ extra: 1 }, { other: 2 }], id: 'a', note: 'first' }, { id: 'b', extra: 2 }];
 export const columns: () => Column[] = function() {
-	return [{ meta: [{ extra: 1 }, { other: 2 }], id: 'a', note: 'first' }, { id: 'b', extra: 2 }];
+	return rows;
 };
 `,
 }

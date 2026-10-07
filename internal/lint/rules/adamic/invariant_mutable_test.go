@@ -68,6 +68,21 @@ const pens: { pet: Animal }[] = kennels.map((kennel) => kennel);`, "kennels.map(
 const kennel: Dog[] = [rex];
 const dogsOf = (): Dog[] => kennel;
 const animalsOf: () => Animal[] = dogsOf;`, "dogsOf"},
+		// #jpdf48x: a literal returned holds what the function does one level down, so that level is still shared.
+		"a held array in a returned literal": {animals + `
+const kennel: Dog[] = [rex];
+const kennelOf = (): { pets: Dog[] } => ({ pets: kennel });
+const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
+		// A spread after the last write may be what the literal holds there.
+		"a part a later spread may write": {animals + `
+declare const holder: { pets: Dog[] };
+const kennelOf = (): { pets: Dog[] } => ({ pets: [rex], ...holder });
+const wide: () => { pets: Animal[] } = kennelOf;`, "kennelOf"},
+		// #jpdf48x, function-probe.tgz's r2: one return of two hands back what the function holds.
+		"a function's one held return": {animals + `
+const kennel: Dog[] = [rex];
+function dogsOf(fresh: boolean): Dog[] { if(fresh) { return []; } return kennel; }
+const animalsOf: (fresh: boolean) => Animal[] = dogsOf;`, "dogsOf"},
 		"a mutable callback slot": {animals + `
 const handler: { onAnimal: (animal: Dog) => void } = { onAnimal: (dog) => { dog.bark(); } };
 const wide: { onAnimal: (animal: never) => void } = handler;`, "handler"},
@@ -367,8 +382,17 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 		"a copy returned":                animals + `interface Pound { all(): Animal[] } class Kennel { dogs: Dog[] = [rex]; all(): Dog[] { return this.dogs.slice(); } } const pound: Pound = new Kennel();`,
 		"a literal returned":             animals + `interface Pound { all(): Animal[] } class Kennel { all(): Dog[] { return [rex]; } } const pound: Pound = new Kennel();`,
 		"a literal returned, or nothing": animals + `interface Pound { all(): Animal[] | undefined } class Kennel { all(): Dog[] | undefined { return [rex]; } } const pound: Pound = new Kennel();`,
-		"a literal's method building":    animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
-		"an iterator's next()":           animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
+		// #jpdf48x, function-probe.tgz's n1 to n3: a function building what it returns, every call, as an arrow, a copy
+		// and a declaration's body. Each runs clean in Node and was reported on main.
+		"an arrow's literal": animals + `interface Pound { all(): Animal[] } const pound: Pound = { all: () => [rex] };`,
+		"a function's copy":  animals + `const dogs: Dog[] = [rex]; const dogsOf = (): Dog[] => dogs.slice(); const animalsOf: () => Animal[] = dogsOf;`,
+		// Built all the way down: every level of the literal is written in place (nexus's validators on the consumers).
+		"a nested literal": `interface Result { valid: string; errors: { identifier: string }[] } const validate = (): { valid: 'no'; errors: { identifier: 'short' }[] } => ({ valid: 'no', errors: [{ identifier: 'short' }] }); const wide: () => Result = validate;`,
+		// Written after the spread, so the literal holds the later value there (MessageService's reconnection data on api).
+		"a literal written after a spread": `declare const base: { other: number }; const data = (): { other: number; mode: { id: 'x' } } => ({ ...base, mode: { id: 'x' } }); const wide: () => { other: number; mode: { id: string } } = data;`,
+		"a declaration's literals":         animals + `function makeDogs(): Dog[] { if(rex.name === '') { return []; } return [rex]; } const make: () => Animal[] = makeDogs;`,
+		"a literal's method building":      animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
+		"an iterator's next()":             animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
