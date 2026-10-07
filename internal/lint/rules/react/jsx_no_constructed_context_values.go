@@ -476,12 +476,19 @@ func jsxNoConstructedContextValuesConstructionOf(
 			ctx, node.AsParenthesizedExpression().Expression, depth+1,
 		)
 
-	case ast.KindAsExpression, ast.KindSatisfiesExpression:
-		// Upstream's `TSAsExpression` arm. `satisfies` did not exist when that arm was written and
-		// takes the same shape, so it is treated the same; recorded here because it is an addition
-		// rather than a reproduction.
+	case ast.KindAsExpression:
+		// Upstream's `TSAsExpression` arm.
 		return jsxNoConstructedContextValuesConstructionOf(
 			ctx, node.AsAsExpression().Expression, depth+1,
+		)
+
+	case ast.KindSatisfiesExpression:
+		// `satisfies` did not exist when upstream's `TSAsExpression` arm was written and takes the same
+		// shape, so it is treated the same; recorded here because it is an addition rather than a
+		// reproduction. It has its own arm because its node is not an AsExpression: reading it as one
+		// panicked on `value={({} satisfies object)}`.
+		return jsxNoConstructedContextValuesConstructionOf(
+			ctx, node.AsSatisfiesExpression().Expression, depth+1,
 		)
 
 	case ast.KindConditionalExpression:

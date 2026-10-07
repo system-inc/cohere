@@ -449,6 +449,8 @@ func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
 
 		// A type assertion is transparent.
 		{"an as expression over an object", "{a: 1} as any", []string{"defaultMsg"}},
+		{"a satisfies expression over an object", "{a: 1} satisfies object", []string{"defaultMsg"}},
+		{"a parenthesized satisfies expression over an object", "({} satisfies object)", []string{"defaultMsg"}},
 
 		// Parentheses, which upstream's parser folds away and ours keeps. Nothing in either corpus
 		// writes one in this position, so a port without the unwrap goes silent here and no
