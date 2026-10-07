@@ -43,61 +43,16 @@ func TestExportGraphsForAdamic(t *testing.T) {
 	if *exportGraphs == "" {
 		t.Skip("writes Adamic's corpus only when -export-graphs names a directory")
 	}
-	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
-	var paths []string
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !entry.IsDir() && !strings.HasSuffix(path, ".md") {
-			paths = append(paths, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(paths)
 	if err := os.MkdirAll(*exportGraphs, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	fixtures, functions := 0, 0
-	for _, path := range paths {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		source := string(contents)
-		if strings.Contains(source, "@flow") {
-			continue
-		}
-		name, err := filepath.Rel(root, path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		name = strings.NewReplacer("/", "-", " ", "-").Replace(name)
-
-		var lowered []*Function
-		probe := rule.Rule{
-			Name:             "adamic-graphs-export",
-			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
-				return rule.Listeners{
-					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
-							t.Fatal("the harness produced no type checker, so every reference would lower as a global")
-						}
-						forEachFunctionLike(node, func(function *ast.Node) {
-							if fn := Lower(function, ctx.TypeChecker); fn != nil {
-								lowered = append(lowered, fn)
-							}
-						})
-					},
-				}
-			},
-		}
-		rule_testing.RunTyped(t, probe, "fixture.tsx", source)
+	for _, fixture := range reactCompilerFixtures(t) {
+		lowered := lowerReactCompilerFixture(t, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
+			return Lower(node, ctx.TypeChecker)
+		})
+		name := fixture.name
 
 		var out strings.Builder
 		index := 0
@@ -125,6 +80,77 @@ func TestExportGraphsForAdamic(t *testing.T) {
 	if fixtures == 0 {
 		t.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
+}
+
+// reactCompilerFixture is one of React Compiler's vendored fixtures: its path made a file name, and its
+// source.
+type reactCompilerFixture struct {
+	name, source string
+}
+
+// reactCompilerFixtures are React Compiler's vendored fixtures in path order, Flow left out, as the
+// conformance corpus leaves them out: the parser can't read them.
+func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
+	t.Helper()
+	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
+	var paths []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() && !strings.HasSuffix(path, ".md") {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(paths)
+	var fixtures []reactCompilerFixture
+	for _, path := range paths {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := string(contents)
+		if strings.Contains(source, "@flow") {
+			continue
+		}
+		name, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixtures = append(fixtures, reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source})
+	}
+	return fixtures
+}
+
+// lowerReactCompilerFixture lowers every outermost function in a fixture's source through lower, with a
+// real type checker.
+func lowerReactCompilerFixture(t *testing.T, source string, lower func(rule.Context, *ast.Node) *Function) []*Function {
+	t.Helper()
+	var lowered []*Function
+	probe := rule.Rule{
+		Name:             "adamic-graphs-export",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(node *ast.Node) {
+					if ctx.TypeChecker == nil {
+						t.Fatal("the harness produced no type checker, so every reference would lower as a global")
+					}
+					forEachFunctionLike(node, func(function *ast.Node) {
+						if fn := lower(ctx, function); fn != nil {
+							lowered = append(lowered, fn)
+						}
+					})
+				},
+			}
+		},
+	}
+	rule_testing.RunTyped(t, probe, "fixture.tsx", source)
+	return lowered
 }
 
 // writeAdamicCase writes one function as Adamic's cases records, read through any IR's Graph.
