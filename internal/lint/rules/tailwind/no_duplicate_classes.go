@@ -44,7 +44,7 @@ type NoDuplicateClassesOptions struct {
 // edits met in the middle without either author seeing the other, and the next person to change
 // that literal inherits the ambiguity about which one is load-bearing.
 //
-// Reads all three surfaces the configuration names, not just JSX attributes. On the ahra tree that
+// Reads every surface the configuration names, not just JSX attributes. On the ahra tree that
 // is 7,773 attribute literals against 2,192 in callees and variables, so an attribute-only rule
 // would cover 78% of the class surface while printing green over the rest.
 //

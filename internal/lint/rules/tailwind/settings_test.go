@@ -27,6 +27,7 @@ var settingsSamples = map[string][2]string{
 	"attributes":             {`["fromSettings"]`, `["fromOptions"]`},
 	"callees":                {`["fromSettings"]`, `["fromOptions"]`},
 	"variables":              {`["fromSettings"]`, `["fromOptions"]`},
+	"tags":                   {`["fromSettings"]`, `["fromOptions"]`},
 	"ignore":                 {`["^settings$"]`, `["^options$"]`},
 	"collapse":               {`false`, `true`},
 	"logical":                {`false`, `true`},
@@ -177,8 +178,8 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(t *testing.T) {
 	testCases := []struct {
 		name, block, refused string
 	}{
-		{"an upstream option not ported yet", `{"tags": []}`, `"tags"`},
-		{"another not ported yet", `{"messageStyle": "compact"}`, `"messageStyle"`},
+		{"an upstream option not ported yet", `{"messageStyle": "compact"}`, `"messageStyle"`},
+		{"another not ported yet", `{"rootFontSize": 16}`, `"rootFontSize"`},
 		{"no option at all", `{"callees": ["cn"], "calees": ["cn"]}`, `"calees"`},
 		{"not an object", `["cn"]`, "expected an object"},
 	}
@@ -236,6 +237,11 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 		`const button = cva('p-2', { variants: { size: { sm: 'flex flex' } } });`,
 		`const card = tv({ slots: { header: 'flex flex' } });`,
 		`const merged = cn({ 'flex flex': open });`,
+		// Tags and function returns, ported in #btxd64n unit 6b.
+		"const Button = twc.button`px-2 px-2`;",
+		"const Link = twx.a`gap-2 gap-2`;",
+		`const Card = twc.div(() => 'flex flex');`,
+		`const Panel = twc.section((properties) => { return properties.open ? 'p-2 p-2' : 'p-4'; });`,
 	}
 	for _, source := range read {
 		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
@@ -244,6 +250,8 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 		`const merged = mergeClassNames('flex flex');`,
 		`const buttonClassName = 'flex flex';`,
 		`const button = cva('p-2', { defaultVariants: { size: 'flex flex' } });`,
+		"const Button = styled.button`px-2 px-2`;",
+		`const Card = twc.div(function named() { return 'flex flex'; });`,
 	}
 	for _, source := range unread {
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded))

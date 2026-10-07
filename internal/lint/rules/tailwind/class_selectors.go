@@ -194,10 +194,6 @@ func (legacy LegacySelector) selector(kind SelectorKind) Selector {
 var defaultSelectorsJSON []byte
 
 // DefaultSelectors is upstream's default selectors, decoded once.
-//
-// They hold what cohere does not read yet, tag selectors and anonymousFunctionReturn matchers (#btxd64n
-// unit 6b), so a project's own are refused until they are. The defaults keep them, since leaving them
-// out would change what the rest of the list means; the reader passes over both.
 var DefaultSelectors = sync.OnceValue(func() []Selector {
 	var selectors []Selector
 	decoder := json.NewDecoder(bytes.NewReader(defaultSelectorsJSON))
@@ -209,8 +205,9 @@ var DefaultSelectors = sync.OnceValue(func() []Selector {
 })
 
 // checkSelectors refuses a selector cohere would read differently from upstream: a kind or matcher
-// type upstream has none of, a callee or tag naming neither a name nor a path, and what is not
-// ported yet.
+// type upstream has none of, or a callee or tag naming neither a name nor a path. Upstream does not
+// check its settings against its schema and ignores these there; refused here, a setting cannot be
+// accepted and do nothing.
 func checkSelectors(selectors []Selector) error {
 	for index, selector := range selectors {
 		switch selector.Kind {
@@ -218,19 +215,17 @@ func checkSelectors(selectors []Selector) error {
 			if selector.Name == "" {
 				return fmt.Errorf("selectors[%d]: a %s selector needs a name", index, selector.Kind)
 			}
-		case SelectorKindCallee:
+		case SelectorKindCallee, SelectorKindTag:
 			if selector.Name == "" && selector.Path == "" {
-				return fmt.Errorf("selectors[%d]: a callee selector needs a name or a path", index)
+				return fmt.Errorf("selectors[%d]: a %s selector needs a name or a path", index, selector.Kind)
 			}
-		case SelectorKindTag:
-			return fmt.Errorf("selectors[%d]: tag selectors are not ported yet (#btxd64n unit 6b), so this one would be ignored", index)
 		default:
 			return fmt.Errorf("selectors[%d]: the kind is attribute, callee, tag or variable, not %q", index, selector.Kind)
 		}
 		if selector.Kind != SelectorKindCallee && (selector.TargetCall != nil || selector.CallTarget != nil || selector.TargetArgument != nil) {
 			return fmt.Errorf("selectors[%d]: only a callee selector takes a call or argument target", index)
 		}
-		if selector.Kind != SelectorKindCallee && selector.Path != "" {
+		if selector.Kind != SelectorKindCallee && selector.Kind != SelectorKindTag && selector.Path != "" {
 			return fmt.Errorf("selectors[%d]: only a callee or tag selector takes a path", index)
 		}
 		if err := checkMatchers(selector.Match, true); err != nil {
@@ -255,7 +250,12 @@ func checkMatchers(matchers []SelectorMatcher, isTopLevel bool) error {
 			if !isTopLevel {
 				return fmt.Errorf("an anonymousFunctionReturn matcher cannot nest inside another")
 			}
-			return fmt.Errorf("anonymousFunctionReturn matchers are not ported yet (#btxd64n unit 6b), so this one would be ignored")
+			if matcher.Path != "" {
+				return fmt.Errorf("an anonymousFunctionReturn matcher takes no path")
+			}
+			if err := checkMatchers(matcher.Match, false); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("a matcher is strings, objectKeys, objectValues or anonymousFunctionReturn, not %q", matcher.Type)
 		}
@@ -266,13 +266,16 @@ func checkMatchers(matchers []SelectorMatcher, isTopLevel bool) error {
 // mergeSelectors is upstream's createRule getOptions (utils/rule.js at 4.7.0): every legacy kind
 // written becomes flat selectors, and drops every flat selector of its kind, the defaults' included.
 // A kind not written keeps the flat selectors, the defaults when `selectors` is not written.
-func mergeSelectors(selectors *[]Selector, attributes, callees, variables []LegacySelector) []Selector {
+func mergeSelectors(selectors *[]Selector, attributes, callees, tags, variables []LegacySelector) []Selector {
 	var merged []Selector
 	for _, legacy := range attributes {
 		merged = append(merged, legacy.selector(SelectorKindAttribute))
 	}
 	for _, legacy := range callees {
 		merged = append(merged, legacy.selector(SelectorKindCallee))
+	}
+	for _, legacy := range tags {
+		merged = append(merged, legacy.selector(SelectorKindTag))
 	}
 	for _, legacy := range variables {
 		merged = append(merged, legacy.selector(SelectorKindVariable))
@@ -285,6 +288,7 @@ func mergeSelectors(selectors *[]Selector, attributes, callees, variables []Lega
 		switch {
 		case selector.Kind == SelectorKindAttribute && attributes != nil,
 			selector.Kind == SelectorKindCallee && callees != nil,
+			selector.Kind == SelectorKindTag && tags != nil,
 			selector.Kind == SelectorKindVariable && variables != nil:
 			continue
 		}

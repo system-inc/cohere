@@ -236,13 +236,100 @@
         ]
     },
     {
-        "name": "6b: tags, function returns, export default",
-        "pending": "6b",
+        "name": "twc and twx: tags and function returns",
         "code": [
-            "const a = twc.div`tag-a`;",
+            "const a = twc.div`tag-a ${x} tag-b`;",
             "const b = twc.div(() => 'returned-a');",
             "const c = twx.span((props) => { return 'returned-b'; });",
-            "const d = twc`no-path-tag`;"
+            "const d = twc`no-path-tag`;",
+            "const e = twc.div(function () { return open ? 'returned-c' : 'returned-d'; });",
+            "const f = twc.div(function named() { return 'named-not-read'; });",
+            "const g = twc.div(() => { const inner = 'declared-not-read'; return inner; });",
+            "const h = twc.div(() => { if (open) { return 'in-a-block'; } return [() => 'nested-arrow', 'beside']; });",
+            "const i = twc.div(() => () => 'curried-arrow');",
+            "const j = twc.div(() => ('parenthesized-body'));",
+            "const k = twc.div(() => `template-body ${x}`);",
+            "const l = twc.div({ render() { return 'method-return'; }, 'method-key': 1 });",
+            "const m = twc.div((props) => props.open && 'and-right');",
+            "const n = twc.div(() => { function helper() { return 'declaration-not-read'; } return helper(); });",
+            "const o = twc.div(Button)`call-tag`;",
+            "const p = twx.span`twx-tag`;",
+            "const q = (twc.div)`parenthesized-tag`;",
+            "const r = other.div`not-twc`;"
+        ]
+    },
+    {
+        "name": "tags: legacy and flat",
+        "settings": {
+            "tags": ["styled", ["css", [{ "match": "strings" }]]]
+        },
+        "options": {
+            "selectors": [
+                { "kind": "tag", "name": "^tw$" },
+                { "kind": "tag", "path": "^theme\\.\\w+$", "match": [{ "type": "strings" }] },
+                { "kind": "callee", "name": "^cn$", "match": [{ "type": "strings" }] }
+            ]
+        },
+        "code": [
+            "const a = styled`styled-direct ${open ? 'styled-hole' : ''}`;",
+            "const b = styled.div`styled-member`;",
+            "const c = css`css-direct ${open ? 'css-hole' : ''}`;",
+            "const d = tw`tw-flat`;",
+            "const e = theme.button`theme-path ${open ? 'theme-hole' : ''}`;",
+            "const f = /* tw */ `bare-comment`;",
+            "const g = /* styled */ `bare-legacy ${x}`;",
+            "const h = // css",
+            "    `line-comment ${open ? 'line-hole' : ''}`;",
+            "const i = /* not-a-tag */ `not-read`;",
+            "const j = cn('callee-kept');",
+            "const k = twc.div`default-tag-dropped`;",
+            "const l = twc.div /* styled */ `tagged-after-a-comment`;"
+        ]
+    },
+    {
+        "name": "export default",
+        "settings": {
+            "variables": [".*", ["^default$", [{ "match": "strings" }]]]
+        },
+        "code": [
+            "const className = 'variable-read';",
+            "export default open ? 'default-branch-a' : 'default-branch-b';"
+        ]
+    },
+    {
+        "name": "export =, which is not export default",
+        "settings": {
+            "variables": [["^default$", [{ "match": "strings" }]]]
+        },
+        "code": [
+            "export = open ? 'export-equals-a' : 'export-equals-b';"
+        ]
+    },
+    {
+        "name": "export default under a variable selector that never names it",
+        "code": [
+            "export default 'default-not-read';"
+        ]
+    },
+    {
+        "name": "anonymousFunctionReturn in a flat selector",
+        "options": {
+            "selectors": [
+                { "kind": "callee", "name": "^variant$", "match": [{ "type": "anonymousFunctionReturn", "match": [{ "type": "strings" }, { "type": "objectKeys" }] }] },
+                { "kind": "variable", "name": "^classes$", "match": [{ "type": "anonymousFunctionReturn", "match": [{ "type": "objectValues", "path": "^base$" }] }] },
+                { "kind": "attribute", "name": "^className$", "match": [{ "type": "anonymousFunctionReturn", "match": [{ "type": "strings" }] }] },
+                { "kind": "variable", "name": "^(styles|default)$", "match": [{ "type": "anonymousFunctionReturn", "match": [{ "type": "strings" }] }] }
+            ]
+        },
+        "code": [
+            "const a = variant((size) => size === 'sm' ? 'small' : { 'large-key': true });",
+            "const b = variant('direct-not-read', () => 'returned');",
+            "const classes = { make: () => ({ base: 'object-base', other: 'object-other' }) };",
+            "const c = <div className={() => 'attribute-return'} />;",
+            "const d = <div className=\"attribute-direct-not-read\" />;",
+            "const e = variant(class { method() { return 'class-method-return'; } });",
+            "const styles = () => 'function-initializer-not-read';",
+            "export default () => 'default-arrow-not-read';"
         ]
     }
 ]

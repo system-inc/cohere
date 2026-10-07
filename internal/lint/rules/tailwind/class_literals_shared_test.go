@@ -22,7 +22,8 @@ const sharedReaderSource = "const className = (open ? 'flex flex' : 'hidden') as
 	"const merged = cn('p-2', open && 'gap-2', ['m-1', size ?? 'm-2'], `px-${size} py-1`);\n" +
 	"const element = <div tw=\"text-left text-left\" className={`flex ${open ? ' rotate-90 ' : ''}`} />;\n" +
 	"const other = <span className=\"items-center\" title=\"not classes\" />;\n" +
-	"const notClasses = 'flex flex';\n"
+	"const notClasses = 'flex flex';\n" +
+	"const bare = /* tw */ `gap-2 gap-2`;\n"
 
 func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	t.Parallel()
@@ -71,10 +72,12 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 	}
 
 	twSettings := TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
+	// A tag with a name, so a bare template is a surface and its reading goes through the memo.
+	tagSettings := TailwindClassLiteralOptions{Tags: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
 
 	// Both readers share one file's cache, as two rules configured differently would.
 	cache := rule.NewFileCache()
-	for _, settings := range []ClassLiteralSettings{DefaultClassLiteralSettings(), twSettings} {
+	for _, settings := range []ClassLiteralSettings{DefaultClassLiteralSettings(), twSettings, tagSettings} {
 		bound := ClassLiteralSurfacesFor(settings).ReaderFor(cache)
 		fresh := NewClassLiteralReader(settings)
 
@@ -101,6 +104,17 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 		if read == 0 || len(bound.values) == 0 {
 			t.Fatalf("settings %s: read %d literals and remembered %d nodes; the fixture reached nothing",
 				settings.key(), read, len(bound.values))
+		}
+
+		// A bare template is remembered exactly when a named tag makes it a surface.
+		rememberedBare := false
+		for node, values := range bound.values {
+			if node.Kind == ast.KindNoSubstitutionTemplateLiteral && len(values.literals) > 0 {
+				rememberedBare = true
+			}
+		}
+		if wantBare := settings.key() == tagSettings.key(); rememberedBare != wantBare {
+			t.Fatalf("settings %s: remembered a bare template's reading %v, want %v", settings.key(), rememberedBare, wantBare)
 		}
 	}
 }

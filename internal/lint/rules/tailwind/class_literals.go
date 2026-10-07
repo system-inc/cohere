@@ -19,6 +19,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -33,7 +34,7 @@ type ClassLiteral struct {
 	Text  string
 	Range core.TextRange
 	// Origin says which reading rule found this literal, so a report can explain itself and a test
-	// can assert that all three surfaces are covered rather than only the obvious one.
+	// can assert that every surface is covered rather than only the obvious one.
 	Origin ClassLiteralOrigin
 	// Edges says which of the literal's ends will touch class text once it is substituted into a
 	// template's hole, so that the whitespace at that end is all that separates two classes. See
@@ -55,8 +56,12 @@ const (
 	// `mergeClassNames('...')`.
 	ClassLiteralOriginCallee ClassLiteralOrigin = "Callee"
 	// ClassLiteralOriginVariable is a string assigned to a variable whose name says it holds
-	// classes, such as `const buttonClassName = '...'`.
+	// classes, such as `const buttonClassName = '...'`, or written as `export default`, which
+	// upstream reads as the variable `default`.
 	ClassLiteralOriginVariable ClassLiteralOrigin = "Variable"
+	// ClassLiteralOriginTag is a tagged template, twc.div and its template, or a template after a
+	// comment that names it, `/* tw */` before the backtick.
+	ClassLiteralOriginTag ClassLiteralOrigin = "Tag"
 )
 
 // ClassLiteralSettings is the selectors a rule reads class strings through, upstream's flat
@@ -73,13 +78,9 @@ type ClassLiteralSettings struct {
 // DefaultClassLiteralSettings is upstream 4.7.0's default selectors (options/default-options.js),
 // embedded from the installed package by tools/generate_class_literals.
 //
-// Tag selectors and anonymousFunctionReturn matchers are among them and not ported yet (#btxd64n unit
-// 6b): `twc.div`...“, `twc.div(() => '...')`, and `export default` as the variable `default` go
-// unread until they are.
-//
 // Defaults rather than a required option, because a rule that declines every file when unconfigured
 // is indistinguishable from a rule with nothing to report. A project writing its own `attributes`,
-// `callees` or `variables`, in a rule's options or in settings["better-tailwindcss"], replaces that
+// `callees`, `tags` or `variables`, in a rule's options or in settings["better-tailwindcss"], replaces that
 // kind's selectors whole, as upstream's legacy options do. Our own repositories name
 // `mergeClassNames` and `createVariantClassNames` there.
 func DefaultClassLiteralSettings() ClassLiteralSettings {
@@ -87,19 +88,17 @@ func DefaultClassLiteralSettings() ClassLiteralSettings {
 }
 
 // TailwindClassLiteralOptions are the selector options every better-tailwindcss rule accepts: the flat
-// `selectors`, and the legacy `attributes`, `callees` and `variables`, each a list of names, or of
-// names with their matchers.
+// `selectors`, and the legacy `attributes`, `callees`, `tags` and `variables`, each a list of names,
+// or of names with their matchers.
 //
 // A legacy kind that is written replaces that kind's selectors whole, an empty list included, which
 // then reads nothing of that kind; a kind not written keeps the flat selectors of its kind, upstream's
 // defaults when `selectors` is not written. That is upstream's createRule (mergeSelectors).
-//
-// Not ported yet: `tags`, refused by name until #btxd64n unit 6b, and a selector of kind tag or with
-// an anonymousFunctionReturn matcher, refused by checkSelectors until then.
 type TailwindClassLiteralOptions struct {
 	Selectors  *[]Selector      `json:"selectors"`
 	Attributes []LegacySelector `json:"attributes"`
 	Callees    []LegacySelector `json:"callees"`
+	Tags       []LegacySelector `json:"tags"`
 	Variables  []LegacySelector `json:"variables"`
 
 	// surfaces is these options compiled, set once by the decoder, so a rule asking on every file reads
@@ -132,7 +131,7 @@ func (options *TailwindClassLiteralOptions) compileClassLiterals() error {
 
 // ClassLiteralSettings is these options merged into one list of selectors, as upstream merges them.
 func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSettings {
-	return ClassLiteralSettings{Selectors: mergeSelectors(options.Selectors, options.Attributes, options.Callees, options.Variables)}
+	return ClassLiteralSettings{Selectors: mergeSelectors(options.Selectors, options.Attributes, options.Callees, options.Tags, options.Variables)}
 }
 
 // ClassLiteralReader finds class-carrying strings in a file.
@@ -143,6 +142,7 @@ func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSe
 type ClassLiteralReader struct {
 	attributes *selectorGroup
 	callees    *selectorGroup
+	tags       *selectorGroup
 	variables  *selectorGroup
 
 	// values holds what each node read as, for the one file this reader serves. Nil on a reader that
@@ -170,8 +170,10 @@ type selectorGroup struct {
 	selectors []compiledSelector
 	lowercase bool
 	hasPaths  bool
-	byName    sync.Map
-	byPath    sync.Map
+	// hasNames is whether any selector names by name, which a bare template's comment can only match.
+	hasNames bool
+	byName   sync.Map
+	byPath   sync.Map
 }
 
 func newSelectorGroup(selectors []Selector, kind SelectorKind) *selectorGroup {
@@ -190,6 +192,7 @@ func newSelectorGroup(selectors []Selector, kind SelectorKind) *selectorGroup {
 		}
 		if selector.Name != "" {
 			compiled.name = newNamePatterns([]string{selector.Name}, group.lowercase)
+			group.hasNames = true
 		}
 		if selector.Path != "" {
 			compiled.path = newNamePatterns([]string{selector.Path}, false)
@@ -201,13 +204,14 @@ func newSelectorGroup(selectors []Selector, kind SelectorKind) *selectorGroup {
 }
 
 // matching is the selectors a name, or a path, matches, by index. path is asked only when a selector
-// with a path did not match by name, since it is a new string for every member call in the file.
+// with a path did not match by name, since it is a new string for every member call in the file. A nil
+// path matches by name alone, for what has no path: an attribute, a variable, a comment.
 func (group *selectorGroup) matching(name string, path func() string) []int {
 	if len(group.selectors) == 0 {
 		return nil
 	}
 	byName := group.answer(&group.byName, name, func(selector compiledSelector) *namePatterns { return selector.name })
-	if !group.hasPaths {
+	if !group.hasPaths || path == nil {
 		return byName
 	}
 	byPath := group.answer(&group.byPath, path(), func(selector compiledSelector) *namePatterns { return selector.path })
@@ -331,7 +335,7 @@ var DefaultClassLiteralSurfaces = sync.OnceValue(func() *ClassLiteralSurfaces {
 // ReaderFor returns the reader for these surfaces in this file, shared through the file's cache by
 // every rule that reads with the same settings.
 //
-// Thirteen rules listen on the same three kinds, so before this each class surface was read thirteen
+// Thirteen rules listen on the same kinds, so before this each class surface was read thirteen
 // times per file, and each rule compiled its own copy of the variable patterns on every file:
 // 13 × 3,978 files × 2 patterns in ahra, about 0.08s of CPU spent recompiling two regular
 // expressions. Reading is a pure function of the node and the settings, so one reading serves them
@@ -367,19 +371,24 @@ func NewClassLiteralReader(settings ClassLiteralSettings) *ClassLiteralReader {
 	return &ClassLiteralReader{
 		attributes: newSelectorGroup(settings.Selectors, SelectorKindAttribute),
 		callees:    newSelectorGroup(settings.Selectors, SelectorKindCallee),
+		tags:       newSelectorGroup(settings.Selectors, SelectorKindTag),
 		variables:  newSelectorGroup(settings.Selectors, SelectorKindVariable),
 	}
 }
 
 // ListenerKinds are the node kinds a rule must subscribe to in order to see every class literal.
 //
-// Returned as a list so a rule registers the same set rather than each one remembering three kinds,
-// and so adding a fourth surface later reaches every rule at once.
+// Returned as a list so a rule registers the same set rather than each one remembering the kinds, and
+// so a new surface reaches every rule at once, as tags and `export default` did (#btxd64n).
 func ListenerKinds() []ast.Kind {
 	return []ast.Kind{
 		ast.KindJsxAttribute,
 		ast.KindCallExpression,
 		ast.KindVariableDeclaration,
+		ast.KindExportAssignment,
+		ast.KindTaggedTemplateExpression,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTemplateExpression,
 	}
 }
 
@@ -426,9 +435,16 @@ type classTemplateValue struct {
 //
 // The slices in a remembered reading are shared by every rule that asks, so callers range over them
 // and never write into them.
+//
+// A template literal is a surface only to a tag selector with a name, which most settings have none of,
+// and every rule asks about every template. Its empty answer costs nothing to give again, so it is not
+// remembered: 3.7 MB over ahra's files was the memo growing for nothing.
 func (r *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
 	if r.values == nil {
 		return r.readClassValues(node)
+	}
+	if !r.tags.hasNames && (node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression) {
+		return classValues{}
 	}
 	if remembered, isRead := r.values[node]; isRead {
 		return remembered
@@ -438,7 +454,7 @@ func (r *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
 	return values
 }
 
-// readClassValues dispatches on the three class surfaces.
+// readClassValues dispatches on the class surfaces, upstream's createRuleListener.
 func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 	if node == nil {
 		return classValues{}
@@ -453,9 +469,131 @@ func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 
 	case ast.KindVariableDeclaration:
 		return r.variableValues(node)
+
+	case ast.KindExportAssignment:
+		return r.exportDefaultValues(node)
+
+	case ast.KindTaggedTemplateExpression:
+		return r.tagValues(node)
+
+	case ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
+		return r.bareTemplateValues(node)
 	}
 
 	return classValues{}
+}
+
+// exportDefaultValues is upstream's getLiteralsByESExportDefaultDeclaration: `export default <value>`
+// is read as a variable named `default`. A function or class declared as the default is not an
+// ExportAssignment here and not read there, and `export =` is TypeScript's, which upstream never reads.
+func (r *ClassLiteralReader) exportDefaultValues(node *ast.Node) classValues {
+	assignment := node.AsExportAssignment()
+	if assignment == nil || assignment.IsExportEquals || assignment.Expression == nil {
+		return classValues{}
+	}
+	indices := r.variables.matching("default", nil)
+	if len(indices) == 0 {
+		return classValues{}
+	}
+	matched := matchedNodes{}
+	for _, index := range indices {
+		readVariableSelector(r.variables.selectors[index], assignment.Expression, &matched)
+	}
+	return classValuesOf(matched, ClassLiteralOriginVariable)
+}
+
+// tagValues is upstream's getLiteralsByTaggedTemplateExpression: a tagged template named by its tag,
+// twc.div, or by the callee of a tag that is a call, twc.div(Button). A tag selector with no matchers
+// reads the template; one with matchers walks from the tagged template itself.
+func (r *ClassLiteralReader) tagValues(node *ast.Node) classValues {
+	tagged := node.AsTaggedTemplateExpression()
+	tag := skipOuter(tagged.Tag)
+	if tag != nil && tag.Kind == ast.KindCallExpression {
+		tag = skipOuter(tag.AsCallExpression().Expression)
+	}
+	if tag == nil {
+		return classValues{}
+	}
+	indices := r.tags.matching(calleeName(tag), func() string {
+		_, path := calleeNameAndPath(tag)
+		return path
+	})
+	if len(indices) == 0 {
+		return classValues{}
+	}
+	matched := matchedNodes{}
+	for _, index := range indices {
+		selector := r.tags.selectors[index]
+		if selector.matchers == nil {
+			readDirect(tagged.Template, &matched)
+			continue
+		}
+		matchNodes(node, selector.matchers, &matched)
+	}
+	return classValuesOf(matched, ClassLiteralOriginTag)
+}
+
+// bareTemplateValues is upstream's getLiteralsByESBareTemplateLiteral: a template no tag holds, read
+// when the comment right before it matches a tag selector's name, `/* tw */` before the backtick. Only
+// a name: a tag selector's path never matches a comment.
+func (r *ClassLiteralReader) bareTemplateValues(node *ast.Node) classValues {
+	if !r.tags.hasNames {
+		return classValues{}
+	}
+	if parent := esParent(node); parent != nil && parent.Kind == ast.KindTaggedTemplateExpression {
+		return classValues{}
+	}
+	comment := leadingComment(node)
+	if comment == "" {
+		return classValues{}
+	}
+	matched := matchedNodes{}
+	for _, index := range r.tags.matching(comment, nil) {
+		selector := r.tags.selectors[index]
+		if selector.matchers == nil {
+			readDirect(node, &matched)
+			continue
+		}
+		matchNodes(node, selector.matchers, &matched)
+	}
+	return classValuesOf(matched, ClassLiteralOriginTag)
+}
+
+// leadingComment is upstream's getLeadingComment: the text of the comment that is the token right
+// before the node, trimmed, or nothing when that token is not a comment.
+//
+// The trivia before the node holds two kinds to the scanner: a comment on the previous token's line is
+// that token's trailing comment, and one after a line break is the node's leading comment. To ESTree's
+// token list both are tokens, and the last of either is the one right before the node.
+func leadingComment(node *ast.Node) string {
+	sourceFile := ast.GetSourceFileOfNode(node)
+	if sourceFile == nil {
+		return ""
+	}
+	source := sourceFile.Text()
+	var factory ast.NodeFactory
+	var last ast.CommentRange
+	found := false
+	for commentRange := range scanner.GetTrailingCommentRanges(&factory, source, node.Pos()) {
+		last, found = commentRange, true
+	}
+	for commentRange := range scanner.GetLeadingCommentRanges(&factory, source, node.Pos()) {
+		if !found || commentRange.Pos() > last.Pos() {
+			last, found = commentRange, true
+		}
+	}
+	if !found {
+		return ""
+	}
+	comment := source[last.Pos():last.End()]
+	if last.Kind == ast.KindMultiLineCommentTrivia {
+		comment = strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
+	} else {
+		comment = strings.TrimPrefix(comment, "//")
+	}
+	// JavaScript's trim, as upstream's `token.value.trim()`, which strips what Go's set does not, a
+	// no-break space among them.
+	return text.TrimWhitespace(comment)
 }
 
 // attributeValues is upstream's getLiteralsByJSXAttribute: every attribute selector whose name
@@ -548,16 +686,22 @@ func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	}
 	matched := matchedNodes{}
 	for _, index := range indices {
-		selector := r.variables.selectors[index]
-		if selector.matchers != nil {
-			switch skipOuter(declaration.Initializer).Kind {
-			case ast.KindArrowFunction, ast.KindCallExpression, ast.KindFunctionExpression:
-				continue
-			}
-		}
-		readSelector(selector, declaration.Initializer, &matched)
+		readVariableSelector(r.variables.selectors[index], declaration.Initializer, &matched)
 	}
 	return classValuesOf(matched, ClassLiteralOriginVariable)
+}
+
+// readVariableSelector reads a variable's value through one selector. One with matchers skips a value
+// that is a call or a function, which a callee selector reads if anything does, and whose returns only
+// an anonymousFunctionReturn matcher could otherwise reach.
+func readVariableSelector(selector compiledSelector, value *ast.Node, matched *matchedNodes) {
+	if selector.matchers != nil {
+		switch skipOuter(value).Kind {
+		case ast.KindArrowFunction, ast.KindCallExpression, ast.KindFunctionExpression:
+			return
+		}
+	}
+	readSelector(selector, value, matched)
 }
 
 // readSelector reads one value through one selector: its matchers' walk, or with none, the value

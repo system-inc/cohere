@@ -15,7 +15,7 @@ import (
 // in the commit that ports it, and not before: an option accepted and ignored is worse than one
 // refused, because the config loads and the setting silently does nothing (#gj5nm6e).
 var tailwindPortedOptions = map[string][]string{
-	"*": {"entryPoint", "tailwindConfig", "cwd", "tsconfig", "selectors"},
+	"*": {"entryPoint", "tailwindConfig", "cwd", "tsconfig", "selectors", "tags"},
 	"better-tailwindcss/enforce-canonical-classes":      {"collapse", "logical"},
 	"better-tailwindcss/enforce-consistent-class-order": {"order", "unknownClassOrder", "unknownClassPosition", "componentClassOrder", "componentClassPosition"},
 	"better-tailwindcss/no-unnecessary-whitespace":      {"allowMultiline"},

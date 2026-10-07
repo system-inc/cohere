@@ -1199,33 +1199,287 @@
             ]
         },
         {
-            "name": "6b: tags, function returns, export default",
+            "name": "twc and twx: tags and function returns",
             "literals": [
                 {
                     "start": 17,
-                    "end": 24,
-                    "text": "`tag-a`",
+                    "end": 26,
+                    "text": "`tag-a ${",
                     "concatenatedLeft": false,
                     "concatenatedRight": false
                 },
                 {
-                    "start": 50,
-                    "end": 62,
+                    "start": 27,
+                    "end": 35,
+                    "text": "} tag-b`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 61,
+                    "end": 73,
                     "text": "'returned-a'",
                     "concatenatedLeft": false,
                     "concatenatedRight": false
                 },
                 {
-                    "start": 104,
-                    "end": 116,
+                    "start": 115,
+                    "end": 127,
                     "text": "'returned-b'",
                     "concatenatedLeft": false,
                     "concatenatedRight": false
                 },
                 {
-                    "start": 135,
-                    "end": 148,
+                    "start": 146,
+                    "end": 159,
                     "text": "`no-path-tag`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 207,
+                    "end": 219,
+                    "text": "'returned-c'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 222,
+                    "end": 234,
+                    "text": "'returned-d'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 430,
+                    "end": 442,
+                    "text": "'in-a-block'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 476,
+                    "end": 484,
+                    "text": "'beside'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 564,
+                    "end": 584,
+                    "text": "'parenthesized-body'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 612,
+                    "end": 629,
+                    "text": "`template-body ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 630,
+                    "end": 632,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 756,
+                    "end": 767,
+                    "text": "'and-right'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 895,
+                    "end": 905,
+                    "text": "`call-tag`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 925,
+                    "end": 934,
+                    "text": "`twx-tag`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 955,
+                    "end": 974,
+                    "text": "`parenthesized-tag`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "tags: legacy and flat",
+            "literals": [
+                {
+                    "start": 16,
+                    "end": 33,
+                    "text": "`styled-direct ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 58,
+                    "end": 60,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 112,
+                    "end": 126,
+                    "text": "`css-direct ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 133,
+                    "end": 143,
+                    "text": "'css-hole'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 146,
+                    "end": 148,
+                    "text": "''",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 148,
+                    "end": 150,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 297,
+                    "end": 312,
+                    "text": "`bare-legacy ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 313,
+                    "end": 315,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 338,
+                    "end": 354,
+                    "text": "`line-comment ${",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 361,
+                    "end": 372,
+                    "text": "'line-hole'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 375,
+                    "end": 377,
+                    "text": "''",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 377,
+                    "end": 379,
+                    "text": "}`",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 432,
+                    "end": 445,
+                    "text": "'callee-kept'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "export default",
+            "literals": [
+                {
+                    "start": 18,
+                    "end": 33,
+                    "text": "'variable-read'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 57,
+                    "end": 75,
+                    "text": "'default-branch-a'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 78,
+                    "end": 96,
+                    "text": "'default-branch-b'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                }
+            ]
+        },
+        {
+            "name": "export =, which is not export default",
+            "literals": []
+        },
+        {
+            "name": "export default under a variable selector that never names it",
+            "literals": []
+        },
+        {
+            "name": "anonymousFunctionReturn in a flat selector",
+            "literals": [
+                {
+                    "start": 44,
+                    "end": 51,
+                    "text": "'small'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 56,
+                    "end": 67,
+                    "text": "'large-key'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 121,
+                    "end": 131,
+                    "text": "'returned'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 173,
+                    "end": 186,
+                    "text": "'object-base'",
+                    "concatenatedLeft": false,
+                    "concatenatedRight": false
+                },
+                {
+                    "start": 248,
+                    "end": 266,
+                    "text": "'attribute-return'",
                     "concatenatedLeft": false,
                     "concatenatedRight": false
                 }

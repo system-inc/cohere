@@ -33,7 +33,7 @@ type ClassSegment struct {
 
 // ClassSegmentsIn returns every run of static class text a node carries.
 //
-// Covers both plain strings and templates, over the same three surfaces the other readers use, so a
+// Covers both plain strings and templates, over the same surfaces the other readers use, so a
 // rule built on this one cannot silently cover less than a rule built on those.
 func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 	if node == nil {
