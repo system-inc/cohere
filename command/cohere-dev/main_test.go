@@ -118,7 +118,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	if elapsed := time.Since(began); elapsed < 4*time.Second {
 		t.Errorf("two runs on one slot finished in %s, so they overlapped", elapsed)
 	}
-	if !strings.Contains(outputs[1], "waiting for a token") || !strings.Contains(outputs[1], "go test ./...") ||
+	if !strings.Contains(outputs[1], "waiting for a token") || !strings.Contains(outputs[1], "go test -vet=all ./...") ||
 		!strings.Contains(outputs[1], "after waiting") {
 		t.Errorf("the second run did not say it waited and for whom:\n%s", outputs[1])
 	}
@@ -130,7 +130,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	if err == nil || !strings.Contains(output, "never passes -count=1") || strings.Contains(output, "tested") {
 		t.Errorf("a -count=1 whole-module run was not refused before running:\n%s", output)
 	}
-	if output, err := run("-count=1", "./internal/edit"); err != nil || !strings.Contains(output, "tested test -count=1 ./internal/edit") {
+	if output, err := run("-count=1", "./internal/edit"); err != nil || !strings.Contains(output, "tested test -vet=all -count=1 ./internal/edit") {
 		t.Errorf("a -count=1 run of one package was held back:\n%s (%v)", output, err)
 	}
 }
@@ -282,10 +282,10 @@ func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
 	if own == 19 {
 		t.Skip("this test already runs at nice 19, the most a run can lower itself, so lowering cannot be seen")
 	}
-	if nice, asked := niceOf("./internal/edit"); nice != 19 || asked != "test ./internal/edit" {
-		t.Errorf("a default run's go ran at nice %d asked %q, want nice 19 asked %q", nice, asked, "test ./internal/edit")
+	if nice, asked := niceOf("./internal/edit"); nice != 19 || asked != "test -vet=all ./internal/edit" {
+		t.Errorf("a default run's go ran at nice %d asked %q, want nice 19 asked %q", nice, asked, "test -vet=all ./internal/edit")
 	}
-	if nice, asked := niceOf("--full-priority", "./internal/edit"); nice != own || asked != "test ./internal/edit" {
+	if nice, asked := niceOf("--full-priority", "./internal/edit"); nice != own || asked != "test -vet=all ./internal/edit" {
 		t.Errorf("a --full-priority run's go ran at nice %d asked %q, want this test's own nice %d and the flag left out", nice, asked, own)
 	}
 }
@@ -387,7 +387,7 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 		t.Errorf("at most %d ran at once on a two-token pool, want 2:\n%s", most, contents)
 	}
 	for name, want := range map[string]string{
-		"test":  "flags=-p=4 threads=3 test ./internal/edit",
+		"test":  "flags=-p=4 threads=3 test -vet=all ./internal/edit",
 		"build": "flags=-p=4 threads=3 build ./command/cohere",
 		"vet":   "flags=-p=4 threads=3 vet ./...",
 		"exec":  "flags=-p=4 threads=3 --flag",
@@ -396,7 +396,7 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 			t.Errorf("%s ran with %q, want a token of the two and %q", name, got, want)
 		}
 	}
-	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 threads=5 test ./internal/edit") {
+	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 threads=5 test -vet=all ./internal/edit") {
 		t.Errorf("a run already under a token did not run in its parent's share:\n%s", contents)
 	}
 }

@@ -120,8 +120,12 @@ func run(verb string, arguments []string) int {
 		})
 	}
 
-	if len(arguments) > 0 && arguments[0] == "--fast" {
+	fast := len(arguments) > 0 && arguments[0] == "--fast"
+	if fast {
 		arguments = arguments[1:]
+	}
+	arguments = withEveryVetCheck(arguments)
+	if fast {
 		// The fast tier rests on Go's test cache, and runs nearly every package, so -count=1 here is the
 		// costliest run there is on a loaded machine (@system_cohere_build's catch).
 		if countsOnce(arguments) {
@@ -149,6 +153,18 @@ func run(verb string, arguments []string) int {
 	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
 		return goTest(environment, arguments)
 	})
+}
+
+// withEveryVetCheck runs every check go vet runs, the landing gate's set, in a test run's vet, unless the caller
+// chose a -vet of their own. go test runs a curated subset by default, which leaves out composites: 130
+// unkeyed literals of another package's struct passed cohere-dev test and failed plain go vet (#kr2yp54).
+func withEveryVetCheck(arguments []string) []string {
+	for _, argument := range arguments {
+		if argument == "-vet" || argument == "--vet" || strings.HasPrefix(argument, "-vet=") || strings.HasPrefix(argument, "--vet=") {
+			return arguments
+		}
+	}
+	return append([]string{"-vet=all"}, arguments...)
 }
 
 // withoutFlag returns the arguments with every copy of flag removed, and whether there was one, so a flag of
