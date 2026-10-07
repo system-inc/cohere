@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
@@ -454,13 +455,5 @@ func hasPrettierIgnore(path *astPath) bool {
 
 // trim and trimEnd are JavaScript's String.prototype.trim and trimEnd: they strip ECMAScript WhiteSpace
 // and LineTerminator, which is not the set Go's strings.TrimSpace strips (U+FEFF is in it, U+0085 not).
-func trim(value string) string    { return strings.TrimFunc(value, isJavaScriptWhitespace) }
-func trimEnd(value string) string { return strings.TrimRightFunc(value, isJavaScriptWhitespace) }
-
-func isJavaScriptWhitespace(character rune) bool {
-	switch character {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF:
-		return true
-	}
-	return character >= 0x2000 && character <= 0x200A
-}
+func trim(value string) string    { return strings.TrimFunc(value, ecmascripttext.IsWhitespace) }
+func trimEnd(value string) string { return strings.TrimRightFunc(value, ecmascripttext.IsWhitespace) }
