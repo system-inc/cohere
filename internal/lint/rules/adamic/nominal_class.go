@@ -48,7 +48,9 @@ var (
  * parameters and `this`, to the reference's arguments, through instantiateType.
  *
  * The rule owns a class instance whole, so it does not descend into one, and invariant-mutable does not
- * either: one hole, one finding.
+ * either: one hole, one finding. A subclass is accepted, which is right for the value and not for a mutable
+ * slot holding it: `Dog[]` seen as `Animal[]` is invariant-mutable's, which judges the slot and leaves a pair
+ * this rule reports (nominalReports).
  *
  * # No fix
  *
@@ -157,6 +159,13 @@ func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *
 		return verdict
 	}
 	return nominalNotAnInstance
+}
+
+// nominalReports is a pair this rule reports: a source that is no instance of the target's class, or one with other
+// type arguments.
+func nominalReports(typeChecker *checker.Checker, source *checker.Type, target *checker.Type) bool {
+	verdict := nominalVerdict(typeChecker, source, target)
+	return verdict == nominalNotAnInstance || verdict == nominalTypeArgumentsDiffer
 }
 
 // typeArgumentsVerdict judges an instance of the target's own class: every type argument identical.

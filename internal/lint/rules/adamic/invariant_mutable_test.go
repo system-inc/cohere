@@ -324,6 +324,65 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 	}
 }
 
+// classAnimals is the vocabulary with classes, which nominal-class judges as values and this rule as what a slot
+// holds (#5y54eyj).
+const classAnimals = `
+class Animal { name: string; constructor(name: string) { this.name = name; } }
+class Dog extends Animal { bark(): string { return this.name; } }
+class Box<Item> { item: Item; constructor(item: Item) { this.item = item; } }
+declare const rex: Dog;
+`
+
+// TestInvariantMutableFiresWhereASlotHoldsAClassInstance: #5y54eyj, class-probe.tgz. nominal-class accepts a Dog as an
+// Animal, rightly for the value, so the slot holding it is this rule's; tsc 6.0.3 accepts each, and Node throws
+// `bark is not a function`.
+func TestInvariantMutableFiresWhereASlotHoldsAClassInstance(t *testing.T) {
+	t.Parallel()
+	for name, fixture := range map[string]struct {
+		source string
+		span   string
+		id     string
+	}{
+		// plain-class-array
+		"an array's element": {classAnimals + `const dogs: Dog[] = [rex]; const all: Animal[] = dogs;`, "dogs", "mutableWidening"},
+		// c2-property
+		"a mutable property": {classAnimals + `const kennel: { pet: Dog } = { pet: rex }; const pen: { pet: Animal } = kennel;`, "kennel", "mutableWidening"},
+		// c3-map
+		"a map's value": {classAnimals + `const dogs = new Map<string, Dog>(); const all: Map<string, Animal> = dogs;`, "dogs", "mutableWidening"},
+		// c5-readonly-made-writable
+		"a read-only slot made writable": {classAnimals + `declare const view: { readonly pet: Animal }; const pen: { pet: Animal } = view;`, "view", "readonlyMadeWritable"},
+		// c4-method-parameter
+		"a method's parameter": {classAnimals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(dog: Dog) { dog.bark(); } };`, "put", "methodParameterNarrowed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := runAdamic(t, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(t, result, fixture.id)
+			expectSpans(t, fixture.source, result, fixture.span)
+		})
+	}
+}
+
+// TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead: #5y54eyj's near-misses, and the pair nominal-class
+// reports itself.
+func TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		// n1, n2, n3
+		"a readonly array":    classAnimals + `const dogs: Dog[] = [rex]; const all: readonly Animal[] = dogs;`,
+		"the same class":      classAnimals + `const dogs: Dog[] = [rex]; const same: Dog[] = dogs;`,
+		"a fresh array":       classAnimals + `const all: Animal[] = [rex];`,
+		"a readonly property": classAnimals + `const kennel: { pet: Dog } = { pet: rex }; const pen: { readonly pet: Animal } = kennel;`,
+		// n4: Box<Dog> is no Box<Animal>, which is nominal-class's finding on the same pair.
+		"another type argument": classAnimals + `const boxes: Box<Dog>[] = [new Box(rex)]; const all: Box<Animal>[] = boxes;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		})
+	}
+}
+
 // TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
 func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
 	t.Parallel()

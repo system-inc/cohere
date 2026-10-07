@@ -64,7 +64,11 @@ var (
  * no-optional-widening's.
  *
  * A class instance is nominal-class's: it requires identical type arguments, which covers every mutable
- * part, so this rule does not descend into one and the two rules never report one hole twice.
+ * part, so this rule does not descend into one. The slot that holds one is this rule's (#5y54eyj): nominal-class
+ * rightly accepts a Dog as an Animal, which is the value, and `Dog[]` seen as `Animal[]` is still a cat written
+ * into the dogs, a TypeError in Node whether the animals are interfaces or classes. Where nominal-class reports
+ * the pair itself, a value that is no instance or one with other type arguments, this rule leaves it, so the
+ * two rules never report one hole twice.
  *
  * # No fix
  *
@@ -84,25 +88,28 @@ var InvariantMutable = rule.Rule{
 		walker := flow.WalkerFor(ctx)
 		// Made once per file, not per site: a judge made per site was a closure per site (#m6tyg79).
 		judge := func(pair flow.Pair) (bool, bool) {
-			if isClassInstance(pair.Target) {
-				return false, false
-			}
+			// What a class instance is, is nominal-class's, so the walk does not go into one. The slot holding it
+			// is still judged here, as any slot is (#5y54eyj).
+			descend := !isClassInstance(pair.Target)
 			// A method's parameter is written by the caller, so whatever the wider type passes must be something
 			// the method reads: the target's parameter type (the pair's Source) assignable to the source's. tsc
 			// compares a method's parameters both ways (#gvzdft9 shape 5); a function's it already checks one way
 			// under strictFunctionTypes, so only a method's are judged here.
 			if pair.MethodParameter {
-				return !walker.IsAssignable(pair.Source, pair.Target), true
+				return !walker.IsAssignable(pair.Source, pair.Target), descend
 			}
 			if !pair.Mutable {
-				return false, true
-			}
-			if readonlyMadeWritable(ctx.Program, pair) {
-				return true, true
+				return false, descend
 			}
 			// Writing through the wider type stores a target value where the original reads a source
 			// value, so every target value must be a source value too.
-			return !walker.IsAssignable(pair.Target, pair.Source), true
+			wrong := readonlyMadeWritable(ctx.Program, pair) || !walker.IsAssignable(pair.Target, pair.Source)
+			if wrong && !descend && nominalReports(typeChecker, pair.Source, pair.Target) {
+				// Not an instance of the class, or one with other type arguments: nominal-class's finding, on
+				// this pair, and one hole is one finding.
+				return false, false
+			}
+			return wrong, descend
 		}
 		return walker.Listeners(func(site flow.Site) {
 			// Object intersections are this rule's to pair, and no other's (#b9a0wgy).
