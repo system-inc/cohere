@@ -30,6 +30,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/cohere/internal/lint/linter"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/rules/adamic"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
 )
 
@@ -37,6 +38,10 @@ import (
 var allowed = map[string]rule.Rule{
 	// For Adamic's stage 3, which accepts import cycles in module order and refuses only a read at load.
 	nexus.CorrectnessNoImportCycleLoadTimeRead.Name: nexus.CorrectnessNoImportCycleLoadTimeRead,
+	// For Adamic's lowering, which refused these holes in a copy of its own until cohere's rules took every one
+	// that is real (#xjdce2d step 4, ruled by @system_cohere). What Adamic can't represent stays its own refusal.
+	adamic.InvariantMutable.Name: adamic.InvariantMutable,
+	adamic.NominalClass.Name:     adamic.NominalClass,
 }
 
 // Finding is one finding, named as cohere's own `--json` output names it: the rule, the file, the 1-based
