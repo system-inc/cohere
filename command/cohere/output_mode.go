@@ -88,8 +88,7 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) r
 		Message:   singleLineDescription(diagnostic.Message.Description),
 	}
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
-		line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Range.Pos())
-		finding.Path, finding.Line, finding.Column = sourceFile.FileName().AsString(), line+1, character+1
+		finding.Path, finding.Line, finding.Column = diagnostic.Location()
 		if lintConfig != nil {
 			if setting, named := lintConfig.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
 				setting.Severity == configuration.SeverityWarn {

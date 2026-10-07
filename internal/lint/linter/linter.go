@@ -43,12 +43,16 @@ func LintFile(
 	// Listeners are collected before walking so the tree is traversed once for all rules rather
 	// than once per rule.
 	combined := make(map[ast.Kind][]func(node *ast.Node))
+	// One cache per file, shared by the file's rules, as the walk gives them: a rule that derives from the
+	// file through rule.Cached finds one here too.
+	fileCache := rule.NewFileCache()
 	for _, subject := range rules {
 		currentRule := subject
 		context := rule.Context{
 			SourceFile:  sourceFile,
 			Program:     rule.ViewProgram(program, sourceFile, currentRule),
 			TypeChecker: typeChecker,
+			FileCache:   fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name
 				if diagnostic.SourceFile == nil {
