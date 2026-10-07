@@ -2,6 +2,7 @@ package high_level_intermediate_representation
 
 import (
 	"fmt"
+	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 			t.Run(testCase.name+"/"+functionName, func(t *testing.T) {
 				t.Parallel()
 				function, ranges := rangesFor(t, fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding))
-				var mutationOrder EvaluationOrder
+				var mutationOrder static_single_assignment.EvaluationOrder
 				calls := 0
 				for _, instruction := range function.Instructions {
 					if instruction != nil {

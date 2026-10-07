@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestValidatePreservedManualMemoizationFiresAndStaysSilent is the baseline.
@@ -17,7 +18,7 @@ import (
 func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 	t.Parallel()
 
-	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
+	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 7}}
 
 	// The value's scope did not survive: it is memoized in source and not in output.
 	lost := &ReactiveFunction{Body: ReactiveBlock{
@@ -110,7 +111,7 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 	t.Parallel()
 
-	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 8}}
+	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 8}}
 
 	// Scope 9 survived and absorbed scope 8, which is where the value lives.
 	tree := &ReactiveFunction{Body: ReactiveBlock{
@@ -145,7 +146,7 @@ func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
 	t.Parallel()
 
-	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{
+	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{
 		1: 7, // outer value, scope did not survive
 		2: 8, // inner value, scope did not survive
 	}}
@@ -173,7 +174,7 @@ func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
 func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) {
 	t.Parallel()
 
-	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
+	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 7}}
 
 	pruned := &ReactiveFunction{Body: ReactiveBlock{
 		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
@@ -200,7 +201,7 @@ func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
 	t.Parallel()
 
 	// No entry for identifier 1, so ScopeOf answers zero.
-	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{}}
+	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{}}
 
 	tree := &ReactiveFunction{Body: ReactiveBlock{
 		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
@@ -220,7 +221,7 @@ func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
 }
 
 // memoStatement wraps a memo marker as a tree statement at the given order.
-func memoStatement(order EvaluationOrder, value InstructionValue) ReactiveStatement {
+func memoStatement(order static_single_assignment.EvaluationOrder, value InstructionValue) ReactiveStatement {
 	return &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{
 		Order: order,
 		Value: &ReactiveInstructionValue{Value: value},

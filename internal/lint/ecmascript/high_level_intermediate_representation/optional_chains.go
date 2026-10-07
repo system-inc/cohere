@@ -18,11 +18,13 @@
 // `CompareManualMemoDependencies` compares the marker strictly against what the developer wrote.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // OptionalChainSidemap is what one traversal recovered, upstream's three outputs.
 type OptionalChainSidemap struct {
 	// TemporariesReadInOptional maps a temporary written inside an optional chain to the full
 	// dependency path it represents, with optionality recorded per step.
-	TemporariesReadInOptional map[IdentifierId]ReactiveScopeDependency
+	TemporariesReadInOptional map[static_single_assignment.IdentifierId]ReactiveScopeDependency
 
 	// ProcessedInstructions are the StoreLocal instructions this pass consumed. Property-load
 	// lvalues are deferred through TemporariesReadInOptional, while test terminals are recorded in
@@ -33,18 +35,18 @@ type OptionalChainSidemap struct {
 	// optional chain's test. Upstream records the terminal itself (`processedInstrsInOptional` is
 	// typed `Instruction | Terminal`) and skips its operand walk; keying by block is the same claim
 	// in an IR where terminals have no stable id.
-	ProcessedOptionalTests map[BlockId]bool
+	ProcessedOptionalTests map[static_single_assignment.BlockId]bool
 
 	// HoistableObjects records, per optional block, a base whose further property loads are safe to
 	// read unconditionally. Set only for a non-optional link riding an outer chain, which is the
 	// `.c` in `a?.b.c`.
-	HoistableObjects map[BlockId]ReactiveScopeDependency
+	HoistableObjects map[static_single_assignment.BlockId]ReactiveScopeDependency
 }
 
 // optionalTraversal is the mutable state of one walk. Upstream's `OptionalTraversalContext`.
 type optionalTraversal struct {
 	function *Function
-	seen     map[BlockId]bool
+	seen     map[static_single_assignment.BlockId]bool
 	result   *OptionalChainSidemap
 }
 
@@ -55,17 +57,17 @@ type optionalTraversal struct {
 // computed links remain on the residual path declared by DependencyGapOptionalChains.
 func CollectOptionalChainSidemap(function *Function) *OptionalChainSidemap {
 	result := &OptionalChainSidemap{
-		TemporariesReadInOptional: map[IdentifierId]ReactiveScopeDependency{},
+		TemporariesReadInOptional: map[static_single_assignment.IdentifierId]ReactiveScopeDependency{},
 		ProcessedInstructions:     map[InstructionId]bool{},
-		ProcessedOptionalTests:    map[BlockId]bool{},
-		HoistableObjects:          map[BlockId]ReactiveScopeDependency{},
+		ProcessedOptionalTests:    map[static_single_assignment.BlockId]bool{},
+		HoistableObjects:          map[static_single_assignment.BlockId]ReactiveScopeDependency{},
 	}
 	if function == nil {
 		return result
 	}
 	traversal := &optionalTraversal{
 		function: function,
-		seen:     map[BlockId]bool{},
+		seen:     map[static_single_assignment.BlockId]bool{},
 		result:   result,
 	}
 	traversal.traverseFunction()
@@ -132,8 +134,8 @@ func recordOptionalChainJoinPhis(function *Function, result *OptionalChainSidema
 // optionalChainJoinBlocks returns the fallthroughs at which optional short-circuit arms rejoin.
 // Phi projection is valid only at these blocks; a later control-flow join may have one optional
 // operand without itself representing that optional chain.
-func optionalChainJoinBlocks(function *Function) map[BlockId]bool {
-	result := map[BlockId]bool{}
+func optionalChainJoinBlocks(function *Function) map[static_single_assignment.BlockId]bool {
+	result := map[static_single_assignment.BlockId]bool{}
 	if function == nil {
 		return result
 	}
@@ -161,11 +163,11 @@ func (t *optionalTraversal) traverseFunction() {
 
 // optionalTestMatch is what `matchOptionalTestBlock` recovers from a branch's consequent.
 type optionalTestMatch struct {
-	consequentId   IdentifierId
+	consequentId   static_single_assignment.IdentifierId
 	property       string
-	propertyId     IdentifierId
+	propertyId     static_single_assignment.IdentifierId
 	storeLocalId   InstructionId
-	consequentGoto BlockId
+	consequentGoto static_single_assignment.BlockId
 }
 
 // matchOptionalTestBlock matches the consequent and alternate of an optional's test.
@@ -233,7 +235,7 @@ func (t *optionalTraversal) matchOptionalTestBlock(branch *Branch) *optionalTest
 // Returns the identifier the chain's value was stored into, or zero when any part of it is not a
 // plain property-load chain. Upstream's `traverseOptionalBlock` (`:240`).
 func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
-	outerAlternate *BlockId) IdentifierId {
+	outerAlternate *static_single_assignment.BlockId) static_single_assignment.IdentifierId {
 	t.seen[block.Id] = true
 	terminal, isOptional := block.Terminal.(*Optional)
 	if !isOptional {
@@ -246,7 +248,7 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 
 	var baseObject ReactiveScopeDependency
 	var test *Branch
-	var testBlockId BlockId
+	var testBlockId static_single_assignment.BlockId
 
 	switch testTerminal := maybeTest.Terminal.(type) {
 	case *Branch:

@@ -109,6 +109,6 @@ func Construct(function *Function) {
 // `Phi.Operands` is kept sorted by predecessor block id, so this is its predecessor ids in that
 // order, read straight off the slice. `TestLowerIsDeterministic` in lower_corpus_test.go is what
 // catches output that varies between runs.
-func PhiOperandsInOrder(phi *Phi) []BlockId {
+func PhiOperandsInOrder(phi *Phi) []static_single_assignment.BlockId {
 	return static_single_assignment.PhiOperandsInOrder(phi)
 }

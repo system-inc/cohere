@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"sort"
 	"testing"
 )
@@ -27,7 +28,7 @@ func TestControlDominatorsFindsTheDecidingBranch(t *testing.T) {
 	// Every branching terminal counts, so the guarded block is controlled and the others are not.
 	controlled := ControlDominators(function, func(Place) bool { return true })
 
-	var controlledBlocks, freeBlocks []BlockId
+	var controlledBlocks, freeBlocks []static_single_assignment.BlockId
 	for _, block := range function.Blocks {
 		if controlled(block.Id) {
 			controlledBlocks = append(controlledBlocks, block.Id)
@@ -99,11 +100,11 @@ func TestControlDominatorsIsEmptyWithoutBranches(t *testing.T) {
 func TestControlDominatorsIsNilSafe(t *testing.T) {
 	t.Parallel()
 
-	if ControlDominators(nil, func(Place) bool { return true })(BlockId(1)) {
+	if ControlDominators(nil, func(Place) bool { return true })(static_single_assignment.BlockId(1)) {
 		t.Error("a nil function reported a controlled block")
 	}
 	function := lowerSource(t, "function Component(x) { return x; }")
-	if ControlDominators(function, nil)(BlockId(1)) {
+	if ControlDominators(function, nil)(static_single_assignment.BlockId(1)) {
 		t.Error("a nil predicate reported a controlled block")
 	}
 }

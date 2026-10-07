@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched is the sibling of
 // `TestCopyNestedBodyLeavesTheNestedFunctionUntouched`, and it exists because that test's shape was
@@ -49,7 +52,7 @@ func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
 		instruction InstructionId
 		index       int
 	}
-	before := map[key]IdentifierId{}
+	before := map[key]static_single_assignment.IdentifierId{}
 	for id, instruction := range nested.Instructions {
 		if instruction == nil {
 			continue

@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // mergeWithReversedEndOrder is the merge sweep with `sortByEndDescending` INVERTED.
 //
@@ -18,7 +21,7 @@ func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *Merg
 	state.starts, state.ends = collectScopeInfo(function, scopes)
 	memberRanges := scopes.MemberRanges()
 
-	visit := func(id EvaluationOrder) {
+	visit := func(id static_single_assignment.EvaluationOrder) {
 		state.visits++
 		if len(state.ends) > 0 && state.ends[len(state.ends)-1].position <= id {
 			top := state.ends[len(state.ends)-1]

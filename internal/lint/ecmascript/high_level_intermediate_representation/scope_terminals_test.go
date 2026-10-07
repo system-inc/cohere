@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // terminalsFor lowers one source, runs the full scope pipeline, and builds the terminals.
@@ -101,13 +102,13 @@ func TestScopeTerminalIsReachableThroughFallthrough(t *testing.T) {
 	}
 
 	// The body is a real edge; the fallthrough is not.
-	var successors []BlockId
-	EachSuccessor(terminal, func(id BlockId) { successors = append(successors, id) })
+	var successors []static_single_assignment.BlockId
+	EachSuccessor(terminal, func(id static_single_assignment.BlockId) { successors = append(successors, id) })
 	if len(successors) != 1 || successors[0] != 3 {
 		t.Errorf("EachSuccessor gave %v, want [3]: the fallthrough must not be an edge", successors)
 	}
-	var withFallthrough []BlockId
-	EachSuccessorAndFallthrough(terminal, func(id BlockId) {
+	var withFallthrough []static_single_assignment.BlockId
+	EachSuccessorAndFallthrough(terminal, func(id static_single_assignment.BlockId) {
 		withFallthrough = append(withFallthrough, id)
 	})
 	if len(withFallthrough) != 2 {
@@ -234,7 +235,7 @@ func (o overlappingIdentity) GroupOf(scope ScopeId) ScopeId { return scope }
 func (o overlappingIdentity) RangeOf(scope ScopeId) MutableRange {
 	// Staircase: each scope starts one later and ends far past the previous end, so consecutive
 	// scopes overlap and neither contains the other.
-	return MutableRange{Start: EvaluationOrder(scope), End: EvaluationOrder(scope) + 10}
+	return MutableRange{Start: static_single_assignment.EvaluationOrder(scope), End: static_single_assignment.EvaluationOrder(scope) + 10}
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +420,7 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
 		t.Errorf("the rewrite left %d single-assignment violations: %v", len(violations), violations)
 	}
 
-	byId := map[BlockId]*BasicBlock{}
+	byId := map[static_single_assignment.BlockId]*BasicBlock{}
 	for _, block := range function.Blocks {
 		if byId[block.Id] != nil {
 			t.Fatalf("duplicate block id %d after the rewrite", block.Id)
@@ -431,7 +432,7 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
 			t.Errorf("block %d has no terminal after the rewrite", block.Id)
 			continue
 		}
-		EachSuccessorAndFallthrough(block.Terminal, func(id BlockId) {
+		EachSuccessorAndFallthrough(block.Terminal, func(id static_single_assignment.BlockId) {
 			if byId[id] == nil {
 				t.Errorf("block %d names block %d, which is not in the graph", block.Id, id)
 			}
@@ -473,7 +474,7 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 	}
 
 	// Every fallthrough named by a Scope terminal must be reached by a Goto with variant Break.
-	fallthroughs := map[BlockId]bool{}
+	fallthroughs := map[static_single_assignment.BlockId]bool{}
 	for _, terminal := range scopeTerminalsIn(function) {
 		fallthroughs[terminal.Fallthrough] = true
 	}
@@ -528,7 +529,7 @@ func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
 
 	// Every instruction and terminal must carry a real position, and positions must increase across
 	// the block slice, which is what reverse postorder plus renumbering guarantees together.
-	var previous EvaluationOrder
+	var previous static_single_assignment.EvaluationOrder
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			order := function.Instructions[instructionId].Order
@@ -666,7 +667,7 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
 							built += result.Built
 
 							seen := map[ScopeId]bool{}
-							byId := map[BlockId]*BasicBlock{}
+							byId := map[static_single_assignment.BlockId]*BasicBlock{}
 							for _, block := range function.Blocks {
 								byId[block.Id] = block
 							}

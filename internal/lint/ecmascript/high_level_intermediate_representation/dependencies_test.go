@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // dependenciesFor lowers one source and runs the whole scope pipeline over it.
@@ -293,7 +294,7 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 			"truncates it to the root", len(truncated[0].Path))
 	}
 
-	hoistable := newDependencyTree(map[IdentifierId]*hoistableNode{
+	hoistable := newDependencyTree(map[static_single_assignment.IdentifierId]*hoistableNode{
 		7: {nonNull: true, properties: map[string]*hoistableNode{
 			"alpha": {nonNull: true, properties: map[string]*hoistableNode{}},
 		}},
@@ -317,7 +318,7 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
 	t.Parallel()
 
-	hoistable := map[IdentifierId]*hoistableNode{
+	hoistable := map[static_single_assignment.IdentifierId]*hoistableNode{
 		7: {nonNull: true, properties: map[string]*hoistableNode{
 			"a": {nonNull: true, properties: map[string]*hoistableNode{}},
 		}},
@@ -411,8 +412,8 @@ func TestDependencyCollectionIsASinglePass(t *testing.T) {
 	collector := &dependencyCollector{
 		function:      function,
 		temporaries:   collectTemporaries(function, usedOutside),
-		declarations:  map[DeclarationId]declaration{},
-		reassignments: map[IdentifierId]declaration{},
+		declarations:  map[static_single_assignment.DeclarationId]declaration{},
+		reassignments: map[static_single_assignment.IdentifierId]declaration{},
 		objectMethods: objectMethodValues(function),
 		result:        &ScopeDependencies{},
 		scopeRange:    identity.RangeOf,
@@ -474,14 +475,14 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 		t.Fatal("the traversal recorded no scope-end blocks, so this test measured nothing")
 	}
 
-	collect := func(infos map[BlockId]scopeBlockInfo) int {
+	collect := func(infos map[static_single_assignment.BlockId]scopeBlockInfo) int {
 		usedOutside := findTemporariesUsedOutsideDeclaringScope(function, infos)
 		result := &ScopeDependencies{}
 		collector := &dependencyCollector{
 			function:      function,
 			temporaries:   collectTemporaries(function, usedOutside),
-			declarations:  map[DeclarationId]declaration{},
-			reassignments: map[IdentifierId]declaration{},
+			declarations:  map[static_single_assignment.DeclarationId]declaration{},
+			reassignments: map[static_single_assignment.IdentifierId]declaration{},
 			objectMethods: objectMethodValues(function),
 			result:        result,
 			scopeRange:    identity.RangeOf,
@@ -494,7 +495,7 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 		return total
 	}
 
-	beginsOnly := map[BlockId]scopeBlockInfo{}
+	beginsOnly := map[static_single_assignment.BlockId]scopeBlockInfo{}
 	for id, info := range terminals {
 		if info.begins {
 			beginsOnly[id] = info
@@ -765,9 +766,9 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name        string
-		lastUsedAt  EvaluationOrder
+		lastUsedAt  static_single_assignment.EvaluationOrder
 		recorded    bool
-		scopeEnd    EvaluationOrder
+		scopeEnd    static_single_assignment.EvaluationOrder
 		wantRemoved int
 	}{
 		{name: "last used before the scope ends", lastUsedAt: 5, recorded: true, scopeEnd: 10, wantRemoved: 1},
@@ -778,9 +779,9 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			dependencies := &ScopeDependencies{
-				declarations: map[ScopeId][]IdentifierId{1: {1}},
+				declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}},
 			}
-			usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{}}
+			usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}}
 			if testCase.recorded {
 				usage.byDeclaration[declaration] = testCase.lastUsedAt
 			}
@@ -801,7 +802,7 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 	if nilTable.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
 		t.Error("a nil table removed something")
 	}
-	live := &ScopeDependencies{declarations: map[ScopeId][]IdentifierId{1: {1}}}
+	live := &ScopeDependencies{declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}}}
 	if live.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
 		t.Error("a nil usage table removed something; missing information must keep declarations")
 	}

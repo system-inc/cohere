@@ -107,6 +107,8 @@
 // a `Function` is the unit every other pass in this package takes. See `ScopeId`.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // ScopeId names one reactive scope within one function.
 //
 // Upstream draws these from a counter on the Environment, so a scope id is unique across every
@@ -169,9 +171,9 @@ func ScopeGaps() []ScopeGap {
 //
 // The zero value is an empty table and is ready to read: every lookup answers "no scope".
 type ReactiveScopes struct {
-	byIdentifier map[IdentifierId]ScopeId
+	byIdentifier map[static_single_assignment.IdentifierId]ScopeId
 	ranges       map[ScopeId]MutableRange
-	members      map[ScopeId][]IdentifierId
+	members      map[ScopeId][]static_single_assignment.IdentifierId
 	order        []ScopeId
 }
 
@@ -180,7 +182,7 @@ type ReactiveScopes struct {
 // A value that never entered an equivalence class has no scope, which is upstream's `null` and is
 // the ordinary answer for most values: 26,962 of a corpus function's values are members and the
 // rest are not. Zero rather than a second return because zero is not a valid ScopeId.
-func (s *ReactiveScopes) ScopeOf(id IdentifierId) ScopeId {
+func (s *ReactiveScopes) ScopeOf(id static_single_assignment.IdentifierId) ScopeId {
 	if s == nil || s.byIdentifier == nil {
 		return 0
 	}
@@ -202,7 +204,7 @@ func (s *ReactiveScopes) RangeOf(scope ScopeId) MutableRange {
 //
 // The slice is the table's own and must not be modified by a caller. Sorted because
 // `DisjointSet.Sets` sorts, and the order is load-bearing for determinism rather than cosmetic.
-func (s *ReactiveScopes) MembersOf(scope ScopeId) []IdentifierId {
+func (s *ReactiveScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
 	if s == nil || s.members == nil {
 		return nil
 	}
@@ -267,9 +269,9 @@ func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set
 		return scopes
 	}
 
-	scopes.byIdentifier = map[IdentifierId]ScopeId{}
+	scopes.byIdentifier = map[static_single_assignment.IdentifierId]ScopeId{}
 	scopes.ranges = map[ScopeId]MutableRange{}
-	scopes.members = map[ScopeId][]IdentifierId{}
+	scopes.members = map[ScopeId][]static_single_assignment.IdentifierId{}
 
 	// Ids start at 1 because zero is the absent scope. Upstream starts at 0 and distinguishes
 	// absence with `null`; `ScopeOf` returns a bare ScopeId, so the sentinel has to be a value.
@@ -351,7 +353,7 @@ func AssignReactiveScopesWithSets(function *Function, ranges *MutableRanges, set
 		scopes.ranges[scope] = hull
 		// Copied rather than aliased: `Sets` returns the table's own slice and a caller holding
 		// `MembersOf` must not be able to reach back into the disjoint set through it.
-		members := make([]IdentifierId, len(class))
+		members := make([]static_single_assignment.IdentifierId, len(class))
 		copy(members, class)
 		scopes.members[scope] = members
 		scopes.order = append(scopes.order, scope)
@@ -406,7 +408,7 @@ func ValidateScopes(function *Function, scopes *ReactiveScopes) []ScopeId {
 		return nil
 	}
 
-	var maxInstruction EvaluationOrder
+	var maxInstruction static_single_assignment.EvaluationOrder
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue

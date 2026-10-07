@@ -38,6 +38,8 @@
 // them, and the dependency collector must see the pruned flag rather than discover the scope alive.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // FlattenReactiveLoops marks every reactive scope that begins inside a loop as pruned.
 //
 // Returns the scope ids it flattened, so a caller can assert the pass did something rather than
@@ -60,7 +62,7 @@ func FlattenReactiveLoops(function *Function) map[ScopeId]bool {
 	// scoped "we are inside a loop right now" flag that costs no dominator computation: a loop's
 	// fallthrough is by construction the first block after the whole construct, so arriving there is
 	// the same event as leaving the loop.
-	activeLoops := map[BlockId]bool{}
+	activeLoops := map[static_single_assignment.BlockId]bool{}
 	activeLoopCount := 0
 
 	for _, block := range function.Blocks {

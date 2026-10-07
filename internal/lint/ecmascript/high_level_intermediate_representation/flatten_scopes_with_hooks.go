@@ -27,6 +27,8 @@
 // not the only one: useMutationState's shape reported with a bare `useSyncExternalStore` import too.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // FlattenScopesWithHooksOrUse flattens every reactive scope a hook call or `use` sits in.
 //
 // Returns the scope ids it pruned, for `BuildReactiveFunctionWithFlattenedScopes` to mark, the same
@@ -39,11 +41,11 @@ func FlattenScopesWithHooksOrUse(function *Function) map[ScopeId]bool {
 	}
 
 	type activeScope struct {
-		block         BlockId
-		fallthroughId BlockId
+		block         static_single_assignment.BlockId
+		fallthroughId static_single_assignment.BlockId
 	}
 	var activeScopes []activeScope
-	var prune []BlockId
+	var prune []static_single_assignment.BlockId
 
 	for _, block := range function.Blocks {
 		if block == nil {

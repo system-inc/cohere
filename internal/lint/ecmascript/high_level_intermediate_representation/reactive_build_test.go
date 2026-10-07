@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"testing"
 )
 
@@ -112,7 +113,7 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 			}
 
 			graphOptionals := 0
-			joinPhis := map[IdentifierId]bool{}
+			joinPhis := map[static_single_assignment.IdentifierId]bool{}
 			for _, block := range function.Blocks {
 				if terminal, ok := block.Terminal.(*Optional); ok {
 					graphOptionals++
@@ -137,7 +138,7 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 			}
 
 			values, statementIfs := 0, 0
-			defined := map[IdentifierId]bool{}
+			defined := map[static_single_assignment.IdentifierId]bool{}
 			VisitReactiveFunction(tree, ReactiveVisitor{
 				Instruction: func(instruction *ReactiveInstruction, traverse func()) {
 					if instruction.LValue != nil {
@@ -145,7 +146,7 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 					}
 					traverse()
 				},
-				Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+				Value: func(_ static_single_assignment.EvaluationOrder, value ReactiveValue, traverse func()) {
 					if optional, ok := value.(*ReactiveOptionalValue); ok {
 						values++
 						if _, ok := optional.Value.(*ReactiveSequenceValue); !ok {
@@ -196,7 +197,7 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 			}
 
 			graphTernaries := 0
-			joinPhis := map[IdentifierId]bool{}
+			joinPhis := map[static_single_assignment.IdentifierId]bool{}
 			for _, block := range function.Blocks {
 				if terminal, ok := block.Terminal.(*Ternary); ok {
 					graphTernaries++
@@ -220,7 +221,7 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 			}
 
 			values, statementIfs := 0, 0
-			defined := map[IdentifierId]bool{}
+			defined := map[static_single_assignment.IdentifierId]bool{}
 			VisitReactiveFunction(tree, ReactiveVisitor{
 				Instruction: func(instruction *ReactiveInstruction, traverse func()) {
 					if instruction.LValue != nil {
@@ -228,7 +229,7 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 					}
 					traverse()
 				},
-				Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+				Value: func(_ static_single_assignment.EvaluationOrder, value ReactiveValue, traverse func()) {
 					if conditional, ok := value.(*ReactiveTernaryValue); ok {
 						values++
 						if conditional.Test == nil || conditional.Consequent == nil || conditional.Alternate == nil {
@@ -306,7 +307,7 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 
 	treeArrays, treeLogicals := 0, 0
 	VisitReactiveFunction(tree, ReactiveVisitor{
-		Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+		Value: func(_ static_single_assignment.EvaluationOrder, value ReactiveValue, traverse func()) {
 			switch shape := value.(type) {
 			case *ReactiveLogicalValue:
 				treeLogicals++
@@ -455,7 +456,7 @@ func hasScopeTerminalInLoopValueBlock(function *Function) bool {
 	if function == nil {
 		return false
 	}
-	var valueBlocks []BlockId
+	var valueBlocks []static_single_assignment.BlockId
 	for _, block := range function.Blocks {
 		switch terminal := block.Terminal.(type) {
 		case *While:

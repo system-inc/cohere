@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // TestMergeCollapsesTheRegionTheSpliceCreated is the pass's reason for existing.
 //
@@ -104,7 +107,7 @@ func TestMergeLeavesTheGraphResolvable(t *testing.T) {
 		t.Fatal("nothing merged, so the repointing this test guards never ran")
 	}
 
-	held := map[BlockId]bool{}
+	held := map[static_single_assignment.BlockId]bool{}
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -123,7 +126,7 @@ func TestMergeLeavesTheGraphResolvable(t *testing.T) {
 		if block == nil {
 			continue
 		}
-		EachBlockReferencePointer(block.Terminal, func(reference *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(reference *static_single_assignment.BlockId) {
 			references++
 			if !held[*reference] {
 				t.Errorf("block %d names block %d, which was merged away and not repointed",
@@ -235,7 +238,7 @@ func TestMergeLeavesAJoinBlockAlone(t *testing.T) {
 			inlined)
 	}
 
-	joins := map[BlockId]int{}
+	joins := map[static_single_assignment.BlockId]int{}
 	branches := 0
 	for _, block := range function.Blocks {
 		if block == nil {

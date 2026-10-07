@@ -38,19 +38,6 @@ package high_level_intermediate_representation
 
 import "github.com/system-inc/cohere/static_single_assignment"
 
-// SSAViolation is one broken invariant.
-type SSAViolation = static_single_assignment.SSAViolation
-
-// SSAViolationKind is which of the two invariants a violation breaks.
-type SSAViolationKind = static_single_assignment.SSAViolationKind
-
-const (
-	// SSAViolationMultipleDefinitions is a value written more than once.
-	SSAViolationMultipleDefinitions = static_single_assignment.SSAViolationMultipleDefinitions
-	// SSAViolationUseNotDominated is a use the definition does not dominate.
-	SSAViolationUseNotDominated = static_single_assignment.SSAViolationUseNotDominated
-)
-
 // VerifySSA checks that a function is in single static assignment form and returns every violation.
 //
 // An empty result means the property holds. It does NOT mean the function was worth checking: a
@@ -58,30 +45,23 @@ const (
 // passes trivially. `SSAStats` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySSA(function *Function) []SSAViolation {
+func VerifySSA(function *Function) []static_single_assignment.SSAViolation {
 	if function == nil {
 		return nil
 	}
 	return static_single_assignment.VerifySSA(ssaGraph{}, function)
 }
 
-// SSAStats counts what a verification actually had to look at. An empty violation list is exactly
-// what a vacuous check returns, so a caller reporting a clean run should report these alongside it.
-type SSAStats = static_single_assignment.SSAStats
-
 // CollectSSAStats measures one function.
-func CollectSSAStats(function *Function) SSAStats {
+func CollectSSAStats(function *Function) static_single_assignment.SSAStats {
 	if function == nil {
-		return SSAStats{}
+		return static_single_assignment.SSAStats{}
 	}
 	return static_single_assignment.CollectSSAStats(ssaGraph{}, function)
 }
 
-// dominanceTree is the immediate-dominator array over Function.Blocks, by position in that slice.
-type dominanceTree = static_single_assignment.Dominance
-
 // computeDominance runs Cooper-Harvey-Kennedy over the function's blocks, which are already in
 // reverse postorder with unreachable blocks removed.
-func computeDominance(function *Function) *dominanceTree {
+func computeDominance(function *Function) *static_single_assignment.Dominance {
 	return static_single_assignment.ComputeDominance(ssaGraph{}, function)
 }

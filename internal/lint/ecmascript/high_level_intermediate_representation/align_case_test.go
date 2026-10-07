@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // alignCase describes a minimal graph exercising one alignment mechanism.
 //
@@ -13,19 +16,19 @@ type alignCase struct {
 	scope MutableRange
 	// terminalId is the evaluation order of the construct's terminal, which is the position the
 	// fallthrough pop minimises a start back to.
-	terminalId EvaluationOrder
+	terminalId static_single_assignment.EvaluationOrder
 	// useAt is where the scoped value is read. Placing it inside the arm rather than the entry block
 	// is what keeps the scope active when the sweep reaches the fallthrough.
-	useAt EvaluationOrder
+	useAt static_single_assignment.EvaluationOrder
 	// fallthroughs is the evaluation order of the fallthrough block's first instruction, which is
 	// the position the fallthrough push widens an end out to.
-	fallthroughs EvaluationOrder
+	fallthroughs static_single_assignment.EvaluationOrder
 }
 
 // buildAlignCase builds the case with an `If` terminal, which is the ordinary widening shape.
 func buildAlignCase(t *testing.T, testCase alignCase) (*Function, *ReactiveScopes) {
 	t.Helper()
-	return buildAlignCaseWithTerminal(t, testCase, func(fallthroughBlock BlockId) Terminal {
+	return buildAlignCaseWithTerminal(t, testCase, func(fallthroughBlock static_single_assignment.BlockId) Terminal {
 		return &If{
 			Consequent:  2,
 			Alternate:   fallthroughBlock,
@@ -38,19 +41,19 @@ func buildAlignCase(t *testing.T, testCase alignCase) (*Function, *ReactiveScope
 // buildAlignCaseWithTerminal builds the case with a caller-supplied terminal, so that one graph can
 // be run with the terminal kind as the only variable. That is what isolates the branch exclusion.
 func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
-	makeTerminal func(fallthroughBlock BlockId) Terminal) (*Function, *ReactiveScopes) {
+	makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) (*Function, *ReactiveScopes) {
 	t.Helper()
 
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)
 	scopes := &ReactiveScopes{
-		byIdentifier: map[IdentifierId]ScopeId{},
+		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
 		ranges:       map[ScopeId]MutableRange{1: testCase.scope},
-		members:      map[ScopeId][]IdentifierId{},
+		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:        []ScopeId{1},
 	}
 
-	nextIdentifier := IdentifierId(1)
+	nextIdentifier := static_single_assignment.IdentifierId(1)
 	place := func(inScope bool) Place {
 		id := nextIdentifier
 		nextIdentifier++
@@ -62,7 +65,7 @@ func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
 		return Place{Identifier: id}
 	}
 
-	emit := func(block *BasicBlock, order EvaluationOrder, use Place) {
+	emit := func(block *BasicBlock, order static_single_assignment.EvaluationOrder, use Place) {
 		instruction := &Instruction{
 			Id:     InstructionId(len(function.Instructions)),
 			Order:  order,
@@ -121,15 +124,15 @@ func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)
 	scopes := &ReactiveScopes{
-		byIdentifier: map[IdentifierId]ScopeId{},
+		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
 		// The scope opens at the read and closes after the inner continuation, so it is still active
 		// at the goto and has not been retired by the activity filter.
 		ranges:  map[ScopeId]MutableRange{1: {21, 31}},
-		members: map[ScopeId][]IdentifierId{},
+		members: map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:   []ScopeId{1},
 	}
 
-	nextIdentifier := IdentifierId(1)
+	nextIdentifier := static_single_assignment.IdentifierId(1)
 	place := func(inScope bool) Place {
 		id := nextIdentifier
 		nextIdentifier++
@@ -140,7 +143,7 @@ func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 		}
 		return Place{Identifier: id}
 	}
-	emit := func(block *BasicBlock, order EvaluationOrder, use Place) {
+	emit := func(block *BasicBlock, order static_single_assignment.EvaluationOrder, use Place) {
 		instruction := &Instruction{
 			Id:     InstructionId(len(function.Instructions)),
 			Order:  order,
@@ -196,13 +199,13 @@ func buildInnermostGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)
 	scopes := &ReactiveScopes{
-		byIdentifier: map[IdentifierId]ScopeId{},
+		byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{},
 		ranges:       map[ScopeId]MutableRange{1: {7, 9}},
-		members:      map[ScopeId][]IdentifierId{},
+		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 		order:        []ScopeId{1},
 	}
 
-	nextIdentifier := IdentifierId(1)
+	nextIdentifier := static_single_assignment.IdentifierId(1)
 	place := func(inScope bool) Place {
 		id := nextIdentifier
 		nextIdentifier++
@@ -213,7 +216,7 @@ func buildInnermostGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 		}
 		return Place{Identifier: id}
 	}
-	emit := func(block *BasicBlock, order EvaluationOrder, use Place) {
+	emit := func(block *BasicBlock, order static_single_assignment.EvaluationOrder, use Place) {
 		instruction := &Instruction{
 			Id:     InstructionId(len(function.Instructions)),
 			Order:  order,

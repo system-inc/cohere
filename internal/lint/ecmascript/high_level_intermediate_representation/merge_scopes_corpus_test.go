@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // forEachCorpusFunction lowers every outermost function-like in the corpus and hands it to visit,
@@ -60,8 +61,8 @@ func forEachCorpusFunction(t *testing.T, limit int,
 
 // nestingItem is one entry in upstream's `assertValidBlockNesting` item list.
 type nestingItem struct {
-	start EvaluationOrder
-	end   EvaluationOrder
+	start static_single_assignment.EvaluationOrder
+	end   static_single_assignment.EvaluationOrder
 }
 
 // scopeNestingItems turns a scope range table into nesting items.
@@ -83,7 +84,7 @@ func scopeNestingItems(ranges map[ScopeId]MutableRange) []nestingItem {
 // (bundle lines 20956-20967): for every block with a fallthrough, the span from that block's
 // terminal to the first instruction of the fallthrough.
 func programBlockSubtrees(function *Function) []nestingItem {
-	byId := map[BlockId]*BasicBlock{}
+	byId := map[static_single_assignment.BlockId]*BasicBlock{}
 	for _, block := range function.Blocks {
 		if block != nil {
 			byId[block.Id] = block
@@ -103,7 +104,7 @@ func programBlockSubtrees(function *Function) []nestingItem {
 		if fallthroughBlock == nil {
 			continue
 		}
-		var end EvaluationOrder
+		var end static_single_assignment.EvaluationOrder
 		if len(fallthroughBlock.Instructions) > 0 {
 			if first := function.Instructions[fallthroughBlock.Instructions[0]]; first != nil {
 				end = first.Order

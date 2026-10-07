@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 // TestReversePostorderKeepsLoopBodyBeforeContinuation pins the ordering that mutable ranges read.
 //
@@ -23,7 +26,7 @@ func TestReversePostorderKeepsLoopBodyBeforeContinuation(t *testing.T) {
 
 	type location struct {
 		block int
-		order EvaluationOrder
+		order static_single_assignment.EvaluationOrder
 	}
 	locations := map[string]location{}
 	for blockIndex, block := range function.Blocks {

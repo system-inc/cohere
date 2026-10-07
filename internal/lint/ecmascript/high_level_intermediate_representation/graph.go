@@ -65,7 +65,7 @@ func MarkEvaluationOrder(function *Function) {
 	static_single_assignment.MarkEvaluationOrder(ssaGraph{}, function)
 }
 
-func setTerminalOrder(terminal Terminal, order EvaluationOrder) {
+func setTerminalOrder(terminal Terminal, order static_single_assignment.EvaluationOrder) {
 	switch t := terminal.(type) {
 	case *Return:
 		t.Order = order
@@ -120,7 +120,7 @@ func setTerminalOrder(terminal Terminal, order EvaluationOrder) {
 // visitor this package already has, so the passes see exactly what they read before they moved.
 type ssaGraph struct{}
 
-func (ssaGraph) Entry(function *Function) BlockId { return function.Entry }
+func (ssaGraph) Entry(function *Function) static_single_assignment.BlockId { return function.Entry }
 
 func (ssaGraph) BlockBound(function *Function) int {
 	// Ids are bounded by `nextBlock`, and by the largest id in the table for a function built by
@@ -134,13 +134,15 @@ func (ssaGraph) BlockBound(function *Function) int {
 	return bound
 }
 
-func (ssaGraph) Block(function *Function, id BlockId) (*BasicBlock, bool) { return function.Block(id) }
+func (ssaGraph) Block(function *Function, id static_single_assignment.BlockId) (*BasicBlock, bool) {
+	return function.Block(id)
+}
 
 func (ssaGraph) Blocks(function *Function) []*BasicBlock { return function.Blocks }
 
 func (ssaGraph) SetBlocks(function *Function, blocks []*BasicBlock) { function.Blocks = blocks }
 
-func (ssaGraph) Retain(function *Function, keep func(id BlockId) bool) {
+func (ssaGraph) Retain(function *Function, keep func(id static_single_assignment.BlockId) bool) {
 	for id := range function.blocksById {
 		if !keep(id) {
 			delete(function.blocksById, id)
@@ -153,17 +155,19 @@ func (ssaGraph) Placeholder(function *Function, block *BasicBlock) *BasicBlock {
 		Id:           block.Id,
 		Kind:         block.Kind,
 		Terminal:     &Unreachable{},
-		Predecessors: append([]BlockId(nil), block.Predecessors...),
+		Predecessors: append([]static_single_assignment.BlockId(nil), block.Predecessors...),
 	}
 	function.blocksById[block.Id] = placeholder
 	return placeholder
 }
 
-func (ssaGraph) Id(block *BasicBlock) BlockId { return block.Id }
+func (ssaGraph) Id(block *BasicBlock) static_single_assignment.BlockId { return block.Id }
 
-func (ssaGraph) Predecessors(block *BasicBlock) []BlockId { return block.Predecessors }
+func (ssaGraph) Predecessors(block *BasicBlock) []static_single_assignment.BlockId {
+	return block.Predecessors
+}
 
-func (ssaGraph) SetPredecessors(block *BasicBlock, predecessors []BlockId) {
+func (ssaGraph) SetPredecessors(block *BasicBlock, predecessors []static_single_assignment.BlockId) {
 	block.Predecessors = predecessors
 }
 
@@ -174,7 +178,7 @@ func (ssaGraph) SetPhis(block *BasicBlock, phis []*Phi) { block.Phis = phis }
 // EachEdge reports the structural fallthrough first, then EachSuccessor's real edges in its order,
 // with MaybeThrow's handler marked exceptional. Try's handler is a real edge: it leaves the block
 // holding the Try, before the try body runs, so nothing in that block can throw on the way.
-func (ssaGraph) EachEdge(block *BasicBlock, visit func(successor BlockId, edge static_single_assignment.Edge)) {
+func (ssaGraph) EachEdge(block *BasicBlock, visit func(successor static_single_assignment.BlockId, edge static_single_assignment.Edge)) {
 	if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
 		visit(fallthroughBlock, static_single_assignment.Fallthrough)
 	}
@@ -182,7 +186,7 @@ func (ssaGraph) EachEdge(block *BasicBlock, visit func(successor BlockId, edge s
 	if maybeThrow, ok := block.Terminal.(*MaybeThrow); ok {
 		handler = maybeThrow.Handler
 	}
-	EachSuccessor(block.Terminal, func(successor BlockId) {
+	EachSuccessor(block.Terminal, func(successor static_single_assignment.BlockId) {
 		if HasBlock(handler) && successor == handler {
 			visit(successor, static_single_assignment.Exceptional)
 			return
@@ -216,7 +220,7 @@ func (ssaGraph) ContextStoreDefines(function *Function, block *BasicBlock, index
 	return place.Identifier == function.Instructions[block.Instructions[index]].LValue.Identifier
 }
 
-func (ssaGraph) SetInstructionOrder(function *Function, block *BasicBlock, index int, order EvaluationOrder) {
+func (ssaGraph) SetInstructionOrder(function *Function, block *BasicBlock, index int, order static_single_assignment.EvaluationOrder) {
 	function.Instructions[block.Instructions[index]].Order = order
 }
 
@@ -226,7 +230,7 @@ func (ssaGraph) EachTerminalPlace(block *BasicBlock, visit func(place *Place, ro
 	})
 }
 
-func (ssaGraph) SetTerminalOrder(block *BasicBlock, order EvaluationOrder) {
+func (ssaGraph) SetTerminalOrder(block *BasicBlock, order static_single_assignment.EvaluationOrder) {
 	setTerminalOrder(block.Terminal, order)
 }
 
@@ -234,11 +238,11 @@ func (ssaGraph) Params(function *Function) []Place { return function.Params }
 
 func (ssaGraph) Returns(function *Function) *Place { return &function.Returns }
 
-func (ssaGraph) Declaration(function *Function, identifier IdentifierId) DeclarationId {
+func (ssaGraph) Declaration(function *Function, identifier static_single_assignment.IdentifierId) static_single_assignment.DeclarationId {
 	return function.Identifiers[identifier].Declaration
 }
 
-func (ssaGraph) Contextual(function *Function, declaration DeclarationId) bool {
+func (ssaGraph) Contextual(function *Function, declaration static_single_assignment.DeclarationId) bool {
 	return function.ContextDeclarations[declaration]
 }
 
@@ -247,24 +251,26 @@ func (ssaGraph) Contextual(function *Function, declaration DeclarationId) bool {
 // The DeclarationId is preserved, which is the whole point: after renaming, "which variable is
 // this" is answered by the declaration and "which value is this" by the identifier, and a pass can
 // ask either.
-func (ssaGraph) Mint(function *Function, original IdentifierId) IdentifierId {
+func (ssaGraph) Mint(function *Function, original static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
 	source := function.Identifiers[original]
 	return function.NewIdentifier(source.Name, source.Node, source.Declaration).Id
 }
 
-func (ssaGraph) Named(function *Function, identifier IdentifierId) bool {
+func (ssaGraph) Named(function *Function, identifier static_single_assignment.IdentifierId) bool {
 	return function.Identifiers[identifier].Name != ""
 }
 
-func (ssaGraph) PlaceString(function *Function, identifier IdentifierId) string {
+func (ssaGraph) PlaceString(function *Function, identifier static_single_assignment.IdentifierId) string {
 	return function.PlaceString(Place{Identifier: identifier})
 }
 
-func (ssaGraph) IdentifierOf(place Place) IdentifierId { return place.Identifier }
+func (ssaGraph) IdentifierOf(place Place) static_single_assignment.IdentifierId {
+	return place.Identifier
+}
 
 // WithIdentifier keeps the place's effect, reactivity and range, which is what every renamed place
 // and phi operand carried before the passes moved.
-func (ssaGraph) WithIdentifier(place Place, identifier IdentifierId) Place {
+func (ssaGraph) WithIdentifier(place Place, identifier static_single_assignment.IdentifierId) Place {
 	place.Identifier = identifier
 	return place
 }

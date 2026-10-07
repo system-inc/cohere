@@ -27,6 +27,8 @@
 // not have known it, and it runs here.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // PruneNonReactiveDependencies removes scope dependencies that cannot change between renders.
 //
 // Returns how many it removed. The `reactive` set is seeded from `Place.Reactive` and then grown by
@@ -42,7 +44,7 @@ func PruneNonReactiveDependencies(tree *ReactiveFunction, function *Function,
 	pruner := nonReactivePruner{
 		function:     function,
 		dependencies: dependencies,
-		reactive:     map[IdentifierId]bool{},
+		reactive:     map[static_single_assignment.IdentifierId]bool{},
 	}
 	// The seed: every place lowering marked reactive. Read off the graph rather than the tree,
 	// because `Place.Reactive` is written per reference and the graph holds every reference.
@@ -71,7 +73,7 @@ func PruneNonReactiveDependencies(tree *ReactiveFunction, function *Function,
 type nonReactivePruner struct {
 	function     *Function
 	dependencies *ScopeDependencies
-	reactive     map[IdentifierId]bool
+	reactive     map[static_single_assignment.IdentifierId]bool
 	// seeded is how many identifiers the seed contributed, before propagation.
 	seeded int
 	pruned int

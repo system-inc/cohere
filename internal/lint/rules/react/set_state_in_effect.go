@@ -8,6 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 var messageSetStateInEffect = rule.Message{
@@ -312,7 +313,7 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 
 	// Value to the Place that made it a setter. Upstream's `setStateFunctions`, keyed the same way.
 	// Single-assignment form is what lets this be one entry per value rather than per binding.
-	setStateFunctions := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
+	setStateFunctions := map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place{}
 
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -416,10 +417,10 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 func handleEffectCall(
 	ctx rule.Context,
 	function *high_level_intermediate_representation.Function,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	callee high_level_intermediate_representation.Place,
 	args []high_level_intermediate_representation.Argument,
-	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) {
 	firstArgument, hasFirst := firstIdentifierArgument(args)
 	if !hasFirst {
@@ -450,14 +451,14 @@ func handleEffectCall(
 func findSetStateCall(
 	ctx rule.Context,
 	function *high_level_intermediate_representation.Function,
-	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) (high_level_intermediate_representation.Place, bool) {
 	if function == nil {
 		return high_level_intermediate_representation.Place{}, false
 	}
 
-	refDerived := map[high_level_intermediate_representation.IdentifierId]bool{}
-	local := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
+	refDerived := map[static_single_assignment.IdentifierId]bool{}
+	local := map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place{}
 	for id, place := range setStateFunctions {
 		local[id] = place
 	}
@@ -685,9 +686,9 @@ func instructionReadsRefDerived(instruction *high_level_intermediate_representat
 func translateAcrossCaptures(
 	value *high_level_intermediate_representation.FunctionExpression,
 	nested *high_level_intermediate_representation.Function,
-	outer map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
-) map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place {
-	inner := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
+	outer map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
+) map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place {
+	inner := map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place{}
 	if value == nil || nested == nil {
 		return inner
 	}
@@ -708,7 +709,7 @@ func translateAcrossCaptures(
 // included: `const {height = fallback} = ref.current...` binds `height` from a ref on the path where
 // the property exists, and a pass that skipped the default would exempt the one path and not the
 // other, which is a distinction upstream does not draw either.
-func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, refDerived map[high_level_intermediate_representation.IdentifierId]bool) {
+func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, refDerived map[static_single_assignment.IdentifierId]bool) {
 	switch shape := pattern.(type) {
 	case *high_level_intermediate_representation.PlacePattern:
 		refDerived[shape.Place.Identifier] = true
@@ -765,7 +766,7 @@ func markPatternRefDerived(pattern high_level_intermediate_representation.Patter
 // standard, and a reader comparing the two implementations should find the same test in both. Both
 // spread fixtures are also kept, in `TestSetStateInEffectSpreadArgument`, since they assert real
 // upstream behaviour even though they cannot see this particular branch.
-func firstIdentifierArgument(args []high_level_intermediate_representation.Argument) (high_level_intermediate_representation.IdentifierId, bool) {
+func firstIdentifierArgument(args []high_level_intermediate_representation.Argument) (static_single_assignment.IdentifierId, bool) {
 	if len(args) == 0 || args[0].Spread {
 		return 0, false
 	}
@@ -781,7 +782,7 @@ func anyOperandIsSetter(
 	ctx rule.Context,
 	function *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
-	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) bool {
 	for _, capture := range value.Captures {
 		if _, known := setStateFunctions[capture.Identifier]; known {
@@ -813,7 +814,7 @@ func isSetterPlace(
 	ctx rule.Context,
 	function *high_level_intermediate_representation.Function,
 	place high_level_intermediate_representation.Place,
-	known map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+	known map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) bool {
 	if _, ok := known[place.Identifier]; ok {
 		return true
@@ -967,7 +968,7 @@ func setStateInEffectNestedFunction(function *high_level_intermediate_representa
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass, which is why this rule needs no type inference.
-func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
+func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}

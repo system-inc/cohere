@@ -25,7 +25,10 @@
 // running it afterwards inlines a body whose damage has already been recorded.
 package high_level_intermediate_representation
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/static_single_assignment"
+)
 
 // InlineImmediatelyInvokedFunctionExpressions splices every inlinable IIFE in function into its
 // caller, and reports how many it spliced.
@@ -124,7 +127,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 	// The values that `DropManualMemoization` marked as the result of a memo call. See
 	// `memoizedResults` for why they are excluded, and the wrapper above for why a caller may ask
 	// for them anyway.
-	memoized := map[IdentifierId]bool{}
+	memoized := map[static_single_assignment.IdentifierId]bool{}
 	if !includeMemoCallbacks {
 		memoized = memoizedResults(function)
 	}
@@ -132,7 +135,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 	inlined := 0
 	// The callee temporaries of the calls that were spliced. Their defining
 	// `FunctionExpression` instructions are dead afterwards and are dropped below.
-	spliced := map[IdentifierId]bool{}
+	spliced := map[static_single_assignment.IdentifierId]bool{}
 	// Copy the block list first. The splice appends blocks to `function.Blocks` as it runs, and a
 	// range over the live slice would walk into blocks the splice just created. The continuation
 	// block is pushed back on deliberately, because a second IIFE later in the same statement is
@@ -142,7 +145,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 	// Upstream keeps this map for the whole function. A function expression and its call do not
 	// have to share a block: lowering an argument such as an optional-chain dependency can put CFG
 	// blocks between the definition and the rewritten zero-argument memo call.
-	functions := map[IdentifierId]*FunctionExpression{}
+	functions := map[static_single_assignment.IdentifierId]*FunctionExpression{}
 
 	for position := 0; position < len(queue); position++ {
 		block := queue[position]
@@ -232,8 +235,8 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 // guarded wrapper is still useful: focused transformation tests can assert that ordinary IIFEs are
 // selected without silently selecting rewritten memos too, and callers that have not erased memo
 // ownership can request that distinction explicitly.
-func memoizedResults(function *Function) map[IdentifierId]bool {
-	results := map[IdentifierId]bool{}
+func memoizedResults(function *Function) map[static_single_assignment.IdentifierId]bool {
+	results := map[static_single_assignment.IdentifierId]bool{}
 	for _, instruction := range function.Instructions {
 		if instruction == nil {
 			continue
@@ -251,7 +254,7 @@ func memoizedResults(function *Function) map[IdentifierId]bool {
 // from `Function.Instructions`, because that table is indexed by id and every other block's ids
 // index into it; blanking an entry would leave a hole a later `function.Instructions[id]` reads as
 // nil, which several passes here do not expect.
-func dropSplicedFunctionExpressions(function *Function, spliced map[IdentifierId]bool) {
+func dropSplicedFunctionExpressions(function *Function, spliced map[static_single_assignment.IdentifierId]bool) {
 	if len(spliced) == 0 {
 		return
 	}
@@ -371,7 +374,7 @@ func returnedPlace(function *Function, block *BasicBlock, terminal *Return) Plac
 	return terminal.Value
 }
 
-func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation BlockId,
+func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation static_single_assignment.BlockId,
 	result Place, node *ast.Node, direct bool) {
 	for _, blockId := range remap.Blocks {
 		block, found := function.Block(blockId)
@@ -457,7 +460,7 @@ func nestedFunctionOf(function *Function, expression *FunctionExpression) *Funct
 // of one -- passed as an argument, stored into an object, returned -- means the value escapes, and
 // a splice would then leave the escaped reference pointing at a function whose body also runs
 // inline. Upstream deletes on every operand of every non-call instruction for this reason.
-func forgetFunctionOperands(value InstructionValue, functions map[IdentifierId]*FunctionExpression) {
+func forgetFunctionOperands(value InstructionValue, functions map[static_single_assignment.IdentifierId]*FunctionExpression) {
 	if len(functions) == 0 {
 		return
 	}

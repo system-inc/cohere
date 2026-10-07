@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // lowerSource parses one function out of source and lowers it.
@@ -85,7 +86,7 @@ func checkInvariants(t *testing.T, function *Function) {
 		if block.Terminal == nil {
 			continue
 		}
-		EachSuccessor(block.Terminal, func(id BlockId) {
+		EachSuccessor(block.Terminal, func(id static_single_assignment.BlockId) {
 			if _, ok := function.Block(id); !ok {
 				t.Errorf("bb%d names successor bb%d, which does not exist", block.Id, id)
 			}
@@ -94,20 +95,20 @@ func checkInvariants(t *testing.T, function *Function) {
 
 	// Predecessors agree with successors in both directions. A one-way disagreement is exactly what
 	// makes single-assignment construction mint a wrong phi.
-	forward := map[BlockId]map[BlockId]bool{}
+	forward := map[static_single_assignment.BlockId]map[static_single_assignment.BlockId]bool{}
 	for _, block := range function.Blocks {
 		if block.Terminal == nil {
 			continue
 		}
-		EachSuccessor(block.Terminal, func(id BlockId) {
+		EachSuccessor(block.Terminal, func(id static_single_assignment.BlockId) {
 			if forward[id] == nil {
-				forward[id] = map[BlockId]bool{}
+				forward[id] = map[static_single_assignment.BlockId]bool{}
 			}
 			forward[id][block.Id] = true
 		})
 	}
 	for _, block := range function.Blocks {
-		recorded := map[BlockId]bool{}
+		recorded := map[static_single_assignment.BlockId]bool{}
 		for _, predecessor := range block.Predecessors {
 			recorded[predecessor] = true
 			if _, ok := function.Block(predecessor); !ok {
@@ -127,7 +128,7 @@ func checkInvariants(t *testing.T, function *Function) {
 	}
 
 	// Evaluation order is assigned and strictly increasing across the block order.
-	previous := EvaluationOrder(0)
+	previous := static_single_assignment.EvaluationOrder(0)
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			order := function.Instructions[instructionId].Order
@@ -398,7 +399,7 @@ func TestLowerSwitch(t *testing.T) {
 	}
 	caseCId := switchTerminal.Cases[2].Block
 	reaches := false
-	EachSuccessor(caseB.Terminal, func(id BlockId) {
+	EachSuccessor(caseB.Terminal, func(id static_single_assignment.BlockId) {
 		if id == caseCId {
 			reaches = true
 		}
@@ -434,7 +435,7 @@ func TestLowerSwitchWithoutDefaultCanSkipEveryCase(t *testing.T) {
 			continue
 		}
 		reachesFallthrough := false
-		EachSuccessor(switchTerminal, func(id BlockId) {
+		EachSuccessor(switchTerminal, func(id static_single_assignment.BlockId) {
 			if id == switchTerminal.Fallthrough {
 				reachesFallthrough = true
 			}
@@ -549,7 +550,7 @@ func TestLowerLogicalIsControlFlow(t *testing.T) {
 	}
 
 	// The call must not be in the same block as the test: if it were, it would look unconditional.
-	var testBlock, callBlock BlockId
+	var testBlock, callBlock static_single_assignment.BlockId
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			if global, ok := function.Instructions[instructionId].Value.(*LoadGlobal); ok {
@@ -793,9 +794,9 @@ func TestLowerShorthandPropertyReadsLocalBinding(t *testing.T) {
 	`)[0]
 	checkInvariants(t, function)
 
-	var local IdentifierId
+	var local static_single_assignment.IdentifierId
 	localFound := false
-	var shorthandValue IdentifierId
+	var shorthandValue static_single_assignment.IdentifierId
 	shorthandFound := false
 	for _, instruction := range function.Instructions {
 		switch value := instruction.Value.(type) {
@@ -1002,7 +1003,7 @@ func TestFallthroughIsNotAnEdge(t *testing.T) {
 		if !ok {
 			continue
 		}
-		EachSuccessor(ifTerminal, func(id BlockId) {
+		EachSuccessor(ifTerminal, func(id static_single_assignment.BlockId) {
 			if id == ifTerminal.Fallthrough {
 				t.Error("EachSuccessor yielded the fallthrough of an if with both arms; it is not an edge")
 			}
@@ -1041,7 +1042,7 @@ func TestEachSuccessorAndFallthroughReachesTheJoin(t *testing.T) {
 			continue
 		}
 		reached := false
-		EachSuccessorAndFallthrough(ifTerminal, func(id BlockId) {
+		EachSuccessorAndFallthrough(ifTerminal, func(id static_single_assignment.BlockId) {
 			if id == ifTerminal.Fallthrough {
 				reached = true
 			}

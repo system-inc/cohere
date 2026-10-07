@@ -1,6 +1,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"strings"
 	"testing"
 )
@@ -29,7 +30,7 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 			t.Parallel()
 			state := newAliasingState()
 			for index, kind := range []EffectValueKind{testCase.left, testCase.right} {
-				place := Place{Identifier: IdentifierId(index + 1)}
+				place := Place{Identifier: static_single_assignment.IdentifierId(index + 1)}
 				state.create(place, aliasingNodeObject)
 				if kind != EffectValueMutable {
 					state.markImmutable(place.Identifier, kind)
@@ -38,7 +39,7 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 			phi := &Phi{Place: Place{Identifier: 3}, Operands: PhiOperands{
 				{Predecessor: 1, Place: Place{Identifier: 1}}, {Predecessor: 2, Place: Place{Identifier: 2}},
 			}}
-			state.derivePhiImmutable(phi, map[BlockId]bool{1: true, 2: !testCase.unseen})
+			state.derivePhiImmutable(phi, map[static_single_assignment.BlockId]bool{1: true, 2: !testCase.unseen})
 			if got := state.immutable[3]; got != testCase.want {
 				t.Fatalf("phi kind=%s, want %s", got, testCase.want)
 			}
@@ -150,7 +151,7 @@ const unrelated = props.value;
 return {reference, copied, current, nested, selected, unrelated};
 }`)
 	refs := refDerivedValues(function)
-	active := map[IdentifierId]bool{}
+	active := map[static_single_assignment.IdentifierId]bool{}
 	for _, instruction := range function.Instructions {
 		if instruction != nil {
 			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {

@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // The compiled output in a golden names upstream's inferred dependencies, verbatim.
@@ -507,7 +508,7 @@ func isCodegenTemporary(dependency string) bool {
 	return codegenTemporaryPattern.MatchString(dependency)
 }
 
-func identifierName(function *Function, id IdentifierId) string {
+func identifierName(function *Function, id static_single_assignment.IdentifierId) string {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return ""
 	}

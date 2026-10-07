@@ -161,7 +161,10 @@
 // `TestMergeIsDeterministic` runs the pass twice over the corpus and compares.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // MergeGap names a merge rule this pass cannot apply, for a caller that needs to know.
 //
@@ -212,7 +215,7 @@ func MergeGaps() []MergeGap {
 type MergedScopes struct {
 	ranges  map[ScopeId]MutableRange
 	group   map[ScopeId]ScopeId
-	members map[ScopeId][]IdentifierId
+	members map[ScopeId][]static_single_assignment.IdentifierId
 	order   []ScopeId
 	unions  int
 }
@@ -246,7 +249,7 @@ func (m *MergedScopes) RangeOf(scope ScopeId) MutableRange {
 // through a merge, sorted.
 //
 // The slice is the table's own and must not be modified by a caller.
-func (m *MergedScopes) MembersOf(scope ScopeId) []IdentifierId {
+func (m *MergedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
 	if m == nil || m.members == nil {
 		return nil
 	}
@@ -371,7 +374,7 @@ func (d *scopeSet) find(item ScopeId) (ScopeId, bool) {
 // by scope id so that the range sorts below are stable under ties, which upstream gets from
 // insertion order.
 type scopesAtPosition struct {
-	position EvaluationOrder
+	position static_single_assignment.EvaluationOrder
 	scopes   []ScopeId
 }
 
@@ -449,8 +452,8 @@ func MergeOverlappingReactiveScopes(function *Function, scopes *ReactiveScopes) 
 // and it is what keeps an unset [0,0) scope out of the sweep entirely, which is what makes the plain
 // min/max widening safe. See the doc comment above.
 func collectScopeInfo(function *Function, scopes *ReactiveScopes) (starts, ends []scopesAtPosition) {
-	startSets := map[EvaluationOrder]map[ScopeId]bool{}
-	endSets := map[EvaluationOrder]map[ScopeId]bool{}
+	startSets := map[static_single_assignment.EvaluationOrder]map[ScopeId]bool{}
+	endSets := map[static_single_assignment.EvaluationOrder]map[ScopeId]bool{}
 
 	record := func(place Place) {
 		scope := scopes.ScopeOf(place.Identifier)
@@ -503,7 +506,7 @@ func collectScopeInfo(function *Function, scopes *ReactiveScopes) (starts, ends 
 // The inner sort is not upstream's -- upstream's `Set` is insertion-ordered and needs no sort. It is
 // here so that the range comparators in the sweep, which are not total orders when two scopes share
 // a start or an end, resolve ties the same way on every run.
-func descendingByPosition(sets map[EvaluationOrder]map[ScopeId]bool) []scopesAtPosition {
+func descendingByPosition(sets map[static_single_assignment.EvaluationOrder]map[ScopeId]bool) []scopesAtPosition {
 	out := make([]scopesAtPosition, 0, len(sets))
 	for position, set := range sets {
 		list := make([]ScopeId, 0, len(set))
@@ -523,7 +526,7 @@ func descendingByPosition(sets map[EvaluationOrder]map[ScopeId]bool) []scopesAtP
 // Ends are processed before starts, which is upstream's order and is load-bearing: a scope ending at
 // exactly the position another starts must leave the stack before the new one is pushed, or the two
 // would appear to be simultaneously active and union spuriously.
-func (s *mergeSweepState) visitInstructionId(id EvaluationOrder) {
+func (s *mergeSweepState) visitInstructionId(id static_single_assignment.EvaluationOrder) {
 	s.visits++
 
 	if len(s.ends) > 0 && s.ends[len(s.ends)-1].position <= id {
@@ -608,7 +611,7 @@ func (s *mergeSweepState) visitInstructionId(id EvaluationOrder) {
 // This is the event with no counterpart in a pairwise-overlap model, and it is where most of the
 // extra unions come from. A value read while its own scope is open but buried under a scope that
 // opened later means the two genuinely interleave, even when their ranges nest perfectly.
-func (s *mergeSweepState) visitPlace(id EvaluationOrder, place Place, scopes *ReactiveScopes,
+func (s *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes,
 	memberRanges *MutableRanges) {
 	placeScope := activeScopeOf(id, place, scopes)
 	if placeScope == 0 {
@@ -630,7 +633,7 @@ func (s *mergeSweepState) visitPlace(id EvaluationOrder, place Place, scopes *Re
 //
 // A place whose scope has already closed answers zero, which is upstream's `null`. Half-open, so
 // the start is inside and the end is not, matching `MutableRange.Contains`.
-func activeScopeOf(id EvaluationOrder, place Place, scopes *ReactiveScopes) ScopeId {
+func activeScopeOf(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes) ScopeId {
 	scope := scopes.ScopeOf(place.Identifier)
 	if scope == 0 {
 		return 0
@@ -663,7 +666,7 @@ func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{
 		ranges:  map[ScopeId]MutableRange{},
 		group:   map[ScopeId]ScopeId{},
-		members: map[ScopeId][]IdentifierId{},
+		members: map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
 
 	for _, scope := range scopes.Ids() {

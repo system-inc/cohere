@@ -17,6 +17,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestCopyNestedBodyLeavesNoUnresolvedReference is the guard the whole file exists for.
@@ -48,12 +49,12 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
 	// Every identifier the parent already owns. A copied instruction naming one of these that is
 	// NOT a capture means the remap was skipped and the id happened to be in range, which is the
 	// failure an in-range check cannot see.
-	preexisting := map[IdentifierId]bool{}
+	preexisting := map[static_single_assignment.IdentifierId]bool{}
 	for id := range parent.Identifiers {
-		preexisting[IdentifierId(id)] = true
+		preexisting[static_single_assignment.IdentifierId(id)] = true
 	}
 
-	capturedIdentifiers := map[IdentifierId]bool{}
+	capturedIdentifiers := map[static_single_assignment.IdentifierId]bool{}
 	for _, capture := range captures {
 		capturedIdentifiers[capture.Identifier] = true
 	}
@@ -69,7 +70,7 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
 		t.Error("the parent grew by nothing, so the body was not actually copied in")
 	}
 
-	copiedBlocks := map[BlockId]bool{}
+	copiedBlocks := map[static_single_assignment.BlockId]bool{}
 	for _, mapped := range remap.Blocks {
 		copiedBlocks[mapped] = true
 	}
@@ -108,7 +109,7 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
 				}
 			})
 		}
-		EachBlockReferencePointer(block.Terminal, func(reference *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(reference *static_single_assignment.BlockId) {
 			if _, found := parent.Block(*reference); !found {
 				t.Errorf("block %d has a terminal naming block %d, which the parent does not hold",
 					blockId, *reference)
@@ -218,7 +219,7 @@ func TestCopyNestedBodyPreservesDeclarationEquivalenceClasses(t *testing.T) {
 		t.Fatal("the fixture produced no nested function")
 	}
 
-	classes := map[DeclarationId][]IdentifierId{}
+	classes := map[static_single_assignment.DeclarationId][]static_single_assignment.IdentifierId{}
 	for _, identifier := range nested.Identifiers {
 		if identifier != nil && identifier.Declaration != 0 {
 			classes[identifier.Declaration] = append(classes[identifier.Declaration], identifier.Id)
@@ -240,7 +241,7 @@ func TestCopyNestedBodyPreservesDeclarationEquivalenceClasses(t *testing.T) {
 	if !ok {
 		t.Fatal("the copy declined")
 	}
-	parentClass := map[DeclarationId]DeclarationId{}
+	parentClass := map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{}
 	for nestedDeclaration, identifiers := range classes {
 		for _, identifier := range identifiers {
 			mapped, found := remap.Identifiers[identifier]
@@ -275,8 +276,8 @@ func TestCopyNestedBodyDeclinesOnAContextMismatch(t *testing.T) {
 	}
 }
 
-func sortedBlockIds(set map[BlockId]bool) []BlockId {
-	var ids []BlockId
+func sortedBlockIds(set map[static_single_assignment.BlockId]bool) []static_single_assignment.BlockId {
+	var ids []static_single_assignment.BlockId
 	for id := range set {
 		ids = append(ids, id)
 	}
@@ -366,16 +367,16 @@ func TestCopyNestedBodyLeavesTheNestedFunctionUntouched(t *testing.T) {
 	}
 
 	type reference struct {
-		block BlockId
+		block static_single_assignment.BlockId
 		index int
 	}
-	before := map[reference]BlockId{}
+	before := map[reference]static_single_assignment.BlockId{}
 	for _, block := range nested.Blocks {
 		if block == nil {
 			continue
 		}
 		index := 0
-		EachBlockReferencePointer(block.Terminal, func(target *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(target *static_single_assignment.BlockId) {
 			before[reference{block: block.Id, index: index}] = *target
 			index++
 		})
@@ -394,7 +395,7 @@ func TestCopyNestedBodyLeavesTheNestedFunctionUntouched(t *testing.T) {
 			continue
 		}
 		index := 0
-		EachBlockReferencePointer(block.Terminal, func(target *BlockId) {
+		EachBlockReferencePointer(block.Terminal, func(target *static_single_assignment.BlockId) {
 			key := reference{block: block.Id, index: index}
 			index++
 			if was, ok := before[key]; ok && was != *target {
@@ -470,7 +471,7 @@ func TestCopyNestedBodyMapsEveryPlaceOnce(t *testing.T) {
 			"should and this test could not fail; the fixture no longer overlaps the id ranges")
 	}
 
-	defined := map[IdentifierId]InstructionId{}
+	defined := map[static_single_assignment.IdentifierId]InstructionId{}
 	for _, block := range nested.Blocks {
 		if block == nil {
 			continue

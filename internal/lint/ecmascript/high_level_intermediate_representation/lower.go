@@ -93,6 +93,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // Lower lowers one function to HIR.
@@ -143,9 +144,9 @@ func lowerNested(node *ast.Node, typeChecker *checker.Checker, enclosing *builde
 		function:     function,
 		typeChecker:  typeChecker,
 		enclosing:    enclosing,
-		declarations: map[*ast.Symbol]DeclarationId{},
-		identifiers:  map[*ast.Symbol]IdentifierId{},
-		captured:     map[*ast.Symbol]IdentifierId{},
+		declarations: map[*ast.Symbol]static_single_assignment.DeclarationId{},
+		identifiers:  map[*ast.Symbol]static_single_assignment.IdentifierId{},
+		captured:     map[*ast.Symbol]static_single_assignment.IdentifierId{},
 		contextual:   findContextIdentifiers(node, typeChecker),
 	}
 
@@ -193,9 +194,9 @@ type builder struct {
 	// declarations maps a source symbol to the binding it names, so two references to the same
 	// variable resolve to one DeclarationId. Symbol identity is the checker's answer to scoping,
 	// which is why this does not implement its own scope tree.
-	declarations map[*ast.Symbol]DeclarationId
+	declarations map[*ast.Symbol]static_single_assignment.DeclarationId
 	// identifiers maps a symbol to the value currently held by that binding.
-	identifiers map[*ast.Symbol]IdentifierId
+	identifiers map[*ast.Symbol]static_single_assignment.IdentifierId
 
 	// lastNested is the builder of the most recently lowered nested function.
 	//
@@ -212,7 +213,7 @@ type builder struct {
 	// against the table of the function holding it. The entry is memoised so that two reads of one
 	// captured binding are the same value here, which is what makes single-assignment form over a
 	// nested function meaningful.
-	captured map[*ast.Symbol]IdentifierId
+	captured map[*ast.Symbol]static_single_assignment.IdentifierId
 
 	// contextual is the set of bindings this function shares with the closures inside it, decided
 	// syntactically before lowering. See `context_identifiers.go` for why the question cannot be
@@ -230,7 +231,7 @@ type builder struct {
 	// through try lowering, and retrofitting a stack into a recursive lowering is where off-by-one
 	// scoping bugs come from. `go vet` does not flag a written-and-unread struct field, so this
 	// comment is the only thing that stops the next reader deleting it as dead.
-	handlers []BlockId
+	handlers []static_single_assignment.BlockId
 }
 
 // jumpTarget is one enclosing construct a break or continue can name.
@@ -238,10 +239,10 @@ type jumpTarget struct {
 	// label is the source label, empty for an unlabeled construct.
 	label string
 	// breakBlock is where `break` goes.
-	breakBlock BlockId
+	breakBlock static_single_assignment.BlockId
 	// continueBlock is where `continue` goes. InvalidBlock for a construct that cannot be continued,
 	// such as a switch or a labeled block.
-	continueBlock BlockId
+	continueBlock static_single_assignment.BlockId
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +279,7 @@ func (b *builder) terminateAndEnter(terminal Terminal, next *BasicBlock) {
 }
 
 // gotoBlock closes the current block with an unconditional jump.
-func (b *builder) gotoBlock(target BlockId, variant GotoVariant) {
+func (b *builder) gotoBlock(target static_single_assignment.BlockId, variant GotoVariant) {
 	b.terminateWith(&Goto{Block: target, Variant: variant})
 }
 
@@ -313,7 +314,7 @@ func (b *builder) newTemporary(node *ast.Node) Place {
 //
 // Upstream gets this structurally: its `LogicalExpression` case stores into a single `place` in both
 // arms and construction versions that one binding.
-func (b *builder) newTemporaryUnder(node *ast.Node, shared DeclarationId) Place {
+func (b *builder) newTemporaryUnder(node *ast.Node, shared static_single_assignment.DeclarationId) Place {
 	identifier := b.function.NewIdentifier("", node, shared)
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
@@ -332,7 +333,7 @@ func (b *builder) newTemporaryUnder(node *ast.Node, shared DeclarationId) Place 
 // so whichever value reached a declaration first claimed it and the real binding was dropped with
 // the losing scope stack. A binding whose store sat inside a scope then registered no declaration
 // for it, and `PruneUnusedScopes` removed the scope for declaring nothing.
-func (b *builder) declarationOf(symbol *ast.Symbol) DeclarationId {
+func (b *builder) declarationOf(symbol *ast.Symbol) static_single_assignment.DeclarationId {
 	if symbol == nil {
 		return 0
 	}
@@ -1104,7 +1105,7 @@ func (b *builder) lowerTryStatement(node *ast.Node) {
 // Labels and jumps
 // ---------------------------------------------------------------------------
 
-func (b *builder) pushJump(label string, breakBlock, continueBlock BlockId) {
+func (b *builder) pushJump(label string, breakBlock, continueBlock static_single_assignment.BlockId) {
 	b.jumps = append(b.jumps, jumpTarget{
 		label:         label,
 		breakBlock:    breakBlock,
@@ -1118,7 +1119,7 @@ func (b *builder) popJump() {
 	}
 }
 
-func (b *builder) lookupBreak(label string) BlockId {
+func (b *builder) lookupBreak(label string) static_single_assignment.BlockId {
 	for index := len(b.jumps) - 1; index >= 0; index-- {
 		jump := b.jumps[index]
 		if label == "" || jump.label == label {
@@ -1128,7 +1129,7 @@ func (b *builder) lookupBreak(label string) BlockId {
 	return InvalidBlock
 }
 
-func (b *builder) lookupContinue(label string) BlockId {
+func (b *builder) lookupContinue(label string) static_single_assignment.BlockId {
 	for index := len(b.jumps) - 1; index >= 0; index-- {
 		jump := b.jumps[index]
 		if !HasBlock(jump.continueBlock) {

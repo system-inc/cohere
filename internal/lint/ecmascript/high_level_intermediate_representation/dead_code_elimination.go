@@ -26,6 +26,8 @@
 // marker, and the instructions that built it do not.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // DeadCodeEliminationResult reports what the pass removed, for measurement.
 type DeadCodeEliminationResult struct {
 	// Instructions is how many instructions were swept.
@@ -82,12 +84,12 @@ func EliminateDeadCode(function *Function) DeadCodeEliminationResult {
 // version of `x` is read, every version must be kept, since sweeping one would leave a later read
 // resolving to nothing.
 type liveIdentifiers struct {
-	identifiers map[IdentifierId]bool
+	identifiers map[static_single_assignment.IdentifierId]bool
 	named       map[string]bool
 }
 
 // reference marks a value as read.
-func (l *liveIdentifiers) reference(function *Function, id IdentifierId) {
+func (l *liveIdentifiers) reference(function *Function, id static_single_assignment.IdentifierId) {
 	l.identifiers[id] = true
 	if identifier := function.Identifiers[id]; identifier != nil && identifier.Name != "" {
 		l.named[identifier.Name] = true
@@ -107,7 +109,7 @@ func (l *liveIdentifiers) reference(function *Function, id IdentifierId) {
 // version whose name is read later leaves that read resolving to nothing, which is a miscompile
 // rather than a lost optimisation. The verdict EXPIRES the moment this runs anywhere later in the
 // pipeline, where named reassignments are live across versions.
-func (l *liveIdentifiers) usedByIdOrName(function *Function, id IdentifierId) bool {
+func (l *liveIdentifiers) usedByIdOrName(function *Function, id static_single_assignment.IdentifierId) bool {
 	if l.identifiers[id] {
 		return true
 	}
@@ -116,7 +118,7 @@ func (l *liveIdentifiers) usedByIdOrName(function *Function, id IdentifierId) bo
 }
 
 // usedById reports whether this exact value is read, ignoring its name.
-func (l *liveIdentifiers) usedById(id IdentifierId) bool {
+func (l *liveIdentifiers) usedById(id static_single_assignment.IdentifierId) bool {
 	return l.identifiers[id]
 }
 
@@ -127,7 +129,7 @@ func (l *liveIdentifiers) usedById(id IdentifierId) bool {
 // which is what the outer fixpoint is for: `hasBackEdge` decides whether to run it at all.
 func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 	state := &liveIdentifiers{
-		identifiers: map[IdentifierId]bool{},
+		identifiers: map[static_single_assignment.IdentifierId]bool{},
 		named:       map[string]bool{},
 	}
 	// A mutation forcing this false SURVIVES: measured identical, because no corpus function
@@ -229,7 +231,7 @@ func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 // Upstream's `hasBackEdge`. Only used to decide whether liveness needs more than one pass, so a
 // conservative true costs an iteration and never an answer.
 func functionHasBackEdge(function *Function) bool {
-	position := make(map[BlockId]int, len(function.Blocks))
+	position := make(map[static_single_assignment.BlockId]int, len(function.Blocks))
 	for index, block := range function.Blocks {
 		if block != nil {
 			position[block.Id] = index

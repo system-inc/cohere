@@ -7,6 +7,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // Refs flags reading or writing a ref's `current` property during render.
@@ -343,7 +344,7 @@ func refsInstructionAt(function *high_level_intermediate_representation.Function
 // This is the seam `high_level_intermediate_representation.Identifier.Node` documents itself as existing for: the node goes to the
 // checker rather than to a local inference pass. Reporting through it rather than through a Place's
 // range matters because a Place's range is the range of the node that produced the INSTRUCTION.
-func refsIdentifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
+func refsIdentifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -355,7 +356,7 @@ func refsIdentifierNode(function *high_level_intermediate_representation.Functio
 }
 
 // refsIdentifierName returns a value's source binding name, empty for a temporary.
-func refsIdentifierName(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
+func refsIdentifierName(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return ""
 	}
@@ -395,7 +396,7 @@ func refsIsRefLikeName(name string) bool {
 // The symbol is compared positively rather than checked for non-nil. The shim is a hand-mirrored
 // struct read through `unsafe.Pointer` and has returned a silently wrong type before, so asserting
 // that what came back is what was asked for is the only check that can see that class of failure.
-func refsIsUseRefType(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) bool {
+func refsIsUseRefType(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
@@ -536,9 +537,9 @@ type refsAccessType struct {
 
 	// Span is where the ref value was accessed, carried so a finding can point at the access rather
 	// than at the operand that happened to reach the check.
-	Span       high_level_intermediate_representation.IdentifierId
+	Span       static_single_assignment.IdentifierId
 	HasSpan    bool
-	RefSpan    high_level_intermediate_representation.IdentifierId
+	RefSpan    static_single_assignment.IdentifierId
 	HasRefSpan bool
 
 	// Value is what a structure carries inside it, nil when it carries nothing.
@@ -554,7 +555,7 @@ type refsFunctionType struct {
 	// during render commits that finding at the CALL site rather than inside the function.
 	ReadRefEffect bool
 	// RefAccessSpan is where inside the function the ref was touched.
-	RefAccessSpan    high_level_intermediate_representation.IdentifierId
+	RefAccessSpan    static_single_assignment.IdentifierId
 	HasRefAccessSpan bool
 	// ReturnType is what the function yields.
 	ReturnType *refsAccessType
@@ -742,7 +743,7 @@ func refsDestructure(t *refsAccessType) *refsAccessType {
 // Registered on the fallthrough of an `if` whose test is a guard, and CONSUMED by the first write
 // it authorizes, which is what makes a second write under one guard still report.
 type refsSafeBlock struct {
-	Block high_level_intermediate_representation.BlockId
+	Block static_single_assignment.BlockId
 	RefId int
 }
 
@@ -771,7 +772,7 @@ const (
 type refsFinding struct {
 	Kind refsFindingKind
 	// Value is the identifier to point the finding at.
-	Value    high_level_intermediate_representation.IdentifierId
+	Value    static_single_assignment.IdentifierId
 	HasValue bool
 	// Node overrides where the finding points when the value alone would point at the wrong syntax.
 	//
@@ -790,8 +791,8 @@ type refsFinding struct {
 // head without the lattice map carrying an entry per link.
 type refsEnvironment struct {
 	changed     bool
-	data        map[high_level_intermediate_representation.IdentifierId]*refsAccessType
-	temporaries map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId
+	data        map[static_single_assignment.IdentifierId]*refsAccessType
+	temporaries map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	// names carries a source binding name onto the temporary that loaded it.
 	//
 	// Populated ONLY from LoadLocal, which is upstream's `set_name` and is called from exactly one
@@ -800,29 +801,29 @@ type refsEnvironment struct {
 	// load's result never receives a name, so the name test finds nothing to match on the outer
 	// access. Propagating names through property loads as well would look more thorough and would
 	// disagree with React on real code, measured on the executable in both directions.
-	names map[high_level_intermediate_representation.IdentifierId]string
+	names map[static_single_assignment.IdentifierId]string
 	// propertyNames is the property a load read, keyed by the value it produced. Consulted only by
 	// the exact `props.ref` shape; see setPropertyName's call site.
-	propertyNames map[high_level_intermediate_representation.IdentifierId]string
+	propertyNames map[static_single_assignment.IdentifierId]string
 	// declarations and byDeclaration recover a value whose single-assignment numbering did not
 	// unify. See `get`.
 	// accessNodes is the member-expression node a ref VALUE came from, so a finding underlines the
 	// whole access rather than only the object identifier.
-	accessNodes   map[high_level_intermediate_representation.IdentifierId]*ast.Node
-	declarations  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId
-	byDeclaration map[high_level_intermediate_representation.DeclarationId]*refsAccessType
+	accessNodes   map[static_single_assignment.IdentifierId]*ast.Node
+	declarations  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
+	byDeclaration map[static_single_assignment.DeclarationId]*refsAccessType
 	refIdSeed     int
 }
 
 func newRefsEnvironment() *refsEnvironment {
 	return &refsEnvironment{
-		data:          map[high_level_intermediate_representation.IdentifierId]*refsAccessType{},
-		temporaries:   map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{},
-		names:         map[high_level_intermediate_representation.IdentifierId]string{},
-		propertyNames: map[high_level_intermediate_representation.IdentifierId]string{},
-		accessNodes:   map[high_level_intermediate_representation.IdentifierId]*ast.Node{},
-		declarations:  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId{},
-		byDeclaration: map[high_level_intermediate_representation.DeclarationId]*refsAccessType{},
+		data:          map[static_single_assignment.IdentifierId]*refsAccessType{},
+		temporaries:   map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{},
+		names:         map[static_single_assignment.IdentifierId]string{},
+		propertyNames: map[static_single_assignment.IdentifierId]string{},
+		accessNodes:   map[static_single_assignment.IdentifierId]*ast.Node{},
+		declarations:  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId{},
+		byDeclaration: map[static_single_assignment.DeclarationId]*refsAccessType{},
 	}
 }
 
@@ -834,14 +835,14 @@ func (env *refsEnvironment) nextRefId() int {
 }
 
 // operandId resolves an identifier through the temporaries side map.
-func (env *refsEnvironment) operandId(key high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
+func (env *refsEnvironment) operandId(key static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
 	if resolved, found := env.temporaries[key]; found {
 		return resolved
 	}
 	return key
 }
 
-func (env *refsEnvironment) define(key high_level_intermediate_representation.IdentifierId, value high_level_intermediate_representation.IdentifierId) {
+func (env *refsEnvironment) define(key static_single_assignment.IdentifierId, value static_single_assignment.IdentifierId) {
 	resolved := env.operandId(value)
 	env.temporaries[key] = resolved
 	// The access node travels with the value along an alias chain, so `const v = ref.current;`
@@ -854,7 +855,7 @@ func (env *refsEnvironment) define(key high_level_intermediate_representation.Id
 }
 
 // carryAccessNode copies a recorded access node from one value to another.
-func (env *refsEnvironment) carryAccessNode(to high_level_intermediate_representation.IdentifierId, from high_level_intermediate_representation.IdentifierId) {
+func (env *refsEnvironment) carryAccessNode(to static_single_assignment.IdentifierId, from static_single_assignment.IdentifierId) {
 	if node, ok := env.accessNodes[env.operandId(from)]; ok {
 		env.accessNodes[to] = node
 		return
@@ -865,35 +866,35 @@ func (env *refsEnvironment) carryAccessNode(to high_level_intermediate_represent
 }
 
 // setName carries a source name onto a temporary, upstream's `set_name`.
-func (env *refsEnvironment) setName(function *high_level_intermediate_representation.Function, target high_level_intermediate_representation.IdentifierId, source high_level_intermediate_representation.IdentifierId) {
+func (env *refsEnvironment) setName(function *high_level_intermediate_representation.Function, target static_single_assignment.IdentifierId, source static_single_assignment.IdentifierId) {
 	if name := refsIdentifierName(function, source); name != "" {
 		env.names[target] = name
 	}
 }
 
 // setName2 records a name directly onto a value, used for a global's own name.
-func (env *refsEnvironment) setName2(target high_level_intermediate_representation.IdentifierId, name string) {
+func (env *refsEnvironment) setName2(target static_single_assignment.IdentifierId, name string) {
 	if name != "" {
 		env.names[target] = name
 	}
 }
 
 // setPropertyName records the property a load read, as the result's name in this position.
-func (env *refsEnvironment) setPropertyName(target high_level_intermediate_representation.IdentifierId, property string) {
+func (env *refsEnvironment) setPropertyName(target static_single_assignment.IdentifierId, property string) {
 	if property != "" {
 		env.propertyNames[target] = property
 	}
 }
 
 // nameOf is the value's own binding name, or the one a LoadLocal carried onto it.
-func (env *refsEnvironment) nameOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
+func (env *refsEnvironment) nameOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
 	if name := refsIdentifierName(function, id); name != "" {
 		return name
 	}
 	return env.names[id]
 }
 
-func (env *refsEnvironment) get(key high_level_intermediate_representation.IdentifierId) *refsAccessType {
+func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refsAccessType {
 	if found, ok := env.data[env.operandId(key)]; ok {
 		return found
 	}
@@ -913,7 +914,7 @@ func (env *refsEnvironment) get(key high_level_intermediate_representation.Ident
 	//
 	// This is a workaround for a representation defect rather than a transcription of upstream,
 	// which has no such gap. It belongs in lowering; see the report.
-	for _, candidate := range [2]high_level_intermediate_representation.IdentifierId{key, env.operandId(key)} {
+	for _, candidate := range [2]static_single_assignment.IdentifierId{key, env.operandId(key)} {
 		if declaration, ok := env.declarations[candidate]; ok {
 			if found, ok := env.byDeclaration[declaration]; ok {
 				return found
@@ -929,7 +930,7 @@ func (env *refsEnvironment) get(key high_level_intermediate_representation.Ident
 // fixpoint's only termination signal. The comparison uses `refsTypeEqual`, which ignores minted ref
 // identity: reading that comparison as ordinary equality is the defect that would prevent
 // convergence.
-func (env *refsEnvironment) set(key high_level_intermediate_representation.IdentifierId, value *refsAccessType) {
+func (env *refsEnvironment) set(key static_single_assignment.IdentifierId, value *refsAccessType) {
 	operandId := env.operandId(key)
 	current, hadCurrent := env.data[operandId]
 	widened := refsJoin(value, current, env.nextRefId)
@@ -956,7 +957,7 @@ func (env *refsEnvironment) set(key high_level_intermediate_representation.Ident
 
 // noteDeclaration records which source binding a value belongs to, so `get` can recover a value
 // whose single-assignment numbering did not unify with the one that was written.
-func (env *refsEnvironment) noteDeclaration(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) {
+func (env *refsEnvironment) noteDeclaration(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return
 	}
@@ -1088,7 +1089,7 @@ func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_
 // `props.ref.current` the object is `t11` with an empty name, and `t11` resolves through the
 // temporaries map to the value produced by the `ref` property load. `refsEnvironment.operandId` is
 // upstream's `Env::operand_id` and is the resolution that recovers it.
-func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id high_level_intermediate_representation.IdentifierId) bool {
+func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) bool {
 	if refsIsUseRefType(ctx, function, id) {
 		return true
 	}
@@ -1130,7 +1131,7 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 	// `<div>{value}</div>` where value came out of a ref reports, but a function returning a ref is
 	// allowed to be rendered. Gathered once per round because a use can precede its definition
 	// across a back edge.
-	interpolatedAsJsx := map[high_level_intermediate_representation.IdentifierId]bool{}
+	interpolatedAsJsx := map[static_single_assignment.IdentifierId]bool{}
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := refsInstructionAt(function, instructionId)
@@ -1236,7 +1237,7 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 //
 // Consulted whenever the instruction switch has nothing better to say. A value the checker types as
 // `RefObject` enters as a ref; everything else enters as none.
-func refsSeedType(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId, env *refsEnvironment) *refsAccessType {
+func refsSeedType(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, env *refsEnvironment) *refsAccessType {
 	if refsIsRefBinding(ctx, function, env, id) {
 		return &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
 	}
@@ -1248,7 +1249,7 @@ func refsSeedType(ctx rule.Context, function *high_level_intermediate_representa
 // Upstream runs this after every instruction, so a ref reaching a value through a shape the switch
 // does not model is still recognized. Skipped when the value is already a ref, so the join does not
 // mint an id on every round and stall the fixpoint.
-func refsApplyDeclaredType(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id high_level_intermediate_representation.IdentifierId) {
+func refsApplyDeclaredType(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) {
 	if !refsIsRefBinding(ctx, function, env, id) {
 		return
 	}
@@ -1275,7 +1276,7 @@ func refsApplyDeclaredType(ctx rule.Context, function *high_level_intermediate_r
 //
 // The looser of the two read checks. Used where a function carrying a ref is legitimately allowed
 // to be there, such as a return value or a JSX child.
-func refsCheckDirectValueAccess(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckDirectValueAccess(env *refsEnvironment, id static_single_assignment.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1287,7 +1288,7 @@ func refsCheckDirectValueAccess(env *refsEnvironment, id high_level_intermediate
 }
 
 // refsCheckValueAccess reports a bare ref value OR a function whose body reads one.
-func refsCheckValueAccess(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckValueAccess(env *refsEnvironment, id static_single_assignment.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1303,7 +1304,7 @@ func refsCheckValueAccess(env *refsEnvironment, id high_level_intermediate_repre
 }
 
 // refsCheckPassedToFunction reports handing a ref, or a ref-reading function, to a call.
-func refsCheckPassedToFunction(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckPassedToFunction(env *refsEnvironment, id static_single_assignment.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1319,7 +1320,7 @@ func refsCheckPassedToFunction(env *refsEnvironment, id high_level_intermediate_
 }
 
 // refsCheckUpdate reports writing through a ref during render.
-func refsCheckUpdate(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, node *ast.Node, findings []refsFinding) []refsFinding {
+func refsCheckUpdate(env *refsEnvironment, id static_single_assignment.IdentifierId, node *ast.Node, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1341,7 +1342,7 @@ func refsTransfer(
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
-	interpolatedAsJsx map[high_level_intermediate_representation.IdentifierId]bool,
+	interpolatedAsJsx map[static_single_assignment.IdentifierId]bool,
 	findings []refsFinding,
 	safeBlocks *[]refsSafeBlock,
 ) []refsFinding {
@@ -1643,7 +1644,7 @@ func refsAggregateIsExempt(ctx rule.Context, function *high_level_intermediate_r
 }
 
 // refsCarryOrSeed passes an operand's element through, falling back to its declared type.
-func refsCarryOrSeed(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, from high_level_intermediate_representation.IdentifierId, to high_level_intermediate_representation.IdentifierId) *refsAccessType {
+func refsCarryOrSeed(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, from static_single_assignment.IdentifierId, to static_single_assignment.IdentifierId) *refsAccessType {
 	if current := env.get(from); current != nil {
 		return current
 	}
@@ -1659,8 +1660,8 @@ func refsPropertyLoadTransfer(
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
-	object high_level_intermediate_representation.IdentifierId,
-	target high_level_intermediate_representation.IdentifierId,
+	object static_single_assignment.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	objectType := env.get(object)
@@ -1708,7 +1709,7 @@ func refsNestedFunctionTransfer(
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
 	value *high_level_intermediate_representation.FunctionExpression,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	inner := refsNestedFunction(function, value.Function)
@@ -1796,7 +1797,7 @@ func refsNestedFunctionTransfer(
 // This is a gap in lowering rather than in this rule, and it is worked around here rather than
 // repaired there because a change to `Returns` would move every pass built on this representation
 // at once. It deserves a fix upstream of this file; see the report.
-func refsReturnedValue(function *high_level_intermediate_representation.Function) high_level_intermediate_representation.IdentifierId {
+func refsReturnedValue(function *high_level_intermediate_representation.Function) static_single_assignment.IdentifierId {
 	for _, block := range function.Blocks {
 		if terminal, isReturn := block.Terminal.(*high_level_intermediate_representation.Return); isReturn {
 			return terminal.Value.Identifier
@@ -1851,8 +1852,8 @@ func refsCallTransfer(
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
-	callee high_level_intermediate_representation.IdentifierId,
-	interpolatedAsJsx map[high_level_intermediate_representation.IdentifierId]bool,
+	callee static_single_assignment.IdentifierId,
+	interpolatedAsJsx map[static_single_assignment.IdentifierId]bool,
 	findings []refsFinding,
 ) []refsFinding {
 	target := instruction.LValue.Identifier
@@ -1930,7 +1931,7 @@ func refsCallTransfer(
 func refsStoreTransfer(
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
-	object high_level_intermediate_representation.IdentifierId,
+	object static_single_assignment.IdentifierId,
 	stored *high_level_intermediate_representation.Place,
 	computedKey *high_level_intermediate_representation.Place,
 	findings []refsFinding,
@@ -1976,7 +1977,7 @@ func refsBinaryTransfer(
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
 	value *high_level_intermediate_representation.BinaryExpression,
-	target high_level_intermediate_representation.IdentifierId,
+	target static_single_assignment.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	leftType := env.get(value.Left.Identifier)

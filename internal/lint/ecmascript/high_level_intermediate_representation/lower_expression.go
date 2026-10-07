@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // lowerExpressionToPlace lowers an expression and returns the value it produces.
@@ -440,7 +441,7 @@ func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind Inst
 				// rule stays silent where upstream reports a dependency that may be mutated later.
 				if b.contextual[symbol] {
 					if b.function.ContextDeclarations == nil {
-						b.function.ContextDeclarations = map[DeclarationId]bool{}
+						b.function.ContextDeclarations = map[static_single_assignment.DeclarationId]bool{}
 					}
 					if identifier := b.function.Identifiers[place.Identifier]; identifier != nil {
 						b.function.ContextDeclarations[identifier.Declaration] = true

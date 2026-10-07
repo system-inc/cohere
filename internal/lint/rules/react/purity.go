@@ -7,6 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // messagePurityImpureCallId is the finding's id, and messagePurityImpureCallReason is everything
@@ -330,7 +331,7 @@ type purityFinding struct {
 func purityReportImpureCalls(ctx rule.Context, function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
 	unit := &purityUnit{
 		ctx:       ctx,
-		values:    map[high_level_intermediate_representation.IdentifierId]purityValue{},
+		values:    map[static_single_assignment.IdentifierId]purityValue{},
 		byName:    map[string]purityValue{},
 		nested:    map[*high_level_intermediate_representation.Function][]purityFinding{},
 		reported:  map[*ast.Node]bool{},
@@ -345,7 +346,7 @@ type purityUnit struct {
 	// values is the abstract state keyed by value. Single-assignment form makes one entry per
 	// value rather than per binding, which is what lets a forward walk be correct without a
 	// fixpoint.
-	values map[high_level_intermediate_representation.IdentifierId]purityValue
+	values map[static_single_assignment.IdentifierId]purityValue
 	// byName is the same state keyed by SOURCE NAME, which is how a nested function reaches a
 	// binding declared in its parent. Lowering gives such a reference a `LoadGlobal` carrying the
 	// name rather than a local place, so the identifier in the child is not the identifier in the
@@ -405,7 +406,7 @@ func (unit *purityUnit) walk(function *high_level_intermediate_representation.Fu
 			// the operand from the latest-numbered predecessor. Blocks are in reverse postorder, so
 			// that is the write that appears last in the source, which is what React prints.
 			var merged purityValue
-			var mergedFrom high_level_intermediate_representation.BlockId
+			var mergedFrom static_single_assignment.BlockId
 			for _, entry := range phi.Operands {
 				incoming, ok := values[entry.Place.Identifier]
 				if !ok || incoming.Kind == purityValueNothing {
@@ -537,7 +538,7 @@ func (unit *purityUnit) step(
 // of the enum IS `purityValueNothing`, so a future arm that stores a partly-built value would break
 // silently without it. Recorded as measured-equivalent rather than as a live guard, so the next
 // reader does not go looking for the input that separates them.
-func purityCopy(values map[high_level_intermediate_representation.IdentifierId]purityValue, from high_level_intermediate_representation.IdentifierId, to ...high_level_intermediate_representation.IdentifierId) bool {
+func purityCopy(values map[static_single_assignment.IdentifierId]purityValue, from static_single_assignment.IdentifierId, to ...static_single_assignment.IdentifierId) bool {
 	source, ok := values[from]
 	if !ok || source.Kind == purityValueNothing {
 		return false
@@ -604,7 +605,7 @@ func (unit *purityUnit) loadByName(function *high_level_intermediate_representat
 func purityLoadProperty(
 	function *high_level_intermediate_representation.Function,
 	instruction *high_level_intermediate_representation.Instruction,
-	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	values map[static_single_assignment.IdentifierId]purityValue,
 	object high_level_intermediate_representation.Place,
 	property string,
 ) {
@@ -628,7 +629,7 @@ func purityLoadProperty(
 func purityDestructure(
 	function *high_level_intermediate_representation.Function,
 	instruction *high_level_intermediate_representation.Instruction,
-	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	values map[static_single_assignment.IdentifierId]purityValue,
 	value *high_level_intermediate_representation.Destructure,
 ) {
 	container, ok := values[value.Value.Identifier]
@@ -679,7 +680,7 @@ func purityDestructure(
 func purityMethodCall(
 	function *high_level_intermediate_representation.Function,
 	instruction *high_level_intermediate_representation.Instruction,
-	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	values map[static_single_assignment.IdentifierId]purityValue,
 	value *high_level_intermediate_representation.MethodCall,
 	report func(purityFinding),
 ) {

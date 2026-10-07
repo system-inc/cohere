@@ -23,7 +23,10 @@
 // `console.log`, method calls throughout.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // AlignMethodCallScopes makes every method call agree with its property about scopes.
 //
@@ -44,7 +47,7 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 
 	// scopeMapping records a property whose scope must become the call's, or must be dropped. A
 	// `ScopeId` of zero means "no scope", which is this tree's spelling of upstream's null.
-	scopeMapping := map[IdentifierId]ScopeId{}
+	scopeMapping := map[static_single_assignment.IdentifierId]ScopeId{}
 	// merged unions scopes that must become one. Keyed by `ScopeId` widened into the identifier
 	// space, because `DisjointSet` is keyed by `IdentifierId` and the two are distinct types.
 	merged := &DisjointSet{}
@@ -78,7 +81,7 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 		switch {
 		case lvalueScope != 0 && propertyScope != 0:
 			if lvalueScope != propertyScope {
-				merged.Union([]IdentifierId{IdentifierId(lvalueScope), IdentifierId(propertyScope)})
+				merged.Union([]static_single_assignment.IdentifierId{static_single_assignment.IdentifierId(lvalueScope), static_single_assignment.IdentifierId(propertyScope)})
 			}
 		case lvalueScope != 0:
 			// The call is scoped and the property is not, so the property joins the call's scope.
@@ -100,20 +103,20 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 // The two are applied in that order because a mapping names a scope by id, and a merge changes which
 // id survives. Applying the mapping first would assign a property to a scope that the merge is about
 // to fold away.
-func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[IdentifierId]ScopeId,
+func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[static_single_assignment.IdentifierId]ScopeId,
 	merged *DisjointSet) *ReactiveScopes {
 	// survivorOf resolves a scope through the merge, or returns it unchanged.
 	survivorOf := func(scope ScopeId) ScopeId {
-		if scope == 0 || !merged.Has(IdentifierId(scope)) {
+		if scope == 0 || !merged.Has(static_single_assignment.IdentifierId(scope)) {
 			return scope
 		}
-		return ScopeId(merged.RepresentativeOf(IdentifierId(scope)))
+		return ScopeId(merged.RepresentativeOf(static_single_assignment.IdentifierId(scope)))
 	}
 
 	rebuilt := &ReactiveScopes{
-		byIdentifier: make(map[IdentifierId]ScopeId, len(scopes.byIdentifier)),
+		byIdentifier: make(map[static_single_assignment.IdentifierId]ScopeId, len(scopes.byIdentifier)),
 		ranges:       map[ScopeId]MutableRange{},
-		members:      map[ScopeId][]IdentifierId{},
+		members:      map[ScopeId][]static_single_assignment.IdentifierId{},
 	}
 
 	for identifier, scope := range scopes.byIdentifier {

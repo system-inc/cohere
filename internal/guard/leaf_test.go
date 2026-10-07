@@ -27,6 +27,11 @@ var allowedRuleImports = map[string]bool{
 	// Every rule that decides on a name's `.ts` ending asks it (#kwt1htp), and a guard of its own holds
 	// them to it. It imports only `strings`, so it is a leaf itself and costs a rule edit nothing.
 	"github.com/system-inc/cohere/internal/types/sourcename": true,
+	// The ids, phis and single assignment the high-level IR and Adamic's flow graph share (#ejcnkja).
+	// It imports only the standard library, and every rule package that names it reached it through
+	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
+	// package to any rule edit's rebuild.
+	"github.com/system-inc/cohere/static_single_assignment": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

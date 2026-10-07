@@ -161,7 +161,10 @@
 // report over blocks would not be.
 package high_level_intermediate_representation
 
-import "sort"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"sort"
+)
 
 // MutableRange is the half-open span of evaluation over which a value is still being written.
 //
@@ -173,8 +176,8 @@ import "sort"
 // The zero value is the unset range, which is what `Identifier.MutableRange` holds before this pass
 // runs and what a caller must handle.
 type MutableRange struct {
-	Start EvaluationOrder
-	End   EvaluationOrder
+	Start static_single_assignment.EvaluationOrder
+	End   static_single_assignment.EvaluationOrder
 }
 
 // IsSet reports whether a range was ever opened.
@@ -184,7 +187,7 @@ func (r MutableRange) IsSet() bool { return r.Start != 0 || r.End != 0 }
 //
 // Half-open, matching React's `inRange`: the start is inside and the end is not. An unset range
 // contains nothing, which is the answer that keeps a caller from having to check IsSet first.
-func (r MutableRange) Contains(order EvaluationOrder) bool {
+func (r MutableRange) Contains(order static_single_assignment.EvaluationOrder) bool {
 	if !r.IsSet() {
 		return false
 	}
@@ -255,11 +258,11 @@ func RangeGaps() []RangeGap {
 // distinguish "not computed" from "no range" - upstream does not either, because zero-zero IS the
 // unset range there.
 type MutableRanges struct {
-	ranges map[IdentifierId]MutableRange
+	ranges map[static_single_assignment.IdentifierId]MutableRange
 }
 
 // Get returns a value's range, or the unset range when this pass never opened one.
-func (m *MutableRanges) Get(id IdentifierId) MutableRange {
+func (m *MutableRanges) Get(id static_single_assignment.IdentifierId) MutableRange {
 	if m == nil || m.ranges == nil {
 		return MutableRange{}
 	}
@@ -277,14 +280,14 @@ func (m *MutableRanges) Len() int {
 // Contains reports whether a value is still being written at an evaluation position.
 //
 // This is React's `inRange` reached through the table. Half-open, and false for an unset range.
-func (m *MutableRanges) Contains(id IdentifierId, order EvaluationOrder) bool {
+func (m *MutableRanges) Contains(id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
 	return m.Get(id).Contains(order)
 }
 
 // set writes a range, creating the table lazily.
-func (m *MutableRanges) set(id IdentifierId, r MutableRange) {
+func (m *MutableRanges) set(id static_single_assignment.IdentifierId, r MutableRange) {
 	if m.ranges == nil {
-		m.ranges = map[IdentifierId]MutableRange{}
+		m.ranges = map[static_single_assignment.IdentifierId]MutableRange{}
 	}
 	m.ranges[id] = r
 }
@@ -512,7 +515,7 @@ func RangesForNested(function *Function) map[FunctionId]*MutableRanges {
 // A thin wrapper over `MutableRanges.Get`, kept because it is the name upstream callers use and
 // because it is the seam that would absorb a later move of the range onto `Identifier`: callers
 // written against this keep compiling if the storage changes.
-func RangeOf(ranges *MutableRanges, id IdentifierId) MutableRange {
+func RangeOf(ranges *MutableRanges, id static_single_assignment.IdentifierId) MutableRange {
 	return ranges.Get(id)
 }
 
@@ -521,7 +524,7 @@ func RangeOf(ranges *MutableRanges, id IdentifierId) MutableRange {
 // This is React's `inRange`. Under-approximates for the reason the package comment gives: false
 // here can mean "settled" or can mean "we could not see the mutation", and a consumer that must not
 // confuse those asks `RangeGaps` first.
-func IsMutableAt(ranges *MutableRanges, id IdentifierId, order EvaluationOrder) bool {
+func IsMutableAt(ranges *MutableRanges, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
 	return ranges.Contains(id, order)
 }
 
@@ -533,9 +536,9 @@ type MutationSite struct {
 	// Instruction is the instruction that may mutate a value.
 	Instruction InstructionId
 	// Order is where it sits in evaluation.
-	Order EvaluationOrder
+	Order static_single_assignment.EvaluationOrder
 	// Target is the value the instruction shape says is written, where the shape names one.
-	Target IdentifierId
+	Target static_single_assignment.IdentifierId
 	// Kind names the shape, for reporting a count by category rather than a bare total.
 	Kind MutationSiteKind
 }
@@ -646,11 +649,11 @@ func MutationSites(function *Function) []MutationSite {
 //
 // The returned ids are sorted, so a failure message is stable between runs. A map is the storage
 // and Go randomises its iteration, a hazard the package has already been bitten by once.
-func ValidateMutableRanges(ranges *MutableRanges) []IdentifierId {
+func ValidateMutableRanges(ranges *MutableRanges) []static_single_assignment.IdentifierId {
 	if ranges == nil || ranges.ranges == nil {
 		return nil
 	}
-	var invalid []IdentifierId
+	var invalid []static_single_assignment.IdentifierId
 	for id, r := range ranges.ranges {
 		if !r.IsValid() {
 			invalid = append(invalid, id)
@@ -682,7 +685,7 @@ func ValidateMutableRanges(ranges *MutableRanges) []IdentifierId {
 // `mutate` widens a phi's end, this fires with no further edit, and
 // `TestRangesPhiOpensBeforeItsBlockWhenWidened` seeds the widened state by hand so the branch is
 // proven to work rather than asserted by a comment.
-func phiOpensBefore(existing MutableRange, firstOrder EvaluationOrder) bool {
+func phiOpensBefore(existing MutableRange, firstOrder static_single_assignment.EvaluationOrder) bool {
 	if firstOrder == 0 {
 		return false
 	}
@@ -700,7 +703,7 @@ func phiOpensBefore(existing MutableRange, firstOrder EvaluationOrder) bool {
 // Split out of the loop so the offset is testable. It only runs when `phiOpensBefore` fires, which
 // needs an end widened by Stage 1, so no lowered source can reach it today and a mutation moving
 // the offset by one survived every fixture over real code.
-func phiOpenedRange(existing MutableRange, firstOrder EvaluationOrder) (MutableRange, bool) {
+func phiOpenedRange(existing MutableRange, firstOrder static_single_assignment.EvaluationOrder) (MutableRange, bool) {
 	if !phiOpensBefore(existing, firstOrder) || existing.Start != 0 {
 		return existing, false
 	}
@@ -714,7 +717,7 @@ func phiOpenedRange(existing MutableRange, firstOrder EvaluationOrder) (MutableR
 // `block.instructions.at(0)?.id ?? block.terminal.id`. Reproduced, because an empty block is common
 // in this graph - every goto-only join block is one - and using zero there would open a phi's range
 // at a position no instruction occupies, which reads back as unset.
-func blockFirstOrder(function *Function, block *BasicBlock) EvaluationOrder {
+func blockFirstOrder(function *Function, block *BasicBlock) static_single_assignment.EvaluationOrder {
 	for _, instructionId := range block.Instructions {
 		if instruction := function.Instructions[instructionId]; instruction != nil {
 			return instruction.Order
@@ -728,7 +731,7 @@ func blockFirstOrder(function *Function, block *BasicBlock) EvaluationOrder {
 // Upstream writes `Math.max(instr.id + 1, existing)` inside a branch that has just tested the
 // existing value is zero, so the max is redundant there. It is reproduced rather than simplified
 // because the redundancy is upstream's and a later widening rule reaching this line would need it.
-func maxOrder(a, b EvaluationOrder) EvaluationOrder {
+func maxOrder(a, b static_single_assignment.EvaluationOrder) static_single_assignment.EvaluationOrder {
 	if a > b {
 		return a
 	}
@@ -772,7 +775,7 @@ const (
 // TIME: a mutation cannot flow backwards through an alias that did not exist yet.
 type aliasingEdge struct {
 	index int
-	node  IdentifierId
+	node  static_single_assignment.IdentifierId
 	kind  aliasingEdgeKind
 }
 
@@ -803,29 +806,29 @@ const (
 // map for its order has already cost this package one defect, and a nondeterministic traversal
 // order here would produce a range table that differs between runs on any function with two edges.
 type aliasingNode struct {
-	id IdentifierId
+	id static_single_assignment.IdentifierId
 
-	createdFrom      map[IdentifierId]int
-	createdFromOrder []IdentifierId
-	captures         map[IdentifierId]int
-	capturesOrder    []IdentifierId
-	aliases          map[IdentifierId]int
-	aliasesOrder     []IdentifierId
-	maybeAliases     map[IdentifierId]int
-	maybeAliasOrder  []IdentifierId
+	createdFrom      map[static_single_assignment.IdentifierId]int
+	createdFromOrder []static_single_assignment.IdentifierId
+	captures         map[static_single_assignment.IdentifierId]int
+	capturesOrder    []static_single_assignment.IdentifierId
+	aliases          map[static_single_assignment.IdentifierId]int
+	aliasesOrder     []static_single_assignment.IdentifierId
+	maybeAliases     map[static_single_assignment.IdentifierId]int
+	maybeAliasOrder  []static_single_assignment.IdentifierId
 
 	edges []aliasingEdge
 
 	value aliasingNodeValue
 }
 
-func newAliasingNode(id IdentifierId, value aliasingNodeValue) *aliasingNode {
+func newAliasingNode(id static_single_assignment.IdentifierId, value aliasingNodeValue) *aliasingNode {
 	return &aliasingNode{
 		id:           id,
-		createdFrom:  map[IdentifierId]int{},
-		captures:     map[IdentifierId]int{},
-		aliases:      map[IdentifierId]int{},
-		maybeAliases: map[IdentifierId]int{},
+		createdFrom:  map[static_single_assignment.IdentifierId]int{},
+		captures:     map[static_single_assignment.IdentifierId]int{},
+		aliases:      map[static_single_assignment.IdentifierId]int{},
+		maybeAliases: map[static_single_assignment.IdentifierId]int{},
 		value:        value,
 	}
 }
@@ -837,7 +840,7 @@ func newAliasingNode(id IdentifierId, value aliasingNodeValue) *aliasingNode {
 // choice. The index is compared against the mutation's index to decide whether the edge already
 // existed, so keeping the earliest makes the edge visible to the widest set of mutations. Keeping
 // the latest would silently narrow every range that flows through a repeated alias.
-func insertBackEdge(into map[IdentifierId]int, order *[]IdentifierId, from IdentifierId, index int) {
+func insertBackEdge(into map[static_single_assignment.IdentifierId]int, order *[]static_single_assignment.IdentifierId, from static_single_assignment.IdentifierId, index int) {
 	if _, exists := into[from]; exists {
 		return
 	}
@@ -863,7 +866,7 @@ func insertBackEdge(into map[IdentifierId]int, order *[]IdentifierId, from Ident
 // only the directly-named value, which is the counterfactual measured in this stage's report and it
 // is strictly weaker than upstream.
 type aliasingState struct {
-	nodes map[IdentifierId]*aliasingNode
+	nodes map[static_single_assignment.IdentifierId]*aliasingNode
 
 	// identities tracks the identifiers that currently denote the same abstract value.
 	//
@@ -876,15 +879,15 @@ type aliasingState struct {
 	// This reduced pass needs only the single-value Assign case. Each Create starts a fresh identity;
 	// Assign moves its destination into the source identity while CreateFrom deliberately retains a
 	// distinct identity with a copied kind.
-	identities      map[IdentifierId]uint64
-	identityMembers map[uint64]map[IdentifierId]struct{}
+	identities      map[static_single_assignment.IdentifierId]uint64
+	identityMembers map[uint64]map[static_single_assignment.IdentifierId]struct{}
 	nextIdentity    uint64
 
 	// freezeSources are values upstream's abstract value itself points through for freezing. A phi
 	// denotes the union of its operands, and freezing a FunctionExpression recursively freezes its
 	// captures. These are deliberately separate from the range graph's Capture edges: an object can
 	// capture a value without Freeze(object) recursively freezing that value.
-	freezeSources map[IdentifierId][]IdentifierId
+	freezeSources map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId
 
 	// immutable is upstream's abstract value kind, reduced to the one bit the mutation gate needs.
 	//
@@ -897,22 +900,22 @@ type aliasingState struct {
 	// Absent rather than false is deliberate. A value the walk never reached has no entry, and the
 	// gate treats that as mutable, which is the pre-existing behaviour of this pass and the
 	// conservative direction for widening.
-	immutable map[IdentifierId]EffectValueKind
+	immutable map[static_single_assignment.IdentifierId]EffectValueKind
 }
 
 func newAliasingState() *aliasingState {
 	return &aliasingState{
-		nodes:           map[IdentifierId]*aliasingNode{},
-		identities:      map[IdentifierId]uint64{},
-		identityMembers: map[uint64]map[IdentifierId]struct{}{},
-		freezeSources:   map[IdentifierId][]IdentifierId{},
-		immutable:       map[IdentifierId]EffectValueKind{},
+		nodes:           map[static_single_assignment.IdentifierId]*aliasingNode{},
+		identities:      map[static_single_assignment.IdentifierId]uint64{},
+		identityMembers: map[uint64]map[static_single_assignment.IdentifierId]struct{}{},
+		freezeSources:   map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{},
+		immutable:       map[static_single_assignment.IdentifierId]EffectValueKind{},
 	}
 }
 
 // markImmutable records that a value is not Mutable or Context, so a conditional mutation of it
 // widens nothing.
-func (s *aliasingState) markImmutable(id IdentifierId, kind EffectValueKind) {
+func (s *aliasingState) markImmutable(id static_single_assignment.IdentifierId, kind EffectValueKind) {
 	s.immutable[id] = kind
 }
 
@@ -923,11 +926,11 @@ func (s *aliasingState) markImmutable(id IdentifierId, kind EffectValueKind) {
 // initialized. This reduced state has no instruction-value sets, so node presence is its
 // initialization predicate. In particular, retaining an immutable bit for an absent node would
 // make a later Assign from that unresolved place frozen retroactively.
-func (s *aliasingState) freeze(id IdentifierId) bool {
-	return s.freezeWithSeen(id, map[IdentifierId]bool{})
+func (s *aliasingState) freeze(id static_single_assignment.IdentifierId) bool {
+	return s.freezeWithSeen(id, map[static_single_assignment.IdentifierId]bool{})
 }
 
-func (s *aliasingState) freezeWithSeen(id IdentifierId, seen map[IdentifierId]bool) bool {
+func (s *aliasingState) freezeWithSeen(id static_single_assignment.IdentifierId, seen map[static_single_assignment.IdentifierId]bool) bool {
 	if seen[id] {
 		return false
 	}
@@ -960,7 +963,7 @@ func (s *aliasingState) freezeWithSeen(id IdentifierId, seen map[IdentifierId]bo
 // The question `state.mutate` asks: its conditional arm mutates for `Mutable` and `Context` and
 // returns `none` for everything else (`InferMutationAliasingEffects.ts:1489`). Absent means mutable,
 // which is the conservative direction for widening and the pre-existing behaviour of this pass.
-func (s *aliasingState) notMutable(id IdentifierId) bool {
+func (s *aliasingState) notMutable(id static_single_assignment.IdentifierId) bool {
 	_, present := s.immutable[id]
 	return present
 }
@@ -970,7 +973,7 @@ func (s *aliasingState) notMutable(id IdentifierId) bool {
 // Upstream's `CreateFrom` at `InferMutationAliasingEffects.ts:731` reads the source's kind and
 // initializes the target with it, rewriting the effect into a plain `Create` of that kind when the
 // source is Primitive, Global or Frozen. This is that propagation, in the one bit this pass reads.
-func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
+func (s *aliasingState) deriveImmutable(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
 	if kind, present := s.immutable[from]; present {
 		s.immutable[into] = kind
 		return
@@ -988,7 +991,7 @@ func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
 // A backedge or unknown operand leaves the phi mutable. Upstream resolves those through its dataflow
 // fixpoint; this pass is deliberately single-shot, and treating an incomplete union as frozen would
 // be the unsound direction.
-func (s *aliasingState) derivePhiImmutable(phi *Phi, seenBlocks map[BlockId]bool) {
+func (s *aliasingState) derivePhiImmutable(phi *Phi, seenBlocks map[static_single_assignment.BlockId]bool) {
 	if phi == nil || len(phi.Operands) == 0 {
 		return
 	}
@@ -1033,16 +1036,16 @@ func (s *aliasingState) create(place Place, value aliasingNodeValue) {
 	s.detachIdentity(place.Identifier)
 	s.nextIdentity++
 	s.identities[place.Identifier] = s.nextIdentity
-	s.identityMembers[s.nextIdentity] = map[IdentifierId]struct{}{place.Identifier: {}}
+	s.identityMembers[s.nextIdentity] = map[static_single_assignment.IdentifierId]struct{}{place.Identifier: {}}
 }
 
 // recordFreezeSources gives a phi or FunctionExpression the values React freezes through when
 // that abstract value is frozen later.
-func (s *aliasingState) recordFreezeSources(into IdentifierId, sources []Place) {
+func (s *aliasingState) recordFreezeSources(into static_single_assignment.IdentifierId, sources []Place) {
 	if len(sources) == 0 {
 		return
 	}
-	identifiers := make([]IdentifierId, 0, len(sources))
+	identifiers := make([]static_single_assignment.IdentifierId, 0, len(sources))
 	for _, source := range sources {
 		identifiers = append(identifiers, source.Identifier)
 	}
@@ -1054,7 +1057,7 @@ func (s *aliasingState) recordFreezeSources(into IdentifierId, sources []Place) 
 // It is called only for Assign from a mutable/context source. Alias, Capture and MaybeAlias must
 // not call it: upstream records those as effects without changing the InstructionValues either
 // identifier denotes.
-func (s *aliasingState) shareIdentity(from IdentifierId, into IdentifierId) {
+func (s *aliasingState) shareIdentity(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
 	if from == into {
 		return
 	}
@@ -1069,7 +1072,7 @@ func (s *aliasingState) shareIdentity(from IdentifierId, into IdentifierId) {
 
 // detachIdentity removes one identifier from its previous abstract value without disturbing the
 // aliases that still denote it. A later Create or Assign is a new definition of this identifier.
-func (s *aliasingState) detachIdentity(id IdentifierId) {
+func (s *aliasingState) detachIdentity(id static_single_assignment.IdentifierId) {
 	identity, ok := s.identities[id]
 	if !ok {
 		return
@@ -1155,7 +1158,7 @@ const (
 
 // mutationQueueEntry is one pending visit in the worklist.
 type mutationQueueEntry struct {
-	place      IdentifierId
+	place      static_single_assignment.IdentifierId
 	transitive bool
 	direction  mutationDirection
 	kind       mutationKind
@@ -1221,13 +1224,13 @@ type mutationQueueEntry struct {
 func (s *aliasingState) mutate(
 	ranges *MutableRanges,
 	index int,
-	start IdentifierId,
-	end EvaluationOrder,
+	start static_single_assignment.IdentifierId,
+	end static_single_assignment.EvaluationOrder,
 	hasEnd bool,
 	transitive bool,
 	startKind mutationKind,
 ) {
-	seen := map[IdentifierId]mutationKind{}
+	seen := map[static_single_assignment.IdentifierId]mutationKind{}
 	queue := []mutationQueueEntry{{
 		place:      start,
 		transitive: transitive,
@@ -1347,7 +1350,7 @@ func (s *aliasingState) mutate(
 // index test already models time correctly; applying early would model it twice and wrongly.
 type pendingMutation struct {
 	index      int
-	end        EvaluationOrder
+	end        static_single_assignment.EvaluationOrder
 	transitive bool
 	kind       mutationKind
 	place      Place
@@ -1372,7 +1375,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 }
 
 func buildAliasingGraphWithContextKinds(function *Function, effects *AliasingEffects,
-	contextKinds map[IdentifierId]EffectValueKind) (*aliasingState, []pendingMutation) {
+	contextKinds map[static_single_assignment.IdentifierId]EffectValueKind) (*aliasingState, []pendingMutation) {
 	state := newAliasingState()
 	refs := refDerivedValues(function)
 	var mutations []pendingMutation
@@ -1410,13 +1413,13 @@ func buildAliasingGraphWithContextKinds(function *Function, effects *AliasingEff
 	// returned value reaches whatever it was returned from.
 	state.create(function.Returns, aliasingNodeObject)
 
-	seenBlocks := map[BlockId]bool{}
+	seenBlocks := map[static_single_assignment.BlockId]bool{}
 	type pendingPhiOperand struct {
 		from  Place
 		into  Place
 		index int
 	}
-	pendingPhis := map[BlockId][]pendingPhiOperand{}
+	pendingPhis := map[static_single_assignment.BlockId][]pendingPhiOperand{}
 
 	for _, block := range function.Blocks {
 		for _, phi := range block.Phis {

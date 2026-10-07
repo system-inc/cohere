@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 func customHookSignature(function *Function) effectSignature {
@@ -28,7 +29,7 @@ func customHookSignature(function *Function) effectSignature {
 // while holding it, since the table is not rebuilt.
 type calleeProducers struct {
 	function *Function
-	table    map[IdentifierId]InstructionValue
+	table    map[static_single_assignment.IdentifierId]InstructionValue
 	// builds counts how many times the table was built, for the test that it is built once.
 	builds int
 }
@@ -38,10 +39,10 @@ func newCalleeProducers(function *Function) *calleeProducers {
 }
 
 // producer returns the value that produced identifier, building the table on the first ask.
-func (producers *calleeProducers) producer(identifier IdentifierId) InstructionValue {
+func (producers *calleeProducers) producer(identifier static_single_assignment.IdentifierId) InstructionValue {
 	if producers.table == nil {
 		producers.builds++
-		producers.table = make(map[IdentifierId]InstructionValue, len(producers.function.Instructions))
+		producers.table = make(map[static_single_assignment.IdentifierId]InstructionValue, len(producers.function.Instructions))
 		for _, candidate := range producers.function.Instructions {
 			if candidate == nil {
 				continue
@@ -68,9 +69,9 @@ func isModuleHookCall(function *Function, producers *calleeProducers, instructio
 	default:
 		return false
 	}
-	seen := map[IdentifierId]bool{}
-	var resolve func(IdentifierId, bool) bool
-	resolve = func(identifier IdentifierId, requireHook bool) bool {
+	seen := map[static_single_assignment.IdentifierId]bool{}
+	var resolve func(static_single_assignment.IdentifierId, bool) bool
+	resolve = func(identifier static_single_assignment.IdentifierId, requireHook bool) bool {
 		if seen[identifier] {
 			return false
 		}

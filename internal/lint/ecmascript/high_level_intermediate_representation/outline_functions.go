@@ -17,6 +17,7 @@
 package high_level_intermediate_representation
 
 import (
+	"github.com/system-inc/cohere/static_single_assignment"
 	"strconv"
 	"strings"
 )
@@ -76,7 +77,7 @@ func OutlineFunctions(function *Function) int {
 			// it does not discard one, and a later pass that reads the callee's own effects still
 			// needs to find it.
 			if function.Outlined == nil {
-				function.Outlined = map[IdentifierId]FunctionId{}
+				function.Outlined = map[static_single_assignment.IdentifierId]FunctionId{}
 			}
 			function.Outlined[instruction.LValue.Identifier] = expression.Function
 			outlined++

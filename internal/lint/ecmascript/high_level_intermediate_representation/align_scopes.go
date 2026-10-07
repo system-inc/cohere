@@ -160,6 +160,8 @@
 // pass twice over the corpus and compares.
 package high_level_intermediate_representation
 
+import "github.com/system-inc/cohere/static_single_assignment"
+
 // AlignGap names an alignment rule this pass cannot apply, for a caller that needs to know.
 //
 // Modelled on `ScopeGap`, `MergeGap`, `RangeGap`, `ReactiveGap` and `DisjointGap` deliberately, and
@@ -195,7 +197,7 @@ func AlignGaps() []AlignGap {
 // The zero value is an empty result and is ready to read.
 type AlignedScopes struct {
 	ranges  map[ScopeId]MutableRange
-	members map[ScopeId][]IdentifierId
+	members map[ScopeId][]static_single_assignment.IdentifierId
 	order   []ScopeId
 	widened int
 	visits  int
@@ -212,7 +214,7 @@ func (a *AlignedScopes) RangeOf(scope ScopeId) MutableRange {
 // MembersOf returns the values belonging to a scope, sorted, or nil for a scope that does not exist.
 //
 // The slice is the table's own and must not be modified by a caller.
-func (a *AlignedScopes) MembersOf(scope ScopeId) []IdentifierId {
+func (a *AlignedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
 	if a == nil || a.members == nil {
 		return nil
 	}
@@ -267,9 +269,9 @@ func (a *AlignedScopes) MemberRanges() *MutableRanges {
 
 // fallthroughRange is one entry on upstream's `activeBlockFallthroughRanges` stack.
 type fallthroughRange struct {
-	fallthrough_ BlockId
-	start        EvaluationOrder
-	end          EvaluationOrder
+	fallthrough_ static_single_assignment.BlockId
+	start        static_single_assignment.EvaluationOrder
+	end          static_single_assignment.EvaluationOrder
 }
 
 // valueBlockNode is one node of upstream's `valueBlockNodes` tree.
@@ -279,8 +281,8 @@ type fallthroughRange struct {
 // `recordPlace`, so this carries that and not the child list. Omitted deliberately rather than
 // overlooked; see the package comment on `placeScopes` for the same shape of decision.
 type valueBlockNode struct {
-	start EvaluationOrder
-	end   EvaluationOrder
+	start static_single_assignment.EvaluationOrder
+	end   static_single_assignment.EvaluationOrder
 }
 
 // alignSweepState is the sweep's working state, matching upstream's locals.
@@ -289,7 +291,7 @@ type alignSweepState struct {
 	activeScopes       []ScopeId
 	activeSet          map[ScopeId]bool
 	seen               map[ScopeId]bool
-	valueBlockNodes    map[BlockId]*valueBlockNode
+	valueBlockNodes    map[static_single_assignment.BlockId]*valueBlockNode
 	ranges             map[ScopeId]MutableRange
 	scopes             *ReactiveScopes
 
@@ -317,7 +319,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 	state := &alignSweepState{
 		activeSet:       map[ScopeId]bool{},
 		seen:            map[ScopeId]bool{},
-		valueBlockNodes: map[BlockId]*valueBlockNode{},
+		valueBlockNodes: map[static_single_assignment.BlockId]*valueBlockNode{},
 		ranges:          map[ScopeId]MutableRange{},
 		scopes:          scopes,
 	}
@@ -331,7 +333,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 		before[id] = r
 	}
 
-	byId := map[BlockId]*BasicBlock{}
+	byId := map[static_single_assignment.BlockId]*BasicBlock{}
 	for _, block := range function.Blocks {
 		if block != nil {
 			byId[block.Id] = block
@@ -348,7 +350,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 	result.ranges = state.ranges
 	result.visits = state.visits
 	result.order = append(result.order, live...)
-	result.members = map[ScopeId][]IdentifierId{}
+	result.members = map[ScopeId][]static_single_assignment.IdentifierId{}
 	for _, id := range live {
 		result.members[id] = scopes.MembersOf(id)
 		if state.ranges[id] != before[id] {
@@ -394,7 +396,7 @@ func AlignThenMergeReactiveScopes(function *Function, scopes *ReactiveScopes) (*
 // The fallback is not a rarity to be handled defensively: measured over 400 corpus files, 1,119
 // fallthrough blocks carry no instructions at all and reach the assertion through the terminal id.
 // A defensive-looking fallback that fires on 1,119 blocks is load-bearing rather than defensive.
-func startingIdOf(function *Function, block *BasicBlock) EvaluationOrder {
+func startingIdOf(function *Function, block *BasicBlock) static_single_assignment.EvaluationOrder {
 	if block == nil {
 		return 0
 	}
@@ -407,7 +409,7 @@ func startingIdOf(function *Function, block *BasicBlock) EvaluationOrder {
 }
 
 // visitBlock is one iteration of upstream's `for (const [, block] of fn.body.blocks)`.
-func (s *alignSweepState) visitBlock(function *Function, byId map[BlockId]*BasicBlock,
+func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
 	block *BasicBlock) {
 	s.visits++
 	startingId := startingIdOf(function, block)
@@ -539,7 +541,7 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[BlockId]*Basic
 // MECHANISM FOUR, the value-block RANGE: the FIRST time a scope is seen, if it is seen inside a value
 // block, the scope is widened to that whole value block's span. `seen` is what makes this fire once
 // per scope rather than once per place, and it is upstream's.
-func (s *alignSweepState) recordPlace(id EvaluationOrder, place Place, node *valueBlockNode) {
+func (s *alignSweepState) recordPlace(id static_single_assignment.EvaluationOrder, place Place, node *valueBlockNode) {
 	scope := s.activeScopeOf(id, place)
 	if scope == 0 {
 		return
@@ -575,7 +577,7 @@ func (s *alignSweepState) recordPlace(id EvaluationOrder, place Place, node *val
 // `TestAlignDeclinesAPlaceReadOutsideItsScope` is that case.
 //
 // Half-open, so the start is inside and the end is not, matching `MutableRange.Contains`.
-func (s *alignSweepState) activeScopeOf(id EvaluationOrder, place Place) ScopeId {
+func (s *alignSweepState) activeScopeOf(id static_single_assignment.EvaluationOrder, place Place) ScopeId {
 	scope := s.scopes.ScopeOf(place.Identifier)
 	if scope == 0 {
 		return 0
@@ -591,13 +593,13 @@ func (s *alignSweepState) activeScopeOf(id EvaluationOrder, place Place) ScopeId
 //
 // Upstream returns each successor unchanged, so the call is a WALK rather than a rewrite despite the
 // name. Reproduced as a walk.
-func (s *alignSweepState) assignValueBlockNodes(function *Function, byId map[BlockId]*BasicBlock,
-	block *BasicBlock, node *valueBlockNode, fallthroughId BlockId, hasFallthrough bool) {
+func (s *alignSweepState) assignValueBlockNodes(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
+	block *BasicBlock, node *valueBlockNode, fallthroughId static_single_assignment.BlockId, hasFallthrough bool) {
 	_, isTernary := block.Terminal.(*Ternary)
 	_, isLogical := block.Terminal.(*Logical)
 	_, isOptional := block.Terminal.(*Optional)
 
-	EachSuccessor(block.Terminal, func(successor BlockId) {
+	EachSuccessor(block.Terminal, func(successor static_single_assignment.BlockId) {
 		if _, taken := s.valueBlockNodes[successor]; taken {
 			return
 		}

@@ -1,10 +1,13 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
 	t.Parallel()
-	const input IdentifierId = 1
+	const input static_single_assignment.IdentifierId = 1
 	for _, testCase := range []struct {
 		name                      string
 		outer, inner              []ReactiveScopeDependency

@@ -28,6 +28,7 @@ package high_level_intermediate_representation
 
 import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // LastUsage records the last instruction at which each declaration is read.
@@ -38,7 +39,7 @@ import (
 // never read and is overwritten later. Do not "fix" this to `IdentifierId` -- upstream's note says
 // that is correct only once the pass leaves single-assignment form behind, which it has not.
 type LastUsage struct {
-	byDeclaration map[DeclarationId]EvaluationOrder
+	byDeclaration map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder
 }
 
 // LastUsedAt returns the last order at which a declaration was read, and whether it was read at all.
@@ -46,7 +47,7 @@ type LastUsage struct {
 // The second return is not decoration. Upstream indexes its map with a non-null assertion and would
 // throw on a miss; a linter cannot, and the two callers treat a miss differently -- one skips the
 // declaration, the other declines the merge.
-func (l *LastUsage) LastUsedAt(declaration DeclarationId) (EvaluationOrder, bool) {
+func (l *LastUsage) LastUsedAt(declaration static_single_assignment.DeclarationId) (static_single_assignment.EvaluationOrder, bool) {
 	if l == nil || l.byDeclaration == nil {
 		return 0, false
 	}
@@ -70,13 +71,13 @@ func (l *LastUsage) Len() int {
 // The graph is taken alongside the tree because a `Place` here names an `IdentifierId` and this
 // pass keys on `DeclarationId`; the mapping between them lives on the graph's identifier table.
 func FindLastUsage(tree *ReactiveFunction, function *Function) *LastUsage {
-	usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{}}
+	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}}
 	if tree == nil || function == nil {
 		return usage
 	}
 
 	VisitReactiveFunction(tree, ReactiveVisitor{
-		Place: func(order EvaluationOrder, place Place, role PlaceRole) {
+		Place: func(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
 			// `declarationOf` answers zero for an identifier missing from the table, which groups
 			// every such value together. That is the shelf helper's documented behaviour and it is
 			// acceptable here for the same reason it is there: the consumers compare a declaration
@@ -127,7 +128,7 @@ func AreEqualDependencies(a, b []ReactiveScopeDependency) bool {
 // A declaration with no recorded usage answers FALSE, which is the conservative direction and
 // differs from upstream only in that upstream would throw. A value never read is not a value proven
 // safe to merge; it is a value this pass has no information about.
-func AreLValuesLastUsedByScope(scopeEnd EvaluationOrder, lvalues []DeclarationId,
+func AreLValuesLastUsedByScope(scopeEnd static_single_assignment.EvaluationOrder, lvalues []static_single_assignment.DeclarationId,
 	usage *LastUsage) bool {
 	for _, lvalue := range lvalues {
 		lastUsedAt, found := usage.LastUsedAt(lvalue)
@@ -196,7 +197,7 @@ func ScopeIsEligibleForMerging(function *Function, scope ScopeId, dependencies *
 // dependencies be rooted -- `path.length === 0` -- because a property read off an invalidating
 // value is not itself guaranteed to change.
 func CanMergeScopes(function *Function, current, next ScopeId, dependencies *ScopeDependencies,
-	temporaries map[DeclarationId]DeclarationId, typeChecker *shimchecker.Checker) bool {
+	temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId, typeChecker *shimchecker.Checker) bool {
 	if dependencies == nil {
 		return false
 	}
@@ -248,8 +249,8 @@ func CanMergeScopes(function *Function, current, next ScopeId, dependencies *Sco
 // `StoreLocal` chain so that a value copied into a temporary is still recognised as the earlier
 // scope's output. Without that indirection an ordinary `const b = a` between two scopes would hide
 // the flow and silently prevent a merge upstream performs.
-func declaredByOrAliasedFrom(function *Function, dependency IdentifierId,
-	declarations []IdentifierId, temporaries map[DeclarationId]DeclarationId) bool {
+func declaredByOrAliasedFrom(function *Function, dependency static_single_assignment.IdentifierId,
+	declarations []static_single_assignment.IdentifierId, temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId) bool {
 	target := declarationOf(function, dependency)
 	aliased, hasAlias := temporaries[target]
 	for _, declaration := range declarations {
@@ -334,7 +335,7 @@ func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function 
 		dependencies: dependencies,
 		typeChecker:  typeChecker,
 		usage:        FindLastUsage(tree, function),
-		temporaries:  map[DeclarationId]DeclarationId{},
+		temporaries:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
 	tree.Body = merger.mergeBlock(tree.Body)
 	return MergeScopesResult{
@@ -372,7 +373,7 @@ type scopeMerger struct {
 	usage               *LastUsage
 	// temporaries resolves a StoreLocal chain, so a value copied into a temporary is still
 	// recognised as the earlier scope's output. See `declaredByOrAliasedFrom`.
-	temporaries map[DeclarationId]DeclarationId
+	temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId
 	merges      int
 	// declarationsPruned counts declarations dropped because the widened range left them dead.
 	declarationsPruned int
@@ -389,7 +390,7 @@ type mergeCandidate struct {
 	to   int
 	// lvalues are the declarations named since the candidate opened, which must all be last used
 	// inside the scope being folded in or the merge is declined.
-	lvalues []DeclarationId
+	lvalues []static_single_assignment.DeclarationId
 }
 
 func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {

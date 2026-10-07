@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPruneUnusedScopesPrunesSomethingAndKeepsSomething is the baseline before any specific claim.
@@ -121,10 +122,10 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			dependencies := &ScopeDependencies{
-				declarations: map[ScopeId][]IdentifierId{1: {7}},
+				declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {7}},
 			}
 			if testCase.originKnown {
-				dependencies.declarationOrigin = map[IdentifierId]ScopeId{7: testCase.origin}
+				dependencies.declarationOrigin = map[static_single_assignment.IdentifierId]ScopeId{7: testCase.origin}
 			}
 
 			scope := &ReactiveScopeBlock{Scope: 1}
@@ -145,7 +146,7 @@ func TestPruneUnusedScopesKeepsScopesWithReassignments(t *testing.T) {
 	t.Parallel()
 
 	dependencies := &ScopeDependencies{
-		reassignments: map[ScopeId][]IdentifierId{1: {7}},
+		reassignments: map[ScopeId][]static_single_assignment.IdentifierId{1: {7}},
 	}
 	scope := &ReactiveScopeBlock{Scope: 1}
 	tree := &ReactiveFunction{Body: ReactiveBlock{scope}}

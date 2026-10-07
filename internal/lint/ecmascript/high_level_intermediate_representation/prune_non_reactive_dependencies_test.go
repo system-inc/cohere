@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestPruneNonReactiveDependenciesKeepsAndPrunes is the baseline, and it matters more here than
@@ -85,7 +86,7 @@ func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
 			1: {{Identifier: 1}},
 			2: {{Identifier: 2}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {2}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {2}},
 	}
 
 	PruneNonReactiveDependencies(tree, function, dependencies)
@@ -131,7 +132,7 @@ func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing
 			1: {{Identifier: 1}},
 			2: {{Identifier: 2}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {2}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {2}},
 	}
 
 	removed := PruneNonReactiveDependencies(tree, function, dependencies)
@@ -180,7 +181,7 @@ func TestPruneNonReactiveDependenciesVisitsInnermostFirst(t *testing.T) {
 			1: {{Identifier: 1}},
 			2: {{Identifier: 2}},
 		},
-		declarations: map[ScopeId][]IdentifierId{1: {2}},
+		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {2}},
 	}
 
 	PruneNonReactiveDependencies(tree, function, dependencies)

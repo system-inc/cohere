@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // lowerTypedForSSA lowers the first function in code with a real type checker attached.
@@ -274,7 +275,7 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 	t.Parallel()
 
-	place := func(id IdentifierId) Place { return Place{Identifier: id} }
+	place := func(id static_single_assignment.IdentifierId) Place { return Place{Identifier: id} }
 	values := []InstructionValue{
 		&LoadLocal{Place: place(1)},
 		&LoadContext{Place: place(1)},
@@ -328,18 +329,18 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 
 	for _, value := range values {
 		var byValue, byPointer []struct {
-			id   IdentifierId
+			id   static_single_assignment.IdentifierId
 			role PlaceRole
 		}
 		EachPlace(value, func(p Place, role PlaceRole) {
 			byValue = append(byValue, struct {
-				id   IdentifierId
+				id   static_single_assignment.IdentifierId
 				role PlaceRole
 			}{p.Identifier, role})
 		})
 		EachPlacePointer(value, func(p *Place, role PlaceRole) {
 			byPointer = append(byPointer, struct {
-				id   IdentifierId
+				id   static_single_assignment.IdentifierId
 				role PlaceRole
 			}{p.Identifier, role})
 		})
@@ -368,7 +369,7 @@ func TestPhiOperandsAreDeterministic(t *testing.T) {
 	phi.Operands.Set(7, Place{Identifier: 3})
 	phi.Operands.Set(2, Place{Identifier: 1})
 	phi.Operands.Set(5, Place{Identifier: 2})
-	want := []BlockId{2, 5, 7}
+	want := []static_single_assignment.BlockId{2, 5, 7}
 	for attempt := 0; attempt < 50; attempt++ {
 		got := PhiOperandsInOrder(phi)
 		if len(got) != len(want) {
@@ -405,7 +406,7 @@ func TestConstructionIsIdempotent(t *testing.T) {
 	// A phi whose operand names no instruction, phi, or parameter defines a value the graph does not
 	// produce.
 	countStale := func(function *Function) (phis int, stale int) {
-		defined := map[IdentifierId]bool{}
+		defined := map[static_single_assignment.IdentifierId]bool{}
 		for _, param := range function.Params {
 			defined[param.Identifier] = true
 		}

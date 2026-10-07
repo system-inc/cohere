@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // TestIdentifiersShareNoStorageAcrossFunctions holds what makes carving identifiers from chunks safe.
@@ -45,7 +46,7 @@ func TestIdentifiersShareNoStorageAcrossFunctions(t *testing.T) {
 			t.Fatalf("%s has %d identifiers, too few to span a second chunk", function.Name, len(function.Identifiers))
 		}
 		for index, identifier := range function.Identifiers {
-			if identifier.Id != IdentifierId(index) {
+			if identifier.Id != static_single_assignment.IdentifierId(index) {
 				t.Fatalf("%s: identifier %d reads as %d, so a pointer into an earlier chunk moved",
 					function.Name, index, identifier.Id)
 			}

@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"github.com/system-inc/cohere/static_single_assignment"
+	"testing"
+)
 
 func TestForOfHeaderBlockKinds(t *testing.T) {
 	t.Parallel()
@@ -15,7 +18,7 @@ for (const row of rows) { for (const cell of row) { consume(cell); } }
 			continue
 		}
 		loops++
-		for _, blockId := range []BlockId{loop.Init, loop.Test} {
+		for _, blockId := range []static_single_assignment.BlockId{loop.Init, loop.Test} {
 			header, found := function.Block(blockId)
 			if !found || header.Kind != BlockKindLoop {
 				t.Errorf("header block %d must have loop kind", blockId)
@@ -81,9 +84,9 @@ after();
 			}
 			identifier := target.LValue.Identifier
 			scopes := &ReactiveScopes{
-				byIdentifier: map[IdentifierId]ScopeId{identifier: 1},
+				byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{identifier: 1},
 				ranges:       map[ScopeId]MutableRange{1: original},
-				members:      map[ScopeId][]IdentifierId{1: {identifier}},
+				members:      map[ScopeId][]static_single_assignment.IdentifierId{1: {identifier}},
 				order:        []ScopeId{1},
 			}
 			aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
