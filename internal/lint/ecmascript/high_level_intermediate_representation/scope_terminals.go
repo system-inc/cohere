@@ -115,14 +115,12 @@ type ScopeIdentity interface {
 	// with no scope. An unmerged scope maps to itself.
 	GroupOf(scope ScopeId) ScopeId
 	// RangeOf gives the surviving scope's final range, after alignment and merging.
-	RangeOf(scope ScopeId) mutation_aliasing.
-
-		// MergedScopeIdentity resolves scope identity through an align-then-merge result.
-		//
-		// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
-		MutableRange
+	RangeOf(scope ScopeId) mutation_aliasing.MutableRange
 }
 
+// MergedScopeIdentity resolves scope identity through an align-then-merge result.
+//
+// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
 type MergedScopeIdentity struct {
 	Aligned *AlignedScopes
 	Merged  *MergedScopes

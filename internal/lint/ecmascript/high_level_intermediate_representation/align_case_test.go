@@ -14,11 +14,9 @@ import (
 // instruction sits at a known position.
 type alignCase struct {
 	// scope is the single scope's range before alignment.
-	scope mutation_aliasing.
-		// terminalId is the evaluation order of the construct's terminal, which is the position the
-		// fallthrough pop minimises a start back to.
-		MutableRange
-
+	scope mutation_aliasing.MutableRange
+	// terminalId is the evaluation order of the construct's terminal, which is the position the
+	// fallthrough pop minimises a start back to.
 	terminalId static_single_assignment.EvaluationOrder
 	// useAt is where the scoped value is read. Placing it inside the arm rather than the entry block
 	// is what keeps the scope active when the sweep reaches the fallthrough.

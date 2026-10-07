@@ -858,12 +858,10 @@ type dependencyCollector struct {
 	objectMethods          map[static_single_assignment.IdentifierId]bool
 	result                 *ScopeDependencies
 	// scopeRange answers a scope's final range, which `checkValidDependency` compares against.
-	scopeRange func(ScopeId) mutation_aliasing.
-		// hoistable is the per-scope set of accesses proven safe to read before the scope runs, from
-		// `CollectHoistablePropertyLoads`. Nil is a valid and meaningful value: it truncates every
-		// dependency path to its root, which is exactly what this pass did before that analysis existed.
-		MutableRange
-
+	scopeRange func(ScopeId) mutation_aliasing.MutableRange
+	// hoistable is the per-scope set of accesses proven safe to read before the scope runs, from
+	// `CollectHoistablePropertyLoads`. Nil is a valid and meaningful value: it truncates every
+	// dependency path to its root, which is exactly what this pass did before that analysis existed.
 	hoistable map[ScopeId][]ReactiveScopeDependency
 	// nestedHoistable is the prototype seam: paths that exist only inside a nested function, which
 	// `CollectHoistablePropertyLoads` never sees because it does not descend either.

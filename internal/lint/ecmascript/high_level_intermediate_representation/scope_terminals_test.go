@@ -233,11 +233,9 @@ func TestScopeTerminalsDeclineOnUnnestedScopes(t *testing.T) {
 type overlappingIdentity struct{ scopes *ReactiveScopes }
 
 func (o overlappingIdentity) GroupOf(scope ScopeId) ScopeId { return scope }
-func (o overlappingIdentity) RangeOf(scope ScopeId) mutation_aliasing.
+func (o overlappingIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	// Staircase: each scope starts one later and ends far past the previous end, so consecutive
 	// scopes overlap and neither contains the other.
-	MutableRange {
-
 	return mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(scope), End: static_single_assignment.EvaluationOrder(scope) + 10}
 }
 
