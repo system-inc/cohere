@@ -70,6 +70,9 @@ func TestNominalClassFiresOnEveryProvenHole(t *testing.T) {
 func TestNominalClassStaysCleanOnInstancesAndInterfaces(t *testing.T) {
 	t.Parallel()
 	for name, source := range map[string]string{
+		"a literal a class and an interface both take": `class A { readonly tag: string = 'a'; bark(): string { return 'woof'; } }
+interface Named { bark(): string }
+const either: A | Named = { tag: 'literal', bark: () => 'literal' };`,
 		"its own instance":       shelters + `const shelter: AnimalShelter = new AnimalShelter();`,
 		"the same type argument": shelters + `const dogBox = new Box<Dog>(rex); const same: Box<Dog> = dogBox;`,
 		// h02's shape, with the interface tsc checks strictly
