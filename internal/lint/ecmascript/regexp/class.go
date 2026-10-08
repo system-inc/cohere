@@ -154,6 +154,16 @@ func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]class
 		end := i + size + escape.width
 		switch escape.kind {
 		case escapeSet:
+			if escape.set == setProperty {
+				if members, ok := greekPropertyAtoms(body[i:end]); ok {
+					class := writeClass(members, false, options)
+					// Keep a set atom so a following dash cannot turn the
+					// expanded property into an endpoint of a source range.
+					atoms = append(atoms, classAtom{kind: classSet, text: class[1 : len(class)-1]})
+					i = end
+					continue
+				}
+			}
 			// regexp2 reads `\d` and `\s` the way ECMAScript does, and `\w`
 			// only until `u` and `i` together widen the set past ASCII.
 			switch {

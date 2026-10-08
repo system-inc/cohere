@@ -171,6 +171,13 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				out.WriteString(wordBoundary(escape.negated, current))
 
 			case escapeSet:
+				if escape.set == setProperty {
+					if atoms, ok := greekPropertyAtoms(source[i:end]); ok {
+						out.WriteString(writeClass(atoms, false, current))
+						i = end
+						continue
+					}
+				}
 				switch {
 				// `\d` and `\s` regexp2 already reads as ECMAScript does, and
 				// `\w` too until `u` and `i` together widen the set past ASCII.
