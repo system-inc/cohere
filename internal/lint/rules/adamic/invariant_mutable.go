@@ -107,6 +107,11 @@ var InvariantMutable = rule.Rule{
 			if !pair.Mutable {
 				return false, descend
 			}
+			// A container a parameter's constraint holds in a field may hold narrower than it says, so any write
+			// through a mutable view of it is the hole (#vnhypqh).
+			if pair.Narrowable {
+				return true, false
+			}
 			// Writing through the wider type stores a target value where the original reads a source
 			// value, so every target value must be a source value too.
 			wrong := readonlyMadeWritable(ctx.Program, pair) || !walker.IsAssignable(pair.Target, pair.Source)

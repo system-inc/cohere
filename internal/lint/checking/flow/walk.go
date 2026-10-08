@@ -68,6 +68,11 @@ type Pair struct {
 	// literal is a literal or a new container (partOf), so the walk knows how far down nobody else holds the value;
 	// past the first part that may be held, there are none.
 	Literals []*ast.Node
+
+	// Narrowable is a container a type parameter's constraint holds in a field (#vnhypqh): the caller's value may
+	// hold a narrower one there, `{ pets: Dog[] }` for `Pack extends { pets: Animal[] }`, so what the constraint
+	// says it holds is no bound on what a write through a wider view can break.
+	Narrowable bool
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -477,12 +482,58 @@ func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
 	if IsClassInstance(pair.Target) || !w.isSlotContainer(constraint) || !w.isSlotContainer(pair.Target) ||
 		!w.hasWritableSlot(pair.Target, 0) {
 		pair.Source = constraint
+		if found, wrong := w.narrowableFields(pair, depth); wrong {
+			return found, true
+		}
 		return w.relate(pair, depth+1)
 	}
 	pair.Mutable = true
 	if wrong, _ := w.judge(pair); wrong {
 		pair.Path = slices.Clone(pair.Path)
 		return pair, true
+	}
+	return Pair{}, false
+}
+
+/*
+ * narrowableFields judges each field of a type parameter's constraint that holds a container, seen through a
+ * target field whose container is writable (#vnhypqh). `Pack extends { pets: Animal[] }` seen as `{ pets:
+ * Animal[] }` relates the constraint's `pets` to the target's, the same type, yet the caller's `{ pets: Dog[] }` is
+ * what the parameter holds, and a Cat pushed through the view lands among the dogs (probe p5 on the task: tsc
+ * 6.0.3 accepts it and Node reads `undefined` as a dog's bark). The field is Narrowable: what it holds may be
+ * narrower than the constraint says.
+ *
+ * The constraint's own fields only. A container deeper in, behind a field of a field, is a narrowing no realistic
+ * instantiation makes, and the DOM puts one under every element (`ownerDocument.adoptedStyleSheets`), so every
+ * `T extends Element` given to an observer would report.
+ */
+func (w *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
+	if pair.Source.Flags()&checker.TypeFlagsObject == 0 || pair.Target.Flags()&checker.TypeFlagsObject == 0 ||
+		IsClassInstance(pair.Source) || w.isSlotContainer(pair.Source) {
+		return Pair{}, false
+	}
+	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, pair.Target) {
+		if property.Flags&ast.SymbolFlagsMethod != 0 {
+			continue
+		}
+		sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, pair.Source, property.Name)
+		if sourceProperty == nil {
+			continue
+		}
+		source := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
+		target := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
+		if !w.isSlotContainer(source) || !w.isSlotContainer(target) || !w.hasWritableSlot(target, 0) {
+			continue
+		}
+		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
+		w.path = append(w.path[:len(pair.Path)], step)
+		field := Pair{Source: source, Target: target, Path: w.path, Mutable: true, Narrowable: true}
+		wrong, _ := w.judge(field)
+		w.path = w.path[:len(pair.Path)]
+		if wrong {
+			field.Path = slices.Clone(append(slices.Clip(pair.Path), step))
+			return field, true
+		}
 	}
 	return Pair{}, false
 }

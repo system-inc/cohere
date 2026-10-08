@@ -154,6 +154,15 @@ function store<Pack extends Animal[]>(pack: Pack): void {
 	const all: Animal[] = pack;
 	all.push({ name: 'cat' });
 }`, "pack"},
+		// #vnhypqh, probe p5: a container the constraint holds in a field, the field typed alike on both sides.
+		"a parameter's field holding an array": {animals + `
+function store<Pack extends { pets: Animal[] }>(pack: Pack): void {
+	const wide: { pets: Animal[] } = pack;
+	wide.pets.push({ name: 'cat' });
+}`, "pack"},
+		"a parameter's field holding a map, named": {animals + `
+interface Kennel { readonly pets: Map<string, Animal> }
+function store<Pack extends Kennel>(pack: Pack): Kennel { return pack; }`, "pack"},
 		// #53w68gt: an intersection's array member is a slot like any array.
 		"an intersection target": {animals + `
 declare const tagged: Dog[] & { tag: string };
@@ -232,7 +241,12 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a parameter given where its constraint is taken":    `declare function observe(target: { id: string }): void; function watch<Item extends { id: string; title: string }>(item: Item): void { observe(item); }`,
 		"a parameter filtered by its constraint's predicate": `function readable(turn: { content: string }): boolean { return turn.content !== ''; } function keep<Turn extends { content: string }>(turns: readonly Turn[]): Turn[] { return turns.filter(readable); }`,
 		"a parameter behind a readonly slot":                 `interface Document { kind: string } function read<Shape extends Document>(operation: { readonly document: Shape }): string { const wide: { readonly document: Document } = operation; return wide.document.kind; }`,
-		"this as an interface its class implements":          `interface Tree { tag: string; keep(): string } const kept: Tree[] = []; class Real implements Tree { tag = 't'; keep(): string { kept.push(this); return 'kept'; } }`,
+		// #vnhypqh's near-misses: a read-only view of the field, a field holding no container, and a container two
+		// fields down, which the DOM puts under every element.
+		"a parameter's field seen read-only":        animals + `function view<Pack extends { pets: Animal[] }>(pack: Pack): { readonly pets: readonly Animal[] } { return pack; }`,
+		"a parameter's field holding a value":       `function view<Pack extends { name: string }>(pack: Pack): { name: string } { return pack; }`,
+		"a container two fields down":               `interface Sheet { readonly href: string } interface Page { readonly owner: { sheets: Sheet[] } } declare function observe(page: Page): void; function watch<Item extends Page>(item: Item): void { observe(item); }`,
+		"this as an interface its class implements": `interface Tree { tag: string; keep(): string } const kept: Tree[] = []; class Real implements Tree { tag = 't'; keep(): string { kept.push(this); return 'kept'; } }`,
 		// #b9a0wgy's near-misses: a readonly member, and a brand, whose object member is a phantom.
 		"an object intersection with a readonly member": animals + `interface Named { readonly label: string } const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' }; const pen: { readonly pet: Animal } & Named = kennel;`,
 		"a class constructor's prototype":               `class Form { readonly kind = 'Form'; } type ClassType = (new () => object) & { prototype: object }; const resolve: () => typeof Form = () => Form; const wide: () => ClassType = resolve;`,
