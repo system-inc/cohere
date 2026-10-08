@@ -503,9 +503,11 @@ func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
  * 6.0.3 accepts it and Node reads `undefined` as a dog's bark). The field is Narrowable: what it holds may be
  * narrower than the constraint says.
  *
- * The constraint's own fields only. A container deeper in, behind a field of a field, is a narrowing no realistic
- * instantiation makes, and the DOM puts one under every element (`ownerDocument.adoptedStyleSheets`), so every
- * `T extends Element` given to an observer would report.
+ * The constraint's own fields only, a bound over a known gap: a container behind a field of a field is the same
+ * hole (`Pack extends { home: { pets: Animal[] } }`, probe p6 on #vnhypqh, Node throws alike), and it stays
+ * unjudged, #k96ahyf. The DOM puts one under every element (`ownerDocument.adoptedStyleSheets`), so at any depth
+ * every `T extends Element` given to an observer would report; telling a deep container an instantiation can
+ * narrow from the DOM's is that task's question.
  */
 func (w *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
 	if pair.Source.Flags()&checker.TypeFlagsObject == 0 || pair.Target.Flags()&checker.TypeFlagsObject == 0 ||
