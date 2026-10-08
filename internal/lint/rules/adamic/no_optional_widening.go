@@ -60,7 +60,7 @@ var NoOptionalWidening = rule.Rule{
 		var exactAtTop bool
 		var missing *ast.Symbol
 		judge := func(pair flow.Pair) (bool, bool) {
-			if isClassInstance(pair.Target) {
+			if flow.IsClassInstance(pair.Target) {
 				return false, false
 			}
 			if pair.Target.Flags()&checker.TypeFlagsObject == 0 || pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {

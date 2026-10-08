@@ -68,6 +68,11 @@ type Pair struct {
 	// literal is a literal or a new container (partOf), so the walk knows how far down nobody else holds the value;
 	// past the first part that may be held, there are none.
 	Literals []*ast.Node
+
+	// Narrowable is a container a type parameter's constraint holds in a field (#vnhypqh): the caller's value may
+	// hold a narrower one there, `{ pets: Dog[] }` for `Pack extends { pets: Animal[] }`, so what the constraint
+	// says it holds is no bound on what a write through a wider view can break.
+	Narrowable bool
 }
 
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
@@ -240,6 +245,12 @@ func (w *Walker) IsAssignable(source *checker.Type, target *checker.Type) bool {
 	return answer
 }
 
+// WidenedType is the checker's getWidenedType: a fresh literal's type without its freshness or its literal
+// property types.
+func (w *Walker) WidenedType(t *checker.Type) *checker.Type {
+	return checker.Checker_getWidenedType(w.typeChecker, t)
+}
+
 // meet records that the walk has met key, and says whether it had met it before.
 func (w *Walker) meet(key [2]*checker.Type) bool {
 	if len(w.visited) < visitedListLimit {
@@ -364,6 +375,9 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	if pair.Target.Flags()&checker.TypeFlagsTypeParameter != 0 {
 		return w.typeParameterSlot(pair)
 	}
+	if pair.Source.Flags()&checker.TypeFlagsTypeParameter != 0 {
+		return w.sourceTypeParameterSlot(pair, depth)
+	}
 	return w.parts(pair, depth)
 }
 
@@ -376,6 +390,19 @@ func hasPrimitiveMember(t *checker.Type) bool {
 		}
 	}
 	return false
+}
+
+// IsClassInstance is the instance side of a class, generic or not: `Box<Dog>`, `Shelter`. The class's own
+// constructor type (`typeof Shelter`) carries the class's symbol too, and is not one.
+func IsClassInstance(t *checker.Type) bool {
+	if t == nil || t.Flags()&checker.TypeFlagsObject == 0 {
+		return false
+	}
+	if t.ObjectFlags()&checker.ObjectFlagsClass != 0 {
+		return true
+	}
+	return t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil &&
+		t.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
 }
 
 // isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
@@ -420,6 +447,95 @@ func (w *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
 	if wrong, _ := w.judge(pair); wrong {
 		pair.Path = slices.Clone(pair.Path)
 		return pair, true
+	}
+	return Pair{}, false
+}
+
+/*
+ * sourceTypeParameterSlot relates a type parameter source (#sse0s6s), the mirror of typeParameterSlot. The
+ * parameter's value is whatever its caller passed: its constraint, or anything narrower.
+ *
+ * In general the walk goes on through the constraint, the value the parameter holds at least. `Pack extends
+ * Dog[]` seen as `Animal[]` is then `Dog[]` seen as `Animal[]`, and the same for a Map or an object with a
+ * writable field (Adamic's type_rules_parameter_* rows, and probes p1_* on #sse0s6s: tsc 6.0.3 accepts each and
+ * Node reads `undefined` as the dog's bark). A class instance constraint (`this` among them) is then the class,
+ * whose fields are its own declared ones, and a class instance target is nominal-class's either way.
+ *
+ * One shape the constraint can't show: a parameter that is itself a container, seen as a mutable container.
+ * `Pack extends Animal[]` seen as `Animal[]` relates the constraint to itself, yet the caller's `Dog[]` is what
+ * pack holds, and a Cat pushed through the view lands among the dogs (probe p1_constraint_is_the_target). There
+ * the parameter is one mutable slot, judged whole as a target parameter is: invariant-mutable asks whether the
+ * target is assignable back to the parameter, which a type other than the parameter never is.
+ *
+ * Judged whole everywhere, it measured four findings on ahra with no Node probe behind any of them: a `T extends
+ * Element` given to `IntersectionObserver.observe`, a `{ content: string }` filter over a generic turn, a spread of
+ * that turn, and a document whose readonly slot the whole judgment ignored. A parameter seen as a wider object
+ * can hold a narrower writable field only through an instantiation that narrows one, where a container's
+ * elements are what every instantiation narrows. A field holding a container under a parameter (`Pack extends {
+ * pets: Animal[] }` seen as `{ pets: Animal[] }`) is the gap this leaves.
+ */
+func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
+	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Source)
+	if constraint == nil || constraint == pair.Source {
+		return Pair{}, false
+	}
+	if IsClassInstance(pair.Target) || !w.isSlotContainer(constraint) || !w.isSlotContainer(pair.Target) ||
+		!w.hasWritableSlot(pair.Target, 0) {
+		pair.Source = constraint
+		if found, wrong := w.narrowableFields(pair, depth); wrong {
+			return found, true
+		}
+		return w.relate(pair, depth+1)
+	}
+	pair.Mutable = true
+	if wrong, _ := w.judge(pair); wrong {
+		pair.Path = slices.Clone(pair.Path)
+		return pair, true
+	}
+	return Pair{}, false
+}
+
+/*
+ * narrowableFields judges each field of a type parameter's constraint that holds a container, seen through a
+ * target field whose container is writable (#vnhypqh). `Pack extends { pets: Animal[] }` seen as `{ pets:
+ * Animal[] }` relates the constraint's `pets` to the target's, the same type, yet the caller's `{ pets: Dog[] }` is
+ * what the parameter holds, and a Cat pushed through the view lands among the dogs (probe p5 on the task: tsc
+ * 6.0.3 accepts it and Node reads `undefined` as a dog's bark). The field is Narrowable: what it holds may be
+ * narrower than the constraint says.
+ *
+ * The constraint's own fields only, a bound over a known gap: a container behind a field of a field is the same
+ * hole (`Pack extends { home: { pets: Animal[] } }`, probe p6 on #vnhypqh, Node throws alike), and it stays
+ * unjudged, #k96ahyf. The DOM puts one under every element (`ownerDocument.adoptedStyleSheets`), so at any depth
+ * every `T extends Element` given to an observer would report; telling a deep container an instantiation can
+ * narrow from the DOM's is that task's question.
+ */
+func (w *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
+	if pair.Source.Flags()&checker.TypeFlagsObject == 0 || pair.Target.Flags()&checker.TypeFlagsObject == 0 ||
+		IsClassInstance(pair.Source) || w.isSlotContainer(pair.Source) {
+		return Pair{}, false
+	}
+	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, pair.Target) {
+		if property.Flags&ast.SymbolFlagsMethod != 0 {
+			continue
+		}
+		sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, pair.Source, property.Name)
+		if sourceProperty == nil {
+			continue
+		}
+		source := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
+		target := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
+		if !w.isSlotContainer(source) || !w.isSlotContainer(target) || !w.hasWritableSlot(target, 0) {
+			continue
+		}
+		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
+		w.path = append(w.path[:len(pair.Path)], step)
+		field := Pair{Source: source, Target: target, Path: w.path, Mutable: true, Narrowable: true}
+		wrong, _ := w.judge(field)
+		w.path = w.path[:len(pair.Path)]
+		if wrong {
+			field.Path = slices.Clone(append(slices.Clip(pair.Path), step))
+			return field, true
+		}
 	}
 	return Pair{}, false
 }

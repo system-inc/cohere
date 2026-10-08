@@ -112,6 +112,57 @@ function admit<Pack extends Animal[], Narrow extends Pack>(narrow: Narrow, extra
 function admit<Pack extends { readonly all: Animal[] }, Narrow extends Pack>(narrow: Narrow): Pack {
 	return narrow;
 }`, "narrow"},
+		// #sse0s6s shape 1, Adamic's type_rules_parameter_* rows (codex/shared-ssa-unit-a 66ad9bb): a parameter source
+		// is the value its constraint holds or narrower, so seen as a wider type with a writable slot, a write through
+		// it reaches the caller's. Probes p1_* on the task: tsc 6.0.3 accepts, Node reads undefined as a string.
+		"a constrained parameter returned wider (parameter_min)": {`interface Animal { readonly name: string; }
+interface Dog extends Animal { readonly bark: string; }
+function view<Pack extends Dog[]>(dogs: Pack): Animal[] {
+ return dogs;
+}
+console.log('accepted');`, "dogs"},
+		"a constrained parameter as a wider array (parameter_array)": {`interface Animal { readonly name: string; }
+interface Dog extends Animal { readonly bark: string; }
+function store<Pack extends Dog[]>(dogs: Pack): void {
+ const animals: Animal[] = dogs;
+ animals[0] = { name: 'cat' };
+}
+const dogs: Dog[] = [{ name: 'old', bark: 'woof' }];
+store(dogs);
+for (const dog of dogs) { console.log(dog.bark); }`, "dogs"},
+		"a constrained parameter as a wider map (parameter_map)": {`interface Animal { readonly name: string; }
+interface Dog extends Animal { readonly bark: string; }
+function store<Pack extends Map<string, Dog>>(dogs: Pack): void {
+ const animals: Map<string, Animal> = dogs;
+ animals.set('pet', { name: 'cat' });
+}
+const dogs = new Map<string, Dog>([['pet', { name: 'old', bark: 'woof' }]]);
+store(dogs);
+for (const dog of dogs.values()) { console.log(dog.bark); }`, "dogs"},
+		"a constrained parameter as a wider field (parameter_field)": {`interface Animal { readonly name: string; }
+interface Dog extends Animal { readonly bark: string; }
+function store<Pack extends { pet: Dog }>(dogs: Pack): void {
+ const animals: { pet: Animal } = dogs;
+ animals.pet = { name: 'cat' };
+ console.log(dogs.pet.bark);
+}
+store({ pet: { name: 'old', bark: 'woof' } });`, "dogs"},
+		// Beyond the rows, probe p1_constraint_is_the_target: the constraint is the target itself, and the caller's
+		// Dog[] is still what pack holds, so relating the constraint alone would miss it.
+		"a parameter seen as its own constraint": {animals + `
+function store<Pack extends Animal[]>(pack: Pack): void {
+	const all: Animal[] = pack;
+	all.push({ name: 'cat' });
+}`, "pack"},
+		// #vnhypqh, probe p5: a container the constraint holds in a field, the field typed alike on both sides.
+		"a parameter's field holding an array": {animals + `
+function store<Pack extends { pets: Animal[] }>(pack: Pack): void {
+	const wide: { pets: Animal[] } = pack;
+	wide.pets.push({ name: 'cat' });
+}`, "pack"},
+		"a parameter's field holding a map, named": {animals + `
+interface Kennel { readonly pets: Map<string, Animal> }
+function store<Pack extends Kennel>(pack: Pack): Kennel { return pack; }`, "pack"},
 		// #53w68gt: an intersection's array member is a slot like any array.
 		"an intersection target": {animals + `
 declare const tagged: Dog[] & { tag: string };
@@ -176,6 +227,27 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a generic method seen under two receivers": `class Entity { name = ''; clone<T extends this>(): T { return this as T; } } class Session extends Entity { token = ''; } declare const session: Readonly<Session & object>; const wide: Readonly<Session> = session;`,
 		"a union member the parameter is not":       `class Tracked { name = ''; } function insert<Entity extends Tracked>(entity: Readonly<Entity> | readonly Entity[]): readonly Entity[] { const entities: readonly Entity[] = Array.isArray(entity) ? entity : [entity]; return entities; }`,
 		"a parameter narrowed to non-null":          `function keep<Value extends { items: string[] } | null>(value: Value, set: (next: Value) => void): void { if(value !== null) { set(value); } }`,
+		// #sse0s6s shape 1's near-misses: a read-only view, the parameter itself, a constraint with nothing to write,
+		// a class constraint (nominal-class's), and `this`, which is the class's own instance.
+		"a constrained parameter seen read-only":   animals + `function view<Pack extends Dog[]>(dogs: Pack): readonly Animal[] { return dogs; }`,
+		"a constrained parameter seen as itself":   animals + `function keep<Pack extends Dog[]>(dogs: Pack): Pack { const same: Pack = dogs; return same; }`,
+		"a parameter whose constraint is readonly": animals + `function view<Item extends Dog>(item: Item): Animal { return item; }`,
+		"a parameter constrained by a class":       animals + `class Kennel { pets: Dog[] = []; } function keep<Held extends Kennel>(kennel: Held): Kennel { return kennel; }`,
+		"this as its class":                        `class Chain { items: string[] = []; next(): Chain { return this; } }`,
+		// The findings judging every parameter source whole measured on ahra and adamic, none with a Node probe: a
+		// parameter given to a function taking its constraint, a parameter whose constraint is an object filtered by
+		// a callback taking that object, a readonly slot holding one, and `this` seen as an interface its class
+		// implements (adamic's reuse_spread_method_alias.a).
+		"a parameter given where its constraint is taken":    `declare function observe(target: { id: string }): void; function watch<Item extends { id: string; title: string }>(item: Item): void { observe(item); }`,
+		"a parameter filtered by its constraint's predicate": `function readable(turn: { content: string }): boolean { return turn.content !== ''; } function keep<Turn extends { content: string }>(turns: readonly Turn[]): Turn[] { return turns.filter(readable); }`,
+		"a parameter behind a readonly slot":                 `interface Document { kind: string } function read<Shape extends Document>(operation: { readonly document: Shape }): string { const wide: { readonly document: Document } = operation; return wide.document.kind; }`,
+		// #vnhypqh's near-misses: a read-only view of the field and a field holding no container. And a container two
+		// fields down, which is not sound (probe p6 on #vnhypqh, Node throws): it pins the depth bound over the known
+		// gap #k96ahyf, since at any depth the DOM's ownerDocument.adoptedStyleSheets reports every T extends Element.
+		"a parameter's field seen read-only":                             animals + `function view<Pack extends { pets: Animal[] }>(pack: Pack): { readonly pets: readonly Animal[] } { return pack; }`,
+		"a parameter's field holding a value":                            `function view<Pack extends { name: string }>(pack: Pack): { name: string } { return pack; }`,
+		"a container two fields down pins the depth bound over #k96ahyf": `interface Sheet { readonly href: string } interface Page { readonly owner: { sheets: Sheet[] } } declare function observe(page: Page): void; function watch<Item extends Page>(item: Item): void { observe(item); }`,
+		"this as an interface its class implements":                      `interface Tree { tag: string; keep(): string } const kept: Tree[] = []; class Real implements Tree { tag = 't'; keep(): string { kept.push(this); return 'kept'; } }`,
 		// #b9a0wgy's near-misses: a readonly member, and a brand, whose object member is a phantom.
 		"an object intersection with a readonly member": animals + `interface Named { readonly label: string } const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' }; const pen: { readonly pet: Animal } & Named = kennel;`,
 		"a class constructor's prototype":               `class Form { readonly kind = 'Form'; } type ClassType = (new () => object) & { prototype: object }; const resolve: () => typeof Form = () => Form; const wide: () => ClassType = resolve;`,

@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/checking/flow"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -144,10 +145,10 @@ func distinguishable(typeChecker *checker.Checker, left *checker.Type, right *ch
 		// Two members of one primitive class: literals of it, told apart by ===.
 		return isUnitLiteral(left) && isUnitLiteral(right)
 	}
-	if isClassInstance(left) && !isClassInstance(right) || !isClassInstance(left) && isClassInstance(right) {
+	if flow.IsClassInstance(left) && !flow.IsClassInstance(right) || !flow.IsClassInstance(left) && flow.IsClassInstance(right) {
 		return true
 	}
-	if isClassInstance(left) && isClassInstance(right) && classSymbol(left) != classSymbol(right) &&
+	if flow.IsClassInstance(left) && flow.IsClassInstance(right) && classSymbol(left) != classSymbol(right) &&
 		!derivesFrom(typeChecker, declaredClassType(typeChecker, left), classSymbol(right), map[*ast.Symbol]bool{}) &&
 		!derivesFrom(typeChecker, declaredClassType(typeChecker, right), classSymbol(left), map[*ast.Symbol]bool{}) {
 		return true
