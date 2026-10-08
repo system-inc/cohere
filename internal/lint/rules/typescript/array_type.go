@@ -6,7 +6,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -228,8 +227,8 @@ func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTy
 	// element type is already the inner node. Without the skip the repair would open its generic
 	// inside the parentheses and leave the closing one stranded.
 	inner := arrayTypeSkipParentheses(elementType)
-	errorRange := type_checking.TrimNodeTextRange(ctx.SourceFile, errorNode)
-	innerRange := type_checking.TrimNodeTextRange(ctx.SourceFile, inner)
+	errorRange := rule.TokenRange(ctx.SourceFile, errorNode)
+	innerRange := rule.TokenRange(ctx.SourceFile, inner)
 
 	ctx.ReportRangeWithFixes(errorRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(errorRange.Pos(), innerRange.Pos()), className+"<"),
@@ -369,8 +368,8 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 		end += ")"
 	}
 
-	nodeRange := type_checking.TrimNodeTextRange(ctx.SourceFile, node)
-	argumentRange := type_checking.TrimNodeTextRange(ctx.SourceFile, argument)
+	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	argumentRange := rule.TokenRange(ctx.SourceFile, argument)
 
 	ctx.ReportRangeWithFixes(nodeRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(nodeRange.Pos(), argumentRange.Pos()), start),
@@ -560,7 +559,7 @@ func arrayTypeMessageType(ctx rule.Context, node *ast.Node) string {
 	if !arrayTypeIsSimple(node) {
 		return "T"
 	}
-	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, node)
+	trimmed := rule.TokenRange(ctx.SourceFile, node)
 	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()]
 }
 

@@ -7,7 +7,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -345,7 +344,7 @@ func classLiteralFieldReplacementFor(
 	}
 
 	sourceText := ctx.SourceFile.Text()
-	bodyStart := type_checking.TrimNodeTextRange(ctx.SourceFile, body).Pos()
+	bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
 	if closingParen >= bodyStart || bodyStart > len(sourceText) {
 		return "", false
 	}
@@ -382,7 +381,7 @@ func classLiteralFieldReplacementFor(
 func classLiteralClosingParenBefore(ctx rule.Context, node *ast.Node, body *ast.Node) int {
 	sourceText := ctx.SourceFile.Text()
 	memberRange := rule.TokenRange(ctx.SourceFile, node)
-	bodyStart := type_checking.TrimNodeTextRange(ctx.SourceFile, body).Pos()
+	bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
 	if bodyStart > len(sourceText) {
 		return -1
 	}
@@ -853,7 +852,7 @@ func classLiteralNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
-	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, node)
+	trimmed := rule.TokenRange(ctx.SourceFile, node)
 	sourceText := ctx.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false

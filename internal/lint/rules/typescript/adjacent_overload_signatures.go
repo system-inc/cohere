@@ -4,7 +4,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
 	shimscanner "github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -524,7 +523,7 @@ func adjacentOverloadNameOf(ctx rule.Context, key *ast.Node) (string, adjacentOv
 	//
 	// `Pos()` includes leading trivia, which upstream's `range` does not, so a key written after a
 	// newline would carry the whitespace and stop matching the same key written inline.
-	// `TrimNodeTextRange` is the same token-start walk `ReportNode` uses.
-	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, key)
+	// `rule.TokenRange` is the same token-start walk `ReportNode` uses.
+	trimmed := rule.TokenRange(ctx.SourceFile, key)
 	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
 }

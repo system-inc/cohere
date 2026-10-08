@@ -26,9 +26,9 @@ import (
 //
 // Provenance: tsgolint `internal/rules/no_array_delete/no_array_delete.go`, vendored at commit
 // `05b7fbc` and absorbed onto cohere's own rule interface here. It reaches for
-// `GetConstrainedTypeAtLocation`, `TrimNodeTextRange` and `Checker_isArrayOrTupleType` because that
-// is what upstream reaches for, and this note is why a reader finds those helpers in a file that
-// otherwise looks native.
+// `GetConstrainedTypeAtLocation`, `TrimNodeTextRange` (here `rule.TokenRange`) and
+// `Checker_isArrayOrTupleType` because that is what upstream reaches for, and this note is why a
+// reader finds those helpers in a file that otherwise looks native.
 //
 // tsgolint is not re-synced, so this file is now the only copy of the algorithm rather than a
 // translation layer over a vendored one. The checker logic below is byte-identical to upstream's;
@@ -41,7 +41,7 @@ import (
 //
 // The reported SPAN is unchanged too, and that is the part worth naming. While this rule was
 // adapted, `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
-// tsgolint's own runner does the same through `type_checking.TrimNodeTextRange`. Our native
+// tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
 // the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
 // include leading trivia and reintroduce the defect fixed in `8bdd70b`; the span test in this
@@ -128,16 +128,16 @@ import (
 //
 // # Two mutants survive the sweep and both are equivalent rather than unseen
 //
-// Rewriting `type_checking.TrimNodeTextRange(sourceFile, n)` to `n.Loc` for either the receiver range or the
+// Rewriting `rule.TokenRange(sourceFile, n)` to `n.Loc` for either the receiver range or the
 // argument range compiles, changes bytes, and no fixture notices. That reads as a blind spot and it
 // is not one, which matters because the trivia-trimming difference is a real defect this project has
 // already shipped once at the adapter.
 //
-// It cannot bite HERE. `TrimNodeTextRange` is
-// `GetRangeOfTokenAtPosition(file, n.Pos()).WithEnd(n.End())`, so it differs from `n.Loc` only in
-// where the range STARTS. Both spellings end at `n.End()`. And this rule reads nothing but the end:
-// `expressionRange` and `argumentRange` are each consumed exactly once, as `.End()`, to locate the
-// bracket tokens. No code path reads either `Pos()`, so no input can distinguish the two versions.
+// It cannot bite HERE. `rule.TokenRange` starts at the node's first token and ends at `n.End()`, so it
+// differs from `n.Loc` only in where the range STARTS. Both spellings end at `n.End()`. And this rule
+// reads nothing but the end: `expressionRange` and `argumentRange` are each consumed exactly once, as
+// `.End()`, to locate the bracket tokens. No code path reads either `Pos()`, so no input can
+// distinguish the two versions.
 //
 // That claim is checked rather than asserted. The same mutation applied to the value actually read,
 // turning `expressionRange.End()` into `expressionRange.End() + 1`, is CAUGHT by twenty six failing
@@ -204,8 +204,8 @@ var NoArrayDelete = rule.Rule{
 					return
 				}
 
-				expressionRange := type_checking.TrimNodeTextRange(ctx.SourceFile, expression.Expression)
-				argumentRange := type_checking.TrimNodeTextRange(ctx.SourceFile, expression.ArgumentExpression)
+				expressionRange := rule.TokenRange(ctx.SourceFile, expression.Expression)
+				argumentRange := rule.TokenRange(ctx.SourceFile, expression.ArgumentExpression)
 
 				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
 				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())

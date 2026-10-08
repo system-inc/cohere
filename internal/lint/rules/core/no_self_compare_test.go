@@ -132,3 +132,29 @@ func TestNoSelfCompareReportsTheWholeComparison(t *testing.T) {
 		t.Fatalf("reported %q, wanted the whole comparison", reported)
 	}
 }
+
+// A JSX element with an empty attribute list followed by a space, which used to crash the rule (#p86b9pw).
+//
+// The empty attribute list is a zero-width node, and rule.TokenRange started it at the next token, past the
+// space, while ending it at the node's end, so the token signature sliced the source backwards: "slice
+// bounds out of range [3:2]" on `<a />>0`, valid TSX. Without the space the next token starts where the
+// node does, which is why upstream's corpus, all of it plain JavaScript, never reached it. The answers are
+// ESLint 10.8.1's, read with the core Linter and jsx on: the two comparisons of a tag with itself report,
+// and the other two are clean.
+func TestNoSelfCompareReadsAJsxElementWithAnEmptyAttributeList(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "/repository/source/SelfCompare.tsx"
+	for _, sourceText := range []string{"<a />>0;", "ReactDOM.render(<div />, x) === null;"} {
+		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfCompare, fileName, sourceText))
+		})
+	}
+	for _, sourceText := range []string{"<a /> === <a />;", "<a ></a> === <a ></a>;"} {
+		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfCompare, fileName, sourceText), "comparingToSelf")
+		})
+	}
+}

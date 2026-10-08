@@ -654,7 +654,7 @@ func noUnnecessaryBooleanLiteralCompareNodeText(ctx rule.Context, node *ast.Node
 	if node == nil {
 		return "", false
 	}
-	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, node)
+	trimmed := rule.TokenRange(ctx.SourceFile, node)
 	sourceText := ctx.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false

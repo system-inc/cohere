@@ -25,7 +25,8 @@ const tokenRangeCorpusVariable = "COHERE_TOKEN_RANGE_CORPUS"
 // It keeps only the start, so the two agree exactly when they agree on every node's start. Findings identical
 // on four consumers would only show that no current rule reached a shape where they differ, so this compares
 // them on every node of every file: the repository's fixtures, JSX, templates and JSDoc among them, and a real
-// tree when the variable names one. A start one past the scanner's is the mutant it must catch.
+// tree when the variable names one. A start one past the scanner's is the mutant it must catch. The scanner's
+// start is clamped to the node's end, since a range never starts past its end; see TokenRange.
 func TestTokenRangeStartsWhereTheScannerDoes(t *testing.T) {
 	t.Parallel()
 	roots := []string{repositoryRoot(t)}
@@ -37,9 +38,15 @@ func TestTokenRangeStartsWhereTheScannerDoes(t *testing.T) {
 		t.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
 
+	// The scanner's start, never past the node's end: a zero-width node has no token, and the scanner's next one
+	// lies past the trivia after it (#p86b9pw). How many nodes that clamp touches is logged by kind below.
 	scannerStart := func(sourceFile *ast.SourceFile, node *ast.Node) int {
-		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos()
+		return min(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos(), node.End())
 	}
+	_, clamped := compareStarts(files, scannerStart, func(sourceFile *ast.SourceFile, node *ast.Node) int {
+		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos()
+	})
+	t.Logf("the scanner's start passes the node's end on %d nodes, by kind: %s", total(clamped), summary(clamped))
 	nodes, disagreements := compareStarts(files, scannerStart, func(sourceFile *ast.SourceFile, node *ast.Node) int {
 		return TokenRange(sourceFile, node).Pos()
 	})

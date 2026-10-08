@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -743,7 +742,7 @@ func preferIncludesNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
 	if sourceFile == nil {
 		return "", false
 	}
-	trimmed := type_checking.TrimNodeTextRange(sourceFile, node)
+	trimmed := rule.TokenRange(sourceFile, node)
 	text := sourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(text) || trimmed.Pos() > trimmed.End() {
 		return "", false

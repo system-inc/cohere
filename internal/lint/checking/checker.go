@@ -174,7 +174,7 @@ func GetForStatementHeadLoc(
 	} else {
 		statement = node.AsForInOrOfStatement().Statement
 	}
-	return TrimNodeTextRange(sourceFile, node).WithEnd(statement.Pos())
+	return rule.TokenRange(sourceFile, node).WithEnd(statement.Pos())
 }
 
 var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}
@@ -625,6 +625,6 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 		}
 	}
 
-	r := TrimNodeTextRange(sourceFile, member)
+	r := rule.TokenRange(sourceFile, member)
 	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
 }

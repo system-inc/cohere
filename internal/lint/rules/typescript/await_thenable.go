@@ -38,13 +38,13 @@ import (
 // suggestion moved from `rule.RuleSuggestion{FixesArr: []rule.RuleFix{...}}` to
 // `rule.Suggestion{Fixes: []rule.Fix{...}}`. The three fix constructors map one to one:
 // `RuleFixRemoveRange` is `rule.RemoveRange`, and `RuleFixRemove(file, node)` is `ctx.RemoveNode`,
-// which are the same expression under different names since `type_checking.TrimNodeTextRange` and
-// `rule.TokenRange` are both `GetRangeOfTokenAtPosition(file, node.Pos()).WithEnd(node.End())`. No
+// which are the same expression under different names since upstream's `utils.TrimNodeTextRange` and
+// `rule.TokenRange` both start at the node's first token and end at its end. No
 // predicate, no tri-state and no traversal was touched.
 //
 // The reported SPANS are unchanged, and that is the part worth naming. While this rule was adapted,
 // `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
-// tsgolint's own runner does the same through `type_checking.TrimNodeTextRange`. Our native
+// tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
 // the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
 // include leading trivia, so an indented `await 0` would report the text "\n  await 0" and an

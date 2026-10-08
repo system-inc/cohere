@@ -17,10 +17,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
-func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
-}
-
 // commentRangeFactory is the one factory every GetCommentsInRange call hands the scanner.
 //
 // The scanner's only use of its factory is NewCommentRange, which builds a CommentRange by value and

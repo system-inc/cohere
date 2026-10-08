@@ -585,12 +585,23 @@ func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message,
 // comment; and a node inside JSDoc. Those keep the scanner. TestTokenRangeStartsWhereTheScannerDoes holds the
 // two to the scanner's start on every node of the fixtures and of the four consumers, and found exactly those
 // shapes when the scanner was dropped for every node (14,522 of 6,024,171).
+//
+// A range never starts past its end. A missing node, which is what the compiler calls any zero-width one, has
+// no token of its own: an empty JSX attribute list, or a name the parser invented in recovery. Scanning from it
+// finds the next token, past whatever trivia follows, so cut at the node's end that start came after the end,
+// and every caller slicing the source with it panicked: no-self-compare on `<a />>0`, valid TSX (#p86b9pw). Its
+// range is the empty one where it sits, which is the start the compiler's own GetTokenPosOfNode gives a missing
+// node and the next token's start clamped to the node's end, both at once, since its position is its end. The
+// scanner's start for the other three shapes is clamped the same way.
 func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	if sourceFile == nil || node == nil {
 		return node.Loc
 	}
-	if ast.NodeIsMissing(node) || ast.IsJSDocNode(node) || node.Kind == ast.KindJsxText || node.Flags&ast.NodeFlagsJSDoc != 0 {
-		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+	if ast.NodeIsMissing(node) {
+		return node.Loc
+	}
+	if ast.IsJSDocNode(node) || node.Kind == ast.KindJsxText || node.Flags&ast.NodeFlagsJSDoc != 0 {
+		return core.NewTextRange(min(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos(), node.End()), node.End())
 	}
 	return core.NewTextRange(scanner.GetTokenPosOfNode(node, sourceFile, false), node.End())
 }

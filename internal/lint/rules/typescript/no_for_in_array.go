@@ -103,7 +103,7 @@ import (
 // loop BODY, deliberately excluding the body itself. It is also the reason the node-report trivia
 // question does not arise for this rule: this is a `ReportRange` of a range the helper computed, so
 // the `TokenRange` trimming that `ReportNode` applies is not in the path at all, and the trimming
-// that does happen is `TrimNodeTextRange` inside `GetForStatementHeadLoc`. Absorbing the rule
+// that does happen is `rule.TokenRange` inside `GetForStatementHeadLoc`. Absorbing the rule
 // therefore cannot move this span: neither the adapter nor our own node helpers ever touched it.
 //
 // That span is asserted rather than assumed. All 18 of upstream's single-file diagnostics are

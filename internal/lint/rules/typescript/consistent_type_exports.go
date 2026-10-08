@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -598,7 +597,7 @@ func consistentTypeExportsLocalName(ctx rule.Context, specifier *ast.Node) (stri
 
 // consistentTypeExportsNameText renders a specifier name as written in the source.
 func consistentTypeExportsNameText(ctx rule.Context, node *ast.Node) (string, bool) {
-	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, node)
+	trimmed := rule.TokenRange(ctx.SourceFile, node)
 	sourceText := ctx.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
