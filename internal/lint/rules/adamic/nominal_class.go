@@ -70,22 +70,27 @@ var NominalClass = rule.Rule{
 		// site (#m6tyg79).
 		var handle policy.MessageHandle
 		judge := func(pair flow.Pair) (bool, bool) {
-			if !isClassInstance(pair.Target) {
+			classes := classTargets(pair.Target)
+			if len(classes) == 0 {
 				return false, true
 			}
-			verdict := nominalVerdict(typeChecker, pair.Source, pair.Target)
-			switch verdict {
-			case nominalAccepted:
-				return false, false
-			case nominalUndecided:
-				// A union or intersection source: the walk pairs its members one by one.
-				return false, true
-			case nominalTypeArgumentsDiffer:
-				handle = nominalClassTypeArgumentsDifferText
-			default:
-				handle = nominalClassNotAnInstanceText
+			// Each class the target is must be one the source is an instance of: Adamic's Weak<A> is
+			// `(A & WeakBrand) | undefined`, so the A inside its intersection is a class like any (#sse0s6s).
+			for _, class := range classes {
+				switch nominalVerdict(typeChecker, pair.Source, class) {
+				case nominalAccepted:
+					continue
+				case nominalUndecided:
+					// A union or intersection source: the walk pairs its members one by one.
+					return false, true
+				case nominalTypeArgumentsDiffer:
+					handle = nominalClassTypeArgumentsDifferText
+				default:
+					handle = nominalClassNotAnInstanceText
+				}
+				return true, false
 			}
-			return true, false
+			return false, false
 		}
 		return walker.Listeners(func(site flow.Site) {
 			if site.Spread || site.Method {
@@ -93,7 +98,7 @@ var NominalClass = rule.Rule{
 				return
 			}
 			handle = policy.MessageHandle{}
-			found, wrong := walker.Walk(site, judge)
+			found, wrong := walkSite(walker, site, judge)
 			if !wrong {
 				return
 			}
@@ -107,6 +112,59 @@ var NominalClass = rule.Rule{
 			})
 		})
 	},
+}
+
+// classTargets are the class instances a target is: the target itself, or each class instance member of an
+// intersection target. None for any other target.
+func classTargets(target *checker.Type) []*checker.Type {
+	if flow.IsClassInstance(target) {
+		return []*checker.Type{target}
+	}
+	if target.Flags()&checker.TypeFlagsIntersection == 0 {
+		return nil
+	}
+	var classes []*checker.Type
+	for _, member := range target.Types() {
+		if flow.IsClassInstance(member) {
+			classes = append(classes, member)
+		}
+	}
+	return classes
+}
+
+/*
+ * walkSite walks a site, deciding a fresh site's union target as the walk decides any union target (#sse0s6s):
+ * the members the source is assignable to are paired, and the site passes when one of them does. A fresh site is
+ * otherwise judged at its top only, its parts being sites of their own, and the top of `const value: A | B = {
+ * value: () => 3 }` is no class, so a literal reached a class through a union unjudged. Probe p3_union_literal on
+ * the task: tsc 6.0.3 accepts it, and Node, past `instanceof A`, calls B's method on the literal and throws.
+ * nominal-class's alone: the other rules judge a fresh site whole.
+ */
+func walkSite(walker *flow.Walker, site flow.Site, judge flow.Judge) (flow.Pair, bool) {
+	if !site.Fresh || site.Target.Flags()&checker.TypeFlagsUnion == 0 {
+		return walker.Walk(site, judge)
+	}
+	// A fresh literal meets tsc's excess property check member by member, which the union as a whole was spared: `{
+	// tag, bark }` into `A | Named` is assignable to Named only once its freshness is gone, which widening takes.
+	// Widening keeps the literal types a member asks for, since the union is the literal's contextual type.
+	widened := walker.WidenedType(site.Source)
+	var first flow.Pair
+	failed := false
+	for _, member := range site.Target.Types() {
+		if !walker.IsAssignable(widened, member) {
+			continue
+		}
+		memberSite := site
+		memberSite.Target = member
+		found, wrong := walker.Walk(memberSite, judge)
+		if !wrong {
+			return flow.Pair{}, false
+		}
+		if !failed {
+			first, failed = found, true
+		}
+	}
+	return first, failed
 }
 
 type nominal int
@@ -148,7 +206,7 @@ func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *
 		}
 		return nominalVerdict(typeChecker, constraint, target)
 	}
-	if !isClassInstance(source) {
+	if !flow.IsClassInstance(source) {
 		return nominalNotAnInstance
 	}
 	targetClass := classSymbol(target)

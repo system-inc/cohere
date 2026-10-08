@@ -93,7 +93,7 @@ var InvariantMutable = rule.Rule{
 		judge := func(pair flow.Pair) (bool, bool) {
 			// What a class instance is, is nominal-class's, so the walk does not go into one. The slot holding it
 			// is still judged here, as any slot is (#5y54eyj).
-			descend := !isClassInstance(pair.Target)
+			descend := !flow.IsClassInstance(pair.Target)
 			// A method's parameter is written by the caller, so whatever the wider type passes must be something
 			// the method reads: the target's parameter type (the pair's Source) assignable to the source's. tsc
 			// compares a method's parameters both ways (#gvzdft9 shape 5); a function's it already checks one way
@@ -175,17 +175,4 @@ func slotText(sourceFile *ast.SourceFile, node *ast.Node, path []flow.Step) stri
 		expression = "value"
 	}
 	return expression + flow.PathText(path)
-}
-
-// isClassInstance is the instance side of a class, generic or not: `Box<Dog>`, `Shelter`. The class's
-// own constructor type (`typeof Shelter`) carries the class's symbol too, and is not one.
-func isClassInstance(t *checker.Type) bool {
-	if t == nil || t.Flags()&checker.TypeFlagsObject == 0 {
-		return false
-	}
-	if t.ObjectFlags()&checker.ObjectFlagsClass != 0 {
-		return true
-	}
-	return t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil &&
-		t.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
 }

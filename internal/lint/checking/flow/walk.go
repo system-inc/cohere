@@ -240,6 +240,12 @@ func (w *Walker) IsAssignable(source *checker.Type, target *checker.Type) bool {
 	return answer
 }
 
+// WidenedType is the checker's getWidenedType: a fresh literal's type without its freshness or its literal
+// property types.
+func (w *Walker) WidenedType(t *checker.Type) *checker.Type {
+	return checker.Checker_getWidenedType(w.typeChecker, t)
+}
+
 // meet records that the walk has met key, and says whether it had met it before.
 func (w *Walker) meet(key [2]*checker.Type) bool {
 	if len(w.visited) < visitedListLimit {
@@ -364,6 +370,9 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	if pair.Target.Flags()&checker.TypeFlagsTypeParameter != 0 {
 		return w.typeParameterSlot(pair)
 	}
+	if pair.Source.Flags()&checker.TypeFlagsTypeParameter != 0 {
+		return w.sourceTypeParameterSlot(pair, depth)
+	}
 	return w.parts(pair, depth)
 }
 
@@ -376,6 +385,19 @@ func hasPrimitiveMember(t *checker.Type) bool {
 		}
 	}
 	return false
+}
+
+// IsClassInstance is the instance side of a class, generic or not: `Box<Dog>`, `Shelter`. The class's own
+// constructor type (`typeof Shelter`) carries the class's symbol too, and is not one.
+func IsClassInstance(t *checker.Type) bool {
+	if t == nil || t.Flags()&checker.TypeFlagsObject == 0 {
+		return false
+	}
+	if t.ObjectFlags()&checker.ObjectFlagsClass != 0 {
+		return true
+	}
+	return t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil &&
+		t.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
 }
 
 // isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
@@ -415,6 +437,47 @@ func (w *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
 	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Target)
 	if constraint == nil || constraint == pair.Target || !w.hasWritableSlot(constraint, 0) {
 		return Pair{}, false
+	}
+	pair.Mutable = true
+	if wrong, _ := w.judge(pair); wrong {
+		pair.Path = slices.Clone(pair.Path)
+		return pair, true
+	}
+	return Pair{}, false
+}
+
+/*
+ * sourceTypeParameterSlot relates a type parameter source (#sse0s6s), the mirror of typeParameterSlot. The
+ * parameter's value is whatever its caller passed: its constraint, or anything narrower.
+ *
+ * In general the walk goes on through the constraint, the value the parameter holds at least. `Pack extends
+ * Dog[]` seen as `Animal[]` is then `Dog[]` seen as `Animal[]`, and the same for a Map or an object with a
+ * writable field (Adamic's type_rules_parameter_* rows, and probes p1_* on #sse0s6s: tsc 6.0.3 accepts each and
+ * Node reads `undefined` as the dog's bark). A class instance constraint (`this` among them) is then the class,
+ * whose fields are its own declared ones, and a class instance target is nominal-class's either way.
+ *
+ * One shape the constraint can't show: a parameter that is itself a container, seen as a mutable container.
+ * `Pack extends Animal[]` seen as `Animal[]` relates the constraint to itself, yet the caller's `Dog[]` is what
+ * pack holds, and a Cat pushed through the view lands among the dogs (probe p1_constraint_is_the_target). There
+ * the parameter is one mutable slot, judged whole as a target parameter is: invariant-mutable asks whether the
+ * target is assignable back to the parameter, which a type other than the parameter never is.
+ *
+ * Judged whole everywhere, it measured four findings on ahra with no Node probe behind any of them: a `T extends
+ * Element` given to `IntersectionObserver.observe`, a `{ content: string }` filter over a generic turn, a spread of
+ * that turn, and a document whose readonly slot the whole judgment ignored. A parameter seen as a wider object
+ * can hold a narrower writable field only through an instantiation that narrows one, where a container's
+ * elements are what every instantiation narrows. A field holding a container under a parameter (`Pack extends {
+ * pets: Animal[] }` seen as `{ pets: Animal[] }`) is the gap this leaves.
+ */
+func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
+	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Source)
+	if constraint == nil || constraint == pair.Source {
+		return Pair{}, false
+	}
+	if IsClassInstance(pair.Target) || !w.isSlotContainer(constraint) || !w.isSlotContainer(pair.Target) ||
+		!w.hasWritableSlot(pair.Target, 0) {
+		pair.Source = constraint
+		return w.relate(pair, depth+1)
 	}
 	pair.Mutable = true
 	if wrong, _ := w.judge(pair); wrong {

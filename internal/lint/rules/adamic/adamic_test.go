@@ -42,13 +42,18 @@ const adamicConfiguration = `{
 }`
 
 // adamicSupport is what Adamic's verification put beside the programs: a console, and the runtime's
-// `panic` as the package `adamic`.
+// `panic` as the package `adamic`, with the prelude's Weak beside it, byte for byte from Adamic's
+// internal/load/prelude.d.ts (#sse0s6s).
 var adamicSupport = map[string]string{
 	"tsconfig.json":                    adamicConfiguration,
 	"package.json":                     `{ "type": "module" }`,
 	"console.d.ts":                     `declare const console: { log(message: string): void; error(message: string): void };`,
 	"node_modules/adamic/package.json": `{ "name": "adamic", "type": "module", "types": "index.d.ts" }`,
-	"node_modules/adamic/index.d.ts":   `export declare function panic(message: string): never;`,
+	"node_modules/adamic/index.d.ts": `export declare function panic(message: string): never;
+export interface WeakBrand {
+	readonly adamicWeak?: never;
+}
+export type Weak<Target extends object> = (Target & WeakBrand) | undefined;`,
 }
 
 // writeAdamicSupport writes adamicSupport into a fixture's directory, over the harness's default tsconfig.
