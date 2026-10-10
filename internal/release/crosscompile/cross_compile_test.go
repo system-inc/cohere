@@ -10,8 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
-
+	"github.com/system-inc/cohere/internal/gotypes"
 	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -87,36 +86,30 @@ func typeCheckTarget(moduleDirectory string, target release.Target) []string {
 }
 
 // typeCheck type-checks the packages patterns name, and everything they import, from source as target
-// would compile them, their tests too when tests is set, and returns every error once, or none.
+// would compile them, their tests too when tests is set, and returns every error once, or none. It runs only
+// `go list -deps -json` and `go env`, which read and never build, so a runner of prebuilt tests can run it
+// (#qnnnkbf): go/packages asked go list for -compiled files and test variants, flags such a runner refuses.
 func typeCheck(moduleDirectory string, target release.Target, tests bool, patterns ...string) []string {
-	loaded, err := packages.Load(&packages.Config{
-		// Syntax and type information for every dependency is what makes go/packages type-check them all
-		// from source rather than reading export data, which it would have to compile first.
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports |
-			packages.NeedDeps | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
-		Dir:   moduleDirectory,
-		Env:   append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0"),
-		Tests: tests,
+	loaded, err := gotypes.Load(gotypes.Config{
+		Directory:   moduleDirectory,
+		Environment: []string{"GOOS=" + target.GoOperatingSystem, "GOARCH=" + target.GoArchitecture, "CGO_ENABLED=0"},
+		Tests:       tests,
 	}, patterns...)
 	if err != nil {
 		return []string{err.Error()}
 	}
-	var problems []string
-	// With tests a package is loaded twice, alone and with its test files, and an error in the code both
-	// share is reported by each, so each is kept once.
-	seen := map[string]bool{}
-	checked := 0
-	packages.Visit(loaded, nil, func(pkg *packages.Package) {
-		checked++
-		for _, problem := range pkg.Errors {
-			if !seen[problem.Error()] {
-				seen[problem.Error()] = true
-				problems = append(problems, problem.Error())
-			}
-		}
-	})
-	if checked == 0 {
+	if len(loaded.Source) == 0 {
 		return []string{fmt.Sprintf("nothing was loaded for %s, so nothing was checked", target)}
+	}
+	var problems []string
+	// With tests a package is checked again with its test files, and against its test variant, and an error
+	// in the code they share is reported by each, so each is kept once.
+	seen := map[string]bool{}
+	for _, problem := range loaded.ErrorsAnywhere() {
+		if !seen[problem.Error()] {
+			seen[problem.Error()] = true
+			problems = append(problems, problem.Error())
+		}
 	}
 	return problems
 }

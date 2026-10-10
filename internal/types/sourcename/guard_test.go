@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
+	"github.com/system-inc/cohere/internal/gotypes"
 )
 
 // tsDecisionsAllowed are the `.ts` decisions that are right to leave alone, by file (relative to the
@@ -190,21 +190,28 @@ func tsDecisions(t *testing.T) []tsDecision {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := &packages.Config{Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedSyntax, Dir: moduleRoot}
-	loaded, err := packages.Load(config, "./...")
+	// Syntax alone, which reads every file go list selects and compiles nothing (#qnnnkbf).
+	loaded, err := gotypes.Parse(gotypes.Config{Directory: moduleRoot}, "./...")
 	if err != nil {
 		t.Fatalf("loading the module: %v", err)
 	}
-	if count := packages.PrintErrors(loaded); count > 0 {
+	count := 0
+	for _, loadedPackage := range loaded {
+		for _, problem := range loadedPackage.Errors {
+			t.Log(problem)
+			count++
+		}
+	}
+	if count > 0 {
 		t.Fatalf("%d errors loading the module, so the walk would read a partial tree", count)
 	}
 	var found []tsDecision
 	for _, loadedPackage := range loaded {
-		if strings.HasSuffix(loadedPackage.PkgPath, "/internal/types/sourcename") {
+		if strings.HasSuffix(loadedPackage.ImportPath, "/internal/types/sourcename") {
 			continue
 		}
 		for index, file := range loadedPackage.Syntax {
-			relative, err := filepath.Rel(moduleRoot, loadedPackage.CompiledGoFiles[index])
+			relative, err := filepath.Rel(moduleRoot, loadedPackage.Files[index])
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -10,8 +10,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"golang.org/x/tools/go/packages"
 )
 
 /*
@@ -77,22 +75,12 @@ type optionDecodingFindings struct {
 // their non-test files.
 func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionDecodingFindings {
 	t.Helper()
-	config := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
-		Dir:  moduleRoot,
-	}
-	loaded, err := packages.Load(config, patterns...)
-	if err != nil {
-		t.Fatalf("loading %v: %v", patterns, err)
-	}
-	if count := packages.PrintErrors(loaded); count > 0 {
-		t.Fatalf("%d errors loading %v, so the walk would read a partial tree", count, patterns)
-	}
+	loaded := loadRules(t, moduleRoot, patterns...)
 
 	findings := optionDecodingFindings{lenientAt: map[string]bool{}}
 	untagged := map[string]bool{}
 	for _, loadedPackage := range loaded {
-		if strings.Contains(loadedPackage.PkgPath, "/tools/") {
+		if strings.Contains(loadedPackage.ImportPath, "/tools/") {
 			// Generators run by hand, which decode upstream's data files, not a rule's options.
 			continue
 		}
