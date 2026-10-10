@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/no-indexed-access-write" },
+  "messages": {
+    "indexedAccessWrite": {
+      "text": "The generic slot {{slot}} cannot receive {{source}}: tsc accepts it through the constraint {{constraint}}, but a caller may instantiate a narrower type. Use a value whose own type is {{slot}}, read from the type parameter."
+    }
+  }
+}

@@ -25,6 +25,7 @@
         "@typescript-eslint/unbound-method": "error",
         "adamic/invariant-mutable": "error",
         "adamic/no-definite-assignment": "error",
+        "adamic/no-indexed-access-write": "error",
         "adamic/no-optional-widening": "error",
         "adamic/no-type-predicate": "error",
         "adamic/no-unchecked-cast": "error",

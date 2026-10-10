@@ -187,7 +187,7 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 }
 
 // offer adds the site of expression flowing into target, unless the two are one type or the target has no
-// object part, where no judge can rule (see Judge). The target is read first so such a site never asks the
+// object part or generic indexed access, where no judge can rule (see Judge). The target is read first so such a site never asks the
 // checker for its source.
 func (w *Walker) offer(expression *ast.Node, target *checker.Type) {
 	if expression == nil || target == nil || !w.hasObjectPart(target) {
@@ -496,12 +496,15 @@ func (w *Walker) offerUpcast(node *ast.Node) {
 }
 
 // hasObjectPart is a type the walk can relate parts of: an object type, a union with one among its
-// members, an intersection with an array, tuple or container member, or a type parameter whose constraint
+// members, a generic indexed access, an intersection with an array, tuple or container member, or a type parameter whose constraint
 // has one (#53w68gt). A union's members are never
 // unions, and a type parameter's base constraint is never a type parameter, so this goes at most two deep.
 func (w *Walker) hasObjectPart(t *checker.Type) bool {
 	switch {
 	case t.Flags()&checker.TypeFlagsObject != 0:
+		return true
+	case IsTypeParameterIndexedAccess(t):
+		// A generic indexed slot can hold a primitive and still vary with the caller (#xzpba0r).
 		return true
 	case t.Flags()&checker.TypeFlagsUnion != 0:
 		return slices.ContainsFunc(t.Types(), w.hasObjectPart)

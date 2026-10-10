@@ -1,0 +1,35 @@
+=== RUN   TestIndexedAccessWrite
+=== RUN   TestIndexedAccessWrite/assignment
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/return
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/nested
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/nested_slot
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/runtime_probe
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/original
+    indexed_access_write_test.go:54: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/nested_slot_from_T
+    indexed_access_write_test.go:80: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/generic_key
+    indexed_access_write_test.go:80: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/nested_read
+    indexed_access_write_test.go:80: expected 1 findings [indexedAccessWrite], got 0 []
+=== RUN   TestIndexedAccessWrite/read_from_T
+    indexed_access_write_test.go:80: expected 1 findings [indexedAccessWrite], got 0 []
+--- FAIL: TestIndexedAccessWrite (0.10s)
+    --- FAIL: TestIndexedAccessWrite/assignment (0.02s)
+    --- FAIL: TestIndexedAccessWrite/return (0.01s)
+    --- FAIL: TestIndexedAccessWrite/nested (0.01s)
+    --- FAIL: TestIndexedAccessWrite/nested_slot (0.01s)
+    --- FAIL: TestIndexedAccessWrite/runtime_probe (0.01s)
+    --- FAIL: TestIndexedAccessWrite/original (0.01s)
+    --- FAIL: TestIndexedAccessWrite/nested_slot_from_T (0.01s)
+    --- FAIL: TestIndexedAccessWrite/generic_key (0.01s)
+    --- FAIL: TestIndexedAccessWrite/nested_read (0.01s)
+    --- FAIL: TestIndexedAccessWrite/read_from_T (0.01s)
+FAIL
+FAIL	github.com/system-inc/cohere/internal/lint/rules/adamic	0.109s
+FAIL
