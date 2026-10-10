@@ -88,9 +88,8 @@ func TestTest(t *testing.T) {
 		{name: "iu negated class", source: "^[^a]$", flags: "iu", subject: "A"},
 		{name: "iu negated class kelvin", source: "^[^k]$", flags: "iu", subject: "\u212a"},
 
-		// ---- a property escape names a set the pattern cannot spell back, so
-		// under `i` it is compared by regexp2 rather than widened. Its name is
-		// part of the escape and must not be widened as text ----
+		// ---- property sets are expanded from pinned Unicode tables and widened;
+		// their names must not be widened as text ----
 		{name: "u property escape", source: `^\p{Ll}$`, flags: "u", subject: "a", want: true},
 		{name: "u property escape is exact", source: `^\p{Ll}$`, flags: "u", subject: "A"},
 		{name: "iu property escape", source: `^\p{Ll}$`, flags: "iu", subject: "A", want: true},
