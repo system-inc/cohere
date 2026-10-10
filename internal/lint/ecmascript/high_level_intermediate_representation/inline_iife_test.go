@@ -607,6 +607,9 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
 		"hoistable_test.go":                 true,
 		"preserve_manual_memoization.go":    true,
 		"scope_oracle_test.go":              true,
+		// The repetition guard reads freshly allocated ids before normalization,
+		// after memo erasure. It deliberately computes no reactive scopes.
+		"inline_order_test.go": true,
 	}
 
 	entries, err := os.ReadDir(".")
