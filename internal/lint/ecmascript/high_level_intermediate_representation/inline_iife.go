@@ -376,7 +376,12 @@ func returnedPlace(function *Function, block *BasicBlock, terminal *Return) Plac
 
 func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation static_single_assignment.BlockId,
 	result Place, node *ast.Node, direct bool) {
-	for _, blockId := range remap.Blocks {
+	// React walks the nested body's Map in insertion order, not block-id order:
+	// InlineImmediatelyInvokedFunctionExpressions.ts:219-222 at
+	// facebook/react bd6ea412c6732b3b946a2827fcaac3a1c8f2e863.
+	// CopyNestedBodyInto preserves that order from nested.Blocks; allocating
+	// return instructions and temporaries while ranging Blocks would randomize ids.
+	for _, blockId := range remap.BlockOrder {
 		block, found := function.Block(blockId)
 		if !found || block == nil {
 			continue
