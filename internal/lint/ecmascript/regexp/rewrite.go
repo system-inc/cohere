@@ -98,11 +98,9 @@ type openGroup struct {
 // what a character means depends on whether it is escaped and whether it sits
 // inside a character class.
 //
-// The second result is false when the source uses a backreference or a
-// property escape under `i`. JavaScript compares a backreference by the same
-// canonicalization it compares a literal by, and it draws `\p{…}` from
-// Unicode's own tables; a widened pattern can name neither, so the caller falls
-// back to regexp2's own case-insensitivity there, which is close but not exact.
+// The second result is false when the source uses a backreference under `i`.
+// JavaScript compares it by the same canonicalization as a literal; a widened
+// pattern cannot name that comparison, so the caller falls back to regexp2.
 func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	var out strings.Builder
 	out.Grow(len(source))
@@ -172,6 +170,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 
 			case escapeSet:
 				switch {
+				case escape.set == setProperty:
+					out.WriteString(writeClass([]classAtom{propertyAtom(escape)}, false, current))
 				// `\d` and `\s` regexp2 already reads as ECMAScript does, and
 				// `\w` too until `u` and `i` together widen the set past ASCII.
 				case escape.set == setWord && current.ignoreCase && current.unicode:
@@ -179,11 +179,6 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				case escape.set == setNonWord && current.ignoreCase && current.unicode:
 					out.WriteString(writeClass(wordClassAtoms(current), true, rewriteOptions{}))
 				default:
-					// A property escape names a set out of Unicode's tables,
-					// which a widened pattern has no way to name back.
-					if escape.set == setProperty && current.ignoreCase {
-						exact = false
-					}
 					out.WriteString(source[i:end])
 				}
 			}
