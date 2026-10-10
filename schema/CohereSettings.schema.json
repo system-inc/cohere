@@ -419,6 +419,9 @@
                 "adamic/no-definite-assignment": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "adamic/no-indexed-access-write": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "adamic/no-optional-widening": {
                     "$ref": "#/$defs/ruleSetting"
                 },
