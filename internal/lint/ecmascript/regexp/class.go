@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/unicodeproperties"
 )
 
 // classAtomKind says what one member of a character class is. Keeping the four
@@ -31,6 +33,7 @@ type classAtom struct {
 	kind   classAtomKind
 	lo, hi rune
 	text   string
+	ranges []unicodeproperties.Range
 }
 
 // covers reports whether the atom already names r, which is what decides
@@ -41,6 +44,17 @@ func (a classAtom) covers(r rune) bool {
 		return r == a.lo
 	case classRange:
 		return r >= a.lo && r <= a.hi
+	case classSet:
+		_, ok := slices.BinarySearchFunc(a.ranges, r, func(span unicodeproperties.Range, r rune) int {
+			if span.Hi < r {
+				return -1
+			}
+			if span.Lo > r {
+				return 1
+			}
+			return 0
+		})
+		return ok
 	}
 	return false
 }
@@ -128,8 +142,7 @@ func readClass(source string) (body string, negated bool, width int, err error) 
 }
 
 // classAtoms reads a class body into the members it names. The second result is
-// false where the class holds a property escape under `i`, which names a set
-// out of Unicode's tables that a widened class has no way to name back.
+// false when an escape cannot be widened exactly.
 func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]classAtom, bool, error) {
 	ctx.inClass = true
 	atoms := []classAtom{}
@@ -157,14 +170,13 @@ func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]class
 			// regexp2 reads `\d` and `\s` the way ECMAScript does, and `\w`
 			// only until `u` and `i` together widen the set past ASCII.
 			switch {
+			case escape.set == setProperty:
+				atoms = append(atoms, propertyAtom(escape))
 			case escape.set == setWord && options.ignoreCase && options.unicode:
 				atoms = append(atoms, wordClassAtoms(options)...)
 			case escape.set == setNonWord && options.ignoreCase && options.unicode:
 				atoms = append(atoms, nonWordClassAtoms(options)...)
 			default:
-				if escape.set == setProperty && options.ignoreCase {
-					exact = false
-				}
 				atoms = append(atoms, classAtom{kind: classSet, text: body[i:end]})
 			}
 		default:
@@ -208,6 +220,9 @@ func joinRanges(atoms []classAtom, options rewriteOptions) ([]classAtom, error) 
 // writeClass writes the members out as a class regexp2 reads the same way,
 // widening it first where the flags ask for it.
 func writeClass(atoms []classAtom, negated bool, options rewriteOptions) string {
+	if slices.ContainsFunc(atoms, func(a classAtom) bool { return a.kind == classSet && a.ranges != nil }) {
+		return writePropertyClass(atoms, negated, options)
+	}
 	if len(atoms) == 0 {
 		// `[]` never matches and `[^]` matches anything: syntax only JavaScript
 		// reads, and regexp2 would take the brackets literally.

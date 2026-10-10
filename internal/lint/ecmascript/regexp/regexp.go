@@ -21,23 +21,16 @@
 //     regexp2 has no flag for.
 //
 // This package takes the second one and closes every one of those gaps by
-// rewriting the pattern before handing it over. It also bounds how long a
+// rewriting the pattern before handing it over. Unicode property escapes use
+// cohere-generated Unicode 17.0.0 tables, including exact ECMAScript aliases. It also bounds how long a
 // match may run: a backtracking engine on a pattern a user wrote is a way to
 // hang the linter, and a match that overruns is reported as no match.
 //
 // Three things are deliberately not covered:
 //
 //   - The `v` flag's set syntax, which Compile refuses outright.
-//   - Comparing a backreference, or a `\p{…}` property escape, without regard
-//     to case. JavaScript compares a backreference by the same canonicalization
-//     it compares a literal by, and draws a property escape from Unicode's own
-//     tables; a rewritten pattern can spell neither, so a pattern using one
-//     under `i` falls back to regexp2's own case-insensitivity, which is close.
-//     `\P{…}` under `i` is where it is furthest off: JavaScript asks whether
-//     any character comparing equal to this one is outside the property, and
-//     regexp2 asks only about the one at hand. The fallback belongs to the
-//     whole pattern, so a `(?i:…)` group in a pattern that does not itself
-//     carry `i` has none to make, and compares both exactly.
+//   - Comparing a backreference without regard to case. JavaScript uses the same
+//     canonicalization as for literals; the fallback uses regexp2's case-insensitivity.
 //   - Exhaustive syntax validation under `u`. The `u` flag makes JavaScript
 //     reject constructs it otherwise tolerates — a bare `]` outside a class is
 //     the usual one — and those still compile here. Every pattern JavaScript

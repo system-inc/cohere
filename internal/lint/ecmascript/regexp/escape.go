@@ -6,12 +6,14 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/unicodeproperties"
 )
 
 // escapeKind says what a backslash escape names, which is what decides how the
-// rewrite may use it: a character may be widened under `i` and may bound a
-// character range, a set may be neither, and an assertion is not a character at
-// all.
+// rewrite may use it: a character may bound a range, a set cannot, and an
+// assertion is not a character at all. Characters and property sets may be
+// widened under `i`.
 type escapeKind uint8
 
 const (
@@ -45,11 +47,12 @@ const (
 // no escape at all under Annex B, and comes back as a backslash of width none,
 // leaving the `c` to be read as the character it is.
 type decodedEscape struct {
-	kind    escapeKind
-	set     setKind
-	r       rune
-	width   int
-	negated bool
+	kind     escapeKind
+	set      setKind
+	r        rune
+	width    int
+	negated  bool
+	property string
 }
 
 // escapeContext is what an escape's meaning depends on besides its own text.
@@ -199,7 +202,11 @@ func decodePropertyEscape(source string, i int, size int, ctx escapeContext) (de
 	}
 	// The name belongs to the escape: `\p{Script=Greek}`. Taking it along keeps
 	// the walk from reading the letters in it as text and widening them.
-	return decodedEscape{kind: escapeSet, set: setProperty, width: size + end + 1}, nil
+	name := source[i+size+1 : i+size+end]
+	if _, ok := unicodeproperties.Lookup(name); !ok {
+		return decodedEscape{}, fmt.Errorf("%w: unknown Unicode property %q", ErrUnsupportedSyntax, name)
+	}
+	return decodedEscape{kind: escapeSet, set: setProperty, width: size + end + 1, property: name, negated: source[i] == 'P'}, nil
 }
 
 // decodeNumericEscape reads an escape a digit opens, which is a backreference,
