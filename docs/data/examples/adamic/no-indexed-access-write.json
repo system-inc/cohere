@@ -1,0 +1,24 @@
+{
+    "rule": "adamic/no-indexed-access-write",
+    "firing": {
+        "file": "Case.ts",
+        "source": "function make<T extends { readonly value: number }>(): T['value'] { return 2; }\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 76,
+                "endLine": 1,
+                "endColumn": 77,
+                "messageId": "indexedAccessWrite",
+                "message": "The generic slot T[\"value\"] cannot receive 2: tsc accepts it through the constraint number, but a caller may instantiate a narrower type. Use a value whose own type is T[\"value\"], read from the type parameter."
+            }
+        ]
+    },
+    "clean": {
+        "file": "Case.ts",
+        "source": "function make<T extends { readonly value: number }>(source: T): { readonly value: T['value'] } { return source; }\n"
+    },
+    "assertedMessageIds": [
+        "indexedAccessWrite"
+    ]
+}

@@ -84,8 +84,8 @@ type Pair struct {
 // such a member has one, an intersection with an array-like or container member does, and so does a type
 // parameter whose constraint has one (#53w68gt).
 // So a site whose target has none (`const x: string = e`, a `number` argument) is never offered, which spares the
-// checker its source on the most common sites (#m6tyg79). A judge that would rule on such a target needs
-// that condition lifted in offer first.
+// checker its source on the most common sites (#m6tyg79). Generic indexed accesses are also offered,
+// including primitive-valued ones (#xzpba0r).
 type Judge func(pair Pair) (wrong bool, descend bool)
 
 // maximumDepth bounds the walk. A recursive type meets its own pair first and stops on the visited set;
@@ -1118,4 +1118,22 @@ func containerArgumentName(container string, index int) string {
 		return "value"
 	}
 	return "member"
+}
+
+// IsTypeParameterIndexedAccess recognizes T[K] and nested accesses such as T['inner']['value'].
+// It does not expand constraints: other relations retaining a parameter need their own Node probe.
+func IsTypeParameterIndexedAccess(t *checker.Type) bool {
+	if t == nil || t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
+		return false
+	}
+	for depth := 0; depth <= maximumDepth; depth++ {
+		if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
+			return true
+		}
+		if t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
+			return false
+		}
+		t = t.AsIndexedAccessType().ObjectType()
+	}
+	return false
 }

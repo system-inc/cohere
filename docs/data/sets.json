@@ -1,7 +1,7 @@
 [
     {
         "name": "cohere:adamic",
-        "rulesOn": 35,
+        "rulesOn": 36,
         "rules": [
             {
                 "name": "@typescript-eslint/ban-ts-comment",
@@ -68,6 +68,10 @@
             },
             {
                 "name": "adamic/no-definite-assignment",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
                 "severity": "error"
             },
             {
@@ -164,7 +168,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 299,
+        "rulesOn": 300,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -692,6 +696,10 @@
             },
             {
                 "name": "adamic/no-definite-assignment",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
                 "severity": "error"
             },
             {
@@ -1697,7 +1705,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 364,
+        "rulesOn": 365,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2137,6 +2145,10 @@
             },
             {
                 "name": "adamic/no-definite-assignment",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
                 "severity": "error"
             },
             {
@@ -4775,6 +4787,10 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-indexed-access-write",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/no-optional-widening",
                 "severity": "off"
             },
@@ -6026,7 +6042,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 298,
+        "rulesOn": 299,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6467,6 +6483,10 @@
             {
                 "name": "adamic/no-definite-assignment",
                 "severity": "off"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
+                "severity": "error"
             },
             {
                 "name": "adamic/no-optional-widening",
@@ -7727,7 +7747,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 288,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8167,6 +8187,10 @@
             },
             {
                 "name": "adamic/no-definite-assignment",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
                 "severity": "error"
             },
             {
@@ -9199,7 +9223,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 276,
+        "rulesOn": 277,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9639,6 +9663,10 @@
             },
             {
                 "name": "adamic/no-definite-assignment",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-indexed-access-write",
                 "severity": "error"
             },
             {

@@ -1,0 +1,49 @@
+=== RUN   TestIndexedAccessWriteEdges
+=== PAUSE TestIndexedAccessWriteEdges
+=== RUN   TestIndexedAccessWriteEdgesStayClean
+=== PAUSE TestIndexedAccessWriteEdgesStayClean
+=== CONT  TestIndexedAccessWriteEdgesStayClean
+=== RUN   TestIndexedAccessWriteEdgesStayClean/overridden_spread
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/overridden_spread
+=== RUN   TestIndexedAccessWriteEdgesStayClean/contextual_method_read
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/contextual_method_read
+=== RUN   TestIndexedAccessWriteEdgesStayClean/method_accepts_constraint
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/method_accepts_constraint
+=== RUN   TestIndexedAccessWriteEdgesStayClean/spread_from_T
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/spread_from_T
+=== CONT  TestIndexedAccessWriteEdges
+=== RUN   TestIndexedAccessWriteEdges/method-return
+=== PAUSE TestIndexedAccessWriteEdges/method-return
+=== RUN   TestIndexedAccessWriteEdges/method-argument
+=== PAUSE TestIndexedAccessWriteEdges/method-argument
+=== RUN   TestIndexedAccessWriteEdges/method-reused
+=== PAUSE TestIndexedAccessWriteEdges/method-reused
+=== RUN   TestIndexedAccessWriteEdges/method-mixed-return
+=== PAUSE TestIndexedAccessWriteEdges/method-mixed-return
+=== RUN   TestIndexedAccessWriteEdges/spread
+=== PAUSE TestIndexedAccessWriteEdges/spread
+=== RUN   TestIndexedAccessWriteEdges/spread-override
+=== PAUSE TestIndexedAccessWriteEdges/spread-override
+=== CONT  TestIndexedAccessWriteEdgesStayClean/overridden_spread
+=== CONT  TestIndexedAccessWriteEdgesStayClean/method_accepts_constraint
+=== CONT  TestIndexedAccessWriteEdgesStayClean/spread_from_T
+=== CONT  TestIndexedAccessWriteEdgesStayClean/contextual_method_read
+--- PASS: TestIndexedAccessWriteEdgesStayClean/method_accepts_constraint (0.07s)
+--- PASS: TestIndexedAccessWriteEdgesStayClean/spread_from_T (0.07s)
+--- PASS: TestIndexedAccessWriteEdgesStayClean/overridden_spread (0.08s)
+--- PASS: TestIndexedAccessWriteEdgesStayClean/contextual_method_read (0.08s)
+--- PASS: TestIndexedAccessWriteEdgesStayClean (0.00s)
+=== CONT  TestIndexedAccessWriteEdges/method-return
+=== CONT  TestIndexedAccessWriteEdges/spread-override
+=== CONT  TestIndexedAccessWriteEdges/spread
+=== CONT  TestIndexedAccessWriteEdges/method-mixed-return
+--- PASS: TestIndexedAccessWriteEdges/spread-override (0.03s)
+=== CONT  TestIndexedAccessWriteEdges/method-reused
+=== CONT  TestIndexedAccessWriteEdges/method-argument
+--- PASS: TestIndexedAccessWriteEdges/method-return (0.04s)
+--- PASS: TestIndexedAccessWriteEdges/method-mixed-return (0.03s)
+--- PASS: TestIndexedAccessWriteEdges/method-argument (0.03s)
+--- PASS: TestIndexedAccessWriteEdges/spread (0.07s)
+--- PASS: TestIndexedAccessWriteEdges/method-reused (0.05s)
+--- PASS: TestIndexedAccessWriteEdges (0.00s)
+ok  	github.com/system-inc/cohere/internal/lint/rules/adamic	0.675s

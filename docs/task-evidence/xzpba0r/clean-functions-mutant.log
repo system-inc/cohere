@@ -1,0 +1,24 @@
+=== RUN   TestIndexedAccessWriteEdgesStayClean
+=== PAUSE TestIndexedAccessWriteEdgesStayClean
+=== CONT  TestIndexedAccessWriteEdgesStayClean
+=== RUN   TestIndexedAccessWriteEdgesStayClean/function_expression
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/function_expression
+=== RUN   TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== RUN   TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== CONT  TestIndexedAccessWriteEdgesStayClean/function_expression
+=== CONT  TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== CONT  TestIndexedAccessWriteEdgesStayClean/plain_block_method
+    indexed_access_write_test.go:155: expected 1 findings [indexedAccessWrite], got 0 []
+=== NAME  TestIndexedAccessWriteEdgesStayClean/expression_arrow
+    indexed_access_write_test.go:155: expected 1 findings [indexedAccessWrite], got 0 []
+=== NAME  TestIndexedAccessWriteEdgesStayClean/function_expression
+    indexed_access_write_test.go:155: expected 1 findings [indexedAccessWrite], got 0 []
+--- FAIL: TestIndexedAccessWriteEdgesStayClean (0.00s)
+    --- FAIL: TestIndexedAccessWriteEdgesStayClean/plain_block_method (0.06s)
+    --- FAIL: TestIndexedAccessWriteEdgesStayClean/expression_arrow (0.06s)
+    --- FAIL: TestIndexedAccessWriteEdgesStayClean/function_expression (0.06s)
+FAIL
+FAIL	github.com/system-inc/cohere/internal/lint/rules/adamic	0.068s
+FAIL

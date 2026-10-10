@@ -1,0 +1,24 @@
+=== RUN   TestIndexedAccessWrite
+=== RUN   TestIndexedAccessWrite/original
+=== RUN   TestIndexedAccessWrite/assignment
+=== RUN   TestIndexedAccessWrite/return
+=== RUN   TestIndexedAccessWrite/nested
+=== RUN   TestIndexedAccessWrite/nested_slot
+=== RUN   TestIndexedAccessWrite/runtime_probe
+=== RUN   TestIndexedAccessWrite/generic_key
+=== RUN   TestIndexedAccessWrite/nested_read
+=== RUN   TestIndexedAccessWrite/read_from_T
+=== RUN   TestIndexedAccessWrite/nested_slot_from_T
+--- PASS: TestIndexedAccessWrite (0.11s)
+    --- PASS: TestIndexedAccessWrite/original (0.03s)
+    --- PASS: TestIndexedAccessWrite/assignment (0.01s)
+    --- PASS: TestIndexedAccessWrite/return (0.01s)
+    --- PASS: TestIndexedAccessWrite/nested (0.01s)
+    --- PASS: TestIndexedAccessWrite/nested_slot (0.01s)
+    --- PASS: TestIndexedAccessWrite/runtime_probe (0.01s)
+    --- PASS: TestIndexedAccessWrite/generic_key (0.01s)
+    --- PASS: TestIndexedAccessWrite/nested_read (0.01s)
+    --- PASS: TestIndexedAccessWrite/read_from_T (0.01s)
+    --- PASS: TestIndexedAccessWrite/nested_slot_from_T (0.01s)
+PASS
+ok  	github.com/system-inc/cohere/internal/lint/rules/adamic	0.116s
