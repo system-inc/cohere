@@ -1,0 +1,6 @@
+=== RUN   TestEveryCohereTestRunsInParallel
+=== PAUSE TestEveryCohereTestRunsInParallel
+=== CONT  TestEveryCohereTestRunsInParallel
+--- PASS: TestEveryCohereTestRunsInParallel (0.87s)
+PASS
+ok  	github.com/system-inc/cohere/internal/testpolicy	0.878s

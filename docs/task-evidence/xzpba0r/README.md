@@ -58,7 +58,7 @@ TypeScript: 0 diagnostics, exit 0. Node v24.19.0: refusal throws 1 TypeError
 (`Cannot read properties of undefined (reading 'toUpperCase')`); accepted prints
 `ONE`, exit 0. See `node-refused.log`.
 
-## Package and static checks
+## Initial package and static checks
 
 Commands used provisioned `go version go1.27.1 linux/amd64`, with `which go`
 returning `/workspace/adamic-tools/go/bin/go`. Tests were run one package at a time.
@@ -89,12 +89,68 @@ records as multisets: 0 added sites and 0 removed sites. There are no newly
 refused Adamic sites to classify. Exit 1 in both runs reflects existing findings.
 The summary JSON files record the counts and coverage limits of this census.
 
-**Ahra remains blocked and is required before landing.** No local checkout was
-available. `git ls-remote https://github.com/system-inc/ahra.git HEAD` returned
-exit 128: `remote: Repository not found.` An accessible URL or checkout path was
-requested; no substitute corpus was used and no ahra counts are claimed.
+Ahra census is owner-run. @system_cohere_lint confirmed that this worker does
+not need to run it, since the repository is not reachable here.
 
 For @system_cohere_lint to relay on #js89dcw: the Adamic counts and zero-site
-delta above, plus the blocked ahra census. Push this branch for review only;
-land through cohere's own landing tool after the outstanding census. Notify
-@system_adamic of the landed SHA then; this worker does not claim a landed SHA.
+delta above. Push this branch for review only; the owner lands through cohere's
+landing tool and notifies @system_adamic of the landed SHA.
+
+## Reviewed follow-up: spreads, methods, and parallel tests
+
+Review base: `56560a66281757cd29c86fd0e313782cd844bbe5`.
+Both `site.Spread` and `site.Method` can carry this indexed-access shape;
+neither is excluded now. The walker also pairs methods on reused object values.
+The override example `{ ...source, value: 2 }` was already caught at its explicit
+property assignment. A copied concrete property was missed at the spread source.
+Contextual method returns and bivariant method parameters were missed at their
+method site; a reused method object was missed because method descent was off.
+
+The same TypeScript 6.0.3 strict command from above was run over `spread*.ts`
+and `method*.ts`: 6 files accepted, 0 diagnostics, exit 0. Running each emitted
+file with Node v24.19.0 gives exit 1 and the same TypeError reading `toUpperCase`
+from undefined (6/6 failures; `edges-node.log`).
+
+| Refused fixture | Finding span | Runtime |
+| --- | --- | --- |
+| `spread.ts` | `source` | concrete property copied into the indexed slot |
+| `spread-override.ts` | `2` | explicit override stores a concrete value |
+| `method-return.ts` | `get` | contextual method returns a concrete value |
+| `method-argument.ts` | `put` | wider caller passes 2 to an indexed parameter |
+| `method-reused.ts` | `result` | reused object's method returns a concrete value |
+| `method-mixed-return.ts` | `get` | one return reads T, another returns 2 |
+
+Accepted controls cover a spread from T, a spread overridden by a read from T,
+a contextual method returning that read (with an unrelated nested function),
+and a method accepting the full constraint while returning a read from T.
+Every accepted control has a tsc-accepted refusal plant. Inferred contextual
+method reads need the same provenance recovery as direct reads; every actual
+return must have the indexed type, and nested functions' returns are ignored.
+
+`go test ./internal/lint/rules/adamic -run '^TestIndexedAccessWriteEdges' -v`:
+10 subtests pass after (6 refusals, 4 accepted controls with plants); each refusal
+and plant has exactly 1 finding at the span in its assertion. All 14 fixture and
+plant programs have 0 tsgo semantic diagnostics under Adamic's options.
+Restoring the rule from the review base gives 8 failed subtests, 2 passed, exit 1
+(`edges-before.log`). The explicit override and its plant were already caught.
+An immediate-return mutant dropping the check gives 10 failed subtests, exit 1
+(`edges-mutant.log`). Both changes were restored before final checks.
+
+All 3 test functions and all 4 `t.Run` callback definitions in
+`indexed_access_write_test.go` now call `t.Parallel()` as their first statement;
+fixtures, temporary programs and checker state are independent.
+
+Final commands:
+
+| Command | Result |
+| --- | --- |
+| `go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel -v` | 1 pass, 0 failures (`testpolicy.log`) |
+| `go test ./internal/lint/rules/adamic -json` | 399 pass events, 0 failures |
+| `go vet ./internal/lint/rules/adamic` | exit 0, 0 diagnostics |
+| `gofmt -l` on the 2 changed Go files | exit 0, 0 filenames |
+| `git diff --check` | exit 0, 0 whitespace errors |
+
+The same Adamic census command with the final binary checks 2,140 files and
+reports 1,068 findings, 0 rule crashes. Comparing full finding records against
+the prior approved binary gives 0 added and 0 removed sites. See
+`adamic-edges-summary.json`; existing findings account for census exit 1.

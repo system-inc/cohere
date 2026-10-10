@@ -33,7 +33,8 @@ var NoIndexedAccessWrite = rule.Rule{
 			if pair.Source.Flags()&checker.TypeFlagsNever != 0 {
 				return false, false
 			}
-			if projectsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) {
+			if projectsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) ||
+				returnsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) {
 				return false, false
 			}
 			same := pair.Source.Flags()&checker.TypeFlagsIndexedAccess != 0 &&
@@ -41,11 +42,14 @@ var NoIndexedAccessWrite = rule.Rule{
 			return !same, false
 		}
 		return walker.Listeners(func(site flow.Site) {
-			if site.Spread || site.Method || readsIndexedAccess(ctx.TypeChecker, site.Node, site.Target) {
+			// Spreads can copy a concrete property into T[K]; contextual methods can
+			// return one or accept one through a bivariant parameter. Their Node probes
+			// are spread.ts, method-return.ts and method-argument.ts (#xzpba0r).
+			if readsIndexedAccess(ctx.TypeChecker, site.Node, site.Target) {
 				return
 			}
 			sourceRoot = site.Source
-			found, wrong := walker.Walk(site, judge)
+			found, wrong := walker.WalkWith(site, judge, flow.WalkOptions{Methods: true})
 			if !wrong {
 				return
 			}
@@ -117,4 +121,54 @@ func projectsIndexedAccess(typeChecker *checker.Checker, source, target *checker
 		target = access.ObjectType()
 	}
 	return checker.Checker_isTypeIdenticalTo(typeChecker, source, target)
+}
+
+// An inferred method returning source.value has a number return type in tsgo,
+// just as the read itself does. Preserve that read only when every return of
+// the actual implementation has the indexed type; nested functions do not count.
+func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.Type, path []flow.Step) bool {
+	if source == nil || len(path) == 0 || path[len(path)-1].Kind != flow.StepReturn {
+		return false
+	}
+	for _, step := range path[:len(path)-1] {
+		if step.Kind != flow.StepProperty {
+			return false
+		}
+		property := checker.Checker_getPropertyOfType(typeChecker, source, step.Name)
+		if property == nil {
+			return false
+		}
+		source = checker.Checker_getTypeOfSymbol(typeChecker, property)
+	}
+	signatures := checker.Checker_getSignaturesOfType(typeChecker, source, checker.SignatureKindCall)
+	if len(signatures) != 1 {
+		return false
+	}
+	declaration := signatures[0].Declaration()
+	if declaration == nil || declaration.Body() == nil || !ast.IsBlock(declaration.Body()) {
+		return false
+	}
+	seen, valid := 0, true
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if ast.IsFunctionLike(node) {
+			return false
+		}
+		if node.Kind == ast.KindReturnStatement {
+			seen++
+			expression := node.AsReturnStatement().Expression
+			if expression == nil {
+				valid = false
+				return true
+			}
+			own := typeChecker.GetTypeAtLocation(expression)
+			valid = own != nil && (own.Flags()&checker.TypeFlagsNever != 0 ||
+				checker.Checker_isTypeIdenticalTo(typeChecker, own, target) || readsIndexedAccess(typeChecker, expression, target))
+			return !valid
+		}
+		node.ForEachChild(visit)
+		return !valid
+	}
+	declaration.Body().ForEachChild(visit)
+	return seen > 0 && valid
 }
