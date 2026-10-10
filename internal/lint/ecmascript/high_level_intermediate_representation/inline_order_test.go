@@ -12,6 +12,7 @@ import (
 // Run identical prepass graphs, rather than assert the loop's shape: map iteration
 // can change freshly allocated identifiers even when ranges are equivalent.
 func TestInlineMemoCallbacksRepeatIdentically(t *testing.T) {
+	t.Parallel()
 	const repetitions = 128
 	fixtures, functions, splices := 0, 0, 0
 	// These five differed on origin/main. Keep their presence load-bearing even
@@ -40,6 +41,7 @@ func TestInlineMemoCallbacksRepeatIdentically(t *testing.T) {
 			if _, needed := required[name]; needed {
 				required[name] = true
 			}
+			// Not parallel: each case adds to splices, which this test checks once every case has run.
 			t.Run(name, func(t *testing.T) {
 				var expected string
 				for run := 0; run < repetitions; run++ {
