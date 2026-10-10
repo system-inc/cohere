@@ -1,0 +1,18 @@
+=== RUN   TestIndexedAccessWriteEdgesStayClean
+=== PAUSE TestIndexedAccessWriteEdgesStayClean
+=== CONT  TestIndexedAccessWriteEdgesStayClean
+=== RUN   TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== RUN   TestIndexedAccessWriteEdgesStayClean/function_expression
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/function_expression
+=== RUN   TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== CONT  TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== CONT  TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== CONT  TestIndexedAccessWriteEdgesStayClean/function_expression
+--- PASS: TestIndexedAccessWriteEdgesStayClean (0.00s)
+    --- PASS: TestIndexedAccessWriteEdgesStayClean/function_expression (0.06s)
+    --- PASS: TestIndexedAccessWriteEdgesStayClean/expression_arrow (0.06s)
+    --- PASS: TestIndexedAccessWriteEdgesStayClean/plain_block_method (0.06s)
+PASS
+ok  	github.com/system-inc/cohere/internal/lint/rules/adamic	0.070s

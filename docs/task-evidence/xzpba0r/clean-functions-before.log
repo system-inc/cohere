@@ -1,0 +1,20 @@
+=== RUN   TestIndexedAccessWriteEdgesStayClean
+=== PAUSE TestIndexedAccessWriteEdgesStayClean
+=== CONT  TestIndexedAccessWriteEdgesStayClean
+=== RUN   TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== RUN   TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/expression_arrow
+=== RUN   TestIndexedAccessWriteEdgesStayClean/function_expression
+=== PAUSE TestIndexedAccessWriteEdgesStayClean/function_expression
+=== CONT  TestIndexedAccessWriteEdgesStayClean/plain_block_method
+=== CONT  TestIndexedAccessWriteEdgesStayClean/function_expression
+=== CONT  TestIndexedAccessWriteEdgesStayClean/expression_arrow
+    indexed_access_write_test.go:149: expected no findings, got 1: [indexedAccessWrite]
+--- FAIL: TestIndexedAccessWriteEdgesStayClean (0.00s)
+    --- FAIL: TestIndexedAccessWriteEdgesStayClean/expression_arrow (0.04s)
+    --- PASS: TestIndexedAccessWriteEdgesStayClean/plain_block_method (0.05s)
+    --- PASS: TestIndexedAccessWriteEdgesStayClean/function_expression (0.05s)
+FAIL
+FAIL	github.com/system-inc/cohere/internal/lint/rules/adamic	0.065s
+FAIL

@@ -140,7 +140,7 @@ All 3 test functions and all 4 `t.Run` callback definitions in
 `indexed_access_write_test.go` now call `t.Parallel()` as their first statement;
 fixtures, temporary programs and checker state are independent.
 
-Final commands:
+Commands at the spread/method follow-up:
 
 | Command | Result |
 | --- | --- |
@@ -150,7 +150,58 @@ Final commands:
 | `gofmt -l` on the 2 changed Go files | exit 0, 0 filenames |
 | `git diff --check` | exit 0, 0 whitespace errors |
 
-The same Adamic census command with the final binary checks 2,140 files and
+At the spread/method follow-up, the same Adamic census command checked 2,140 files and
 reports 1,068 findings, 0 rule crashes. Comparing full finding records against
 the prior approved binary gives 0 added and 0 removed sites. See
 `adamic-edges-summary.json`; existing findings account for census exit 1.
+
+## Clean function forms follow-up
+
+Review base: `cf2e340bfbae3739fa28a263681dca581fdba972`.
+Added three standalone accepted fixtures:
+
+- `accepted-method.ts`: the plain block-bodied method shorthand `get() { return source.value; }`.
+- `accepted-arrow.ts`: the expression-bodied property arrow `get: () => source.value`.
+- `accepted-function.ts`: the function-expression property `get: function () { return source.value; }`.
+
+All are quiet. Every fixture replaces `source.value` with `2` as a control,
+which must report exactly 1 finding. The asserted spans are respectively `get`,
+`() => 2`, and `function () { return 2; }`. Method shorthand goes through the
+method site; arrow and function-expression properties go through their initializer
+function relation. Expression bodies now use the same indexed-return predicate
+as block return statements, as the function's one return.
+
+Focused command:
+
+```sh
+go test ./internal/lint/rules/adamic \
+  -run '^TestIndexedAccessWriteEdgesStayClean/(plain_block_method|expression_arrow|function_expression)$' -v
+```
+
+Before the fix: 1 failed subtest (the clean arrow expected 0 findings, got 1),
+2 passed subtests (method shorthand and function expression, including plants),
+exit 1. See `clean-functions-before.log`. After: 3 passed subtests, 0 failures;
+each plant reports 1 finding. See `clean-functions-after.log`.
+The drop-check mutant gives 3 failed subtests, each expecting 1 plant finding and
+getting 0, exit 1. See `clean-functions-mutant.log`. The mutation was restored.
+All 3 source fixtures and all 3 plants have 0 tsgo semantic diagnostics under
+Adamic's options, asserted by the tests.
+
+The TypeScript 6.0.3 strict command from above was also run over all 3 clean
+fixtures and their 3 plants: 6 accepted programs, 0 diagnostics, exit 0.
+Node v24.19.0 prints `ONE`, exit 0 for each clean fixture; each plant exits 1
+with `TypeError: Cannot read properties of undefined (reading 'toUpperCase')`.
+See `clean-functions-node.log`.
+
+Current checks:
+
+| Command | Result |
+| --- | --- |
+| `go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel -v` | 1 pass, 0 failures (`clean-functions-testpolicy.log`) |
+| `go test ./internal/lint/rules/adamic -json` | 402 pass events, 0 failures |
+| `go vet ./internal/lint/rules/adamic` | exit 0, 0 diagnostics |
+| `gofmt -l` on the 2 changed Go files | exit 0, 0 filenames |
+| `git diff --check` | exit 0, 0 whitespace errors |
+
+No census was rerun for this follow-up: @system_cohere_lint owns the census
+after this fix. The worker pushes the branch without landing it.

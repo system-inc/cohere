@@ -113,7 +113,17 @@ func TestIndexedAccessWriteEdges(t *testing.T) {
 
 func TestIndexedAccessWriteEdgesStayClean(t *testing.T) {
 	t.Parallel()
+	read := func(name string) string {
+		bytes, err := os.ReadFile("testdata/indexed-access/" + name + ".ts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(bytes)
+	}
 	for name, fixture := range map[string]struct{ source, old, plant, span string }{
+		"plain block method":  {read("accepted-method"), "source.value", "2", "get"},
+		"expression arrow":    {read("accepted-arrow"), "source.value", "2", "() => 2"},
+		"function expression": {read("accepted-function"), "source.value", "2", "function () { return 2; }"},
 		"spread from T": {
 			`function make<T extends { readonly value: number }>(source: T): { readonly value: T['value'] } { return { ...source }; }`,
 			"source: T", "source: { readonly value: number }", "source",

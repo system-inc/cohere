@@ -123,7 +123,7 @@ func projectsIndexedAccess(typeChecker *checker.Checker, source, target *checker
 	return checker.Checker_isTypeIdenticalTo(typeChecker, source, target)
 }
 
-// An inferred method returning source.value has a number return type in tsgo,
+// An inferred function returning source.value has a number return type in tsgo,
 // just as the read itself does. Preserve that read only when every return of
 // the actual implementation has the indexed type; nested functions do not count.
 func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.Type, path []flow.Step) bool {
@@ -145,8 +145,20 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 		return false
 	}
 	declaration := signatures[0].Declaration()
-	if declaration == nil || declaration.Body() == nil || !ast.IsBlock(declaration.Body()) {
+	if declaration == nil || declaration.Body() == nil {
 		return false
+	}
+	isIndexedReturn := func(expression *ast.Node) bool {
+		if expression == nil {
+			return false
+		}
+		own := typeChecker.GetTypeAtLocation(expression)
+		return own != nil && (own.Flags()&checker.TypeFlagsNever != 0 ||
+			checker.Checker_isTypeIdenticalTo(typeChecker, own, target) || readsIndexedAccess(typeChecker, expression, target))
+	}
+	// An expression-bodied arrow has exactly one return: its body expression.
+	if !ast.IsBlock(declaration.Body()) {
+		return isIndexedReturn(declaration.Body())
 	}
 	seen, valid := 0, true
 	var visit func(*ast.Node) bool
@@ -156,14 +168,7 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 		}
 		if node.Kind == ast.KindReturnStatement {
 			seen++
-			expression := node.AsReturnStatement().Expression
-			if expression == nil {
-				valid = false
-				return true
-			}
-			own := typeChecker.GetTypeAtLocation(expression)
-			valid = own != nil && (own.Flags()&checker.TypeFlagsNever != 0 ||
-				checker.Checker_isTypeIdenticalTo(typeChecker, own, target) || readsIndexedAccess(typeChecker, expression, target))
+			valid = isIndexedReturn(node.AsReturnStatement().Expression)
 			return !valid
 		}
 		node.ForEachChild(visit)
