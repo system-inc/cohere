@@ -463,20 +463,10 @@
     },
     "no-invalid-regexp": {
         "1724871cc95a": "extra",
-        "1a8946a6736c": "extra",
         "4aa20ded0495": "missing",
-        "590dc791863d": "extra",
-        "5c4a72f27b33": "extra",
-        "6aece5a6ae62": "extra",
-        "7ec6da2be206": "extra",
         "7fc9b7e267c9": "extra",
         "840a44ae6cb6": "extra",
-        "9a5222231887": "extra",
-        "cfcb6b3d8903": "extra",
-        "d85799e16212": "extra",
-        "e1a3441530b2": "missing",
-        "efbcefb4f685": "extra",
-        "fda95b42becf": "extra"
+        "e1a3441530b2": "missing"
     },
     "no-misleading-character-class": {
         "31d7f0cdb5df": "missing",
