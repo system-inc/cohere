@@ -158,3 +158,19 @@ writing ranges, preserving set-atom identity until range syntax has been checked
 No whole-module tests, landing, or Adamic consumer changes were performed. The
 branch goes to cohere's origin for @system_cohere_lint's review. After landing,
 Adamic's library should consume this package at the landed SHA and remove its copy.
+
+## Parallel-policy follow-up
+
+`go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel` failed
+before the scheduling fix with five violations across 1,144 test files, all in
+properties_test.go. The three independent top-level tests now call t.Parallel()
+as their first statement. Both subtest loops have a directly preceding
+"Not parallel:" comment because they update counts the parent logs after the loop.
+Both t.Run sites in regexp_test.go already called t.Parallel() first.
+
+After the fix, the same gate command passed (one test, zero violations).
+`go test ./internal/lint/ecmascript/regexp -v` passed all 13 top-level tests,
+including 1,715 property subtests and 24 syntax fixtures, with 64,403,940
+membership comparisons. `go vet ./internal/lint/ecmascript/regexp` passed
+(one package, zero diagnostics), and `gofmt -l internal/lint/ecmascript/regexp/properties_test.go`
+listed zero files. No tests or runtime behavior were added in this follow-up.

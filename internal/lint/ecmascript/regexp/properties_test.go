@@ -121,6 +121,7 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 var acceptedPropertyNames string
 
 func TestUnicodePropertiesNode(t *testing.T) {
+	t.Parallel()
 	if unicode.Version != unicodeproperties.Version {
 		t.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicodeproperties.Version)
 	}
@@ -141,6 +142,7 @@ func TestUnicodePropertiesNode(t *testing.T) {
 	answers := oracleProperties(t, probes)
 	checks, tested := 0, 0
 	for i, a := range answers {
+		// Not parallel: each subtest updates counts that the parent logs after the loop.
 		t.Run(a.Name, func(t *testing.T) {
 			tested++
 			if !a.Accepted {
@@ -157,6 +159,7 @@ func TestUnicodePropertiesNode(t *testing.T) {
 }
 
 func TestUnicodePropertiesFresh(t *testing.T) {
+	t.Parallel()
 	cmd := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -165,6 +168,7 @@ func TestUnicodePropertiesFresh(t *testing.T) {
 }
 
 func TestUnicodePropertySyntaxNode(t *testing.T) {
+	t.Parallel()
 	type fixture struct{ Source, Flags string }
 	fixtures := []fixture{
 		{`^[\p{Script=Greek}-]$`, "u"},
@@ -215,6 +219,7 @@ func TestUnicodePropertySyntaxNode(t *testing.T) {
 	}
 	checks := 0
 	for i, f := range fixtures {
+		// Not parallel: each subtest updates the membership count that the parent logs after the loop.
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			re, err := Compile(f.Source, f.Flags)
 			if (err == nil) != answers[i].Accepted {
