@@ -34,6 +34,9 @@ type InlineRemap struct {
 	Identifiers map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	// Blocks maps a nested block id to the parent's.
 	Blocks map[static_single_assignment.BlockId]static_single_assignment.BlockId
+	// BlockOrder holds copied parent block ids in nested.Blocks order.
+	// Keep it separate from Blocks: return rewriting allocates ids in this order.
+	BlockOrder []static_single_assignment.BlockId
 	// Instructions maps a nested instruction id to the parent's.
 	Instructions map[InstructionId]InstructionId
 	// Entry is the parent-space id of the nested function's entry block.
@@ -130,7 +133,9 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		if block == nil {
 			continue
 		}
-		remap.Blocks[block.Id] = parent.NewBlock(block.Kind).Id
+		copied := parent.NewBlock(block.Kind).Id
+		remap.Blocks[block.Id] = copied
+		remap.BlockOrder = append(remap.BlockOrder, copied)
 	}
 	remap.Entry = remap.Blocks[nested.Entry]
 
