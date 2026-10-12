@@ -74,13 +74,20 @@ func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
 	}
 }
 
-// TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads covers what eviction must not break. A
-// test can still hold a graph the cache has evicted, so a rebuild of the same fixture gets a root of its own,
-// and the evicted graph keeps reading its own files. Each build reads a memory filesystem of its own, which
-// nothing writes after it is made, so the evicted graph's file is what it was built from.
+// TestAFixtureHasOneRootWhateverWasBuiltBeforeIt is the guard on #jdkmmhs. A fixture's root is its key
+// alone, so a fixture built first and the same fixture built again after another has evicted it get one
+// root. A root that counted builds made every path a fixture reads, and every message naming one, follow
+// t.Parallel's scheduling, which gave Adamic's traced builds a fresh key on every run for identical bytes.
+//
+// It also covers what sharing that root must not break. A test can still hold the graph the cache evicted,
+// and the rebuild is a second graph at the same root, so the evicted graph must keep reading its own files.
+// Each build reads a memory filesystem of its own, which nothing writes after it is made.
+//
+// Shown able to fail: with the root named fmt.Sprintf("%s-%d", key, programCacheBuilds) again, the second
+// build's root differs from the first's.
 //
 // Not parallel: it sets the package-wide cache capacity to one, which would evict other tests' builds.
-func TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads(t *testing.T) {
+func TestAFixtureHasOneRootWhateverWasBuiltBeforeIt(t *testing.T) {
 	withProgramCacheCapacity(t, 1)
 
 	files := map[string]string{"bound.ts": "export const planted100 = 100;\n"}
@@ -89,10 +96,18 @@ func TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads(t *testing
 		t.Fatal(err)
 	}
 	cachedFixture(t, 101)
-	second := cachedFixture(t, 100)
+	builds := programCacheBuilds
+	secondGraph, second, err := buildCachedProgram(files, "bound.ts", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if first == second {
-		t.Fatalf("a rebuilt fixture reused the evicted build's root %s", first)
+	// The second ask must be a real build, or the two roots agree because one entry answered both.
+	if programCacheBuilds != builds+1 || secondGraph == firstGraph {
+		t.Fatal("the fixture was not evicted and built again, so this proves nothing about its root")
+	}
+	if want := memoryFixtureRoot + "/" + programCacheKey(files, "bound.ts", false); first != want || second != want {
+		t.Fatalf("a fixture's root is not its key alone: first build %s, after another fixture %s, want %s", first, second, want)
 	}
 	held := false
 	for _, sourceFile := range firstGraph.ProjectFiles() {
