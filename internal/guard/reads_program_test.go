@@ -111,6 +111,12 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 			want: programFacts{readsProgram: true, definesRule: true, reads: readsOtherFiles},
 		},
 		{
+			name: "compiler-resolved reference targets",
+			source: `package probe
+var Probe = rule.Rule{ProgramReads: rule.ReadsOtherFiles, Run: func(ctx rule.Context, options any) rule.Listeners { _ = ctx.Program.ReferenceTargets(ctx.SourceFile); return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, reads: readsOtherFiles, declared: readsOtherFiles},
+		},
+		{
 			name: "a read in a comment only",
 			source: `package probe
 // This rule never touches ctx.Program.
@@ -223,6 +229,7 @@ var programReadsByMethod = map[string]programRead{
 	"ResolveModule":                  readsModuleResolution,
 	"GetSourceFileForResolvedModule": readsOtherFiles,
 	"SourceFiles":                    readsOtherFiles,
+	"ReferenceTargets":               readsOtherFiles,
 	"GetSourceFile":                  readsOtherFiles,
 	"FS":                             readsOtherFiles,
 	"DesignSystemFS":                 readsDesignSystem,

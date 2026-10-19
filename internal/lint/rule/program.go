@@ -107,6 +107,7 @@ type Program interface {
 	// ReadsOtherFiles.
 	GetSourceFileForResolvedModule(fileName string) *ast.SourceFile
 	SourceFiles() []*ast.SourceFile
+	ReferenceTargets(file *ast.SourceFile) map[*ast.FileReference]*ast.SourceFile
 	GetSourceFile(fileName string) *ast.SourceFile
 	FS() vfs.FS
 
@@ -332,4 +333,29 @@ func caseSensitivity(caseSensitive bool) tspath.CaseSensitivity {
 		return tspath.CaseSensitive
 	}
 	return tspath.CaseInsensitive
+}
+
+// ReferenceTargets resolves all three triple-slash forms through the compiler's
+// existing resolution results. A rule reading these edges declares ReadsOtherFiles.
+func (view *programView) ReferenceTargets(file *ast.SourceFile) map[*ast.FileReference]*ast.SourceFile {
+	view.require(ReadsOtherFiles, "ReferenceTargets")
+	targets := map[*ast.FileReference]*ast.SourceFile{}
+	for _, ref := range file.ReferencedFiles {
+		if target := view.program.GetSourceFileFromReference(file, ref); target != nil {
+			targets[ref] = target
+		}
+	}
+	for _, ref := range file.TypeReferenceDirectives {
+		if resolved := view.program.GetResolvedTypeReferenceDirectiveFromTypeReferenceDirective(ref, file); resolved != nil {
+			if target := view.program.GetSourceFile(resolved.ResolvedFileName); target != nil {
+				targets[ref] = target
+			}
+		}
+	}
+	for _, ref := range file.LibReferenceDirectives {
+		if target := view.program.GetLibFileFromReference(ref); target != nil {
+			targets[ref] = target
+		}
+	}
+	return targets
 }

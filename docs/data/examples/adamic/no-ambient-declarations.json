@@ -1,0 +1,24 @@
+{
+    "rule": "adamic/no-ambient-declarations",
+    "firing": {
+        "file": "control.ts",
+        "source": "declare const limit: number;",
+        "findings": [
+            {
+                "line": 1,
+                "column": 15,
+                "endLine": 1,
+                "endColumn": 20,
+                "messageId": "ambientDeclaration",
+                "message": "`limit` declares a value or augments a type without defining its runtime implementation. TypeScript trusts the declaration, but Node can throw when the program uses it. Define the runtime value or implementation instead."
+            }
+        ]
+    },
+    "clean": {
+        "file": "main.cts",
+        "source": "declare const limit: number;"
+    },
+    "assertedMessageIds": [
+        "ambientDeclaration"
+    ]
+}

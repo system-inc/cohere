@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/no-ambient-declarations" },
+  "messages": {
+    "ambientDeclaration": {
+      "text": "`{{declaration}}` declares a value or augments a type without defining its runtime implementation. TypeScript trusts the declaration, but Node can throw when the program uses it. Define the runtime value or implementation instead."
+    }
+  }
+}
