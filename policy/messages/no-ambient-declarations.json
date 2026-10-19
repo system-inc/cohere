@@ -1,8 +1,13 @@
 {
-  "rules": { "TypeScript": "adamic/no-ambient-declarations" },
+  "rules": {
+    "TypeScript": "adamic/no-ambient-declarations"
+  },
   "messages": {
     "ambientDeclaration": {
       "text": "The declaration {{declaration}} supplies a runtime value or member without defining it. TypeScript trusts this declaration, but the emitted program can throw when the promised runtime definition is absent. Define the value or member in the program."
+    },
+    "ambientField": {
+      "text": "The declared field {{declaration}} promises {{type}}, but {{reason}}. A declare annotation emits no runtime field. Define the value in the class or retain the inherited field type."
     }
   }
 }

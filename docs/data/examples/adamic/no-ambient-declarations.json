@@ -1,16 +1,16 @@
 {
     "rule": "adamic/no-ambient-declarations",
     "firing": {
-        "file": "Case.a",
-        "source": "declare const missing: number;\n",
+        "file": "Case.ts",
+        "source": "declare let limit: number;\nlimit.toFixed();\n",
         "findings": [
             {
                 "line": 1,
-                "column": 15,
+                "column": 13,
                 "endLine": 1,
-                "endColumn": 22,
+                "endColumn": 18,
                 "messageId": "ambientDeclaration",
-                "message": "The declaration missing supplies a runtime value or member without defining it. TypeScript trusts this declaration, but the emitted program can throw when the promised runtime definition is absent. Define the value or member in the program."
+                "message": "The declaration limit supplies a runtime value or member without defining it. TypeScript trusts this declaration, but the emitted program can throw when the promised runtime definition is absent. Define the value or member in the program."
             }
         ]
     },
@@ -19,6 +19,7 @@
         "source": "declare const missing: number;\n"
     },
     "assertedMessageIds": [
-        "ambientDeclaration"
+        "ambientDeclaration",
+        "ambientField"
     ]
 }

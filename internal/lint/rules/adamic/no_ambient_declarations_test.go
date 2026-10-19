@@ -110,6 +110,10 @@ func TestNoAmbientDeclarationsFileScope(t *testing.T) {
 		t.Run(extension, func(t *testing.T) {
 			t.Parallel()
 			source := "declare const missing: number;"
+			runtimeSource := source + " missing.toFixed();"
+			if extension == ".ts" || extension == ".tsx" || extension == ".a" {
+				source = runtimeSource
+			}
 			filename := "Case" + extension
 			setup := func(directory string) {
 				writeAdamicSupport(t)(directory)
@@ -124,7 +128,7 @@ func TestNoAmbientDeclarationsFileScope(t *testing.T) {
 			} else {
 				rule_testing.ExpectClean(t, result)
 				// The same declaration in a source .ts file must report.
-				rule_testing.ExpectFindings(t, runAdamic(t, ambientSubject(), source), "ambientDeclaration")
+				rule_testing.ExpectFindings(t, runAdamic(t, ambientSubject(), runtimeSource), "ambientDeclaration")
 			}
 		})
 	}
@@ -166,5 +170,73 @@ func ambientSetup(t *testing.T, files map[string]string) func(string) {
 				t.Fatal(err)
 			}
 		}
+	}
+}
+
+func TestNoAmbientDeclarationFields(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"field-unbacked", "field-same", "field-narrow"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			files := ambientFixture(t, name)
+			ambientCheckTypes(t, files)
+			run := func() rule_testing.Result {
+				return rule_testing.RunTypedFilesWithSetup(t, ambientSubject(), files, "Case.ts", ambientSetup(t, files))
+			}
+			if name == "field-same" {
+				rule_testing.ExpectClean(t, run())
+				// Plant the Node-failing narrowing into the same inherited field slot.
+				files["Case.ts"] = strings.Replace(files["Case.ts"], "readonly x: number = 1", `readonly x: number | string = "s"`, 1)
+				ambientCheckTypes(t, files)
+			}
+			result := run()
+			rule_testing.ExpectFindings(t, result, "ambientField")
+			expectSpans(t, files["Case.ts"], result, "x")
+			if len(result.Diagnostics) == 1 {
+				message := result.Diagnostics[0].Message.Description
+				for _, text := range []string{"x", "number", "runtime"} {
+					if !strings.Contains(message, text) {
+						t.Errorf("message %q lacks %q", message, text)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestNoAmbientDeclarationTypeOnlyBindings(t *testing.T) {
+	t.Parallel()
+	for name, source := range map[string]string{
+		"unused":           `declare const missing: number;`,
+		"type-only export": `declare const missing: number; export type { missing };`,
+		"brand":            ambientFixture(t, "brand-types")["Case.ts"],
+		"brand shorthand":  ambientFixture(t, "brand-types")["Case.ts"],
+		"class heritage":   `declare class Missing { value: number } type Instance = Missing; export type { Instance };`,
+		"function":         `declare function missing(): number; type Callback = typeof missing; export type { Callback };`,
+		"class":            `declare class Missing { value: number } type Instance = Missing; type Constructor = typeof Missing; export type { Instance, Constructor };`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			files := map[string]string{"Case.ts": source}
+			ambientCheckTypes(t, files)
+			rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, ambientSubject(), files, "Case.ts", ambientSetup(t, files)))
+			plant := map[string]string{"unused": "missing.toFixed();", "type-only export": "missing.toFixed();", "brand": "translationSlotsBrand.toString();", "function": "missing().toFixed();", "class": "new Missing().value.toFixed();", "brand shorthand": "const value = { translationSlotsBrand }; value.translationSlotsBrand.toString();", "class heritage": "class D extends Missing {} new D();"}[name]
+			files["Case.ts"] += "\n" + plant
+			ambientCheckTypes(t, files)
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithSetup(t, ambientSubject(), files, "Case.ts", ambientSetup(t, files)), "ambientDeclaration")
+		})
+	}
+	for _, name := range []string{"brand-value", "brand-other-file", "brand-import-only", "brand-export-value", "brand-type-import"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			files := ambientFixture(t, name)
+			ambientCheckTypes(t, files)
+			if name == "brand-type-import" {
+				rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, ambientSubject(), files, "Case.ts", ambientSetup(t, files)))
+				files["Read.ts"] = strings.Replace(files["Read.ts"], "import type", "import", 1)
+				ambientCheckTypes(t, files)
+			}
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithSetup(t, ambientSubject(), files, "Case.ts", ambientSetup(t, files)), "ambientDeclaration")
+		})
 	}
 }

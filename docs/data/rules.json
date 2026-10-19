@@ -4467,7 +4467,8 @@
             "category": "adamic",
             "typeAware": true,
             "messageIds": [
-                "ambientDeclaration"
+                "ambientDeclaration",
+                "ambientField"
             ],
             "sets": [
                 {
