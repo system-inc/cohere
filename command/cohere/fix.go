@@ -596,6 +596,7 @@ func proposalsForText(
 		}
 		withoutTypeChecker = append(withoutTypeChecker, subject)
 	}
+	complete := len(withoutTypeChecker) == len(applicable)
 	applicable = withoutTypeChecker
 
 	/*
@@ -650,6 +651,15 @@ func proposalsForText(
 		walkNode(sourceFile.AsNode(), listeners)
 	}
 
+	if len(directives.Directives()) > 0 {
+		ran := make([]string, 0, len(applicable))
+		for _, subject := range applicable {
+			ran = append(ran, subject.Name)
+		}
+		program.ReportDeadDirectives(sourceFile, directives, ran, complete, func(diagnostic rule.Diagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		})
+	}
 	return edit.ProposalsFrom(diagnostics), nil
 }
 

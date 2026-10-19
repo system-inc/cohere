@@ -380,9 +380,8 @@ func (s coverageSummary) coverageFilesLine(details bool) string {
 	if s.Suppression != nil {
 		terms = append(terms, fmt.Sprintf("%d findings suppressed, %d without a reason",
 			s.Suppression.Suppressed, s.Suppression.SuppressedWithoutReason))
-		// Dead scaffolding is worth deleting, so it is counted by default when there is any. It is a
-		// count rather than a finding because a filtered run makes every directive for an unselected
-		// rule look unused, and a number that is wrong under a common flag should not fail a build.
+		// Keep the coverage count beside the walk's fixable unused-disable findings. The walk only
+		// reports names whose rules ran, so a filtered run preserves unselected names.
 		if s.Suppression.Dead > 0 {
 			terms = append(terms, fmt.Sprintf("%d disable comments silenced nothing while their rule ran", s.Suppression.Dead))
 		}

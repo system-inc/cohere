@@ -1182,7 +1182,7 @@ func (d *fileDispatcher) dispatchFile(
 	ranRules := rules
 	if d.replayed != nil {
 		for _, withheld := range d.replayed.withheld {
-			directives.MarkApplied(int(withheld.Directive))
+			directives.MarkApplied(int(withheld.Directive), withheld.RuleName)
 		}
 		ranRules = d.replayed.rules
 	}
@@ -1304,6 +1304,7 @@ func (d *fileDispatcher) dispatchFile(
 		}
 	}
 
+	reportDeadDirectives(sourceFile, directives, ranRules, measureOnly, ruleCrashes, report)
 	silenced = tally(sourceFile.FileName().AsString(), directives, ranRule, resolution)
 	silenced.directives = len(directives.Directives()) > 0 || len(directives.RuleReferences()) > 0
 	silenced.withheld = d.withheld

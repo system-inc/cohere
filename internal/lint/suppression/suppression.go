@@ -84,6 +84,9 @@ type Directive struct {
 
 	// applied counts the findings this directive actually withheld.
 	applied int
+
+	// appliedRules records the registry names whose findings this comment withheld.
+	appliedRules map[string]bool
 }
 
 // HasReason is whether the author said why.
@@ -286,7 +289,7 @@ func (i *Index) SuppressedBy(ruleName string, offset int) int {
 			continue
 		}
 		if candidate.Covers(ruleName, line) {
-			candidate.applied++
+			i.MarkApplied(index, ruleName)
 			return index
 		}
 	}
@@ -296,12 +299,28 @@ func (i *Index) SuppressedBy(ruleName string, offset int) int {
 // MarkApplied records that the directive at index withheld a finding this run did not produce, because the
 // findings cache replayed the rule that would have, and reports false when no directive is at index. The index
 // is SuppressedBy's from a run over the same bytes, so it names the same directive.
-func (i *Index) MarkApplied(index int) bool {
+func (i *Index) MarkApplied(index int, ruleName string) bool {
 	if i == nil || index < 0 || index >= len(i.directives) {
 		return false
 	}
-	i.directives[index].applied++
+	directive := i.directives[index]
+	directive.applied++
+	if directive.appliedRules == nil {
+		directive.appliedRules = map[string]bool{}
+	}
+	directive.appliedRules[ruleName] = true
 	return true
+}
+
+// AppliedTo reports whether this directive withheld a finding for the named rule, resolving
+// its spelling just as Covers does. A live name must survive removal of a dead sibling name.
+func (d *Directive) AppliedTo(named string) bool {
+	for registered := range d.appliedRules {
+		if matchesRuleName(named, registered) {
+			return true
+		}
+	}
+	return false
 }
 
 // Directives returns every directive found, in source order.
