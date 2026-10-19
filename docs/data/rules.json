@@ -8446,6 +8446,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }

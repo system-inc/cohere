@@ -4270,7 +4270,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 290,
+        "rulesOn": 291,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5265,6 +5265,10 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {

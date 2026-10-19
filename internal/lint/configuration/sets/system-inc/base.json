@@ -40,6 +40,7 @@
         "adamic/nominal-class": "off",
         "adamic/single-spread": "off",
         "nexus/boundary-no-nexus-outside-import": "error",
+        "nexus/import-no-forbidden-source": "error",
         "no-restricted-properties": [
             "error",
             {
