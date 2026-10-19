@@ -50,12 +50,20 @@ type suggestionGroup struct {
 	Modifiers        suggestionList `json:"modifiers"`
 }
 
+type rootProperties struct {
+	Colour    []string `json:"colour"`
+	Other     []string `json:"other"`
+	Arbitrary []string `json:"arbitrary"`
+}
+
 type suggestionsFile struct {
 	TailwindVersion           string                       `json:"tailwindVersion"`
 	ProbedNamespaces          int                          `json:"probedNamespaces"`
 	DefaultSpacingSuggestions []string                     `json:"defaultSpacingSuggestions"`
 	SuggestedFractions        []string                     `json:"suggestedFractions"`
 	Statics                   map[string]bool              `json:"statics"`
+	NestedStatics             []string                     `json:"nestedStatics"`
+	RootProperties            map[string]rootProperties    `json:"rootProperties"`
 	Functional                map[string][]suggestionGroup `json:"functional"`
 }
 
@@ -140,6 +148,35 @@ var FrameworkStaticSuggested = map[string]bool{
 	sort.Strings(names)
 	for _, name := range names {
 		fmt.Fprintf(&body, "\t%s: %t,\n", strconv.Quote(name), file.Statics[name])
+	}
+	body.WriteString(`}
+
+// FrameworkStaticNested are the statics whose compiled body holds a rule or an at-rule beside its
+// declarations, which FrameworkStaticDeclarations flattens away, so a signature reads them as unknown.
+var FrameworkStaticNested = map[string]bool{
+`)
+	nested := append([]string(nil), file.NestedStatics...)
+	sort.Strings(nested)
+	for _, name := range nested {
+		fmt.Fprintf(&body, "\t%s: true,\n", strconv.Quote(name))
+	}
+	body.WriteString(`}
+
+// FrameworkRootProperties is every property a functional root's classes were seen to declare in a
+// signature, under either feature set, across every suggested value, modifier and arbitrary shape the
+// generator probed, split by the arm upstream picks: a named colour, any other named value or the bare
+// root, and an arbitrary value. The bound a class this port cannot compile is held to.
+var FrameworkRootProperties = map[string]RootProperties{
+`)
+	propertyRoots := make([]string, 0, len(file.RootProperties))
+	for root := range file.RootProperties {
+		propertyRoots = append(propertyRoots, root)
+	}
+	sort.Strings(propertyRoots)
+	for _, root := range propertyRoots {
+		properties := file.RootProperties[root]
+		fmt.Fprintf(&body, "\t%s: {Colour: %s, Other: %s, Arbitrary: %s},\n", strconv.Quote(root),
+			stringSlice(properties.Colour), stringSlice(properties.Other), stringSlice(properties.Arbitrary))
 	}
 	body.WriteString(`}
 

@@ -216,6 +216,119 @@ const statics = Object.fromEntries(
     staticNames.map((name) => [name, everything.designSystem.utilities.getCompletions(name).length > 0]),
 );
 
+/*
+ * The statics whose compiled body holds a rule or an at-rule beside its declarations, such as
+ * `container`'s breakpoint `@media` blocks and `space-x-reverse`'s `:where()` rule. FrameworkStaticDeclarations
+ * flattens bodies to their declarations, which is all a reading needs and not enough for a signature,
+ * so the signature reads these as unknown. An `@property` is not counted, since a signature drops it.
+ */
+function holdsNesting(nodes) {
+    return nodes.some((node) => {
+        if (node.kind === 'rule') return true;
+        if (node.kind === 'at-rule') return node.name !== '@property';
+        if (node.kind === 'at-root' || node.kind === 'context') return holdsNesting(node.nodes ?? []);
+        return false;
+    });
+}
+const nestedStatics = staticNames
+    .filter((name) => {
+        const candidate = everything.designSystem.parseCandidate(name).find((parsed) => parsed.kind === 'static');
+        if (!candidate) return false;
+        return everything.designSystem.compileAstNodes(candidate).some(({ node }) => holdsNesting(node.nodes ?? []));
+    })
+    .sort();
+
+/*
+ * Every property each functional root's classes can declare in a signature, the universe the pass
+ * bounds a class by when it cannot compile it. Probed rather than read: every suggested value with and
+ * without each modifier, and an arbitrary value of each shape a root's switch can tell apart, each with
+ * and without a type annotation, under both feature sets a signature is taken with. A property only
+ * some value outside these probes reaches would leave the bound short, which is what
+ * TestSignatureAgreesWithTailwind's bound check is there to catch on real themes.
+ */
+const arbitraryProbes = [
+    '#000', 'red', 'var(--zz-probe)', '1px', '0', '50%', '1', '2.5', '1/2', '45deg', 'url(x)',
+    'linear-gradient(red,blue)', 'auto', 'center', 'cover', 'serif', 'small', 'larger', '1_2', 'none',
+    'thin', 'initial',
+];
+const dataTypes = [
+    'color', 'length', 'percentage', 'ratio', 'number', 'integer', 'url', 'position', 'bg-size', 'size',
+    'line-width', 'image', 'family-name', 'generic-name', 'absolute-size', 'relative-size', 'angle', 'vector',
+];
+function signatureCaches() {
+    const caches = [];
+    for (const options of [{ collapse: true, logicalToPhysical: true }, { collapse: false, logicalToPhysical: true }]) {
+        everything.designSystem.canonicalizeCandidates(['bg-[#000]'], options);
+        const features = (options.collapse ? 1 : 0) | (options.logicalToPhysical ? 2 : 0);
+        for (const symbol of Object.getOwnPropertySymbols(everything.designSystem.storage)) {
+            const byOptions = everything.designSystem.storage[symbol];
+            if (!byOptions || typeof byOptions.entries !== 'function') continue;
+            for (const [key, inner] of byOptions.entries()) {
+                if (!key || typeof key !== 'object' || key.features !== features || !('rem' in key)) continue;
+                const sample = inner?.entries?.().next().value;
+                if (sample && typeof sample[1] === 'string' && sample[1].startsWith('.x {')) caches.push(inner);
+            }
+        }
+    }
+    if (caches.length !== 2) {
+        process.stderr.write('enumerate.mjs: the two signature caches were not found\n');
+        process.exit(1);
+    }
+    return caches;
+}
+const signatureCachesForProbes = signatureCaches();
+function propertiesOf(className, into) {
+    for (const cache of signatureCachesForProbes) {
+        const signature = cache.get(className);
+        if (typeof signature !== 'string') continue;
+        for (const match of signature.matchAll(/^\s*([^\s{}@][^:{}]*?): [^{\n]*;$/gm)) into.add(match[1]);
+    }
+}
+/*
+ * Split three ways, by how upstream picks the arm. A named value a colour namespace resolves takes the
+ * colour arm, since every colour-bearing root tries its colour lookup first; any other named value, and
+ * the bare root, take the rest; an arbitrary value takes whatever its inferred type selects, so its
+ * bucket is everything an arbitrary probe reached. The Go bound reads the bucket its class falls in.
+ */
+const isColourNamespace = (namespace) => namespace === '--color' || namespace.endsWith('-color');
+const colourKeywords = new Set(['current', 'inherit', 'transparent']);
+function namedValueIsColour(value) {
+    if (colourKeywords.has(value)) return true;
+    const probe = /zzp(\d+)$/.exec(value);
+    if (!probe) return false;
+    const key = `${namespaces[Number(probe[1])]}-zzp${probe[1]}`;
+    return isColourNamespace(key.slice(0, key.length - value.length - 1));
+}
+const rootProperties = {};
+for (const root of everything.designSystem.utilities.keys('functional')) {
+    const buckets = { colour: new Set(), other: new Set(), arbitrary: new Set() };
+    const groups = everything.designSystem.utilities.getCompletions(root.replace(/^-/, ''));
+    const modifiers = new Set(['50', 'zz-probe', '[50%]', '[1px]']);
+    for (const group of groups) for (const modifier of group.modifiers) modifiers.add(modifier);
+    const probeClass = (className, bucket) => {
+        propertiesOf(className, bucket);
+        for (const modifier of modifiers) propertiesOf(`${className}/${modifier}`, bucket);
+    };
+    probeClass(root, buckets.other);
+    for (const group of groups) {
+        for (const value of group.values) {
+            if (value === null) continue;
+            probeClass(`${root}-${value}`, namedValueIsColour(value) ? buckets.colour : buckets.other);
+        }
+    }
+    for (const value of arbitraryProbes) {
+        probeClass(`${root}-[${value}]`, buckets.arbitrary);
+        for (const dataType of dataTypes) probeClass(`${root}-[${dataType}:${value}]`, buckets.arbitrary);
+    }
+    if (buckets.colour.size + buckets.other.size + buckets.arbitrary.size > 0) {
+        rootProperties[root] = {
+            colour: [...buckets.colour].sort(),
+            other: [...buckets.other].sort(),
+            arbitrary: [...buckets.arbitrary].sort(),
+        };
+    }
+}
+
 if (problems.length > 0) {
     process.stderr.write(`enumerate.mjs: ${problems.length} problems\n${problems.join('\n')}\n`);
     process.exit(1);
@@ -230,6 +343,8 @@ process.stdout.write(
             defaultSpacingSuggestions,
             suggestedFractions,
             statics,
+            nestedStatics,
+            rootProperties,
             functional,
         },
         null,
