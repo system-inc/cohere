@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -41,6 +42,8 @@ import (
 // nothing reaches the disk, so the summary is what a writing run would do, stated as what would
 // change. One function with a switch rather than a second copy, because a check that decided
 // anything differently from the write would report a tree as clean that `--fix` then rewrites.
+// Unused-disable warnings are advisory: a check reports them without proposing their repairs,
+// while a writing run applies them. Otherwise their would-change finding would defeat warn.
 func applyProposedFixes(
 	ctx context.Context,
 	graph *program.Graph,
@@ -162,6 +165,11 @@ func applyProposedFixes(
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
 		}
+		// A warning-only directive repair is available to --fix, but must not turn --no-fix red.
+		if !write && diagnostic.RuleName == configuration.UnusedDisable &&
+			unusedDisableSeverity(graph.LintConfig, diagnostic.SourceFile.FileName().AsString()) == configuration.SeverityWarn {
+			continue
+		}
 		// In the form the format scope holds, since both halves of the union below are keyed by it. The
 		// compiler names a file `C:/work/a.ts` and the walk `C:\work\a.ts` on Windows, and one file under
 		// both names was fixed under one and formatted under the other, from the text before its fixes.
@@ -276,7 +284,17 @@ func applyProposedFixes(
 			if fixesWithheld {
 				return nil, nil
 			}
-			return relint(fileName, text)
+			proposals, err := relint(fileName, text)
+			if !write && unusedDisableSeverity(graph.LintConfig, fileName) == configuration.SeverityWarn {
+				kept := proposals[:0]
+				for _, proposal := range proposals {
+					if proposal.RuleName != configuration.UnusedDisable {
+						kept = append(kept, proposal)
+					}
+				}
+				proposals = kept
+			}
+			return proposals, err
 		}
 	}
 	serially := func(fileName string, text string) ([]edit.Proposal, error) {
@@ -596,6 +614,7 @@ func proposalsForText(
 		}
 		withoutTypeChecker = append(withoutTypeChecker, subject)
 	}
+	complete := len(withoutTypeChecker) == len(applicable)
 	applicable = withoutTypeChecker
 
 	/*
@@ -650,6 +669,15 @@ func proposalsForText(
 		walkNode(sourceFile.AsNode(), listeners)
 	}
 
+	if len(directives.Directives()) > 0 && unusedDisableSeverity(graph.LintConfig, fileName) != configuration.SeverityOff {
+		ran := make([]string, 0, len(applicable))
+		for _, subject := range applicable {
+			ran = append(ran, subject.Name)
+		}
+		program.ReportDeadDirectives(sourceFile, directives, ran, complete, func(diagnostic rule.Diagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		})
+	}
 	return edit.ProposalsFrom(diagnostics), nil
 }
 
