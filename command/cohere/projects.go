@@ -154,6 +154,7 @@ func (found discovery) notes() []string {
 
 // projectRun is one project's run, as its child reported it.
 type projectRun struct {
+	open     *openReport
 	project  discoveredProject
 	output   []byte
 	exitCode int
@@ -221,12 +222,16 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		if found.Ownership.SharedDirectory[label] && project.Engine == engineTypeScript {
 			projectArguments = append(slices.Clone(arguments), "--no-cache")
 		}
+		openPath := ""
+		if activeOpen != nil {
+			openPath = filepath.Join(yieldDirectory, fmt.Sprintf("open-%d.json", index))
+		}
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
-			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, children)
+			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children)
 		}()
 	}
 	group.Wait()
@@ -235,7 +240,21 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	// follow one another with no heading between them; `--verbose` keeps the sections and their account.
 	account := accountOutput(out)
 	worst := 0
+	if activeOpen != nil {
+		activeOpen.Checked = true
+	}
 	for _, checked := range runs {
+		if activeOpen != nil {
+			if checked.open == nil || !checked.open.Checked || checked.notChecked != "" || checked.err != nil {
+				activeOpen.Checked = false
+			}
+			if checked.open != nil {
+				activeOpen.HasFindings = activeOpen.HasFindings || checked.open.HasFindings
+				for _, path := range checked.open.Paths {
+					activeOpen.add(path)
+				}
+			}
+		}
 		fmt.Fprintf(account, "%s\n", sectionHeading(checked.project))
 		if checked.notChecked != "" {
 			fmt.Fprintf(account, "%s\n\n", checked.notChecked)
@@ -328,7 +347,7 @@ func projectRunsAtOnce() int {
 // runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
 // names what it yields to nearer projects (see ownership.go). The child is held in children while it runs,
 // so a signal to this run reaches it.
-func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string, children *projectChildren) projectRun {
+func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string, openPath string, children *projectChildren) projectRun {
 	directory := filepath.Join(root, filepath.FromSlash(project.Directory))
 	prefix := []string{"--directory", directory}
 	if project.ConfigFile != "" {
@@ -345,6 +364,9 @@ func runProject(executable string, root string, project discoveredProject, argum
 	if yieldFile != "" {
 		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
 	}
+	if openPath != "" {
+		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
+	}
 	var output bytes.Buffer
 	child.Stdout = &output
 	child.Stderr = &output
@@ -352,6 +374,9 @@ func runProject(executable string, root string, project discoveredProject, argum
 	started := time.Now()
 	err := children.run(child)
 	run := projectRun{project: project, output: output.Bytes(), elapsed: time.Since(started)}
+	if openPath != "" {
+		run.open = readOpenReport(openPath)
+	}
 	var exited *exec.ExitError
 	switch {
 	case err == nil:

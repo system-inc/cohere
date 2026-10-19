@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +44,9 @@ func main() {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
 		abandonRunCache()
+		if activeOpen != nil {
+			activeOpen.Checked = false
+		}
 		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
 		exitProcess(1)
 	}
@@ -71,6 +72,7 @@ func run() error {
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
 	typesOnly := flag.Bool("types", false, "report TypeScript's own diagnostics only, running no rules and writing no fixes")
 	lintOnly := flag.Bool("lint", false, "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics")
+	openFiles := flag.Bool("open", false, "open files with remaining findings in code after the run (composes with --types and --lint)")
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
 		"the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
@@ -118,7 +120,7 @@ func run() error {
 	listRulesEnabled := flag.Bool("rules-enabled", false,
 		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
 	printConfig := flag.Bool("print-config", false,
-		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit")
+		"print resolved rules, registered settings, language options and matching overrides as JSON for one file (the path given, else index.ts at the project root), and exit; globals name their TypeScript declaration files; ESLint plugin package versions, parser names and settings.react have no cohere meaning (settings.react is refused)")
 	// A bare run, --fix and --no-fix format by default, so naming --format there changes nothing. It is
 	// accepted rather than refused, so the commands written before the default still mean what they did.
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
@@ -158,6 +160,10 @@ func run() error {
 	showPhases := flag.Bool("phases", false, "put where the time went first in the footer's parentheses")
 	jsonOutput := flag.Bool("json", false, "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json")
 	flag.Parse()
+	if *openFiles {
+		activeOpen = &openReport{}
+		dropVerdict()
+	}
 	cacheOff = *noCache
 	if *verbose && *jsonOutput {
 		return fmt.Errorf("--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program")
@@ -306,7 +312,7 @@ func run() error {
 			return nil
 		}
 		if *printConfig {
-			return writeResolvedConfig(os.Stdout, resolved)
+			return writeResolvedConfig(os.Stdout, lintConfig, resolved, location, probePath)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -1241,7 +1247,7 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		findings += len(result.Diagnostics)
+		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfig)
 		if adamicReadinessRequested {
 			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 		}
@@ -1753,39 +1759,6 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 	return ""
 }
 
-// writeResolvedConfig prints every registered rule's resolved setting for one file, as JSON in the shape
-// ESLint's `--print-config` uses: `{"rules": {"name": [severity, ...options]}}`, severity 0, 1 or 2.
-//
-// Resolved per registered rule by the resolver's own question, not read from the config's keys. A key
-// can configure a rule spelled differently (`@typescript-eslint/no-invalid-this` configures core
-// `no-invalid-this` when no key names it exactly), so the keys are the wrong answer to "what runs",
-// which is the answer a parity check against ESLint needs (#mnmx9s4). A rule nobody configured is
-// left out, as ESLint leaves out a rule no config names.
-func writeResolvedConfig(out io.Writer, resolved configuration.Resolved) error {
-	rules := map[string][]json.RawMessage{}
-	for _, registered := range registry.All() {
-		status, setting := resolved.StatusOf(registered.Name)
-		var severity int
-		switch status {
-		case configuration.StatusEnabled:
-			severity = int(setting.Severity)
-		case configuration.StatusScopedOff:
-			severity = 0
-		default:
-			continue
-		}
-		entry := []json.RawMessage{json.RawMessage(strconv.Itoa(severity))}
-		entry = append(entry, setting.Options...)
-		rules[registered.Name] = entry
-	}
-	encoded, err := json.MarshalIndent(map[string]any{"rules": rules}, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(out, string(encoded))
-	return err
-}
-
 // registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
 // key spelled differently from the one it inherits apart from a twin rule's key.
 func registeredRuleNames() []string {
@@ -1854,6 +1827,9 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	// This mirrors settingFor rather than reimplementing it loosely, because a check that disagreed
 	// with the resolver would report keys that work and miss keys that do not.
 	resolves := func(key string) bool {
+		if key == configuration.UnusedDisable {
+			return true
+		}
 		for name := range registered {
 			if configuration.KeyReachesRule(key, name) {
 				return true

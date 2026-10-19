@@ -11,6 +11,7 @@
         "adamic/no-optional-widening": "cohere:adamic turns it on, and our code has 349 findings in ahra, 244 in www-phi-health and 163 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#aaajpke). Outsiders get it on.",
         "adamic/no-type-predicate": "cohere:adamic turns it on, and our code has 352 findings in ahra, 138 in www-phi-health and 123 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#05k4swm). Outsiders get it on.",
         "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 916 findings in ahra, 270 in www-phi-health and 218 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). Outsiders get it on.",
+        "adamic/no-void-widening": "cohere:adamic turns it on, and our code has 56 findings in ahra, 47 in www-phi-health and 46 in www-ahra-ai at cohere cf0a4b7f, so it is off here until its fix wave reads 0 in every consumer (#zqe5fv4). Outsiders get it on.",
         "adamic/nominal-class": "cohere:adamic turns it on, and our code has 9 findings in ahra, 4 in www-phi-health and 4 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#zeqjfyx). Outsiders get it on.",
         "adamic/single-spread": "cohere:adamic turns it on, and our code has 259 findings in ahra, 163 in www-phi-health and 108 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#hzk757e). Outsiders get it on.",
         "no-restricted-globals": "Adds Buffer to the house list: our code runs on Cloudflare Workers, where @cloudflare/workers-types declares Buffer as any, and @nexus/source/encoding/ByteEncoding replaces it. Every other entry is cohere:typescript's."
@@ -31,6 +32,7 @@
         "adamic/no-optional-widening": "off",
         "adamic/no-type-predicate": "off",
         "adamic/no-unchecked-cast": "off",
+        "adamic/no-void-widening": "off",
         "adamic/nominal-class": "off",
         "adamic/single-spread": "off",
         "nexus/boundary-no-nexus-outside-import": "error",

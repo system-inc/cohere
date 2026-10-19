@@ -34,7 +34,7 @@ var swiftPassThroughSwitches = []string{
 // It used to be dropped, and `--format-only` dropped meant a format gate that type-checked and linted the
 // whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv).
 var swiftFrontDoorFlags = []string{
-	"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile",
+	"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
 }
 
 // swiftRefusals say why a flag the engine cannot honor yet is refused, where the general sentence would

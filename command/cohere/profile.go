@@ -30,6 +30,7 @@ func startProfile(path string) error {
 // exitProcess ends the process with code, finishing the profile first. os.Exit runs no deferred call, so
 // every exit goes through here, or a profiled run would leave a truncated profile behind.
 func exitProcess(code int) {
+	finishOpen()
 	if profileFile != nil {
 		pprof.StopCPUProfile()
 		if err := profileFile.Close(); err != nil {

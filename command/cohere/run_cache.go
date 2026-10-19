@@ -626,6 +626,7 @@ func abandonRunCache() {
 // exits with the code. Every verdict exit goes through here, or the cache would record a run with the
 // wrong exit code, and a failing tree replayed as exit 0 passes CI while printing a failure.
 func finishRunCache(exitCode int) {
+	finishOpen()
 	session := activeRunCache
 	if session != nil {
 		activeRunCache = nil

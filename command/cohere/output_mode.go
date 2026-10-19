@@ -54,6 +54,7 @@ var activeSummary runSummary
 // printFinding prints one finding in the view the run asked for: as it always printed under `--verbose`,
 // as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`.
 func printFinding(out io.Writer, finding runFinding, verboseLine string) {
+	activeOpen.add(finding.Path)
 	switch activeOutput.Mode {
 	case outputVerbose:
 		fmt.Fprint(out, verboseLine)
@@ -79,13 +80,17 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 }
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
-// its file. A rule the settings do not name for the file reports as an error, as it fails the run.
+// its file. Unnamed rules report as errors; the unused-disable engine diagnostic defaults to warn.
 func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) runFinding {
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
 		MessageID: diagnostic.Message.Id,
 		Message:   singleLineDescription(diagnostic.Message.Description),
+	}
+	if diagnostic.RuleName == configuration.UnusedDisable {
+		path, _, _ := diagnostic.Location()
+		finding.Severity = unusedDisableSeverity(lintConfig, path).String()
 	}
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
 		finding.Path, finding.Line, finding.Column = diagnostic.Location()
@@ -134,6 +139,10 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	// In a repository with several projects each is its own run, told its path, the root's as ".".
 	if label := os.Getenv(projectLabelVariable); label != "" {
 		summary.Label = label
+	}
+	if activeOpen != nil {
+		activeOpen.Checked = summary.Gaps.CrashedFiles == 0 && summary.Gaps.RuleCrashes == 0 &&
+			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
 
@@ -187,4 +196,23 @@ func printChangedFiles(out io.Writer, changed []changedFile) {
 			fmt.Fprintln(out, line)
 		}
 	}
+}
+
+// unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
+func unusedDisableSeverity(config *configuration.Config, path string) configuration.Severity {
+	resolved := configuration.Resolved{}
+	if config != nil {
+		resolved = config.Resolve(path)
+	}
+	return resolved.UnusedDisableSeverity()
+}
+
+func lintWarningCount(diagnostics []rule.Diagnostic, config *configuration.Config) int {
+	warnings := 0
+	for _, diagnostic := range diagnostics {
+		if ruleFinding(diagnostic, config).Severity == "warn" {
+			warnings++
+		}
+	}
+	return warnings
 }

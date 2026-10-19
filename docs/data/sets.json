@@ -1,7 +1,7 @@
 [
     {
         "name": "cohere:adamic",
-        "rulesOn": 36,
+        "rulesOn": 38,
         "rules": [
             {
                 "name": "@typescript-eslint/ban-ts-comment",
@@ -87,11 +87,19 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "error"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "error"
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -168,7 +176,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 300,
+        "rulesOn": 302,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -715,11 +723,19 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "error"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "error"
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -1705,7 +1721,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 365,
+        "rulesOn": 367,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2164,11 +2180,19 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "error"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "error"
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -4246,7 +4270,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 289,
+        "rulesOn": 291,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4803,12 +4827,20 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "off"
             },
             {
                 "name": "adamic/single-spread",
                 "severity": "off"
+            },
+            {
+                "name": "adamic/union-write",
+                "severity": "error"
             },
             {
                 "name": "array-callback-return",
@@ -5233,6 +5265,10 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -6042,7 +6078,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 299,
+        "rulesOn": 300,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6501,12 +6537,20 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "off"
             },
             {
                 "name": "adamic/single-spread",
                 "severity": "off"
+            },
+            {
+                "name": "adamic/union-write",
+                "severity": "error"
             },
             {
                 "name": "array-callback-return",
@@ -7747,7 +7791,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 289,
+        "rulesOn": 291,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8206,11 +8250,19 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "error"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "error"
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -9223,7 +9275,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 277,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9682,11 +9734,19 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "error"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "error"
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // cohere-dev land: a merge queue, so a green gate can't be starved by main moving under it (#fz6xejy).
@@ -207,7 +208,8 @@ func mergeMain(worktree string, mainCommit string) error {
 }
 
 // gate runs the landing gate on the worktree through a pool token: go vet and the tests of every module
-// go.work names outside a submodule, each in one go invocation (workspace.go), saying which it covered.
+// go.work names outside a submodule, each in one go invocation (workspace.go), saying which it covered, then
+// the docs data check (checkDocsData).
 func gate(worktree string, commit string) int {
 	covered, err := readWorkspace(worktree)
 	if err != nil {
@@ -216,16 +218,17 @@ func gate(worktree string, commit string) int {
 	}
 	covered.report(os.Stderr)
 	patterns := covered.patterns()
-	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(budget []string) int {
-		environment := gateEnvironment(budget)
+	// Each command takes its share as the pool is when it starts (tokenRun.step): a gate that waited for its
+	// token on a busy pool widens for its tests or its docs check once the pool goes idle.
+	return withSteppedToken("land gate on "+shortCommit(commit)+" in "+worktree, func(step func(string) []string) int {
 		vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
-		vet.Dir, vet.Env = worktree, environment
+		vet.Dir, vet.Env = worktree, gateEnvironment(step("go vet"))
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
 		if err := vet.Run(); err != nil {
 			return exitCodeOf(err)
 		}
 		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, err := testEnvironment(environment)
+		testing, uncovered, err := testEnvironment(gateEnvironment(step("the test run")))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 			return 2
@@ -237,8 +240,37 @@ func gate(worktree string, commit string) int {
 		if err := test.Run(); err != nil {
 			return exitCodeOf(err)
 		}
-		return 0
+		return checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 	})
+}
+
+// docsDataGenerator is the repository's generator of the website's data, relative to its root.
+const docsDataGenerator = "./internal/docsdata/tools/generate"
+
+// docsDataRecapture is what a landing whose docs data went stale runs, then commits.
+const docsDataRecapture = "go run " + docsDataGenerator + " -capture"
+
+// checkDocsData refuses a landing that leaves the website's data stale, where the change that made it stale
+// is (#h31rcf0). The release checked it and the gate did not, so 0b892cc9 changed no_concatenated_classes,
+// landed green without recapturing its examples, and the 1.0 dry run would have failed at its first step.
+// -check recaptures every example from the lint tests rather than reading the committed ones back, so it
+// can find one stale. A repository without the generator has no docs data, and the gate says so.
+func checkDocsData(worktree string, environment func() []string) int {
+	if _, err := os.Stat(filepath.Join(worktree, docsDataGenerator)); err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: no %s here, so no docs data to check\n", docsDataGenerator)
+		return 0
+	}
+	started := time.Now()
+	check := exec.Command("go", "run", docsDataGenerator, "-check")
+	check.Dir, check.Env = worktree, environment()
+	check.Stdout, check.Stderr = os.Stdout, os.Stderr
+	if err := check.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
+			"and land again\n", docsDataRecapture)
+		return exitCodeOf(err)
+	}
+	fmt.Fprintf(os.Stderr, "cohere-dev: the docs data is current (%s)\n", time.Since(started).Round(time.Second))
+	return 0
 }
 
 // gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p and -buildvcs=false,

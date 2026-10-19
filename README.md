@@ -152,6 +152,33 @@ the Nexus tier. Both ship in the package, so the path works offline and matches 
 `cohere --rules-enabled` lists the ones your settings turn on for one file (`index.ts` at the project
 root unless you name another).
 
+## Suppressing findings
+
+Use a disable comment with a reason to suppress a finding on the next line:
+
+```ts
+// cohere-disable-next-line no-debugger -- inspect this fixture in the debugger
+debugger;
+```
+
+`cohere-disable-line` covers the same line; `/* cohere-disable rule-name */` covers a block
+until a matching `/* cohere-enable rule-name */` or the end of the file. Comma-separated names
+suppress multiple rules, and omitting names suppresses every rule. The equivalent `eslint-`
+spellings also work.
+
+A directive that silences nothing while its named rules ran reports as `unused-disable`, a
+**warning by default**. It does not fail `--lint` or `--no-fix`; `--fix` removes the comment,
+or only its dead names, preserving live and unselected names and the reason. Configure its
+severity in `CohereSettings.json`, including in file overrides:
+
+```json
+{ "rules": { "unused-disable": "warn" } }
+```
+
+Use `"error"` to fail the run on dead directives, or `"off"` to disable both their findings
+and their fixes. The coverage count remains visible when reporting is off. `unused-disable`
+is an engine check, so it is configurable without being an entry in `cohere --rules`.
+
 ## Flags
 
 | Flag | What it does |
@@ -165,6 +192,7 @@ root unless you name another).
 | `--format-only` | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
 | `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
 | `--types` | report TypeScript's diagnostics only, running no rules and fixing nothing |
+| `--open` | open files with remaining findings in `code`, once in report order; combines with `--types` and `--lint`, preserves the run's exit status |
 | `--unused` | report code that is never used: unreferenced exports and unreachable statements |
 | `--unused-all` | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`) |
 | `--unused-deep` | also group the unused code into islands by what reaches what (implies `--unused`) |
