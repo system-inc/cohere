@@ -319,6 +319,21 @@ func (c *Config) resolveMatch(match []byte) Resolved {
 	return Resolved{Rules: effective, identity: &resolutionIdentity{match: string(match)}}
 }
 
+// MatchedOverrideIndices returns the blocks applied to this resolution in precedence order.
+// The indices name Config.Overrides; the memoized match is the resolver's source of truth.
+func (r Resolved) MatchedOverrideIndices() []int {
+	indices := []int{}
+	if r.identity == nil {
+		return indices
+	}
+	for remaining := []byte(r.identity.match); len(remaining) > 0; {
+		index, width := binary.Uvarint(remaining)
+		remaining = remaining[width:]
+		indices = append(indices, int(index))
+	}
+	return indices
+}
+
 // relativePath expresses a path the way the config's patterns are written: relative to the config
 // file, slash-separated, with no leading dot.
 //

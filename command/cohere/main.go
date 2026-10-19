@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -118,7 +116,7 @@ func run() error {
 	listRulesEnabled := flag.Bool("rules-enabled", false,
 		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
 	printConfig := flag.Bool("print-config", false,
-		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit")
+		"print resolved rules, registered settings, language options and matching overrides as JSON for one file (the path given, else index.ts at the project root), and exit; globals name their TypeScript declaration files; ESLint plugin package versions, parser names and settings.react have no cohere meaning (settings.react is refused)")
 	// A bare run, --fix and --no-fix format by default, so naming --format there changes nothing. It is
 	// accepted rather than refused, so the commands written before the default still mean what they did.
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
@@ -306,7 +304,7 @@ func run() error {
 			return nil
 		}
 		if *printConfig {
-			return writeResolvedConfig(os.Stdout, resolved)
+			return writeResolvedConfig(os.Stdout, lintConfig, resolved, location, probePath)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -1751,39 +1749,6 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		}
 	}
 	return ""
-}
-
-// writeResolvedConfig prints every registered rule's resolved setting for one file, as JSON in the shape
-// ESLint's `--print-config` uses: `{"rules": {"name": [severity, ...options]}}`, severity 0, 1 or 2.
-//
-// Resolved per registered rule by the resolver's own question, not read from the config's keys. A key
-// can configure a rule spelled differently (`@typescript-eslint/no-invalid-this` configures core
-// `no-invalid-this` when no key names it exactly), so the keys are the wrong answer to "what runs",
-// which is the answer a parity check against ESLint needs (#mnmx9s4). A rule nobody configured is
-// left out, as ESLint leaves out a rule no config names.
-func writeResolvedConfig(out io.Writer, resolved configuration.Resolved) error {
-	rules := map[string][]json.RawMessage{}
-	for _, registered := range registry.All() {
-		status, setting := resolved.StatusOf(registered.Name)
-		var severity int
-		switch status {
-		case configuration.StatusEnabled:
-			severity = int(setting.Severity)
-		case configuration.StatusScopedOff:
-			severity = 0
-		default:
-			continue
-		}
-		entry := []json.RawMessage{json.RawMessage(strconv.Itoa(severity))}
-		entry = append(entry, setting.Options...)
-		rules[registered.Name] = entry
-	}
-	encoded, err := json.MarshalIndent(map[string]any{"rules": rules}, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(out, string(encoded))
-	return err
 }
 
 // registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
