@@ -155,9 +155,12 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		reader := surfaces.ReaderFor(ctx.FileCache)
 		ignored := compileIgnorePatterns(ignore)
-		canonicalizer := designSystem.Canonicalizer
-		if canonicalizer == nil {
-			canonicalizer = tailwindengine.NewCanonicalizer(designSystem.System)
+		// Every result that built carries its Canonicalizer, from loadedDesignSystemResult. One without it
+		// was put together by hand, and building one here would build a fresh memo for every file, the
+		// second build path design_system.go exists to refuse, so the rule declines as it does with no
+		// System.
+		if designSystem.Canonicalizer == nil {
+			return nil
 		}
 
 		report := func(node *ast.Node) {
@@ -166,7 +169,7 @@ var EnforceCanonicalClasses = rule.Rule{
 				if collapse.enabled {
 					merged = reportCollapses(ctx, literal, ignored, designSystem, collapse)
 				}
-				reportSingles(ctx, literal, ignored, designSystem.System, canonicalizer, merged)
+				reportSingles(ctx, literal, ignored, designSystem.System, designSystem.Canonicalizer, merged)
 			}
 		}
 
