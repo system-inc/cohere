@@ -1,0 +1,168 @@
+# A consumer's CI, installed from the registry: what a repository that adopts cohere runs as its gate.
+#
+# Nothing here comes from this repository. There is no checkout, the runner's Go is replaced by one that
+# fails loudly, and @system-inc/cohere arrives from npm the way it reaches anyone else, through npm and
+# through pnpm. That is the difference from release.yml's clean-machine job, which installs the packages
+# a run staged: this proves what the registry actually serves, after it serves it (#303yeg1).
+#
+# Each leg builds a small TypeScript project, settles it with one bare `cohere`, the way a consumer's tree
+# is settled before it is committed, and then gates it with `cohere --no-fix`, which must pass. A type
+# error and an unformatted file are then each planted in a copy, and the gate must fail on each by name.
+#
+# release.yml calls this after it publishes. It can also be run by hand for any published version:
+#
+#     gh workflow run consumer.yml -f version=1.0.0
+name: consumer
+
+on:
+    workflow_call:
+        inputs:
+            version:
+                required: true
+                type: string
+    workflow_dispatch:
+        inputs:
+            version:
+                description: The published version of @system-inc/cohere to install, like 1.0.0
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+jobs:
+    installed-from-npm:
+        strategy:
+            fail-fast: false
+            matrix:
+                runner: [ubuntu-latest, ubuntu-24.04-arm, macos-26, windows-latest]
+                manager: [npm, pnpm]
+        runs-on: ${{ matrix.runner }}
+        timeout-minutes: 20
+        defaults:
+            run:
+                shell: bash
+
+        steps:
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Replace Go with one that fails loudly
+              # The runner images ship Go. If cohere ever ran it, a consumer without Go would see that
+              # failure, so this one fails the gate naming it instead of passing on a toolchain no consumer
+              # was asked to have.
+              run: |
+                  nogo="$RUNNER_TEMP/no-go"
+                  mkdir -p "$nogo"
+                  printf '#!/bin/sh\necho "cohere ran go ($*), which a consumer'"'"'s machine need not have" >&2\nexit 97\n' > "$nogo/go"
+                  cp "$nogo/go" "$nogo/go.exe" 2> /dev/null || true
+                  chmod 755 "$nogo/go"
+                  echo "$nogo" >> "$GITHUB_PATH"
+
+            - name: Wait for the version on the registry
+              # A publish is visible to the registry's metadata a little before every mirror serves it, so
+              # a run straight after release.yml retries rather than failing on propagation.
+              run: |
+                  for _ in $(seq 1 30); do
+                      if npm view "@system-inc/cohere@${{ inputs.version }}" version > /dev/null 2>&1; then
+                          echo "the registry serves @system-inc/cohere@${{ inputs.version }}"
+                          exit 0
+                      fi
+                      sleep 10
+                  done
+                  echo "@system-inc/cohere@${{ inputs.version }} is not on the registry after five minutes"
+                  exit 1
+
+            - name: Install cohere the way a consumer does, and gate a project with it
+              env:
+                  MANAGER: ${{ matrix.manager }}
+                  VERSION: ${{ inputs.version }}
+              run: |
+                  if go version 2> /dev/null; then
+                      echo "a working go is still first on PATH, so this would not prove cohere needs none"
+                      exit 1
+                  fi
+
+                  project="$RUNNER_TEMP/consumer"
+                  mkdir -p "$project/source"
+                  cd "$project"
+                  printf '{ "name": "consumer", "private": true }\n' > package.json
+                  printf '{ "compilerOptions": { "strict": true, "noEmit": true, "target": "ES2022", "module": "esnext", "moduleResolution": "bundler" }, "include": ["source"] }\n' > tsconfig.json
+                  printf 'node_modules\n.cache/\n' > .gitignore
+                  printf 'export function total(values: number[]): number {\n    return values.reduce((sum, value) => sum + value, 0);\n}\n' > source/Total.ts
+
+                  if [ "$MANAGER" = "pnpm" ]; then
+                      npm install --global pnpm@10 > /dev/null
+                      pnpm add --save-dev "@system-inc/cohere@$VERSION"
+                      cohere() { pnpm exec cohere "$@"; }
+                  else
+                      npm install --save-dev --no-audit --no-fund "@system-inc/cohere@$VERSION"
+                      cohere() { npx --no-install cohere "$@"; }
+                  fi
+
+                  failures=0
+                  fail() {
+                      echo "FAIL $1"
+                      failures=$((failures + 1))
+                  }
+
+                  cohere --version | tee version.log
+                  if ! grep -Fq "$VERSION" version.log; then
+                      fail "--version does not name $VERSION"
+                  fi
+
+                  # Settled once, as a consumer's committed tree is, then gated.
+                  cohere > settle.log 2>&1 || true
+                  if cohere --no-fix > gate.log 2>&1; then
+                      echo "ok   a settled project passes the gate"
+                  else
+                      fail "a settled project failed the gate"
+                      cat gate.log
+                  fi
+
+                  # A type error fails the gate and names its file.
+                  cp -R "$project" "$RUNNER_TEMP/typed"
+                  printf 'export const broken: number = "text";\n' > "$RUNNER_TEMP/typed/source/Broken.ts"
+                  if (cd "$RUNNER_TEMP/typed" && cohere --no-fix) > typed.log 2>&1; then
+                      fail "the gate passed a type error"
+                  elif grep -Fq "Broken.ts" typed.log; then
+                      echo "ok   a type error fails the gate, by name"
+                  else
+                      fail "the gate failed without naming Broken.ts"
+                      cat typed.log
+                  fi
+
+                  # An unformatted file fails the gate and names its file.
+                  cp -R "$project" "$RUNNER_TEMP/unformatted"
+                  printf 'export const ugly   =   1\n' > "$RUNNER_TEMP/unformatted/source/Ugly.ts"
+                  if (cd "$RUNNER_TEMP/unformatted" && cohere --no-fix) > unformatted.log 2>&1; then
+                      fail "the gate passed an unformatted file"
+                  elif grep -Fq "Ugly.ts" unformatted.log; then
+                      echo "ok   an unformatted file fails the gate, by name"
+                  else
+                      fail "the gate failed without naming Ugly.ts"
+                      cat unformatted.log
+                  fi
+
+                  if [ "$failures" -gt 0 ]; then
+                      echo "$failures checks failed with $MANAGER on ${{ matrix.runner }}"
+                      exit 1
+                  fi
+                  echo "every check passed with $MANAGER on ${{ matrix.runner }}"
+
+            - name: Verify what was installed, as the README says to
+              # The README's three commands, run against the install above. On one leg, since the result
+              # does not depend on the platform: the registry signatures, and each binary against the
+              # SHA256SUMS on the GitHub release and against its build attestation.
+              if: matrix.runner == 'ubuntu-latest' && matrix.manager == 'npm'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ inputs.version }}
+              run: |
+                  cd "$RUNNER_TEMP/consumer"
+                  npm audit signatures
+
+                  cd "$(dirname "$(realpath node_modules/@system-inc/cohere)")"
+                  gh release download "v$VERSION" --repo system-inc/cohere --pattern SHA256SUMS --output - | shasum -a 256 -c --ignore-missing
+                  gh attestation verify cohere-linux-x64/bin/cohere --repo system-inc/cohere

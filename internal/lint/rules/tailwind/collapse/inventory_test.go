@@ -43,6 +43,11 @@ import (
 //	                                     against `candidatesToCss` on a live design system.
 //	valueOperators                   6   the operators the arbitrary-value printer unspaces, the
 //	                                     literal set in `printArbitraryValue` at 4.3.3
+//	deprecationRenames               3   canonicalize-candidates.ts's DEPRECATION_MAP
+//	gradientDirections               8   its DIRECTIONS, the legacy gradient's eight
+//	utilityCanonicalizations         2   its UTILITY_CANONICALIZATIONS, in order, holding the passes
+//	                                     ported so far; canonical_unported.json counts the rest
+//	variantCanonicalizations         1   its VARIANT_CANONICALIZATIONS, the same way
 //
 // # Ours, each answering something a reading cannot
 //
@@ -119,6 +124,10 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"baseStatics":                        len(baseStatics),
 		"GapRootDescriptions":                len(GapRootDescriptions),
 		"valueOperators":                     len(valueOperators),
+		"deprecationRenames":                 len(deprecationRenames),
+		"gradientDirections":                 len(gradientDirections),
+		"utilityCanonicalizations":           len(utilityCanonicalizations),
+		"variantCanonicalizations":           len(variantCanonicalizations),
 	}
 	ours := map[string]int{
 		"baseDescriptors":  len(baseDescriptors),
