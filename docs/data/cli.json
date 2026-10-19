@@ -71,6 +71,10 @@
             "usage": "leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only"
         },
         {
+            "name": "open",
+            "usage": "open files with remaining findings in code after the run (composes with --types and --lint)"
+        },
+        {
             "name": "phases",
             "usage": "put where the time went first in the footer's parentheses"
         },
