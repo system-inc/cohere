@@ -48,6 +48,14 @@ import (
 //	utilityCanonicalizations         2   its UTILITY_CANONICALIZATIONS, in order, holding the passes
 //	                                     ported so far; canonical_unported.json counts the rest
 //	variantCanonicalizations         1   its VARIANT_CANONICALIZATIONS, the same way
+//	FrameworkSuggestions           237   each functional root's `suggest` recipe: literals, theme
+//	                                     namespaces and flags, never keys. Probed from the engine by
+//	                                     generate_suggestions and held, through BuildClassList, to
+//	                                     `getClassList()` on four themes
+//	FrameworkStaticSuggested       890   every static the registry holds, and whether its `suggest`
+//	                                     offers it
+//	DefaultSpacingSuggestions       34   utilities.ts's DEFAULT_SPACING_SUGGESTIONS
+//	SuggestedFractions              26   the fractions its `suggest` appends
 //
 // # Ours, each answering something a reading cannot
 //
@@ -128,6 +136,10 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"gradientDirections":                 len(gradientDirections),
 		"utilityCanonicalizations":           len(utilityCanonicalizations),
 		"variantCanonicalizations":           len(variantCanonicalizations),
+		"FrameworkSuggestions":               len(FrameworkSuggestions),
+		"FrameworkStaticSuggested":           len(FrameworkStaticSuggested),
+		"DefaultSpacingSuggestions":          len(DefaultSpacingSuggestions),
+		"SuggestedFractions":                 len(SuggestedFractions),
 	}
 	ours := map[string]int{
 		"baseDescriptors":  len(baseDescriptors),
