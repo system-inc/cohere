@@ -1249,7 +1249,7 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		findings += len(result.Diagnostics)
+		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfig)
 		if adamicReadinessRequested {
 			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 		}
@@ -1862,6 +1862,9 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	// This mirrors settingFor rather than reimplementing it loosely, because a check that disagreed
 	// with the resolver would report keys that work and miss keys that do not.
 	resolves := func(key string) bool {
+		if key == configuration.UnusedDisable {
+			return true
+		}
 		for name := range registered {
 			if configuration.KeyReachesRule(key, name) {
 				return true

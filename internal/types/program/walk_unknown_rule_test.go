@@ -51,6 +51,9 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
 		}
 		described := []string{}
 		for _, diagnostic := range result.Diagnostics {
+			if diagnostic.RuleName == "unused-disable" {
+				continue
+			}
 			described = append(described, diagnostic.RuleName+"/"+diagnostic.Message.Id+" "+
 				source[diagnostic.Range.Pos():diagnostic.Range.End()])
 		}

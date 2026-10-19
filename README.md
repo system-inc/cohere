@@ -152,6 +152,33 @@ the Nexus tier. Both ship in the package, so the path works offline and matches 
 `cohere --rules-enabled` lists the ones your settings turn on for one file (`index.ts` at the project
 root unless you name another).
 
+## Suppressing findings
+
+Use a disable comment with a reason to suppress a finding on the next line:
+
+```ts
+// cohere-disable-next-line no-debugger -- inspect this fixture in the debugger
+debugger;
+```
+
+`cohere-disable-line` covers the same line; `/* cohere-disable rule-name */` covers a block
+until a matching `/* cohere-enable rule-name */` or the end of the file. Comma-separated names
+suppress multiple rules, and omitting names suppresses every rule. The equivalent `eslint-`
+spellings also work.
+
+A directive that silences nothing while its named rules ran reports as `unused-disable`, a
+**warning by default**. It does not fail `--lint` or `--no-fix`; `--fix` removes the comment,
+or only its dead names, preserving live and unselected names and the reason. Configure its
+severity in `CohereSettings.json`, including in file overrides:
+
+```json
+{ "rules": { "unused-disable": "warn" } }
+```
+
+Use `"error"` to fail the run on dead directives, or `"off"` to disable both their findings
+and their fixes. The coverage count remains visible when reporting is off. `unused-disable`
+is an engine check, so it is configurable without being an entry in `cohere --rules`.
+
 ## Flags
 
 | Flag | What it does |

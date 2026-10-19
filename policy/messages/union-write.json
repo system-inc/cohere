@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/union-write" },
+  "messages": {
+    "unionWrite": {
+      "text": "The slot `{{slot}}` cannot receive {{source}} through a union: member {{member}} requires {{target}}. A write must fit the slot in every member. Narrow the receiver before writing, or use a value accepted by every member."
+    }
+  }
+}

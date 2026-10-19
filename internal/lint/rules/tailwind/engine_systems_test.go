@@ -1,10 +1,6 @@
 package tailwind
 
-import (
-	"testing"
-
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
-)
+import "testing"
 
 // engineSystem is one design system an assertion about the engine runs on.
 type engineSystem struct {
@@ -40,5 +36,5 @@ func forEachEngineSystem(t *testing.T, run func(t *testing.T, designSystem Desig
 func publicDesignSystem(t *testing.T) DesignSystemResult {
 	t.Helper()
 	system := independentLiveSystem(t)
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+	return loadedDesignSystemResult(system, "")
 }

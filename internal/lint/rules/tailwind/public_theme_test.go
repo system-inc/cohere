@@ -29,7 +29,7 @@ func publicThemeSystem(t *testing.T) DesignSystemResult {
 	if err != nil {
 		t.Fatalf("loading the public theme: %v", err)
 	}
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+	return loadedDesignSystemResult(system, entryPoint)
 }
 
 // themeSystems are the public theme and ahra's, for an assertion whose expectations were measured on
@@ -73,14 +73,15 @@ func TestClassOrderReadsTheRepositoryOnThePublicTheme(t *testing.T) {
 // twin. `glow-soft` declares only a custom property, so it exists and no property table can say so.
 func TestExistenceIsNotReadFromPropertyTablesOnThePublicTheme(t *testing.T) {
 	t.Parallel()
-	system := publicThemeSystem(t).System
+	designSystem := publicThemeSystem(t)
+	system := designSystem.System
 	lostByShortcut := 0
 	for _, className := range []string{"container", "from-black/70", "to-transparent", "glow-soft"} {
 		if !classExistsIn(className, system) {
 			t.Errorf("%s is real and the rule reports it unknown", className)
 			continue
 		}
-		if _, canResolve := resolveClassFactsIn(className, DesignSystemResult{System: system}); !canResolve {
+		if _, canResolve := resolveClassFactsIn(className, designSystem); !canResolve {
 			lostByShortcut++
 		}
 	}
@@ -265,7 +266,7 @@ func TestRepositoryUtilitiesAreCompiledOnThePublicTheme(t *testing.T) {
 		t.Errorf("appear-50 sets only a custom property and was answered with %v", facts.Properties)
 	}
 
-	independent := DesignSystemResult{System: independentLiveSystem(t)}
+	independent := loadedDesignSystemResult(independentLiveSystem(t), "")
 	if _, compiledElsewhere := repositoryClassFacts("surface--2", "", independent); compiledElsewhere {
 		t.Error("surface--2 was answered by compiling a block on a design system that declares none, so " +
 			"the repository half is not reading the repository in front of the rule")
