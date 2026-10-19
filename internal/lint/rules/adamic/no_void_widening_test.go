@@ -26,8 +26,8 @@ func TestNoVoidWidening(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 32 {
-		t.Fatalf("got %d fixtures, want 32", len(files))
+	if len(files) != 59 {
+		t.Fatalf("got %d fixtures, want 59", len(files))
 	}
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
@@ -51,8 +51,12 @@ func TestNoVoidWidening(t *testing.T) {
 			rule_testing.ExpectFindings(t, result, "voidWidening")
 			span := "make"
 			switch filepath.Base(file) {
-			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts":
+			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts", "mutable-promise.ts", "promise-union-origin.ts":
 				span = "narrow"
+			case "promise-body-call.ts":
+				span = "make()"
+			case "call-result.ts":
+				span = "makeCallback()"
 			case "returned.ts":
 				span = "wrap"
 			case "received.ts":
