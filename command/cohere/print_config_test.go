@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -243,5 +244,93 @@ func TestPrintConfigSettingsReaders(t *testing.T) {
 	settings, err = settingsForFile(base, resolved, registrations)
 	if err != nil || len(settings) != 0 {
 		t.Errorf("settings without a reader = %s, %v", settings, err)
+	}
+}
+
+// The inherited twin lies outside the old five-name list. A scoped twin and the engine diagnostic
+// exercise per-file resolution; replacing the inherited twin with its core name removes the alias.
+func TestPrintConfigAliasesAndUnusedDisable(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := t.TempDir()
+	base := `{"extends":"cohere:adamic","rules":{"@typescript-eslint/no-invalid-this":"error"}}`
+	settings := `{"extends":"./Base.json","rules":{"unused-disable":"error"},"overrides":[{"files":["Other.ts"],"rules":{"unused-disable":"off","nexus/no-debugger":"error"},"reason":"fixture exception"}]}`
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":       `{"compilerOptions":{"target":"ES2022","module":"ESNext","lib":["ES2022"]},"include":["*.ts"]}`,
+		"Thing.ts":            "export const thing = 1;\n",
+		"Other.ts":            "export const other = 2;\n",
+		"Base.json":           base,
+		"CohereSettings.json": settings,
+	})
+	read := func(file string) (map[string]string, map[string][]json.RawMessage) {
+		t.Helper()
+		command := exec.Command(binary, "--print-config", file)
+		command.Dir = root
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("print-config: %v\n%s", err, output)
+		}
+		var doc struct {
+			RuleAliases map[string]string
+			Rules       map[string][]json.RawMessage
+		}
+		if err := json.Unmarshal(output, &doc); err != nil {
+			t.Fatal(err)
+		}
+		return doc.RuleAliases, doc.Rules
+	}
+	checkSeverity := func(rules map[string][]json.RawMessage, want configuration.Severity) {
+		t.Helper()
+		got := rules[configuration.UnusedDisable]
+		expected := []json.RawMessage{json.RawMessage(strconv.Itoa(int(want)))}
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("unused-disable = %s, want %s", got, expected)
+		}
+	}
+	aliases, rules := read("Thing.ts")
+	if aliases["@typescript-eslint/no-invalid-this"] != "no-invalid-this" || !reflect.DeepEqual(rules["@typescript-eslint/no-invalid-this"], rules["no-invalid-this"]) {
+		t.Errorf("inherited twin alias = %v, rules = %s / %s", aliases, rules["@typescript-eslint/no-invalid-this"], rules["no-invalid-this"])
+	}
+	for _, absent := range []string{"nexus/require-await", "nexus/no-use-before-define", "nexus/logical-assignment-operators", "nexus/no-implicit-coercion", "nexus/max-classes-per-file", "nexus/no-debugger"} {
+		if _, ok := aliases[absent]; ok {
+			t.Errorf("unconfigured alias %s printed", absent)
+		}
+		if _, ok := rules[absent]; ok {
+			t.Errorf("unconfigured alias rule %s printed", absent)
+		}
+	}
+	checkSeverity(rules, configuration.SeverityError)
+	aliases, rules = read("Other.ts")
+	if aliases["nexus/no-debugger"] != "no-debugger" {
+		t.Errorf("scoped alias = %v", aliases)
+	}
+	checkSeverity(rules, configuration.SeverityOff)
+	// The default is asked of the engine's resolver, so its next default change requires no print fix.
+	for _, fixture := range []struct {
+		level string
+		want  configuration.Severity
+	}{
+		{"warn", configuration.SeverityWarn},
+		{"", (configuration.Resolved{}).UnusedDisableSeverity()},
+	} {
+		changed := strings.Replace(settings, `"unused-disable":"error"`, `"unused-disable":"warn"`, 1)
+		if fixture.level == "" {
+			changed = strings.Replace(settings, `"rules":{"unused-disable":"error"}`, `"rules":{}`, 1)
+		}
+		if err := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(changed), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, rules = read("Thing.ts")
+		checkSeverity(rules, fixture.want)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Base.json"), []byte(strings.Replace(base, "@typescript-eslint/no-invalid-this", "no-invalid-this", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliases, rules = read("Thing.ts")
+	if _, ok := aliases["@typescript-eslint/no-invalid-this"]; ok {
+		t.Errorf("removed twin still printed as alias: %v", aliases)
+	}
+	if _, ok := rules["@typescript-eslint/no-invalid-this"]; ok {
+		t.Error("removed twin still printed in rules")
 	}
 }

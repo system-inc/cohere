@@ -180,8 +180,17 @@ func (r Resolved) RawOptionsFor(ruleName string) []json.RawMessage {
 // The suffix must fall on a `/` boundary. Plain suffix matching would let a config entry for
 // `no-enum` silence `consistency-no-enum`, which is a rule nobody named.
 func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
-	if setting, configured := r.Rules[ruleName]; configured {
-		return setting, true
+	key, configured := r.keyFor(ruleName)
+	if !configured {
+		return RuleSetting{}, false
+	}
+	return r.Rules[key], true
+}
+
+// keyFor identifies the configuration key selected by the resolver for one registered name.
+func (r Resolved) keyFor(ruleName string) (string, bool) {
+	if _, configured := r.Rules[ruleName]; configured {
+		return ruleName, true
 	}
 
 	// The suffix must fall on a `/` boundary, or a config entry for `no-enum` would silence
@@ -196,10 +205,10 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 	//
 	// That is the worst shape a configuration defect can take. A surprising result invites a re-run,
 	// and a re-run here manufactures a second opinion rather than a confirmation.
-	var matched RuleSetting
+	var matched string
 	found := false
 	ambiguous := false
-	for configuredName, setting := range r.Rules {
+	for configuredName := range r.Rules {
 		if configuredName == ruleName || !KeyReachesRule(configuredName, ruleName) {
 			continue
 		}
@@ -207,7 +216,7 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 			ambiguous = true
 			continue
 		}
-		matched = setting
+		matched = configuredName
 		found = true
 	}
 
@@ -215,9 +224,28 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 	// Reporting unconfigured is the honest answer: it routes to the caller that already knows how to
 	// say "nobody has decided about this rule", rather than picking one at random and looking sure.
 	if ambiguous {
-		return RuleSetting{}, false
+		return "", false
 	}
 	return matched, found
+}
+
+// RuleAliases maps the non-exact keys this file resolves through to their registered names.
+// Inherited and matching override keys are already in Rules. Exact keys and ambiguous fallbacks
+// follow keyFor, so this does not invent aliases for unconfigured spellings or inactive overrides.
+func (r Resolved) RuleAliases(registeredNames []string) map[string]string {
+	aliases := map[string]string{}
+	for _, name := range registeredNames {
+		key, configured := r.keyFor(name)
+		if !configured || key == name {
+			continue
+		}
+		// A qualified key can reach nested registered names; name its most specific target, independent
+		// of registry order. All targets considered here actually resolved through this key.
+		if len(name) > len(aliases[key]) {
+			aliases[key] = name
+		}
+	}
+	return aliases
 }
 
 // KeyReachesRule reports whether a config key configures a registered rule: the key is the rule's

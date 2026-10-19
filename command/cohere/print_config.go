@@ -17,14 +17,6 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-var printConfigAliases = map[string]string{
-	"nexus/require-await":                "require-await",
-	"nexus/no-use-before-define":         "no-use-before-define",
-	"nexus/logical-assignment-operators": "logical-assignment-operators",
-	"nexus/no-implicit-coercion":         "no-implicit-coercion",
-	"nexus/max-classes-per-file":         "max-classes-per-file",
-}
-
 type printedOverride struct {
 	Index  int                          `json:"index"`
 	File   string                       `json:"file"`
@@ -110,7 +102,7 @@ func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved c
 		Departures  map[string]printedDeparture  `json:"departures"`
 		RuleAliases map[string]string            `json:"ruleAliases"`
 		Rules       map[string][]json.RawMessage `json:"rules"`
-	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: printConfigAliases, Rules: resolvedConfigRules(resolved)}
+	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: resolved.RuleAliases(registeredRuleNames()), Rules: resolvedConfigRules(resolved)}
 	document.LanguageOptions.SourceType = sourceType
 	document.LanguageOptions.Target = strings.ToLower(graph.Program.Options().GetEmitScriptTarget().String())
 	document.LanguageOptions.Tsconfig = graph.ConfigFileName
@@ -160,9 +152,8 @@ func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, reg
 	return settings, nil
 }
 
-// resolvedConfigRules preserves the registered-rule view and adds the five house spellings whose
-// settings already reach core implementations. A configured unused-disable, when registered, follows
-// the same loop as every other rule; a build without it invents no dead-directive setting.
+// resolvedConfigRules preserves the registered-rule view, adds this file's alternate configuration
+// spellings, and asks the engine's resolver for unused-disable (which is not an AST registry rule).
 func resolvedConfigRules(resolved configuration.Resolved) map[string][]json.RawMessage {
 	rules := map[string][]json.RawMessage{}
 	for _, registered := range registry.All() {
@@ -180,10 +171,11 @@ func resolvedConfigRules(resolved configuration.Resolved) map[string][]json.RawM
 		entry = append(entry, setting.Options...)
 		rules[registered.Name] = entry
 	}
-	for alias, name := range printConfigAliases {
+	for alias, name := range resolved.RuleAliases(registeredRuleNames()) {
 		if entry, found := rules[name]; found {
 			rules[alias] = entry
 		}
 	}
+	rules[configuration.UnusedDisable] = []json.RawMessage{json.RawMessage(strconv.Itoa(int(resolved.UnusedDisableSeverity())))}
 	return rules
 }
