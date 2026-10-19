@@ -727,3 +727,42 @@ func TestCorrectnessNoCallerDataMutationArrayDataKinds(t *testing.T) {
 		})
 	}
 }
+
+func TestCorrectnessNoCallerDataMutationArrayRemoval(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"junk delete for header", "const queue = state.windows.filter(window => !window.finished).sort((a, b) => a.rowsDeleted - b.rowsDeleted); for(let window = queue.shift(); window !== undefined; window = queue.shift()) { window.rowsDeleted += rows; if(rows < statementLimit) window.finished = true; }", []string{"window.rowsDeleted", "window.finished"}},
+		{"pop while", "const queue = state.windows.slice(); let window; while((window = queue.pop()) !== undefined) { window.rowsDeleted += rows; }", []string{"window.rowsDeleted"}},
+		{"initialized pop while", "const queue = state.windows.slice(); let window = queue.pop(); while(window !== undefined) { window.finished = true; window = queue.pop(); }", []string{"window.finished"}},
+		{"splice indexed", "const queue = state.windows.slice(); queue.splice(0, 1)[0]!.rowsDeleted = 1;", []string{"queue.splice(0, 1)[0]!.rowsDeleted"}},
+		{"splice iteration", "const queue = state.windows.slice(); for(const window of queue.splice(0, 1)) window.finished = true;", []string{"window.finished"}},
+		{"direct shift", "const queue = state.windows.slice(); queue.shift()!.finished = true;", []string{"queue.shift()!.finished"}},
+		{"fresh literal", "const queue = [{ rowsDeleted: 0, finished: false }]; for(let window = queue.shift(); window !== undefined; window = queue.shift()) window.finished = true;", nil},
+		{"fresh map", "const queue = state.windows.map(window => ({ ...window })); for(let window = queue.shift(); window !== undefined; window = queue.shift()) window.finished = true;", nil},
+		{"fresh pop", "const queue = state.windows.map(window => ({ ...window })); let window; while((window = queue.pop()) !== undefined) window.finished = true;", nil},
+		{"fresh splice", "const queue = state.windows.map(window => ({ ...window })); queue.splice(0, 1)[0]!.finished = true;", nil},
+		{"reassigned fresh element", "const queue = state.windows.slice(); let window = queue.shift(); window = { rowsDeleted: 0, finished: false }; window.finished = true;", nil},
+		{"destructured reassignment", "const queue = state.windows.slice(); let window = queue.shift(); ({ window } = { window: { rowsDeleted: 0, finished: false } }); window.finished = true;", nil},
+		{"mixed origins", "const queue = state.windows.slice(); const fresh = [{ rowsDeleted: 0, finished: false }]; let window = queue.shift(); window = fresh.shift(); if(window) window.finished = true;", nil},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := func(body string) string {
+				return correctnessNoCallerDataMutationSource(
+					"interface WindowInterface { rowsDeleted: number; finished: boolean }",
+					"export async function runJunkDeleteWindows(state: { windows: WindowInterface[] }, rows: number, statementLimit: number) { "+body+" }")
+			}
+			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture(testCase.body)), testCase.want...)
+			if len(testCase.want) == 0 {
+				// Plant: replacing the fresh source with caller elements makes the write observable.
+				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("const queue = state.windows.slice(); queue.shift()!.finished = true;")), "queue.shift()!.finished")
+			}
+		})
+	}
+}

@@ -72,8 +72,10 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //     accesses and non-null assertions whose root is an identifier resolving, by symbol, to a parameter
 //     of a function in this file, or to a name destructured from one (`function f({ entry })`).
 //     Unreassigned local aliases and for-of elements retain that origin. Array copies made with
-//     filter, slice, identity map, spread or concat retain element identity, not container identity;
-//     sort/reverse retain the receiver and find/at/indexing select its existing elements. Method
+//     filter, slice, splice, identity map, spread or concat retain element identity, not container identity;
+//     sort/reverse retain the receiver and find/at/shift/pop/indexing select its existing elements.
+//     A reassigned local is followed only when its initializer and every write are shift/pop calls
+//     returning elements from the same caller origin. Method
 //     contracts are resolved to the default library, never inferred from a project's method name.
 //  3. Into project data. The written property is declared in a source file of this program rather
 //     than in a declaration file (`lib.*.d.ts`, `lib.dom.d.ts`, `@types/*`, a package's own types). A
@@ -375,7 +377,7 @@ func correctnessNoCallerDataMutationOrigin(ctx rule.Context, expression *ast.Nod
 			return nil
 		}
 		switch access.Name().Text() {
-		case "find", "at":
+		case "find", "at", "shift", "pop":
 			if access.Name().Text() == "at" && len(call.Arguments.Nodes) == 1 {
 				if index, ok := correctnessNoCallerDataMutationLiteralIndex(call.Arguments.Nodes[0]); ok {
 					if element := correctnessNoCallerDataMutationKnownElement(ctx, access.Expression, index); element != nil {
@@ -386,7 +388,7 @@ func correctnessNoCallerDataMutationOrigin(ctx rule.Context, expression *ast.Nod
 			return next(access.Expression, depth+1)
 		case "sort", "reverse":
 			return next(access.Expression, depth)
-		case "filter", "slice":
+		case "filter", "slice", "splice":
 			if depth > 0 {
 				return next(access.Expression, depth)
 			}
@@ -430,8 +432,11 @@ func correctnessNoCallerDataMutationOrigin(ctx rule.Context, expression *ast.Nod
 			for function != nil && !ast.IsFunctionLike(function) {
 				function = function.Parent
 			}
-			if function == nil || correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+			if function == nil {
 				continue
+			}
+			if correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+				return correctnessNoCallerDataMutationRemovalBindingOrigin(ctx, function, declaration, symbol, depth, next)
 			}
 			if initializer := declaration.Initializer(); initializer != nil {
 				return next(initializer, depth)
@@ -443,6 +448,79 @@ func correctnessNoCallerDataMutationOrigin(ctx rule.Context, expression *ast.Nod
 		}
 	}
 	return nil
+}
+
+// A removal loop can assign its element binding repeatedly without changing whose objects it
+// holds. Require its initializer (if present) and every binding write to be a default-library
+// shift/pop call with the same caller origin. Any fresh value, arbitrary assignment or update
+// invalidates the binding; this is a narrow identity contract, not general assignment flow analysis.
+func correctnessNoCallerDataMutationRemovalBindingOrigin(ctx rule.Context, function, declaration *ast.Node, symbol *ast.Symbol, depth int, originOf func(*ast.Node, int) *ast.Symbol) *ast.Symbol {
+	var origin *ast.Symbol
+	valid := true
+	accept := func(value *ast.Node) {
+		value = ast.SkipParentheses(value)
+		if value.Kind != ast.KindCallExpression {
+			valid = false
+			return
+		}
+		callee := ast.SkipParentheses(value.AsCallExpression().Expression)
+		if callee.Kind != ast.KindPropertyAccessExpression {
+			valid = false
+			return
+		}
+		name := callee.AsPropertyAccessExpression().Name()
+		if (name.Text() != "shift" && name.Text() != "pop") || !correctnessNoCallerDataMutationArrayMethod(ctx, name) {
+			valid = false
+			return
+		}
+		candidate := originOf(value, depth)
+		if candidate == nil || (origin != nil && candidate != origin) {
+			valid = false
+			return
+		}
+		origin = candidate
+	}
+	if initializer := declaration.Initializer(); initializer != nil {
+		accept(initializer)
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if !valid {
+			return true
+		}
+		if node.Kind == ast.KindIdentifier && node.Text() == symbol.Name && reference.WritesToBinding(node) {
+			resolved := ctx.TypeChecker.GetSymbolAtLocation(node)
+			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
+				if valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+					resolved = valueSymbol
+				}
+			}
+			if resolved != symbol {
+				return false
+			}
+			parent := node.Parent
+			if parent == nil || parent.Kind != ast.KindBinaryExpression || parent.AsBinaryExpression().Left != node ||
+				parent.AsBinaryExpression().OperatorToken.Kind != ast.KindEqualsToken {
+				valid = false
+				return true
+			}
+			accept(parent.AsBinaryExpression().Right)
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	for _, parameter := range function.Parameters() {
+		if initializer := parameter.Initializer(); initializer != nil {
+			visit(initializer)
+		}
+	}
+	if body := function.Body(); body != nil {
+		visit(body)
+	}
+	if !valid {
+		return nil
+	}
+	return origin
 }
 
 // A known slot takes precedence over an array's possible shared elements. In particular,
