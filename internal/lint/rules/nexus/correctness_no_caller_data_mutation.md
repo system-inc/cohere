@@ -2,9 +2,7 @@
 
 | | |
 |---|---|
-| **Recommendation** | `error`. On at error in ahra since the 144 sites below were restructured or stated (`#0hredns`) |
-| Findings | **ahra 144** (measured 2026-10-03, cohere's real config plus this rule) |
-| Measured precision | 144 of 144 land in data a source file declares, reached through a parameter; none is a host object |
+| **Recommendation** | `error` |
 | Plugin | cohere-native, `nexus` |
 | Auto-fixable | no |
 | Needs type information | yes, to tie the written chain to a parameter by symbol and to say where each written property and mutating method is declared; without a checker the rule registers nothing |
@@ -15,7 +13,51 @@ A write through a parameter into data project code declares: an assignment (any 
 `delete`, or a call of a mutating default-library collection method (`push`, `unshift`, `pop`, `shift`,
 `splice`, `sort`, `reverse`, `fill`, `copyWithin`; a Map's or WeakMap's `set` and `delete`, a Set's or
 WeakSet's `add` and `delete`, and `clear`), on a chain of property accesses, element accesses and
-non-null assertions whose root is a parameter, or a name destructured from one.
+non-null assertions whose root is a parameter, or a name destructured from one. Unreassigned
+local aliases and `for...of` bindings preserve that origin too.
+
+### Array copies preserve element identity
+
+A new array need not contain new objects. The rule follows existing elements through the default
+library's `filter`, `slice`, `splice`, `concat`, and `map` when its inline callback returns its first
+parameter unchanged (an expression body or a single `return`). Array literals preserve the identity
+of their ordinary elements and spreads. `sort` and `reverse` return the same array; indexing, `find`, `at`,
+`shift`, `pop`, and `for...of` select its elements. `splice` returns a new array containing the removed
+original elements. These contracts also apply to `ReadonlyArray` where available.
+
+The container and the elements are separate: sorting a `slice()` or replacing its slots is silent;
+writing a shared element's fields or mutating a shared element collection reports. Known literal
+positions (including concat prefixes and negative `at` positions) that select fresh objects stay
+silent. A `map` callback that constructs an object, such as `entry => ({ ...entry })`, does not
+establish element identity.
+Unknown calls, project methods with array-method names and arbitrary callbacks are not followed.
+A reassigned local element binding is followed when its initializer (if present) and every assignment
+are `shift()` or `pop()` calls returning elements from the same caller origin. This includes
+`for (let window = queue.shift(); window !== undefined; window = queue.shift())` and a `while` loop
+that assigns `queue.pop()` to its element binding. A fresh-object assignment or a removal call on a
+fresh array invalidates that binding. Host-owned properties and the existing process-state and
+out-parameter exemptions retain their boundaries through aliases.
+
+Examples below assume `entries` is caller data and `queue` is a shallow copy of it:
+
+| Kind | Example reported write |
+|---|---|
+| Local alias of caller data | `const alias = entries; alias.push(entry)` |
+| Filtered elements | `entries.filter(keep)[0]!.status = 'done'` |
+| Sliced elements | `entries.slice()[0]!.status = 'done'` |
+| Identity-mapped elements | `entries.map(entry => entry)[0]!.status = 'done'` |
+| Spread or ordinary array elements | `[...entries][0]!.status = 'done'`; `[entries[0]!][0]!.status = 'done'` |
+| Concatenated receiver or arguments | `entries.concat([])[0]!.status = 'done'`; `for (const entry of local.concat(entries)) entry.status = 'done'` |
+| Copies sorted or reversed before selection | `entries.slice().sort(compare)[0]!.status = 'done'`; `entries.slice().reverse()[0]!.status = 'done'` |
+| Removed elements and arrays | `queue.shift()!.status = 'done'`; `queue.pop()!.status = 'done'`; `queue.splice(i, 1)[0]!.status = 'done'` |
+| Found or positional elements | `entries.find(keep)!.status = 'done'`; `entries.at(0)!.position++` |
+| Aliased selection or iteration | `const entry = entries.slice()[0]!; entry.status = 'done'`; `for (const entry of entries.slice()) entry.position++` |
+| Record or collection elements | `records.slice()[0]![key] = 1`; `arrays.slice().at(0)!.push(1)` |
+
+For example, `runJunkDeleteWindows` builds a queue with `state.windows.filter(...).sort(...)`,
+then repeatedly calls `queue.shift()` in a `for` header and update. Writes to `window.rowsDeleted`
+and `window.finished` still change the caller's progress record. Intentional writes can use disable
+comments explaining that the progress record is saved after each statement.
 
 The line between data and a host object is where the written property is declared. A property a source
 file declares is the caller's data. A property a declaration file declares (`lib.*.d.ts`, the DOM,
@@ -50,8 +92,8 @@ interface, a class or a type alias.
 
 Some methods are handed a record to fill in, and that is their contract. Base's
 `OrmPersistedScheduledExecutable.run(entity, context)` is the case: the scheduler persists `entity` after
-`run` returns, so every job's override writes its outcome onto it. Rather than the same sentence at each
-of api's 26 overrides, the method that defines the contract says it once:
+`run` returns, so every job's override writes its outcome onto it. The method that defines the
+contract can state it once for all overrides:
 
 ```ts
 /** @mutates entity the scheduler persists the record after run returns */
@@ -72,13 +114,6 @@ implements it, at any depth. The tag goes on a method declaration or an interfac
 - Each write a contract excuses is counted in `--coverage`, under the tagged method, its parameter and
   the file declaring them.
 
-## Where it came from
-
-Kirk's ruling on `#e3yxyx7`, 2026-10-01: not upstream's `no-param-reassign` with `props: true`. On ahra
-that adds 143 findings that are two different things, about 80 writes into a caller's data object and
-about 55 writes to host objects whose API is setting properties, and upstream can only separate them with
-an allowance list of parameter names, which the doctrine forbids. This rule separates them by type.
-
 ## What it declines
 
 Each is a missed finding, never a false one.
@@ -89,53 +124,9 @@ Each is a missed finding, never a false one.
   reorders the caller's arrays and is not reported.
 - **A setter** on a project class: assigning it calls code written to be called that way.
 - **A parameter the function reassigns** anywhere, its defaults included: a write may land in the copy.
-- **A chain through `this`, a call's result, or a cast**, and a target typed `any`.
+- **A chain through `this`, an unknown call's result, or a cast**, and a target typed `any`.
+  The array contracts above are the supported call results.
 - **`list.length = 0`**: `length` is declared by the default library, so the truncation of a caller's
   array is silent.
 - **A default-library typed array** (`buffer[offset] = 0` on a `Uint8Array`): declared by the default
   library, and a buffer handed in to be filled is that API's shape.
-
-## The ahra findings, classified by hand
-
-Measured 2026-10-03. The first run counted 175; 31 were callback parameters (reduce accumulators,
-`forEach` elements, syntax-tree visitors' nodes), which is what the callback exemption removes. The 144
-left, every one read at its site:
-
-| kind | count | examples |
-|---|---|---|
-| Accumulator or out-parameter: the function's contract is to fill what it is handed | 78 | `diffs.push` in `StructureDoctor.ts` (25), `into.inputTokens +=` in `AhraOsKingdom.addUsage`, `out.x =` in `MapProjection.ts` (10), `visited.add`, `commentCount.value++` |
-| State holder: an object that exists to be mutated by the functions it is passed to | 39 | `hub.debounceTimer =`, `hub.watchersByPath.delete` across the four live hubs (28), `credentials.accessToken =`, `state.cursorByToken[...] =` |
-| In-place edit that is the function's stated job | 25 | `request.headers[...] =` in `signAwsRequest` (5), `localArguments.splice` in each `takeFlag` (7), `packageJson[...] =` in the doctor's `apply` (4), `opsNavigationLink.active =` |
-| Hidden in-place sort: the caller's list comes back reordered and nothing says so | 2 | `reportDriveUsage` sorts `rows`; `mergeOldestFirst` returns `messages.sort(...)` |
-
-None is a false finding by the rule's definition: each lands in data a source file declares, reached
-through a parameter. The first three kinds are deliberate designs; the last is a defect. Which of the
-deliberate ones should be restructured (return the value, take a copy) and which should carry a
-suppression stating the out-parameter contract is Kirk's call.
-
-## Verification
-
-Process state (`#dz42gce`): an interface, a class and a type alias tagged with a reason are exempt, through
-an assignment, an update and a collection call. A plain interface of the same shape, a union, `Partial`,
-`Readonly`, an array, an extending interface and an optional parameter each still report in the same file,
-and a bare tag reports and exempts nothing. Mutants killed: the exemption never applied, a bare tag never
-reported, a bare tag exempting.
-
-Out-parameter contracts (`#tnn31qs`): an override that renames the parameter, an override of that
-override, and an implementation of a tagged interface method are exempt, through an assignment, an update
-and a collection call, and the neighbouring parameter still reports. A method sharing the name and
-parameter names without overriding, one sharing an interface method's name without implementing it, a
-swapped parameter order and a plain function each still report. A bare tag, a misspelled parameter and a
-tag naming nothing each report and exempt nothing. The notes count two excused writes under a contract
-declared in another file. Mutants killed: no override walk, matching by name rather than position, a bare
-tag honored, implements not followed, no walk past the first override, no unknown-parameter finding, a
-bare tag not reported, the collection-call path ignoring contracts.
-
-- Fixtures from the real site: `addUsage` as it stands (three writes fire) and fixed to return the sum
-  (silent). 15 firing shapes and 20 silent ones, including a host type in a declaration file, the
-  default library's `RegExp` and `Error`, a host Record and a host array reached from project data.
-- Mutation check, 14 mutants, each confirmed to compile, all killed: callbacks not exempt, `new` not
-  counted as a callback, the reassignment check removed, defaults not searched for a reassignment,
-  setters counted, declaration files counted, any element key resolved as a property, the receiver not
-  required to be data, `Record` alone as a data shape, any method counted as a writer, a collection's
-  receiver unchecked, destructured parameters not followed, arrays not counted, updates not listened to.
