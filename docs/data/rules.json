@@ -5169,8 +5169,10 @@
                 "anchorsPaths": true
             },
             "messageIds": [
-                "canonicalCollapse"
+                "canonicalCollapse",
+                "canonicalSingle"
             ],
+            "fixKind": "fix",
             "sets": [
                 {
                     "set": "cohere:tailwind",

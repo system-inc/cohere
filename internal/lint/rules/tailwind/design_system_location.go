@@ -300,7 +300,7 @@ func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS
 	for _, stylesheet := range system.Stylesheets {
 		fileSystem.Stat(tspath.RootedPath(stylesheet))
 	}
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+	return loadedDesignSystemResult(system, entryPoint)
 }
 
 // cwdFrom is upstream's `ctx.cwd` for this location: the anchor, or the project root when there is none,

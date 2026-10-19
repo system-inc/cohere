@@ -43,6 +43,19 @@ func runCanonicalFixtureWithOptions(
 	options any,
 ) rule_testing.Result {
 	t.Helper()
+	return runCanonicalFixtureWithStylesheet(t, fileName, source, `@import "tailwindcss";`, options)
+}
+
+// runCanonicalFixtureWithStylesheet is runCanonicalFixtureWithOptions over a stylesheet the case writes,
+// for the cases whose subject is what a repository declares on top of the framework.
+func runCanonicalFixtureWithStylesheet(
+	t *testing.T,
+	fileName string,
+	source string,
+	stylesheet string,
+	options any,
+) rule_testing.Result {
+	t.Helper()
 
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
@@ -52,7 +65,7 @@ func runCanonicalFixtureWithOptions(
 
 	files := map[string]string{
 		fileName:                     source,
-		unknownFixtureStylesheetPath: `@import "tailwindcss";`,
+		unknownFixtureStylesheetPath: stylesheet,
 	}
 	plantPackage := func(root string) {
 		modules := filepath.Join(root, "node_modules")
