@@ -605,6 +605,9 @@ func abbreviatedOwnsProperty(ctx rule.Context, name *ast.Node) bool {
 	if ctx.TypeChecker == nil {
 		return true
 	}
+	if owner.Kind == ast.KindTypeLiteral && abbreviatedCombinedExternal(ctx, owner, name.Text()) {
+		return false
+	}
 	// Declaration merging can add a member to a foreign interface without a module wrapper.
 	if owner.Name() != nil && abbreviatedExternalSymbol(ctx.TypeChecker.GetSymbolAtLocation(owner.Name())) {
 		return false
@@ -707,4 +710,45 @@ func abbreviatedHeritage(owner *ast.Node) *ast.NodeList {
 		return owner.AsClassExpression().HeritageClauses
 	}
 	return nil
+}
+
+// Only union/intersection constituents at this shape's level can share its spelling. Stop at
+// properties and named declarations so a nested shape or an alias used elsewhere stays ours.
+func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name string) bool {
+	for current := literal; current.Parent != nil; current = current.Parent {
+		parent := current.Parent
+		var constituents *ast.NodeList
+		switch parent.Kind {
+		case ast.KindParenthesizedType:
+			continue
+		case ast.KindIntersectionType:
+			constituents = parent.AsIntersectionTypeNode().Types
+		case ast.KindUnionType:
+			constituents = parent.AsUnionTypeNode().Types
+		default:
+			return false
+		}
+		for _, constituent := range constituents.Nodes {
+			if constituent != current && abbreviatedTypeHasExternalProperty(ctx, ctx.TypeChecker.GetTypeAtLocation(constituent), name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Type, name string) bool {
+	if valueType == nil {
+		return false
+	}
+	// A union need not share the property across every alternative. Each constituent gets a vote.
+	if valueType.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
+		for _, part := range valueType.Types() {
+			if abbreviatedTypeHasExternalProperty(ctx, part, name) {
+				return true
+			}
+		}
+		return false
+	}
+	return abbreviatedExternalSymbol(ctx.TypeChecker.GetPropertyOfType(valueType, name))
 }

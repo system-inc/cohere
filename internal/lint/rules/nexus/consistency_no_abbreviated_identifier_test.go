@@ -791,3 +791,134 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(t *testing.T) {
 		})
 	}
 }
+
+// These dependency declarations retain React's SVGProps -> ClassAttributes -> RefAttributes
+// inheritance and CSSProperties -> csstype.Properties inheritance, including the relevant fields.
+func abbreviatedReactDependencyFiles(source string) map[string]string {
+	return map[string]string{
+		"subject.tsx": "import * as React from 'react';\ninterface SVGSVGElement {}\ndeclare const condition: boolean;\ndeclare const previous: { height?: number } | undefined;\n" + source,
+		"node_modules/react/index.d.ts": `
+			import * as CSS from 'csstype';
+			export interface RefObject<T> { current: T }
+			export type RefCallback<T> = { bivarianceHack(instance: T | null): void }['bivarianceHack'];
+			export type Ref<T> = RefCallback<T> | RefObject<T | null> | null;
+			export interface Attributes { key?: string | number | bigint | null | undefined }
+			export interface RefAttributes<T> extends Attributes { ref?: Ref<T> | undefined }
+			export interface ClassAttributes<T> extends RefAttributes<T> {}
+			export interface CSSProperties extends CSS.Properties<string | number> {}
+			export interface SVGAttributes<T> {
+				className?: string | undefined;
+				height?: number | string | undefined;
+				style?: CSSProperties | undefined;
+				viewBox?: string | undefined;
+				width?: number | string | undefined;
+			}
+			export interface SVGProps<T> extends SVGAttributes<T>, ClassAttributes<T> {}
+		`,
+		"node_modules/csstype/index.d.ts": `
+			export interface Properties<TLength = (string & {}) | 0> {
+				maxWidth?: TLength | 'max-content' | 'min-content' | 'none' | (string & {}) | undefined;
+				minHeight?: TLength | 'max-content' | 'min-content' | (string & {}) | undefined;
+			}
+		`,
+	}
+}
+
+// #nweav21 review controls: go test ./internal/lint/rules/nexus -run
+// ^TestConsistencyNoAbbreviatedIdentifier(Combined|Spread)DependencyProperties$
+// fails 10/56 cases on 356201b8 and when the composition guard is removed. Dropping the
+// existing contextual type for spread/branch literals fails 20/56. A maxAgentsBytes plant
+// appended to every subject fails all 56/56, including every reporting control.
+func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, source string
+		want         int
+	}{
+		{"intersection", `type Properties = React.SVGProps<SVGSVGElement> & { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{"union", `type Properties = React.SVGProps<SVGSVGElement> | { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{"reversed intersection", `type Properties = { ref?: React.Ref<SVGSVGElement> } & React.SVGProps<SVGSVGElement>;`, 0},
+		{"parenthesized", `type Properties = ((React.SVGProps<SVGSVGElement>) & (({ ref?: React.Ref<SVGSVGElement> })));`, 0},
+		{"nested union constituent", `type Alternatives = React.SVGProps<SVGSVGElement> | { title: string }; type Properties = Alternatives & { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{"nested intersection constituent", `type Alternatives = React.SVGProps<SVGSVGElement> & { title: string }; type Properties = Alternatives | { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{"quoted member", `type Properties = React.SVGProps<SVGSVGElement> & { 'ref'?: React.Ref<SVGSVGElement> };`, 0},
+		{"computed member", `type Properties = React.SVGProps<SVGSVGElement> & { ['ref']?: React.Ref<SVGSVGElement> };`, 0},
+		{"method member", `type Properties = React.SVGProps<SVGSVGElement> & { ref?(): void };`, 0},
+		{"only our intersection constituent declares it", `type Properties = React.SVGProps<SVGSVGElement> & { durationMs?: number };`, 1},
+		{"only our union constituent declares it", `type Properties = React.SVGProps<SVGSVGElement> | { durationMs?: number };`, 1},
+		{"both constituents ours", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes & { ref?: React.Ref<SVGSVGElement> };`, 2},
+		{"own union", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes | { ref?: React.Ref<SVGSVGElement> };`, 2},
+		{"nested property is a separate shape", `type Properties = React.SVGProps<SVGSVGElement> & { nested: { ref?: React.Ref<SVGSVGElement> } };`, 1},
+		{"referenced declaration stays ours", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = React.SVGProps<SVGSVGElement> & Attributes;`, 1},
+		{"mapped existing dependency property", `type Properties = Pick<React.SVGProps<SVGSVGElement>, 'ref'> & { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{"mapped generic declares no named property", `type Properties = Record<'ref', unknown> & { ref?: React.Ref<SVGSVGElement> };`, 1},
+		{"index signature declares no named property", `type Properties = Record<string, unknown> & { ref?: React.Ref<SVGSVGElement> };`, 1},
+		{"page properties unchanged", `type PageProperties = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> };`, 2},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+			if len(result.Diagnostics) != testCase.want {
+				t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+			}
+		})
+	}
+}
+
+// The checked-in checker already propagates context through these value-preserving expressions.
+// All twenty typed cases are quiet on 356201b8; the seventeen owned/boundary cases report there.
+// These pin that behavior without adding an unproven fallback walk.
+func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing.T) {
+	t.Parallel()
+	expressions := []struct{ name, source string }{
+		{"direct spread", `{ maxWidth: 'x' }`},
+		{"and", `condition && { maxWidth: 'x' }`},
+		{"or right", `previous || { maxWidth: 'x' }`},
+		{"or left", `{ maxWidth: 'x' } || previous`},
+		{"nullish right", `previous ?? { maxWidth: 'x' }`},
+		{"nullish left", `{ maxWidth: 'x' } ?? previous`},
+		{"conditional true", `condition ? { maxWidth: 'x' } : {}`},
+		{"conditional false", `condition ? {} : { maxWidth: 'x' }`},
+		{"parenthesized", `((condition && ({ maxWidth: 'x' })))`},
+		{"nested spreads", `{ ...(condition && { maxWidth: 'x' }) }`},
+	}
+	for _, expression := range expressions {
+		t.Run(expression.name, func(t *testing.T) {
+			t.Parallel()
+			cases := []struct {
+				name, source string
+				want         int
+			}{
+				{"dependency context", "const style: React.CSSProperties = { ...(" + expression.source + ") };", 0},
+				{"JSX style context", "declare function Icon(properties: React.SVGProps<SVGSVGElement>): any; const icon = <Icon style={{ ...(" + expression.source + ") }} />;", 0},
+				{"own shape", "const style = { ...(" + expression.source + ") };", 1},
+			}
+			for _, testCase := range cases {
+				t.Run(testCase.name, func(t *testing.T) {
+					t.Parallel()
+					result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+					if len(result.Diagnostics) != testCase.want {
+						t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+					}
+				})
+			}
+		})
+	}
+	boundaries := []struct{ name, source string }{
+		{"condition is not a value", `const style: React.CSSProperties = { ...({ maxWidth: 'x' } ? {} : {}) };`},
+		{"and left is not a value", `const style: React.CSSProperties = { ...({ maxWidth: 'x' } && {}) };`},
+		{"nested property is a separate shape", `const style: React.CSSProperties = { ...({ nested: { maxWidth: 'x' } }) };`},
+		{"no matching contextual property", `const properties: React.SVGProps<SVGSVGElement> = { ...(condition && { maxWidth: 'x' }) };`},
+		{"index signature", `const configuration: Record<string, unknown> = { ...(condition && { maxWidth: 'x' }) };`},
+		{"untyped Jest configuration unchanged", `export default { maxWorkers: 4 };`},
+		{"untyped ESLint configuration unchanged", `export default { maxWarnings: 1 };`},
+	}
+	for _, testCase := range boundaries {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+			rule_testing.ExpectFindings(t, result, "abbreviatedIdentifier")
+		})
+	}
+}
