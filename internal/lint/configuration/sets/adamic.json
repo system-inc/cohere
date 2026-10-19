@@ -31,6 +31,7 @@
         "adamic/no-unchecked-cast": "error",
         "adamic/no-void-widening": "error",
         "adamic/nominal-class": "error",
-        "adamic/single-spread": "error"
+        "adamic/single-spread": "error",
+        "adamic/union-write": "error"
     }
 }

@@ -362,7 +362,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
 	// And the repository half, against a class the corpus repository declares and no framework
 	// contains. `background--0` is a functional `@utility` block in ahra's own stylesheet, compiled
 	// here rather than looked up.
-	ahra := DesignSystemResult{System: unknownFixtureLiveSystem(t)}
+	ahra := loadedDesignSystemResult(unknownFixtureLiveSystem(t), "")
 	facts, canResolve := resolveClassFactsIn("background--0", ahra)
 	if !canResolve {
 		t.Fatal("background--0 did not resolve, so the repository half is not being compiled")
@@ -395,7 +395,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
 	// TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor pins for `KnownStatics`. What must
 	// differ is which half answered: the repository's compiled block on ahra, the framework table
 	// elsewhere.
-	independent := DesignSystemResult{System: independentLiveSystem(t)}
+	independent := loadedDesignSystemResult(independentLiveSystem(t), "")
 	if _, compiledHere := repositoryClassFacts("background--0", "", ahra); !compiledHere {
 		t.Error("background--0 was not answered by compiling ahra's own @utility block, so the " +
 			"repository half is not being consulted")
@@ -426,7 +426,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
 // Pinned on the CURRENT behaviour so closing it upstream breaks this test deliberately.
 func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(t *testing.T) {
 	t.Parallel()
-	independent := DesignSystemResult{System: independentLiveSystem(t)}
+	independent := loadedDesignSystemResult(independentLiveSystem(t), "")
 
 	if _, canResolve := resolveClassFactsIn("synthetic-static", independent); canResolve {
 		t.Error("a static @utility block now resolves against the repository that declares it, which " +
@@ -537,7 +537,7 @@ func TestSelectorShapeCannotProduceAWrongFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading the nested-utility design system: %v", err)
 	}
-	designSystem := DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+	designSystem := loadedDesignSystemResult(system, "")
 
 	// The class whose shape the table does not carry declines rather than resolving to a wrong one.
 	if _, canResolve := resolveClassFactsIn("gutter-small", designSystem); canResolve {

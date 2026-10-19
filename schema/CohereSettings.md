@@ -346,6 +346,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `adamic/no-void-widening`
 - `adamic/nominal-class`
 - `adamic/single-spread`
+- `adamic/union-write`
 
 </details>
 

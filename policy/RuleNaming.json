@@ -35,7 +35,8 @@
         { "name": "no-unchecked-cast", "definition": "No cast the runtime cannot check; an upcast and a checked downcast to a union member are allowed." },
         { "name": "no-void-widening", "definition": "A void return is not read through any or a union promising a value it may not return (#cs0p22v)." },
         { "name": "nominal-class", "definition": "A class type accepts only instances of that class, with identical type arguments." },
-        { "name": "single-spread", "definition": "An object literal spreads at most once, as its first member." }
+        { "name": "single-spread", "definition": "An object literal spreads at most once, as its first member." },
+        { "name": "union-write", "definition": "A property or element write through a union must fit that slot in every member (#wcvkh0d)." }
       ]
     }
   ]

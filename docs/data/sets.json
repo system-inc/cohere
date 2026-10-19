@@ -99,6 +99,10 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/union-write",
+                "severity": "error"
+            },
+            {
                 "name": "constructor-super",
                 "severity": "warn"
             },
@@ -728,6 +732,10 @@
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -2181,6 +2189,10 @@
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {
@@ -4258,7 +4270,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 289,
+        "rulesOn": 290,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4825,6 +4837,10 @@
             {
                 "name": "adamic/single-spread",
                 "severity": "off"
+            },
+            {
+                "name": "adamic/union-write",
+                "severity": "error"
             },
             {
                 "name": "array-callback-return",
@@ -6058,7 +6074,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 299,
+        "rulesOn": 300,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6527,6 +6543,10 @@
             {
                 "name": "adamic/single-spread",
                 "severity": "off"
+            },
+            {
+                "name": "adamic/union-write",
+                "severity": "error"
             },
             {
                 "name": "array-callback-return",
@@ -8238,6 +8258,10 @@
                 "severity": "error"
             },
             {
+                "name": "adamic/union-write",
+                "severity": "error"
+            },
+            {
                 "name": "array-callback-return",
                 "severity": "error"
             },
@@ -9715,6 +9739,10 @@
             },
             {
                 "name": "adamic/single-spread",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/union-write",
                 "severity": "error"
             },
             {

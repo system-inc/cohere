@@ -46,6 +46,9 @@ func main() {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
 		abandonRunCache()
+		if activeOpen != nil {
+			activeOpen.Checked = false
+		}
 		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
 		exitProcess(1)
 	}
@@ -71,6 +74,7 @@ func run() error {
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
 	typesOnly := flag.Bool("types", false, "report TypeScript's own diagnostics only, running no rules and writing no fixes")
 	lintOnly := flag.Bool("lint", false, "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics")
+	openFiles := flag.Bool("open", false, "open files with remaining findings in code after the run (composes with --types and --lint)")
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
 		"the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
@@ -158,6 +162,10 @@ func run() error {
 	showPhases := flag.Bool("phases", false, "put where the time went first in the footer's parentheses")
 	jsonOutput := flag.Bool("json", false, "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json")
 	flag.Parse()
+	if *openFiles {
+		activeOpen = &openReport{}
+		dropVerdict()
+	}
 	cacheOff = *noCache
 	if *verbose && *jsonOutput {
 		return fmt.Errorf("--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program")
@@ -1241,7 +1249,7 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		findings += len(result.Diagnostics)
+		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfig)
 		if adamicReadinessRequested {
 			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 		}
@@ -1854,6 +1862,9 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	// This mirrors settingFor rather than reimplementing it loosely, because a check that disagreed
 	// with the resolver would report keys that work and miss keys that do not.
 	resolves := func(key string) bool {
+		if key == configuration.UnusedDisable {
+			return true
+		}
 		for name := range registered {
 			if configuration.KeyReachesRule(key, name) {
 				return true

@@ -336,3 +336,14 @@ func (c *Config) relativePath(path string) string {
 
 	return strings.TrimPrefix(normalized, "./")
 }
+
+// UnusedDisable is an engine diagnostic configured in rules, not an AST rule in the registry.
+const UnusedDisable = "unused-disable"
+
+// UnusedDisableSeverity honors file overrides and defaults to ESLint's warning severity.
+func (r Resolved) UnusedDisableSeverity() Severity {
+	if setting, configured := r.Rules[UnusedDisable]; configured {
+		return setting.Severity
+	}
+	return SeverityWarn
+}

@@ -112,6 +112,9 @@ func Checker_isReadonlySymbol(recv *checker.Checker, symbol *ast.Symbol) bool
 //go:linkname Checker_resolveAlias github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).resolveAlias
 func Checker_resolveAlias(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
+//go:linkname Checker_getWriteTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWriteTypeOfSymbol
+func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
+
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
@@ -135,6 +138,9 @@ func Checker_getSignaturesOfType(recv *checker.Checker, t *checker.Type, kind ch
 
 //go:linkname Checker_getIndexTypeOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getIndexTypeOfType
 func Checker_getIndexTypeOfType(recv *checker.Checker, t *checker.Type, keyType *checker.Type) *checker.Type
+
+//go:linkname Checker_getApplicableIndexInfo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getApplicableIndexInfo
+func Checker_getApplicableIndexInfo(recv *checker.Checker, t *checker.Type, keyType *checker.Type) *checker.IndexInfo
 
 //go:linkname Checker_getBaseTypes github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypes
 func Checker_getBaseTypes(recv *checker.Checker, t *checker.Type) []*checker.Type

@@ -440,6 +440,9 @@
                 "adamic/single-spread": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "adamic/union-write": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "array-callback-return": {
                     "$ref": "#/$defs/ruleSetting"
                 },
