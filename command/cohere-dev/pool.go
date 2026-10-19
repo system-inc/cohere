@@ -28,6 +28,13 @@ import (
 // at eight threads each, and the measured load stayed at 107 to 140 on sixteen cores (#qhg0ntb).
 // A command that already runs under a token, a test that runs go build, say, runs inside its parent's share
 // and takes no second token, which would also deadlock a pool its parent has already filled.
+//
+// A run that finds the pool idle borrows (borrowTokens). With no one in line it takes every other free token
+// but one, and runs that much wider, so a lone gate uses the machine instead of a quarter of it: on
+// 2026-10-19 a whole-module gate alone on the machine ran 906 CPU-seconds in 4m05s, an average of 3.7 of 16
+// cores, with three tokens free the whole time. One token is always left, so a run that arrives next starts
+// at once rather than waiting out a borrower, and the threads in use never pass the pool's. Go's -p and
+// GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its run ends.
 
 // tokensVariable sets how many tokens the machine has.
 const tokensVariable = "COHERE_DEV_TOKENS"
@@ -160,11 +167,88 @@ func withToken(what string, work func(environment []string) int) int {
 		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 1
 	}
-	code := work(budgetEnvironment(os.Environ(), held.number, shape))
+	borrowed := borrowTokens(directory, shape, held.number, what)
+	if len(borrowed) > 0 {
+		wide := shape.widened(1 + len(borrowed))
+		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is idle, so this run borrows %s: %d packages at a time on %d threads\n",
+			tokenNumbers(borrowed), wide.packages, wide.threads)
+	}
+	code := work(budgetEnvironment(os.Environ(), held.number, shape.widened(1+len(borrowed))))
+	for _, token := range borrowed {
+		token.release()
+	}
 	held.release()
 	// The run is over and its token free, so this is when the cache is looked at (cache.go).
 	startCacheTrim(directory)
 	return code
+}
+
+// borrowTokens takes, for a run that holds token own, every other free token but one, when no one waits in
+// line, and returns them held. Nothing is borrowed while anyone waits: the tokens are theirs, in arrival
+// order. A token taken by someone else between the count and the take is simply not borrowed, and when the
+// borrowing would leave none free, because another run took one meanwhile, the last borrowed goes back.
+func borrowTokens(directory string, shape poolShape, own int, what string) []*heldSlot {
+	if len(waiters(directory)) > 0 {
+		return nil
+	}
+	free := 0
+	for token := 1; token <= shape.tokens; token++ {
+		if token != own && heldBy(directory, token) == "" {
+			free++
+		}
+	}
+	borrowed := []*heldSlot{}
+	for len(borrowed) < free-1 {
+		token, err := takeSlot(directory, shape.tokens, "borrowed by token "+strconv.Itoa(own)+"'s run: "+what)
+		if err != nil || token == nil {
+			break
+		}
+		borrowed = append(borrowed, token)
+	}
+	if len(borrowed) > 0 && !anyFree(directory, shape.tokens) {
+		borrowed[len(borrowed)-1].release()
+		borrowed = borrowed[:len(borrowed)-1]
+	}
+	return borrowed
+}
+
+// anyFree reports whether any token is free.
+func anyFree(directory string, tokens int) bool {
+	for token := 1; token <= tokens; token++ {
+		if heldBy(directory, token) == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// tokenNumbers names held tokens as a person says them: "token 2", "tokens 2 and 3", "tokens 2, 3 and 4".
+func tokenNumbers(held []*heldSlot) string {
+	names := make([]string, len(held))
+	for index, token := range held {
+		names[index] = strconv.Itoa(token.number)
+	}
+	if len(names) == 1 {
+		return "token " + names[0]
+	}
+	return "tokens " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// widened is the shape of a run holding tokens of the pool's tokens: their cores together, split between
+// packages and threads as evenly as they divide, packages the larger, so a lone long test binary gains threads
+// as well as the run gaining binaries. Held to one token, it is the pool's own shape, unchanged.
+func (shape poolShape) widened(tokens int) poolShape {
+	if tokens <= 1 {
+		return shape
+	}
+	cores := shape.packages * shape.threads * tokens
+	threads := 1
+	for candidate := 1; candidate*candidate <= cores; candidate++ {
+		if cores%candidate == 0 {
+			threads = candidate
+		}
+	}
+	return poolShape{tokens: shape.tokens, packages: cores / threads, threads: threads}
 }
 
 // waitInLine takes one of a directory's slots in arrival order, waiting its turn, and returns it held. The
