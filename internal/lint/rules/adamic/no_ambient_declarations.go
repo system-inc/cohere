@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -28,8 +29,9 @@ var NoAmbientDeclarations = rule.Rule{
 		if file == nil || file.IsDeclarationFile {
 			return nil
 		}
-		switch strings.ToLower(filepath.Ext(file.FileName().AsString())) {
-		case ".ts", ".tsx", ".a":
+		// An Adamic `.a` file is TypeScript, so ask sourcename what each name is treated as.
+		switch strings.ToLower(filepath.Ext(sourcename.TreatedAs(file.FileName().AsString()))) {
+		case ".ts", ".tsx":
 		default:
 			return nil
 		}
