@@ -29,6 +29,7 @@
         "adamic/no-optional-widening": "error",
         "adamic/no-type-predicate": "error",
         "adamic/no-unchecked-cast": "error",
+        "adamic/no-void-widening": "error",
         "adamic/nominal-class": "error",
         "adamic/single-spread": "error"
     }

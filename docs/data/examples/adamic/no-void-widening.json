@@ -1,0 +1,24 @@
+{
+    "rule": "adamic/no-void-widening",
+    "firing": {
+        "file": "Case.ts",
+        "source": "const make: () => void = () => 'x';\nconst wider: () => any = make;\nconsole.log(wider().toFixed(1));\n",
+        "findings": [
+            {
+                "line": 2,
+                "column": 26,
+                "endLine": 2,
+                "endColumn": 30,
+                "messageId": "voidWidening",
+                "message": "The return value in make cannot be read as () => any from () => void: void may hide an arbitrary returned value, which the wider type lets a caller read unchecked. Keep the void type or declare the actual return value."
+            }
+        ]
+    },
+    "clean": {
+        "file": "Case.ts",
+        "source": "const f: () => void = () => 42;\nf();\n"
+    },
+    "assertedMessageIds": [
+        "voidWidening"
+    ]
+}
