@@ -46,6 +46,8 @@ type runSummary struct {
 
 	TypeErrors int
 	Findings   int
+	// WarningFindings are included in Findings and reported, but do not fail the verdict.
+	WarningFindings int
 
 	// Changed is each file the run rewrote, by fixing, formatting or both: the files it cohered, the
 	// brand's verb for altering. WouldChange is the files a `--no-fix` run found a fix or formatting
@@ -215,9 +217,9 @@ type runGaps struct {
 	AdamicIgnored int `json:"adamicIgnored,omitempty"`
 }
 
-// failed is whether the run found anything or lost a verdict to a crash, which is what the exit code says
-// too. A crash is cohere's bug, and a run that could not check a file never exits 0. See runCrash.
+// failed is whether errors, required rewrites or crashes fail the run. Warnings stay in the
+// finding total without failing it, including when the summary is replayed from the run cache.
 func (summary runSummary) failed() bool {
-	return summary.TypeErrors > 0 || summary.Findings > 0 || summary.WouldChange > 0 ||
+	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0
 }

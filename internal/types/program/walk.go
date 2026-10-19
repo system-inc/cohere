@@ -1304,7 +1304,9 @@ func (d *fileDispatcher) dispatchFile(
 		}
 	}
 
-	reportDeadDirectives(sourceFile, directives, ranRules, measureOnly, ruleCrashes, report)
+	if resolution.UnusedDisableSeverity() != configuration.SeverityOff {
+		reportDeadDirectives(sourceFile, directives, ranRules, measureOnly, ruleCrashes, report)
+	}
 	silenced = tally(sourceFile.FileName().AsString(), directives, ranRule, resolution)
 	silenced.directives = len(directives.Directives()) > 0 || len(directives.RuleReferences()) > 0
 	silenced.withheld = d.withheld

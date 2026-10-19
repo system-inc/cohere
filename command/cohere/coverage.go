@@ -649,7 +649,7 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 	}
 	missing := []string{}
 	for name, setting := range lintConfig.Rules {
-		if setting.Severity == configuration.SeverityOff {
+		if name == configuration.UnusedDisable || setting.Severity == configuration.SeverityOff {
 			continue
 		}
 		if !implementsConfiguredRule(name, implemented) {
@@ -663,8 +663,8 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 // wantedConfiguredRules counts the rules the config turns on, the parity line's denominator.
 func wantedConfiguredRules(lintConfig *configuration.Config) int {
 	wanted := 0
-	for _, setting := range lintConfig.Rules {
-		if setting.Severity != configuration.SeverityOff {
+	for name, setting := range lintConfig.Rules {
+		if name != configuration.UnusedDisable && setting.Severity != configuration.SeverityOff {
 			wanted++
 		}
 	}
@@ -753,6 +753,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	activeSummary.FilesInScope = coverage.FilesWalked
 	activeSummary.Nodes = coverage.NodesVisited
 	activeSummary.Findings += len(report.Result.Diagnostics)
+	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfig)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
