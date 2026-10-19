@@ -572,3 +572,158 @@ func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(t *testing.T
 		})
 	}
 }
+
+// Each identity fixture is also a control for its fresh-object counterpart below: changing the
+// source of an element must change whether the write is reported (#c7r06cq).
+func TestCorrectnessNoCallerDataMutationArrayIdentity(t *testing.T) {
+	t.Parallel()
+
+	for _, expression := range []string{
+		"entries.filter(entry => entry.position > 0)",
+		"entries.slice()",
+		"entries.map(entry => entry)",
+		"entries.map(function(entry) { return entry; })",
+		"[...entries]",
+		"entries.concat([])",
+		"([] as EntryInterface[]).concat(entries)",
+		"entries.filter(entry => true).sort((a, b) => a.position - b.position)",
+		"entries.slice().reverse()",
+		"[entries[0]!]",
+		"entries.concat(entries[0]!)",
+		"entries.slice().map(entry => entry).filter(entry => true)",
+	} {
+		t.Run(expression, func(t *testing.T) {
+			t.Parallel()
+
+			result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+				"export function settle(entries: EntryInterface[]) {",
+				"    const queue: EntryInterface[] = "+expression+";",
+				"    const alias = queue;",
+				"    for(const entry of alias) { entry.position++; entry.status = 'done'; }",
+				"    alias[0]!.status = 'done';",
+				"    alias.find(entry => true)!.position += 1;",
+				"    alias.at(-1)!.status = 'done';",
+				"}",
+			))
+			correctnessNoCallerDataMutationExpect(t, result,
+				"entry.position", "entry.status", "alias[0]!.status", "alias.find(entry => true)!.position", "alias.at(-1)!.status")
+		})
+	}
+}
+
+func TestCorrectnessNoCallerDataMutationArrayFreshObjects(t *testing.T) {
+	t.Parallel()
+
+	for _, expression := range []string{
+		"entries.map(entry => ({ ...entry }))",
+		"entries.map(function(entry) { return { ...entry }; })",
+		"entries.map(entry => { entry = { ...entry }; return entry; })",
+		"entries.map(entry => ({ status: entry.status, position: entry.position }))",
+		"entries.slice().map(entry => ({ ...entry })).filter(entry => true)",
+		"[...entries.map(entry => ({ ...entry }))]",
+		"entries.map(entry => ({ ...entry })).concat([])",
+	} {
+		t.Run(expression, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := func(source string) string {
+				return correctnessNoCallerDataMutationSource(
+					"export function settle(entries: EntryInterface[]) {",
+					"    const queue = "+source+";",
+					"    for(const entry of queue) entry.status = 'done';",
+					"    queue[0]!.position++;",
+					"    queue.find(entry => true)!.status = 'done';",
+					"    queue.at(0)!.position++;",
+					"}",
+				)
+			}
+			rule_testing.ExpectClean(t, correctnessNoCallerDataMutationRun(t, fixture(expression)))
+			// Plant: the same four writes now land on the original elements.
+			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("entries.map(entry => entry)")),
+				"entry.status", "queue[0]!.position", "queue.find(entry => true)!.status", "queue.at(0)!.position")
+		})
+	}
+}
+
+func TestCorrectnessNoCallerDataMutationArrayBoundaries(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"copy container", "const queue = entries.slice(); queue.sort(); queue.reverse(); queue.push(entries[0]!); queue[0] = entries[1]!;", nil},
+		{"direct selection", "entries.find(entry => true)!.status = 'done'; entries.at(0)!.position++;", []string{"entries.find(entry => true)!.status", "entries.at(0)!.position"}},
+		{"selected local", "const entry = entries.slice()[0]!; entry.status = 'done';", []string{"entry.status"}},
+		{"direct alias", "const alias = entries; alias.push({ status: '', position: 0 });", []string{"alias.push"}},
+		{"reassigned alias", "let queue = entries.slice(); queue = [{ status: '', position: 0 }]; queue[0]!.status = 'done';", nil},
+		{"reassigned element", "for(let entry of entries.slice()) { entry = { ...entry }; entry.status = 'done'; }", nil},
+		{"reassigned parameter", "entries = entries.map(entry => ({ ...entry })); entries.slice()[0]!.status = 'done';", nil},
+		{"nested collection", "const queue = entries.slice(); queue[0]!.child!.status = 'done';", []string{"queue[0]!.child!.status"}},
+		{"shadowed element", "const queue = entries.slice(); { const queue = [{ status: '', position: 0 }]; queue[0]!.status = 'done'; } use(queue);", nil},
+		{"inline index", "entries.slice()[0]!.status = 'done';", []string{"entries.slice()[0]!.status"}},
+		{"concat argument", "const queue = [{ status: '', position: 0 }].concat(entries); for(const entry of queue) entry.status = 'done';", []string{"entry.status"}},
+		{"literal fresh slot", "const queue = [{ status: '', position: 0 }, ...entries]; queue[0]!.status = 'done';", nil},
+		{"concat fresh slot", "const queue = [{ status: '', position: 0 }].concat(entries); queue[0]!.status = 'done';", nil},
+		{"last fresh slot", "const queue = [...entries, { status: '', position: 0 }]; queue.at(-1)!.status = 'done';", nil},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := func(body string) string {
+				return correctnessNoCallerDataMutationSource("export function settle(entries: EntryInterface[]) { " + body + " }")
+			}
+			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture(testCase.body)), testCase.want...)
+			// Plant for every silent boundary, in the same function and with the same parameter.
+			if len(testCase.want) == 0 {
+				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("entries[0]!.status = 'done';")), "entries[0]!.status")
+			}
+		})
+	}
+}
+
+// A reduced DataJunkDelete progress record: the queue is new, the windows are the caller's.
+func TestCorrectnessNoCallerDataMutationJunkDeleteWindows(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		"interface WindowInterface { rowsDeleted: number; finished: boolean }",
+		"export function runJunkDeleteWindows(state: { windows: WindowInterface[] }, rows: number) {",
+		"    const queue = state.windows.filter(window => !window.finished).sort((a, b) => a.rowsDeleted - b.rowsDeleted);",
+		"    for(const window of queue) { window.rowsDeleted += rows; window.finished = true; }",
+		"}",
+	))
+	correctnessNoCallerDataMutationExpect(t, result, "window.rowsDeleted", "window.finished")
+}
+
+func TestCorrectnessNoCallerDataMutationArrayDataKinds(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{"record elements", "export function touch(entries: Record<string, number>[], key: string) { entries.slice()[0]![key] = 1; }", []string{"entries.slice()[0]![key]"}},
+		{"array elements", "export function touch(entries: number[][]) { entries.slice().at(0)!.push(1); entries.find(entry => true)!.push(2); }", []string{"entries.slice().at(0)!.push", "entries.find(entry => true)!.push"}},
+		{"readonly input", "export function touch(entries: readonly EntryInterface[]) { const queue = entries.filter(entry => true); for(const entry of queue) entry.status = 'done'; }", []string{"entry.status"}},
+		{"project lookalikes", "interface Factory { slice(): EntryInterface[]; find(): EntryInterface; at(index: number): EntryInterface } export function touch(entries: Factory) { entries.slice()[0]!.status = 'done'; entries.find().status = 'done'; entries.at(0).position++; }", nil},
+		{"host record alias", "export function touch(element: HostElementInterface) { const data = element.dataset; data['state'] = 'open'; }", nil},
+		{"host array alias", "export function touch(element: HostElementInterface) { const names = element.classNames; names.push('open'); }", nil},
+		{"host elements", "export function touch(entries: CanvasContextInterface[]) { entries.slice()[0]!.fillStyle = 'red'; }", nil},
+		{"process state", "/** @processState progress is shared by the process */ interface State { entries: EntryInterface[] } export function touch(state: State) { const queue = state.entries.slice(); queue[0]!.position++; }", nil},
+		{"out parameter", "export class Job {\n /** @mutates state the scheduler saves progress */\n run(state: { entries: EntryInterface[] }) { const queue = state.entries.filter(entry => true); for(const entry of queue) entry.position++; } }", nil},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.source)), testCase.want...)
+			if len(testCase.want) == 0 {
+				// Plant a caller-owned element write beside the silent fixture.
+				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.source,
+					"export function plant(entries: EntryInterface[]) { entries.slice()[0]!.status = 'done'; }")), "entries.slice()[0]!.status")
+			}
+		})
+	}
+}

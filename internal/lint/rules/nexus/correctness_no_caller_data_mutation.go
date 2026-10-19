@@ -1,6 +1,7 @@
 package nexus
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -70,6 +71,10 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //  2. Reached from a parameter. The written expression is a chain of property accesses, element
 //     accesses and non-null assertions whose root is an identifier resolving, by symbol, to a parameter
 //     of a function in this file, or to a name destructured from one (`function f({ entry })`).
+//     Unreassigned local aliases and for-of elements retain that origin. Array copies made with
+//     filter, slice, identity map, spread or concat retain element identity, not container identity;
+//     sort/reverse retain the receiver and find/at/indexing select its existing elements. Method
+//     contracts are resolved to the default library, never inferred from a project's method name.
 //  3. Into project data. The written property is declared in a source file of this program rather
 //     than in a declaration file (`lib.*.d.ts`, `lib.dom.d.ts`, `@types/*`, a package's own types). A
 //     write with no declared property (an element of an array or tuple, or an index-signature key)
@@ -97,8 +102,8 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //     be called that way, which is an API rather than a write into data.
 //   - A parameter the function reassigns anywhere (`options = { ...options }`): a write may land in the
 //     copy, and telling which is flow analysis this rule does not do.
-//   - A write through `this`, through a call's result, or through an `as` cast: the chain must reach the
-//     parameter by plain access.
+//   - A write through `this`, through an unknown call's result, or through an `as` cast. Only the
+//     array contracts above are followed through calls; map callbacks must return the element itself.
 //   - A write whose target type is `any`: no declaration, and no receiver type to read.
 //   - A write through a parameter whose declared type is process state (below).
 //   - A write through a method's parameter that the method, or a method it overrides or implements,
@@ -257,7 +262,10 @@ func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.No
 	if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
 		return
 	}
-	parameter := correctnessNoCallerDataMutationParameterReached(ctx, target)
+	// The receiver, not the slot being replaced, must be shared. A copied array owns its
+	// slots even when those slots still contain the caller's objects.
+	receiver := target.Expression()
+	parameter := correctnessNoCallerDataMutationParameterReached(ctx, receiver)
 	if parameter == nil {
 		return
 	}
@@ -309,42 +317,277 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage())
 }
 
-// correctnessNoCallerDataMutationParameterReached walks an access chain to its root and returns the
-// root's symbol when it is a parameter this rule judges (not a callback's, and never reassigned), or
-// nil.
+// correctnessNoCallerDataMutationParameterReached follows value identity, keeping the array
+// container separate from its elements. A shallow copy shares elements only: it cannot establish
+// identity at depth zero. Symbols and a recursion stack keep aliases shadow-safe and cycles bounded.
 func correctnessNoCallerDataMutationParameterReached(ctx rule.Context, expression *ast.Node) *ast.Symbol {
-	root := expression
-	for {
-		root = ast.SkipParentheses(root)
-		switch root.Kind {
-		case ast.KindPropertyAccessExpression:
-			root = root.AsPropertyAccessExpression().Expression
-			continue
-		case ast.KindElementAccessExpression:
-			root = root.AsElementAccessExpression().Expression
-			continue
-		case ast.KindNonNullExpression:
-			root = root.AsNonNullExpression().Expression
-			continue
+	return correctnessNoCallerDataMutationOrigin(ctx, expression, 0, map[*ast.Node]bool{})
+}
+
+func correctnessNoCallerDataMutationOrigin(ctx rule.Context, expression *ast.Node, depth int, seen map[*ast.Node]bool) *ast.Symbol {
+	if expression == nil || seen[expression] {
+		return nil
+	}
+	seen[expression] = true
+	defer delete(seen, expression)
+	next := func(node *ast.Node, depth int) *ast.Symbol {
+		return correctnessNoCallerDataMutationOrigin(ctx, node, depth, seen)
+	}
+	expression = ast.SkipParentheses(expression)
+	switch expression.Kind {
+	case ast.KindNonNullExpression:
+		return next(expression.AsNonNullExpression().Expression, depth)
+	case ast.KindPropertyAccessExpression:
+		// Do not let an alias turn a host-owned property (such as element.dataset) into
+		// project data merely because its new receiver is an identifier.
+		if correctnessNoCallerDataMutationWritesData(ctx, expression) {
+			return next(expression.AsPropertyAccessExpression().Expression, depth)
 		}
-		break
+	case ast.KindElementAccessExpression:
+		access := expression.AsElementAccessExpression()
+		if index, ok := correctnessNoCallerDataMutationLiteralIndex(access.ArgumentExpression); ok && index >= 0 {
+			if element := correctnessNoCallerDataMutationKnownElement(ctx, access.Expression, index); element != nil {
+				return next(element, depth)
+			}
+		}
+		return next(access.Expression, depth+1)
+	case ast.KindArrayLiteralExpression:
+		if depth == 0 {
+			return nil
+		}
+		for _, element := range expression.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindSpreadElement {
+				if origin := next(element.AsSpreadElement().Expression, depth); origin != nil {
+					return origin
+				}
+			} else if origin := next(element, depth-1); origin != nil {
+				return origin
+			}
+		}
+	case ast.KindCallExpression:
+		call := expression.AsCallExpression()
+		callee := ast.SkipParentheses(call.Expression)
+		if callee.Kind != ast.KindPropertyAccessExpression {
+			return nil
+		}
+		access := callee.AsPropertyAccessExpression()
+		if !correctnessNoCallerDataMutationArrayMethod(ctx, access.Name()) {
+			return nil
+		}
+		switch access.Name().Text() {
+		case "find", "at":
+			if access.Name().Text() == "at" && len(call.Arguments.Nodes) == 1 {
+				if index, ok := correctnessNoCallerDataMutationLiteralIndex(call.Arguments.Nodes[0]); ok {
+					if element := correctnessNoCallerDataMutationKnownElement(ctx, access.Expression, index); element != nil {
+						return next(element, depth)
+					}
+				}
+			}
+			return next(access.Expression, depth+1)
+		case "sort", "reverse":
+			return next(access.Expression, depth)
+		case "filter", "slice":
+			if depth > 0 {
+				return next(access.Expression, depth)
+			}
+		case "map":
+			if depth > 0 && len(call.Arguments.Nodes) > 0 && correctnessNoCallerDataMutationIdentityCallback(ctx, call.Arguments.Nodes[0]) {
+				return next(access.Expression, depth)
+			}
+		case "concat":
+			if depth == 0 {
+				return nil
+			}
+			if origin := next(access.Expression, depth); origin != nil {
+				return origin
+			}
+			for _, argument := range call.Arguments.Nodes {
+				// concat flattens array arguments one level, but also accepts single elements.
+				argumentDepth := depth - 1
+				if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(argument)) {
+					argumentDepth = depth
+				}
+				if origin := next(argument, argumentDepth); origin != nil {
+					return origin
+				}
+			}
+		}
+	case ast.KindIdentifier:
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+		if parameter := correctnessNoCallerDataMutationParameterOf(ctx, symbol); parameter != nil {
+			function := parameter.Parent
+			if function != nil && !correctnessNoCallerDataMutationIsCallback(function) &&
+				!correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+				return symbol
+			}
+			return nil
+		}
+		for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
+			if declaration.Kind != ast.KindVariableDeclaration || declaration.Name().Kind != ast.KindIdentifier {
+				continue
+			}
+			function := declaration.Parent
+			for function != nil && !ast.IsFunctionLike(function) {
+				function = function.Parent
+			}
+			if function == nil || correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+				continue
+			}
+			if initializer := declaration.Initializer(); initializer != nil {
+				return next(initializer, depth)
+			}
+			list := declaration.Parent
+			if list != nil && list.Kind == ast.KindVariableDeclarationList && list.Parent != nil && list.Parent.Kind == ast.KindForOfStatement {
+				return next(list.Parent.AsForInOrOfStatement().Expression, depth+1)
+			}
+		}
 	}
-	if root.Kind != ast.KindIdentifier {
-		return nil
+	return nil
+}
+
+// A known slot takes precedence over an array's possible shared elements. In particular,
+// [fresh, ...caller][0] and [...caller, fresh].at(-1) write to fresh, not to caller data.
+func correctnessNoCallerDataMutationKnownElement(ctx rule.Context, array *ast.Node, index int) *ast.Node {
+	slots := correctnessNoCallerDataMutationKnownSlots(ctx, array, map[*ast.Node]bool{})
+	if index < 0 {
+		for left, right := 0, len(slots)-1; left < right; left, right = left+1, right-1 {
+			slots[left], slots[right] = slots[right], slots[left]
+		}
+		index = -index - 1
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
-	parameter := correctnessNoCallerDataMutationParameterOf(ctx, symbol)
-	if parameter == nil {
-		return nil
+	for position, slot := range slots {
+		if slot == nil { // An unknown-length spread prevents resolving positions beyond it.
+			return nil
+		}
+		if position == index {
+			return slot
+		}
 	}
-	function := parameter.Parent
-	if function == nil || correctnessNoCallerDataMutationIsCallback(function) {
-		return nil
+	return nil
+}
+
+// nil is an unknown-length segment; non-nil slots are the expressions placed into a new array.
+// This is deliberately limited to literal construction and concat, not arbitrary array evaluation.
+func correctnessNoCallerDataMutationKnownSlots(ctx rule.Context, array *ast.Node, seen map[*ast.Node]bool) []*ast.Node {
+	unknown := []*ast.Node{nil}
+	if array == nil || seen[array] {
+		return unknown
 	}
-	if correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
-		return nil
+	seen[array] = true
+	defer delete(seen, array)
+	array = ast.SkipParentheses(array)
+	slots := []*ast.Node{}
+	switch array.Kind {
+	case ast.KindArrayLiteralExpression:
+		for _, element := range array.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindSpreadElement {
+				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ctx, element.AsSpreadElement().Expression, seen)...)
+			} else {
+				slots = append(slots, element)
+			}
+		}
+		return slots
+	case ast.KindIdentifier:
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(array)
+		for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
+			if declaration.Kind != ast.KindVariableDeclaration || declaration.Initializer() == nil {
+				continue
+			}
+			function := declaration.Parent
+			for function != nil && !ast.IsFunctionLike(function) {
+				function = function.Parent
+			}
+			if function != nil && !correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+				return correctnessNoCallerDataMutationKnownSlots(ctx, declaration.Initializer(), seen)
+			}
+		}
+	case ast.KindCallExpression:
+		call := array.AsCallExpression()
+		callee := ast.SkipParentheses(call.Expression)
+		if callee.Kind != ast.KindPropertyAccessExpression {
+			return unknown
+		}
+		access := callee.AsPropertyAccessExpression()
+		if access.Name().Text() != "concat" || !correctnessNoCallerDataMutationArrayMethod(ctx, access.Name()) {
+			return unknown
+		}
+		slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ctx, access.Expression, seen)...)
+		for _, argument := range call.Arguments.Nodes {
+			if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(argument)) {
+				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ctx, argument, seen)...)
+			} else {
+				slots = append(slots, argument)
+			}
+		}
+		return slots
 	}
-	return symbol
+	return unknown
+}
+
+func correctnessNoCallerDataMutationLiteralIndex(expression *ast.Node) (int, bool) {
+	if expression == nil {
+		return 0, false
+	}
+	expression = ast.SkipParentheses(expression)
+	sign := 1
+	if expression.Kind == ast.KindPrefixUnaryExpression && expression.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
+		sign = -1
+		expression = expression.AsPrefixUnaryExpression().Operand
+	}
+	if expression.Kind != ast.KindNumericLiteral {
+		return 0, false
+	}
+	index, err := strconv.Atoi(expression.Text())
+	return sign * index, err == nil
+}
+
+// Only the default library's Array/ReadonlyArray methods have these identity contracts. A project's
+// method with the same name can return anything, even when its receiver has a caller origin.
+func correctnessNoCallerDataMutationArrayMethod(ctx rule.Context, name *ast.Node) bool {
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		owner := declaration.Parent
+		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil ||
+			(owner.Name().Text() != "Array" && owner.Name().Text() != "ReadonlyArray") ||
+			!type_checking.IsSourceFileDefaultLibrary(ctx.Program, ast.GetSourceFileOfNode(declaration)) {
+			return false
+		}
+	}
+	return true
+}
+
+// Accept only an unreassigned first parameter returned directly, as an expression or a single return
+// statement. Object construction, arbitrary helpers and branching callbacks do not prove identity.
+func correctnessNoCallerDataMutationIdentityCallback(ctx rule.Context, callback *ast.Node) bool {
+	callback = ast.SkipParentheses(callback)
+	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
+		return false
+	}
+	parameters := callback.Parameters()
+	if len(parameters) == 0 || parameters[0].Name().Kind != ast.KindIdentifier {
+		return false
+	}
+	body := callback.Body()
+	if body == nil {
+		return false
+	}
+	if body.Kind == ast.KindBlock {
+		statements := body.AsBlock().Statements.Nodes
+		if len(statements) != 1 || statements[0].Kind != ast.KindReturnStatement {
+			return false
+		}
+		body = statements[0].AsReturnStatement().Expression
+	}
+	if body == nil {
+		return false
+	}
+	body = ast.SkipParentheses(body)
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(parameters[0].Name())
+	return body.Kind == ast.KindIdentifier && symbol != nil && ctx.TypeChecker.GetSymbolAtLocation(body) == symbol &&
+		!correctnessNoCallerDataMutationIsReassigned(ctx, callback, symbol)
 }
 
 // correctnessNoCallerDataMutationParameterOf returns the parameter a symbol is declared by, directly or
@@ -422,6 +665,13 @@ func correctnessNoCallerDataMutationIsReassigned(ctx rule.Context, function *ast
 // declares: a property declared in a source file and not a setter, or an element of an array, a tuple,
 // a `Record` or its kin, or a type a source file declares.
 func correctnessNoCallerDataMutationWritesData(ctx rule.Context, target *ast.Node) bool {
+	for {
+		target = ast.SkipParentheses(target)
+		if target.Kind != ast.KindNonNullExpression {
+			break
+		}
+		target = target.AsNonNullExpression().Expression
+	}
 	var key *ast.Node
 	var receiver *ast.Node
 	switch target.Kind {
@@ -433,6 +683,10 @@ func correctnessNoCallerDataMutationWritesData(ctx rule.Context, target *ast.Nod
 		access := target.AsElementAccessExpression()
 		key = access.ArgumentExpression
 		receiver = access.Expression
+	case ast.KindCallExpression:
+		// A selected element can itself be a collection. Origin has already checked the
+		// default-library array contract and every intervening host/project boundary.
+		return correctnessNoCallerDataMutationParameterReached(ctx, target) != nil
 	default:
 		return false
 	}
@@ -454,7 +708,11 @@ func correctnessNoCallerDataMutationWritesData(ctx rule.Context, target *ast.Nod
 		}
 		owner = owner.AsNonNullExpression().Expression
 	}
-	if owner.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, owner) {
+	if owner.Kind == ast.KindCallExpression || owner.Kind == ast.KindArrayLiteralExpression {
+		if correctnessNoCallerDataMutationOrigin(ctx, owner, 1, map[*ast.Node]bool{}) == nil {
+			return false
+		}
+	} else if owner.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, owner) {
 		return false
 	}
 	receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)

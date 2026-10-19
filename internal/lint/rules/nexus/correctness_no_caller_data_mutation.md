@@ -15,7 +15,44 @@ A write through a parameter into data project code declares: an assignment (any 
 `delete`, or a call of a mutating default-library collection method (`push`, `unshift`, `pop`, `shift`,
 `splice`, `sort`, `reverse`, `fill`, `copyWithin`; a Map's or WeakMap's `set` and `delete`, a Set's or
 WeakSet's `add` and `delete`, and `clear`), on a chain of property accesses, element accesses and
-non-null assertions whose root is a parameter, or a name destructured from one.
+non-null assertions whose root is a parameter, or a name destructured from one. Unreassigned
+local aliases and `for...of` bindings preserve that origin too.
+
+### Array copies preserve element identity
+
+A new array need not contain new objects. The rule follows existing elements through the default
+library's `filter`, `slice`, `concat`, and `map` when its inline callback returns its first parameter
+unchanged (an expression body or a single `return`). Array literals preserve the identity of their
+ordinary elements and spreads. `sort` and `reverse` return the same array; indexing, `find`, `at`, and
+`for...of` select its elements. These contracts also apply to `ReadonlyArray` where available.
+
+The container and the elements are separate: sorting a `slice()` or replacing its slots is silent;
+writing a shared element's fields or mutating a shared element collection reports. Known literal
+positions (including concat prefixes and negative `at` positions) that select fresh objects stay silent. A `map` callback
+that constructs an object, such as `entry => ({ ...entry })`, does not establish element identity.
+Unknown calls, project methods with array-method names, reassigned bindings and arbitrary callbacks
+are not followed. Host-owned properties and the existing process-state/out-parameter exemptions
+retain their boundaries through aliases.
+
+New site kinds covered by `#c7r06cq` (examples assume `entries` is caller data):
+
+| Kind | Example reported write |
+|---|---|
+| Local alias of caller data | `const alias = entries; alias.push(entry)` |
+| Filtered elements | `entries.filter(keep)[0]!.status = 'done'` |
+| Sliced elements | `entries.slice()[0]!.status = 'done'` |
+| Identity-mapped elements | `entries.map(entry => entry)[0]!.status = 'done'` |
+| Spread or ordinary array elements | `[...entries][0]!.status = 'done'`; `[entries[0]!][0]!.status = 'done'` |
+| Concatenated receiver or arguments | `entries.concat([])[0]!.status = 'done'`; `for (const entry of local.concat(entries)) entry.status = 'done'` |
+| Copies sorted or reversed before selection | `entries.slice().sort(compare)[0]!.status = 'done'`; `entries.slice().reverse()[0]!.status = 'done'` |
+| Found or positional elements | `entries.find(keep)!.status = 'done'`; `entries.at(0)!.position++` |
+| Aliased selection or iteration | `const entry = entries.slice()[0]!; entry.status = 'done'`; `for (const entry of entries.slice()) entry.position++` |
+| Record or collection elements | `records.slice()[0]![key] = 1`; `arrays.slice().at(0)!.push(1)` |
+
+The reduced `DataJunkDelete.runJunkDeleteWindows` fixture reports both `window.rowsDeleted += rows`
+and `window.finished = true` after `state.windows.filter(...).sort(...)`. The consumer's intentional
+progress-record writes need disable comments explaining that the state is saved after each statement;
+consumer measurement and those comments belong to the rule owner before landing.
 
 The line between data and a host object is where the written property is declared. A property a source
 file declares is the caller's data. A property a declaration file declares (`lib.*.d.ts`, the DOM,
@@ -89,7 +126,8 @@ Each is a missed finding, never a false one.
   reorders the caller's arrays and is not reported.
 - **A setter** on a project class: assigning it calls code written to be called that way.
 - **A parameter the function reassigns** anywhere, its defaults included: a write may land in the copy.
-- **A chain through `this`, a call's result, or a cast**, and a target typed `any`.
+- **A chain through `this`, an unknown call's result, or a cast**, and a target typed `any`.
+  The array contracts above are the supported call results.
 - **`list.length = 0`**: `length` is declared by the default library, so the truncation of a caller's
   array is silent.
 - **A default-library typed array** (`buffer[offset] = 0` on a `Uint8Array`): declared by the default
@@ -139,3 +177,38 @@ bare tag not reported, the collection-call path ignoring contracts.
   setters counted, declaration files counted, any element key resolved as a property, the receiver not
   required to be data, `Record` alone as a data shape, any method counted as a writer, a collection's
   receiver unchecked, destructured parameters not followed, arrays not counted, updates not listened to.
+
+Array identity (`#c7r06cq`): `go test ./internal/lint/rules/nexus -run
+'TestCorrectnessNoCallerDataMutation(Array|JunkDelete)' -json` on unchanged `febe188a` code with the
+new fixtures: **35 failing and 8 passing leaf cases** (39 failed and 8 passed events including
+parents). The reduced junk-delete fixture expected 2 findings and got 0. With the implementation,
+`go test ./internal/lint/rules/nexus -run 'TestCorrectnessNoCallerDataMutation' -json` passed **96 test
+events**, including all **43 new leaf cases**. Silent fixtures include plants of caller-owned writes;
+identity fixtures are the controls for fresh-object maps. Nine compiling mutants were killed with
+the array/junk-delete command above:
+
+| Mutant | Failing leaf cases |
+|---|---:|
+| A shallow copy shares the container too | 4 |
+| Every map shares its elements | 7 |
+| Project methods have array contracts | 1 |
+| Ignore alias/iteration-binding reassignment | 2 |
+| Let aliases erase host-property boundaries | 2 |
+| Do not follow find/at selection | 21 |
+| Do not follow for-of elements | 22 |
+| Do not follow local aliases | 25 |
+| Ignore known fresh slots | 3 |
+
+These are fixture counts, not a consumer finding census. The owner measures ahra, www-phi-health and
+api-phi-health, reads new findings, and handles ahra's ESLint twin before landing. This change does not
+change rule sets or tiers.
+
+
+Final package checks: `go test ./internal/lint/rules/nexus -json`: **2,358 passed, 2 skipped test
+events**. `go test ./internal/testpolicy ./internal/lint/registry ./internal/guard -json`:
+**4 / 26,131 / 33 passed test events**, respectively, with **2 registry skips**. The nexus skips are
+the existing opt-in shouting-mask controls; the registry skips are scratch-file checking without its
+environment flag and live-config reachability without a consumer checkout. `go vet
+./internal/lint/rules/nexus`: exit 0, no diagnostics. `gofmt -l` on
+`correctness_no_caller_data_mutation.go` and `correctness_no_caller_data_mutation_test.go`: 0 files
+listed. `git diff --check`: exit 0, no output. No whole-module tests were run.
