@@ -75,8 +75,8 @@ var (
 	// programCacheCapacity is how many built programs the cache holds at once.
 	programCacheCapacity = defaultProgramCacheCapacity
 
-	// programCacheBuilds counts builds, so each one gets a root of its own. A key evicted and built
-	// again must not share a root with the first build, which a test may still be holding.
+	// programCacheBuilds counts builds, for a test to tell a cache hit from a build. It never names
+	// anything: a fixture's root is its key alone (#jdkmmhs).
 	programCacheBuilds int
 )
 
@@ -105,6 +105,16 @@ func programCacheKey(files map[string]string, subjectFileName string, verbatim b
 //
 // The returned directory is the fixture's root in its memory filesystem, for a caller that needs to name a
 // path inside it. Nothing on disk is there.
+//
+// The root is the key alone, so one fixture has one root whatever ran before it. It used to carry a
+// process-wide build count, which follows t.Parallel's scheduling, so every path a build reads and
+// every message naming one changed from run to run: Adamic's traced builds recorded about 17,000
+// module-resolution misses under /cohere-fixture/<key>-<N> and stored identical bytes under a fresh
+// key each time (#jdkmmhs). An evicted key built again shares its root with a graph a test may still
+// hold, which is safe because nothing keyed by a path outlives its program: each build reads a memory
+// filesystem of its own, the shared lib parse covers only bundled paths, and every run-scoped rule
+// cache (the theme, design system, importer, import-cycle and standard-streams caches, and the design
+// system's recordings) is keyed by the program's identity, so two graphs at one root are two keys.
 func buildCachedProgram(files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
 	key := programCacheKey(files, subjectFileName, verbatim)
 
@@ -114,7 +124,7 @@ func buildCachedProgram(files map[string]string, subjectFileName string, verbati
 		programCacheRecency.MoveToFront(entry.recency)
 	} else {
 		programCacheBuilds++
-		entry = &programCacheEntry{key: key, directory: fmt.Sprintf("%s-%d", key, programCacheBuilds)}
+		entry = &programCacheEntry{key: key, directory: key}
 		entry.recency = programCacheRecency.PushFront(entry)
 		programCache[key] = entry
 		evictBeyondCapacity()
