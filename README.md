@@ -165,6 +165,7 @@ root unless you name another).
 | `--format-only` | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
 | `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
 | `--types` | report TypeScript's diagnostics only, running no rules and fixing nothing |
+| `--open` | open files with remaining findings in `code`, once in report order; combines with `--types` and `--lint`, preserves the run's exit status |
 | `--unused` | report code that is never used: unreferenced exports and unreachable statements |
 | `--unused-all` | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`) |
 | `--unused-deep` | also group the unused code into islands by what reaches what (implies `--unused`) |

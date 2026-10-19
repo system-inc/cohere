@@ -54,6 +54,7 @@ var activeSummary runSummary
 // printFinding prints one finding in the view the run asked for: as it always printed under `--verbose`,
 // as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`.
 func printFinding(out io.Writer, finding runFinding, verboseLine string) {
+	activeOpen.add(finding.Path)
 	switch activeOutput.Mode {
 	case outputVerbose:
 		fmt.Fprint(out, verboseLine)
@@ -134,6 +135,10 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	// In a repository with several projects each is its own run, told its path, the root's as ".".
 	if label := os.Getenv(projectLabelVariable); label != "" {
 		summary.Label = label
+	}
+	if activeOpen != nil {
+		activeOpen.Checked = summary.Gaps.CrashedFiles == 0 && summary.Gaps.RuleCrashes == 0 &&
+			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
 
