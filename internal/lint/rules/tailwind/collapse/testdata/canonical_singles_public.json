@@ -1,0 +1,2720 @@
+{
+  "tailwindVersion": "4.3.3",
+  "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
+  "harvested": null,
+  "options": {
+    "collapse": false,
+    "logicalToPhysical": true
+  },
+  "groundTruth": "canonicalizeCandidates([className], options), one class at a time",
+  "unknownCount": 20,
+  "caseCount": 541,
+  "rewriteCount": 458,
+  "cases": [
+    {
+      "className": "bg-gradient-to-t",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-t"
+    },
+    {
+      "className": "focus:bg-gradient-to-t",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-t"
+    },
+    {
+      "className": "bg-gradient-to-t!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-t!"
+    },
+    {
+      "className": "bg-gradient-to-tr",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-tr"
+    },
+    {
+      "className": "focus:bg-gradient-to-tr",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-tr"
+    },
+    {
+      "className": "bg-gradient-to-tr!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-tr!"
+    },
+    {
+      "className": "bg-gradient-to-r",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-r"
+    },
+    {
+      "className": "focus:bg-gradient-to-r",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-r"
+    },
+    {
+      "className": "bg-gradient-to-r!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-r!"
+    },
+    {
+      "className": "bg-gradient-to-br",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-br"
+    },
+    {
+      "className": "focus:bg-gradient-to-br",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-br"
+    },
+    {
+      "className": "bg-gradient-to-br!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-br!"
+    },
+    {
+      "className": "bg-gradient-to-b",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-b"
+    },
+    {
+      "className": "focus:bg-gradient-to-b",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-b"
+    },
+    {
+      "className": "bg-gradient-to-b!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-b!"
+    },
+    {
+      "className": "bg-gradient-to-bl",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-bl"
+    },
+    {
+      "className": "focus:bg-gradient-to-bl",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-bl"
+    },
+    {
+      "className": "bg-gradient-to-bl!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-bl!"
+    },
+    {
+      "className": "bg-gradient-to-l",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-l"
+    },
+    {
+      "className": "focus:bg-gradient-to-l",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-l"
+    },
+    {
+      "className": "bg-gradient-to-l!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-l!"
+    },
+    {
+      "className": "bg-gradient-to-tl",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "bg-linear-to-tl"
+    },
+    {
+      "className": "focus:bg-gradient-to-tl",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:bg-linear-to-tl"
+    },
+    {
+      "className": "bg-gradient-to-tl!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "bg-linear-to-tl!"
+    },
+    {
+      "className": "order-none",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "order-0"
+    },
+    {
+      "className": "focus:order-none",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:order-0"
+    },
+    {
+      "className": "order-none!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "order-0!"
+    },
+    {
+      "className": "break-words",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "wrap-break-word"
+    },
+    {
+      "className": "focus:break-words",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:wrap-break-word"
+    },
+    {
+      "className": "break-words!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "wrap-break-word!"
+    },
+    {
+      "className": "overflow-ellipsis",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "text-ellipsis"
+    },
+    {
+      "className": "focus:overflow-ellipsis",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:text-ellipsis"
+    },
+    {
+      "className": "overflow-ellipsis!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "text-ellipsis!"
+    },
+    {
+      "className": "start-full",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-s-full"
+    },
+    {
+      "className": "focus:start-full",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-s-full"
+    },
+    {
+      "className": "start-full!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-s-full!"
+    },
+    {
+      "className": "-start-full",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-s-full"
+    },
+    {
+      "className": "focus:-start-full",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-s-full"
+    },
+    {
+      "className": "-start-full!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-s-full!"
+    },
+    {
+      "className": "start-auto",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-s-auto"
+    },
+    {
+      "className": "focus:start-auto",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-s-auto"
+    },
+    {
+      "className": "start-auto!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-s-auto!"
+    },
+    {
+      "className": "start-px",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-s-px"
+    },
+    {
+      "className": "focus:start-px",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-s-px"
+    },
+    {
+      "className": "start-px!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-s-px!"
+    },
+    {
+      "className": "-start-px",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-s-px"
+    },
+    {
+      "className": "focus:-start-px",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-s-px"
+    },
+    {
+      "className": "-start-px!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-s-px!"
+    },
+    {
+      "className": "start-8",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-s-8"
+    },
+    {
+      "className": "focus:start-8",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-s-8"
+    },
+    {
+      "className": "start-8!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-s-8!"
+    },
+    {
+      "className": "-start-8",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-s-8"
+    },
+    {
+      "className": "focus:-start-8",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-s-8"
+    },
+    {
+      "className": "-start-8!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-s-8!"
+    },
+    {
+      "className": "start-123",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-s-123"
+    },
+    {
+      "className": "focus:start-123",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-s-123"
+    },
+    {
+      "className": "start-123!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-s-123!"
+    },
+    {
+      "className": "-start-123",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-s-123"
+    },
+    {
+      "className": "focus:-start-123",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-s-123"
+    },
+    {
+      "className": "-start-123!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-s-123!"
+    },
+    {
+      "className": "end-full",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-e-full"
+    },
+    {
+      "className": "focus:end-full",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-e-full"
+    },
+    {
+      "className": "end-full!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-e-full!"
+    },
+    {
+      "className": "-end-full",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-e-full"
+    },
+    {
+      "className": "focus:-end-full",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-e-full"
+    },
+    {
+      "className": "-end-full!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-e-full!"
+    },
+    {
+      "className": "end-auto",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-e-auto"
+    },
+    {
+      "className": "focus:end-auto",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-e-auto"
+    },
+    {
+      "className": "end-auto!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-e-auto!"
+    },
+    {
+      "className": "end-px",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-e-px"
+    },
+    {
+      "className": "focus:end-px",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-e-px"
+    },
+    {
+      "className": "end-px!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-e-px!"
+    },
+    {
+      "className": "-end-px",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-e-px"
+    },
+    {
+      "className": "focus:-end-px",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-e-px"
+    },
+    {
+      "className": "-end-px!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-e-px!"
+    },
+    {
+      "className": "end-8",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-e-8"
+    },
+    {
+      "className": "focus:end-8",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-e-8"
+    },
+    {
+      "className": "end-8!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-e-8!"
+    },
+    {
+      "className": "-end-8",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-e-8"
+    },
+    {
+      "className": "focus:-end-8",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-e-8"
+    },
+    {
+      "className": "-end-8!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-e-8!"
+    },
+    {
+      "className": "end-123",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "inset-e-123"
+    },
+    {
+      "className": "focus:end-123",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:inset-e-123"
+    },
+    {
+      "className": "end-123!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "inset-e-123!"
+    },
+    {
+      "className": "-end-123",
+      "origin": "upstream: deprecated utilities",
+      "canonical": "-inset-e-123"
+    },
+    {
+      "className": "focus:-end-123",
+      "origin": "upstream: deprecated utilities, with-variant",
+      "canonical": "focus:-inset-e-123"
+    },
+    {
+      "className": "-end-123!",
+      "origin": "upstream: deprecated utilities, important",
+      "canonical": "-inset-e-123!"
+    },
+    {
+      "className": "bg-[theme(colors.red.500)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-red-500"
+    },
+    {
+      "className": "focus:bg-[theme(colors.red.500)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-red-500"
+    },
+    {
+      "className": "bg-[theme(colors.red.500)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-red-500!"
+    },
+    {
+      "className": "bg-[size:theme(spacing.4)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-size-[--spacing(4)]"
+    },
+    {
+      "className": "focus:bg-[size:theme(spacing.4)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-size-[--spacing(4)]"
+    },
+    {
+      "className": "bg-[size:theme(spacing.4)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-size-[--spacing(4)]!"
+    },
+    {
+      "className": "w-[calc(100dvh-theme(spacing.2))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-[calc(100dvh-(--spacing(2)))]"
+    },
+    {
+      "className": "focus:w-[calc(100dvh-theme(spacing.2))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-[calc(100dvh-(--spacing(2)))]"
+    },
+    {
+      "className": "w-[calc(100dvh-theme(spacing.2))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-[calc(100dvh-(--spacing(2)))]!"
+    },
+    {
+      "className": "w-[calc(100dvh+theme(spacing.2))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-[calc(100dvh+(--spacing(2)))]"
+    },
+    {
+      "className": "focus:w-[calc(100dvh+theme(spacing.2))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-[calc(100dvh+(--spacing(2)))]"
+    },
+    {
+      "className": "w-[calc(100dvh+theme(spacing.2))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-[calc(100dvh+(--spacing(2)))]!"
+    },
+    {
+      "className": "w-[calc(100dvh/theme(spacing.2))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-[calc(100dvh/(--spacing(2)))]"
+    },
+    {
+      "className": "focus:w-[calc(100dvh/theme(spacing.2))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-[calc(100dvh/(--spacing(2)))]"
+    },
+    {
+      "className": "w-[calc(100dvh/theme(spacing.2))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-[calc(100dvh/(--spacing(2)))]!"
+    },
+    {
+      "className": "w-[calc(100dvh*theme(spacing.2))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-[calc(100dvh*(--spacing(2)))]"
+    },
+    {
+      "className": "focus:w-[calc(100dvh*theme(spacing.2))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-[calc(100dvh*(--spacing(2)))]"
+    },
+    {
+      "className": "w-[calc(100dvh*theme(spacing.2))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-[calc(100dvh*(--spacing(2)))]!"
+    },
+    {
+      "className": "bg-[theme(colors.red.500,red)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-(--color-red-500,red)"
+    },
+    {
+      "className": "focus:bg-[theme(colors.red.500,red)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-(--color-red-500,red)"
+    },
+    {
+      "className": "bg-[theme(colors.red.500,red)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-(--color-red-500,red)!"
+    },
+    {
+      "className": "bg-[theme(colors.foo.1000,theme(colors.red.500))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-red-500"
+    },
+    {
+      "className": "focus:bg-[theme(colors.foo.1000,theme(colors.red.500))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-red-500"
+    },
+    {
+      "className": "bg-[theme(colors.foo.1000,theme(colors.red.500))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-red-500!"
+    },
+    {
+      "className": "text-[calc(theme(fontSize.xs)*2)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "text-[calc(var(--text-xs)*2)]"
+    },
+    {
+      "className": "focus:text-[calc(theme(fontSize.xs)*2)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:text-[calc(var(--text-xs)*2)]"
+    },
+    {
+      "className": "text-[calc(theme(fontSize.xs)*2)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "text-[calc(var(--text-xs)*2)]!"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/75%)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-red-500/75"
+    },
+    {
+      "className": "focus:bg-[theme(colors.red.500/75%)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-red-500/75"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/75%)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-red-500/75!"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/12.34%)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-red-500/[12.34%]"
+    },
+    {
+      "className": "focus:bg-[theme(colors.red.500/12.34%)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-red-500/[12.34%]"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/12.34%)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-red-500/[12.34%]!"
+    },
+    {
+      "className": "bg-[#fff]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-white"
+    },
+    {
+      "className": "focus:bg-[#fff]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-white"
+    },
+    {
+      "className": "bg-[#fff]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-white!"
+    },
+    {
+      "className": "bg-[#FFF]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-white"
+    },
+    {
+      "className": "focus:bg-[#FFF]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-white"
+    },
+    {
+      "className": "bg-[#FFF]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-white!"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/50%)]/50",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-[--theme(--color-red-500/50%)]/50"
+    },
+    {
+      "className": "focus:bg-[theme(colors.red.500/50%)]/50",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-[--theme(--color-red-500/50%)]/50"
+    },
+    {
+      "className": "bg-[theme(colors.red.500/50%)]/50!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-[--theme(--color-red-500/50%)]/50!"
+    },
+    {
+      "className": "max-[theme(screens.lg)]:flex",
+      "origin": "upstream: arbitrary values",
+      "canonical": "max-[--theme(--breakpoint-lg)]:flex"
+    },
+    {
+      "className": "focus:max-[theme(screens.lg)]:flex",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:max-[--theme(--breakpoint-lg)]:flex"
+    },
+    {
+      "className": "max-[theme(screens.lg)]:flex!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "max-[--theme(--breakpoint-lg)]:flex!"
+    },
+    {
+      "className": "max-[theme(spacing.4)]:flex",
+      "origin": "upstream: arbitrary values",
+      "canonical": "max-[theme(spacing.4)]:flex"
+    },
+    {
+      "className": "focus:max-[theme(spacing.4)]:flex",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:max-[theme(spacing.4)]:flex"
+    },
+    {
+      "className": "max-[theme(spacing.4)]:flex!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "max-[theme(spacing.4)]:flex!"
+    },
+    {
+      "className": "max-[theme(spacing.4/50)]:flex",
+      "origin": "upstream: arbitrary values",
+      "canonical": "max-[theme(spacing.4/50)]:flex"
+    },
+    {
+      "className": "focus:max-[theme(spacing.4/50)]:flex",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:max-[theme(spacing.4/50)]:flex"
+    },
+    {
+      "className": "max-[theme(spacing.4/50)]:flex!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "max-[theme(spacing.4/50)]:flex!"
+    },
+    {
+      "className": "grid-cols-[min(50%_,_theme(spacing.80))_auto]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "grid-cols-[min(50%,--spacing(80))_auto]"
+    },
+    {
+      "className": "focus:grid-cols-[min(50%_,_theme(spacing.80))_auto]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:grid-cols-[min(50%,--spacing(80))_auto]"
+    },
+    {
+      "className": "grid-cols-[min(50%_,_theme(spacing.80))_auto]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "grid-cols-[min(50%,--spacing(80))_auto]!"
+    },
+    {
+      "className": "pt-[min(20%,calc(var(--spacing)*8))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "pt-[min(20%,--spacing(8))]"
+    },
+    {
+      "className": "focus:pt-[min(20%,calc(var(--spacing)*8))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:pt-[min(20%,--spacing(8))]"
+    },
+    {
+      "className": "pt-[min(20%,calc(var(--spacing)*8))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "pt-[min(20%,--spacing(8))]!"
+    },
+    {
+      "className": "pt-[min(20%,calc(var(--spacing)*var(--other)))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "pt-[min(20%,--spacing(var(--other)))]"
+    },
+    {
+      "className": "focus:pt-[min(20%,calc(var(--spacing)*var(--other)))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:pt-[min(20%,--spacing(var(--other)))]"
+    },
+    {
+      "className": "pt-[min(20%,calc(var(--spacing)*var(--other)))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "pt-[min(20%,--spacing(var(--other)))]!"
+    },
+    {
+      "className": "pt-[calc(var(--spacing)*8)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "pt-8"
+    },
+    {
+      "className": "focus:pt-[calc(var(--spacing)*8)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:pt-8"
+    },
+    {
+      "className": "pt-[calc(var(--spacing)*8)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "pt-8!"
+    },
+    {
+      "className": "pt-[calc(var(--spacing)*var(--other))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "pt-[--spacing(var(--other))]"
+    },
+    {
+      "className": "focus:pt-[calc(var(--spacing)*var(--other))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:pt-[--spacing(var(--other))]"
+    },
+    {
+      "className": "pt-[calc(var(--spacing)*var(--other))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "pt-[--spacing(var(--other))]!"
+    },
+    {
+      "className": "max-w-[theme(screens.md)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "max-w-(--breakpoint-md)"
+    },
+    {
+      "className": "focus:max-w-[theme(screens.md)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:max-w-(--breakpoint-md)"
+    },
+    {
+      "className": "max-w-[theme(screens.md)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "max-w-(--breakpoint-md)!"
+    },
+    {
+      "className": "w-[theme(maxWidth.md)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-md"
+    },
+    {
+      "className": "focus:w-[theme(maxWidth.md)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-md"
+    },
+    {
+      "className": "w-[theme(maxWidth.md)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-md!"
+    },
+    {
+      "className": "leading-[1]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "leading-none"
+    },
+    {
+      "className": "focus:leading-[1]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:leading-none"
+    },
+    {
+      "className": "leading-[1]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "leading-none!"
+    },
+    {
+      "className": "border-[2px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "border-2"
+    },
+    {
+      "className": "focus:border-[2px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:border-2"
+    },
+    {
+      "className": "border-[2px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "border-2!"
+    },
+    {
+      "className": "border-[1234px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "border-1234"
+    },
+    {
+      "className": "focus:border-[1234px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:border-1234"
+    },
+    {
+      "className": "border-[1234px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "border-1234!"
+    },
+    {
+      "className": "bg-[position:123px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-position-[123px]"
+    },
+    {
+      "className": "focus:bg-[position:123px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-position-[123px]"
+    },
+    {
+      "className": "bg-[position:123px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-position-[123px]!"
+    },
+    {
+      "className": "bg-[size:123px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-size-[123px]"
+    },
+    {
+      "className": "focus:bg-[size:123px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-size-[123px]"
+    },
+    {
+      "className": "bg-[size:123px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-size-[123px]!"
+    },
+    {
+      "className": "bg-[123px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "bg-position-[123px]"
+    },
+    {
+      "className": "focus:bg-[123px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:bg-position-[123px]"
+    },
+    {
+      "className": "bg-[123px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "bg-position-[123px]!"
+    },
+    {
+      "className": "w-[64rem]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "w-5xl"
+    },
+    {
+      "className": "focus:w-[64rem]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:w-5xl"
+    },
+    {
+      "className": "w-[64rem]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "w-5xl!"
+    },
+    {
+      "className": "from-[25%]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "from-25%"
+    },
+    {
+      "className": "focus:from-[25%]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:from-25%"
+    },
+    {
+      "className": "from-[25%]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "from-25%!"
+    },
+    {
+      "className": "from-[2.5%]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "from-[2.5%]"
+    },
+    {
+      "className": "focus:from-[2.5%]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:from-[2.5%]"
+    },
+    {
+      "className": "from-[2.5%]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "from-[2.5%]!"
+    },
+    {
+      "className": "-mt-[12rem]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-48"
+    },
+    {
+      "className": "focus:-mt-[12rem]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-48"
+    },
+    {
+      "className": "-mt-[12rem]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-48!"
+    },
+    {
+      "className": "-mt-[-12rem]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-48"
+    },
+    {
+      "className": "focus:-mt-[-12rem]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-48"
+    },
+    {
+      "className": "-mt-[-12rem]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-48!"
+    },
+    {
+      "className": "-mt-[12.34rem]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[-12.34rem]"
+    },
+    {
+      "className": "focus:-mt-[12.34rem]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[-12.34rem]"
+    },
+    {
+      "className": "-mt-[12.34rem]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[-12.34rem]!"
+    },
+    {
+      "className": "-mt-[-12.34rem]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[12.34rem]"
+    },
+    {
+      "className": "focus:-mt-[-12.34rem]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[12.34rem]"
+    },
+    {
+      "className": "-mt-[-12.34rem]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[12.34rem]!"
+    },
+    {
+      "className": "-mt-[12.34px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[-12.34px]"
+    },
+    {
+      "className": "focus:-mt-[12.34px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[-12.34px]"
+    },
+    {
+      "className": "-mt-[12.34px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[-12.34px]!"
+    },
+    {
+      "className": "-mt-[-12.34px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[12.34px]"
+    },
+    {
+      "className": "focus:-mt-[-12.34px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[12.34px]"
+    },
+    {
+      "className": "-mt-[-12.34px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[12.34px]!"
+    },
+    {
+      "className": "-mt-[492px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[-492px]"
+    },
+    {
+      "className": "focus:-mt-[492px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[-492px]"
+    },
+    {
+      "className": "-mt-[492px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[-492px]!"
+    },
+    {
+      "className": "-mt-[calc(-1*492px)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[492px]"
+    },
+    {
+      "className": "focus:-mt-[calc(-1*492px)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[492px]"
+    },
+    {
+      "className": "-mt-[calc(-1*492px)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[492px]!"
+    },
+    {
+      "className": "-mt-[-492px]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[492px]"
+    },
+    {
+      "className": "focus:-mt-[-492px]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[492px]"
+    },
+    {
+      "className": "-mt-[-492px]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[492px]!"
+    },
+    {
+      "className": "-mt-[calc(-1*-492px)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-[-492px]"
+    },
+    {
+      "className": "focus:-mt-[calc(-1*-492px)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-[-492px]"
+    },
+    {
+      "className": "-mt-[calc(-1*-492px)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-[-492px]!"
+    },
+    {
+      "className": "-mt-(--my-var)",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-(--my-var)"
+    },
+    {
+      "className": "focus:-mt-(--my-var)",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-(--my-var)"
+    },
+    {
+      "className": "-mt-(--my-var)!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-(--my-var)!"
+    },
+    {
+      "className": "-mt-[var(--my-var)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-(--my-var)"
+    },
+    {
+      "className": "focus:-mt-[var(--my-var)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-(--my-var)"
+    },
+    {
+      "className": "-mt-[var(--my-var)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-(--my-var)!"
+    },
+    {
+      "className": "mt-[calc(var(--my-var)*-1)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-(--my-var)"
+    },
+    {
+      "className": "focus:mt-[calc(var(--my-var)*-1)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-(--my-var)"
+    },
+    {
+      "className": "mt-[calc(var(--my-var)*-1)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-(--my-var)!"
+    },
+    {
+      "className": "mt-[calc(-1*var(--my-var))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-(--my-var)"
+    },
+    {
+      "className": "focus:mt-[calc(-1*var(--my-var))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-(--my-var)"
+    },
+    {
+      "className": "mt-[calc(-1*var(--my-var))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-(--my-var)!"
+    },
+    {
+      "className": "-mt-[calc(var(--my-var)*-1)]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-(--my-var)"
+    },
+    {
+      "className": "focus:-mt-[calc(var(--my-var)*-1)]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-(--my-var)"
+    },
+    {
+      "className": "-mt-[calc(var(--my-var)*-1)]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-(--my-var)!"
+    },
+    {
+      "className": "-mt-[calc(-1*var(--my-var))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-(--my-var)"
+    },
+    {
+      "className": "focus:-mt-[calc(-1*var(--my-var))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-(--my-var)"
+    },
+    {
+      "className": "-mt-[calc(-1*var(--my-var))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-(--my-var)!"
+    },
+    {
+      "className": "mt-[calc(-1*calc(-1*var(--my-var)))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "mt-(--my-var)"
+    },
+    {
+      "className": "focus:mt-[calc(-1*calc(-1*var(--my-var)))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:mt-(--my-var)"
+    },
+    {
+      "className": "mt-[calc(-1*calc(-1*var(--my-var)))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "mt-(--my-var)!"
+    },
+    {
+      "className": "-mt-[calc(-1*calc(-1*var(--my-var)))]",
+      "origin": "upstream: arbitrary values",
+      "canonical": "-mt-(--my-var)"
+    },
+    {
+      "className": "focus:-mt-[calc(-1*calc(-1*var(--my-var)))]",
+      "origin": "upstream: arbitrary values, with-variant",
+      "canonical": "focus:-mt-(--my-var)"
+    },
+    {
+      "className": "-mt-[calc(-1*calc(-1*var(--my-var)))]!",
+      "origin": "upstream: arbitrary values, important",
+      "canonical": "-mt-(--my-var)!"
+    },
+    {
+      "className": "[--resolved-value:0]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "[--resolved-value:0]"
+    },
+    {
+      "className": "focus:[--resolved-value:0]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:[--resolved-value:0]"
+    },
+    {
+      "className": "[--resolved-value:0]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "[--resolved-value:0]!"
+    },
+    {
+      "className": "[--resolved-value:4]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "[--resolved-value:4]"
+    },
+    {
+      "className": "focus:[--resolved-value:4]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:[--resolved-value:4]"
+    },
+    {
+      "className": "[--resolved-value:4]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "[--resolved-value:4]!"
+    },
+    {
+      "className": "[--resolved-value:8]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "[--resolved-value:8]"
+    },
+    {
+      "className": "focus:[--resolved-value:8]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:[--resolved-value:8]"
+    },
+    {
+      "className": "[--resolved-value:8]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "[--resolved-value:8]!"
+    },
+    {
+      "className": "[color:CanvasText]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "text-[CanvasText]"
+    },
+    {
+      "className": "focus:[color:CanvasText]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:text-[CanvasText]"
+    },
+    {
+      "className": "[color:CanvasText]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "text-[CanvasText]!"
+    },
+    {
+      "className": "text-[CanvasText]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "text-[CanvasText]"
+    },
+    {
+      "className": "focus:text-[CanvasText]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:text-[CanvasText]"
+    },
+    {
+      "className": "text-[CanvasText]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "text-[CanvasText]!"
+    },
+    {
+      "className": "max-w-(--breakpoint-md)",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "max-w-(--breakpoint-md)"
+    },
+    {
+      "className": "focus:max-w-(--breakpoint-md)",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:max-w-(--breakpoint-md)"
+    },
+    {
+      "className": "max-w-(--breakpoint-md)!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "max-w-(--breakpoint-md)!"
+    },
+    {
+      "className": "max-w-(--container-3xl)",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "max-w-3xl"
+    },
+    {
+      "className": "focus:max-w-(--container-3xl)",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:max-w-3xl"
+    },
+    {
+      "className": "max-w-(--container-3xl)!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "max-w-3xl!"
+    },
+    {
+      "className": "gap-[7.25rem]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "gap-29"
+    },
+    {
+      "className": "focus:gap-[7.25rem]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:gap-29"
+    },
+    {
+      "className": "gap-[7.25rem]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "gap-29!"
+    },
+    {
+      "className": "gap-[calc(7rem+0.25rem)]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "gap-29"
+    },
+    {
+      "className": "focus:gap-[calc(7rem+0.25rem)]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:gap-29"
+    },
+    {
+      "className": "gap-[calc(7rem+0.25rem)]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "gap-29!"
+    },
+    {
+      "className": "gap-[116px]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "gap-[116px]"
+    },
+    {
+      "className": "focus:gap-[116px]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:gap-[116px]"
+    },
+    {
+      "className": "gap-[116px]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "gap-[116px]!"
+    },
+    {
+      "className": "w-[124px]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "w-[124px]"
+    },
+    {
+      "className": "focus:w-[124px]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:w-[124px]"
+    },
+    {
+      "className": "w-[124px]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "w-[124px]!"
+    },
+    {
+      "className": "w-[0.123rem]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "w-[0.123rem]"
+    },
+    {
+      "className": "focus:w-[0.123rem]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:w-[0.123rem]"
+    },
+    {
+      "className": "w-[0.123rem]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "w-[0.123rem]!"
+    },
+    {
+      "className": "w-[123px]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "w-[123px]"
+    },
+    {
+      "className": "focus:w-[123px]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:w-[123px]"
+    },
+    {
+      "className": "w-[123px]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "w-[123px]!"
+    },
+    {
+      "className": "w-[256px]",
+      "origin": "upstream: arbitrary utilities",
+      "canonical": "w-[256px]"
+    },
+    {
+      "className": "focus:w-[256px]",
+      "origin": "upstream: arbitrary utilities, with-variant",
+      "canonical": "focus:w-[256px]"
+    },
+    {
+      "className": "w-[256px]!",
+      "origin": "upstream: arbitrary utilities, important",
+      "canonical": "w-[256px]!"
+    },
+    {
+      "className": "aspect-16/9",
+      "origin": "upstream: bare values",
+      "canonical": "aspect-video"
+    },
+    {
+      "className": "focus:aspect-16/9",
+      "origin": "upstream: bare values, with-variant",
+      "canonical": "focus:aspect-video"
+    },
+    {
+      "className": "aspect-16/9!",
+      "origin": "upstream: bare values, important",
+      "canonical": "aspect-video!"
+    },
+    {
+      "className": "[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "focus:flex"
+    },
+    {
+      "className": "focus:[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:focus:flex"
+    },
+    {
+      "className": "[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "focus:flex!"
+    },
+    {
+      "className": "[@media(scripting:_none)]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "noscript:flex"
+    },
+    {
+      "className": "focus:[@media(scripting:_none)]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:noscript:flex"
+    },
+    {
+      "className": "[@media(scripting:_none)]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "noscript:flex!"
+    },
+    {
+      "className": "[@media(scripting:none)]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "noscript:flex"
+    },
+    {
+      "className": "focus:[@media(scripting:none)]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:noscript:flex"
+    },
+    {
+      "className": "[@media(scripting:none)]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "noscript:flex!"
+    },
+    {
+      "className": "[@media_(scripting:_none)]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "noscript:flex"
+    },
+    {
+      "className": "focus:[@media_(scripting:_none)]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:noscript:flex"
+    },
+    {
+      "className": "[@media_(scripting:_none)]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "noscript:flex!"
+    },
+    {
+      "className": "has-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "has-focus:flex"
+    },
+    {
+      "className": "focus:has-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:has-focus:flex"
+    },
+    {
+      "className": "has-[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "has-focus:flex!"
+    },
+    {
+      "className": "not-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "not-focus:flex"
+    },
+    {
+      "className": "focus:not-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:not-focus:flex"
+    },
+    {
+      "className": "not-[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "not-focus:flex!"
+    },
+    {
+      "className": "group-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "group-focus:flex"
+    },
+    {
+      "className": "focus:group-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:group-focus:flex"
+    },
+    {
+      "className": "group-[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "group-focus:flex!"
+    },
+    {
+      "className": "peer-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "peer-focus:flex"
+    },
+    {
+      "className": "focus:peer-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:peer-focus:flex"
+    },
+    {
+      "className": "peer-[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "peer-focus:flex!"
+    },
+    {
+      "className": "in-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants",
+      "canonical": "in-focus:flex"
+    },
+    {
+      "className": "focus:in-[&:focus]:flex",
+      "origin": "upstream: arbitrary variants, with-variant",
+      "canonical": "focus:in-focus:flex"
+    },
+    {
+      "className": "in-[&:focus]:flex!",
+      "origin": "upstream: arbitrary variants, important",
+      "canonical": "in-focus:flex!"
+    },
+    {
+      "className": "[[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-visible:flex"
+    },
+    {
+      "className": "focus:[[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-visible:flex"
+    },
+    {
+      "className": "[[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-visible:flex!"
+    },
+    {
+      "className": "[&[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-visible:flex"
+    },
+    {
+      "className": "focus:[&[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-visible:flex"
+    },
+    {
+      "className": "[&[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-visible:flex!"
+    },
+    {
+      "className": "[[data-visible]&]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-visible:flex"
+    },
+    {
+      "className": "focus:[[data-visible]&]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-visible:flex"
+    },
+    {
+      "className": "[[data-visible]&]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-visible:flex!"
+    },
+    {
+      "className": "[&>[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:data-visible:flex"
+    },
+    {
+      "className": "focus:[&>[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:data-visible:flex"
+    },
+    {
+      "className": "[&>[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:data-visible:flex!"
+    },
+    {
+      "className": "[&_>_[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:data-visible:flex"
+    },
+    {
+      "className": "focus:[&_>_[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:data-visible:flex"
+    },
+    {
+      "className": "[&_>_[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:data-visible:flex!"
+    },
+    {
+      "className": "[&>*]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:flex"
+    },
+    {
+      "className": "focus:[&>*]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:flex"
+    },
+    {
+      "className": "[&>*]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:flex!"
+    },
+    {
+      "className": "[&_>_*]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:flex"
+    },
+    {
+      "className": "focus:[&_>_*]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:flex"
+    },
+    {
+      "className": "[&_>_*]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:flex!"
+    },
+    {
+      "className": "[&_>_[foo]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:[[foo]]:flex"
+    },
+    {
+      "className": "focus:[&_>_[foo]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:[[foo]]:flex"
+    },
+    {
+      "className": "[&_>_[foo]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:[[foo]]:flex!"
+    },
+    {
+      "className": "[&_[foo]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:[[foo]]:flex"
+    },
+    {
+      "className": "focus:[&_[foo]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:[[foo]]:flex"
+    },
+    {
+      "className": "[&_[foo]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:[[foo]]:flex!"
+    },
+    {
+      "className": "[&_>_[foo=bar]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:[[foo=bar]]:flex"
+    },
+    {
+      "className": "focus:[&_>_[foo=bar]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:[[foo=bar]]:flex"
+    },
+    {
+      "className": "[&_>_[foo=bar]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:[[foo=bar]]:flex!"
+    },
+    {
+      "className": "[&_[foo=bar]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:[[foo=bar]]:flex"
+    },
+    {
+      "className": "focus:[&_[foo=bar]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:[[foo=bar]]:flex"
+    },
+    {
+      "className": "[&_[foo=bar]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:[[foo=bar]]:flex!"
+    },
+    {
+      "className": "[&_[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:data-visible:flex"
+    },
+    {
+      "className": "focus:[&_[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:data-visible:flex"
+    },
+    {
+      "className": "[&_[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:data-visible:flex!"
+    },
+    {
+      "className": "[&_*]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:flex"
+    },
+    {
+      "className": "focus:[&_*]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:flex"
+    },
+    {
+      "className": "[&_*]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:flex!"
+    },
+    {
+      "className": "[&:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "first:flex"
+    },
+    {
+      "className": "focus:[&:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:first:flex"
+    },
+    {
+      "className": "[&:first-child]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "first:flex!"
+    },
+    {
+      "className": "[&:not(:first-child)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-first:flex"
+    },
+    {
+      "className": "focus:[&:not(:first-child)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-first:flex"
+    },
+    {
+      "className": "[&:not(:first-child)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-first:flex!"
+    },
+    {
+      "className": "[&_:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:first:flex"
+    },
+    {
+      "className": "focus:[&_:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:first:flex"
+    },
+    {
+      "className": "[&_:first-child]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:first:flex!"
+    },
+    {
+      "className": "[&_>_:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:first:flex"
+    },
+    {
+      "className": "focus:[&_>_:first-child]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:first:flex"
+    },
+    {
+      "className": "[&_>_:first-child]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:first:flex!"
+    },
+    {
+      "className": "[&_:--custom]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "**:[:--custom]:flex"
+    },
+    {
+      "className": "focus:[&_:--custom]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:**:[:--custom]:flex"
+    },
+    {
+      "className": "[&_:--custom]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "**:[:--custom]:flex!"
+    },
+    {
+      "className": "[&_>_:--custom]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "*:[:--custom]:flex"
+    },
+    {
+      "className": "focus:[&_>_:--custom]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:*:[:--custom]:flex"
+    },
+    {
+      "className": "[&_>_:--custom]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "*:[:--custom]:flex!"
+    },
+    {
+      "className": "[p_&]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "in-[p]:flex"
+    },
+    {
+      "className": "focus:[p_&]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:in-[p]:flex"
+    },
+    {
+      "className": "[p_&]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "in-[p]:flex!"
+    },
+    {
+      "className": "[.foo_&]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "in-[.foo]:flex"
+    },
+    {
+      "className": "focus:[.foo_&]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:in-[.foo]:flex"
+    },
+    {
+      "className": "[.foo_&]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "in-[.foo]:flex!"
+    },
+    {
+      "className": "[[data-visible]_&]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "in-data-visible:flex"
+    },
+    {
+      "className": "focus:[[data-visible]_&]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:in-data-visible:flex"
+    },
+    {
+      "className": "[[data-visible]_&]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "in-data-visible:flex!"
+    },
+    {
+      "className": "[[data-foo][data-bar]_&]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "[[data-foo][data-bar]_&]:flex"
+    },
+    {
+      "className": "focus:[[data-foo][data-bar]_&]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:[[data-foo][data-bar]_&]:flex"
+    },
+    {
+      "className": "[[data-foo][data-bar]_&]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "[[data-foo][data-bar]_&]:flex!"
+    },
+    {
+      "className": "[figure>&]:my-0",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "[figure>&]:my-0"
+    },
+    {
+      "className": "focus:[figure>&]:my-0",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:[figure>&]:my-0"
+    },
+    {
+      "className": "[figure>&]:my-0!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "[figure>&]:my-0!"
+    },
+    {
+      "className": "[&:nth-child(2)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-2:flex"
+    },
+    {
+      "className": "focus:[&:nth-child(2)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-2:flex"
+    },
+    {
+      "className": "[&:nth-child(2)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-2:flex!"
+    },
+    {
+      "className": "[&:not(:nth-child(2))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-2:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-child(2))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-2:flex"
+    },
+    {
+      "className": "[&:not(:nth-child(2))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-2:flex!"
+    },
+    {
+      "className": "[&:nth-child(-n+3)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:nth-child(-n+3)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-[-n+3]:flex"
+    },
+    {
+      "className": "[&:nth-child(-n+3)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:not(:nth-child(-n+3))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-child(-n+3))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-[-n+3]:flex"
+    },
+    {
+      "className": "[&:not(:nth-child(-n+3))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:nth-child(-n_+_3)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:nth-child(-n_+_3)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-[-n+3]:flex"
+    },
+    {
+      "className": "[&:nth-child(-n_+_3)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:not(:nth-child(-n_+_3))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-child(-n_+_3))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-[-n+3]:flex"
+    },
+    {
+      "className": "[&:not(:nth-child(-n_+_3))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:nth-last-child(2)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-last-2:flex"
+    },
+    {
+      "className": "focus:[&:nth-last-child(2)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-last-2:flex"
+    },
+    {
+      "className": "[&:nth-last-child(2)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-last-2:flex!"
+    },
+    {
+      "className": "[&:not(:nth-last-child(2))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-last-2:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-last-child(2))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-last-2:flex"
+    },
+    {
+      "className": "[&:not(:nth-last-child(2))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-last-2:flex!"
+    },
+    {
+      "className": "[&:nth-last-child(-n+3)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:nth-last-child(-n+3)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "[&:nth-last-child(-n+3)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-last-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:not(:nth-last-child(-n+3))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-last-child(-n+3))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "[&:not(:nth-last-child(-n+3))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-last-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:nth-last-child(-n_+_3)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:nth-last-child(-n_+_3)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "[&:nth-last-child(-n_+_3)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "nth-last-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:not(:nth-last-child(-n_+_3))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-last-child(-n_+_3))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-nth-last-[-n+3]:flex"
+    },
+    {
+      "className": "[&:not(:nth-last-child(-n_+_3))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-nth-last-[-n+3]:flex!"
+    },
+    {
+      "className": "[&:nth-child(odd)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "odd:flex"
+    },
+    {
+      "className": "focus:[&:nth-child(odd)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:odd:flex"
+    },
+    {
+      "className": "[&:nth-child(odd)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "odd:flex!"
+    },
+    {
+      "className": "[&:not(:nth-child(odd))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "even:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-child(odd))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:even:flex"
+    },
+    {
+      "className": "[&:not(:nth-child(odd))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "even:flex!"
+    },
+    {
+      "className": "[&:nth-child(even)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "even:flex"
+    },
+    {
+      "className": "focus:[&:nth-child(even)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:even:flex"
+    },
+    {
+      "className": "[&:nth-child(even)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "even:flex!"
+    },
+    {
+      "className": "[&:not(:nth-child(even))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "odd:flex"
+    },
+    {
+      "className": "focus:[&:not(:nth-child(even))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:odd:flex"
+    },
+    {
+      "className": "[&:not(:nth-child(even))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "odd:flex!"
+    },
+    {
+      "className": "[[data-visible][data-dark]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "[[data-visible][data-dark]]:flex"
+    },
+    {
+      "className": "focus:[[data-visible][data-dark]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:[[data-visible][data-dark]]:flex"
+    },
+    {
+      "className": "[[data-visible][data-dark]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "[[data-visible][data-dark]]:flex!"
+    },
+    {
+      "className": "[:where([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "[:where([data-visible])]:flex"
+    },
+    {
+      "className": "focus:[:where([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:[:where([data-visible])]:flex"
+    },
+    {
+      "className": "[:where([data-visible])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "[:where([data-visible])]:flex!"
+    },
+    {
+      "className": "[[data-url*=\"example\"]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-[url*=\"example\"]:flex"
+    },
+    {
+      "className": "focus:[[data-url*=\"example\"]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-[url*=\"example\"]:flex"
+    },
+    {
+      "className": "[[data-url*=\"example\"]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-[url*=\"example\"]:flex!"
+    },
+    {
+      "className": "[[data-url$=\".com\"_i]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-[url$=\".com\"_i]:flex"
+    },
+    {
+      "className": "focus:[[data-url$=\".com\"_i]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-[url$=\".com\"_i]:flex"
+    },
+    {
+      "className": "[[data-url$=\".com\"_i]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-[url$=\".com\"_i]:flex!"
+    },
+    {
+      "className": "[[data-url$=.com_i]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-[url$=.com_i]:flex"
+    },
+    {
+      "className": "focus:[[data-url$=.com_i]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-[url$=.com_i]:flex"
+    },
+    {
+      "className": "[[data-url$=.com_i]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-[url$=.com_i]:flex!"
+    },
+    {
+      "className": "[&:is([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "data-visible:flex"
+    },
+    {
+      "className": "focus:[&:is([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:data-visible:flex"
+    },
+    {
+      "className": "[&:is([data-visible])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "data-visible:flex!"
+    },
+    {
+      "className": "[@media(pointer:fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "pointer-fine:flex"
+    },
+    {
+      "className": "focus:[@media(pointer:fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:pointer-fine:flex"
+    },
+    {
+      "className": "[@media(pointer:fine)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "pointer-fine:flex!"
+    },
+    {
+      "className": "[@media_(pointer_:_fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "pointer-fine:flex"
+    },
+    {
+      "className": "focus:[@media_(pointer_:_fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:pointer-fine:flex"
+    },
+    {
+      "className": "[@media_(pointer_:_fine)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "pointer-fine:flex!"
+    },
+    {
+      "className": "[@media_not_(pointer_:_fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-pointer-fine:flex"
+    },
+    {
+      "className": "focus:[@media_not_(pointer_:_fine)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-pointer-fine:flex"
+    },
+    {
+      "className": "[@media_not_(pointer_:_fine)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-pointer-fine:flex!"
+    },
+    {
+      "className": "[@media_print]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "print:flex"
+    },
+    {
+      "className": "focus:[@media_print]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:print:flex"
+    },
+    {
+      "className": "[@media_print]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "print:flex!"
+    },
+    {
+      "className": "[@media_not_print]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-print:flex"
+    },
+    {
+      "className": "focus:[@media_not_print]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-print:flex"
+    },
+    {
+      "className": "[@media_not_print]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-print:flex!"
+    },
+    {
+      "className": "[@media_not_(prefers-color-scheme:dark)]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "not-dark:flex"
+    },
+    {
+      "className": "focus:[@media_not_(prefers-color-scheme:dark)]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:not-dark:flex"
+    },
+    {
+      "className": "[@media_not_(prefers-color-scheme:dark)]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "not-dark:flex!"
+    },
+    {
+      "className": "has-[[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-data-visible:flex"
+    },
+    {
+      "className": "focus:has-[[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-data-visible:flex"
+    },
+    {
+      "className": "has-[[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-data-visible:flex!"
+    },
+    {
+      "className": "has-[&:is([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-data-visible:flex"
+    },
+    {
+      "className": "focus:has-[&:is([data-visible])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-data-visible:flex"
+    },
+    {
+      "className": "has-[&:is([data-visible])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-data-visible:flex!"
+    },
+    {
+      "className": "has-[&>[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-[&>[data-visible]]:flex"
+    },
+    {
+      "className": "focus:has-[&>[data-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-[&>[data-visible]]:flex"
+    },
+    {
+      "className": "has-[&>[data-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-[&>[data-visible]]:flex!"
+    },
+    {
+      "className": "has-[[data-slot=description]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-data-[slot=description]:flex"
+    },
+    {
+      "className": "focus:has-[[data-slot=description]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-data-[slot=description]:flex"
+    },
+    {
+      "className": "has-[[data-slot=description]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-data-[slot=description]:flex!"
+    },
+    {
+      "className": "has-[&:is([data-slot=description])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-data-[slot=description]:flex"
+    },
+    {
+      "className": "focus:has-[&:is([data-slot=description])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-data-[slot=description]:flex"
+    },
+    {
+      "className": "has-[&:is([data-slot=description])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-data-[slot=description]:flex!"
+    },
+    {
+      "className": "has-[[aria-visible=\"true\"]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-aria-visible:flex"
+    },
+    {
+      "className": "focus:has-[[aria-visible=\"true\"]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-aria-visible:flex"
+    },
+    {
+      "className": "has-[[aria-visible=\"true\"]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-aria-visible:flex!"
+    },
+    {
+      "className": "has-[[aria-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-aria-[visible]:flex"
+    },
+    {
+      "className": "focus:has-[[aria-visible]]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-aria-[visible]:flex"
+    },
+    {
+      "className": "has-[[aria-visible]]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-aria-[visible]:flex!"
+    },
+    {
+      "className": "has-[&:not(:nth-child(even))]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-odd:flex"
+    },
+    {
+      "className": "focus:has-[&:not(:nth-child(even))]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-odd:flex"
+    },
+    {
+      "className": "has-[&:not(:nth-child(even))]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-odd:flex!"
+    },
+    {
+      "className": "[&:has([role=checkbox])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-[[role=checkbox]]:flex"
+    },
+    {
+      "className": "focus:[&:has([role=checkbox])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-[[role=checkbox]]:flex"
+    },
+    {
+      "className": "[&:has([role=checkbox])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-[[role=checkbox]]:flex!"
+    },
+    {
+      "className": "[&:has([aria-visible=\"true\"])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-aria-visible:flex"
+    },
+    {
+      "className": "focus:[&:has([aria-visible=\"true\"])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-aria-visible:flex"
+    },
+    {
+      "className": "[&:has([aria-visible=\"true\"])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-aria-visible:flex!"
+    },
+    {
+      "className": "[&:has([data-slot=description])]:flex",
+      "origin": "upstream: modernize arbitrary variants",
+      "canonical": "has-data-[slot=description]:flex"
+    },
+    {
+      "className": "focus:[&:has([data-slot=description])]:flex",
+      "origin": "upstream: modernize arbitrary variants, with-variant",
+      "canonical": "focus:has-data-[slot=description]:flex"
+    },
+    {
+      "className": "[&:has([data-slot=description])]:flex!",
+      "origin": "upstream: modernize arbitrary variants, important",
+      "canonical": "has-data-[slot=description]:flex!"
+    },
+    {
+      "className": "border-y-(--color-border-informative)",
+      "origin": "consumer",
+      "canonical": "border-y-(--color-border-informative)"
+    },
+    {
+      "className": "border-t-(--color-border-informative)",
+      "origin": "consumer",
+      "canonical": "border-t-(--color-border-informative)"
+    },
+    {
+      "className": "border-b-(--color-border-informative)",
+      "origin": "consumer",
+      "canonical": "border-b-(--color-border-informative)"
+    },
+    {
+      "className": "start-0",
+      "origin": "consumer",
+      "canonical": "inset-s-0"
+    },
+    {
+      "className": "end-0",
+      "origin": "consumer",
+      "canonical": "inset-e-0"
+    },
+    {
+      "className": "data-[state=selected]:[&>*]:[--table-pinned-background:var(--color-background--2)]",
+      "origin": "consumer",
+      "canonical": "data-[state=selected]:*:[--table-pinned-background:var(--color-background--2)]"
+    },
+    {
+      "className": "[&>*]:border-b",
+      "origin": "consumer",
+      "canonical": "*:border-b"
+    },
+    {
+      "className": "[&>[data-dot=true]]:!bg-red-600",
+      "origin": "consumer",
+      "canonical": "*:data-[dot=true]:bg-red-600!"
+    },
+    {
+      "className": "ring-(--color-content-1)",
+      "origin": "consumer",
+      "canonical": "ring-(--color-content-1)"
+    },
+    {
+      "className": "ring-(--color-background-negative)",
+      "origin": "consumer",
+      "canonical": "ring-(--color-background-negative)"
+    },
+    {
+      "className": "text-(--color-border-0)",
+      "origin": "consumer",
+      "canonical": "text-(--color-border-0)"
+    },
+    {
+      "className": "border-(--color-content-1)",
+      "origin": "consumer",
+      "canonical": "border-(--color-content-1)"
+    },
+    {
+      "className": "bg-(--color-content-1)",
+      "origin": "consumer",
+      "canonical": "bg-(--color-content-1)"
+    },
+    {
+      "className": "bg-(--color-border-0)",
+      "origin": "consumer",
+      "canonical": "bg-(--color-border-0)"
+    },
+    {
+      "className": "bg-(--color-blue-500)",
+      "origin": "consumer",
+      "canonical": "bg-blue-500"
+    },
+    {
+      "className": "ring-(--color-blue-500)",
+      "origin": "consumer",
+      "canonical": "ring-blue-500"
+    },
+    {
+      "className": "bg-[var(--table-pinned-background)]",
+      "origin": "consumer",
+      "canonical": "bg-(--table-pinned-background)"
+    },
+    {
+      "className": "!outline",
+      "origin": "consumer",
+      "canonical": "outline!"
+    },
+    {
+      "className": "md:max-w-[32rem]",
+      "origin": "consumer",
+      "canonical": "md:max-w-lg"
+    },
+    {
+      "className": "max-w-[45.5rem]",
+      "origin": "consumer",
+      "canonical": "max-w-182"
+    },
+    {
+      "className": "z-[60]",
+      "origin": "consumer",
+      "canonical": "z-60"
+    },
+    {
+      "className": "z-[1]",
+      "origin": "consumer",
+      "canonical": "z-1"
+    },
+    {
+      "className": "has-[&>*]:flex",
+      "origin": "consumer",
+      "canonical": "has-*:flex"
+    },
+    {
+      "className": "bg-[#123456]",
+      "origin": "clean",
+      "canonical": "bg-[#123456]"
+    },
+    {
+      "className": "bg-(--not-a-theme-key)",
+      "origin": "clean",
+      "canonical": "bg-(--not-a-theme-key)"
+    },
+    {
+      "className": "ring-[3px]",
+      "origin": "clean",
+      "canonical": "ring-[3px]"
+    },
+    {
+      "className": "w-[17px]",
+      "origin": "clean",
+      "canonical": "w-[17px]"
+    },
+    {
+      "className": "justify-end",
+      "origin": "clean",
+      "canonical": "justify-end"
+    },
+    {
+      "className": "self-end",
+      "origin": "clean",
+      "canonical": "self-end"
+    },
+    {
+      "className": "items-end",
+      "origin": "clean",
+      "canonical": "items-end"
+    },
+    {
+      "className": "snap-end",
+      "origin": "clean",
+      "canonical": "snap-end"
+    },
+    {
+      "className": "rounded-e-md",
+      "origin": "clean",
+      "canonical": "rounded-e-md"
+    },
+    {
+      "className": "[&>*_p]:flex",
+      "origin": "clean",
+      "canonical": "[&>*_p]:flex"
+    },
+    {
+      "className": "[&>*:hover]:flex",
+      "origin": "clean",
+      "canonical": "[&>*:hover]:flex"
+    },
+    {
+      "className": "[&_p]:flex",
+      "origin": "clean",
+      "canonical": "[&_p]:flex"
+    },
+    {
+      "className": "*:flex",
+      "origin": "clean",
+      "canonical": "*:flex"
+    },
+    {
+      "className": "inset-e-0",
+      "origin": "clean",
+      "canonical": "inset-e-0"
+    },
+    {
+      "className": "inset-s-4",
+      "origin": "clean",
+      "canonical": "inset-s-4"
+    },
+    {
+      "className": "bg-red-500",
+      "origin": "clean",
+      "canonical": "bg-red-500"
+    },
+    {
+      "className": "px-4",
+      "origin": "clean",
+      "canonical": "px-4"
+    }
+  ]
+}

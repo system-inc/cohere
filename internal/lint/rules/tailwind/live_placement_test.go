@@ -112,7 +112,7 @@ func livePlacementSystem(t *testing.T, spelling string) DesignSystemResult {
 	if err != nil {
 		return DesignSystemResult{Err: err}
 	}
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+	return loadedDesignSystemResult(system, entryPoint)
 }
 
 // TestUnknownClassesPlacesEveryCorpusClass is `no-unknown-classes`'s population measurement.
