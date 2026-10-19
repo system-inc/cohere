@@ -112,18 +112,14 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 		{"Vars segment", "const themeVars = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Var segment", "const themeVarName = 1;\n", []string{"abbreviatedWordSegment"}},
 
-		// A bare `queryFn` variable still fires; only the object-literal key is exempt. It lands on
+		// A bare `queryFn` variable fires. It lands on
 		// the `Fn` suffix branch rather than the `fn` prefix one, which is the order the original
 		// runs them in and the message a reader of `queryFn` needs: the repair is a role name.
 		{"bare queryFn", "const queryFn = () => 1;\n", []string{"abbreviatedSuffix"}},
 		{"bare mutationFn", "const mutationFn = () => 1;\n", []string{"abbreviatedSuffix"}},
 
-		// A destructure binds a name this file owns, unlike an object-literal key.
+		// A destructure binds a name this file owns.
 		{"destructured binding", "const { props } = source;\n", []string{"abbreviatedIdentifier"}},
-
-		// `this.props` is ours: the declaration is a class property no member check protects, so a
-		// blind skip renames the declaration and leaves every read pointing at the old name.
-		{"this member read", "class Thing {\n    read() {\n        return this.props;\n    }\n}\n", []string{"abbreviatedIdentifier"}},
 
 		// Every reference reports, not just the declaration.
 		{"declaration and reference", "const idx = 0;\nuse(idx);\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
@@ -191,7 +187,6 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 		// Names somebody else chose. Renaming any of these changes what the code reaches for.
 		{"a property read", "const value = thing.props;\n"},
 		{"a chained property read", "const value = thing.config.idx;\n"},
-		{"an object literal key", "const options = { config: 1, idx: 2 };\n"},
 		{"an import specifier", "import { config } from 'external';\n"},
 		{"a namespace import", "import * as config from 'external';\n"},
 		{"a default import", "import params from 'external';\n"},
@@ -229,11 +224,8 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 		{"a spread of a rest parameter", "function forward(...args: unknown[]) {\n    return target(...args);\n}\n"},
 		{"a use of a destructured rest", "const [first, ...args] = source;\nuse(first, args);\n"},
 		{"two rests in one file", "function run(...args: string[]) {\n    use(args);\n}\nconst other = (...args: number[]) => args.length;\n"},
-		{"queryFn as an object key", "const query = { queryFn: load, mutationFn: save };\n"},
 
-		// React 19 made `ref` a regular property, so the canonical spelling is load-bearing.
-		{"a ref interface member", "interface ThingProperties {\n    ref?: Reference;\n}\n"},
-		{"a ref shorthand", "const forwarded = { ref };\n"},
+		// A destructured ref forwarded to React retains its binding exemption.
 		{"a destructured ref forwarded onward", "export const Thing = ({ ref }) => <Child ref={ref} />;\n"},
 	}
 	for _, testCase := range cases {
@@ -575,7 +567,6 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 
 	cases := []struct{ name, sourceText string }{
 		{"a property read", "const value = thing.maxAgentsBytes;\n"},
-		{"an object literal key", "const options = { maxAgentsBytes: 1 };\n"},
 		{"an import specifier", "import { maxAgentsBytes } from 'external';\n"},
 		{"a namespace import", "import * as maxAgentsBytes from 'external';\n"},
 	}
@@ -680,6 +671,123 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 				return
 			}
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// Typed ownership fixtures use the same spelling on both sides of each boundary.
+// #nweav21 controls (go test ./internal/lint/rules/nexus -run
+// ^TestConsistencyNoAbbreviatedIdentifierOwnedProperties$): old code fails 30/63; skipping all
+// owned properties fails 34/63; ignoring ownership fails 29/63. Appending a maxAgentsBytes
+// binding to each subject fails all 63/63, including every silent fixture.
+// Exact spans ensure a contextual literal is silent while its declaration reports once.
+// The setup path preserves our tsconfig: the cached harness forces every source file into a
+// module, which would prevent the global interface-merging fixture from actually merging.
+func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, source string
+		want         int
+	}{
+		{"own ref property", `interface Session { ref: unknown; params: unknown; config: unknown; args: unknown; maxDuration: number } function forward(...args: unknown[]) {}`, 5},
+		{"own queryFn property", `const session = { queryFn: () => 500 };`, 1},
+		{"interface property", `interface Session { durationMs: number }`, 1},
+		{"type property", `type Session = { durationMs: number }`, 1},
+		{"interface method", `interface Session { durationMs(): number }`, 1},
+		{"class property", `class Session { durationMs = 500 }`, 1},
+		{"class method", `class Session { durationMs() { return 500 } }`, 1},
+		{"class accessor", `class Session { get durationMs() { return 500 } }`, 1},
+		{"own literal", `const session = { durationMs: 500 };`, 1},
+		{"literal method", `const session = { durationMs() { return 500 } };`, 1},
+		{"literal accessor", `const session = { get durationMs() { return 500 } };`, 1},
+		{"string interface key", `interface Session { "durationMs": number }`, 1},
+		{"string literal key", `const session = { "durationMs": 500 };`, 1},
+		{"index signature", `const session: { [key: string]: number } = { durationMs: 500 };`, 1},
+		{"Record", `const session: Record<string, number> = { durationMs: 500 };`, 1},
+		{"generic schema", `declare const Schema: { object<T>(shape: T): T }; const session = Schema.object({ durationMs: 500 });`, 1},
+		{"schema index", `declare const Schema: { object(shape: Record<string, unknown>): unknown }; const session = Schema.object({ durationMs: 500 });`, 1},
+		{"own interface contextual key", `interface Session { durationMs: number } const session: Session = { durationMs: 500 };`, 1},
+		{"own type contextual key", `type Session = { durationMs: number }; const session: Session = { durationMs: 500 };`, 1},
+		{"own satisfies key", `interface Session { durationMs: number } const session = { durationMs: 500 } satisfies Session;`, 1},
+		{"dependency contextual key", `import { Options } from 'wire'; const session: Options = { durationMs: 500 };`, 0},
+		{"dependency argument", `import { accept } from 'wire'; accept({ durationMs: 500 });`, 0},
+		{"dependency string key", `import { Options } from 'wire'; const session: Options = { "durationMs": 500 };`, 0},
+		{"dependency method", `import { Worker } from 'wire'; const session: Worker = { durationMs() { return 500 } };`, 0},
+		{"dependency override", `import { Base } from 'wire'; class Session extends Base { durationMs = 500 }`, 0},
+		{"dependency implementation", `import { Worker } from 'wire'; class Session implements Worker { durationMs() { return 500 } }`, 0},
+		{"transitive dependency override", `import { Base } from 'wire'; class Middle extends Base {} class Session extends Middle { durationMs = 500 }`, 0},
+		{"redeclared dependency override", `import { Base } from 'wire'; class Middle extends Base { durationMs = 100 } class Session extends Middle { durationMs = 500 }`, 0},
+		{"static does not implement instance contract", `import { Options } from 'wire'; class Session implements Options { durationMs = 100; static durationMs = 500 }`, 1},
+		{"generic constraint", `function define<T extends { durationMs: number }>(shape: T): T { return shape } const session = define({ durationMs: 500 });`, 1},
+		{"own inferred contextual key", `const defaults = { durationMs: 100 }; const session: typeof defaults = { durationMs: 500 };`, 1},
+
+		{"own override", `class Base { durationMs = 1 } class Session extends Base { durationMs = 500 }`, 2},
+		{"own implementation", `interface Worker { durationMs(): number } class Session implements Worker { durationMs() { return 500 } }`, 2},
+		{"module augmentation", `import 'wire'; declare module 'wire' { interface Options { durationMs: number } }`, 0},
+		{"global augmentation", `export {}; declare global { interface Window { durationMs: number } }`, 0},
+		{"merged foreign interface", `interface Host { durationMs: number }`, 0},
+		{"own namespace", `namespace Local { export interface Session { durationMs: number } }`, 1},
+		{"property read", `import { external } from 'wire'; const elapsed = external.durationMs;`, 0},
+		{"this property read", `class Session { read() { return this.durationMs; } }`, 0},
+		{"destructured key", `import { external } from 'wire'; const { durationMs: elapsed } = external;`, 0},
+		{"import name", `import { durationMs } from 'wire';`, 0},
+		{"JSX attribute", `declare const Widget: any; const element = <Widget durationMs={500} />;`, 0},
+		{"dependency source", `import { Options } from 'source-wire'; const session: Options = { durationMs: 500 };`, 0},
+		{"own imported declaration key", `import { Options } from './options'; const session: Options = { durationMs: 500 };`, 0},
+		{"local library declaration", `const session: Host = { durationMs: 500 };`, 0},
+		{"platform property", `class Session implements Pick<Math, 'max'> { max(...values: number[]) { return 500 } }`, 0},
+		{"union contextual key", `import { Options } from 'wire'; const session: Options | { value: number } = { durationMs: 500 };`, 0},
+		{"intersection contextual key", `import { Options } from 'wire'; const session: Options & { value: number } = { durationMs: 500, value: 1 };`, 0},
+		{"nested contextual key", `import { Options } from 'wire'; const session: { timer: Options } = { timer: { durationMs: 500 } };`, 0},
+		{"contextual return", `import { Options } from 'wire'; function create(): Options { return { durationMs: 500 }; }`, 0},
+		{"contextual assignment", `import { Options } from 'wire'; let session: Options; session = { durationMs: 500 };`, 0},
+		{"finite Record", `const session: Record<'durationMs', number> = { durationMs: 500 };`, 1},
+		{"class expression", `const Session = class { durationMs = 500 };`, 1},
+		{"dependency accessor", `import { Options } from 'wire'; class Session implements Options { get durationMs() { return 500 } }`, 0},
+		{"dependency static override", `import { StaticBase } from 'wire'; class Session extends StaticBase { static durationMs = 500 }`, 0},
+		{"own string class key", `class Session { "durationMs" = 500 }`, 1},
+		{"own imported spelling", `import { durationMs } from 'wire'; interface Session { durationMs: number }`, 1},
+
+		{"computed dependency declaration", `import { ComputedOptions } from 'wire'; const session: ComputedOptions = { durationMs: 500 };`, 0},
+		{"computed interface key", `interface Session { ['durationMs']: number }`, 1},
+		{"computed class key", `class Session { ['durationMs'] = 500 }`, 1},
+		{"computed literal key", `const session = { ['durationMs']: 500 };`, 1},
+		{"private class key", `class Session { #durationMs = 500; #idx = 0 }`, 2},
+
+		{"full names", `interface Session { durationInMilliseconds: number } class Timer { durationInMilliseconds = 500 } const session = { durationInMilliseconds: 500 };`, 0},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			fileName := "subject.tsx"
+			if testCase.name == "own ref property" {
+				fileName = "app/page.tsx"
+			}
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistencyNoAbbreviatedIdentifier, map[string]string{
+				fileName:                            testCase.source,
+				"tsconfig.json":                     `{ "compilerOptions": { "strict": true, "target": "ES2022", "lib": ["ES2022"], "types": [] }, "include": ["**/*.ts", "**/*.tsx"] }`,
+				"node_modules/wire/index.d.ts":      `export interface ComputedOptions { ['durationMs']: number } export interface Options { durationMs: number } export interface Worker { durationMs(): number } export class StaticBase { static durationMs: number } export class Base { durationMs: number } export const external: Options; export const durationMs: number; export function accept(options: Options): void;`,
+				"node_modules/source-wire/index.ts": `export interface Options { durationMs: number }`,
+				"options.ts":                        `export interface Options { durationMs: number }`,
+				"host.d.ts":                         `interface Host { durationMs: number }`,
+			}, fileName, ConsistencyNoAbbreviatedIdentifierOptions{
+				FrameworkParameterFilePatterns: []string{"app/page.tsx"},
+				FrameworkConstantFilePatterns:  []string{"app/page.tsx"},
+			}, func(string) {})
+			if len(result.Diagnostics) != testCase.want {
+				t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+			}
+			for _, diagnostic := range result.Diagnostics {
+				text := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if text != "durationMs" && text != `"durationMs"` && text != "ref" && text != "queryFn" && text != "'durationMs'" && text != "#durationMs" && text != "#idx" && text != "params" && text != "config" && text != "args" && text != "maxDuration" {
+					t.Errorf("finding at %q instead of the property declaration", text)
+				}
+			}
+			if strings.HasPrefix(testCase.name, "own ") && strings.Contains(testCase.name, "key") && strings.Contains(testCase.source, "const session") && len(result.Diagnostics) == 1 {
+				if result.Diagnostics[0].Range.Pos() >= strings.Index(result.SourceFile.Text(), "const session") {
+					t.Fatal("reported at literal instead of declaration")
+				}
+			}
 		})
 	}
 }
