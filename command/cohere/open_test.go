@@ -180,7 +180,11 @@ func TestOpenReport(t *testing.T) {
 func TestOpenDiscoveredProjects(t *testing.T) {
 	t.Parallel()
 	binary := buildCohere(t)
-	root := t.TempDir()
+	// cohere reports real paths, and on macOS the temp directory sits behind the /tmp symlink.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeTree(t, root, map[string]string{
 		"types/tsconfig.json":       `{"compilerOptions":{"strict":true,"noEmit":true},"include":["*.ts"]}`,
 		"types/CohereSettings.json": `{"rules":{}}`,
