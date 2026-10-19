@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
+	"github.com/system-inc/cohere/internal/gotypes"
 )
 
 /*
@@ -78,21 +78,11 @@ type optionReadFindings struct {
 // non-test file reads.
 func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionReadFindings {
 	t.Helper()
-	config := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
-		Dir:  moduleRoot,
-	}
-	loaded, err := packages.Load(config, patterns...)
-	if err != nil {
-		t.Fatalf("loading %v: %v", patterns, err)
-	}
-	if count := packages.PrintErrors(loaded); count > 0 {
-		t.Fatalf("%d errors loading %v, so the walk would read a partial tree", count, patterns)
-	}
+	loaded := loadRules(t, moduleRoot, patterns...)
 
 	// Every field an option decode reaches, by its declaring object.
 	fields := map[*types.Var]optionField{}
-	nonTestFiles := func(loadedPackage *packages.Package) []*ast.File {
+	nonTestFiles := func(loadedPackage *gotypes.Package) []*ast.File {
 		files := []*ast.File{}
 		for _, file := range loadedPackage.Syntax {
 			if !strings.HasSuffix(loadedPackage.Fset.Position(file.Pos()).Filename, "_test.go") {
@@ -102,7 +92,7 @@ func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, p
 		return files
 	}
 	for _, loadedPackage := range loaded {
-		if strings.Contains(loadedPackage.PkgPath, "/tools/") {
+		if strings.Contains(loadedPackage.ImportPath, "/tools/") {
 			continue
 		}
 		for _, file := range nonTestFiles(loadedPackage) {

@@ -18,13 +18,14 @@ import (
 // guardOverlay is the overlay the guards here read the rule packages through: the one GOFLAGS names, as
 // file path to contents, or nil when GOFLAGS names none.
 //
-// The guards load the rule packages with go/packages, which runs `go list` and then parses every file
-// itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
+// The guards load the rule packages with internal/gotypes, which runs `go list` and then parses every
+// file itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
 // stops there, and nothing in the binary can see it (measured: no build setting records it, and the
 // environment is untouched). So a guard run that way checked the working tree while the command line
 // said it checked the overlay, and two wrong "dispatch green" claims went through on it. GOFLAGS is
-// inherited by the test binary and by the `go list` go/packages starts, so `GOFLAGS=-overlay=x.json`
-// is the spelling every layer reads; this hands its contents to go/packages' own parser.
+// inherited by the test binary, so `GOFLAGS=-overlay=x.json` is the spelling it can read; this hands its
+// contents to the loader's own parser, which keeps the flag out of the go commands it runs, since go list
+// only answers for the files the loader reads anyway and a runner of prebuilt tests refuses it.
 //
 // The spelling that cannot work is refused rather than ignored, when it can be seen: on Unix the `go`
 // command that started this binary is asked for its arguments, and an -overlay there that GOFLAGS does
@@ -64,7 +65,7 @@ func guardOverlayFrom(t *testing.T, goFlags string) map[string][]byte {
 //
 // Paths must be absolute. The go command resolves a relative one against its own working directory, and
 // this binary runs in its package's directory and loads from the module root, so a relative path would
-// name a different file at each layer. A deleted file ("" as its replacement) is refused too: go/packages
+// name a different file at each layer. A deleted file ("" as its replacement) is refused too: the loader
 // can replace a file's contents but has no way to say a file is absent, so the guard would read it.
 func readOverlay(path string) (map[string][]byte, error) {
 	if !filepath.IsAbs(path) {
@@ -86,7 +87,7 @@ func readOverlay(path string) (map[string][]byte, error) {
 			return nil, fmt.Errorf("the overlay entry %s -> %s is relative; name both absolutely", target, replacement)
 		}
 		if replacement == "" {
-			return nil, fmt.Errorf("the overlay deletes %s, which go/packages cannot express, so the guard would still read it", target)
+			return nil, fmt.Errorf("the overlay deletes %s, which the loader cannot express, so the guard would still read it", target)
 		}
 		contents, err := os.ReadFile(replacement)
 		if err != nil {

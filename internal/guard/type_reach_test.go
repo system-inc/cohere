@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
+	"github.com/system-inc/cohere/internal/gotypes"
 )
 
 // A rule claims TypeReach Shapes only where nothing it can run reads into an imported function's body, and
@@ -104,15 +104,16 @@ var shapeReaders = map[string]bool{"rule.ExportNameIn": true, "rule.ImportBindin
 func TestShapeReadersHandBackNoSyntax(t *testing.T) {
 	t.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+	var rulePackage *gotypes.Package
+	for _, pkg := range lintPackages(t, guardOverlay(t)) {
+		if strings.HasSuffix(pkg.ImportPath, "/internal/lint/rule") {
+			rulePackage = pkg
+		}
 	}
-	loaded, err := packages.Load(&packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: root, Overlay: guardOverlay(t)}, "./internal/lint/rule")
-	if err != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
-		t.Fatalf("loading the rule package: %v %v", err, loaded)
+	if rulePackage == nil || rulePackage.Types == nil || len(rulePackage.Errors) > 0 {
+		t.Fatalf("loading the rule package: %v", rulePackage)
 	}
-	scope := loaded[0].Types.Scope()
+	scope := rulePackage.Types.Scope()
 	for name := range shapeReaders {
 		function, ok := scope.Lookup(strings.TrimPrefix(name, "rule.")).(*types.Func)
 		if !ok {
