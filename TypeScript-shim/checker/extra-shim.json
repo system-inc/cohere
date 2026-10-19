@@ -6,6 +6,8 @@
 	"ExtraMethods": {
 		"Checker": [
 			"getBaseConstraintOfType",
+			"getWriteTypeOfSymbol",
+			"getApplicableIndexInfo",
 			"getImmediateAliasedSymbol",
 			"resolveAlias",
 			"getDeclaredTypeOfSymbol",
