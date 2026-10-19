@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -262,7 +261,7 @@ func TestPrintConfigAliasesAndUnusedDisable(t *testing.T) {
 		"Base.json":           base,
 		"CohereSettings.json": settings,
 	})
-	read := func(file string) (map[string]string, map[string][]json.RawMessage) {
+	read := func(file string) (map[string]string, printedUnusedDisable) {
 		t.Helper()
 		command := exec.Command(binary, "--print-config", file)
 		command.Dir = root
@@ -271,31 +270,35 @@ func TestPrintConfigAliasesAndUnusedDisable(t *testing.T) {
 			t.Fatalf("print-config: %v\n%s", err, output)
 		}
 		var doc struct {
-			RuleAliases map[string]string
-			Rules       map[string][]json.RawMessage
+			RuleAliases   map[string]string
+			UnusedDisable *int `json:"unusedDisable"`
+			Rules         map[string][]json.RawMessage
 		}
 		if err := json.Unmarshal(output, &doc); err != nil {
 			t.Fatal(err)
 		}
-		return doc.RuleAliases, doc.Rules
+		return doc.RuleAliases, printedUnusedDisable{severity: doc.UnusedDisable, rules: doc.Rules}
 	}
-	checkSeverity := func(rules map[string][]json.RawMessage, want configuration.Severity) {
+	// unused-disable is printed on its own key, never among the rules, since --rules lists only registered
+	// rules and a parity check would read an entry there as a rule cohere has no implementation for.
+	checkSeverity := func(printed printedUnusedDisable, want configuration.Severity) {
 		t.Helper()
-		got := rules[configuration.UnusedDisable]
-		expected := []json.RawMessage{json.RawMessage(strconv.Itoa(int(want)))}
-		if !reflect.DeepEqual(got, expected) {
-			t.Errorf("unused-disable = %s, want %s", got, expected)
+		if printed.severity == nil || *printed.severity != int(want) {
+			t.Errorf("unusedDisable = %v, want %d", printed.severity, want)
+		}
+		if _, listed := printed.rules[configuration.UnusedDisable]; listed {
+			t.Errorf("unused-disable is listed among the rules, where --rules cannot answer for it")
 		}
 	}
 	aliases, rules := read("Thing.ts")
-	if aliases["@typescript-eslint/no-invalid-this"] != "no-invalid-this" || !reflect.DeepEqual(rules["@typescript-eslint/no-invalid-this"], rules["no-invalid-this"]) {
-		t.Errorf("inherited twin alias = %v, rules = %s / %s", aliases, rules["@typescript-eslint/no-invalid-this"], rules["no-invalid-this"])
+	if aliases["@typescript-eslint/no-invalid-this"] != "no-invalid-this" || !reflect.DeepEqual(rules.rules["@typescript-eslint/no-invalid-this"], rules.rules["no-invalid-this"]) {
+		t.Errorf("inherited twin alias = %v, rules = %s / %s", aliases, rules.rules["@typescript-eslint/no-invalid-this"], rules.rules["no-invalid-this"])
 	}
 	for _, absent := range []string{"nexus/require-await", "nexus/no-use-before-define", "nexus/logical-assignment-operators", "nexus/no-implicit-coercion", "nexus/max-classes-per-file", "nexus/no-debugger"} {
 		if _, ok := aliases[absent]; ok {
 			t.Errorf("unconfigured alias %s printed", absent)
 		}
-		if _, ok := rules[absent]; ok {
+		if _, ok := rules.rules[absent]; ok {
 			t.Errorf("unconfigured alias rule %s printed", absent)
 		}
 	}
@@ -330,7 +333,14 @@ func TestPrintConfigAliasesAndUnusedDisable(t *testing.T) {
 	if _, ok := aliases["@typescript-eslint/no-invalid-this"]; ok {
 		t.Errorf("removed twin still printed as alias: %v", aliases)
 	}
-	if _, ok := rules["@typescript-eslint/no-invalid-this"]; ok {
+	if _, ok := rules.rules["@typescript-eslint/no-invalid-this"]; ok {
 		t.Error("removed twin still printed in rules")
 	}
+}
+
+// printedUnusedDisable is what TestPrintConfigAliasesAndUnusedDisable reads back: the engine setting's own
+// key, and the rules it must stay out of.
+type printedUnusedDisable struct {
+	severity *int
+	rules    map[string][]json.RawMessage
 }

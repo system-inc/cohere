@@ -98,11 +98,16 @@ func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved c
 			Tsconfig   string              `json:"tsconfig"`
 			Globals    map[string][]string `json:"globals"`
 		} `json:"languageOptions"`
-		Overrides   []printedOverride            `json:"overrides"`
-		Departures  map[string]printedDeparture  `json:"departures"`
-		RuleAliases map[string]string            `json:"ruleAliases"`
-		Rules       map[string][]json.RawMessage `json:"rules"`
-	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: resolved.RuleAliases(registeredRuleNames()), Rules: resolvedConfigRules(resolved)}
+		Overrides   []printedOverride           `json:"overrides"`
+		Departures  map[string]printedDeparture `json:"departures"`
+		RuleAliases map[string]string           `json:"ruleAliases"`
+		// UnusedDisable is the engine's dead-directive check, set under `unused-disable` in a config's rules
+		// but not a registered rule, so it stands apart from Rules, which --rules can always answer for. It
+		// is ESLint's linterOptions.reportUnusedDisableDirectives, as a severity.
+		UnusedDisable int                          `json:"unusedDisable"`
+		Rules         map[string][]json.RawMessage `json:"rules"`
+	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: resolved.RuleAliases(registeredRuleNames()),
+		UnusedDisable: int(resolved.UnusedDisableSeverity()), Rules: resolvedConfigRules(resolved)}
 	document.LanguageOptions.SourceType = sourceType
 	document.LanguageOptions.Target = strings.ToLower(graph.Program.Options().GetEmitScriptTarget().String())
 	document.LanguageOptions.Tsconfig = graph.ConfigFileName
@@ -152,8 +157,8 @@ func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, reg
 	return settings, nil
 }
 
-// resolvedConfigRules preserves the registered-rule view, adds this file's alternate configuration
-// spellings, and asks the engine's resolver for unused-disable (which is not an AST registry rule).
+// resolvedConfigRules preserves the registered-rule view and adds this file's alternate configuration
+// spellings. Every name in it is a registered rule or reaches one.
 func resolvedConfigRules(resolved configuration.Resolved) map[string][]json.RawMessage {
 	rules := map[string][]json.RawMessage{}
 	for _, registered := range registry.All() {
@@ -176,6 +181,5 @@ func resolvedConfigRules(resolved configuration.Resolved) map[string][]json.RawM
 			rules[alias] = entry
 		}
 	}
-	rules[configuration.UnusedDisable] = []json.RawMessage{json.RawMessage(strconv.Itoa(int(resolved.UnusedDisableSeverity())))}
 	return rules
 }
