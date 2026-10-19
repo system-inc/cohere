@@ -1,0 +1,24 @@
+{
+    "rule": "adamic/union-write",
+    "firing": {
+        "file": "Case.ts",
+        "source": "function put(cell: { n: number } | { n: number | string }): void { cell.n = 'text'; }\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 68,
+                "endLine": 1,
+                "endColumn": 74,
+                "messageId": "unionWrite",
+                "message": "The slot `cell.n` cannot receive \"text\" through a union: member { n: number; } requires number. A write must fit the slot in every member. Narrow the receiver before writing, or use a value accepted by every member."
+            }
+        ]
+    },
+    "clean": {
+        "file": "Case.ts",
+        "source": "function put(cell: { n: number | string }): void { cell.n = 'text'; }\n"
+    },
+    "assertedMessageIds": [
+        "unionWrite"
+    ]
+}

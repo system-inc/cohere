@@ -20,6 +20,15 @@ func messageCanonicalCollapse(inputs []string, output string) rule.Message {
 	}
 }
 
+// messageCanonicalSingle is upstream's own `single` message, word for word, because better-tailwindcss
+// prints it and a project running both engines should read one finding the same way in each (#15swfzq).
+func messageCanonicalSingle(className string, canonical string) rule.Message {
+	return rule.Message{
+		Id:          "canonicalSingle",
+		Description: "The class: \"" + className + "\" can be simplified to \"" + canonical + "\".",
+	}
+}
+
 // EnforceCanonicalClassesOptions lets a project name the surfaces that carry class strings, and
 // exempt classes it does not want rewritten.
 type EnforceCanonicalClassesOptions struct {
@@ -31,8 +40,7 @@ type EnforceCanonicalClassesOptions struct {
 	// zero-finding run rather than a crash.
 	Ignore []string `json:"ignore"`
 	// Collapse is upstream's `collapse`, on by default: whether classes that merge into one are
-	// reported. Off, upstream still rewrites single classes, and so this rule, which reports only
-	// collapses (single-class rewrites are out of its scope, see below), reports nothing.
+	// reported. Off, upstream still reports a single class Tailwind rewrites, and so does this rule.
 	Collapse *bool `json:"collapse"`
 	// Logical is upstream's `logical`, on by default: whether the canonicalizer reads logical
 	// properties as their physical longhands when it compares classes. Off, the families that only
@@ -74,11 +82,22 @@ type EnforceCanonicalClassesOptions struct {
 // over-reports, so its failure is a finding that does not appear, which someone notices, rather than
 // noise on correct code, which is how a rule gets turned off.
 //
-// Single-class rewrites are also out of scope: `z-[1]` is `z-1` and `start-4` is `inset-s-4`, and
-// both are properties of one class rather than of a pair. The table deliberately excludes them,
-// because a generator that counted them as families reported 1,326 families including
-// `-bg-conic + -end => -inset-e`, where one class rewrote alone and the other was an unrelated
-// neighbour.
+// # One class at a time
+//
+// A class Tailwind rewrites on its own is reported too, in upstream's words and with its fix: `start-4`
+// is `inset-s-4`, `[&>*]:` is `*:`, `bg-[var(--a)]` is `bg-(--a)`. That is a separate question from the
+// pairs, answered by the Canonicalizer, a pass-by-pass port of `canonicalizeCandidates` for a single
+// class (#15swfzq), and kept out of the collapse table on purpose: a generator that counted one-class
+// rewrites as families reported 1,326 families including `-bg-conic + -end => -inset-e`, where one
+// class rewrote alone and the other was an unrelated neighbour.
+//
+// What it cannot see yet is named rather than implied. Of upstream's ten utility passes, the
+// Canonicalizer runs bgGradientToLinear and deprecatedUtilities; of its four variant passes,
+// modernizeArbitraryValuesVariant.
+// A class only an unported pass rewrites, such as `z-[1]` (arbitraryUtilities) or `flex-grow`
+// (bareValueUtilities), is not reported, and canonical_unported.json lists every such class on the
+// public theme and ahra by pass. The direction is the one this rule holds everywhere: a missing pass is
+// a finding that does not appear.
 //
 // # Why the preconditions are the whole rule
 //
@@ -122,11 +141,10 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		surfaces := DefaultClassLiteralSurfaces()
 		var ignore []string
-		collapse := canonicalCollapseOptions{logical: true}
+		collapse := canonicalCollapseOptions{enabled: true, logical: true}
 		if isConfigured {
-			if configured.Collapse != nil && !*configured.Collapse {
-				// Nothing this rule reports survives `collapse: false`, so it declines the file.
-				return nil
+			if configured.Collapse != nil {
+				collapse.enabled = *configured.Collapse
 			}
 			if configured.Logical != nil {
 				collapse.logical = *configured.Logical
@@ -137,10 +155,21 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		reader := surfaces.ReaderFor(ctx.FileCache)
 		ignored := compileIgnorePatterns(ignore)
+		// Every result that built carries its Canonicalizer, from loadedDesignSystemResult. One without it
+		// was put together by hand, and building one here would build a fresh memo for every file, the
+		// second build path design_system.go exists to refuse, so the rule declines as it does with no
+		// System.
+		if designSystem.Canonicalizer == nil {
+			return nil
+		}
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportCollapses(ctx, literal, ignored, designSystem, collapse)
+				var merged map[string]bool
+				if collapse.enabled {
+					merged = reportCollapses(ctx, literal, ignored, designSystem, collapse)
+				}
+				reportSingles(ctx, literal, ignored, designSystem.System, designSystem.Canonicalizer, merged)
 			}
 		}
 
@@ -198,7 +227,8 @@ func (c candidateParts) printedValue() string {
 	return c.Value
 }
 
-// reportCollapses finds mergeable sets in one literal and reports the shorter spelling.
+// reportCollapses finds mergeable sets in one literal and reports the shorter spelling, returning the
+// classes it reported as merged so reportSingles leaves them to this finding.
 //
 // Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
 // `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
@@ -209,11 +239,12 @@ func reportCollapses(
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
 	collapse canonicalCollapseOptions,
-) {
+) map[string]bool {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
-		return
+		return nil
 	}
+	reported := map[string]bool{}
 
 	remaining := make([]string, 0, len(classes))
 	seen := make(map[string]bool, len(classes))
@@ -232,10 +263,13 @@ func reportCollapses(
 	for pass := 0; pass < maximumPasses; pass++ {
 		inputs, output, didMerge := mergeOnce(remaining, designSystem, collapse)
 		if !didMerge {
-			return
+			return reported
 		}
 
 		ctx.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
+		for _, input := range inputs {
+			reported[input] = true
+		}
 
 		next := make([]string, 0, len(remaining))
 		merged := map[string]bool{inputs[0]: true, inputs[1]: true}
@@ -247,10 +281,79 @@ func reportCollapses(
 		}
 		remaining = append(next, output)
 	}
+	return reported
+}
+
+// reportSingles reports each class Tailwind rewrites on its own, at the literal, with a fix that rewrites
+// that class's own text and nothing else.
+//
+// Filtered as upstream filters before asking: an ignored class is not asked about, and neither is one the
+// design system cannot compile, which better-tailwindcss drops because Tailwind's canonicalizer crashes on
+// some of them. A class already reported as part of a collapse is left to that finding, since upstream
+// reports such a class once, under its `multiple` message.
+//
+// Every occurrence is reported, as upstream reports each one, and only the first gets the fix, for the
+// reason reportDeprecations gives: `no-duplicate-classes` deletes a repeat, and renaming the same bytes
+// would be refused as an overlap.
+func reportSingles(
+	ctx rule.Context,
+	literal ClassLiteral,
+	ignored []*ignorePattern,
+	system *tailwindengine.LoadedDesignSystem,
+	canonicalizer *tailwindengine.Canonicalizer,
+	merged map[string]bool,
+) {
+	classes := SplitClasses(literal.Text)
+	if len(classes) == 0 || system == nil {
+		return
+	}
+
+	var tokens []classToken
+	tokenized := false
+	if ctx.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	}
+	classTokens := classesOf(tokens)
+	if tokenized && len(classTokens) == len(classes) {
+		for index, token := range classTokens {
+			if token.Text != classes[index] {
+				tokenized = false
+				break
+			}
+		}
+	} else {
+		tokenized = false
+	}
+	// A literal holding a template hole is only partly known, so its classes are reported and its text is
+	// never rewritten from the fragments the reader saw.
+	canFix := tokenized && !strings.Contains(literal.Text, "${")
+
+	for index, className := range classes {
+		if merged[className] || isIgnored(className, ignored) || !classExistsIn(className, system) {
+			continue
+		}
+		canonical := canonicalizer.CanonicalizeClass(className)
+		if canonical == className {
+			continue
+		}
+
+		var fixes []rule.Fix
+		if canFix && !containsString(classes[:index], className) {
+			fixes = []rule.Fix{rule.ReplaceRange(classTokens[index].Range, canonical)}
+		}
+		ctx.Report(rule.Diagnostic{
+			Range:      literal.Range,
+			Message:    messageCanonicalSingle(className, canonical),
+			SourceFile: ctx.SourceFile,
+			Fixes:      fixes,
+		})
+	}
 }
 
 // canonicalCollapseOptions is what a collapse is allowed to use, from the rule's options.
 type canonicalCollapseOptions struct {
+	// enabled is upstream's `collapse`. Off, only single classes are reported.
+	enabled bool
 	// logical is upstream's `logical`: whether a family that merges only through the canonicalizer's
 	// logical-to-physical reading counts.
 	logical bool

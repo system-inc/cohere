@@ -359,6 +359,7 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 		"fade-in",
 	}
 
+	designSystem := loadedDesignSystemResult(system, "")
 	lostByShortcut := 0
 	for _, className := range realButUndeclared {
 		if !classExistsIn(className, system) {
@@ -367,7 +368,7 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 		}
 
 		// The shortcut: resolve through the property tables, as the other rules do.
-		if _, canResolve := resolveClassFactsIn(className, DesignSystemResult{System: system}); !canResolve {
+		if _, canResolve := resolveClassFactsIn(className, designSystem); !canResolve {
 			lostByShortcut++
 		}
 	}
