@@ -39,8 +39,9 @@ func unusedDisableRecords(t *testing.T, output string) ([]findingJSON, summaryJS
 	return findings, summary
 }
 
-// The CLI is the contract: warning-only directives neither fail lint nor --no-fix, even though
-// --fix removes them. Explicit error and off, and per-file overrides, are controls in both directions.
+// The CLI is the contract: a dead directive fails lint and --no-fix by default (#9137dhp), and
+// --fix removes it. Warning-only directives fail neither, though --fix still removes them. Explicit
+// warn, error and off, and per-file overrides, are controls in both directions.
 func TestUnusedDisableSeverity(t *testing.T) {
 	t.Parallel()
 	binary := buildCohere(t)
@@ -48,7 +49,7 @@ func TestUnusedDisableSeverity(t *testing.T) {
 		name, level, override, wantSeverity string
 		wantExit                            int
 	}{
-		{"default", "", "", "warn", 0},
+		{"default", "", "", "error", 1},
 		{"warn", "warn", "", "warn", 0},
 		{"error", "error", "", "error", 1},
 		{"off", "off", "", "", 0},
@@ -96,6 +97,17 @@ func TestUnusedDisableSeverity(t *testing.T) {
 				}
 				if count != want {
 					t.Fatalf("%s reported %d unused directives, want %d", mode, count, want)
+				}
+				// At error the check does not withhold the repair: --no-fix names the file --fix would
+				// rewrite. At warn it does, which the unexpected-finding test above already holds.
+				if mode == "--no-fix" && fixture.wantSeverity == "error" {
+					wouldChange := false
+					for _, finding := range findings {
+						wouldChange = wouldChange || finding.Rule == "fix" && strings.HasSuffix(finding.Path, "source/a.ts")
+					}
+					if !wouldChange {
+						t.Fatalf("--no-fix withheld the repair at error:\n%s", output)
+					}
 				}
 				bytes, err := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
 				if err != nil {

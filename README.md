@@ -166,17 +166,18 @@ until a matching `/* cohere-enable rule-name */` or the end of the file. Comma-s
 suppress multiple rules, and omitting names suppresses every rule. The equivalent `eslint-`
 spellings also work.
 
-A directive that silences nothing while its named rules ran reports as `unused-disable`, a
-**warning by default**. It does not fail `--lint` or `--no-fix`; `--fix` removes the comment,
-or only its dead names, preserving live and unselected names and the reason. Configure its
-severity in `CohereSettings.json`, including in file overrides:
+A directive that silences nothing while its named rules ran reports as `unused-disable`, an
+**error by default**. It fails `--lint` and `--no-fix`, and `--no-fix` shows its repair as a
+change it would make; `--fix` removes the comment, or only its dead names, preserving live and
+unselected names and the reason. Configure its severity in `CohereSettings.json`, including in
+file overrides:
 
 ```json
 { "rules": { "unused-disable": "warn" } }
 ```
 
-Use `"error"` to fail the run on dead directives, or `"off"` to disable both their findings
-and their fixes. The coverage count remains visible when reporting is off. `unused-disable`
+Use `"warn"` to report dead directives without failing the run, as ESLint does by default, or
+`"off"` to disable both their findings and their fixes. The coverage count remains visible when reporting is off. `unused-disable`
 is an engine check, so it is configurable without being an entry in `cohere --rules`.
 
 ## Flags

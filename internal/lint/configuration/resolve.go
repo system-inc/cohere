@@ -383,10 +383,12 @@ func (c *Config) relativePath(path string) string {
 // UnusedDisable is an engine diagnostic configured in rules, not an AST rule in the registry.
 const UnusedDisable = "unused-disable"
 
-// UnusedDisableSeverity honors file overrides and defaults to ESLint's warning severity.
+// UnusedDisableSeverity honors file overrides and defaults to error, so a dead directive fails the run
+// the way a finding does (#9137dhp, Kirk's call). warn, which reports without failing, and off stay
+// settable; ESLint's own default is warn, so a project that wants its parity sets it.
 func (r Resolved) UnusedDisableSeverity() Severity {
 	if setting, configured := r.Rules[UnusedDisable]; configured {
 		return setting.Severity
 	}
-	return SeverityWarn
+	return SeverityError
 }

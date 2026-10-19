@@ -80,7 +80,7 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 }
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
-// its file. Unnamed rules report as errors; the unused-disable engine diagnostic defaults to warn.
+// its file. Unnamed rules report as errors, and so does the unused-disable engine diagnostic by default.
 func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) runFinding {
 	finding := runFinding{
 		Severity:  "error",
