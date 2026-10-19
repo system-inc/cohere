@@ -14,7 +14,11 @@ import (
 type canonicalSinglesFixture struct {
 	TailwindVersion string `json:"tailwindVersion"`
 	EntryPoint      string `json:"entryPoint"`
-	Cases           []struct {
+	Options         struct {
+		Collapse          bool `json:"collapse"`
+		LogicalToPhysical bool `json:"logicalToPhysical"`
+	} `json:"options"`
+	Cases []struct {
 		ClassName string `json:"className"`
 		Origin    string `json:"origin"`
 		Canonical string `json:"canonical"`
@@ -56,7 +60,8 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 			}
 		}
 
-		canonicalizer := NewCanonicalizer(oracleSystem(t, fixture.EntryPoint))
+		canonicalizer := NewCanonicalizer(oracleSystem(t, fixture.EntryPoint)).
+			WithFeatures(SignatureFeaturesFor(fixture.Options.Collapse, fixture.Options.LogicalToPhysical))
 
 		agreed, rewrites, silent := 0, 0, map[string][]string{}
 		var unlisted []string

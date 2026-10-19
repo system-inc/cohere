@@ -1,0 +1,29 @@
+/*
+ * The shapes BuildClassList handles that no real theme in the corpus writes (#15swfzq unit 1b): a
+ * legacy numeric key, a repository `@utility` offering quoted literals, one offering the spacing scale
+ * through `--spacing(--value(integer))` and `--spacing(--modifier(number))`, and two statics a
+ * repository redeclares, one the framework offers and one it no longer does.
+ */
+@import "tailwindcss";
+
+@theme {
+    --spacing-2_5: 0.625rem;
+    --tab-size-github: 8;
+}
+
+@utility tab-* {
+    tab-size: --value(--tab-size-*, 'tight', "loose");
+}
+
+@utility gutter-* {
+    padding: --spacing(--value(integer));
+    margin: --spacing(--modifier(number));
+}
+
+@utility flex {
+    display: flex;
+}
+
+@utility break-words {
+    overflow-wrap: break-word;
+}

@@ -71,12 +71,16 @@
             "usage": "leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only"
         },
         {
+            "name": "open",
+            "usage": "open files with remaining findings in code after the run (composes with --types and --lint)"
+        },
+        {
             "name": "phases",
             "usage": "put where the time went first in the footer's parentheses"
         },
         {
             "name": "print-config",
-            "usage": "print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit"
+            "usage": "print resolved rules, registered settings, language options and matching overrides as JSON for one file (the path given, else index.ts at the project root), and exit; globals name their TypeScript declaration files; ESLint plugin package versions, parser names and settings.react have no cohere meaning (settings.react is refused)"
         },
         {
             "name": "profile",

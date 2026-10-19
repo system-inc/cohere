@@ -3,11 +3,11 @@
   "entryPoint": "ahra:app/_theme/styles/theme.css",
   "harvested": "ahra:",
   "options": {
-    "collapse": false,
+    "collapse": true,
     "logicalToPhysical": true
   },
   "groundTruth": "canonicalizeCandidates([className], options), one class at a time",
-  "unknownCount": 590520,
+  "unknownCount": 590667,
   "caseCount": 2798,
   "rewriteCount": 477,
   "cases": [

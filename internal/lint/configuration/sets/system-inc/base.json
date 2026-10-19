@@ -10,6 +10,7 @@
         "adamic/no-optional-widening": "cohere:adamic turns it on, and our code has 401 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#aaajpke). Outsiders get it on.",
         "adamic/no-type-predicate": "cohere:adamic turns it on, and our code has 155 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#05k4swm). Outsiders get it on.",
         "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 1,340 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). Outsiders get it on.",
+        "adamic/no-void-widening": "cohere:adamic turns it on, and our code has 23 findings in api-phi-health at cohere cf0a4b7f, so it is off here until its fix wave reads 0 in every consumer (#zqe5fv4). Outsiders get it on.",
         "adamic/nominal-class": "cohere:adamic turns it on, and our code has 1,396 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#zeqjfyx). Outsiders get it on.",
         "adamic/single-spread": "cohere:adamic turns it on, and our code has 232 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#hzk757e). Outsiders get it on.",
         "no-restricted-globals": "Adds Buffer to the house list: our code runs on Cloudflare Workers, where @cloudflare/workers-types declares Buffer as any, and @nexus/source/encoding/ByteEncoding replaces it. Every other entry is cohere:typescript's.",
@@ -35,9 +36,11 @@
         "adamic/no-optional-widening": "off",
         "adamic/no-type-predicate": "off",
         "adamic/no-unchecked-cast": "off",
+        "adamic/no-void-widening": "off",
         "adamic/nominal-class": "off",
         "adamic/single-spread": "off",
         "nexus/boundary-no-nexus-outside-import": "error",
+        "nexus/import-no-forbidden-source": "error",
         "no-restricted-properties": [
             "error",
             {

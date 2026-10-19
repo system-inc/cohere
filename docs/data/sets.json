@@ -1,7 +1,7 @@
 [
     {
         "name": "cohere:adamic",
-        "rulesOn": 37,
+        "rulesOn": 38,
         "rules": [
             {
                 "name": "@typescript-eslint/ban-ts-comment",
@@ -84,6 +84,10 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-void-widening",
                 "severity": "error"
             },
             {
@@ -172,7 +176,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 301,
+        "rulesOn": 302,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -716,6 +720,10 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-void-widening",
                 "severity": "error"
             },
             {
@@ -1713,7 +1721,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 366,
+        "rulesOn": 367,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2169,6 +2177,10 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-void-widening",
                 "severity": "error"
             },
             {
@@ -4258,7 +4270,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 290,
+        "rulesOn": 291,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4815,6 +4827,10 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "off"
             },
@@ -5249,6 +5265,10 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -6517,6 +6537,10 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-void-widening",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/nominal-class",
                 "severity": "off"
             },
@@ -7767,7 +7791,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 290,
+        "rulesOn": 291,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8223,6 +8247,10 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-void-widening",
                 "severity": "error"
             },
             {
@@ -9247,7 +9275,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 278,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9703,6 +9731,10 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-void-widening",
                 "severity": "error"
             },
             {

@@ -431,6 +431,9 @@
                 "adamic/no-unchecked-cast": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "adamic/no-void-widening": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "adamic/nominal-class": {
                     "$ref": "#/$defs/ruleSetting"
                 },

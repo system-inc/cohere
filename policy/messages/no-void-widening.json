@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/no-void-widening" },
+  "messages": {
+    "voidWidening": {
+      "text": "The return value in {{slot}} cannot be read as {{target}} from {{source}}: void may hide an arbitrary returned value, which the wider type lets a caller read unchecked. Keep the void type or declare the actual return value."
+    }
+  }
+}

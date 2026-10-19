@@ -48,6 +48,24 @@ import (
 //	utilityCanonicalizations         2   its UTILITY_CANONICALIZATIONS, in order, holding the passes
 //	                                     ported so far; canonical_unported.json counts the rest
 //	variantCanonicalizations         1   its VARIANT_CANONICALIZATIONS, the same way
+//	FrameworkSuggestions           237   each functional root's `suggest` recipe: literals, theme
+//	                                     namespaces and flags, never keys. Probed from the engine by
+//	                                     generate_suggestions and held, through BuildClassList, to
+//	                                     `getClassList()` on four themes
+//	FrameworkStaticSuggested       890   every static the registry holds, and whether its `suggest`
+//	                                     offers it
+//	DefaultSpacingSuggestions       34   utilities.ts's DEFAULT_SPACING_SUGGESTIONS
+//	SuggestedFractions              26   the fractions its `suggest` appends
+//	FrameworkStaticNested           15   the statics whose compiled body nests a rule or an at-rule,
+//	                                     which the flat statics table loses, so a signature declines
+//	FrameworkRootProperties        315   every property a functional root's classes declare in a
+//	                                     signature, by arm, probed from the engine; the bound a class
+//	                                     this port cannot compile is held to, checked class by class
+//	                                     on three themes
+//	signatureVariadicExpansions     11   expand-declaration.ts's VARIADIC_EXPANSION_MAP
+//	signatureVariadicLogicalExpansions
+//	                                10   its VARIADIC_LOGICAL_EXPANSION_MAP
+//	signatureLogicalExpansions       8   its LOGICAL_EXPANSION_MAP
 //
 // # Ours, each answering something a reading cannot
 //
@@ -68,6 +86,12 @@ import (
 //	                              from the same value. An emitter answers every type it is asked and
 //	                              so cannot rank them; see
 //	                              TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt.
+//	signatureValueUnportedRoots
+//	                         32   the roots whose emitter writes a value where upstream wraps it in an
+//	                              expression this port does not hold, `blur(8px)` and `span 2 / span 2`
+//	                              among them. A signature answers unknown for them rather than a string
+//	                              that differs from upstream's. Measured: every other root's signature
+//	                              agreed with upstream's on all three themes the differential reads.
 //	CollapseFamilies         45   which pairs canonicalize into a third root. Upstream does ship
 //	                              shorthand data, which this entry used to deny: two maps keyed on
 //	                              CSS property, `padding-inline: [padding-left, padding-right]` and
@@ -101,6 +125,11 @@ import (
 // tables together and buy nothing: the differential holds at 95,931 answered with 17 disagreements,
 // all named and tested.
 //
+// Unit 1b of #15swfzq needed signatures, which are values, and did not reopen this. It compiles a class
+// exactly only where an emitter already writes upstream's value, substitutes `--spacing()` the way
+// css-functions.ts does, and answers unknown everywhere else; signatureValueUnportedRoots is where that
+// line falls, and the signature differential is what drew it.
+//
 // # What this test actually asserts
 //
 // The counts, so a table growing or shrinking without its reason being revisited fails here. The
@@ -128,10 +157,20 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"gradientDirections":                 len(gradientDirections),
 		"utilityCanonicalizations":           len(utilityCanonicalizations),
 		"variantCanonicalizations":           len(variantCanonicalizations),
+		"FrameworkSuggestions":               len(FrameworkSuggestions),
+		"FrameworkStaticSuggested":           len(FrameworkStaticSuggested),
+		"DefaultSpacingSuggestions":          len(DefaultSpacingSuggestions),
+		"SuggestedFractions":                 len(SuggestedFractions),
+		"FrameworkStaticNested":              len(FrameworkStaticNested),
+		"FrameworkRootProperties":            len(FrameworkRootProperties),
+		"signatureVariadicExpansions":        len(signatureVariadicExpansions),
+		"signatureVariadicLogicalExpansions": len(signatureVariadicLogicalExpansions),
+		"signatureLogicalExpansions":         len(signatureLogicalExpansions),
 	}
 	ours := map[string]int{
-		"baseDescriptors":  len(baseDescriptors),
-		"CollapseFamilies": len(CollapseFamilies),
+		"baseDescriptors":             len(baseDescriptors),
+		"CollapseFamilies":            len(CollapseFamilies),
+		"signatureValueUnportedRoots": len(signatureValueUnportedRoots),
 	}
 
 	for name, count := range upstream {
@@ -149,8 +188,8 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 2 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 2, so "+
+	if len(ours) != 3 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 

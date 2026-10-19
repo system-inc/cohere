@@ -11,9 +11,11 @@
 //
 // # Which passes are here, and what the rest cost
 //
-// Ported: bgGradientToLinear and deprecatedUtilities among the utility passes and
-// modernizeArbitraryValuesVariant among the variant ones, plus the printer. The other passes are not run at all, so a class only they would
-// rewrite comes back unchanged and is not reported. That is the direction this rule's comment insists
+// Ported: bgGradientToLinear, calcToSpacingFunction, optimizeArbitraryValueExpressions, arbitraryUtilities
+// and deprecatedUtilities among the utility passes, modernizeArbitraryValuesVariant among the variant
+// ones, and the printer. The other passes are not run at all, so a class only they would rewrite comes
+// back unchanged and is not reported. A pass that cannot tell what upstream would do stops the passes
+// after it, so the class is printed as the earlier ones left it. That is the direction this rule's comment insists
 // on: a missing pass is a finding that does not appear, never one that appears wrongly.
 // canonical_singles.json is Tailwind's own answer for every class on the public theme and ahra, and
 // TestCanonicalizeAgreesWithTailwind fails on any class this answers differently, except the ones listed
@@ -22,11 +24,12 @@
 // # Signatures, and the sufficient condition that stands in for them
 //
 // Upstream decides that two spellings mean the same thing by comparing signatures: both compiled to CSS
-// with theme variables inlined, calc folded and declarations sorted. Porting that is unit 1b of #15swfzq.
-// deprecatedUtilities needs only a yes or no between two specific classes, so here it is answered by the
-// framework emitters at real resolved values: two classes whose declarations come out identical have equal
-// signatures, because a signature is a function of the CSS. The converse does not hold, so this can say
-// no where upstream says yes, which under-reports, and can never say yes where upstream says no.
+// with theme variables inlined, calc folded and declarations sorted. signature.go ports that, and the
+// passes added in unit 1b compare through it. deprecatedUtilities, from unit 1a, needs only a yes or no
+// between two specific classes and answers it by the framework emitters at real resolved values: two
+// classes whose declarations come out identical have equal signatures, because a signature is a function
+// of the CSS. The converse does not hold, so it can say no where upstream says yes, which under-reports,
+// and can never say yes where upstream says no.
 package tailwind
 
 import (
@@ -41,15 +44,43 @@ import (
 // through one Canonicalizer, the way upstream keeps one cache per design system.
 type Canonicalizer struct {
 	system *LoadedDesignSystem
+	// features are the signature features this canonicalizer compares under, from the rule's collapse
+	// and logical options. WithFeatures hands out one canonicalizer per set.
+	features SignatureFeatures
+	// shared is what every feature set's canonicalizer over this design system has in common.
+	shared *canonicalizerShared
 	// classes memoizes CanonicalizeClass by the class as written, and variants memoizes one variant's
 	// canonical spelling by its printed form, as upstream's two DefaultMaps do.
 	classes  sync.Map
 	variants sync.Map
+	// signatures memoizes a class's signature under features, and pools the signature pool for each set
+	// of properties arbitraryUtilities has searched.
+	signatures sync.Map
+	pools      sync.Map
 }
 
-// NewCanonicalizer returns a canonicalizer over one design system.
+// NewCanonicalizer returns a canonicalizer over one design system, comparing under the plugin's default
+// options: collapse and logical both on.
 func NewCanonicalizer(system *LoadedDesignSystem) *Canonicalizer {
-	return &Canonicalizer{system: system}
+	features := SignatureFeaturesFor(true, true)
+	shared := &canonicalizerShared{system: system}
+	canonicalizer := &Canonicalizer{system: system, features: features, shared: shared}
+	shared.byFeatures.Store(features, canonicalizer)
+	return canonicalizer
+}
+
+// WithFeatures is the canonicalizer over the same design system comparing under other features, built
+// the first time a rule's options ask for them.
+func (canonicalizer *Canonicalizer) WithFeatures(features SignatureFeatures) *Canonicalizer {
+	if existing, found := canonicalizer.shared.byFeatures.Load(features); found {
+		return existing.(*Canonicalizer)
+	}
+	created, _ := canonicalizer.shared.byFeatures.LoadOrStore(features, &Canonicalizer{
+		system:   canonicalizer.system,
+		features: features,
+		shared:   canonicalizer.shared,
+	})
+	return created.(*Canonicalizer)
 }
 
 // CanonicalizeClass is what Tailwind rewrites className to on its own, or className itself when nothing
@@ -121,7 +152,14 @@ func (canonicalizer *Canonicalizer) canonicalizeUtility(className string) string
 	for _, candidate := range ParseCandidate(className, canonicalizer.system) {
 		replacement := candidate
 		for _, pass := range utilityCanonicalizations {
-			replacement = pass(canonicalizer, replacement)
+			var answered bool
+			if replacement, answered = pass(canonicalizer, replacement); !answered {
+				// A pass that cannot tell what upstream does stops the passes, and what the earlier ones
+				// established is still printed. Every rewrite a pass here makes is signature-equivalent,
+				// and upstream prints whatever its passes leave, so the class it reports is reported here
+				// too, at worst naming a replacement short of upstream's, which canonicalUnported counts.
+				break
+			}
 		}
 		if printed := PrintCandidate(replacement, prefix); printed != className {
 			return printed
@@ -134,9 +172,17 @@ func (canonicalizer *Canonicalizer) canonicalizeUtility(className string) string
 // port runs. Upstream's list is bgGradientToLinear, themeToVarUtility, calcToSpacingFunction,
 // optimizeArbitraryValueExpressions, arbitraryUtilities, bareValueUtilities, deprecatedUtilities,
 // dropUnnecessaryDataTypes, arbitraryValueToBareValueUtility and optimizeModifier. A pass missing here
-// leaves its classes as written, which canonicalUnported counts.
-var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) ParsedCandidate{
+// leaves its classes as written, which canonicalUnported counts. themeToVarUtility is not ported, and
+// stands here as a guard that aborts a class it would change, since the passes after it would otherwise
+// see a candidate upstream's never do.
+//
+// A pass answers false when it cannot tell what upstream would do, and no pass after it runs.
+var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) (ParsedCandidate, bool){
 	(*Canonicalizer).bgGradientToLinear,
+	(*Canonicalizer).themeToVarUtilityGuard,
+	(*Canonicalizer).calcToSpacingFunction,
+	(*Canonicalizer).optimizeArbitraryValueExpressions,
+	(*Canonicalizer).arbitraryUtilities,
 	(*Canonicalizer).deprecatedUtilities,
 }
 
@@ -192,16 +238,16 @@ var gradientDirections = map[string]bool{"t": true, "tr": true, "r": true, "br":
 
 // bgGradientToLinear is upstream's pass of the same name: Tailwind 4's `bg-linear-to-*` for the static
 // `bg-gradient-to-*` it replaced. A rename with no sameness check, as upstream has none.
-func (canonicalizer *Canonicalizer) bgGradientToLinear(candidate ParsedCandidate) ParsedCandidate {
+func (canonicalizer *Canonicalizer) bgGradientToLinear(candidate ParsedCandidate) (ParsedCandidate, bool) {
 	if candidate.Kind != ParsedCandidateKindStatic {
-		return candidate
+		return candidate, true
 	}
 	direction, isGradient := strings.CutPrefix(candidate.Root, "bg-gradient-to-")
 	if !isGradient || !gradientDirections[direction] {
-		return candidate
+		return candidate, true
 	}
 	candidate.Root = "bg-linear-to-" + direction
-	return candidate
+	return candidate, true
 }
 
 // deprecationRenames is upstream's DEPRECATION_MAP: whole classes renamed outright.
@@ -217,7 +263,7 @@ var deprecationRenames = map[string]string{
 // The renames are DEPRECATION_MAP and DEPRECATION_TRANSFORMATION_MAP, which turns `start-*` into
 // `inset-s-*` and `end-*` into `inset-e-*`, negative or not. The sameness check is what keeps a
 // repository's own `@utility start-*` as written: it compiles to its own body, not to the inset.
-func (canonicalizer *Canonicalizer) deprecatedUtilities(candidate ParsedCandidate) ParsedCandidate {
+func (canonicalizer *Canonicalizer) deprecatedUtilities(candidate ParsedCandidate) (ParsedCandidate, bool) {
 	written := PrintCandidate(candidate, "")
 	for _, replacementText := range deprecatedReplacements(written) {
 		if !canonicalizer.compilesTheSame(written, replacementText) {
@@ -227,9 +273,9 @@ func (canonicalizer *Canonicalizer) deprecatedUtilities(candidate ParsedCandidat
 		if len(replacements) == 0 {
 			continue
 		}
-		return replacements[0]
+		return replacements[0], true
 	}
-	return candidate
+	return candidate, true
 }
 
 // deprecatedReplacements is upstream's tryDeprecatedUtilities: the outright rename first, then each

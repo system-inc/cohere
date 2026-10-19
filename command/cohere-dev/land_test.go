@@ -371,3 +371,61 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(t *testing.T) {
 		t.Errorf("the landing did not land once the nested test passed (%v):\n%s", err, output)
 	}
 }
+
+// The landing gate checks the docs data, so a change that leaves an example stale is refused where it's
+// made, not at the next release (#h31rcf0). The fixture's generator stands in for cohere's: -check fails
+// while docs/data/example.txt is stale. The refusal names the recapture command, and once the example is
+// fresh the same landing lands. This runs the real go through the land fixture.
+func TestTheGateRefusesStaleDocsData(t *testing.T) {
+	t.Parallel()
+	fixture := newLandFixture(t)
+	// The real go: the stand-in's directory comes off the front of PATH.
+	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
+	a := fixture.worktree("a")
+	write := func(files map[string]string) {
+		t.Helper()
+		for name, contents := range files {
+			path := filepath.Join(a, name)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	write(map[string]string{
+		"go.mod": "module example.com/root\n\ngo 1.21\n",
+		"internal/docsdata/tools/generate/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
+			"func main() {\n\tcontents, _ := os.ReadFile(\"docs/data/example.txt\")\n" +
+			"\tif string(contents) != \"fresh\\n\" {\n\t\tfmt.Println(\"stale: docs/data/example.txt\")\n\t\tos.Exit(1)\n\t}\n}\n",
+		"docs/data/example.txt": "stale\n",
+	})
+	fixture.git(a, "add", "go.mod", "internal", "docs")
+	fixture.git(a, "commit", "-q", "-m", "a rule change whose example went stale")
+	land := func() (string, error) {
+		landing := exec.Command(fixture.wrapper, "land")
+		landing.Dir, landing.Env = a, fixture.environment
+		output, err := landing.CombinedOutput()
+		return string(output), err
+	}
+	if output, err := land(); err == nil || !strings.Contains(output, "the docs data is stale, so nothing landed") ||
+		!strings.Contains(output, docsDataRecapture) || !strings.Contains(output, "stale: docs/data/example.txt") {
+		t.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", err, output)
+	}
+	write(map[string]string{"docs/data/example.txt": "fresh\n"})
+	fixture.git(a, "add", "docs/data/example.txt")
+	fixture.git(a, "commit", "-q", "-m", "the example recaptured")
+	if output, err := land(); err != nil || !strings.Contains(output, "the docs data is current") || !strings.Contains(output, "landed") {
+		t.Errorf("the landing did not land once the example was fresh (%v):\n%s", err, output)
+	}
+}
+
+// cohere has its docs data generator where the gate looks for it, so moving it fails here rather than
+// quietly turning the gate's docs check off.
+func TestCohereHasTheDocsDataGeneratorTheGateRuns(t *testing.T) {
+	t.Parallel()
+	if _, err := os.Stat(filepath.Join("..", "..", docsDataGenerator, "main.go")); err != nil {
+		t.Fatalf("the landing gate runs %s, and it is not in this module: %v", docsDataGenerator, err)
+	}
+}

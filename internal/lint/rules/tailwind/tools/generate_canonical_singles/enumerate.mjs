@@ -3,9 +3,10 @@
  * one-class report is tested against the engine better-tailwindcss calls rather than against a reading of
  * canonicalize-candidates.ts (#15swfzq).
  *
- * Each class goes to `canonicalizeCandidates` alone, with better-tailwindcss 4.7.0's options when its
- * rootFontSize is unset: `{collapse: false, logicalToPhysical: true}`. Collapse is off because a lone
- * class has nothing to merge with, and asking with it on would let a pair rewrite hide behind a single.
+ * Each class goes to `canonicalizeCandidates` alone, with better-tailwindcss's options at their defaults
+ * and rootFontSize unset: `{collapse: true, logicalToPhysical: true}`. A lone class has nothing to merge
+ * with, so collapse decides only how signatures compare: on, they expand shorthands, which is what the
+ * plugin compares with. The captures before #15swfzq unit 1b asked with collapse off.
  *
  * Every class that compiles is recorded, the ones Tailwind leaves alone as well as the ones it rewrites.
  * The ones it leaves alone are the half that catches over-reporting: a Go printer that spells one class
@@ -52,9 +53,9 @@ const { designSystem, tailwindVersion, recordedEntryPoint } = await loadDesignSy
     flagValue('--resolve-root'),
 );
 
-// better-tailwindcss 4.7.0's call with rootFontSize unset: `rem` stays absent, which is the reason this
-// rule never rewrites `h-[76px]` to `h-19`.
-const options = { collapse: false, logicalToPhysical: true };
+// better-tailwindcss's call with its options at their defaults and rootFontSize unset: `rem` stays absent,
+// which is the reason this rule never rewrites `h-[76px]` to `h-19`.
+const options = { collapse: true, logicalToPhysical: true };
 
 const casesPath = NodePath.join(NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url)), 'cases.json');
 const cases = JSON.parse(NodeFileSystem.readFileSync(casesPath, 'utf8'));

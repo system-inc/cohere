@@ -98,10 +98,14 @@ jobs:
                   cache: true
 
             # The module's tests run the launcher with Node, and the provenance proof calls the npm that
-            # ships with it, so both are the Node and npm the publish job uses rather than the image's.
+            # ships with it, so both are the Node and npm the publish job uses rather than the image's. 24,
+            # the version the repository is developed on: the regexp tests' oracle compiles RegExp
+            # modifiers like `(?i:...)`, which Node 22 rejects as an invalid group, so on 22 they fail on
+            # the oracle rather than on cohere (dry run 39276248388). The clean-machine and Windows jobs
+            # stay on 22, the oldest Node a consumer is likely to run cohere's launcher with.
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
 
             - name: Check the module before building anything
               # A release is not the place to discover a formatting or vet failure. These are the
@@ -492,7 +496,7 @@ jobs:
             # The npm the release job's provenance proof ran, so what was proven is what publishes.
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
 
             - name: Publish to npm
               # Publishing is opt-in per run rather than automatic on a tag, because it cannot be

@@ -169,7 +169,10 @@ var EnforceCanonicalClasses = rule.Rule{
 				if collapse.enabled {
 					merged = reportCollapses(ctx, literal, ignored, designSystem, collapse)
 				}
-				reportSingles(ctx, literal, ignored, designSystem.System, designSystem.Canonicalizer, merged)
+				// Upstream signs every class under the same options it collapses with, so a project that
+				// turns collapse off compares signatures without expanding shorthands.
+				canonicalizer := designSystem.Canonicalizer.WithFeatures(tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical))
+				reportSingles(ctx, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
 		}
 
