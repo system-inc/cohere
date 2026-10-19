@@ -3,7 +3,7 @@
   "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
   "harvested": null,
   "options": {
-    "collapse": false,
+    "collapse": true,
     "logicalToPhysical": true
   },
   "groundTruth": "canonicalizeCandidates([className], options), one class at a time",

@@ -62,6 +62,27 @@ type ClassListEntry struct {
 	Name string
 	// Modifiers are the modifiers offered with it, deduplicated, in the order first offered.
 	Modifiers []string
+	// sources are what offered the class: a static, or a functional root and value, each recorded once.
+	// Usually one; a static and a functional suggestion of the same name are two.
+	sources []classListSource
+}
+
+// classListSource is one registration that offers a class: a static by its name, or a functional root,
+// negated or not, with the value it suggested, empty for the bare root.
+type classListSource struct {
+	static bool
+	root   string
+	value  string
+}
+
+// addSource records a source once.
+func (entry *ClassListEntry) addSource(source classListSource) {
+	for _, existing := range entry.sources {
+		if existing == source {
+			return
+		}
+	}
+	entry.sources = append(entry.sources, source)
 }
 
 // legacyNumericKey is upstream's LEGACY_NUMERIC_KEY: a theme key spelled `2_5` is suggested as `2.5`.
@@ -87,29 +108,36 @@ func BuildClassList(system *LoadedDesignSystem) []ClassListEntry {
 	// Statics: every one the registry holds, less those whose `suggest` returns nothing.
 	for name, suggested := range FrameworkStaticSuggested {
 		if suggested {
-			entry(name)
+			entry(name).addSource(classListSource{static: true, root: name})
 		}
 	}
 	// A repository static is listed the same way: upstream asks the root's completions, and a
 	// framework `suggest` that returns nothing still answers for a name the repository redeclares.
 	for name, kinds := range system.utilityRoots {
 		if suggested, isFramework := FrameworkStaticSuggested[name]; kinds[UtilityKindStatic] && (suggested || !isFramework) {
-			entry(name)
+			entry(name).addSource(classListSource{static: true, root: name})
 		}
 	}
 
 	theme := system.Theme()
+	// Many roots draw on the same namespaces, `--color` above all, so each namespace list is read from
+	// the theme once.
+	keys := map[string][]string{}
 	for root, groups := range system.suggestionGroups() {
 		for _, group := range groups {
-			modifiers := suggestionValues(group.Modifiers, theme)
-			for _, value := range suggestionValues(group.Values, theme) {
+			modifiers := suggestionValues(group.Modifiers, theme, keys)
+			for _, value := range suggestionValues(group.Values, theme, keys) {
 				name := root
 				if value != "" {
 					name = root + "-" + value
 				}
-				addModifiers(entry(name), modifiers)
+				listed := entry(name)
+				addModifiers(listed, modifiers)
+				listed.addSource(classListSource{root: root, value: value})
 				if group.SupportsNegative {
-					addModifiers(entry("-"+name), modifiers)
+					negative := entry("-" + name)
+					addModifiers(negative, modifiers)
+					negative.addSource(classListSource{root: "-" + root, value: value})
 				}
 			}
 		}
@@ -142,7 +170,7 @@ func (system *LoadedDesignSystem) suggestionGroups() map[string][]SuggestionGrou
 
 // suggestionValues is one list resolved against the theme, in upstream's order: the default as the
 // empty string first, then the literals, the spacing scale, the theme's keys and the fractions.
-func suggestionValues(list SuggestionList, theme *Theme) []string {
+func suggestionValues(list SuggestionList, theme *Theme, keys map[string][]string) []string {
 	var values []string
 	if list.HasDefault {
 		if list.DefaultWhenThemeKey == "" {
@@ -157,17 +185,29 @@ func suggestionValues(list SuggestionList, theme *Theme) []string {
 			values = append(values, DefaultSpacingSuggestions...)
 		}
 	}
-	for _, key := range theme.KeysInNamespaces(list.Namespaces) {
-		values = append(values, legacyNumericKey.ReplaceAllString(key, "$1.$2"))
+	namespacesKey := strings.Join(list.Namespaces, " ")
+	resolved, isResolved := keys[namespacesKey]
+	if !isResolved {
+		for _, key := range theme.KeysInNamespaces(list.Namespaces) {
+			resolved = append(resolved, legacyNumericKey.ReplaceAllString(key, "$1.$2"))
+		}
+		keys[namespacesKey] = resolved
 	}
+	values = append(values, resolved...)
 	if list.Fractions {
 		values = append(values, SuggestedFractions...)
 	}
 	return values
 }
 
-// addModifiers merges modifiers into an entry, keeping the first occurrence of each.
+// addModifiers merges modifiers into an entry, keeping the first occurrence of each. An entry with none
+// yet shares the group's slice, which no caller writes into, and copies only when a second source merges.
 func addModifiers(entry *ClassListEntry, modifiers []string) {
+	if len(entry.Modifiers) == 0 {
+		entry.Modifiers = modifiers
+		return
+	}
+	merged := false
 	for _, modifier := range modifiers {
 		found := false
 		for _, existing := range entry.Modifiers {
@@ -177,6 +217,10 @@ func addModifiers(entry *ClassListEntry, modifiers []string) {
 			}
 		}
 		if !found {
+			if !merged {
+				entry.Modifiers = append([]string(nil), entry.Modifiers...)
+				merged = true
+			}
 			entry.Modifiers = append(entry.Modifiers, modifier)
 		}
 	}

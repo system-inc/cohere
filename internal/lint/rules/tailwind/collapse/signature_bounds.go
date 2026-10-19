@@ -101,9 +101,14 @@ func (compiler *SignatureCompiler) boundNodes(candidate *ParsedCandidate) ([]*No
 	}
 	switch candidate.Kind {
 	case ParsedCandidateKindStatic:
+		// A static's declarations are its declarations however they nest, so one body alone is certain.
+		// The framework's and the repository's together are a union upstream orders its own way, and
+		// are only possible.
 		var nodes []*Node
+		bodies := 0
 		if system.utilityRoots[candidate.Root][UtilityKindStatic] {
 			nodes = append(nodes, system.staticUtilityNodes[candidate.Root]...)
+			bodies++
 		}
 		if _, isRegistered := FrameworkStaticSuggested[candidate.Root]; isRegistered {
 			declarations, isFlattened := FrameworkStaticDeclarations[candidate.Root]
@@ -111,10 +116,11 @@ func (compiler *SignatureCompiler) boundNodes(candidate *ParsedCandidate) ([]*No
 				return nil, false, false
 			}
 			for _, declaration := range declarations {
-				nodes = append(nodes, &Node{Kind: KindDeclaration, Property: declaration.Property, Value: declaration.Value, ValuePresent: true})
+				nodes = append(nodes, &Node{Kind: KindDeclaration, Property: declaration.Property, Value: declaration.Value, ValuePresent: declaration.ValuePresent})
 			}
+			bodies++
 		}
-		return nodes, false, true
+		return nodes, bodies == 1, true
 
 	case ParsedCandidateKindFunctional:
 		var nodes []*Node

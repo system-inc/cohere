@@ -145,6 +145,10 @@ type LoadedDesignSystem struct {
 	// let the second block overwrite the first, which lost the static form silently and left
 	// `fade-in` answerable by neither the table nor the evaluator.
 	utilityRoots map[string]map[UtilityKind]bool
+	// redeclaredUtilityRoots are the roots the repository declares in two `@utility` blocks of the same
+	// kind. Upstream registers both and compiles and suggests both; UtilityEvaluator keeps the last, so a
+	// caller that needs every class or every body of such a root has to know it is missing one.
+	redeclaredUtilityRoots map[string]bool
 	// customVariants is every `@custom-variant` name the repository declared.
 	customVariants map[string]bool
 	// frameworkVariants is the set of names the framework registered, so Contributions can tell an
@@ -507,18 +511,19 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	}
 
 	return &LoadedDesignSystem{
-		EntryPoint:         entryPoint,
-		TailwindVersion:    TailwindVersion,
-		Stylesheets:        collector.stylesheets,
-		SkippedDirectives:  collector.skipped,
-		BuildCount:         nextBuildCount(),
-		theme:              collector.theme,
-		variants:           variants,
-		utility:            evaluator,
-		staticUtilityNodes: collector.staticUtilityNodes,
-		utilityRoots:       collector.utilityRoots,
-		customVariants:     collector.customVariants,
-		frameworkVariants:  frameworkNames,
+		EntryPoint:             entryPoint,
+		TailwindVersion:        TailwindVersion,
+		Stylesheets:            collector.stylesheets,
+		SkippedDirectives:      collector.skipped,
+		BuildCount:             nextBuildCount(),
+		theme:                  collector.theme,
+		variants:               variants,
+		utility:                evaluator,
+		staticUtilityNodes:     collector.staticUtilityNodes,
+		utilityRoots:           collector.utilityRoots,
+		redeclaredUtilityRoots: collector.redeclaredUtilityRoots,
+		customVariants:         collector.customVariants,
+		frameworkVariants:      frameworkNames,
 	}, nil
 }
 
@@ -580,7 +585,9 @@ type stylesheetCollector struct {
 	utilityDefinitions []*UtilityDefinition
 	staticUtilityNodes map[string][]*Node
 	utilityRoots       map[string]map[UtilityKind]bool
-	customVariants     map[string]bool
+	// redeclaredUtilityRoots records a root met a second time under the same kind.
+	redeclaredUtilityRoots map[string]bool
+	customVariants         map[string]bool
 	// customVariantOrder is customVariants in the order the walk first declared each, which is the
 	// order upstream registers them in and so the order they sort in.
 	customVariantOrder []string
@@ -786,6 +793,12 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 
 	if collector.utilityRoots[root] == nil {
 		collector.utilityRoots[root] = make(map[UtilityKind]bool, 2)
+	}
+	if collector.utilityRoots[root][kind] {
+		if collector.redeclaredUtilityRoots == nil {
+			collector.redeclaredUtilityRoots = map[string]bool{}
+		}
+		collector.redeclaredUtilityRoots[root] = true
 	}
 	collector.utilityRoots[root][kind] = true
 	// Only functional blocks reach the evaluator. A static `@utility` takes no value, so it has no

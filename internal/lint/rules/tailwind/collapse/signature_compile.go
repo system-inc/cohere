@@ -25,6 +25,7 @@ package tailwind
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
@@ -199,11 +200,11 @@ func spacingFunction(arguments []ValueNode, theme *Theme) (string, bool) {
 }
 
 // signatureNodes is the body upstream's `@apply` would substitute for the class: every reading that
-// compiles, concatenated. Exact only when at most one reading compiles and this port compiles it.
+// compiles, concatenated in the order compileCandidates sorts their rules into. Exact only when every
+// reading's answer is.
 func (compiler *SignatureCompiler) signatureNodes(className string) ([]*Node, SignatureState) {
 	system := compiler.system
-	var compiled []*Node
-	compiledReadings := 0
+	var readings [][]*Node
 	for _, candidate := range ParseCandidate(prefixedClass(className, system), system) {
 		if len(candidate.Variants) > 0 || candidate.Important {
 			return nil, SignatureUnknown
@@ -213,20 +214,65 @@ func (compiler *SignatureCompiler) signatureNodes(className string) ([]*Node, Si
 		case SignatureUnknown:
 			return nil, SignatureUnknown
 		case SignatureExact:
-			compiled = nodes
-			compiledReadings++
+			readings = append(readings, nodes)
 		}
 	}
-	switch compiledReadings {
+	switch len(readings) {
 	case 0:
 		return nil, SignatureNone
 	case 1:
-		return compiled, SignatureExact
-	default:
-		// Upstream concatenates every reading's body; two readings both compiling are rare enough
-		// that this declines rather than reproducing the order they would be emitted in.
-		return nil, SignatureUnknown
+		return readings[0], SignatureExact
 	}
+	sortReadingsLikeCompile(readings)
+	var concatenated []*Node
+	for _, nodes := range readings {
+		concatenated = append(concatenated, nodes...)
+	}
+	return concatenated, SignatureExact
+}
+
+// sortReadingsLikeCompile orders several readings of one class as compileCandidates orders their rules:
+// by the first property position where their property sorts differ, then most declarations first. They
+// share a class, so the alphabetical tie-break and the variant order never separate them, and a tie
+// keeps the parse order, as V8's stable sort does.
+func sortReadingsLikeCompile(readings [][]*Node) {
+	sorts := make(map[*Node]Sort, len(readings))
+	for _, nodes := range readings {
+		if len(nodes) > 0 {
+			sorts[nodes[0]] = PropertySort(nodes)
+		}
+	}
+	sortOf := func(nodes []*Node) Sort {
+		if len(nodes) == 0 {
+			return Sort{}
+		}
+		return sorts[nodes[0]]
+	}
+	sort.SliceStable(readings, func(left, right int) bool {
+		return compareReadingSorts(sortOf(readings[left]), sortOf(readings[right])) < 0
+	})
+}
+
+// compareReadingSorts is compileCandidates' comparator without its variant and candidate terms. An
+// absent position is Infinity upstream, and Infinity minus Infinity is NaN, which falls through to the
+// count exactly as a zero does.
+func compareReadingSorts(left Sort, right Sort) int {
+	offset := 0
+	for offset < len(left.Order) && offset < len(right.Order) && left.Order[offset] == right.Order[offset] {
+		offset++
+	}
+	leftHas, rightHas := offset < len(left.Order), offset < len(right.Order)
+	switch {
+	case leftHas && rightHas:
+		if left.Order[offset] != right.Order[offset] {
+			return left.Order[offset] - right.Order[offset]
+		}
+	case leftHas:
+		return -1
+	case rightHas:
+		return 1
+	}
+	return right.Count - left.Count
 }
 
 // prefixedClass puts the theme's prefix in front of a class that lacks it, as upstream's signature
@@ -242,7 +288,12 @@ func prefixedClass(className string, system *LoadedDesignSystem) string {
 // readingNodes compiles one reading of a class.
 func (compiler *SignatureCompiler) readingNodes(candidate *ParsedCandidate) ([]*Node, SignatureState) {
 	system := compiler.system
-	if candidate.Modifier != nil {
+	// A fraction is parsed with its denominator as the modifier, `w-1/2` as `1` over `2`. A root that
+	// supports fractions reads the fraction before it reads a modifier, so for one of those it is not a
+	// modifier at all; the parser fills the fraction for any named modifier, `black/10` included, and on
+	// every other root it is the modifier it looks like.
+	isFraction := candidate.Value != nil && candidate.Value.Fraction != "" && suggestsFractions(strings.TrimPrefix(candidate.Root, "-"))
+	if candidate.Modifier != nil && !isFraction {
 		return nil, SignatureUnknown
 	}
 	switch candidate.Kind {
@@ -319,8 +370,16 @@ func (compiler *SignatureCompiler) functionalReadingNodes(candidate *ParsedCandi
 		return nil, SignatureUnknown
 	}
 	// The three colour keywords are answered by resolveThemeColor before any theme lookup, which the
-	// two slices' descriptions do not carry, so here they resolve to nothing where upstream compiles.
-	if candidate.Value.Kind == ParsedValueKindNamed && isColourKeyword(candidate.Value.Value) {
+	// two slices' descriptions do not carry. A colour root, one whose `suggest` offers them, takes the
+	// keyword's colour through its emitter; any other root resolves it as an ordinary name.
+	if candidate.Value.Kind == ParsedValueKindNamed && isColourKeyword(candidate.Value.Value) && suggestsColourKeywords(root) {
+		resolved := ResolvedUtilityValue{Value: colourKeywordValue(candidate.Value.Value)}
+		if utility, known := FrameworkFunctionalUtilities[root]; known {
+			return utility.Emit(root, resolved), SignatureExact
+		}
+		if utility, known := FrameworkMultiDeclarationUtilities[root]; known {
+			return utility.Emit(root, "", resolved), SignatureExact
+		}
 		return nil, SignatureUnknown
 	}
 	if utility, known := FrameworkFunctionalUtilities[root]; known {
@@ -371,6 +430,11 @@ func colourArmNodes(candidate *ParsedCandidate, root string, theme *Theme) ([]*N
 		}
 		value, resolved := resolveArmColor(candidate, &description.Arms[0], theme)
 		if !resolved {
+			// Another arm may take the value, and this port does not compile those. Whether any arm
+			// takes it at all is what existence asks, so a value no arm resolves compiles to nothing.
+			if _, produced := ResolveFunctionalUtilityValue(candidate, description, theme, strings.HasPrefix(candidate.Root, "-")); !produced {
+				return nil, SignatureNone
+			}
 			return nil, SignatureUnknown
 		}
 		colourBranch.Value = value
@@ -410,6 +474,38 @@ func isColourKeyword(value string) bool {
 	return value == "inherit" || value == "transparent" || value == "current"
 }
 
+// suggestsFractions reports whether a root's `suggest` offers fractions, which upstream sets exactly
+// for the roots registered with `supportsFractions`.
+func suggestsFractions(root string) bool {
+	for _, group := range FrameworkSuggestions[root] {
+		if group.Values.Fractions {
+			return true
+		}
+	}
+	return false
+}
+
+// colourKeywordValue is what resolveThemeColor makes of a keyword: `current` is `currentcolor`.
+func colourKeywordValue(keyword string) string {
+	if keyword == "current" {
+		return "currentcolor"
+	}
+	return keyword
+}
+
+// suggestsColourKeywords reports whether a root's `suggest` offers the three keywords, which is how
+// upstream's colorUtility registers itself.
+func suggestsColourKeywords(root string) bool {
+	for _, group := range FrameworkSuggestions[root] {
+		for _, literal := range group.Values.Literals {
+			if literal == "current" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // signatureValueUnportedRoots are the roots whose emitter here writes the resolved value where upstream
 // wraps it in an expression this port does not hold: the filter functions (`blur(8px)` where the emitter
 // writes `8px`), `span n / span n`, the reverse-aware `calc()` chains of space and divide, the degree
@@ -422,7 +518,7 @@ var signatureValueUnportedRoots = map[string]bool{
 	"backdrop-sepia": true, "blur": true, "brightness": true, "contrast": true, "grayscale": true,
 	"hue-rotate": true, "invert": true, "saturate": true, "sepia": true,
 	"col-span": true, "row-span": true,
-	"space-x": true, "space-y": true, "divide": true, "divide-x": true, "divide-y": true,
+	"space-x": true, "space-y": true, "divide-x": true, "divide-y": true,
 	"skew": true, "skew-x": true, "skew-y": true, "mask-conic": true, "mask-linear": true,
 	"line-clamp": true, "container": true, "transition": true,
 }

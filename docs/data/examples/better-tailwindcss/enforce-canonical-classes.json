@@ -2,19 +2,19 @@
     "rule": "better-tailwindcss/enforce-canonical-classes",
     "firing": {
         "file": "Component.tsx",
-        "source": "const element = <div className=\"!outline\" />;\n",
+        "source": "const element = <div className=\"z-[1]\" />;\n",
         "findings": [
             {
                 "line": 1,
                 "column": 33,
                 "endLine": 1,
-                "endColumn": 41,
+                "endColumn": 38,
                 "messageId": "canonicalSingle",
-                "message": "The class: \"!outline\" can be simplified to \"outline!\".",
+                "message": "The class: \"z-[1]\" can be simplified to \"z-1\".",
                 "fix": true
             }
         ],
-        "fixedSource": "const element = <div className=\"outline!\" />;\n"
+        "fixedSource": "const element = <div className=\"z-1\" />;\n"
     },
     "clean": {
         "file": "Component.tsx",
