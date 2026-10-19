@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 548,
+    "count": 549,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -4447,6 +4447,47 @@
                 },
                 {
                     "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "adamic/no-ambient-declarations",
+            "language": "TypeScript",
+            "namespace": "adamic",
+            "origin": "house",
+            "category": "adamic",
+            "typeAware": true,
+            "messageIds": [
+                "ambientDeclaration"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
                     "severity": "error"
                 },
                 {

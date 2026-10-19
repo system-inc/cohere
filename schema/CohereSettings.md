@@ -194,7 +194,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 494 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 495 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -335,9 +335,10 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>adamic</code>, 9 rules</summary>
+<details><summary><code>adamic</code>, 10 rules</summary>
 
 - `adamic/invariant-mutable`
+- `adamic/no-ambient-declarations`
 - `adamic/no-definite-assignment`
 - `adamic/no-indexed-access-write`
 - `adamic/no-optional-widening`

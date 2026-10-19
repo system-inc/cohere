@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/no-ambient-declarations" },
+  "messages": {
+    "ambientDeclaration": {
+      "text": "The declaration {{declaration}} supplies a runtime value or member without defining it. TypeScript trusts this declaration, but the emitted program can throw when the promised runtime definition is absent. Define the value or member in the program."
+    }
+  }
+}
