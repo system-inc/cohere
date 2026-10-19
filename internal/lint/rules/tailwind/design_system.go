@@ -78,6 +78,10 @@ type DesignSystemResult struct {
 	// a different name. It costs a few map copies over the framework's roots plus one PropertySort
 	// per static `@utility` block, on a path the build counter already guards.
 	Table *tailwindengine.Table
+	// Canonicalizer answers what this design system's Tailwind rewrites one class to, nil when Err is
+	// set. Built here for the reason Table is: it remembers its answers, and a run asks it about the same
+	// classes from every file (#15swfzq).
+	Canonicalizer *tailwindengine.Canonicalizer
 	// Err is why no design system could be built, nil when System is set.
 	//
 	// A rule holding this must decline rather than report zero findings. See the failing-safe note
@@ -251,7 +255,19 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 	// The descriptor table is built here, on the counted path, rather than lazily on first use. A
 	// second build path would not be visible to TestDesignSystemIsBuiltOncePerProgram, and an
 	// invisible build path is exactly how the per-file rebuild came back the last time.
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+	return loadedDesignSystemResult(system, entryPoint)
+}
+
+// loadedDesignSystemResult is the result for a design system that built, with everything a run derives
+// from it once: the descriptor table and the canonicalizer. Both places that load one build it here, so a
+// third derived piece cannot reach one and miss the other.
+func loadedDesignSystemResult(system *tailwindengine.LoadedDesignSystem, entryPoint string) DesignSystemResult {
+	return DesignSystemResult{
+		System:        system,
+		Table:         tailwindengine.NewTable(system),
+		Canonicalizer: tailwindengine.NewCanonicalizer(system),
+		EntryPoint:    entryPoint,
+	}
 }
 
 // projectRootOf is the directory the program's tsconfig sits in.

@@ -306,7 +306,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: loading its stylesheet: %v", list.name, err)
 		}
-		systems[list.systemKey()] = DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+		systems[list.systemKey()] = loadedDesignSystemResult(system, entryPoint)
 	}
 
 	measurement := classOrderLiveMeasure(t, synthetic, systems)
@@ -535,7 +535,7 @@ func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 	if err != nil {
 		t.Fatalf("loading the design system: %v", err)
 	}
-	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
+	return loadedDesignSystemResult(system, entryPoint)
 }
 
 // TestClassOrderLiveDeclinesRatherThanPartiallySorting pins the fail-safe.
