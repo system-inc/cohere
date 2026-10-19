@@ -34,7 +34,9 @@ import (
 // 2026-10-19 a whole-module gate alone on the machine ran 906 CPU-seconds in 4m05s, an average of 3.7 of 16
 // cores, with three tokens free the whole time. One token is always left, so a run that arrives next starts
 // at once rather than waiting out a borrower, and the threads in use never pass the pool's. Go's -p and
-// GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its run ends.
+// GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
+// several commands, the landing gate's, rebalances between them (tokenRun), widening when the pool went idle
+// and giving tokens back to anyone who arrived.
 
 // tokensVariable sets how many tokens the machine has.
 const tokensVariable = "COHERE_DEV_TOKENS"
@@ -144,8 +146,19 @@ func poolDirectory() (string, error) {
 // withToken runs work holding a token, in arrival order, with the environment its commands must run in.
 // what describes the work for the line other waiters read. It returns work's exit code.
 func withToken(what string, work func(environment []string) int) int {
+	return withSteppedToken(what, func(step func(string) []string) int {
+		return work(step(""))
+	})
+}
+
+// withSteppedToken is withToken for work that runs several go commands one after another, the landing
+// gate's vet, tests and docs check. Each asks step for its environment first, and step rebalances the run's
+// share with the pool as it is now (tokenRun.step), so a run that started on a busy pool widens once the
+// pool goes idle, and one that borrowed gives its tokens back to anyone who has arrived since.
+func withSteppedToken(what string, steps func(step func(name string) []string) int) int {
 	if held := os.Getenv(heldTokenVariable); held != "" {
-		return work(os.Environ())
+		// Inside a parent's share, which the parent rebalances: a nested run never steps.
+		return steps(func(string) []string { return os.Environ() })
 	}
 	shape, err := readPoolShape()
 	if err != nil {
@@ -167,16 +180,9 @@ func withToken(what string, work func(environment []string) int) int {
 		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 1
 	}
-	borrowed := borrowTokens(directory, shape, held.number, what)
-	if len(borrowed) > 0 {
-		wide := shape.widened(1 + len(borrowed))
-		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is idle, so this run borrows %s: %d packages at a time on %d threads\n",
-			tokenNumbers(borrowed), wide.packages, wide.threads)
-	}
-	code := work(budgetEnvironment(os.Environ(), held.number, shape.widened(1+len(borrowed))))
-	for _, token := range borrowed {
-		token.release()
-	}
+	run := &tokenRun{directory: directory, shape: shape, held: held, what: what}
+	code := steps(run.step)
+	run.giveBack()
 	held.release()
 	// The run is over and its token free, so this is when the cache is looked at (cache.go).
 	startCacheTrim(directory)
@@ -210,6 +216,54 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 		borrowed = borrowed[:len(borrowed)-1]
 	}
 	return borrowed
+}
+
+// tokenRun is a token's run and what it has borrowed, rebalanced before each of its go commands (#fvbwfvh).
+// Go's -p and GOMAXPROCS are fixed when a process starts, so a run's share can only change between its
+// commands: one that started on a busy pool with one token widens once the pool goes idle, and one holding
+// borrowed tokens gives them back at its next command when anyone is waiting.
+type tokenRun struct {
+	directory string
+	shape     poolShape
+	held      *heldSlot
+	what      string
+	borrowed  []*heldSlot
+	stepped   bool
+}
+
+// step gives back what the run borrowed, borrows again from the pool as it is now (borrowTokens: all but one
+// free token, and none while anyone waits), says when that changed the run's share, and returns the
+// environment the next command runs in. name names the command in what it says.
+func (run *tokenRun) step(name string) []string {
+	before := len(run.borrowed)
+	run.giveBack()
+	run.borrowed = borrowTokens(run.directory, run.shape, run.held.number, run.what)
+	wide := run.shape.widened(1 + len(run.borrowed))
+	subject := "this run"
+	if name != "" {
+		subject = name
+	}
+	switch {
+	case !run.stepped && len(run.borrowed) > 0:
+		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is idle, so %s borrows %s: %d packages at a time on %d threads\n",
+			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
+	case run.stepped && len(run.borrowed) > before:
+		fmt.Fprintf(os.Stderr, "cohere-dev: the pool went idle, so %s borrows %s: %d packages at a time on %d threads\n",
+			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
+	case run.stepped && len(run.borrowed) < before:
+		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is busy now, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
+			subject, before-len(run.borrowed), wide.packages, wide.threads)
+	}
+	run.stepped = true
+	return budgetEnvironment(os.Environ(), run.held.number, wide)
+}
+
+// giveBack releases every borrowed token.
+func (run *tokenRun) giveBack() {
+	for _, token := range run.borrowed {
+		token.release()
+	}
+	run.borrowed = nil
 }
 
 // anyFree reports whether any token is free.

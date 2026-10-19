@@ -218,16 +218,17 @@ func gate(worktree string, commit string) int {
 	}
 	covered.report(os.Stderr)
 	patterns := covered.patterns()
-	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(budget []string) int {
-		environment := gateEnvironment(budget)
+	// Each command takes its share as the pool is when it starts (tokenRun.step): a gate that waited for its
+	// token on a busy pool widens for its tests or its docs check once the pool goes idle.
+	return withSteppedToken("land gate on "+shortCommit(commit)+" in "+worktree, func(step func(string) []string) int {
 		vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
-		vet.Dir, vet.Env = worktree, environment
+		vet.Dir, vet.Env = worktree, gateEnvironment(step("go vet"))
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
 		if err := vet.Run(); err != nil {
 			return exitCodeOf(err)
 		}
 		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, err := testEnvironment(environment)
+		testing, uncovered, err := testEnvironment(gateEnvironment(step("the test run")))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 			return 2
@@ -239,7 +240,7 @@ func gate(worktree string, commit string) int {
 		if err := test.Run(); err != nil {
 			return exitCodeOf(err)
 		}
-		return checkDocsData(worktree, environment)
+		return checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 	})
 }
 
@@ -254,14 +255,14 @@ const docsDataRecapture = "go run " + docsDataGenerator + " -capture"
 // landed green without recapturing its examples, and the 1.0 dry run would have failed at its first step.
 // -check recaptures every example from the lint tests rather than reading the committed ones back, so it
 // can find one stale. A repository without the generator has no docs data, and the gate says so.
-func checkDocsData(worktree string, environment []string) int {
+func checkDocsData(worktree string, environment func() []string) int {
 	if _, err := os.Stat(filepath.Join(worktree, docsDataGenerator)); err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: no %s here, so no docs data to check\n", docsDataGenerator)
 		return 0
 	}
 	started := time.Now()
 	check := exec.Command("go", "run", docsDataGenerator, "-check")
-	check.Dir, check.Env = worktree, environment
+	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr
 	if err := check.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
