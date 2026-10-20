@@ -101,7 +101,7 @@ var UnionWrite = rule.Rule{
 				}
 				access := callee.AsPropertyAccessExpression()
 				if access.Name().Text() != "assign" || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Object" ||
-					!type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+					!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
 					return
 				}
 				target := node.Arguments()[0]
