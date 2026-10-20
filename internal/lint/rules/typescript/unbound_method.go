@@ -518,7 +518,7 @@ func isNativelyBoundMember(ctx rule.Context, object *ast.Node, property *ast.Nod
 		return false
 	}
 	propertySymbol := checker.Type_symbol(propertyType)
-	return propertySymbol != nil && type_checking.IsSymbolFromDefaultLibrary(ctx.Program, propertySymbol)
+	return propertySymbol != nil && rule.IsSymbolFromDefaultLibrary(ctx.Program, propertySymbol)
 }
 
 // isSymbolNotFromThisFile is upstream's `isNotImported`, named for what it measures.

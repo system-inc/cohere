@@ -164,7 +164,7 @@ func readonlyMadeWritable(program rule.Program, pair flow.Pair) bool {
 		return false
 	}
 	for _, declaration := range pair.SourceProperty.Declarations {
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && program != nil && type_checking.IsSourceFileDefaultLibrary(program, file) {
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && program != nil && rule.IsSourceFileDefaultLibrary(program, file) {
 			return false
 		}
 	}

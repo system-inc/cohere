@@ -164,7 +164,7 @@ func correctnessNoDiscardedPureResultIsPure(ctx rule.Context, name *ast.Node) bo
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}

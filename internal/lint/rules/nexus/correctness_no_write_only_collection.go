@@ -2,7 +2,6 @@ package nexus
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -167,7 +166,7 @@ func correctnessNoWriteOnlyCollectionKind(ctx rule.Context, initializer *ast.Nod
 		if constructor.Kind != ast.KindIdentifier || (constructor.Text() != "Map" && constructor.Text() != "Set") {
 			return ""
 		}
-		if !type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+		if !rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
 			return ""
 		}
 		return constructor.Text()
@@ -235,7 +234,7 @@ func correctnessNoWriteOnlyCollectionIsWriter(ctx rule.Context, name *ast.Node) 
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}

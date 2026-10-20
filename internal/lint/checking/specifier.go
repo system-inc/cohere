@@ -83,7 +83,7 @@ func typeDeclaredInLib(
 		return true
 	}
 	return Some(declarationFiles, func(d *ast.SourceFile) bool {
-		return IsSourceFileDefaultLibrary(program, d)
+		return rule.IsSourceFileDefaultLibrary(program, d)
 	})
 }
 

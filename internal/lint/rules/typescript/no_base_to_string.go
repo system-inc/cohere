@@ -622,7 +622,7 @@ func (state *noBaseToStringState) isSymbolToPrimitiveMethod(declaration *ast.Nod
 		return false
 	}
 	symbol := state.ctx.TypeChecker.GetSymbolAtLocation(access.Expression)
-	return symbol != nil && type_checking.IsSymbolFromDefaultLibrary(state.ctx.Program, symbol)
+	return symbol != nil && rule.IsSymbolFromDefaultLibrary(state.ctx.Program, symbol)
 }
 
 // isBuiltinStringCall is upstream's `isBuiltInStringCall`.
@@ -648,7 +648,7 @@ func (state *noBaseToStringState) isBuiltinStringCall(call *ast.CallExpression) 
 		return true
 	}
 	for _, declaration := range symbol.Declarations {
-		if !type_checking.IsSourceFileDefaultLibrary(state.ctx.Program,
+		if !rule.IsSourceFileDefaultLibrary(state.ctx.Program,
 			ast.GetSourceFileOfNode(declaration)) {
 			return false
 		}

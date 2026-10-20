@@ -624,7 +624,7 @@ func preferNullishCoalescingIgnorableFlags(
 //	const Boolean = ...; inside a function     declared in the source file
 //	const Boolean = ...; at module scope       declared in the source file
 //
-// `checking.IsSymbolFromDefaultLibrary` is the shelf's existing question for exactly this, so this
+// `rule.IsSymbolFromDefaultLibrary` is the shelf's existing question for exactly this, so this
 // is a caller rather than a reimplementation, and it needs no scope resolver at all.
 func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool {
 	for current := node; current != nil; {
@@ -642,7 +642,7 @@ func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool
 			if ctx.TypeChecker == nil || ctx.Program == nil {
 				return false
 			}
-			if !type_checking.IsSymbolFromDefaultLibrary(ctx.Program,
+			if !rule.IsSymbolFromDefaultLibrary(ctx.Program,
 				ctx.TypeChecker.GetSymbolAtLocation(call.Expression)) {
 				return false
 			}

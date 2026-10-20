@@ -21,14 +21,6 @@ func ComparePaths(a string, b string, program rule.Program) int {
 	return tspath.ComparePaths(a, b, caseSensitivity)
 }
 
-func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool {
-	return rule.IsSourceFileDefaultLibrary(program, file)
-}
-
-func IsSymbolFromDefaultLibrary(program rule.Program, symbol *ast.Symbol) bool {
-	return rule.IsSymbolFromDefaultLibrary(program, symbol)
-}
-
 /**
  * @example
  * ```ts
@@ -133,7 +125,7 @@ func IsBuiltinTypeAliasLike(
 			return builtinPredicateMatches_False
 		}
 
-		if IsSymbolFromDefaultLibrary(program, aliasSymbol.Symbol()) && predicate(subtype) {
+		if rule.IsSymbolFromDefaultLibrary(program, aliasSymbol.Symbol()) && predicate(subtype) {
 			return builtinPredicateMatches_True
 		}
 
@@ -155,7 +147,7 @@ func IsBuiltinSymbolLike(
 
 		actualSymbolName := symbol.Name
 
-		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && IsSymbolFromDefaultLibrary(program, symbol) {
+		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && rule.IsSymbolFromDefaultLibrary(program, symbol) {
 			return builtinPredicateMatches_True
 		}
 
@@ -174,7 +166,7 @@ func IsAnyBuiltinSymbolLike(
 			return builtinPredicateMatches_False
 		}
 
-		if IsSymbolFromDefaultLibrary(program, symbol) {
+		if rule.IsSymbolFromDefaultLibrary(program, symbol) {
 			return builtinPredicateMatches_True
 		}
 

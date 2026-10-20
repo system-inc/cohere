@@ -2,7 +2,6 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -143,7 +142,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // not it is being invoked. Both were measured, and a rule keyed on `KindCallExpression` with a
 // callee named `eval` would have been wrong on both.
 //
-// So this rule declares the type checker and asks `type_checking.IsSymbolFromDefaultLibrary`. Probed
+// So this rule declares the type checker and asks `rule.IsSymbolFromDefaultLibrary`. Probed
 // against this rule's own inputs rather than trusted: global `eval` resolves to a symbol declared
 // in `lib.es5.d.ts`, a declaration file, while a shadowing parameter or local resolves to a
 // declaration in the source file. The shelf helper and a hand-rolled `IsDeclarationFile` loop agree
@@ -233,7 +232,7 @@ var UnsupportedSyntax = rule.Rule{
 					return
 				}
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if !type_checking.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+				if !rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
 					return
 				}
 				ctx.ReportNode(node, messageUnsupportedEval)
