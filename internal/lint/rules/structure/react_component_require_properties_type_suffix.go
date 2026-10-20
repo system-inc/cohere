@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -59,8 +60,16 @@ func messageUseTypeAliasSuffix() rule.Message {
 // The rename is derived rather than appended blindly. `ButtonProps` becomes `ButtonProperties` and
 // `ButtonInterface` becomes `ButtonProperties`, because appending would produce `ButtonPropsProperties`,
 // which nobody wants and which the author would have to fix by hand anyway.
+//
+// A type a dependency declares keeps its own name (#kk5kk04). Next's `PageProps<'/x'>` and
+// `LayoutProps<'/x'>` are globals from a generated declaration file, and React's `ComponentProps` comes
+// from a package: they carry the framework's spelling, and renaming one at the parameter wrote
+// `PageProperties<'/x'>`, a name nothing declares, so the fix broke type checking. Ownership is decided
+// by where the type is declared rather than how it is spelled, which takes the checker. Without one the
+// rule judges every name as before.
 var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
-	Name: "structure/react-component-require-properties-type-suffix",
+	Name:             "structure/react-component-require-properties-type-suffix",
+	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
@@ -96,6 +105,9 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 
 			typeName := typeReferenceName(parameterTypeNode(parameters[0]))
 			if typeName == "" || strings.HasSuffix(typeName, "Properties") {
+				return
+			}
+			if isDependencyPropertyType(ctx, parameterTypeNode(parameters[0])) {
 				return
 			}
 
@@ -154,7 +166,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				for name := range module.AllDeclaredTypeNames(ctx.SourceFile) {
 					declaredTypeNames[name] = true
 				}
-				collectComponentPropertyTypeNames(node, componentPropertyTypes)
+				collectComponentPropertyTypeNames(ctx, node, componentPropertyTypes)
 			},
 
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
@@ -206,7 +218,10 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 // needs the complete set before it judges anything and walk order does not supply that. Reaching
 // every component means walking the whole tree rather than the top level: a component can be
 // declared inside a function, and the original's map was filled from a listener that saw those too.
-func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool) {
+//
+// A dependency's type is left out, so a declaration of ours that happens to share its name is not
+// renamed on its account.
+func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, into map[string]bool) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
@@ -243,7 +258,7 @@ func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]boo
 		if name != nil && name.Kind == ast.KindIdentifier &&
 			react.IsLikelyComponentName(name.Text()) && len(parameters) == 1 {
 			if typeName := typeReferenceName(parameterTypeNode(parameters[0])); typeName != "" &&
-				!strings.HasSuffix(typeName, "Properties") {
+				!strings.HasSuffix(typeName, "Properties") && !isDependencyPropertyType(ctx, parameterTypeNode(parameters[0])) {
 				into[typeName] = true
 			}
 		}
@@ -254,6 +269,24 @@ func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]boo
 		})
 	}
 	visit(sourceFile)
+}
+
+// isDependencyPropertyType reports whether a component's parameter type names a type a dependency
+// declares, following an import to what it imports: the specifier is ours, the type it names may not
+// be. A name the checker cannot resolve, like an import of a file the program lacks, is judged as ours,
+// which keeps its finding rather than dropping it.
+func isDependencyPropertyType(ctx rule.Context, typeNode *ast.Node) bool {
+	if ctx.TypeChecker == nil || typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(typeNode.AsTypeReferenceNode().TypeName)
+	if symbol == nil {
+		return false
+	}
+	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+		symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+	}
+	return rule.IsDeclaredByADependency(symbol)
 }
 
 // propertiesTypeNameFor derives the corrected name rather than appending to the wrong one.

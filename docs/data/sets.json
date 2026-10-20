@@ -1,7 +1,7 @@
 [
     {
         "name": "cohere:adamic",
-        "rulesOn": 39,
+        "rulesOn": 40,
         "rules": [
             {
                 "name": "@typescript-eslint/ban-ts-comment",
@@ -64,6 +64,10 @@
             },
             {
                 "name": "adamic/invariant-mutable",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-ambient-declarations",
                 "severity": "error"
             },
             {
@@ -180,7 +184,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 303,
+        "rulesOn": 304,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -704,6 +708,10 @@
             },
             {
                 "name": "adamic/invariant-mutable",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-ambient-declarations",
                 "severity": "error"
             },
             {
@@ -1729,7 +1737,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 368,
+        "rulesOn": 369,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2165,6 +2173,10 @@
             },
             {
                 "name": "adamic/invariant-mutable",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-ambient-declarations",
                 "severity": "error"
             },
             {
@@ -4819,6 +4831,10 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-ambient-declarations",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/no-cross-enum-narrowing",
                 "severity": "error"
             },
@@ -6533,6 +6549,10 @@
                 "severity": "off"
             },
             {
+                "name": "adamic/no-ambient-declarations",
+                "severity": "off"
+            },
+            {
                 "name": "adamic/no-cross-enum-narrowing",
                 "severity": "error"
             },
@@ -7811,7 +7831,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 292,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8247,6 +8267,10 @@
             },
             {
                 "name": "adamic/invariant-mutable",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-ambient-declarations",
                 "severity": "error"
             },
             {
@@ -9299,7 +9323,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 280,
+        "rulesOn": 281,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9735,6 +9759,10 @@
             },
             {
                 "name": "adamic/invariant-mutable",
+                "severity": "error"
+            },
+            {
+                "name": "adamic/no-ambient-declarations",
                 "severity": "error"
             },
             {

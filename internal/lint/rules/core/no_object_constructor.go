@@ -92,7 +92,8 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 // ended. See `previousStatementCanContinue` for the enumeration and for what each row was measured
 // against.
 var NoObjectConstructor = rule.Rule{
-	Name: "no-object-constructor",
+	TypeReach: rule.TypeReachShapes,
+	Name:      "no-object-constructor",
 
 	// The whole discrimination between a report and a false positive on `const createObject =
 	// Object => new Object()` is whether `Object` is the global, and nothing structural answers it.

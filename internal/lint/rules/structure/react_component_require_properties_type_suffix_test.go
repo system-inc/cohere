@@ -6,7 +6,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-const typeSuffixFile = "/repository/source/components/Button.tsx"
+// Every fixture runs against a real type graph. The rule asks the checker whether a type is a
+// dependency's, and the syntax-only harness hands it a nil checker, so a fixture there would prove the
+// no-checker path rather than the rule. An import of `./Types`, which no fixture holds, resolves to
+// nothing and is judged as ours.
+const typeSuffixFile = "source/components/Button.tsx"
 
 func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 	t.Parallel()
@@ -56,7 +60,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix,
 				typeSuffixFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -129,7 +133,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 		// Outside a React file the rule declines before looking.
 		{
 			"a component-shaped function in a ts file",
-			"/repository/source/api/Thing.ts",
+			"source/api/Thing.ts",
 			"import React from 'react';\nimport type { ButtonProps } from './Types';\n" +
 				"export function Button(properties: ButtonProps) {\n" +
 				"    React.useEffect(() => {}, []);\n    return properties;\n}\n",
@@ -138,7 +142,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -170,7 +174,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 	t.Parallel()
 
 	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+		rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonProps } from './Types';\n"+
 				"export function Button(properties: ButtonProps) {\n    return <button />;\n}\n"),
 		"import type { ButtonProps } from './Types';\n"+
@@ -179,7 +183,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 	// An Interface suffix is replaced rather than appended to, which is the case that separates a
 	// derived rename from a blind one: appending gives ButtonInterfaceProperties.
 	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+		rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonInterface } from './Types';\n"+
 				"export function Button(properties: ButtonInterface) {\n    return <button />;\n}\n"),
 		"import type { ButtonInterface } from './Types';\n"+
@@ -187,7 +191,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 
 	// A name with no known suffix gets one appended.
 	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+		rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonBag } from './Types';\n"+
 				"export function Button(properties: ButtonBag) {\n    return <button />;\n}\n"),
 		"import type { ButtonBag } from './Types';\n"+
@@ -231,7 +235,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			result := rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix,
 				typeSuffixFile, testCase.sourceText)
 
 			// Both halves have to be renamed or the file stops compiling, so the count is the
@@ -279,7 +283,7 @@ func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T
 		"export type MenuItemInterface = MenuItemProperties;\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
+	result := rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
 	if len(result.Diagnostics) == 0 {
 		t.Fatal("wanted the convention violation still reported, got no findings")
 	}
@@ -301,7 +305,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t 
 	source := "export interface MenuItemInterface { a: string }\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
+	result := rule_testing.RunTyped(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
 	}
@@ -310,4 +314,141 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t 
 			t.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
 		}
 	}
+}
+
+// nextRouteTypes stands in for the declaration file Next generates and next-env.d.ts pulls in:
+// `PageProps` and `LayoutProps` are globals carrying the framework's names.
+const nextRouteTypes = "declare global {\n" +
+	"    interface PageProps<Route extends string> { params: Promise<{ route: Route }> }\n" +
+	"    interface LayoutProps<Route extends string> { params: Promise<{ route: Route }>; children: unknown }\n" +
+	"}\nexport {};\n"
+
+// dependencyFiles is a program holding every kind of dependency the rule leaves alone: Next's globals in
+// a declaration file, a stand-in React whose types are a declaration file under node_modules, and a
+// package that ships plain TypeScript under node_modules, which is a dependency's although it is not a
+// declaration file.
+var dependencyFiles = map[string]string{
+	".next/types/routes.d.ts":         nextRouteTypes,
+	"next-env.d.ts":                   "/// <reference path=\"./.next/types/routes.d.ts\" />\n",
+	"node_modules/react/package.json": `{"name": "react", "types": "index.d.ts"}`,
+	"node_modules/react/index.d.ts":   "export type ComponentProps<Tag extends string> = { tag: Tag };\n",
+	"node_modules/kit/package.json":   `{"name": "kit", "types": "index.ts"}`,
+	"node_modules/kit/index.ts":       "export interface KitProps { label: string }\n",
+}
+
+// runWithDependencies runs the rule on subject, written at fileName beside dependencyFiles.
+func runWithDependencies(t *testing.T, fileName string, subject string) rule_testing.Result {
+	t.Helper()
+	files := map[string]string{fileName: subject}
+	for name, contents := range dependencyFiles {
+		files[name] = contents
+	}
+	return rule_testing.RunTypedFiles(t, ReactComponentRequirePropertiesTypeSuffix, files, fileName)
+}
+
+// A type a dependency declares keeps the dependency's name (#kk5kk04). Ownership is decided by where the
+// type is declared, so Next's globals, React's types and a package's own TypeScript all pass, each
+// through the path that can tell it apart: a declaration file, a node_modules path, and an import
+// followed to what it names.
+func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		fileName   string
+		sourceText string
+	}{
+		{
+			"Next's global PageProps",
+			"app/x/page.tsx",
+			"export default function Page(properties: PageProps<'/x'>) {\n    return <main>{String(properties)}</main>;\n}\n",
+		},
+		{
+			"Next's global LayoutProps",
+			"app/x/layout.tsx",
+			"export default function Layout(properties: LayoutProps<'/x'>) {\n    return <main>{String(properties.children)}</main>;\n}\n",
+		},
+		{
+			"React's ComponentProps, imported by name",
+			typeSuffixFile,
+			"import type { ComponentProps } from 'react';\n" +
+				"export function Button(properties: ComponentProps<'button'>) {\n    return <button>{properties.tag}</button>;\n}\n",
+		},
+		{
+			"React's ComponentProps, through the namespace",
+			typeSuffixFile,
+			"import * as React from 'react';\n" +
+				"export function Button(properties: React.ComponentProps<'button'>) {\n    return <button>{properties.tag}</button>;\n}\n",
+		},
+		{
+			"a package's type shipped as plain TypeScript under node_modules",
+			typeSuffixFile,
+			"import type { KitProps } from 'kit';\n" +
+				"export const Button = (properties: KitProps) => <button>{properties.label}</button>;\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runWithDependencies(t, testCase.fileName, testCase.sourceText))
+		})
+	}
+}
+
+// The fix used to rename Next's global at the parameter, and the program stopped type checking.
+//
+// `PageProps<'/x'>` became `PageProperties<'/x'>`, which parses and names nothing, so the fix engine's
+// parse guard had nothing to refuse. The rule now reports nothing there, so there is no fix to apply,
+// while a component of ours in the same file keeps both its findings and both its fixes: skipping the
+// dependency's type is not a silencer for the file.
+func TestReactComponentRequirePropertiesTypeSuffixNeverRenamesADependencysType(t *testing.T) {
+	t.Parallel()
+
+	result := runWithDependencies(t, "app/x/page.tsx",
+		"function Card(properties: CardProps) {\n    return <p>{properties.label}</p>;\n}\n"+
+			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
+			"interface CardProps { label: string }\n")
+	rule_testing.ExpectFixedSource(t, result,
+		"function Card(properties: CardProperties) {\n    return <p>{properties.label}</p>;\n}\n"+
+			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
+			"interface CardProperties { label: string }\n")
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("wanted the two findings for CardProps and none for PageProps, got %d", len(result.Diagnostics))
+	}
+}
+
+// A dependency's name is not collected for the declaration findings, so a declaration of ours that
+// happens to share it, in a scope of its own, is not renamed on its account. Collecting it reported the
+// helper's interface and renamed it to `KitProperties`, a rename nothing asked for.
+func TestReactComponentRequirePropertiesTypeSuffixDoesNotCollectADependencysName(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, runWithDependencies(t, typeSuffixFile,
+		"import type { KitProps } from 'kit';\n"+
+			"export function Button(properties: KitProps) {\n    return <button>{properties.label}</button>;\n}\n"+
+			"export function describe() {\n    interface KitProps { label: string }\n"+
+			"    const sample: KitProps = { label: 'a' };\n    return sample.label;\n}\n"))
+}
+
+// Our own interface without the suffix still fails, at the use and at the declaration, each with its fix,
+// in a program that also holds the dependencies: the predicate keeps what our source declares.
+func TestReactComponentRequirePropertiesTypeSuffixStillFixesOurOwnTypeBesideDependencies(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectFixedSource(t,
+		runWithDependencies(t, typeSuffixFile,
+			"export function Button(properties: ButtonProps) {\n    return <button>{properties.label}</button>;\n}\n"+
+				"export interface ButtonProps { label: string }\n"),
+		"export function Button(properties: ButtonProperties) {\n    return <button>{properties.label}</button>;\n}\n"+
+			"export interface ButtonProperties { label: string }\n")
+}
+
+// Without a checker the rule cannot tell whose a type is, and judges every name as it did before the
+// dependency check existed: a missed exemption, never a dropped finding of ours.
+func TestReactComponentRequirePropertiesTypeSuffixWithoutACheckerJudgesEveryName(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, "/repository/app/x/page.tsx",
+		"export default function Page(properties: PageProps<'/x'>) {\n    return null;\n}\n"),
+		"useComponentPropertyTypeSuffix")
 }
