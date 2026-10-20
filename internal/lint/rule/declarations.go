@@ -1,6 +1,10 @@
 package rule
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+)
 
 // DeclarationsIn returns the declarations of symbol that sit in sourceFile, in the checker's order.
 //
@@ -66,4 +70,30 @@ func IsFirstDeclaredInDeclarationFile(symbol *ast.Symbol) bool {
 	}
 	file := ast.GetSourceFileOfNode(symbol.Declarations[0])
 	return file != nil && file.IsDeclarationFile
+}
+
+// IsDeclaredByADependency reports whether any declaration of symbol is a dependency's (see
+// IsDependencyDeclaration): a type or value a framework or package names, which a rule about our own
+// naming must leave alone, and a fix must never rename, since the name is not ours to change. One such
+// declaration is enough, so a global our source merges into is still the dependency's. It answers about
+// files and hands back no node, which the type-reach guard trusts.
+func IsDeclaredByADependency(symbol *ast.Symbol) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if IsDependencyDeclaration(declaration) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDependencyDeclaration reports whether declaration sits outside our source: in a declaration file,
+// like Next's generated route types or a lib, or in any file under a node_modules directory, which an
+// installed package may ship as plain TypeScript. Ownership is decided by where the type is declared,
+// not by how it is spelled (#kk5kk04).
+func IsDependencyDeclaration(declaration *ast.Node) bool {
+	file := ast.GetSourceFileOfNode(declaration)
+	return file != nil && (file.IsDeclarationFile || strings.Contains(strings.ReplaceAll(file.FileName().AsString(), "\\", "/"), "/node_modules/"))
 }

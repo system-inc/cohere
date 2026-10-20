@@ -416,6 +416,9 @@
                 "adamic/invariant-mutable": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "adamic/no-ambient-declarations": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "adamic/no-definite-assignment": {
                     "$ref": "#/$defs/ruleSetting"
                 },
