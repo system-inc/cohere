@@ -80,8 +80,11 @@ type typeReachScan struct {
 //   - rule.DeclarationsIn filters to the file it is handed, and is trusted only when handed the rule's
 //     own ctx.SourceFile;
 //   - rule.IsDeclaredOnlyInDeclarationFiles and rule.IsDeclaredInASourceFile answer a bool about which
-//     files declare a symbol.
+//     files declare a symbol;
+//   - rule.IsFirstDeclaredInDeclarationFile answers only the first declaration's file kind, preserving
+//     the order-sensitive query used by core.resolvesToAGlobal. Its tests cover mixed files in both orders.
 var ownFileDeclarationReaders = map[string]bool{
+	"rule.IsFirstDeclaredInDeclarationFile": true,
 	"rule.DeclarationsIn":                   true,
 	"rule.IsDeclaredOnlyInDeclarationFiles": true,
 	"rule.IsDeclaredInASourceFile":          true,

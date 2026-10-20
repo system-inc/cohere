@@ -117,6 +117,7 @@ func DecodeNoPromiseExecutorReturnOptions(raw []byte) (any, error) {
 // considers `wrapBraces` and declines, because `{function () {}}` is a block containing a function
 // DECLARATION with no name, which is a syntax error. A named one is fine and gets the suggestion.
 var NoPromiseExecutorReturn = rule.Rule{
+	TypeReach:        rule.TypeReachShapes,
 	Name:             "no-promise-executor-return",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
