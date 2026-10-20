@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/incremental"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/zeebo/xxh3"
 )
 
@@ -291,9 +292,10 @@ func countContentKeyed(projectFiles []*ast.SourceFile, signatures map[string]Sig
 const syntaxDefinition = "syntax2:"
 
 // elidedBodiesVersion is the version of a file's text with the body of every function, method, accessor,
-// constructor, arrow function and class static block cut out, outermost first, and with the whitespace and
+// constructor and arrow function cut out, outermost first, and with the whitespace and
 // plain comments between tokens left out. An edit inside a body, or to a plain comment or a blank line,
-// leaves it unchanged; an edit anywhere else changes it.
+// leaves it unchanged; an edit anywhere else changes it. Static blocks currently expose no Body() in
+// the compiler API, so their text is retained. rule.ElidedBodyRange preserves that exact definition.
 //
 // Trivia is found from the parse, never by scanning the text on its own: each node's leading trivia runs
 // from its full start to its first token, which the parser fixed, so a regular expression or a string
@@ -320,23 +322,17 @@ func elidedBodiesVersion(sourceFile *ast.SourceFile) string {
 	}
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
-		if ast.IsFunctionLikeDeclaration(node) || ast.IsClassStaticBlockDeclaration(node) {
-			if body := node.Body(); body != nil {
-				// A body's position includes the trivia before it, so a comment between a signature and its
-				// brace is cut with the body, and an edit to it is as invisible to the shape as one inside.
-				// No rule reads such a comment off an imported declaration; one that did would need the
-				// content fingerprint anyway.
-				noteTrivia(node.Pos())
-				cuts = append(cuts, cut{body.Pos(), body.End(), "{}"})
-				triviaAt[body.Pos()] = true
-				node.ForEachChild(func(child *ast.Node) bool {
-					if child.End() <= body.Pos() {
-						visit(child)
-					}
-					return false
-				})
+		if start, end, elided := rule.ElidedBodyRange(node); elided {
+			noteTrivia(node.Pos())
+			cuts = append(cuts, cut{start, end, "{}"})
+			triviaAt[start] = true
+			node.ForEachChild(func(child *ast.Node) bool {
+				if child.End() <= start {
+					visit(child)
+				}
 				return false
-			}
+			})
+			return false
 		}
 		noteTrivia(node.Pos())
 		node.ForEachChild(visit)

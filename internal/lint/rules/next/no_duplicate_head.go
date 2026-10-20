@@ -122,6 +122,7 @@ var NoDuplicateHead = rule.Rule{
 	// the shadow cases and the member-tag case both turn on which binding a tag resolves to rather
 	// than on how it is spelled. Two siblings in this package resolve JSX tags the same way.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	NoListener:       rule.NoListenerDeclinesIrrelevantFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Every declaration node that binds a local name `Head` at the module root. Keyed by node
@@ -247,14 +248,5 @@ var NoDuplicateHead = rule.Rule{
 // `const Head` inside a function and an imported `Head` at the root are two declarations and a tag
 // under the function resolves to the inner one. Comparing kinds, or comparing text, would count it.
 func resolvesToDeclaration(ctx rule.Context, tagName *ast.Node, declarations map[*ast.Node]bool) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(tagName)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if declarations[declaration] {
-			return true
-		}
-	}
-	return false
+	return rule.HasDeclarationInSet(ctx.TypeChecker.GetSymbolAtLocation(tagName), declarations)
 }

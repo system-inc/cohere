@@ -140,6 +140,7 @@ var NoUnstableNestedComponents = rule.Rule{
 	// decide whether a bare `createElement(...)` names the React function. Upstream answers the
 	// same question with scope analysis over the file's imports.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUnstableNestedComponentsOptions](options)

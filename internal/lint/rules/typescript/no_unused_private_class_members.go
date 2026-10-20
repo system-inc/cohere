@@ -105,6 +105,7 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 	// A use is attributed by resolving the property name to its declaration, which is the checker's
 	// question and is what replaces upstream's scope pass.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
@@ -373,14 +374,9 @@ func markPrivateKeywordAccess(
 	if symbol == nil {
 		return
 	}
-	for _, declaration := range symbol.Declarations {
-		for _, candidate := range candidates {
-			if candidate.isHashPrivate || candidate.declaration != declaration || candidate.used {
-				continue
-			}
-			if privateKeywordAccessIsRead(access, candidate.isAccessor) {
-				candidate.used = true
-			}
+	for _, candidate := range candidates {
+		if !candidate.isHashPrivate && !candidate.used && rule.HasDeclaration(symbol, candidate.declaration) && privateKeywordAccessIsRead(access, candidate.isAccessor) {
+			candidate.used = true
 		}
 	}
 }
@@ -602,11 +598,9 @@ func markDestructuredUse(ctx rule.Context, element *ast.Node, byName map[string]
 	if property == nil {
 		return
 	}
-	for _, declaration := range property.Declarations {
-		for _, candidate := range candidates {
-			if !candidate.isHashPrivate && candidate.declaration == declaration {
-				candidate.used = true
-			}
+	for _, candidate := range candidates {
+		if !candidate.isHashPrivate && rule.HasDeclaration(property, candidate.declaration) {
+			candidate.used = true
 		}
 	}
 }
@@ -647,11 +641,9 @@ func markResolvedUse(ctx rule.Context, name *ast.Node, byName map[string][]*priv
 	if symbol == nil {
 		return
 	}
-	for _, declaration := range symbol.Declarations {
-		for _, candidate := range candidates {
-			if !candidate.isHashPrivate && candidate.declaration == declaration {
-				candidate.used = true
-			}
+	for _, candidate := range candidates {
+		if !candidate.isHashPrivate && rule.HasDeclaration(symbol, candidate.declaration) {
+			candidate.used = true
 		}
 	}
 }
@@ -686,11 +678,9 @@ func markShorthandAssignmentUse(
 	if property == nil {
 		return
 	}
-	for _, declaration := range property.Declarations {
-		for _, candidate := range candidates {
-			if !candidate.isHashPrivate && candidate.declaration == declaration {
-				candidate.used = true
-			}
+	for _, candidate := range candidates {
+		if !candidate.isHashPrivate && rule.HasDeclaration(property, candidate.declaration) {
+			candidate.used = true
 		}
 	}
 }

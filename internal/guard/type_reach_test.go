@@ -89,6 +89,11 @@ type typeReachScan struct {
 //     vacuous-all default-library queries. Their tests distinguish ordinary declaration files and
 //     mixed library/source declarations in both orders.
 var ownFileDeclarationReaders = map[string]bool{
+	// Scalar identity comparisons; tests pin own/foreign declarations in both checker orders.
+	"rule.HasDeclaration":        true,
+	"rule.HasDeclarationInSet":   true,
+	"rule.FirstDeclarationInSet": true,
+	"rule.IsDeclaredInFile":      true,
 	// Scalar provenance/count queries: mixed-order and empty/missing-file tests preserve each contract.
 	"rule.HasDeclarations":                  true,
 	"rule.IsDeclaredInANonDeclarationFile":  true,
@@ -108,8 +113,11 @@ var ownFileDeclarationReaders = map[string]bool{
 //
 //   - rule.ExportNameIn follows imports and re-exports through other files' export syntax to the export
 //     of a module an expression names, the React compiler lowering's callee origin;
-//   - rule.ImportBindingOf reads how a name is bound in its own file, the lowering's global loads.
-var shapeReaders = map[string]bool{"rule.ExportNameIn": true, "rule.ImportBindingOf": true}
+//   - rule.ImportBindingOf reads how a name is bound in its own file, the lowering's global loads;
+//   - rule.IsReactPragmaBinding checks the identifier's home and each foreign header against the
+//     exact cut ranges shared with SignatureEntry.Syntax. The scan also requires ctx.SourceFile as
+//     its home argument. Wrong-file, cut-region and cache-invalidation tests hold both boundaries.
+var shapeReaders = map[string]bool{"rule.IsReactPragmaBinding": true, "rule.ExportNameIn": true, "rule.ImportBindingOf": true}
 
 // A shape reader's answer is plain data. A result that could carry a compiler value would let a caller
 // take a node from another file and descend into its body, which is the read the scan exists to see, so
@@ -401,7 +409,7 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 				return false
 			}
 			object := info.Uses[selector.Sel]
-			if object == nil || object.Pkg() == nil || object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" {
+			if object == nil || object.Pkg() == nil || (object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" && object.Pkg().Name()+"."+object.Name() != "rule.IsReactPragmaBinding") {
 				return false
 			}
 			return len(call.Args) == 0 || !isOwnSourceFile(call.Args[0], info)
