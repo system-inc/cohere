@@ -93,3 +93,75 @@ func TestIsDeclaredOnlyInDeclarationFilesTellsALibGlobalFromASourceBinding(t *te
 		t.Error("parseInt, or a nil symbol, was taken for something a source file declares")
 	}
 }
+
+// IsDeclaredByADependency tells a type a dependency declares from one our source declares: a global from a
+// declaration file, and a type an installed package ships as plain TypeScript under node_modules, against
+// an interface a source file declares and one it merges into the global.
+func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	files := map[string]string{
+		"tsconfig.json":                 `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, "include": ["*.ts"]}`,
+		"routes.d.ts":                   "interface PageProps { route: string }\ninterface Merged { a: string }\n",
+		"node_modules/kit/package.json": `{"name": "kit", "types": "index.ts"}`,
+		"node_modules/kit/index.ts":     "export interface KitProps { a: string }\n",
+		"subject.ts": "import type { KitProps } from 'kit';\ninterface Ours { a: string }\ndeclare global { interface Merged { b: string } }\n" +
+			"export declare const page: PageProps;\nexport declare const kit: KitProps;\nexport declare const ours: Ours;\nexport declare const merged: Merged;\n",
+	}
+	for name, contents := range files {
+		path := filepath.Join(directory, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var subject *ast.SourceFile
+	for _, sourceFile := range graph.ProjectFiles() {
+		if filepath.Base(sourceFile.FileName().AsString()) == "subject.ts" {
+			subject = sourceFile
+		}
+	}
+	if subject == nil {
+		t.Fatal("the probe program does not hold the subject")
+	}
+	checker, release := graph.CheckerForFile(context.Background(), subject)
+	defer release()
+
+	// Each `declare const` names its type once, and the type reference's symbol is what a rule asks about.
+	symbolOfTypeAt := func(statement int) *ast.Symbol {
+		declaration := subject.Statements.Nodes[statement].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
+		symbol := checker.GetSymbolAtLocation(declaration.Type().AsTypeReferenceNode().TypeName)
+		if symbol == nil {
+			t.Fatalf("statement %d named no symbol", statement)
+		}
+		return symbol
+	}
+	page, kit, ours, merged := symbolOfTypeAt(3), checker.GetAliasedSymbol(symbolOfTypeAt(4)), symbolOfTypeAt(5), symbolOfTypeAt(6)
+
+	if !rule.IsDeclaredByADependency(page) {
+		t.Error("a global declared in a declaration file was not recognised as a dependency's")
+	}
+	if !rule.IsDeclaredByADependency(kit) {
+		t.Error("a type a package ships as plain TypeScript under node_modules was not recognised as a dependency's")
+	}
+	if rule.IsDeclaredByADependency(ours) {
+		t.Error("an interface a source file declares was taken for a dependency's")
+	}
+	if !rule.IsDeclaredByADependency(merged) {
+		t.Error("a global our source merges into was not recognised as a dependency's")
+	}
+	if rule.IsDeclaredByADependency(nil) || rule.IsDependencyDeclaration(nil) {
+		t.Error("a nil symbol or declaration was taken for a dependency's")
+	}
+
+	// The import specifier itself is in our source, so a caller has to follow the alias to ask the question.
+	if rule.IsDeclaredByADependency(symbolOfTypeAt(4)) {
+		t.Error("the import alias, declared in the subject, was taken for the package's type")
+	}
+}

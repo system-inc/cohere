@@ -15835,7 +15835,7 @@
             "namespace": "structure",
             "origin": "house",
             "category": "react-component",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "useComponentPropertyTypeSuffix",
                 "useInterfaceSuffix",

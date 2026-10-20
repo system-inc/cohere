@@ -1,7 +1,7 @@
 {
     "rule": "structure/react-component-require-properties-type-suffix",
     "firing": {
-        "file": "/repository/source/components/Button.tsx",
+        "file": "source/components/Button.tsx",
         "source": "import type { ButtonBag } from './Types';\nexport function Button(properties: ButtonBag) {\n    return <button />;\n}\n",
         "findings": [
             {
@@ -17,7 +17,7 @@
         "fixedSource": "import type { ButtonBag } from './Types';\nexport function Button(properties: ButtonBagProperties) {\n    return <button />;\n}\n"
     },
     "clean": {
-        "file": "/repository/source/components/Button.tsx",
+        "file": "source/components/Button.tsx",
         "source": "export function Button() {\n    return <button />;\n}\n"
     },
     "assertedMessageIds": [
