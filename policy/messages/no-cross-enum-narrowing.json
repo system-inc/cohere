@@ -1,0 +1,8 @@
+{
+  "rules": { "TypeScript": "adamic/no-cross-enum-narrowing" },
+  "messages": {
+    "crossEnumNarrowing": {
+      "text": "'{{other}}' and '{{member}}' are both {{value}}, but TypeScript treats them as unrelated, so this comparison narrows away '{{member}}' values that match at run time."
+    }
+  }
+}

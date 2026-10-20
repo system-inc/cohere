@@ -1,0 +1,24 @@
+{
+    "rule": "adamic/no-cross-enum-narrowing",
+    "firing": {
+        "file": "Case.ts",
+        "source": "// t98e: a switch case\nenum Kind { A, B }\nenum Other { X, Y }\ntype P = { kind: Kind.A; value: string };\ntype Q = { kind: Other.X; value: number };\nfunction f(v: P | Q): string {\n  switch (v.kind) {\n    case Other.X:\n      return v.value.toFixed(1);\n    default:\n      return v.value.toUpperCase();\n  }\n}\nconsole.log(f({ kind: Kind.A, value: 'text1' }));\nexport {};\n",
+        "findings": [
+            {
+                "line": 8,
+                "column": 10,
+                "endLine": 8,
+                "endColumn": 17,
+                "messageId": "crossEnumNarrowing",
+                "message": "'Other.X' and 'Kind.A' are both 0, but TypeScript treats them as unrelated, so this comparison narrows away 'Kind.A' values that match at run time."
+            }
+        ]
+    },
+    "clean": {
+        "file": "Case.ts",
+        "source": "const f: () => void = () => 1; f();\n"
+    },
+    "assertedMessageIds": [
+        "crossEnumNarrowing"
+    ]
+}
