@@ -37,8 +37,8 @@ func TestCrossEnumNarrowingRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 17 {
-		t.Fatalf("fixtures: %d, want 17", len(files))
+	if len(files) != 22 {
+		t.Fatalf("fixtures: %d, want 22", len(files))
 	}
 	for _, file := range files {
 		t.Run(strings.TrimSuffix(filepath.Base(file), ".ts"), func(t *testing.T) {
@@ -71,8 +71,27 @@ func TestCrossEnumNarrowingLegal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	literal, err := os.ReadFile("testdata/cross-enum-j.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quiet := map[string]string{}
+	for _, name := range []string{"any", "number-intersection", "literal-union", "string-literal", "wrong-number", "wrong-string"} {
+		bytes, err := os.ReadFile("testdata/cross-enum-" + name + ".ts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		quiet[name] = string(bytes)
+	}
 	base := strings.NewReplacer("return v.value.toFixed(1);", "return String(v.value);", "console.log(f(p));", "console.log('ok');").Replace(string(data))
 	for name, source := range map[string]string{
+		"wrong number primitive":                 quiet["wrong-number"],
+		"wrong string primitive":                 quiet["wrong-string"],
+		"any sibling (tsc keeps P)":              quiet["any"],
+		"intersection sibling (tsc keeps P)":     quiet["number-intersection"],
+		"literal union sibling (tsc keeps P)":    quiet["literal-union"],
+		"string literal sibling (tsc keeps P)":   quiet["string-literal"],
+		"literal sibling (tsc keeps P)":          string(literal),
 		"different member (tsc already rejects)": strings.Replace(base, "type Q = { kind: Other.X;", "type Q = { kind: Other.Y;", 1),
 		"self comparison":                        strings.Replace(base, "v.kind === Other.X", "v.kind === v.kind", 1),
 		"different values":                       strings.Replace(base, "enum Other { X, Y }", "enum Other { X = 2, Y }", 1),

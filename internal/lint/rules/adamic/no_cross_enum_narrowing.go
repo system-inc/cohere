@@ -42,18 +42,13 @@ var NoCrossEnumNarrowing = rule.Rule{
 				if !singleEnum {
 					continue
 				}
-				declared := crossEnumMembers(ctx.TypeChecker, crossEnumDeclaredType(ctx.TypeChecker, sides[1]))
+				declaredTypes := crossEnumDeclaredTypes(ctx.TypeChecker, sides[1])
+				var declared []crossEnumMember
+				for _, typ := range declaredTypes {
+					declared = append(declared, crossEnumMembers(ctx.TypeChecker, typ)...)
+				}
 				for _, other := range compared {
-					// A disjoint enum-only comparison is already rejected by tsc (TS2367).
-					// The hole requires the compared enum to participate in the narrowed type.
-					shared := false
-					for _, member := range declared {
-						if member.enum == other.enum && member.value == other.value {
-							shared = true
-							break
-						}
-					}
-					if !shared {
+					if !crossEnumHasNarrowingConstituent(other, declaredTypes, declared) {
 						continue
 					}
 					for _, member := range declared {
@@ -98,6 +93,7 @@ type crossEnumMember struct {
 	enum  *ast.Symbol
 	name  string
 	value any
+	typ   *checker.Type
 }
 
 func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember {
@@ -113,14 +109,38 @@ func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember 
 		if owner == nil {
 			continue
 		}
-		result = append(result, crossEnumMember{enum: owner, name: type_checking.StableTypeText(tc, part), value: part.AsLiteralType().Value()})
+		result = append(result, crossEnumMember{enum: owner, name: type_checking.StableTypeText(tc, part), value: part.AsLiteralType().Value(), typ: part})
 	}
 	return result
 }
 
-// Recover property types through the receiver's declared type, not its flow type.
-// A union property's synthetic symbol alone may already have lost constituents.
-func crossEnumDeclaredType(tc *checker.Checker, node *ast.Node) *checker.Type {
+// The shim does not expose isTypeComparableTo. These are the grounded overlap
+// constituents: a matching member of the compared enum, its broad primitive, or unknown.
+// Plain literals are excluded: tsc keeps the other enum in that branch (cross-enum-j.ts).
+func crossEnumHasNarrowingConstituent(other crossEnumMember, types []*checker.Type, members []crossEnumMember) bool {
+	for _, member := range members {
+		if member.enum == other.enum && member.value == other.value {
+			return true
+		}
+	}
+	for _, typ := range types {
+		for _, part := range type_checking.UnionTypeParts(typ) {
+			if part.Flags()&checker.TypeFlagsUnknown != 0 {
+				return true
+			}
+			if part.Flags()&checker.TypeFlagsNumber != 0 && other.typ.Flags()&checker.TypeFlagsNumberLiteral != 0 ||
+				part.Flags()&checker.TypeFlagsString != 0 && other.typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Recover slots through each constituent of the receiver's declared type before
+// forming a property union: Kind.A | number would otherwise collapse to number
+// and erase the enum member whose runtime tag collides (h.ts).
+func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type {
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return nil
@@ -139,17 +159,22 @@ func crossEnumDeclaredType(tc *checker.Checker, node *ast.Node) *checker.Type {
 		}
 	}
 	if receiver != nil {
-		typ := crossEnumDeclaredType(tc, receiver)
-		if typ != nil {
-			if property := checker.Checker_getPropertyOfType(tc, typ, key); property != nil {
-				return checker.Checker_getTypeOfSymbol(tc, property)
+		var slots []*checker.Type
+		for _, typ := range crossEnumDeclaredTypes(tc, receiver) {
+			for _, part := range type_checking.UnionTypeParts(typ) {
+				if property := checker.Checker_getPropertyOfType(tc, part, key); property != nil {
+					slots = append(slots, checker.Checker_getTypeOfSymbol(tc, property))
+				}
 			}
+		}
+		if len(slots) > 0 {
+			return slots
 		}
 	}
 	if symbol := tc.GetSymbolAtLocation(node); symbol != nil && symbol.Flags&ast.SymbolFlagsAlias == 0 {
-		return checker.Checker_getTypeOfSymbol(tc, symbol)
+		return []*checker.Type{checker.Checker_getTypeOfSymbol(tc, symbol)}
 	}
-	return tc.GetTypeAtLocation(node)
+	return []*checker.Type{tc.GetTypeAtLocation(node)}
 }
 
 // Unknown computed members still have an enum identity. They cannot supply a
