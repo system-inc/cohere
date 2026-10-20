@@ -100,10 +100,5 @@ func resolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	declaringFile := ast.GetSourceFileOfNode(symbol.Declarations[0])
-	return declaringFile != nil && declaringFile.IsDeclarationFile
+	return rule.IsFirstDeclaredInDeclarationFile(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }

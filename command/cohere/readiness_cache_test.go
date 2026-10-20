@@ -36,7 +36,9 @@ func readinessFixture(t *testing.T) *runCacheFixture {
 	fixture := newRunCacheFixture(t, buildCohere(t))
 	fixture.write("source/definite.ts", "export class Account {\n    balance!: number;\n}\n")
 	fixture.write("source/types.ts", "export type Value = number;\n")
-	fixture.write("source/use.ts", "import type { Value } from \"./types\";\n\ndeclare const value: Value;\nexport const doubled: number = value;\n")
+	// A parameter, not an ambient declare: adamic/no-ambient-declarations refuses a declare read as a value, which
+	// would make use.ts unready before its import changes and leave the fixture nothing to move.
+	fixture.write("source/use.ts", "import type { Value } from \"./types\";\n\nexport function doubled(value: Value): number {\n    const result: number = value;\n    return result;\n}\n")
 	fixture.commit("readiness")
 	return fixture
 }

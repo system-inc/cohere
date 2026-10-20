@@ -157,7 +157,8 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 // suggestion is the safe side of this divergence, because a suggestion is never applied
 // without a human, and the code it proposes is valid in every edition this codebase targets.
 var PreferRegexLiterals = rule.Rule{
-	Name: "prefer-regex-literals",
+	TypeReach: rule.TypeReachShapes,
+	Name:      "prefer-regex-literals",
 
 	// The calls come from the shelf's ReferenceTracker, which tells the global RegExp from a local one
 	// by where its symbol is declared: eleven of upstream's clean cases are exactly that shadow.

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/rules/core"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -234,6 +235,95 @@ func TestACommentEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
 			}
 			if ran["lib.ts"] == 0 {
 				t.Error("the edited file itself was not re-walked")
+			}
+		})
+	}
+}
+
+// Global binding queries only classify declaration files. Keep a real reporting input for every
+// caller: the Object suggestion is deliberately suppressed, because findings with repairs are never
+// cached. Its withheld finding is replayed too, and an unsuppressed cold control below proves it fires.
+func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		subject    rule.Rule
+		source     string
+		suppressed int
+	}{
+		{core.AccessorPairs, `Object.defineProperty({}, "value", { set(value: number) {} });`, 0},
+		{core.NoObjectConstructor, "// cohere-disable-next-line no-object-constructor\nObject();", 1},
+		{core.NoPromiseExecutorReturn, `new Promise((resolve, reject) => { return 1; });`, 0},
+		{core.PreferRegexLiterals, "RegExp(String.raw`a`, \"gg\");", 0},
+	} {
+		t.Run(tc.subject.Name, func(t *testing.T) {
+			t.Parallel()
+			root := writeProject(t, map[string]string{
+				"tsconfig.json": minimalConfig,
+				"lib.ts":        "export function value(): string { return \"before\"; }\n",
+				"consumer.ts":   "import { value } from \"./lib\";\nvoid value;\n" + tc.source + "\n",
+			})
+			counter := &countingRule{ran: map[string]int{}}
+			rules := []rule.Rule{counter.wrap(tc.subject)}
+			before, recorded, shapes := shapeWalk(t, root, rules, nil, nil)
+			if len(before.Diagnostics)+before.Coverage.Suppressed != 1 || before.Coverage.Suppressed != tc.suppressed {
+				t.Fatalf("want exactly one real finding (suppressed %d), got %v, suppressed %d", tc.suppressed, diagnosticKeys(before.Diagnostics), before.Coverage.Suppressed)
+			}
+			var entry *program.LintCacheEntry
+			for index := range recorded.Entries {
+				if filepath.Base(recorded.Entries[index].Path) == "consumer.ts" {
+					entry = &recorded.Entries[index]
+				}
+			}
+			if entry == nil || len(entry.Findings)+len(entry.Withheld) != 1 {
+				t.Fatal("the reporting consumer was not cached with its finding or suppression")
+			}
+			path := filepath.Join(root, "lib.ts")
+			if err := os.WriteFile(path, []byte("export function value(): string { return \"edited body\"; }\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			body, bodyCache, bodyShapes := shapeWalk(t, root, rules, recorded, shapes)
+			ran := counter.snapshot()
+			cold := plainWalk(t, root, rules)
+			if !reflect.DeepEqual(diagnosticKeys(body.Diagnostics), diagnosticKeys(cold.Diagnostics)) || body.Coverage.Suppressed != cold.Coverage.Suppressed {
+				t.Fatal("body replay differs from cold findings or suppressions")
+			}
+			if ran["consumer.ts"] != 0 || body.ShapeKeyedRerun != 0 {
+				t.Errorf("body edit ran consumer %d times (ShapeKeyedRerun %d), want a replay", ran["consumer.ts"], body.ShapeKeyedRerun)
+			}
+			if ran["lib.ts"] != 1 {
+				t.Errorf("edited lib ran %d times, want 1", ran["lib.ts"])
+			}
+			if shapes[path].Signature != bodyShapes[path].Signature || shapes[path].Syntax != bodyShapes[path].Syntax {
+				t.Fatal("body edit moved a shape")
+			}
+			if err := os.WriteFile(path, []byte("export function value(): number { return 1; }\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			signature, _, signatureShapes := shapeWalk(t, root, rules, bodyCache, bodyShapes)
+			ran = counter.snapshot()
+			cold = plainWalk(t, root, rules)
+			if bodyShapes[path].Signature == signatureShapes[path].Signature && bodyShapes[path].Syntax == signatureShapes[path].Syntax {
+				t.Fatal("signature edit did not move the shape key")
+			}
+			if ran["consumer.ts"] != 1 || signature.ShapeKeyedRerun != 1 {
+				t.Errorf("signature edit ran consumer %d times (ShapeKeyedRerun %d), want 1", ran["consumer.ts"], signature.ShapeKeyedRerun)
+			}
+			if !reflect.DeepEqual(diagnosticKeys(signature.Diagnostics), diagnosticKeys(cold.Diagnostics)) || signature.Coverage.Suppressed != cold.Coverage.Suppressed {
+				t.Fatal("signature refresh differs from cold findings or suppressions")
+			}
+			if len(cold.Diagnostics)+cold.Coverage.Suppressed != 1 {
+				t.Fatal("signature edit lost the real finding")
+			}
+			if tc.suppressed != 0 {
+				if err := os.WriteFile(filepath.Join(root, "consumer.ts"), []byte("import { value } from \"./lib\";\nvoid value;\nObject();\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				active := plainWalk(t, root, rules)
+				if len(active.Diagnostics) != 1 {
+					t.Fatal("unsuppressed Object control produced no finding")
+				}
 			}
 		})
 	}
