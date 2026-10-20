@@ -7,7 +7,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -156,6 +155,7 @@ var ConsistentGenericConstructors = rule.Rule{
 	// The typed-array exemption asks whether a name resolves to the global rather than to a local
 	// declaration, which is a resolution question. Everything else is syntax.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
@@ -475,18 +475,7 @@ func isExemptBuiltInArray(ctx rule.Context, annotationName *ast.Node) bool {
 		return true
 	}
 
-	// A declaration in a real source file means the name was shadowed locally. A declaration only in
-	// a default library file is the global itself.
-	for _, declaration := range symbol.Declarations {
-		declarationFile := ast.GetSourceFileOfNode(declaration)
-		if declarationFile == nil {
-			continue
-		}
-		if !type_checking.IsSourceFileDefaultLibrary(ctx.Program, declarationFile) {
-			return false
-		}
-	}
-	return true
+	return rule.IsDeclaredOnlyInDefaultLibraries(ctx.Program, symbol)
 }
 
 func buildPreferConstructorMessage() rule.Message {

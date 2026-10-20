@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -265,7 +264,7 @@ func consistencyNoIsoStringDateCutConstInitializer(ctx rule.Context, identifier 
 // default library declares on `Date`.
 func consistencyNoIsoStringDateCutIsDateMember(ctx rule.Context, name *ast.Node) bool {
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
-	if symbol == nil || !type_checking.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+	if symbol == nil || !rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {

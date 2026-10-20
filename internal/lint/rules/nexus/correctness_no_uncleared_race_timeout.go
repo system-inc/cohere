@@ -2,7 +2,6 @@ package nexus
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -136,7 +135,7 @@ func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ctx rule.Context, symbol *
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}
@@ -170,7 +169,7 @@ func correctnessNoUnclearedRaceTimeoutPromise(ctx rule.Context, element *ast.Nod
 	}
 	constructor := ast.SkipParentheses(element.AsNewExpression().Expression)
 	if constructor.Kind != ast.KindIdentifier || constructor.Text() != "Promise" ||
-		!type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+		!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
 		return nil
 	}
 	return element
@@ -263,7 +262,7 @@ func correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ctx rule.Context, declaratio
 		return ast.IsGlobalScopeAugmentation(container.Parent)
 	case container.Kind == ast.KindInterfaceDeclaration:
 		return container.Name() != nil && container.Name().Text() == "WindowOrWorkerGlobalScope" &&
-			type_checking.IsSourceFileDefaultLibrary(ctx.Program, file)
+			rule.IsSourceFileDefaultLibrary(ctx.Program, file)
 	}
 	return false
 }

@@ -79,6 +79,7 @@ var messagePreferObjectHasOwn = rule.Message{
 var PreferObjectHasOwn = rule.Rule{
 	Name:             "prefer-object-has-own",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -210,17 +211,7 @@ func preferObjectHasOwnUnwrap(node *ast.Node) *ast.Node {
 // The question is about the code the FIX would produce rather than the code that is there, so it is
 // asked by resolving the name at the site the replacement would occupy.
 func preferObjectHasOwnGlobalObjectIsInScopeAt(ctx rule.Context, at *ast.Node) bool {
-	symbol := ctx.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		declaringFile := ast.GetSourceFileOfNode(declaration)
-		if declaringFile == nil || !declaringFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false))
 }
 
 // preferObjectHasOwnResolvesToTheGlobalObject answers upstream's scope question through the
@@ -231,30 +222,7 @@ func preferObjectHasOwnGlobalObjectIsInScopeAt(ctx rule.Context, at *ast.Node) b
 // and its shape is what is wanted here: a name with zero declarations is not something this rule
 // should report on, since `Object` always has declarations when the library is loaded.
 func preferObjectHasOwnResolvesToTheGlobalObject(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	// Every declaration must be ambient rather than just the first.
-	//
-	// Measured equivalent on this shape and kept anyway, with the measurement recorded so the next
-	// reader does not have to retake it. Probed over five ways to write `Object` in source beside
-	// the global: a var, a function, a class and a namespace each RESOLVE THE VALUE POSITION to a
-	// symbol carrying only their own source declaration, so the global is replaced rather than
-	// merged with. The one shape that does merge, `interface Object`, contributes a TYPE, so the
-	// value position still comes back with two ambient declarations and no source one. No probed
-	// input produces a mixed list here, so the loop and an index-zero read cannot disagree.
-	//
-	// The loop stands because the verdict is about what the checker does today rather than about
-	// the grammar, and because index-zero is the pattern this tree has been bitten by before. If a
-	// merging shape is ever found, this is already right and the note is what expires.
-	for _, declaration := range symbol.Declarations {
-		declaringFile := ast.GetSourceFileOfNode(declaration)
-		if declaringFile == nil || !declaringFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferObjectHasOwnFix builds the repair, or declines.

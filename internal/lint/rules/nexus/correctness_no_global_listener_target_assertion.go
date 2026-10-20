@@ -218,7 +218,7 @@ func correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx rule.Conte
 	}
 	for _, declaration := range symbol.Declarations {
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -147,7 +146,7 @@ func correctnessNoTestOnGlobalRegexIsRegExpMember(ctx rule.Context, symbol *ast.
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}
@@ -214,7 +213,7 @@ func correctnessNoTestOnGlobalRegexFlags(ctx rule.Context, creation *ast.Node) (
 		newExpression := creation.AsNewExpression()
 		constructor := ast.SkipParentheses(newExpression.Expression)
 		if constructor.Kind != ast.KindIdentifier || constructor.Text() != "RegExp" ||
-			!type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+			!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
 			return "", false
 		}
 		if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) != 2 {

@@ -97,3 +97,23 @@ func IsDependencyDeclaration(declaration *ast.Node) bool {
 	file := ast.GetSourceFileOfNode(declaration)
 	return file != nil && (file.IsDeclarationFile || strings.Contains(strings.ReplaceAll(file.FileName().AsString(), "\\", "/"), "/node_modules/"))
 }
+
+// HasDeclarations reports whether the checker supplied any declarations, without exposing syntax.
+func HasDeclarations(symbol *ast.Symbol) bool {
+	return symbol != nil && len(symbol.Declarations) != 0
+}
+
+// IsDeclaredInANonDeclarationFile reports whether any declaration with a source file is non-ambient.
+// Unlike IsDeclaredInASourceFile it ignores missing files, preserving identifierIsShadowed's query.
+func IsDeclaredInANonDeclarationFile(symbol *ast.Symbol) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		file := ast.GetSourceFileOfNode(declaration)
+		if file != nil && !file.IsDeclarationFile {
+			return true
+		}
+	}
+	return false
+}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -630,7 +629,7 @@ func correctnessNoCallerDataMutationArrayMethod(ctx rule.Context, name *ast.Node
 		owner := declaration.Parent
 		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil ||
 			(owner.Name().Text() != "Array" && owner.Name().Text() != "ReadonlyArray") ||
-			!type_checking.IsSourceFileDefaultLibrary(ctx.Program, ast.GetSourceFileOfNode(declaration)) {
+			!rule.IsSourceFileDefaultLibrary(ctx.Program, ast.GetSourceFileOfNode(declaration)) {
 			return false
 		}
 	}
@@ -803,7 +802,7 @@ func correctnessNoCallerDataMutationWritesData(ctx rule.Context, target *ast.Nod
 	}
 	if alias := checker.Type_alias(receiverType); alias != nil && alias.Symbol() != nil &&
 		correctnessNoCallerDataMutationDataShapes[alias.Symbol().Name] &&
-		type_checking.IsSymbolFromDefaultLibrary(ctx.Program, alias.Symbol()) {
+		rule.IsSymbolFromDefaultLibrary(ctx.Program, alias.Symbol()) {
 		return true
 	}
 	return rule.IsDeclaredInASourceFile(checker.Type_symbol(receiverType))
@@ -825,7 +824,7 @@ func correctnessNoCallerDataMutationIsWriter(ctx rule.Context, name *ast.Node) b
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
 			return false
 		}
 	}

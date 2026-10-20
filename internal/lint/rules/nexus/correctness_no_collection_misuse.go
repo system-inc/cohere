@@ -217,7 +217,7 @@ func correctnessNoCollectionMisuseIsLibraryType(ctx rule.Context, part *checker.
 	if symbol == nil {
 		return false
 	}
-	return names[symbol.Name] && type_checking.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
+	return names[symbol.Name] && rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
 }
 
 // correctnessNoCollectionMisuseIsCollection says whether every member of an expression's type is one
@@ -426,8 +426,8 @@ func correctnessNoCollectionMisuseIsObjectMethodOnCollection(ctx rule.Context, n
 		object.Kind != ast.KindIdentifier || object.Text() != "Object" {
 		return false
 	}
-	if !type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(object)) ||
-		!type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+	if !rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(object)) ||
+		!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
 		return false
 	}
 	return correctnessNoCollectionMisuseIsCollection(ctx, call.Arguments.Nodes[0], correctnessNoCollectionMisuseAnyCollection)

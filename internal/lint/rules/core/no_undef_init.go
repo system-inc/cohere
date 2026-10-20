@@ -78,6 +78,7 @@ func buildNoUndefInitMessage(name string) rule.Message {
 var NoUndefInit = rule.Rule{
 	Name:             "no-undef-init",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
@@ -160,16 +161,7 @@ func identifierIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && !file.IsDeclarationFile {
-			return true
-		}
-	}
-	return false
+	return rule.IsDeclaredInANonDeclarationFile(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // noUndefInitFix builds the removal upstream would build, or declines the way upstream declines.
