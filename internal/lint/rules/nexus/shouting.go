@@ -30,7 +30,7 @@ import (
 // as a false positive that teaches people to disable the rule.
 var allowedUppercaseTokens = map[string]bool{
 	"AAB": true, "AAC": true, "ACH": true, "ACID": true, "AES": true, "AI": true, "AKA": true, "ANN": true,
-	"ANSI": true, "AOV": true, "API": true, "APK": true, "APNS": true, "ARIA": true, "ARN": true,
+	"ANSI": true, "AOV": true, "API": true, "APK": true, "APNS": true, "ARIA": true, "ARM": true, "ARN": true,
 	"ARP": true, "ARR": true, "ASAP": true, "ASCII": true, "ASIN": true, "ASN": true,
 	"AST": true, "AVI": true,
 	"AVIF": true, "AWS": true, "B2B": true, "BCP": true, "BEL": true, "BEM": true, "BOM": true, "BTC": true,
@@ -48,7 +48,7 @@ var allowedUppercaseTokens = map[string]bool{
 	"CAC": true, "CAF": true, "CAPI": true, "CCPA": true, "CD": true, "CDATA": true, "CDN": true,
 	"CDT": true, "CFA": true, "CFO": true,
 	"CGI": true, "CHIPS": true, "CI": true, "CJS": true, "CLI": true, "CMYK": true, "COA": true,
-	"COGS": true, "CORS": true, "CPA": true, "CPM": true, "CPU": true, "CRUD": true, "CSS": true,
+	"COGS": true, "CORS": true, "CPA": true, "CPM": true, "CPU": true, "CRT": true, "CRUD": true, "CSS": true,
 	"CST": true, "CSV": true, "CTA": true, "CTE": true, "CTR": true, "CUSIP": true, "DB": true, "DEL": true,
 	"DER": true, "DKIM": true, "DM": true, "DNA": true, "DNS": true, "DOM": true, "DOS": true, "DRY": true,
 	"DSHEA": true, "DTO": true, "EBML": true, "EBU": true, "ECDH": true, "ECDSA": true, "ECE": true,
