@@ -227,6 +227,9 @@ func gate(worktree string, commit string) int {
 		if err := vet.Run(); err != nil {
 			return exitCodeOf(err)
 		}
+		if code := checkRuleCPU(worktree, func() []string { return gateEnvironment(step("the rule CPU budget check")) }); code != 0 {
+			return code
+		}
 		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
 		testing, uncovered, err := testEnvironment(gateEnvironment(step("the test run")))
 		if err != nil {
@@ -244,8 +247,33 @@ func gate(worktree string, commit string) int {
 	})
 }
 
+// ruleCPUCheck is the repository-local, generated stress corpus and its budget test.
+const ruleCPUCheck = "./internal/lint/registry/rule_budget_test.go"
+
 // docsDataGenerator is the repository's generator of the website's data, relative to its root.
 const docsDataGenerator = "./internal/docsdata/tools/generate"
+
+// checkRuleCPU runs uncached on each land attempt, before tests and fast-forward.
+// Repositories without this cohere-specific check say so, like the docs data check.
+func checkRuleCPU(worktree string, environment func() []string) int {
+	if _, err := os.Stat(filepath.Join(worktree, ruleCPUCheck)); err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "cohere-dev: reading the rule CPU check: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "cohere-dev: no %s here, so no rule CPU budget to check\n", ruleCPUCheck)
+		return 0
+	}
+	started := time.Now()
+	check := exec.Command("go", "test", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v", "./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)))
+	check.Dir, check.Env = worktree, environment()
+	check.Stdout, check.Stderr = os.Stdout, os.Stderr
+	if err := check.Run(); err != nil {
+		return exitCodeOf(err)
+	}
+	fmt.Fprintf(os.Stderr, "cohere-dev: rule CPU budget passed (%s)\n", time.Since(started).Round(time.Millisecond))
+	return 0
+}
 
 // docsDataRecapture is what a landing whose docs data went stale runs, then commits.
 const docsDataRecapture = "go run " + docsDataGenerator + " -capture"
