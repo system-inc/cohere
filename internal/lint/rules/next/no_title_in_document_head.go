@@ -75,6 +75,7 @@ var NoTitleInDocumentHead = rule.Rule{
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:             "@next/next/no-title-in-document-head",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The specifier nodes this file watches, at most one per `next/document` declaration.
 		var watched []*ast.Node
@@ -207,14 +208,9 @@ func resolvesToWatchedSpecifier(ctx rule.Context, tagName *ast.Node, watched []*
 		return false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(tagName)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		for _, specifier := range watched {
-			if declaration == specifier {
-				return true
-			}
+	for _, specifier := range watched {
+		if rule.HasDeclaration(symbol, specifier) {
+			return true
 		}
 	}
 	return false

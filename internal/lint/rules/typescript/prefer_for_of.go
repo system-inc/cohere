@@ -81,6 +81,7 @@ var PreferForOf = rule.Rule{
 	// Resolving a body identifier back to the loop's own declarator is the only way to tell a
 	// reference to this index from a reference to a shadowing one with the same name.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
@@ -310,16 +311,7 @@ func isIndexOnlyUsedToSubscript(
 // kind comparison, because a kind comparison passes every corpus case and fails on exactly the
 // shadowing shape upstream tests, where both declarations are the same kind.
 func resolvesToDeclarator(ctx rule.Context, identifier *ast.Node, declarator *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == declarator {
-			return true
-		}
-	}
-	return false
+	return rule.HasDeclaration(ctx.TypeChecker.GetSymbolAtLocation(identifier), declarator)
 }
 
 // isSubscriptOfArray answers upstream's condition on one reference.

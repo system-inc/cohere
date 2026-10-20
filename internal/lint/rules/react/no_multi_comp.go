@@ -115,6 +115,7 @@ var NoMultiComp = rule.Rule{
 	// case 5, which writes `import React, { createElement } from "react"` and returns
 	// `createElement("img")`, would be judged not a component.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {

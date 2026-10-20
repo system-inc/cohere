@@ -301,6 +301,7 @@ var LogicalAssignmentOperators = rule.Rule{
 	// every such name as the global, which is the right answer for source that does not shadow it
 	// and is why the untyped fixtures agree on everything else.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[LogicalAssignmentOperatorsOptions](options)
 		if settings.Require == nil {
@@ -453,15 +454,7 @@ func (state *logicalAssignmentState) isShadowedInThisFile(identifier *ast.Node) 
 	if symbol == nil {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
-			continue
-		}
-		if ast.GetSourceFileOfNode(declaration) == state.ctx.SourceFile {
-			return true
-		}
-	}
-	return false
+	return rule.IsDeclaredInFile(state.ctx.SourceFile, symbol)
 }
 
 // logicalAssignmentIsSameReference is upstream's `isSameReference` called with no third argument,

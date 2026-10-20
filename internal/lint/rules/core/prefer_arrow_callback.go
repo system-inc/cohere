@@ -134,6 +134,7 @@ var PreferArrowCallback = rule.Rule{
 	// Telling a genuine self-reference from a shadowed one is name resolution. See the judgment
 	// section above for the three measured outcomes.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := preferArrowCallbackSettingsFrom(options)
@@ -242,7 +243,7 @@ func preferArrowCallbackResolvesToADeclaration(ctx rule.Context, node *ast.Node)
 		return false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-	return symbol != nil && len(symbol.Declarations) > 0
+	return rule.HasDeclarations(symbol)
 }
 
 // preferArrowCallbackIsDeclarationName answers whether this identifier is a name being declared

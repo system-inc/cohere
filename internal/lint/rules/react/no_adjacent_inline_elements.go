@@ -147,6 +147,7 @@ var NoAdjacentInlineElements = rule.Rule{
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
 	// whether `createElement` binds to a `react` import. The JSX arm needs nothing.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// isInlineJsxChild answers upstream's `isInline` for a node in a JSX child list.

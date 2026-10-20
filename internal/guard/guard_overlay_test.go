@@ -332,3 +332,38 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A pragma reader may inspect the home file's bodies only when home is the rule's own file. Runtime
+// identifier checks alone cannot establish that argument at a call site; the scan must check it too.
+func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(t *testing.T) {
+	t.Parallel()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "internal/lint/rules/react/checked_requires_onchange_or_readonly.go")
+	original, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := "rule.IsReactPragmaBinding(ctx.SourceFile,"
+	if strings.Count(string(original), before) != 1 {
+		t.Fatal("fixture must replace exactly one pragma call")
+	}
+	overlay := guardOverlay(t)
+	planted := make(map[string][]byte, len(overlay)+1)
+	for path, contents := range overlay {
+		planted[path] = contents
+	}
+	planted[target] = []byte(strings.Replace(string(original), before, "rule.IsReactPragmaBinding(ast.GetSourceFileOfNode(callee),", 1))
+	baseline := scanTypeReach(t, overlay)
+	unsafe := scanTypeReach(t, planted)
+	for _, name := range []string{"react/no-adjacent-inline-elements", "react/no-multi-comp", "react/no-object-type-as-default-prop", "react/no-unstable-nested-components"} {
+		if baseline.mayReadImportedBodies[name] {
+			t.Errorf("%s: own-file pragma call refused", name)
+		}
+		if !unsafe.mayReadImportedBodies[name] {
+			t.Errorf("%s: arbitrary-home pragma call trusted", name)
+		}
+	}
+}

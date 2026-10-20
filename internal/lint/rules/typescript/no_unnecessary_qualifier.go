@@ -80,6 +80,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 	// Every question the rule asks is a resolution question: what does this qualifier name, what is
 	// visible at this point, and are those the same symbol.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		walkOutermost := func(node *ast.Node) {
@@ -264,11 +265,9 @@ func qualifierSymbolIsNamespaceInScope(
 	namespacesInScope []*ast.Node,
 	symbol *ast.Symbol,
 ) bool {
-	for _, declaration := range symbol.Declarations {
-		for _, namespaceNode := range namespacesInScope {
-			if declaration == namespaceNode {
-				return true
-			}
+	for _, namespaceNode := range namespacesInScope {
+		if rule.HasDeclaration(symbol, namespaceNode) {
+			return true
 		}
 	}
 

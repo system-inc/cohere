@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
+	"github.com/system-inc/cohere/internal/lint/rules/next"
 	"github.com/system-inc/cohere/internal/lint/rules/react"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -253,6 +255,11 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 	nullish.Run = func(ctx rule.Context, _ any) rule.Listeners {
 		return nullishRun(ctx, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
 	}
+	logical := core.LogicalAssignmentOperators
+	logicalRun := logical.Run
+	logicalOptions := core.DefaultLogicalAssignmentOperatorsSettings()
+	logicalOptions.EnforceForIfStatements = true
+	logical.Run = func(ctx rule.Context, _ any) rule.Listeners { return logicalRun(ctx, logicalOptions) }
 	for _, tc := range []struct {
 		subject    rule.Rule
 		source     string
@@ -270,6 +277,18 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 		{nullish, `const Boolean = (v: unknown) => v; declare const x: string | undefined; Boolean(x || "fallback");`, 1},
 		{typescript.ConsistentGenericConstructors, `class Uint8Array<T> {} const x: Uint8Array<string> = new Uint8Array();`, 1},
 		{react.UnsupportedSyntax, `function useThing() { useState(); eval("1"); }`, 0},
+		{next.NoScriptComponentInHead, `import Head from "next/head"; const tree = <Head><Script /></Head>;`, 1},
+		{next.NoDuplicateHead, `import Head from "next/head"; const tree = <><Head/><Head/></>;`, 1},
+		{next.NoTitleInDocumentHead, `import {Head} from "next/document"; const tree = <Head><title>x</title></Head>;`, 1},
+		{typescript.PreferForOf, `const xs=[1,2]; for(let i=0;i<xs.length;i++){ void xs[i]; }`, 1},
+		{typescript.NoUnusedPrivateClassMembers, `class C { private unused=0; private used=1; method(){return this.used;} }`, 1},
+		{typescript.NoUnnecessaryQualifier, `namespace A { export const x=1; const y=A.x; }`, 1},
+		{logical, `let x; if (x === null || x === undefined) x = "a";`, 1},
+		{core.PreferArrowCallback, `foo(function(){ const arguments = 1; return arguments; });`, 1},
+		{react.NoAdjacentInlineElements, `import {createElement} from "react"; createElement("div", undefined, [createElement("a"),createElement("span")]);`, 1},
+		{react.NoMultiComp, `import {createElement} from "react"; function A(){return createElement("div");} function B(){return createElement("div");}`, 1},
+		{react.NoObjectTypeAsDefaultProp, `import {createElement} from "react"; function A({items=[]}) {return createElement("div");}`, 1},
+		{react.NoUnstableNestedComponents, `import {createElement} from "react"; function Parent(){function Child(){return createElement("div");} return createElement(Child);}`, 1},
 	} {
 		t.Run(tc.subject.Name, func(t *testing.T) {
 			t.Parallel()
@@ -278,9 +297,9 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 				source = "// cohere-disable-next-line " + tc.subject.Name + "\n" + source
 			}
 			root := writeProject(t, map[string]string{
-				"tsconfig.json": minimalConfig,
+				"tsconfig.json": strings.ReplaceAll(minimalConfig, "./*.ts", "./*.ts*"),
 				"lib.ts":        "export function value(): string { return \"before\"; }\n",
-				"consumer.ts":   "import { value } from \"./lib\";\nvoid value;\n" + source + "\n",
+				"consumer.tsx":  "import { value } from \"./lib\";\nvoid value;\n" + source + "\n",
 			})
 			counter := &countingRule{ran: map[string]int{}}
 			rules := []rule.Rule{counter.wrap(tc.subject)}
@@ -290,7 +309,7 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 			}
 			var entry *program.LintCacheEntry
 			for index := range recorded.Entries {
-				if filepath.Base(recorded.Entries[index].Path) == "consumer.ts" {
+				if filepath.Base(recorded.Entries[index].Path) == "consumer.tsx" {
 					entry = &recorded.Entries[index]
 				}
 			}
@@ -308,8 +327,8 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 			if !reflect.DeepEqual(diagnosticKeys(body.Diagnostics), diagnosticKeys(cold.Diagnostics)) || body.Coverage.Suppressed != cold.Coverage.Suppressed {
 				t.Fatal("body replay differs from cold findings or suppressions")
 			}
-			if ran["consumer.ts"] != 0 || body.ShapeKeyedRerun != 0 {
-				t.Errorf("body edit ran consumer %d times (ShapeKeyedRerun %d), want a replay", ran["consumer.ts"], body.ShapeKeyedRerun)
+			if ran["consumer.tsx"] != 0 || body.ShapeKeyedRerun != 0 {
+				t.Errorf("body edit ran consumer %d times (ShapeKeyedRerun %d), want a replay", ran["consumer.tsx"], body.ShapeKeyedRerun)
 			}
 			if ran["lib.ts"] != 1 {
 				t.Errorf("edited lib ran %d times, want 1", ran["lib.ts"])
@@ -327,8 +346,8 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 			if bodyShapes[path].Signature == signatureShapes[path].Signature && bodyShapes[path].Syntax == signatureShapes[path].Syntax {
 				t.Fatal("signature edit did not move the shape key")
 			}
-			if ran["consumer.ts"] != 1 || signature.ShapeKeyedRerun != 1 {
-				t.Errorf("signature edit ran consumer %d times (ShapeKeyedRerun %d), want 1", ran["consumer.ts"], signature.ShapeKeyedRerun)
+			if ran["consumer.tsx"] != 1 || signature.ShapeKeyedRerun != 1 {
+				t.Errorf("signature edit ran consumer %d times (ShapeKeyedRerun %d), want 1", ran["consumer.tsx"], signature.ShapeKeyedRerun)
 			}
 			if !reflect.DeepEqual(diagnosticKeys(signature.Diagnostics), diagnosticKeys(cold.Diagnostics)) || signature.Coverage.Suppressed != cold.Coverage.Suppressed {
 				t.Fatal("signature refresh differs from cold findings or suppressions")
@@ -337,13 +356,110 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 				t.Fatal("signature edit lost the real finding")
 			}
 			if tc.suppressed != 0 {
-				if err := os.WriteFile(filepath.Join(root, "consumer.ts"), []byte("import { value } from \"./lib\";\nvoid value;\n"+tc.source+"\n"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(root, "consumer.tsx"), []byte("import { value } from \"./lib\";\nvoid value;\n"+tc.source+"\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				active := plainWalk(t, root, rules)
 				if len(active.Diagnostics) != 1 {
 					t.Fatal("unsuppressed control produced no finding")
 				}
+			}
+		})
+	}
+}
+
+// Foreign initializers must move the shape whenever the recognizer can observe their edit. The two
+// nested negative cases are visibility controls, not evidence that hidden syntax is safe to inspect.
+func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, lib, consumer string }{
+		{"script", "declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; const createElement = React.createElement;", "import \"./lib\"; createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"},
+		{"top-level-var-block", "declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; if (true) { var createElement = React.createElement; }", "import \"./lib\"; createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"},
+		{"merged-namespace", "declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; namespace Shared { export const createElement = React.createElement; }", "/// <reference path=\"./lib.ts\" />\nnamespace Shared { createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]); }"},
+		{"module-alias-is-not-followed", "declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; export const createElement = React.createElement;", "import { createElement } from \"./lib\"; createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"},
+		{"foreign-function-local-is-not-visible", "declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; export function setup() { const createElement = React.createElement; }", "import { setup } from \"./lib\"; void setup; createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"},
+		{"global-augmentation-inside-function", "export {}; declare const React: { createElement: (...args: any[]) => unknown }; declare const Other: typeof React; function setup() { declare global { var createElement = React.createElement; } }", "import \"./lib\"; createElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			subject := react.NoAdjacentInlineElements
+			lib := tc.lib + "\nfunction shapeProbe(): string { return \"before\"; }\n"
+			root := writeProject(t, map[string]string{"tsconfig.json": minimalConfig, "lib.ts": lib, "consumer.ts": tc.consumer})
+			counter := &countingRule{ran: map[string]int{}}
+			rules := []rule.Rule{counter.wrap(subject)}
+			before, cache, shapes := shapeWalk(t, root, rules, nil, nil)
+			positive := tc.name == "script" || tc.name == "top-level-var-block" || tc.name == "merged-namespace"
+			want := 0
+			if positive {
+				want = 1
+			}
+			if len(before.Diagnostics) != want {
+				t.Fatalf("initial findings %v, want %d", diagnosticKeys(before.Diagnostics), want)
+			}
+			path := filepath.Join(root, "lib.ts")
+			bodyText := strings.Replace(lib, "return \"before\";", "return \"edited body\";", 1)
+			if err := os.WriteFile(path, []byte(bodyText), 0644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			body, bodyCache, bodyShapes := shapeWalk(t, root, rules, cache, shapes)
+			ran := counter.snapshot()
+			cold := plainWalk(t, root, rules)
+			// Global scripts and augmentations participate in the engine's content-keyed global
+			// component. The module-only cases can replay; globals conservatively rerun.
+			global := positive || tc.name == "global-augmentation-inside-function"
+			bodyRuns := 0
+			if global {
+				bodyRuns = 1
+			}
+			if ran["consumer.ts"] != bodyRuns || body.ShapeKeyedRerun != bodyRuns {
+				t.Errorf("body edit ran consumer %d times (shape %d), want %d", ran["consumer.ts"], body.ShapeKeyedRerun, bodyRuns)
+			}
+			if shapes[path].Signature != bodyShapes[path].Signature || shapes[path].Syntax != bodyShapes[path].Syntax {
+				t.Fatal("body edit moved shape")
+			}
+			if !reflect.DeepEqual(diagnosticKeys(body.Diagnostics), diagnosticKeys(cold.Diagnostics)) || len(cold.Diagnostics) != want {
+				t.Fatal("body replay differs from cold")
+			}
+			signatureText := strings.Replace(bodyText, "function shapeProbe(): string { return \"edited body\"; }", "function shapeProbe(): number { return 1; }", 1)
+			if err := os.WriteFile(path, []byte(signatureText), 0644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			signature, signatureCache, signatureShapes := shapeWalk(t, root, rules, bodyCache, bodyShapes)
+			ran = counter.snapshot()
+			cold = plainWalk(t, root, rules)
+			if ran["consumer.ts"] != 1 || signature.ShapeKeyedRerun != 1 {
+				t.Errorf("signature edit ran consumer %d times, want 1", ran["consumer.ts"])
+			}
+			if bodyShapes[path].Signature == signatureShapes[path].Signature && bodyShapes[path].Syntax == signatureShapes[path].Syntax {
+				t.Fatal("signature edit left shape unchanged")
+			}
+			if !reflect.DeepEqual(diagnosticKeys(signature.Diagnostics), diagnosticKeys(cold.Diagnostics)) || len(cold.Diagnostics) != want {
+				t.Fatal("signature refresh differs from cold")
+			}
+			initializerText := strings.Replace(signatureText, "= React.createElement", "= Other.createElement", 1)
+			if err := os.WriteFile(path, []byte(initializerText), 0644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			edited, _, editedShapes := shapeWalk(t, root, rules, signatureCache, signatureShapes)
+			ran = counter.snapshot()
+			cold = plainWalk(t, root, rules)
+			moved := signatureShapes[path].Signature != editedShapes[path].Signature || signatureShapes[path].Syntax != editedShapes[path].Syntax
+			wantMoved := positive || tc.name == "module-alias-is-not-followed"
+			if moved != wantMoved {
+				t.Errorf("initializer shape moved %v, want %v", moved, wantMoved)
+			}
+			wantRuns := 0
+			if wantMoved || global {
+				wantRuns = 1
+			}
+			if ran["consumer.ts"] != wantRuns {
+				t.Errorf("initializer edit ran consumer %d times, want %d", ran["consumer.ts"], wantRuns)
+			}
+			if !reflect.DeepEqual(diagnosticKeys(edited.Diagnostics), diagnosticKeys(cold.Diagnostics)) || len(cold.Diagnostics) != 0 {
+				t.Fatal("initializer refresh/replay differs from cold zero findings")
 			}
 		})
 	}

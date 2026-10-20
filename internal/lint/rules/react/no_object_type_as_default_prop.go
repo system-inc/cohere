@@ -62,6 +62,7 @@ func messageForbiddenTypeDefaultParam(propertyName string, forbiddenType string)
 var NoObjectTypeAsDefaultProp = rule.Rule{
 	Name:             "react/no-object-type-as-default-prop",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

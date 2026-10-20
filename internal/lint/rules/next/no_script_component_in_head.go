@@ -86,6 +86,7 @@ var NoScriptComponentInHead = rule.Rule{
 	// Shadowing is the whole reason. See the doc above: a local `Head` is textually identical to the
 	// imported one and is silent upstream, and only resolution separates them.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The clause each `next/head` default import declares. A file can write more than one such
@@ -152,11 +153,7 @@ func bindsToOneOf(ctx rule.Context, tagName *ast.Node, clauses map[*ast.Node]boo
 	if ctx.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(tagName)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	return clauses[symbol.Declarations[0]]
+	return rule.FirstDeclarationInSet(ctx.TypeChecker.GetSymbolAtLocation(tagName), clauses)
 }
 
 // isScriptComponent reports whether a JSX child is an element whose tag is literally `Script`.
