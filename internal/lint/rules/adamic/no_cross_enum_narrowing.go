@@ -60,7 +60,7 @@ var NoCrossEnumNarrowing = rule.Rule{
 							value = strconv.Quote(text)
 						}
 						ctx.ReportNode(node, rule.Message{Id: "crossEnumNarrowing", Description: crossEnumNarrowingText.Render(map[string]string{
-							"other": other.name, "member": member.name, "value": value,
+							"other": type_checking.StableTypeText(ctx.TypeChecker, other.typ), "member": type_checking.StableTypeText(ctx.TypeChecker, member.typ), "value": value,
 						})})
 						return
 					}
@@ -89,9 +89,11 @@ var NoCrossEnumNarrowing = rule.Rule{
 	},
 }
 
+// A member's display text is built only when a finding reports it: a comparison against a large enum
+// (TypeScript's SyntaxKind, typescript-eslint's AST_NODE_TYPES) decomposes hundreds of members, and
+// printing each one cost ahra's cold run two minutes of CPU.
 type crossEnumMember struct {
 	enum  *ast.Symbol
-	name  string
 	value any
 	typ   *checker.Type
 }
@@ -109,7 +111,7 @@ func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember 
 		if owner == nil {
 			continue
 		}
-		result = append(result, crossEnumMember{enum: owner, name: type_checking.StableTypeText(tc, part), value: part.AsLiteralType().Value(), typ: part})
+		result = append(result, crossEnumMember{enum: owner, value: part.AsLiteralType().Value(), typ: part})
 	}
 	return result
 }
@@ -159,11 +161,19 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 		}
 	}
 	if receiver != nil {
+		// Each distinct slot type is kept once. A receiver typed as a large union (typescript-eslint's
+		// Node has about 170 members) mostly shares one type per property, so without this a chain like
+		// node.parent.type expands every member's parent into every member again.
 		var slots []*checker.Type
+		seen := map[*checker.Type]bool{}
 		for _, typ := range crossEnumDeclaredTypes(tc, receiver) {
 			for _, part := range type_checking.UnionTypeParts(typ) {
 				if property := checker.Checker_getPropertyOfType(tc, part, key); property != nil {
-					slots = append(slots, checker.Checker_getTypeOfSymbol(tc, property))
+					slot := checker.Checker_getTypeOfSymbol(tc, property)
+					if !seen[slot] {
+						seen[slot] = true
+						slots = append(slots, slot)
+					}
 				}
 			}
 		}
@@ -184,7 +194,15 @@ func crossEnumOwner(tc *checker.Checker, typ *checker.Type) *ast.Symbol {
 		return nil
 	}
 	symbol := checker.Type_symbol(typ)
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsEnumMember == 0 || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Parent == nil {
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsEnumMember == 0 {
+		return nil
+	}
+	// The binder sets a member's parent to its enum, which answers without asking the checker for the
+	// enum declaration's type once per member per comparison.
+	if symbol.Parent != nil && symbol.Parent.Flags&ast.SymbolFlagsEnum != 0 {
+		return symbol.Parent
+	}
+	if symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Parent == nil {
 		return nil
 	}
 	return checker.Type_symbol(tc.GetTypeAtLocation(symbol.ValueDeclaration.Parent))
