@@ -211,6 +211,12 @@ func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (s
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
 
+//go:linkname Checker_getAssignedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAssignedType
+func Checker_getAssignedType(recv *checker.Checker, node *ast.Node) *checker.Type
+
+//go:linkname Checker_getTypeWithDefault github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeWithDefault
+func Checker_getTypeWithDefault(recv *checker.Checker, t *checker.Type, defaultExpression *ast.Node) *checker.Type
+
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
 func Checker_isTypeIdenticalTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 

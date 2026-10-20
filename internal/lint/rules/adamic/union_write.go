@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/checking/flow"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -27,15 +28,8 @@ var UnionWrite = rule.Rule{
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return nil
 		}
-		check := func(target *ast.Node, value *checker.Type) {
-			target = ast.SkipParentheses(target)
-			var receiver *ast.Node
-			switch target.Kind {
-			case ast.KindPropertyAccessExpression:
-				receiver = target.AsPropertyAccessExpression().Expression
-			case ast.KindElementAccessExpression:
-				receiver = target.AsElementAccessExpression().Expression
-			default:
+		checkSlot := func(target, receiver *ast.Node, value *checker.Type, name *string) {
+			if value == nil {
 				return
 			}
 			typeChecker := ctx.TypeChecker
@@ -44,11 +38,23 @@ var UnionWrite = rule.Rule{
 				return
 			}
 			for _, member := range receiverType.AsUnionType().Types() {
-				for _, slot := range unionWriteSlots(typeChecker, member, target) {
+				var slots []*checker.Type
+				if name != nil {
+					if property := checker.Checker_getPropertyOfType(typeChecker, member, *name); property != nil {
+						slots = []*checker.Type{checker.Checker_getWriteTypeOfSymbol(typeChecker, property)}
+					}
+				} else {
+					slots = unionWriteSlots(typeChecker, member, target)
+				}
+				for _, slot := range slots {
 					if !checker.Checker_isTypeAssignableTo(typeChecker, value, slot) {
 						span := rule.TokenRange(ctx.SourceFile, target)
+						slotName := ctx.SourceFile.Text()[span.Pos():span.End()]
+						if name != nil {
+							slotName += "." + *name
+						}
 						ctx.ReportNode(target, rule.Message{Id: "unionWrite", Description: unionWriteText.Render(map[string]string{
-							"slot":   ctx.SourceFile.Text()[span.Pos():span.End()],
+							"slot":   slotName,
 							"source": type_checking.StableTypeText(typeChecker, value),
 							"member": type_checking.StableTypeText(typeChecker, member),
 							"target": type_checking.StableTypeText(typeChecker, slot),
@@ -58,16 +64,79 @@ var UnionWrite = rule.Rule{
 				}
 			}
 		}
+		check := func(target *ast.Node, value *checker.Type) {
+			target = ast.SkipParentheses(target)
+			switch target.Kind {
+			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+				checkSlot(target, target.Expression(), value, nil)
+			}
+		}
+		// Direct rest targets are left out: the helper widens tuple rests and
+		// does not project object rest. Those need dedicated source projections.
+		// The compiler projects the actual source part through nested patterns,
+		// tuples, iterables and defaults. Do not substitute the target's read type.
+		patternWrite := func(node *ast.Node) {
+			parent := node.Parent
+			if parent == nil || parent.Kind == ast.KindBinaryExpression ||
+				parent.Kind == ast.KindSpreadElement || parent.Kind == ast.KindSpreadAssignment {
+				return
+			}
+			if flow.IsDestructuringTarget(node) {
+				check(node, checker.Checker_getAssignedType(ctx.TypeChecker, node))
+			}
+		}
 		update := func(node, operand *ast.Node, operator ast.Kind) {
 			if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
 				check(operand, ctx.TypeChecker.GetTypeAtLocation(node))
 			}
 		}
 		return rule.Listeners{
+			ast.KindPropertyAccessExpression: patternWrite,
+			ast.KindElementAccessExpression:  patternWrite,
+			ast.KindCallExpression: func(node *ast.Node) {
+				call := node.AsCallExpression()
+				callee := ast.SkipParentheses(call.Expression)
+				if callee.Kind != ast.KindPropertyAccessExpression || len(node.Arguments()) < 2 {
+					return
+				}
+				access := callee.AsPropertyAccessExpression()
+				if access.Name().Text() != "assign" || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Object" ||
+					!type_checking.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+					return
+				}
+				target := node.Arguments()[0]
+				for _, source := range node.Arguments()[1:] {
+					sourceType := unionWriteConstraint(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(source))
+					sources := []*checker.Type{sourceType}
+					if sourceType.Flags()&checker.TypeFlagsUnion != 0 {
+						sources = sourceType.AsUnionType().Types()
+					}
+					for _, member := range sources {
+						for _, property := range checker.Checker_getPropertiesOfType(ctx.TypeChecker, member) {
+							name := property.Name
+							// An absent optional property is not copied. Preserve real undefined,
+							// but remove the compiler's missing-property marker.
+							checkSlot(target, target, checker.Checker_getNonMissingTypeOfSymbol(ctx.TypeChecker, property), &name)
+						}
+					}
+				}
+			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				operator := binary.OperatorToken.Kind
 				if !ast.IsAssignmentOperator(operator) {
+					return
+				}
+				if flow.IsDestructuringTarget(node) {
+					value := checker.Checker_getAssignedType(ctx.TypeChecker, node)
+					// A missing optional source property is the compiler's error/any
+					// type here; the default is still a concrete possible write.
+					if value.Flags()&checker.TypeFlagsAny != 0 {
+						value = ctx.TypeChecker.GetTypeAtLocation(binary.Right)
+					} else {
+						value = checker.Checker_getTypeWithDefault(ctx.TypeChecker, value, binary.Right)
+					}
+					check(binary.Left, value)
 					return
 				}
 				value := binary.Right
