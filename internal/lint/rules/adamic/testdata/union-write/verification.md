@@ -1,5 +1,8 @@
 # union-write verification (#agg5nsf)
 
+Historical record: #6j6ekcs closes the rest-target limitation noted below. See
+[rest-target verification](rest-verification.md) for the follow-up evidence.
+
 Baseline: cohere `f657d46b71f48f18069789b6e7a9ee786134727b`, TypeScript submodule
 `d92d9bfee114c80be2c375d72edae966176e3a4f`, Go 1.27.1, Node 24.19.0,
 TypeScript JavaScript compiler 6.0.3. Commands ran inside cohere after the

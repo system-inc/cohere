@@ -121,6 +121,9 @@ func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker
 //go:linkname Checker_getNonMissingTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNonMissingTypeOfSymbol
 func Checker_getNonMissingTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
+//go:linkname Checker_getRestType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getRestType
+func Checker_getRestType(recv *checker.Checker, source *checker.Type, properties []*ast.Node, symbol *ast.Symbol) *checker.Type
+
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
 func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
 
@@ -214,6 +217,9 @@ func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName
 //go:linkname Checker_getAssignedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAssignedType
 func Checker_getAssignedType(recv *checker.Checker, node *ast.Node) *checker.Type
 
+//go:linkname Checker_getTypeOfDestructuredSpreadExpression github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfDestructuredSpreadExpression
+func Checker_getTypeOfDestructuredSpreadExpression(recv *checker.Checker, t *checker.Type) *checker.Type
+
 //go:linkname Checker_getTypeWithDefault github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeWithDefault
 func Checker_getTypeWithDefault(recv *checker.Checker, t *checker.Type, defaultExpression *ast.Node) *checker.Type
 
@@ -225,6 +231,9 @@ func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, tar
 
 //go:linkname Checker_isTypeStrictSubtypeOf github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeStrictSubtypeOf
 func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
+
+//go:linkname Checker_sliceTupleType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).sliceTupleType
+func Checker_sliceTupleType(recv *checker.Checker, t *checker.Type, index int, endSkipCount int) *checker.Type
 
 type extra_Checker struct {
 	id                                          uint32

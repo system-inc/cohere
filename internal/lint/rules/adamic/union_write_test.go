@@ -24,6 +24,15 @@ func unionWriteSubject() rule.Rule {
 func TestUnionWriteRefused(t *testing.T) {
 	t.Parallel()
 	for name, slot := range map[string]string{
+		"rest-array-union-source":      "holder.items",
+		"rest-object-union-source":     "holder.bag",
+		"rest-array":                   "holder.items",
+		"rest-array-leading":           "holder.items",
+		"rest-object":                  "holder.bag",
+		"rest-object-leading":          "holder.bag",
+		"rest-array-tuple":             "holder.items",
+		"rest-array-generic":           "holder.items",
+		"rest-object-generic":          "holder.bag",
 		"for-of-target":                "cell.value",
 		"for-in-target":                "cell.value",
 		"array-pattern":                "cell.value",
@@ -103,8 +112,8 @@ func TestUnionWriteNodeProbes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) != 45 {
-		t.Fatalf("got %d probes, want 45", len(paths))
+	if len(paths) != 54 {
+		t.Fatalf("got %d probes, want 54", len(paths))
 	}
 	for _, path := range paths {
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -138,6 +147,21 @@ func TestUnionWriteNodeProbes(t *testing.T) {
 func TestUnionWriteLegalNeighbours(t *testing.T) {
 	t.Parallel()
 	for name, fixture := range map[string]struct{ source, old, plant string }{
+		"rest tuple-valued slot":       {`function put(holder: {items: [number]} | {items: [1]}): void { const source: [1] = [1]; [...holder.items] = source; }`, `const source: [1] = [1]`, `const source: [2] = [2]`},
+		"rest array fits":              {`function put(holder: {items: string[]} | {items: (string | number)[]}): void { [...holder.items] = ['text']; }`, `{items: string[]} |`, `{items: number[]} |`},
+		"rest array narrowed":          {`type Holder = {kind: 's'; items: string[]} | {kind: 'n'; items: number[]}; function put(holder: Holder): void { if (holder.kind === 's') { [...holder.items] = ['text']; } }`, `holder.kind === 's'`, `true`},
+		"rest array plain":             {`function put(holder: {items: string[]}): void { [...holder.items] = ['text']; }`, `holder: {items: string[]}`, `holder: {items: string[]} | {items: number[]}`},
+		"rest array leading fits":      {`function put(holder: {items: string[]} | {items: (string | number)[]}): void { let first = ''; [first, ...holder.items] = ['a', 'text']; }`, `{items: string[]} |`, `{items: number[]} |`},
+		"rest array leading narrowed":  {`type Holder = {kind: 's'; items: string[]} | {kind: 'n'; items: number[]}; function put(holder: Holder): void { if (holder.kind === 's') { let first = ''; [first, ...holder.items] = ['a', 'text']; } }`, `holder.kind === 's'`, `true`},
+		"rest array leading plain":     {`function put(holder: {items: string[]}): void { let first = ''; [first, ...holder.items] = ['a', 'text']; }`, `holder: {items: string[]}`, `holder: {items: string[]} | {items: number[]}`},
+		"rest object fits":             {`function put(holder: {bag: {text: string}} | {bag: {text: string | number}}): void { ({ ...holder.bag } = {text: 'ahra'}); }`, `{bag: {text: string}} |`, `{bag: {count: number}} |`},
+		"rest object narrowed":         {`type Holder = {kind: 's'; bag: {text: string}} | {kind: 'n'; bag: {count: number}}; function put(holder: Holder): void { if (holder.kind === 's') { ({ ...holder.bag } = {text: 'ahra'}); } }`, `holder.kind === 's'`, `true`},
+		"rest object plain":            {`function put(holder: {bag: {text: string}}): void { ({ ...holder.bag } = {text: 'ahra'}); }`, `holder: {bag: {text: string}}`, `holder: {bag: {text: string}} | {bag: {count: number}}`},
+		"rest tuple drops prefix":      {`function put(holder: {items: number[]} | {items: (number | string)[]}): void { const source: [string, number, number] = ['text', 1, 2]; let first = ''; [first, ...holder.items] = source; }`, `{items: number[]} |`, `{items: string[]} |`},
+		"rest tuple empty tail":        {`function put(holder: {items: number[]} | {items: string[]}): void { const source: [string] = ['text']; let first = ''; [first, ...holder.items] = source; }`, `[first, ...holder.items]`, `[...holder.items]`},
+		"rest union tuple":             {`function put(holder: {items: number[]} | {items: (number | string)[]}, source: [string, number] | [boolean, number]): void { let first: unknown; [first, ...holder.items] = source; }`, `{items: number[]} |`, `{items: boolean[]} |`},
+		"rest object excludes prefix":  {`function put(holder: {bag: {count: number}} | {bag: {count: number; text?: never}}): void { let first = ''; ({text: first, ...holder.bag} = {text: 'ahra', count: 1}); }`, `text: first, `, ``},
+		"rest object union source":     {`function put(holder: {bag: {text: string}} | {bag: {text: string | number}}, source: {omit: number; text: string} | {omit: boolean; text: string}): void { let first: unknown; ({omit: first, ...holder.bag} = source); }`, `{bag: {text: string}} |`, `{bag: {count: number}} |`},
 		"for of fits":                  {`function put(cell: {value: string | number} | {value: string | number}): void { for (cell.value of ['text']) {} }`, `{value: string | number} |`, `{value: number} |`},
 		"for of narrowed":              {`type Cell = {kind: 's'; value: string} | {kind: 'n'; value: number}; function put(cell: Cell): void { if (cell.kind === 's') { for (cell.value of ['text']) {} } }`, `cell.kind === 's'`, `true`},
 		"for of overlapping":           {`function put(cell: {value: string} | {value: string | number}): void { for (cell.value of ['text']) {} }`, `{value: string} |`, `{value: number} |`},
