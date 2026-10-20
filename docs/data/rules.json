@@ -6926,7 +6926,7 @@
             "namespace": "nexus",
             "origin": "house",
             "category": "consistency",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },

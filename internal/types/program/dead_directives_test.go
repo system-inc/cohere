@@ -160,14 +160,21 @@ func TestDeadDisableFindingsSurviveReplay(t *testing.T) {
 func TestDeadDisableWireKeysUseTheRealAbbreviationRule(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	source := "export const payload = {\n" +
+	// The rule judges a property name where its declaration is ours (#nweav21): at the interface, where
+	// the two directives below are live, and never again at a literal key filling that declaration, where
+	// all three are dead. last_modified carries no directive at the interface, since snake case isn't this
+	// rule's to report.
+	source := "interface Payload {\nlast_modified: number;\n" +
+		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: number;\n" +
+		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: number;\n}\n" +
+		"export const payload: Payload = {\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nlast_modified: 1,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: 2,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: 3,\n};\n"
 	subject := nexus.ConsistencyNoAbbreviatedIdentifier
 	full := walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, source), []rule.Rule{subject})
-	if len(full.Diagnostics) != 3 {
-		t.Fatalf("got %d wire-key findings, want 3", len(full.Diagnostics))
+	if len(full.Diagnostics) != 3 || full.Coverage.Suppressed != 2 {
+		t.Fatalf("got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface", len(full.Diagnostics), full.Coverage.Suppressed)
 	}
 	for _, finding := range full.Diagnostics {
 		if finding.RuleName != "unused-disable" || len(finding.Fixes) != 1 {
