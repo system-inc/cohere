@@ -10,6 +10,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
+	"github.com/system-inc/cohere/internal/lint/rules/react"
+	"github.com/system-inc/cohere/internal/lint/rules/typescript"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -245,22 +247,40 @@ func TestACommentEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
 // cached. Its withheld finding is replayed too, and an unsuppressed cold control below proves it fires.
 func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 	t.Parallel()
+	// Enable the option that actually consults Boolean's default-library provenance.
+	nullish := typescript.PreferNullishCoalescing
+	nullishRun := nullish.Run
+	nullish.Run = func(ctx rule.Context, _ any) rule.Listeners {
+		return nullishRun(ctx, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
+	}
 	for _, tc := range []struct {
 		subject    rule.Rule
 		source     string
 		suppressed int
 	}{
 		{core.AccessorPairs, `Object.defineProperty({}, "value", { set(value: number) {} });`, 0},
-		{core.NoObjectConstructor, "// cohere-disable-next-line no-object-constructor\nObject();", 1},
+		{core.NoObjectConstructor, "Object();", 1},
 		{core.NoPromiseExecutorReturn, `new Promise((resolve, reject) => { return 1; });`, 0},
 		{core.PreferRegexLiterals, "RegExp(String.raw`a`, \"gg\");", 0},
+		{core.PreferNumericLiterals, `parseInt("10", 2);`, 1},
+		{core.PreferExponentiationOperator, `globalThis.Math.pow(2, 3);`, 1},
+		{core.PreferObjectHasOwn, `Object.prototype.hasOwnProperty.call({}, "x");`, 1},
+		{core.PreferPromiseRejectErrors, `Promise.reject(undefined);`, 0},
+		{core.NoUndefInit, `let x = undefined;`, 1},
+		{nullish, `const Boolean = (v: unknown) => v; declare const x: string | undefined; Boolean(x || "fallback");`, 1},
+		{typescript.ConsistentGenericConstructors, `class Uint8Array<T> {} const x: Uint8Array<string> = new Uint8Array();`, 1},
+		{react.UnsupportedSyntax, `function useThing() { useState(); eval("1"); }`, 0},
 	} {
 		t.Run(tc.subject.Name, func(t *testing.T) {
 			t.Parallel()
+			source := tc.source
+			if tc.suppressed != 0 {
+				source = "// cohere-disable-next-line " + tc.subject.Name + "\n" + source
+			}
 			root := writeProject(t, map[string]string{
 				"tsconfig.json": minimalConfig,
 				"lib.ts":        "export function value(): string { return \"before\"; }\n",
-				"consumer.ts":   "import { value } from \"./lib\";\nvoid value;\n" + tc.source + "\n",
+				"consumer.ts":   "import { value } from \"./lib\";\nvoid value;\n" + source + "\n",
 			})
 			counter := &countingRule{ran: map[string]int{}}
 			rules := []rule.Rule{counter.wrap(tc.subject)}
@@ -317,12 +337,12 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(t *testing.T) {
 				t.Fatal("signature edit lost the real finding")
 			}
 			if tc.suppressed != 0 {
-				if err := os.WriteFile(filepath.Join(root, "consumer.ts"), []byte("import { value } from \"./lib\";\nvoid value;\nObject();\n"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(root, "consumer.ts"), []byte("import { value } from \"./lib\";\nvoid value;\n"+tc.source+"\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				active := plainWalk(t, root, rules)
 				if len(active.Diagnostics) != 1 {
-					t.Fatal("unsuppressed Object control produced no finding")
+					t.Fatal("unsuppressed control produced no finding")
 				}
 			}
 		})

@@ -119,3 +119,33 @@ func TestIsFirstDeclaredInDeclarationFilePreservesOrderAndFileKind(t *testing.T)
 		}
 	}
 }
+
+// Mixed declarations in both orders pin all, any, empty and missing-file semantics independently.
+func TestDeclarationMetadataQueriesPreserveAllAnyAndEmpty(t *testing.T) {
+	t.Parallel()
+	shared, first, _, global := declarationsProbe(t)
+	source := rule.DeclarationsIn(first, shared)[0]
+	library := global.Declarations[0]
+	for _, tc := range []struct {
+		name                                    string
+		declarations                            []*ast.Node
+		has, onlyAmbient, anySource, nonAmbient bool
+	}{
+		{"empty", nil, false, false, false, false},
+		{"missing", []*ast.Node{nil}, true, false, true, false},
+		{"library", []*ast.Node{library}, true, true, false, false},
+		{"source", []*ast.Node{source}, true, false, true, true},
+		{"library then source", []*ast.Node{library, source}, true, false, true, true},
+		{"source then library", []*ast.Node{source, library}, true, false, true, true},
+	} {
+		symbol := &ast.Symbol{Declarations: tc.declarations}
+		got := [4]bool{rule.HasDeclarations(symbol), rule.IsDeclaredOnlyInDeclarationFiles(symbol), rule.IsDeclaredInASourceFile(symbol), rule.IsDeclaredInANonDeclarationFile(symbol)}
+		want := [4]bool{tc.has, tc.onlyAmbient, tc.anySource, tc.nonAmbient}
+		if got != want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, want)
+		}
+	}
+	if rule.HasDeclarations(nil) || rule.IsDeclaredInANonDeclarationFile(nil) {
+		t.Error("nil symbol has declarations")
+	}
+}

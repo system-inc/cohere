@@ -52,6 +52,7 @@ type PreferPromiseRejectErrorsOptions struct {
 var PreferPromiseRejectErrors = rule.Rule{
 	Name:             "prefer-promise-reject-errors",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declining the file once rather than once per node. `NeedsTypeChecker` governs the
 		// registration path only, and the harness builds a context by hand, so this is the guard
@@ -275,17 +276,7 @@ func preferPromiseRejectErrorsIsGlobalPromiseReject(ctx rule.Context, call *ast.
 // non-ambient declaration. Every declaration must be ambient rather than just the first, which is
 // the index-zero trap this tree has been bitten by before.
 func preferPromiseRejectErrorsResolvesToTheGlobalPromise(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !file.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferPromiseRejectErrorsIsGlobalUndefined answers whether an expression is the global
@@ -310,7 +301,7 @@ func preferPromiseRejectErrorsIsGlobalUndefined(ctx rule.Context, expression *as
 	if symbol == nil {
 		return true
 	}
-	return len(symbol.Declarations) == 0
+	return !rule.HasDeclarations(symbol)
 }
 
 // preferPromiseRejectErrorsCouldBeError is upstream's `couldBeError` from its shared ast utilities.

@@ -88,6 +88,7 @@ var preferExponentiationOperatorPrecedence = operatorAssignmentBinaryPrecedence(
 var PreferExponentiationOperator = rule.Rule{
 	Name:             "prefer-exponentiation-operator",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -186,24 +187,9 @@ func preferExponentiationOperatorStaticAccess(node *ast.Node) (name string, rece
 // this rule. Probed across seven shapes with controls before being built on.
 func preferExponentiationOperatorResolvesToAnAmbientName(ctx rule.Context, identifier *ast.Node) bool {
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil {
-		// Unresolvable. A name the checker cannot place is not something to rewrite.
-		return false
-	}
-	// Written as the COMPLEMENT of "declared in source" rather than as "every declaration is
-	// ambient", and the difference is load-bearing. `globalThis` resolves to a symbol with ZERO
-	// declarations, so an all-ambient test answers false for it and `globalThis.Math.pow(a, b)`
-	// went silent while upstream reports it. This is the trap the brief records against
-	// `resolvesToAGlobal`, met here for real: the guard was false on exactly the case it had to
-	// accept. A local `var Math` or a parameter contributes a source declaration and is still
-	// rejected, which is what stops a shadowed global.
-	for _, declaration := range symbol.Declarations {
-		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !file.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	// globalThis has zero declarations: require a resolved symbol, but deliberately accept an
+	// empty declaration list. The all-declaration-files reader would reject that shipped case.
+	return symbol != nil && !rule.IsDeclaredInASourceFile(symbol)
 }
 
 // preferExponentiationOperatorUnwrapParentheses strips every layer of parentheses.

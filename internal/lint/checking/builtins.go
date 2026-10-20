@@ -9,7 +9,6 @@ package type_checking
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -23,56 +22,11 @@ func ComparePaths(a string, b string, program rule.Program) int {
 }
 
 func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool {
-	if !file.IsDeclarationFile {
-		return false
-	}
-
-	if program.IsSourceFileDefaultLibrary(file.PathKey()) {
-		return true
-	}
-
-	options := program.Options()
-
-	if options.NoLib.IsTrue() {
-		return false
-	}
-
-	// copied from program.go
-	var libs []string
-	if options.Lib == nil {
-		name := tsoptions.GetDefaultLibFileName(options)
-		libs = append(libs, tspath.CombinePaths(program.DefaultLibraryPath(), name))
-	} else {
-		for _, lib := range options.Lib {
-			name, ok := tsoptions.GetLibFileName(lib)
-			if ok {
-				libs = append(libs, tspath.CombinePaths(program.DefaultLibraryPath(), name))
-			}
-			// !!! error on unknown name
-		}
-	}
-
-	return Some(libs, func(lib string) bool {
-		return ComparePaths(file.FileName().AsString(), lib, program) == 0
-	})
+	return rule.IsSourceFileDefaultLibrary(program, file)
 }
 
-func IsSymbolFromDefaultLibrary(
-	program rule.Program,
-	symbol *ast.Symbol,
-) bool {
-	if symbol == nil {
-		return false
-	}
-
-	for _, declaration := range symbol.Declarations {
-		sourceFile := ast.GetSourceFileOfNode(declaration)
-		if IsSourceFileDefaultLibrary(program, sourceFile) {
-			return true
-		}
-	}
-
-	return false
+func IsSymbolFromDefaultLibrary(program rule.Program, symbol *ast.Symbol) bool {
+	return rule.IsSymbolFromDefaultLibrary(program, symbol)
 }
 
 /**

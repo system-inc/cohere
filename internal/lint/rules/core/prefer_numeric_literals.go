@@ -91,6 +91,7 @@ var preferNumericLiteralsRadix = map[int]struct {
 var PreferNumericLiterals = rule.Rule{
 	Name:             "prefer-numeric-literals",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -225,17 +226,7 @@ func preferNumericLiteralsUnwrap(node *ast.Node) *ast.Node {
 // covering a parameter and a local for each of the two names, and nothing about the syntax
 // separates them from the real thing.
 func preferNumericLiteralsResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		declaringFile := ast.GetSourceFileOfNode(declaration)
-		if declaringFile == nil || !declaringFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferNumericLiteralsFix builds the repair, or declines.

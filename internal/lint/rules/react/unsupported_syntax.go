@@ -212,6 +212,7 @@ var UnsupportedSyntax = rule.Rule{
 	// on `eval` answers a `lib.es5.d.ts` declaration for the global and a source-file declaration
 	// for a shadowing parameter, and nothing in the abstract syntax tree distinguishes them.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

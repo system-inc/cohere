@@ -83,7 +83,17 @@ type typeReachScan struct {
 //     files declare a symbol;
 //   - rule.IsFirstDeclaredInDeclarationFile answers only the first declaration's file kind, preserving
 //     the order-sensitive query used by core.resolvesToAGlobal. Its tests cover mixed files in both orders.
+//   - rule.HasDeclarations answers only existence; rule.IsDeclaredInANonDeclarationFile ignores
+//     missing files, unlike IsDeclaredInASourceFile. Their tests pin empty and mixed-order inputs.
+//   - rule.IsSymbolFromDefaultLibrary and rule.IsDeclaredOnlyInDefaultLibraries preserve the any and
+//     vacuous-all default-library queries. Their tests distinguish ordinary declaration files and
+//     mixed library/source declarations in both orders.
 var ownFileDeclarationReaders = map[string]bool{
+	// Scalar provenance/count queries: mixed-order and empty/missing-file tests preserve each contract.
+	"rule.HasDeclarations":                  true,
+	"rule.IsDeclaredInANonDeclarationFile":  true,
+	"rule.IsSymbolFromDefaultLibrary":       true,
+	"rule.IsDeclaredOnlyInDefaultLibraries": true,
 	"rule.IsFirstDeclaredInDeclarationFile": true,
 	"rule.DeclarationsIn":                   true,
 	"rule.IsDeclaredOnlyInDeclarationFiles": true,
