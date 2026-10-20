@@ -55,3 +55,15 @@ func IsDeclaredInASourceFile(symbol *ast.Symbol) bool {
 	}
 	return false
 }
+
+// IsFirstDeclaredInDeclarationFile reports the source-file kind of symbol's first declaration.
+// It returns only file metadata, never syntax a caller could descend into. In particular this is
+// not IsDeclaredOnlyInDeclarationFiles: a merged symbol can start in a declaration file and also
+// have source declarations. Callers preserving an existing first-declaration query need that order.
+func IsFirstDeclaredInDeclarationFile(symbol *ast.Symbol) bool {
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	file := ast.GetSourceFileOfNode(symbol.Declarations[0])
+	return file != nil && file.IsDeclarationFile
+}

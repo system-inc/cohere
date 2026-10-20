@@ -166,6 +166,7 @@ var messageAccessorPairsMissingSetterInDescriptor = rule.Message{
 // through the checker. `resolvesToAGlobal` in this package already answers exactly that question.
 // Two of upstream's own clean cases turn on it, and both are imported.
 var AccessorPairs = rule.Rule{
+	TypeReach:        rule.TypeReachShapes,
 	Name:             "accessor-pairs",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {

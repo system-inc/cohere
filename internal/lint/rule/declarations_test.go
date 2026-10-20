@@ -93,3 +93,29 @@ func TestIsDeclaredOnlyInDeclarationFilesTellsALibGlobalFromASourceBinding(t *te
 		t.Error("parseInt, or a nil symbol, was taken for something a source file declares")
 	}
 }
+
+// The first declaration's file classification is all the reader may expose. Mixed symbols in both
+// orders distinguish it from an any/all query and from ignoring the declaration-file check.
+func TestIsFirstDeclaredInDeclarationFilePreservesOrderAndFileKind(t *testing.T) {
+	t.Parallel()
+	shared, first, _, global := declarationsProbe(t)
+	source := rule.DeclarationsIn(first, shared)[0]
+	library := global.Declarations[0]
+	for _, tc := range []struct {
+		name   string
+		symbol *ast.Symbol
+		want   bool
+	}{
+		{"nil", nil, false},
+		{"empty", &ast.Symbol{}, false},
+		{"missing file", &ast.Symbol{Declarations: []*ast.Node{nil}}, false},
+		{"source", shared, false},
+		{"library", global, true},
+		{"library then source", &ast.Symbol{Declarations: []*ast.Node{library, source}}, true},
+		{"source then library", &ast.Symbol{Declarations: []*ast.Node{source, library}}, false},
+	} {
+		if got := rule.IsFirstDeclaredInDeclarationFile(tc.symbol); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
