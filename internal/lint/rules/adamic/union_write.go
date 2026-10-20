@@ -71,8 +71,6 @@ var UnionWrite = rule.Rule{
 				checkSlot(target, target.Expression(), value, nil)
 			}
 		}
-		// Direct rest targets are left out: the helper widens tuple rests and
-		// does not project object rest. Those need dedicated source projections.
 		// The compiler projects the actual source part through nested patterns,
 		// tuples, iterables and defaults. Do not substitute the target's read type.
 		patternWrite := func(node *ast.Node) {
@@ -85,12 +83,30 @@ var UnionWrite = rule.Rule{
 				check(node, checker.Checker_getAssignedType(ctx.TypeChecker, node))
 			}
 		}
+		restWrite := func(node *ast.Node) {
+			if !flow.IsDestructuringTarget(node) {
+				return
+			}
+			target := ast.SkipParentheses(node.Expression())
+			if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
+				return
+			}
+			// Most rest targets are identifiers or non-union slots. Do not ask
+			// the checker to project a remainder until there is a union to judge.
+			receiver := unionWriteConstraint(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(target.Expression()))
+			if receiver == nil || receiver.Flags()&checker.TypeFlagsUnion == 0 {
+				return
+			}
+			check(target, unionWriteRestType(ctx.TypeChecker, node))
+		}
 		update := func(node, operand *ast.Node, operator ast.Kind) {
 			if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
 				check(operand, ctx.TypeChecker.GetTypeAtLocation(node))
 			}
 		}
 		return rule.Listeners{
+			ast.KindSpreadElement:            restWrite,
+			ast.KindSpreadAssignment:         restWrite,
 			ast.KindPropertyAccessExpression: patternWrite,
 			ast.KindElementAccessExpression:  patternWrite,
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -200,4 +216,47 @@ func unionWriteSlots(typeChecker *checker.Checker, member *checker.Type, target 
 		}
 	}
 	return slots
+}
+
+// Project the whole remainder once, before checkSlot visits target members.
+// Each pattern has at most one rest. The prefix scan is linear in pattern size;
+// the array union loop passes each source member, never the original union,
+// to the compiler helpers. getRestType performs its own single member mapping.
+func unionWriteRestType(typeChecker *checker.Checker, rest *ast.Node) *checker.Type {
+	pattern := rest.Parent
+	source := unionWriteConstraint(typeChecker, checker.Checker_getAssignedType(typeChecker, pattern))
+	if rest.Kind == ast.KindSpreadAssignment {
+		var omitted []*ast.Node
+		for _, property := range pattern.AsObjectLiteralExpression().Properties.Nodes {
+			if property == rest {
+				break
+			}
+			if name := property.Name(); name != nil {
+				omitted = append(omitted, name)
+			}
+		}
+		return checker.Checker_getRestType(typeChecker, source, omitted, nil)
+	}
+	index := 0
+	for _, element := range pattern.AsArrayLiteralExpression().Elements.Nodes {
+		if element == rest {
+			break
+		}
+		index++
+	}
+	members := []*checker.Type{source}
+	if source.Flags()&checker.TypeFlagsUnion != 0 {
+		members = source.AsUnionType().Types()
+	}
+	remainders := make([]*checker.Type, 0, len(members))
+	for _, member := range members {
+		if checker.IsTupleType(member) {
+			// The rest is a fresh mutable tuple when its length is known.
+			// Keep that precision so a remainder can also fit tuple-valued slots.
+			remainders = append(remainders, checker.Checker_sliceTupleType(typeChecker, member, index, 0))
+		} else {
+			remainders = append(remainders, checker.Checker_getTypeOfDestructuredSpreadExpression(typeChecker, member))
+		}
+	}
+	return typeChecker.GetUnionType(remainders)
 }
