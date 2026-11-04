@@ -18,7 +18,7 @@ struct ContractFixtureTests {
         .appendingPathComponent("Contract", isDirectory: true)
 
     static let fixtureNames = [
-        "Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly",
+        "Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly", "FormatOnly",
     ]
 
     @Test(arguments: fixtureNames)

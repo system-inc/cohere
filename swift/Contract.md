@@ -17,6 +17,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
 | `LintOnly.jsonl` | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings. |
+| `FormatOnly.jsonl` | `--no-fix --format-only`, a real run: the fix phase ran with no fix proposed and found one file the formatter would change, which is the one finding; types, lint and unused skipped as `not requested`, and the summary calls the run complete. Exit 1, for the finding. |
 | `Unused.jsonl` | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
@@ -384,6 +385,8 @@ it where a run that did not finish prints green.
 | `--types`, `--lint` | That phase alone, as for TypeScript. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
 | `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope. |
+| `--format-only` | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2. |
+| `--no-format` | Formatting left out of a bare run, `--fix` or `--no-fix`, as TypeScript's `--no-format`: the fixers run, types and lint run, and no file is formatted or reported unformatted. The `fix` record counts nothing formatted, and its `formatScope` says formatting was left out. Named with `--format`, `--format-all` or `--format-only`, the run is refused with exit 2. |
 | `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
