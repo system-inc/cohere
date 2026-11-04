@@ -53,8 +53,8 @@ var consistencyNoPropertyAliasText = policy.MessageOf("nexus/consistency-no-prop
 // property, an object above it, or the root binding) is assigned, updated or deleted after the
 // declaration and before the local's last read (#nd52037).
 //
-// Both read names, not symbols, within the enclosing function, as the hook exemption does, so a
-// nested binding of the same name counts too. Structure's ESLint twin decides the same two.
+// These walks resolve references to the local's binding when a checker is available, as the hook
+// and closure exemptions do. A shadowing binding of the same name does not count.
 //
 // Four more are locals the function makes, which Reach Over Alias allows, ruled on api's report
 // for #zh8mpvp and ported in #r28b8he. Three of them ask the checker, which is why the rule declares
@@ -143,15 +143,15 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					return
 				}
 
-				if isReadInsideHookDependencyArray(enclosing, localName, name) {
+				if isReadInsideHookDependencyArray(ctx, enclosing, localName, name) {
 					return
 				}
 
-				if isWrittenAfterItsDeclaration(enclosing, localName, name) {
+				if isWrittenAfterItsDeclaration(ctx, enclosing, localName, name) {
 					return
 				}
 
-				if isSnapshotTakenBeforeItsSourceIsWritten(enclosing, node, localName, name, initializer) {
+				if isSnapshotTakenBeforeItsSourceIsWritten(ctx, enclosing, node, localName, name, initializer) {
 					return
 				}
 
@@ -163,7 +163,7 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					if chainReadsAGetter(ctx, initializer) {
 						return
 					}
-					if isReadInsideANestedFunction(enclosing, localName, name) && chainIsNarrowed(ctx, initializer) {
+					if isReadInsideANestedFunction(ctx, enclosing, localName, name) && chainIsNarrowed(ctx, initializer) {
 						return
 					}
 					if isNarrowedWhereAClosureReadsIt(ctx, enclosing, localName, name) {
@@ -252,7 +252,7 @@ func chainContainsCall(expression *ast.Node) bool {
 // The whole function is searched rather than the statements near the declaration, because the array
 // that justifies the alias is usually several lines below it. The declaration's own name node is
 // excluded, since the binding is not a read of itself.
-func isReadInsideHookDependencyArray(enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideHookDependencyArray(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
 	found := false
 
 	var walk func(node *ast.Node) bool
@@ -273,7 +273,7 @@ func isReadInsideHookDependencyArray(enclosing *ast.Node, localName string, decl
 					if index == 0 || argument.Kind != ast.KindArrayLiteralExpression {
 						continue
 					}
-					if arrayMentions(argument, localName, declarationName) {
+					if arrayMentions(ctx, argument, localName, declarationName) {
 						found = true
 						return true
 					}
@@ -293,7 +293,7 @@ func isReadInsideHookDependencyArray(enclosing *ast.Node, localName string, decl
 // An entry may be the bare identifier or the head of a longer reach (`value.property`), so the walk
 // descends rather than comparing top-level elements. The declaration's own name node is skipped
 // because a binding is not a read.
-func arrayMentions(array *ast.Node, localName string, declarationName *ast.Node) bool {
+func arrayMentions(ctx rule.Context, array *ast.Node, localName string, declarationName *ast.Node) bool {
 	mentioned := false
 
 	var walk func(node *ast.Node) bool
@@ -301,7 +301,7 @@ func arrayMentions(array *ast.Node, localName string, declarationName *ast.Node)
 		if node == nil || mentioned {
 			return false
 		}
-		if referencesTheLocal(node, localName, declarationName) {
+		if referencesTheLocal(ctx, node, localName, declarationName) {
 			mentioned = true
 			return true
 		}
@@ -315,14 +315,14 @@ func arrayMentions(array *ast.Node, localName string, declarationName *ast.Node)
 
 // isWrittenAfterItsDeclaration reports whether anything in the enclosing function writes the local's
 // name again: an assignment, a compound assignment, an update, or a destructuring target.
-func isWrittenAfterItsDeclaration(enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isWrittenAfterItsDeclaration(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
 	written := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || written {
 			return false
 		}
-		if referencesTheLocal(node, localName, declarationName) && reference.WritesToBinding(node) {
+		if referencesTheLocal(ctx, node, localName, declarationName) && reference.WritesToBinding(node) {
 			written = true
 			return true
 		}
@@ -340,14 +340,14 @@ func isWrittenAfterItsDeclaration(enclosing *ast.Node, localName string, declara
 // `const value = state.inner.value`, a write to `state.inner.value`, to `state.inner` or to `state`
 // each changes what a reach at the read would see. A write is an assignment of any operator, an
 // update, or a `delete`.
-func isSnapshotTakenBeforeItsSourceIsWritten(enclosing *ast.Node, declaration *ast.Node, localName string, declarationName *ast.Node, initializer *ast.Node) bool {
+func isSnapshotTakenBeforeItsSourceIsWritten(ctx rule.Context, enclosing *ast.Node, declaration *ast.Node, localName string, declarationName *ast.Node, initializer *ast.Node) bool {
 	lastRead := -1
 	var findLastRead func(node *ast.Node) bool
 	findLastRead = func(node *ast.Node) bool {
 		if node == nil {
 			return false
 		}
-		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
 			node.End() > lastRead {
 			lastRead = node.End()
 		}
@@ -516,14 +516,14 @@ func chainIsNarrowed(ctx rule.Context, initializer *ast.Node) bool {
 
 // isReadInsideANestedFunction reports whether the local is read inside a function within the one
 // that declares it.
-func isReadInsideANestedFunction(enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideANestedFunction(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
 	found := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || found {
 			return false
 		}
-		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
 			scope.EnclosingFunctionLike(node) != enclosing {
 			found = true
 			return true
@@ -535,27 +535,31 @@ func isReadInsideANestedFunction(enclosing *ast.Node, localName string, declarat
 	return found
 }
 
-// referencesTheLocal reports whether an identifier is a reference by the local's name: not the
-// declaration itself, and not a name that only shares the spelling, which is the name half of a
-// member access (`this.server`), a declaration's own name, or a destructuring key. A shorthand
-// property (`{ server }`) reads the binding and counts.
+// referencesTheLocal reports whether an identifier references the local's own binding: not the
+// declaration itself, a member name (`this.server`), a declaration's name, or a destructuring key.
+// A shorthand property (`{ server }`) reads the binding and counts.
 //
-// Names, not symbols, within the enclosing function, as every walk in this rule reads them. Without
-// the member-name test a later `this.server` stood in for a read of a local `server`, which could
-// exempt an alias the reach would replace exactly (#r28b8he).
-func referencesTheLocal(node *ast.Node, localName string, declarationName *ast.Node) bool {
+// Production declares NeedsTypeChecker, so compare symbols to exclude shadowing parameters and
+// other same-named bindings in every exemption walk. Without a checker, retain the syntactic,
+// name-only match for untyped rule execution, where binding identity is unavailable.
+func referencesTheLocal(ctx rule.Context, node *ast.Node, localName string, declarationName *ast.Node) bool {
 	if node.Kind != ast.KindIdentifier || node == declarationName || node.Text() != localName {
 		return false
 	}
 	parent := node.Parent
-	if parent == nil || parent.Kind == ast.KindShorthandPropertyAssignment {
-		return true
+	if parent != nil && parent.Kind != ast.KindShorthandPropertyAssignment {
+		if parent.Name() == node {
+			return false
+		}
+		if parent.Kind == ast.KindBindingElement && parent.AsBindingElement().PropertyName == node {
+			return false
+		}
 	}
-	if parent.Name() == node {
-		return false
-	}
-	if parent.Kind == ast.KindBindingElement && parent.AsBindingElement().PropertyName == node {
-		return false
+	if ctx.TypeChecker != nil {
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+		// ReadSymbol uses GetSymbolAtLocation for ordinary identifiers and resolves a
+		// shorthand to its value binding rather than the object literal's property symbol.
+		return symbol != nil && reference.ReadSymbol(ctx.TypeChecker, node) == symbol
 	}
 	return true
 }
@@ -575,7 +579,7 @@ func isNarrowedWhereAClosureReadsIt(ctx rule.Context, enclosing *ast.Node, local
 		if node == nil || found {
 			return false
 		}
-		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
 			scope.EnclosingFunctionLike(node) != enclosing && ctx.TypeChecker.GetTypeAtLocation(node) != declared {
 			found = true
 			return true

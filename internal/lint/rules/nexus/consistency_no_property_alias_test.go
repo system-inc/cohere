@@ -23,6 +23,14 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 		name       string
 		sourceText string
 	}{
+		// Shadowed parameters are separate bindings in each exemption walk (#y2acc0c).
+		// All six report fixtures fail on 29631237 and with a name-only reference mutant.
+		{"y2acc0c shadowed shorthand closure", "export function collect(state: { value?: number }) {\n    if (state.value !== undefined) {\n        const value = state.value;\n        function nested(value: number) { return { value }; }\n        use(value);\n    }\n}\ndeclare function use(value: number): void;\n"},
+		{"y2acc0c closure parameter before the loop", "interface EventShape { type: string; subject: { run?: string } }\nexport function closure(events: EventShape[]): string[] {\n    const runs = new Set<string>();\n    const judged = new Set(events.map((event) => event.subject.run ?? '').filter((run) => run !== ''));\n    for(const event of events) {\n        const run = event.subject.run;\n        if(event.type === 'placed' && run !== undefined && !judged.has(run)) runs.add(run);\n    }\n    return [...runs];\n}\n"},
+		{"y2acc0c shadowed dependency array", "export function collect(state: { value: number }) {\n    const value = state.value;\n    function nested(value: number) { useMemo(() => 0, [value]); }\n    use(value);\n}\ndeclare function useMemo(callback: () => number, dependencies: number[]): void;\ndeclare function use(value: number): void;\n"},
+		{"y2acc0c shadowed write", "export function collect(state: { value: number }) {\n    const value = state.value;\n    function nested(value: number) { value = 2; }\n    use(value);\n}\ndeclare function use(value: number): void;\n"},
+		{"y2acc0c shadowed last read after a source write", "export function collect(state: { value: number }) {\n    const value = state.value;\n    use(value);\n    state.value = 2;\n    function nested(value: number) { use(value); }\n}\ndeclare function use(value: number): void;\n"},
+		{"y2acc0c shadowed closure with a narrowed property", "export function collect(state: { value?: number }) {\n    if (state.value !== undefined) {\n        const value = state.value;\n        function nested(value: number) { use(value); }\n        use(value);\n    }\n}\ndeclare function use(value: number): void;\n"},
 		// #y2acc0c: these already report on 29631237; loop rebinding does not trigger the
 		// snapshot exemption. Suppressing reports makes all three fixtures fail.
 		{"a for-of const binding", "interface Event { type: string; subject: { run: string | undefined }; }\nexport function collect(events: Event[], judged: Set<string>, runs: Set<string>) {\n    for (const event of events) {\n        const run = event.subject.run;\n        if (event.type === 'future.placed' && run !== undefined && !judged.has(run)) runs.add(run);\n    }\n}\n"},
@@ -84,6 +92,11 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 		name       string
 		sourceText string
 	}{
+		// Real captures still keep narrowings. Disabling the matching closure exemption
+		// makes these fail; using the shorthand property symbol also breaks the first.
+		{"y2acc0c real shorthand closure", "export function collect(state: { value?: number }) {\n    if (state.value !== undefined) {\n        const value = state.value;\n        return () => ({ value });\n    }\n}\n"},
+		{"y2acc0c real closure keeps a property narrowing", "export function collect(state: { value?: number }) {\n    if (state.value !== undefined) {\n        const value = state.value;\n        function shadow(value: number) { use(value); }\n        return () => use(value);\n    }\n}\ndeclare function use(value: number): void;\n"},
+		{"y2acc0c real closure keeps a local narrowing", "export function collect(state: { value?: number }) {\n    const value = state.value;\n    function shadow(value: number) { use(value); }\n    if (value !== undefined) return () => use(value);\n}\ndeclare function use(value: number): void;\n"},
 		// #y2acc0c: a real body write still needs the snapshot. Disabling that exemption
 		// makes this fixture fail with one unexpected finding.
 		{"a snapshot before a write inside a for-of body", "interface Event { subject: { run: string | undefined }; }\nexport function collect(events: Event[], other: Event['subject']) {\n    for (const event of events) {\n        const run = event.subject.run;\n        event.subject = other;\n        use(run);\n    }\n}\ndeclare function use(value: unknown): void;\n"},
