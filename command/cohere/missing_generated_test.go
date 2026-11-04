@@ -15,8 +15,9 @@ import (
 // project runs clean.
 //
 // The cases around it hold the edges: a missing generated file with no type error following still fails,
-// since what it declares was never checked; a reference path is the same trigger as an import; and a
-// missing file git does not ignore is a mistake in the source, left to its own type error.
+// since what it declares was never checked; a writing run holds every lint fix while it is missing; a
+// reference path is the same trigger as an import; and a missing file git does not ignore is a mistake in
+// the source, left to its own type error.
 //
 // skipLibCheck is on, as create-next-app writes it. With it off the checker also reports the import itself
 // (TS2882, next-env.d.ts being a declaration file it then checks), which folds with the rest.
@@ -108,6 +109,39 @@ func TestAMissingGeneratedFileLeadsAsOneCause(t *testing.T) {
 		}
 		if strings.Contains(output, "folded under it") {
 			t.Errorf("a fold line with no type error to fold:\n%s", output)
+		}
+	})
+
+	// #46ern7e: a writing run holds every lint fix while the file is missing, and applies them once it exists.
+	t.Run("fixes held while missing, applied once generated", func(t *testing.T) {
+		t.Parallel()
+		inferrable := "export const answer: number = 1;\n"
+		root := project(t, "import \"./.next/types/routes.d.ts\";\n", inferrable)
+		write := func() string {
+			t.Helper()
+			command := exec.Command(binary, "--no-format", "--no-cache")
+			command.Dir = root
+			output, _ := command.CombinedOutput()
+			return string(output)
+		}
+		page := func() string {
+			t.Helper()
+			contents, err := os.ReadFile(filepath.Join(root, "app/page.ts"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(contents)
+		}
+
+		output := write()
+		if page() != inferrable || !strings.Contains(output, "⚠ 🪄 fixes held") {
+			t.Errorf("a writing run with a generated file missing changed the page to %q:\n%s", page(), output)
+		}
+
+		writeTree(t, root, map[string]string{".next/types/routes.d.ts": routes})
+		output = write()
+		if page() != "export const answer = 1;\n" || strings.Contains(output, "fixes held") {
+			t.Errorf("with the generated file present, the fix did not apply, page %q:\n%s", page(), output)
 		}
 	})
 

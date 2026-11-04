@@ -23,6 +23,12 @@ import (
 // fail the run, `--verbose` and `--json` print every one, and the footer names the missing file as a gap,
 // which also fails the run when no type error follows from it. A green run never comes from a file that
 // was not there to check.
+//
+// Every lint fix is held while one is missing (#46ern7e). A rule reads the names the missing file declares
+// as unresolved, whether or not it asks the checker: on a fresh Next clone,
+// structure/react-component-require-properties-type-suffix took PageProps for the project's own type and
+// renamed it to PageProperties in 39 files, and a bare run wrote them. The fix phase then runs as
+// `--format-only` does, since formatting reads no names, and the footer says the fixes were held.
 
 // missingGeneratedRule is the name the cause prints under, where a finding prints its rule.
 const missingGeneratedRule = "missing-generated-file"
@@ -58,9 +64,9 @@ func missingGeneratedMessage(input program.MissingInput) string {
 	return fmt.Sprintf("%s does not exist: it is generated output (git ignores it), and %s", input.Specifier, missingGeneratedRemedy(input.Target))
 }
 
-// printMissingGenerated prints each missing generated file as a finding, in every view, ahead of the type
-// errors.
-func printMissingGenerated(missing []program.MissingInput, root string) {
+// printMissingGenerated prints each missing generated file as a finding, in every view, ahead of anything
+// the run found.
+func printMissingGenerated(missing []program.MissingInput) {
 	for _, input := range missing {
 		message := missingGeneratedMessage(input)
 		printFinding(os.Stdout, runFinding{

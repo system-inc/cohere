@@ -688,6 +688,17 @@ func run() error {
 	// lint does not reach still accounts for every file in scope.
 	activeSummary.FilesInScope, activeSummary.FilesChecked = len(projectFiles), len(projectFiles)
 	activeSummary.Gaps.NothingToCheck = graph != nil && len(projectFiles) == 0
+
+	// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads the output, and
+	// while one is missing every lint fix is held (#46ern7e): a rule reads the names that file declares as
+	// unresolved, and on a fresh Next clone one renamed PageProps to PageProperties in 39 files. Formatting
+	// reads no names, so it still runs. See missing_generated.go.
+	var missingGenerated []program.MissingInput
+	if graph != nil {
+		missingGenerated = graph.MissingGeneratedInputs(generatedOutputUnder(location.Root))
+	}
+	printMissingGenerated(missingGenerated)
+	activeSummary.Gaps.MissingGenerated = missingGeneratedTargets(missingGenerated, location.Root)
 	activeSummary.Gaps.FormattingNotChecked = !runFix
 	report := &pipelineReport{
 		graph:          buildDuration,
@@ -930,6 +941,12 @@ func run() error {
 		if *formatOnly {
 			fixFiles, fixRules = nil, nil
 		}
+		// Held, as `--format-only` holds them, while a generated file is missing. See above.
+		fixesHeld := !*formatOnly && len(missingGenerated) > 0
+		if fixesHeld {
+			fixFiles, fixRules = nil, nil
+			activeSummary.Gaps.FixesHeld = true
+		}
 
 		fixStart := time.Now()
 		formatting := newFormatClock()
@@ -1043,6 +1060,8 @@ func run() error {
 		switch {
 		case *formatOnly:
 			report.narrow(phaseFix, "formatting only, no fixes proposed")
+		case fixesHeld:
+			report.narrow(phaseFix, "formatting only, fixes held while a generated file is missing")
 		case formatLeftOut != "":
 			report.narrow(phaseFix, formatLeftOut)
 		}
@@ -1097,10 +1116,11 @@ func run() error {
 		// about 0.9s fixed plus 1.1s per walk, so this removes roughly a third of a default run.
 		//
 		// With no program file in scope the fix phase did not walk at all, and its empty result is not a
-		// walk to reuse: lint walks for itself and refuses the empty set, as it always has.
+		// walk to reuse: lint walks for itself and refuses the empty set, as it always has. The same holds
+		// when fixes were held, since the walk then had no file and no rule.
 		//
 		// A checked run wrote nothing whatever its count, so its walk is always the graph's own.
-		if (!mutate || fixSummary.FilesChanged == 0) && len(projectFiles) > 0 {
+		if (!mutate || fixSummary.FilesChanged == 0) && len(projectFiles) > 0 && !fixesHeld {
 			reusableWalk = &fixWalk
 		}
 	}
@@ -1131,10 +1151,6 @@ func run() error {
 		}
 		typesDuration := check.elapsed + time.Since(finishing)
 
-		// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads, ahead of the
-		// type errors it causes. See missing_generated.go.
-		missingGenerated := graph.MissingGeneratedInputs(generatedOutputUnder(location.Root))
-		printMissingGenerated(missingGenerated, location.Root)
 		for _, diagnostic := range typeDiagnostics {
 			if file := diagnostic.File(); file != nil && !graph.IsOptionsDiagnostic(diagnostic) {
 				typeErrorFiles[file.FileName().AsString()] = true
@@ -1147,7 +1163,6 @@ func run() error {
 		}
 		findings += len(typeDiagnostics)
 		activeSummary.TypeErrors += len(typeDiagnostics)
-		activeSummary.Gaps.MissingGenerated = missingGeneratedTargets(missingGenerated, location.Root)
 
 		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""

@@ -167,6 +167,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	if len(gaps.MissingGenerated) > 0 {
 		markers = append(markers, "⚠ "+counted(len(gaps.MissingGenerated), "generated file missing", "generated files missing"))
 	}
+	if gaps.FixesHeld {
+		markers = append(markers, "⚠ 🪄 fixes held")
+	}
 	if gaps.ProgramFiles > summary.FilesInScope && summary.FilesInScope > 0 {
 		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", grouped(summary.FilesInScope), grouped(gaps.ProgramFiles)))
 	}

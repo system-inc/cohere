@@ -218,6 +218,9 @@ type runGaps struct {
 	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
 	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
 	MissingGenerated []string `json:"missingGenerated,omitempty"`
+	// FixesHeld is a run whose lint fixes were held because a generated file is missing (#46ern7e): none was
+	// proposed or written, and formatting ran alone.
+	FixesHeld bool `json:"fixesHeld,omitempty"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings
