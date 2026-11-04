@@ -8190,7 +8190,10 @@
                     "set": "cohere:next",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "nexus/correctness-no-mock-on-module-namespace",

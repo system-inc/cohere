@@ -300,6 +300,12 @@
     "reason": "This is a JSX rendering hazard, and a SwiftUI `if` requires a Bool."
   },
   {
+    "typeScriptRule": "nexus/correctness-no-load-time-import-meta-path",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift has no import.meta: a file's path is #filePath or #fileID, a literal the compiler writes in, so it is defined wherever the code runs and nothing reads it at load."
+  },
+  {
     "typeScriptRule": "nexus/correctness-no-mock-on-module-namespace",
     "verdict": "NotApplicable",
     "swiftRule": null,
