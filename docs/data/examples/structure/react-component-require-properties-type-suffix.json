@@ -1,24 +1,33 @@
 {
     "rule": "structure/react-component-require-properties-type-suffix",
     "firing": {
-        "file": "source/components/Button.tsx",
-        "source": "import type { ButtonBag } from './Types';\nexport function Button(properties: ButtonBag) {\n    return <button />;\n}\n",
+        "file": "app/page.tsx",
+        "source": "interface PageProps { label: string } export function Page(properties: PageProps) { return null; }\n",
         "findings": [
             {
-                "line": 2,
-                "column": 36,
-                "endLine": 2,
-                "endColumn": 45,
+                "line": 1,
+                "column": 11,
+                "endLine": 1,
+                "endColumn": 20,
+                "messageId": "useInterfaceSuffix",
+                "message": "This interface is used as a component's property type and does not end in Properties. A component's property type is the one type a reader looks up by guessing its name from the component's, so the suffix is what makes that guess work. Mixed suffixes mean every search for one spelling misses the other. Reported separately from the use site because renaming the declaration is the edit, and the use site follows.",
+                "fix": true
+            },
+            {
+                "line": 1,
+                "column": 72,
+                "endLine": 1,
+                "endColumn": 81,
                 "messageId": "useComponentPropertyTypeSuffix",
                 "message": "This component's property type does not end in Properties. A component's property type is the one type a reader looks up by guessing its name from the component's, so the suffix is what makes that guess work. Mixed suffixes mean every search for one spelling misses the other.",
                 "fix": true
             }
         ],
-        "fixedSource": "import type { ButtonBag } from './Types';\nexport function Button(properties: ButtonBagProperties) {\n    return <button />;\n}\n"
+        "fixedSource": "interface PageProperties { label: string } export function Page(properties: PageProperties) { return null; }\n"
     },
     "clean": {
-        "file": "source/components/Button.tsx",
-        "source": "export function Button() {\n    return <button />;\n}\n"
+        "file": "/repository/app/x/page.tsx",
+        "source": "export default function Page(properties: PageProps<'/x'>) { return null; }"
     },
     "assertedMessageIds": [
         "useComponentPropertyTypeSuffix",
