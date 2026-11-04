@@ -390,13 +390,17 @@ the button: `gh workflow run release.yml -f version=0.2.0`.
 
 **Keys.** The steady state stores none. The GitHub release and the attestations use the run's own
 token. npm uses trusted publishing: GitHub proves to npm which repository and workflow are running, so
-no npm key exists to leak, and provenance comes with it. Two exceptions:
+no npm key exists to leak, and provenance comes with it. The VS Code extension is the exception: opted
+in with the repository variable `PUBLISH_EXTENSION=true`, it needs `VSCE_PAT` and `OVSX_PAT`, and the
+Marketplace's expires.
 
-- **The first release, 0.1.0,** publishes with an `NPM_TOKEN` secret, since npm can only trust a
-  workflow for packages that already exist. It's a granular token, read and write on `@system-inc`,
-  with Bypass 2FA, valid for a few days. Once 0.1.0 is out, it's revoked and the secret deleted.
-- **The VS Code extension,** opted in with the repository variable `PUBLISH_EXTENSION=true`, needs
-  `VSCE_PAT` and `OVSX_PAT`, and the Marketplace's expires.
+**0.1.0 was published by hand,** because npm can only trust a workflow for packages that already exist.
+Its tag run (41766910807) built and proved everything, then a granular token with Bypass 2FA was
+refused with `EOTP`: npm is retiring such tokens for direct publishing. The maintainer published that
+run's own tarballs from a laptop, platform packages first and the dispatcher last, after checking them
+against `SHA256SUMS` and the run's attestations. So 0.1.0 alone has no npm provenance; its binaries
+still verify against the GitHub release and the build attestations. The token is revoked and
+`NPM_TOKEN` is gone.
 
 **The lock.** On a machine where agents act through the maintainer's GitHub account, nothing GitHub
 enforces can tell the maintainer from an agent. npm's staged publishing can. Without `NPM_TOKEN`,
@@ -406,10 +410,12 @@ the GitHub release waits as a draft. Once every package is approved, run
 `gh workflow run consumer.yml -f version=<version>`. It proves the install from the registry, publishes
 the draft, and then runs the three verification commands from the README against the public release.
 
-**Setting up trusted publishing,** once per package after 0.1.0: on npmjs.com, each package's
-Settings, Trusted Publisher, GitHub Actions, organization `system-inc`, repository `cohere`, workflow
-`release.yml`, with stage-only permission. A new configuration expires unless it completes a publish
-within 2 days, so it's done right before the release that first uses it. `npm stage publish` takes
+**Trusted publishing** is set on all seven packages, stage-only, so the workflow can stage a version
+but never put one live. It was set with npm 11.15.0 or later, which `npm trust` needs, signed in with
+2FA, once per package:
+`npm trust github @system-inc/<package> --file release.yml --repo system-inc/cohere --allow-stage-publish`.
+`npm trust list @system-inc/<package>` shows it. A package added later needs the same line once it
+exists on npm. `npm stage publish` takes
 `--provenance`, and the workflow passes it, but npm's docs don't say an approved version keeps it, so
 the first staged release checks with `npm audit signatures` before the README's promise is trusted.
 
