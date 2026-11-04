@@ -45,7 +45,7 @@ type Signing struct {
 	// A release that signed with what was available and stopped there would read as done.
 	Identity string
 
-	// KeychainProfile is the `notarytool` profile holding the Apple ID credentials, stored with
+	// KeychainProfile is the `notarytool` profile holding the notary credentials, stored with
 	// `xcrun notarytool store-credentials`. Credentials are never passed as arguments, because a
 	// command line is visible to every process on the machine and ends up in CI logs.
 	KeychainProfile string
