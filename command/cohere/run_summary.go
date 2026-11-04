@@ -215,11 +215,14 @@ type runGaps struct {
 	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
 	// format walk: checked, and never formatted (#6mhafvb).
 	AdamicIgnored int `json:"adamicIgnored,omitempty"`
+	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
+	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
+	MissingGenerated []string `json:"missingGenerated,omitempty"`
 }
 
-// failed is whether errors, required rewrites or crashes fail the run. Warnings stay in the
-// finding total without failing it, including when the summary is replayed from the run cache.
+// failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings
+// stay in the finding total without failing it, including when the summary is replayed from the run cache.
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
-		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0
+		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0
 }

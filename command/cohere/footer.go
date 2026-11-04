@@ -40,10 +40,10 @@ import (
 //
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
-// not checked, a run narrowed to some of the files, a project with nothing to check. The old phase line
-// existed so that a run which checked nothing could not print like one that checked everything, and a
-// one-line summary that dropped those cases would undo it in the line people actually read. So a gap is
-// never left to `--verbose`.
+// not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
+// program asks for that does not exist yet. The old phase line existed so that a run which checked nothing
+// could not print like one that checked everything, and a one-line summary that dropped those cases would
+// undo it in the line people actually read. So a gap is never left to `--verbose`.
 
 // phaseGlyphs are the house's glyph for each phase that has one.
 var phaseGlyphs = map[phaseName]string{
@@ -163,6 +163,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	var markers []string
 	if gaps.NothingToCheck {
 		markers = append(markers, "⚠ no files to check")
+	}
+	if len(gaps.MissingGenerated) > 0 {
+		markers = append(markers, "⚠ "+counted(len(gaps.MissingGenerated), "generated file missing", "generated files missing"))
 	}
 	if gaps.ProgramFiles > summary.FilesInScope && summary.FilesInScope > 0 {
 		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", grouped(summary.FilesInScope), grouped(gaps.ProgramFiles)))

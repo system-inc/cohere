@@ -1131,14 +1131,23 @@ func run() error {
 		}
 		typesDuration := check.elapsed + time.Since(finishing)
 
+		// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads, ahead of the
+		// type errors it causes. See missing_generated.go.
+		missingGenerated := graph.MissingGeneratedInputs(generatedOutputUnder(location.Root))
+		printMissingGenerated(missingGenerated, location.Root)
 		for _, diagnostic := range typeDiagnostics {
-			printCompilerDiagnostic(diagnostic)
 			if file := diagnostic.File(); file != nil && !graph.IsOptionsDiagnostic(diagnostic) {
 				typeErrorFiles[file.FileName().AsString()] = true
 			}
 		}
+		if !foldTypeDiagnostics(missingGenerated, typeDiagnostics) {
+			for _, diagnostic := range typeDiagnostics {
+				printCompilerDiagnostic(diagnostic)
+			}
+		}
 		findings += len(typeDiagnostics)
 		activeSummary.TypeErrors += len(typeDiagnostics)
+		activeSummary.Gaps.MissingGenerated = missingGeneratedTargets(missingGenerated, location.Root)
 
 		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""
@@ -1353,8 +1362,11 @@ func run() error {
 	// only appeared on failure would reintroduce exactly that ambiguity for the successful case.
 	writeRunEnd(report, os.Stdout)
 
-	// A crash fails the run as a finding does, though it is not one: see runCrash.
-	if findings > 0 || activeSummary.Gaps.CrashedFiles > 0 || activeSummary.Gaps.RuleCrashes > 0 {
+	// A crash fails the run as a finding does, though it is not one: see runCrash. So does a generated file
+	// the program asks for that does not exist, even with no type error after it, since what it declares
+	// was never checked (#wxsqavy).
+	if findings > 0 || activeSummary.Gaps.CrashedFiles > 0 || activeSummary.Gaps.RuleCrashes > 0 ||
+		len(activeSummary.Gaps.MissingGenerated) > 0 {
 		finishRunCache(1)
 	}
 	return nil

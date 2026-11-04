@@ -262,6 +262,12 @@ gap: `✓ 💎 2.4s (…) • 💅 formatting not checked`. The same goes for a 
 that skipped every file, a run narrowed to some of the files, and an Adamic `.a` file git ignores. A crash
 is in the footer too, and it never passes.
 
+So is a generated file the program asks for and nobody has generated yet: an import or `/// <reference
+path>` in a project file whose target doesn't exist and git ignores, such as the `.next/types` files
+next-env.d.ts imports before `next typegen` has run. It leads the output as one finding with its remedy,
+the type errors it causes fold under it as one line counted by code (`--verbose` and `--json` print every
+one), and the run fails, even when no type error follows from it.
+
 On a terminal the verdict and time are bold, what was found is red, and the parentheses are dim. A
 pipe, a file or `NO_COLOR` gets no color codes at all.
 
