@@ -1,0 +1,9 @@
+{"commit":"dev","contract":3,"engine":"cohere-swift","kind":"provenance","sourceTreeModified":false,"swiftFormat":"604.0.0","swiftSyntax":"604.0.0","toolchain":"swiftlang-6.4.2.1.9","version":"0.1.0"}
+{"elapsedMilliseconds":7,"excluded":[],"filesInPackage":2,"filesInScope":2,"filesOurs":2,"kind":"project","package":"Example","root":"/project","scopeDescription":"","targets":[{"files":2,"kind":"library","languageMode":"6","name":"Example"}]}
+{"column":1,"file":"/project/Sources/Example/Doubler.swift","fixes":[],"kind":"finding","line":5,"message":"not formatted the house way; a run without --no-fix rewrites it","messageId":"notFormatted","rule":"cohere-swift/consistency-require-formatting","severity":"error","source":"format","suggestions":[]}
+{"changedFiles":[],"filesConsidered":2,"filesNotFormatted":0,"filesReformatted":0,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"formatScope":"every file in the package","kind":"fix","notFormattedReasons":{},"refusalsByReason":{}}
+{"detail":"","elapsedMilliseconds":7,"kind":"phase","name":"fix","outcome":"ran"}
+{"detail":"not requested","elapsedMilliseconds":0,"kind":"phase","name":"types","outcome":"skipped"}
+{"detail":"not requested","elapsedMilliseconds":0,"kind":"phase","name":"lint","outcome":"skipped"}
+{"detail":"not requested — this is a report, ask for it with --unused","elapsedMilliseconds":0,"kind":"phase","name":"unused","outcome":"skipped"}
+{"complete":true,"exitCode":1,"findings":1,"kind":"summary"}

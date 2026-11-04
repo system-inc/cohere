@@ -231,6 +231,52 @@ struct PipelineControlTests {
         #expect(untouchedRecord["filesRewritten"] as? Int == 0)
     }
 
+    /*
+     `--format-only` formats and does nothing else: no fix proposed, and types, lint and unused skipped as not requested,
+     so nothing is compiled. With `--no-fix` it reports what formatting would change and writes nothing. The source
+     holds a fixable `fileprivate` and an unformatted line, so a run that fixed, linted or left formatting out shows it.
+     */
+    @Test func formatOnlyFormatsAndRunsNoOtherPhase() async throws {
+        let source =
+            Self.cleanSource.replacingOccurrences(of: "value * 2", with: "value  *  2")
+            + "\nfileprivate func helper() {}\n"
+        let gate = try await Self.run(source: source, arguments: ["--format-only"])
+        #expect(gate.phase("fix") == "ran")
+        #expect(
+            gate.phase("types") == "skipped" && gate.phase("lint") == "skipped" && gate.phase("unused") == "skipped"
+        )
+        #expect(
+            gate.findings == ["cohere-swift/consistency-require-formatting:5"],
+            "the format finding alone: \(gate.findings)",
+        )
+        #expect(gate.of("types").isEmpty, "a types record means something was compiled")
+
+        let writing = try await Self.run(source: source, arguments: ["--format-only"], mutating: true)
+        let changed = try #require(writing.of("fix").first?["changedFiles"] as? [[String: Any]])
+        #expect(changed.count == 1)
+        #expect(changed.first?["fixedBy"] as? [String: Int] == [:], "no fix was proposed")
+        #expect(changed.first?["formatted"] as? Bool == true)
+    }
+
+    /* `--no-format` keeps the fixers, types and lint, and leaves the formatter out: an unformatted file is neither rewritten nor reported. */
+    @Test func noFormatLeavesTheFormatterOut() async throws {
+        let unformatted = Self.cleanSource.replacingOccurrences(of: "value * 2", with: "value  *  2")
+        let checked = try await Self.run(source: unformatted, arguments: ["--no-format"])
+        #expect(checked.findings.isEmpty, "no format finding: \(checked.findings)")
+        #expect(checked.phase("types") == "ran" && checked.phase("lint") == "ran")
+        #expect((checked.of("fix").first?["formatScope"] as? String)?.contains("--no-format") == true)
+
+        let fixed = try await Self.run(
+            source: unformatted + "\nfileprivate func helper() {}\n",
+            arguments: ["--no-format"],
+            mutating: true,
+        )
+        let changed = try #require(fixed.of("fix").first?["changedFiles"] as? [[String: Any]])
+        #expect(changed.first?["fixedBy"] as? [String: Int] == ["cohere-swift/private-over-fileprivate": 1])
+        #expect(changed.first?["formatted"] as? Bool == false, "the formatter was left out")
+        #expect(fixed.of("fix").first?["filesReformatted"] as? Int == 0)
+    }
+
     /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */
     @Test func anUnreadableFileIsNamedInARecord() async throws {
         let latin1 = Data("// caf".utf8) + Data([0xE9, 0x0A])

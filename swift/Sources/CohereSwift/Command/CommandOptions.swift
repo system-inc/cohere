@@ -23,6 +23,12 @@ public struct CommandOptions: Equatable, Sendable {
     public var typesOnly = false
     public var lintOnly = false
     public var formatAll = false
+    /* `--format`, which changes nothing for Swift but is kept so `--no-format` can refuse it by name. */
+    public var formatNamed = false
+    /* The fix phase narrowed to formatting: no fix proposed, and no other phase, as TypeScript's `--format-only`. */
+    public var formatOnly = false
+    /* Formatting left out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only, as TypeScript's `--no-format`. */
+    public var noFormat = false
     public var lintConfiguration: URL?
     public var fixPasses = 10
     public var singleThreaded = false
@@ -32,11 +38,15 @@ public struct CommandOptions: Equatable, Sendable {
     public var unused = false
     public var paths: [String] = []
 
-    public var runFix: Bool { fixOnly || !anyPhaseNamed }
+    public var runFix: Bool { fixOnly || formatOnly || !anyPhaseNamed }
     public var runTypes: Bool { typesOnly || !anyPhaseNamed }
     public var runLint: Bool { lintOnly || !anyPhaseNamed }
     public var mutate: Bool { runFix && !noFix }
-    private var anyPhaseNamed: Bool { fixOnly || typesOnly || lintOnly }
+    /* Whether the fix phase asks the rules for fixes: a mutating run that is not `--format-only`. */
+    public var proposeFixes: Bool { self.mutate && !formatOnly }
+    /* Whether the fix phase formats: every run of it, unless `--no-format`. */
+    public var runFormat: Bool { runFix && !noFormat }
+    private var anyPhaseNamed: Bool { fixOnly || typesOnly || lintOnly || formatOnly }
 
     public init() {}
 
@@ -72,8 +82,10 @@ public struct CommandOptions: Equatable, Sendable {
                 case "--types": options.typesOnly = true
                 case "--lint": options.lintOnly = true
                 /* Formatting is on by default for Swift (the contract says why), so the flag is accepted and changes nothing. */
-                case "--format": break
+                case "--format": options.formatNamed = true
                 case "--format-all": options.formatAll = true
+                case "--format-only": options.formatOnly = true
+                case "--no-format": options.noFormat = true
                 case "--lint-config":
                     options.lintConfiguration =
                         URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
@@ -102,6 +114,32 @@ public struct CommandOptions: Equatable, Sendable {
             }
         }
 
+        /* `--no-format` leaves formatting out, so a flag asking for formatting beside it is a contradiction, as in TypeScript. */
+        if options.noFormat {
+            for (named, other) in [
+                (options.formatNamed, "--format"), (options.formatAll, "--format-all"),
+                (options.formatOnly, "--format-only"),
+            ] where named {
+                throw UsageFailure(
+                    description:
+                        "--no-format and \(other) contradict each other: --no-format leaves formatting out, and \(other) asks for it"
+                )
+            }
+        }
+        /* `--format-only` is formatting alone, so a flag asking for other work beside it is a contradiction, as in TypeScript. */
+        if options.formatOnly {
+            for (named, other, asks) in [
+                (options.fixOnly, "--fix", "applies lint fixes"),
+                (options.typesOnly, "--types", "runs the type check"),
+                (options.lintOnly, "--lint", "runs the lint rules"),
+                (options.unused, "--unused", "runs the unused-code report"),
+            ] where named {
+                throw UsageFailure(
+                    description:
+                        "--format-only and \(other) contradict each other: --format-only runs formatting alone, and \(other) \(asks)"
+                )
+            }
+        }
         if options.noFix && options.fixOnly {
             throw UsageFailure(
                 description:

@@ -76,7 +76,7 @@ public struct Pipeline {
          */
         var vocabulary = AbbreviationVocabulary()
         if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off
-            && (options.runFix || options.runLint)
+            && (options.proposeFixes || options.runLint)
         {
             do {
                 vocabulary = try AbbreviationVocabulary.compiledIn()
@@ -165,14 +165,15 @@ public struct Pipeline {
             /*
              Fixers first, then the formatter over the fixed text, so the formatter has the last word on layout
              and a fixer's output is always formatted. Under `--no-fix` nothing is fixed: the fixable findings
-             surface in lint, and the formatter is asked only what it would change.
+             surface in lint, and the formatter is asked only what it would change. `--format-only` proposes no
+             fix, so the formatter alone runs; `--no-format` leaves the formatter out, so the fixers alone do.
              */
             var fixesApplied = 0
             var refusals: [String: Int] = [:]
             var toFormat = parsed.files
             var fixerFindings: [String: [String: [FindingRecord]]] = [:]
             var fixedByFile: [String: [String: Int]] = [:]
-            if options.mutate {
+            if options.proposeFixes {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 /* Each file is fixed on its own, so the files are fixed side by side; results are gathered back in input order. */
                 let files = parsed.files
@@ -203,7 +204,10 @@ public struct Pipeline {
                 parsed.files.map { ($0.url.path, $0.source) },
                 uniquingKeysWith: { first, _ in first },
             )
-            let formatting = await FormatPhase().run(toFormat)
+            let formatting =
+                options.runFormat
+                ? await FormatPhase().run(toFormat)
+                : FormatPhase.Result(outcomes: toFormat.map { (file: $0, outcome: .unchanged) })
             var rewritten: [FileSet.OwnedFile] = []
             var changedFiles: [FixRecord.ChangedFile] = []
             var reformatted = 0
@@ -585,7 +589,9 @@ public struct Pipeline {
             filesReformatted: reformatted,
             filesNotFormatted: notFormatted.values.reduce(0, +),
             notFormattedReasons: notFormatted,
-            formatScope: scope.everything ? "every file in the package" : scope.description,
+            formatScope: !options.runFormat
+                ? "none: formatting was left out (--no-format)"
+                : scope.everything ? "every file in the package" : scope.description,
             changedFiles: rewritten,
         )
     }

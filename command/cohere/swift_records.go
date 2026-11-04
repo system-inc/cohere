@@ -814,10 +814,14 @@ func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
 
 // swiftRequestedPhases is which phases a command line asks for, read as the TypeScript run reads it: no
 // phase flag asks for fix, types and lint; `--fix`, `--types` or `--lint` asks for only the ones named;
-// and any `--unused` flag asks for unused as well. Takes the flag reader as a parameter so a test can
-// state its flags, as swiftEngineArguments does.
+// and any `--unused` flag asks for unused as well. `--format-only` asks for fix alone, narrowed to
+// formatting, so the engine's types and lint skipped as not requested are no gap. Takes the flag reader as
+// a parameter so a test can state its flags, as swiftEngineArguments does.
 func swiftRequestedPhases(given map[string]bool, value func(string) string) map[phaseName]bool {
 	named := func(flag string) bool { return given[flag] && value(flag) == "true" }
+	if named("format-only") {
+		return map[phaseName]bool{phaseFix: true}
+	}
 	anyPhaseNamed := named("fix") || named("types") || named("lint")
 	return map[phaseName]bool{
 		phaseFix:    named("fix") || !anyPhaseNamed,

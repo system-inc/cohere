@@ -6,9 +6,7 @@
 package main
 
 import (
-	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -118,56 +116,41 @@ func TestACrashedProjectOrNoProjectFailsTheRun(t *testing.T) {
 	}
 }
 
-// Under --format-only a Swift package is not run, since the engine has no format-only mode and would
-// type-check and lint it as well (#nqb3mjv): the engine never starts, and the final line names the gap
-// rather than passing over it. Beside a TypeScript program the run checks that and passes; alone, it has
-// checked nothing and fails (#71a0ts8). The same flag against the package alone is refused by name.
-func TestFormatOnlySkipsASwiftPackageAndNamesTheGap(t *testing.T) {
+// Under --format-only a Swift package runs in the engine's own format-only mode (#nqb3mjv, c024df4b): the
+// engine gets --format-only, its types and lint skipped as not requested are no gap, and its format finding
+// fails the run, beside a TypeScript program and in the package alone. Before, the engine had no such mode,
+// so the package was skipped with its gap named, and the flag against it alone was refused.
+func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(t *testing.T) {
 	t.Parallel()
 	binary := buildCohere(t)
-	started := filepath.Join(t.TempDir(), "started")
-	engine := fakeSwiftEngine(t, "touch '"+started+"'\nexit 3")
-	formatOnly := func(root string) (string, int) {
-		command := exec.Command(binary, "--no-fix", "--format-only")
-		command.Dir = root
-		command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
-		output, err := command.CombinedOutput()
-		var exited *exec.ExitError
-		if errors.As(err, &exited) {
-			return string(output), childExitCode(t, exited)
-		} else if err != nil {
-			t.Fatalf("running cohere: %v\n%s", err, output)
-		}
-		return string(output), 0
-	}
-	const gap = "⚠ apple/Toy not format-checked: the Swift engine has no format-only mode yet"
+	arguments := filepath.Join(t.TempDir(), "arguments")
+	engine := fakeSwiftEngine(t, "echo \"$@\" >> '"+arguments+"'\ncat "+filepath.Join(contractDirectory(t), "FormatOnly.jsonl")+"\nexit 1")
+	root := mixedRepository(t, "apple/Toy")
 
-	output, exitCode := formatOnly(mixedRepository(t, "apple/Toy"))
-	if exitCode != 0 || !strings.Contains(output, "✓ 💎") || !strings.Contains(output, "1 project") || !strings.Contains(output, gap) {
-		t.Errorf("beside a TypeScript program, the run did not pass naming the Swift gap (exit %d):\n%s", exitCode, output)
+	output, exitCode := runWithEngine(t, binary, engine, root, "--no-fix", "--format-only")
+	if exitCode == 0 || !strings.Contains(output, "apple/Toy (Swift): failed, exit") || !strings.Contains(output, "  . (TypeScript): green") ||
+		!strings.Contains(output, "projects: 2 checked (1 TypeScript, 1 Swift), 1 failed") {
+		t.Errorf("beside a TypeScript program, the Swift format finding did not fail the run (exit %d):\n%s", exitCode, output)
+	}
+	if strings.Contains(output, "not requested") && strings.Contains(output, "did not run") {
+		t.Errorf("the run counted types or lint skipped as not requested as a gap:\n%s", output)
 	}
 
-	swiftOnly := newRepository(t, nil)
-	writeTree(t, filepath.Join(swiftOnly, "apple", "Toy"), map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"})
-	output, exitCode = formatOnly(swiftOnly)
-	// The root as cohere names it, through any symlink in the temporary directory's path.
-	resolved, err := filepath.EvalSymlinks(swiftOnly)
+	output, alone := runWithEngine(t, binary, engine, root, "--no-fix", "--format-only", "--directory", filepath.Join(root, "apple", "Toy"))
+	if alone == 0 || alone != exitCode || !strings.Contains(output, "notFormatted") && !strings.Contains(output, "Doubler.swift") {
+		t.Errorf("the package alone did not fail on its format finding as the mixed run did (exit %d, mixed %d):\n%s", alone, exitCode, output)
+	}
+	logged, err := os.ReadFile(arguments)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exitCode == 0 || !strings.Contains(output, "✗ ☠️") || !strings.Contains(output, "nothing checked under "+resolved) || !strings.Contains(output, gap) {
-		t.Errorf("a run that skipped its only project did not fail naming what it skipped (exit %d):\n%s", exitCode, output)
+	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
+		if !strings.Contains(" "+line+" ", " --no-fix ") || !strings.Contains(" "+line+" ", " --format-only ") {
+			t.Errorf("the engine was run without --no-fix --format-only: %q", line)
+		}
 	}
-	if _, err := os.Stat(started); err == nil {
-		t.Errorf("the Swift engine ran under --format-only")
-	}
-
-	output, exitCode = runWithEngine(t, binary, engine, swiftOnly, "--no-fix", "--format-only", "--directory", filepath.Join(swiftOnly, "apple", "Toy"))
-	if exitCode == 0 || !strings.Contains(output, "--format-only is not implemented for Swift yet") {
-		t.Errorf("--format-only against the package alone was not refused by name (exit %d):\n%s", exitCode, output)
-	}
-	if _, err := os.Stat(started); err == nil {
-		t.Errorf("the Swift engine ran under a refused --format-only")
+	if count := len(strings.Split(strings.TrimSpace(string(logged)), "\n")); count != 2 {
+		t.Errorf("the engine ran %d times, want twice:\n%s", count, logged)
 	}
 }
 
