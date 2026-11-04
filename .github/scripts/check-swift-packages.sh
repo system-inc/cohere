@@ -51,8 +51,10 @@ for run in "$@"; do
     fi
 
     status=0
-    # The `+` form, because bash 3.2, the one macOS ships, calls an empty array unbound under `set -u`.
-    ${launch[@]+"${launch[@]}"} "$gate/cohere-$platform/bin/cohere" "$flag" --directory "$gate/Sample-$platform" \
+    # --verbose, because the coverage lines below print only there: a default run prints its findings and
+    # one footer line (#ytqqv8v), so without it every run reads as covering no file. The `+` form, because
+    # bash 3.2, the one macOS ships, calls an empty array unbound under `set -u`.
+    ${launch[@]+"${launch[@]}"} "$gate/cohere-$platform/bin/cohere" "$flag" --verbose --directory "$gate/Sample-$platform" \
         > "$gate/$platform.log" 2>&1 || status=$?
     cat "$gate/$platform.log"
 
