@@ -450,6 +450,14 @@ specifically; an Apple Development certificate signs successfully and is then re
 service at the end of a release. Staging without credentials is supported and says so in its own
 summary, because an unsigned release is fine and an unsigned release that looks signed is not.
 
+Releases sign as "Developer ID Application: Kirk Ouimet (6YC8868VS9)", from the secrets
+`MACOS_CERTIFICATE` (the certificate, its key and Apple's G2 intermediate, as a base64 `.p12`),
+`MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGNING_IDENTITY` and `KEYCHAIN_PASSWORD`. They notarize with an
+App Store Connect team key with the Developer role: `APPLE_API_KEY` (the `.p8`), `APPLE_API_KEY_ID`
+and `APPLE_API_ISSUER`. A key reaches only that team. An Apple ID with an app-specific password would
+also work, and would carry the whole account's iCloud mail, contacts and calendars with it, so it isn't
+used. The certificate expires on 2027-12-03.
+
 Note that a notarization ticket cannot be stapled to a bare executable — only to a bundle, a disk
 image, or an installer package — so a notarized Mach-O is validated by an online check on first
 launch. A machine that is entirely offline the first time it runs a quarantined `cohere` is still
