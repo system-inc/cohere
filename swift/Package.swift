@@ -36,11 +36,18 @@ import PackageDescription
  */
 let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
 
-/* The compiler checks cohere-swift's own `toolchain-require-upcoming-features` asks of every Swift target, held to here too. */
+/*
+ The compiler checks cohere-swift's own `toolchain-require-upcoming-features` asks of every Swift target, held to here too.
+
+ Strict memory safety's diagnostics are errors, not warnings. Toolchains disagree about what is unsafe (Swift 6.3
+ flagged two closure calls in SwiftDemangler that 6.4 accepts), and a warning on the release runner's toolchain
+ only scrolls past (v0.1.0's release run, 41766910807), so a build that falls short of the engine's own rule fails.
+ */
 let houseSettings: [SwiftSetting] = [
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("MemberImportVisibility"),
     .strictMemorySafety(),
+    .treatWarning("StrictMemorySafety", as: .error),
 ]
 
 let package = Package(

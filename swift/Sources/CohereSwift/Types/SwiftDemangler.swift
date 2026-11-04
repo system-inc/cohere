@@ -78,12 +78,12 @@ import Synchronization
              The one call into the library, unsafe because a C function is trusted with a raw buffer. It stays in
              bounds because it is told the buffer's own count and writes no further, and the buffer is lent only
              for the call.
+
+             The name and the buffer reach the C function through Swift's own argument conversions rather than
+             `withCString` and `withUnsafeMutableBufferPointer` closures. Swift 6.3 counts those closure calls as
+             unsafe and 6.4 does not, so no marking of them builds clean on both, while a single unsafe call does.
              */
-            let length = mangled.withCString { name in
-                buffer.withUnsafeMutableBufferPointer { output in
-                    unsafe getDemangledName(name, output.baseAddress, output.count)
-                }
-            }
+            let length = unsafe getDemangledName(mangled, &buffer, capacity)
             guard length > 0 else { return nil }
             if length < capacity {
                 return String(decoding: buffer.prefix(length).map { UInt8(bitPattern: $0) }, as: UTF8.self)
