@@ -23,6 +23,11 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 		name       string
 		sourceText string
 	}{
+		// #y2acc0c: these already report on 29631237; loop rebinding does not trigger the
+		// snapshot exemption. Suppressing reports makes all three fixtures fail.
+		{"a for-of const binding", "interface Event { type: string; subject: { run: string | undefined }; }\nexport function collect(events: Event[], judged: Set<string>, runs: Set<string>) {\n    for (const event of events) {\n        const run = event.subject.run;\n        if (event.type === 'future.placed' && run !== undefined && !judged.has(run)) runs.add(run);\n    }\n}\n"},
+		{"a for-of let binding", "interface Event { type: string; subject: { run: string | undefined }; }\nexport function collect(events: Event[], judged: Set<string>, runs: Set<string>) {\n    for (let event of events) {\n        const run = event.subject.run;\n        if (event.type === 'future.placed' && run !== undefined && !judged.has(run)) runs.add(run);\n    }\n}\n"},
+		{"a for-in binding", "export function collect(events: Record<string, unknown>) {\n    for (const event in events) {\n        const length = event.length;\n        use(length);\n    }\n}\ndeclare function use(value: unknown): void;\n"},
 		{"the real Run.ts shape", "export function run(options: OptionsInterface) {\n    const onOutputLine = options.onOutputLine;\n    return onOutputLine;\n}\n"},
 		{"the real TrackedPromise shape", "export function run(tracked: TrackedInterface) {\n    const promise = tracked.promise;\n    return promise;\n}\n"},
 		{"a nested reach", "export function run(state: StateInterface) {\n    const value = state.inner.value;\n    return value;\n}\n"},
@@ -79,6 +84,9 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 		name       string
 		sourceText string
 	}{
+		// #y2acc0c: a real body write still needs the snapshot. Disabling that exemption
+		// makes this fixture fail with one unexpected finding.
+		{"a snapshot before a write inside a for-of body", "interface Event { subject: { run: string | undefined }; }\nexport function collect(events: Event[], other: Event['subject']) {\n    for (const event of events) {\n        const run = event.subject.run;\n        event.subject = other;\n        use(run);\n    }\n}\ndeclare function use(value: unknown): void;\n"},
 		{"the names differ", "export function run(options: OptionsInterface) {\n    const value = options.other;\n    return value;\n}\n"},
 		{"a call in the chain", "export function run() {\n    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;\n    return timeZone;\n}\n"},
 		{"a call at the head of the chain", "export function run(make: MakeInterface) {\n    const value = make().value;\n    return value;\n}\n"},
