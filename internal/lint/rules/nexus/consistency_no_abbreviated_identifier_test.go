@@ -922,3 +922,39 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing
 		})
 	}
 }
+
+// An unavailable type contract cannot establish that a member spelling is ours.
+func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, source, dependency string
+		want                     int
+	}{
+		{name: "unresolved reference", source: "declare const page: PageProps;"},
+		{name: "unresolved contextual contract", source: "const page: PageProps = { durationMs: 500 };"},
+		{name: "unresolved inherited contract", source: "class Session implements PageProps { durationMs = 500 }"},
+		{name: "unresolved combined contract", source: "type Session = PageProps & { durationMs: number };"},
+		{name: "own declaration", source: "interface PageProps { durationMs: number } declare const page: PageProps;", want: 2},
+		{name: "dependency declaration", source: "declare const page: PageProps;", dependency: "interface PageProps { durationMs: number }"},
+		{name: "own contextual declaration", source: "interface PageProps { durationMs: number } const page: PageProps = { durationMs: 500 };", want: 2},
+		{name: "dependency contextual declaration", source: "const page: PageProps = { durationMs: 500 };", dependency: "interface PageProps { durationMs: number }"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			files := map[string]string{"subject.ts": tc.source}
+			if tc.dependency != "" {
+				files["contract.d.ts"] = "export {}; declare global { " + tc.dependency + " }"
+			}
+			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, files, "subject.ts")
+			if len(result.Diagnostics) != tc.want {
+				t.Fatalf("got %d findings, want %d: %v", len(result.Diagnostics), tc.want, result.MessageIds())
+			}
+			for _, diagnostic := range result.Diagnostics {
+				if len(diagnostic.Fixes) != 0 {
+					t.Fatal("abbreviation rule must not fix names")
+				}
+			}
+		})
+	}
+}

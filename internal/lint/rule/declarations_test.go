@@ -221,3 +221,65 @@ func TestDeclarationMetadataQueriesPreserveAllAnyAndEmpty(t *testing.T) {
 		t.Error("nil symbol has declarations")
 	}
 }
+
+// A real missing import yields the checker's unknown symbol, while a bare missing
+// global may yield a declaration-free error symbol after diagnostics. Neither establishes ownership.
+func TestIsResolvedSymbolRequiresADeclaration(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	files := map[string]string{
+		"tsconfig.json": `{"compilerOptions":{"strict":true,"target":"ES2022","types":[]},"include":["*.ts"]}`,
+		"subject.ts":    "import type { Missing } from './missing'; interface PageProps {} declare const page: PageProps; declare const absent: Absent; declare const imported: Missing; declare const untyped: any;",
+	}
+	for name, contents := range files {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := graph.ProjectFiles()[0]
+	if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), subject); len(diagnostics) != 2 {
+		t.Fatalf("got %d compiler diagnostics, want missing module and missing name", len(diagnostics))
+	}
+	checker, release := graph.CheckerForFile(context.Background(), subject)
+	defer release()
+	typeSymbol := func(index int) *ast.Symbol {
+		declaration := subject.Statements.Nodes[index].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
+		return checker.GetSymbolAtLocation(declaration.Type().AsTypeReferenceNode().TypeName)
+	}
+	own, absent, alias := typeSymbol(2), typeSymbol(3), typeSymbol(4)
+	typeAt := func(index int) *ast.Node {
+		return subject.Statements.Nodes[index].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
+	}
+	if !rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(3))) {
+		t.Error("missing global lost its unresolved type")
+	}
+	if rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(2))) || rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(5))) || rule.IsUnresolvedType(nil) {
+		t.Error("own type, explicit any, or no context was classified as unresolved")
+	}
+	unknown := checker.GetAliasedSymbol(alias)
+	if rule.HasDeclarations(absent) || alias == nil || !checker.IsUnknownSymbol(unknown) {
+		t.Fatal("fixture did not produce a declaration-free missing name and an unknown alias target")
+	}
+	for _, tc := range []struct {
+		name   string
+		symbol *ast.Symbol
+		want   bool
+	}{
+		{"nil", nil, false}, {"without declarations", &ast.Symbol{}, false}, {"missing global", absent, false},
+		{"unknown", unknown, false}, {"unresolved alias", alias, false}, {"own", own, true},
+	} {
+		// Not parallel: the checker lease belongs to the parent and must remain live.
+		t.Run(tc.name, func(t *testing.T) {
+			if got := rule.IsResolvedSymbol(checker, tc.symbol); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if rule.IsResolvedSymbol(nil, own) {
+		t.Fatal("a missing checker established ownership")
+	}
+}
