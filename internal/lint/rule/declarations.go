@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 )
 
 // DeclarationsIn returns the declarations of symbol that sit in sourceFile, in the checker's order.
@@ -116,4 +117,27 @@ func IsDeclaredInANonDeclarationFile(symbol *ast.Symbol) bool {
 		}
 	}
 	return false
+}
+
+// IsResolvedSymbol reports whether a name resolves to a declaration. An absent symbol,
+// an unresolved import's unknown symbol, and synthetic symbols without declarations
+// establish no ownership: naming rules must neither report nor rename them. Follow
+// aliases first, since an import declaration alone does not prove its target exists.
+// This scalar query exposes no foreign syntax to a type-reach caller.
+func IsResolvedSymbol(typeChecker *checker.Checker, symbol *ast.Symbol) bool {
+	if typeChecker == nil || symbol == nil {
+		return false
+	}
+	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+		symbol = checker.SkipAlias(symbol, typeChecker)
+	}
+	return symbol != nil && !typeChecker.IsUnknownSymbol(symbol) && HasDeclarations(symbol)
+}
+
+// IsUnresolvedType recognizes the checker's error recovery type for a missing
+// contract. It is distinct from explicit any, unknown, and an absent contextual
+// type (an unconstrained literal). Type queries may have already lost the missing
+// name's symbol; naming rules still cannot infer ownership from that error.
+func IsUnresolvedType(valueType *checker.Type) bool {
+	return valueType != nil && valueType.Flags()&checker.TypeFlagsAny != 0 && valueType.AsIntrinsicType().IntrinsicName() == "error"
 }

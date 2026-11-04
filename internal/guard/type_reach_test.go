@@ -95,6 +95,7 @@ var ownFileDeclarationReaders = map[string]bool{
 	"rule.FirstDeclarationInSet": true,
 	"rule.IsDeclaredInFile":      true,
 	// Scalar provenance/count queries: mixed-order and empty/missing-file tests preserve each contract.
+	"rule.IsResolvedSymbol":                 true,
 	"rule.HasDeclarations":                  true,
 	"rule.IsDeclaredInANonDeclarationFile":  true,
 	"rule.IsSymbolFromDefaultLibrary":       true,

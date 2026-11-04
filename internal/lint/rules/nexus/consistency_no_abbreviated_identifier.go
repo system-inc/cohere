@@ -635,6 +635,9 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 			if static {
 				baseType = ctx.TypeChecker.GetTypeAtLocation(base.Expression())
 			}
+			if rule.IsUnresolvedType(baseType) {
+				return true
+			}
 			if baseType == nil {
 				continue
 			}
@@ -659,6 +662,10 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 // declaration in any alternative still owns that spelling; a synthetic index/mapped property
 // without a declaration of this name does not. Inferred self-context is not an earlier declaration.
 func abbreviatedContextDeclaresProperty(ctx rule.Context, contextual *checker.Type, name string, literal *ast.Node) bool {
+	// A missing contract has no declaration from which to infer ownership.
+	if rule.IsUnresolvedType(contextual) {
+		return true
+	}
 	if contextual == nil {
 		return false
 	}
@@ -721,6 +728,10 @@ func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name strin
 }
 
 func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Type, name string) bool {
+	// An unresolved constituent may own the spelling once its declaration exists.
+	if rule.IsUnresolvedType(valueType) {
+		return true
+	}
 	if valueType == nil {
 		return false
 	}

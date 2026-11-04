@@ -66,7 +66,7 @@ func messageUseTypeAliasSuffix() rule.Message {
 // from a package: they carry the framework's spelling, and renaming one at the parameter wrote
 // `PageProperties<'/x'>`, a name nothing declares, so the fix broke type checking. Ownership is decided
 // by where the type is declared rather than how it is spelled, which takes the checker. Without one the
-// rule judges every name as before.
+// rule cannot establish ownership and leaves the name alone.
 var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 	Name:             "structure/react-component-require-properties-type-suffix",
 	NeedsTypeChecker: true,
@@ -107,7 +107,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			if typeName == "" || strings.HasSuffix(typeName, "Properties") {
 				return
 			}
-			if isDependencyPropertyType(ctx, parameterTypeNode(parameters[0])) {
+			if isUnownedPropertyType(ctx, parameterTypeNode(parameters[0])) {
 				return
 			}
 
@@ -258,7 +258,7 @@ func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, i
 		if name != nil && name.Kind == ast.KindIdentifier &&
 			react.IsLikelyComponentName(name.Text()) && len(parameters) == 1 {
 			if typeName := typeReferenceName(parameterTypeNode(parameters[0])); typeName != "" &&
-				!strings.HasSuffix(typeName, "Properties") && !isDependencyPropertyType(ctx, parameterTypeNode(parameters[0])) {
+				!strings.HasSuffix(typeName, "Properties") && !isUnownedPropertyType(ctx, parameterTypeNode(parameters[0])) {
 				into[typeName] = true
 			}
 		}
@@ -271,17 +271,15 @@ func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, i
 	visit(sourceFile)
 }
 
-// isDependencyPropertyType reports whether a component's parameter type names a type a dependency
-// declares, following an import to what it imports: the specifier is ours, the type it names may not
-// be. A name the checker cannot resolve, like an import of a file the program lacks, is judged as ours,
-// which keeps its finding rather than dropping it.
-func isDependencyPropertyType(ctx rule.Context, typeNode *ast.Node) bool {
+// isUnownedPropertyType excludes both dependency types and names with no resolved
+// declaration. Missing Next typegen output is a compiler error, not a type we own.
+func isUnownedPropertyType(ctx rule.Context, typeNode *ast.Node) bool {
 	if ctx.TypeChecker == nil || typeNode == nil || typeNode.Kind != ast.KindTypeReference {
-		return false
+		return true
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(typeNode.AsTypeReferenceNode().TypeName)
-	if symbol == nil {
-		return false
+	if !rule.IsResolvedSymbol(ctx.TypeChecker, symbol) {
+		return true
 	}
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
 		symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
