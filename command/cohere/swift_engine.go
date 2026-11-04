@@ -24,7 +24,7 @@ import (
 // gives them, forwarded only when the caller typed them. The rest are refused by name, by the engine
 // or below, because a flag accepted and ignored reads as a run that did what was asked.
 var swiftPassThroughSwitches = []string{
-	"no-fix", "fix", "types", "lint", "format", "format-all", "single-threaded",
+	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
 	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
 }
 
@@ -32,18 +32,10 @@ var swiftPassThroughSwitches = []string{
 // the lint config and fix passes it forwards with their values, how the report is printed, and the profile
 // of this process. Any flag given that is in neither list is refused by name (see swiftEngineArguments).
 // It used to be dropped, and `--format-only` dropped meant a format gate that type-checked and linted the
-// whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv).
+// whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv). The engine has read
+// `--format-only` and `--no-format` with TypeScript's meaning since c024df4b, so both pass through.
 var swiftFrontDoorFlags = []string{
 	"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
-}
-
-// swiftRefusals say why a flag the engine cannot honor yet is refused, where the general sentence would
-// not say enough.
-var swiftRefusals = map[string]string{
-	"format-only": "--format-only is not implemented for Swift yet: the engine has no format-only mode, and running " +
-		"it would type-check and lint the package as well (#nqb3mjv), so nothing was checked",
-	"no-format": "--no-format is not implemented for Swift yet: the engine formats on every run (swift/Contract.md), " +
-		"so its format findings would still count (#nqb3mjv), and nothing was checked",
 }
 
 // runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
@@ -208,9 +200,6 @@ func swiftEngineArguments(
 		if slices.Contains(swiftPassThroughSwitches, name) || slices.Contains(swiftFrontDoorFlags, name) ||
 			name == "tsconfig" || value(name) == "false" {
 			continue
-		}
-		if reason, explained := swiftRefusals[name]; explained {
-			return nil, "", errors.New(reason)
 		}
 		return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so the run was refused rather than run without it, and nothing was checked", name)
 	}

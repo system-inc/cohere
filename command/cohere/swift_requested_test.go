@@ -158,3 +158,26 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 		t.Fatalf("a requested lint skipped and called incomplete: exit %d, err %v\n%s", exitCode, err, output)
 	}
 }
+
+// --format-only asks for the fix phase alone, as TypeScript's does, so the engine's types and lint skipped as
+// not requested are no gap, and its format finding is the verdict (#nqb3mjv, c024df4b). Without it a phase
+// flag would be read as asking for everything, and the format gate would fail on phases it never asked for.
+func TestFormatOnlyAsksForTheFixPhaseAlone(t *testing.T) {
+	t.Parallel()
+	given, value := flagsOf("no-fix", "format-only")
+	requested := swiftRequestedPhases(given, value)
+	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
+		t.Fatalf("--format-only requested %v, want fix alone", requested)
+	}
+	output, exitCode, err := renderRequested(t, contractFixture(t, "FormatOnly.jsonl"), requested, 1)
+	if err != nil {
+		t.Fatalf("the format-only stream was refused: %v\n%s", err, output)
+	}
+	if exitCode != 1 {
+		t.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
+	}
+	everything := swiftRequestedPhases(flagsOf("no-fix"))
+	if _, _, err := renderRequested(t, contractFixture(t, "FormatOnly.jsonl"), everything, 1); err == nil {
+		t.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
+	}
+}
