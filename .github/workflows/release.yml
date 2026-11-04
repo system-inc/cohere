@@ -20,25 +20,29 @@
 # Every release is verifiable from outside (README.md, "Verifying a release"). The packages carry a
 # SHA256SUMS the launcher checks before it runs a binary, every file is attested, and npm publishes with
 # provenance. Each check is shown here refusing a file with one byte flipped before anything publishes.
+#
+# A release is a tag, by Kirk's ruling of 2026-11-03: pushing `v0.2.0` on a commit that is on main
+# releases 0.2.0, and nothing else publishes. A merge to main never does, since main moves many times a
+# day and an npm version is permanent. A tag with a prerelease suffix, `v0.2.0-rc.1`, is a full rehearsal
+# that publishes nothing, and so is the button (workflow_dispatch), which takes the version to stamp.
+#
+# How npm is reached depends on whether the NPM_TOKEN secret exists. With it, the packages publish
+# directly, with provenance: that is the first release, 0.1.0, since npm can only trust a workflow for
+# packages that already exist. Without it, the packages are staged over trusted publishing (OIDC), with no
+# stored key, and each goes live only when a maintainer approves it on npm with 2FA, which no token and no
+# agent can do. Until then the GitHub release waits as a draft, and consumer.yml, run after the approvals,
+# proves the install from the registry and publishes it (CONTRIBUTING.md, "Releasing").
 name: release
 
 on:
+    push:
+        tags: ["v*"]
     workflow_dispatch:
         inputs:
             version:
-                description: The version to stamp and publish, like 0.1.0. Versions start at 0.1.0, and the release refuses anything below it
+                description: The version to stamp in a dry run, like 0.1.0. A dry run publishes nothing; a release is a pushed v* tag
                 required: true
                 type: string
-            publish:
-                description: Publish to npm rather than only staging the packages
-                required: false
-                default: false
-                type: boolean
-            publish-extension:
-                description: Also publish the VS Code extension to the Marketplace and Open VSX, which needs the VSCE_PAT and OVSX_PAT secrets. Only with publish
-                required: false
-                default: false
-                type: boolean
 
 # A release writes to the registry, so two of them running at once could interleave and publish a
 # half-matched set. Concurrency is serialized rather than cancelled: cancelling a release mid-publish
@@ -48,7 +52,46 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    # What this run is: the version, and whether it publishes. A pushed tag names the version and publishes
+    # unless it carries a prerelease suffix; the button names the version and never publishes. Every job
+    # below reads both from here, so there is one answer for the whole run.
+    plan:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: read
+        outputs:
+            version: ${{ steps.plan.outputs.version }}
+            publish: ${{ steps.plan.outputs.publish }}
+        steps:
+            - id: plan
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  DISPATCHED_VERSION: ${{ inputs.version }}
+              run: |
+                  if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+                      version=${GITHUB_REF_NAME#v}
+                      # A release ships what main holds. A tag on a commit main doesn't contain, from a branch
+                      # or from history rewritten since, is refused before anything builds.
+                      status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status)
+                      if [ "$status" != "behind" ] && [ "$status" != "identical" ]; then
+                          echo "the tag $GITHUB_REF_NAME is on $GITHUB_SHA, which main does not contain (compare: $status), so it is not released"
+                          exit 1
+                      fi
+                      publish=true
+                      case "$version" in
+                          *-*) publish=false ;;
+                      esac
+                  else
+                      version=$DISPATCHED_VERSION
+                      publish=false
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  echo "publish=$publish" >> "$GITHUB_OUTPUT"
+                  echo "cohere $version, publish: $publish"
+
     release:
+        needs: plan
         # macos-26 for Xcode 26 and Swift 6.3, the oldest stable toolchain the engine's Package.swift
         # (tools 6.2) builds with. Never the xcode-27 preview image: a release is not built on a beta.
         runs-on: macos-26
@@ -224,7 +267,7 @@ jobs:
                   fi
 
                   go run ./command/cohere-release \
-                      --version "${{ inputs.version }}" \
+                      --version "${{ needs.plan.outputs.version }}" \
                       --output dist \
                       --signing-identity "$MACOS_SIGNING_IDENTITY" \
                       --notary-profile "$notary_profile"
@@ -237,8 +280,8 @@ jobs:
               run: |
                   ./dist/cohere-darwin-arm64/bin/cohere --version
                   reported=$(./dist/cohere-darwin-arm64/bin/cohere --version | head -1 | awk '{print $2}')
-                  if [ "$reported" != "${{ inputs.version }}" ]; then
-                      echo "the binary reports $reported but this release is ${{ inputs.version }}"
+                  if [ "$reported" != "${{ needs.plan.outputs.version }}" ]; then
+                      echo "the binary reports $reported but this release is ${{ needs.plan.outputs.version }}"
                       exit 1
                   fi
 
@@ -290,7 +333,7 @@ jobs:
 
             - uses: actions/upload-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}
+                  name: cohere-${{ needs.plan.outputs.version }}
                   path: dist/
                   # Long enough to investigate a bad release without keeping six 43 MB binaries
                   # per run forever.
@@ -299,7 +342,7 @@ jobs:
             - name: Package the VS Code extension, versioned with this release
               # One .vsix for both registries, built beside the npm packages so it rides the same tar to
               # the publish job. The script stamps the version and checks the .vsix it made.
-              run: bash .github/scripts/package-vscode-extension.sh "${{ inputs.version }}" dist
+              run: bash .github/scripts/package-vscode-extension.sh "${{ needs.plan.outputs.version }}" dist
 
             - name: Attest every binary, the checksums and the extension
               # A build attestation per file, signed through Sigstore with this run's identity and stored on
@@ -353,7 +396,7 @@ jobs:
 
             - uses: actions/upload-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
                   path: cohere-dist.tar
                   retention-days: 14
 
@@ -361,7 +404,7 @@ jobs:
     # arm64-only libclang into an x86_64 engine, so only an Intel Mac with an x86_64 Xcode shows that
     # phase working. macos-26-intel carries Xcode 26, whose Swift 6.3 reads the engine's tools 6.2.
     swift-on-intel:
-        needs: release
+        needs: [plan, release]
         runs-on: macos-26-intel
         timeout-minutes: 30
 
@@ -374,7 +417,7 @@ jobs:
 
             - uses: actions/download-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
 
             - name: Prove the x64 package checks Swift natively, every phase
               run: |
@@ -389,7 +432,7 @@ jobs:
     # whole go test suite is not run, since much of it uses /bin/sh, symlinks and `/`-absolute fixtures.
     # win32-arm64 is built and not run, since there is no runner for it here.
     windows:
-        needs: release
+        needs: [plan, release]
         runs-on: windows-latest
         timeout-minutes: 30
         defaults:
@@ -412,7 +455,7 @@ jobs:
 
             - uses: actions/download-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
 
             - name: Prove the Windows package checks, fixes and formats a project
               run: |
@@ -431,7 +474,7 @@ jobs:
     # findings, a type error, unformatted files and a CRLF file, and every exit code and message is
     # checked (check-platform-package.sh). macOS and Linux here; Windows is the job above.
     clean-machine:
-        needs: release
+        needs: [plan, release]
         strategy:
             fail-fast: false
             matrix:
@@ -457,7 +500,7 @@ jobs:
 
             - uses: actions/download-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
 
             - name: Install the packages into an empty project and check it, with no Go
               run: |
@@ -478,89 +521,124 @@ jobs:
 
     publish:
         # After every proof, so a package one of them refused is never on the registry.
-        needs: [release, swift-on-intel, windows, clean-machine]
-        if: ${{ inputs.publish }}
+        needs: [plan, release, swift-on-intel, windows, clean-machine]
+        if: ${{ needs.plan.outputs.publish == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 15
-        # id-token for npm's provenance, which signs each package with this run's identity; contents: write
-        # to create the GitHub release that carries SHA256SUMS.
+        # id-token for trusted publishing and npm's provenance, which sign with this run's identity;
+        # contents: write to create the GitHub release that carries SHA256SUMS.
         permissions:
             contents: write
             id-token: write
+        outputs:
+            mode: ${{ steps.npm.outputs.mode }}
 
         steps:
             - uses: actions/download-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
 
-            # The npm the release job's provenance proof ran, so what was proven is what publishes.
+            # The Node the release job's provenance proof ran, so what was proven is what publishes.
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
 
-            - name: Publish to npm
-              # Publishing is opt-in per run rather than automatic on a tag, because it cannot be
-              # undone. The platform packages go first: the dispatcher depends on them, so
-              # publishing it first opens a window where an install resolves a dispatcher whose
-              # binaries do not exist yet.
+            - name: Publish to npm, directly or staged
+              # The platform packages go first: the dispatcher depends on them, so publishing it first opens a
+              # window where an install resolves a dispatcher whose binaries do not exist yet. Every path
+              # starts with ./ because npm reads `dist/cohere` as the GitHub repository dist/cohere, which in a
+              # dry run published six packages and then failed the seventh.
+              id: npm
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
               run: |
                   tar -xf cohere-dist.tar
-                  echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > ~/.npmrc
-
-                  # Every path starts with ./ because npm reads `dist/cohere` as the GitHub repository
-                  # dist/cohere. Measured in a dry run: the six platform packages published, and then the
-                  # dispatcher, the one package a user installs, failed on a git clone, which would have
-                  # left a version half on the registry.
-                  #
-                  # --provenance links each version to this run and commit, shown on npm as a provenance
-                  # badge and checked by `npm audit signatures` on any machine that installs it.
+                  packages=()
                   for package in ./dist/*/; do
-                      if [ "$(basename "$package")" = "cohere" ]; then
-                          continue
+                      if [ "$(basename "$package")" != "cohere" ]; then
+                          packages+=("$package")
                       fi
-                      npm publish "$package" --access public --provenance
                   done
+                  packages+=(./dist/cohere)
 
-                  npm publish ./dist/cohere --access public --provenance
+                  if [ -n "$NODE_AUTH_TOKEN" ]; then
+                      # The first release, before npm can trust this workflow for packages that don't exist
+                      # yet. --provenance links each version to this run and commit.
+                      echo "mode=direct" >> "$GITHUB_OUTPUT"
+                      echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > ~/.npmrc
+                      for package in "${packages[@]}"; do
+                          npm publish "$package" --access public --provenance
+                      done
+                      exit 0
+                  fi
+
+                  # No stored key: trusted publishing stages each package, and a maintainer approves it on npm
+                  # with 2FA. Staging needs npm 11.15.0 or later, so the bundled npm is replaced when older.
+                  echo "mode=staged" >> "$GITHUB_OUTPUT"
+                  npm install --global npm@11 > /dev/null
+                  if ! node -e 'const [a, b] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && b >= 15) ? 0 : 1)' "$(npm --version)"; then
+                      echo "npm $(npm --version) cannot stage; staging needs 11.15.0 or later"
+                      exit 1
+                  fi
+                  # --provenance as the direct path passes it: npm 11.21's `stage publish` takes it, and the
+                  # first staged release checks the approved versions carry it.
+                  for package in "${packages[@]}"; do
+                      npm stage publish "$package" --access public --provenance
+                  done
+                  {
+                      echo "### cohere ${{ needs.plan.outputs.version }} is staged on npm"
+                      echo
+                      echo "Approve each of the ${#packages[@]} packages at npmjs.com (Staged Packages, Approve) or with \`npm stage approve <id>\`, which asks for 2FA. Then run \`gh workflow run consumer.yml -f version=${{ needs.plan.outputs.version }}\`, which proves the install from the registry and publishes the draft GitHub release."
+                  } >> "$GITHUB_STEP_SUMMARY"
 
             - name: Create the GitHub release, carrying SHA256SUMS
-              # After npm, so a release page never points at packages that failed to publish. The checksums
-              # here and the ones inside @system-inc/cohere are one file, held equal by the release job, so
-              # a reader can check an install against a copy that did not come through npm.
+              # After npm, so a release page never points at packages that failed to publish. Staged packages
+              # aren't installable until they are approved, so then the release waits as a draft, which
+              # consumer.yml publishes once the registry serves them. The checksums here and the ones inside
+              # @system-inc/cohere are one file, held equal by the release job, so a reader can check an
+              # install against a copy that did not come through npm.
               env:
                   GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ needs.plan.outputs.version }}
+                  MODE: ${{ steps.npm.outputs.mode }}
               run: |
-                  gh release create "v${{ inputs.version }}" dist/SHA256SUMS \
+                  draft=()
+                  if [ "$MODE" = "staged" ]; then
+                      draft=(--draft)
+                  fi
+                  gh release create "v$VERSION" dist/SHA256SUMS "${draft[@]}" \
                       --repo "$GITHUB_REPOSITORY" \
-                      --target "$GITHUB_SHA" \
-                      --title "cohere ${{ inputs.version }}" \
-                      --notes "Install with \`npm install --save-dev @system-inc/cohere@${{ inputs.version }}\`. What changed is in CHANGELOG.md, and how to verify what you installed is under \"Verifying a release\" in README.md."
+                      --verify-tag \
+                      --title "cohere $VERSION" \
+                      --notes "Install with \`npm install --save-dev @system-inc/cohere@$VERSION\`. What changed is in CHANGELOG.md, and how to verify what you installed is under \"Verifying a release\" in README.md."
 
     # A consumer's CI, installing what the registry now serves: npm and pnpm on fresh macOS, Linux and
-    # Windows runners with no Go and no checkout, each gating a project with `cohere --no-fix`.
+    # Windows runners with no Go and no checkout, each gating a project with `cohere --no-fix`. Straight
+    # after a direct publish; after a staged one it waits for the approvals, and is run by hand then.
     consumer:
-        needs: publish
-        if: ${{ inputs.publish }}
+        needs: [plan, publish]
+        if: ${{ needs.publish.outputs.mode == 'direct' }}
+        permissions:
+            contents: write
         uses: ./.github/workflows/consumer.yml
         with:
-            version: ${{ inputs.version }}
+            version: ${{ needs.plan.outputs.version }}
 
     publish-vscode-extension:
         # After the cohere packages are on npm, so the extension never reaches a registry before the
         # cohere it runs. `publish` already waits on every proof, so this does too. Opt in, by Kirk's
         # ruling for 1.0: a release that publishes only the npm packages, with no registry tokens for the
-        # extension, finishes green rather than failing here after npm has published.
-        needs: publish
-        if: ${{ inputs.publish && inputs.publish-extension }}
+        # extension, finishes green rather than failing here after npm has published. Opted into with the
+        # repository variable PUBLISH_EXTENSION=true, since a tag carries no inputs.
+        needs: [plan, publish]
+        if: ${{ vars.PUBLISH_EXTENSION == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 15
 
         steps:
             - uses: actions/download-artifact@v4
               with:
-                  name: cohere-${{ inputs.version }}-tar
+                  name: cohere-${{ needs.plan.outputs.version }}-tar
 
             - name: Publish to the Visual Studio Marketplace and Open VSX
               # The Marketplace serves VS Code; Open VSX serves Cursor, VSCodium and Windsurf. Each token
@@ -572,7 +650,7 @@ jobs:
                   OVSX_PAT: ${{ secrets.OVSX_PAT }}
               run: |
                   tar -xf cohere-dist.tar
-                  vsix="dist/cohere-${{ inputs.version }}.vsix"
+                  vsix="dist/cohere-${{ needs.plan.outputs.version }}.vsix"
                   for token in VSCE_PAT OVSX_PAT; do
                       if [ -z "${!token}" ]; then
                           echo "the $token secret is not set, so the extension was published to neither registry"

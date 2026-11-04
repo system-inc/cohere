@@ -372,6 +372,47 @@ The Swift engine's contract is not a compatibility surface. The front door and `
 one package, and the release refuses to stage a pair that speak different contract versions, so a
 contract change needs no version of its own.
 
+### Releasing
+
+A release is a tag, and only a tag. Main moves many times a day and an npm version is permanent, so a
+merge never publishes anything. Kirk set it this way on 2026-11-03:
+
+1. **Prepare.** When main holds enough to ship, the changelog tool, run against the last tag, says the
+   smallest version the change allows, and the release's section goes into `CHANGELOG.md`.
+2. **Decide.** Kirk reads the section and says go.
+3. **Tag.** `v<version>` goes up on a commit main contains. `release.yml` runs on it: the module
+   check, the six platform packages, every proof, then npm, then the GitHub release, then
+   `consumer.yml`, which installs the version from the registry with npm and pnpm on fresh runners. A
+   tag main doesn't contain is refused before anything builds.
+
+A tag with a prerelease suffix, `v0.2.0-rc.1`, runs the whole thing and publishes nothing, and so does
+the button: `gh workflow run release.yml -f version=0.2.0`.
+
+**Keys.** The steady state stores none. The GitHub release and the attestations use the run's own
+token. npm uses trusted publishing: GitHub proves to npm which repository and workflow are running, so
+no npm key exists to leak, and provenance comes with it. Two exceptions:
+
+- **The first release, 0.1.0,** publishes with an `NPM_TOKEN` secret, since npm can only trust a
+  workflow for packages that already exist. It's a granular token, read and write on `@system-inc`,
+  with Bypass 2FA, valid for a few days. Once 0.1.0 is out, it's revoked and the secret deleted.
+- **The VS Code extension,** opted in with the repository variable `PUBLISH_EXTENSION=true`, needs
+  `VSCE_PAT` and `OVSX_PAT`, and the Marketplace's expires.
+
+**The lock.** On a machine where agents act through the maintainer's GitHub account, nothing GitHub
+enforces can tell the maintainer from an agent. npm's staged publishing can. Without `NPM_TOKEN`,
+`release.yml` stages each package with `npm stage publish` over trusted publishing, and a package goes
+live only when a maintainer approves it on npm with 2FA, which a workflow token cannot do. Until then,
+the GitHub release waits as a draft. Once every package is approved, run
+`gh workflow run consumer.yml -f version=<version>`. It proves the install from the registry, publishes
+the draft, and then runs the three verification commands from the README against the public release.
+
+**Setting up trusted publishing,** once per package after 0.1.0: on npmjs.com, each package's
+Settings, Trusted Publisher, GitHub Actions, organization `system-inc`, repository `cohere`, workflow
+`release.yml`, with stage-only permission. A new configuration expires unless it completes a publish
+within 2 days, so it's done right before the release that first uses it. `npm stage publish` takes
+`--provenance`, and the workflow passes it, but npm's docs don't say an approved version keeps it, so
+the first staged release checks with `npm audit signatures` before the README's promise is trusted.
+
 ### The formatter carries no JavaScript
 
 A released binary formats with cohere's native Go printers and embeds none of the Prettier fork's

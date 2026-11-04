@@ -9,7 +9,9 @@
 # is settled before it is committed, and then gates it with `cohere --no-fix`, which must pass. A type
 # error and an unformatted file are then each planted in a copy, and the gate must fail on each by name.
 #
-# release.yml calls this after it publishes. It can also be run by hand for any published version:
+# release.yml calls this after a direct publish. After a staged one, run it by hand once every package is
+# approved on npm, and its last job publishes the release's draft GitHub page. It can also be run for any
+# published version:
 #
 #     gh workflow run consumer.yml -f version=0.1.0
 name: consumer
@@ -151,16 +153,51 @@ jobs:
                   fi
                   echo "every check passed with $MANAGER on ${{ matrix.runner }}"
 
-            - name: Verify what was installed, as the README says to
-              # The README's three commands, run against the install above. On one leg, since the result
-              # does not depend on the platform: the registry signatures, and each binary against the
-              # SHA256SUMS on the GitHub release and against its build attestation.
-              if: matrix.runner == 'ubuntu-latest' && matrix.manager == 'npm'
+    # The GitHub release goes public only once npm serves every package and each install above passed. A
+    # staged release leaves it a draft for exactly that; a direct one has published it already, and this
+    # changes nothing.
+    publish-release-page:
+        needs: installed-from-npm
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: write
+        steps:
+            - name: Publish the draft GitHub release, if it is one
               env:
                   GH_TOKEN: ${{ github.token }}
                   VERSION: ${{ inputs.version }}
               run: |
-                  cd "$RUNNER_TEMP/consumer"
+                  draft=$(gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)
+                  if [ "$draft" = "true" ]; then
+                      gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false
+                      echo "published the GitHub release v$VERSION"
+                  else
+                      echo "the GitHub release v$VERSION is already public"
+                  fi
+
+    # The README's three verification commands, run the way a stranger would: after the release page is
+    # public, against a fresh install. On one runner, since the answer doesn't depend on the platform: the
+    # registry's signatures, and the binary against the release's SHA256SUMS and its build attestation.
+    verified-as-the-readme-says:
+        needs: publish-release-page
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Install, then verify with the README's three commands
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ inputs.version }}
+              run: |
+                  project="$RUNNER_TEMP/verified"
+                  mkdir -p "$project"
+                  cd "$project"
+                  printf '{ "name": "verified", "private": true }\n' > package.json
+                  npm install --save-dev --no-audit --no-fund "@system-inc/cohere@$VERSION"
                   npm audit signatures
 
                   cd "$(dirname "$(realpath node_modules/@system-inc/cohere)")"
