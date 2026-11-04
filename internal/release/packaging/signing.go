@@ -1,9 +1,11 @@
 package release
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -40,7 +42,7 @@ type Signing struct {
 	//	Apple Development   Authority=Apple Development ...   spctl: rejected
 	//
 	// So signing with the wrong certificate type changes the signature and not the verdict. It is
-	// worth stating because the intermediate state looks like progress: `codesign --cohere` passes,
+	// worth stating because the intermediate state looks like progress: `codesign --verify` passes,
 	// the binary carries a real Apple chain and a TeamIdentifier, and Gatekeeper still refuses it.
 	// A release that signed with what was available and stopped there would read as done.
 	Identity string
@@ -49,6 +51,12 @@ type Signing struct {
 	// `xcrun notarytool store-credentials`. Credentials are never passed as arguments, because a
 	// command line is visible to every process on the machine and ends up in CI logs.
 	KeychainProfile string
+
+	// NotaryKeychain is the path of the keychain file holding KeychainProfile, passed to every
+	// `notarytool` call. A release runner keeps its profile in a keychain made for the run, and
+	// notarytool takes a keychain by path, never by name: `--keychain build.keychain` is refused as a
+	// file that doesn't exist. Empty means the user's own keychains.
+	NotaryKeychain string
 }
 
 // IsConfigured reports whether signing can run.
@@ -104,16 +112,16 @@ func Sign(binaryPath string, signing Signing) error {
 // signature that did not take produces a binary that ships, installs, and is killed on the first
 // machine that receives it through a quarantining path.
 func VerifySignature(binaryPath string) error {
-	command := exec.Command("codesign", "--cohere", "--strict", "--verbose=2", binaryPath)
+	command := exec.Command("codesign", "--verify", "--strict", "--verbose=2", binaryPath)
 
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("the signature on %s did not cohere: %w\n%s", binaryPath, err, output)
+		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, err, output)
 	}
 
 	// An ad-hoc signature verifies successfully and is worth nothing to Gatekeeper. Go's linker
 	// applies one to every arm64 binary, so a signing step that silently did nothing leaves a
-	// binary that passes `codesign --cohere` and is still killed on a quarantined launch. Checking
+	// binary that passes `codesign --verify` and is still killed on a quarantined launch. Checking
 	// for it is what separates "verified" from "verified as actually signed by us".
 	details, err := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
 	if err != nil {
@@ -129,36 +137,90 @@ func VerifySignature(binaryPath string) error {
 	return nil
 }
 
-// Notarize submits a binary to Apple and waits for the verdict.
+// Notarize submits a signed binary to Apple and waits for the verdict, which must be Accepted.
 //
 // A binary is submitted inside a zip because the notary service takes archives rather than bare
 // executables. The verdict is waited on rather than polled later, because a release that continues
-// past an unfinished submission can publish a binary the service later rejects.
+// past an unfinished submission can publish a binary the service later rejects. And it is read,
+// not inferred from the exit code: notarytool can finish a submission whose status is Invalid, and
+// a release that took that for a pass would print "signed and notarized" over a binary Apple refused.
 //
 // Stapling is deliberately not attempted. A ticket can only be stapled to a bundle, a disk image,
 // or an installer package, never to a bare executable, so a Mach-O binary is validated by an online
 // check against Apple's service on first launch instead. This is a real limitation rather than an
 // oversight: a machine that is entirely offline the first time it runs a quarantined cohere will be
 // blocked. The npm install path does not set quarantine at all, so this does not affect it.
-func Notarize(zipPath string, signing Signing) error {
+func Notarize(binaryPath string, signing Signing) error {
 	if !signing.CanNotarize() {
 		return fmt.Errorf("no notarytool keychain profile configured")
 	}
 
-	command := exec.Command(
-		"xcrun", "notarytool", "submit", zipPath,
-		"--keychain-profile", signing.KeychainProfile,
-		// Without --wait the command returns as soon as the upload finishes, and a release would
-		// continue on a submission that has not been judged yet.
-		"--wait",
-	)
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("notarizing %s: %w", zipPath, err)
+	directory, err := os.MkdirTemp("", "cohere-notarize-")
+	if err != nil {
+		return fmt.Errorf("making a directory for the notary archive: %w", err)
 	}
+	defer os.RemoveAll(directory)
+	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
+	// ditto rather than zip, as Apple's notarization guide uses: it keeps the signature's extended
+	// attributes, which zip can drop.
+	if output, err := exec.Command("ditto", "-c", "-k", "--keepParent", binaryPath, zipPath).CombinedOutput(); err != nil {
+		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, err, output)
+	}
+
+	fmt.Printf("notarizing %s\n", binaryPath)
+	arguments := append([]string{"notarytool", "submit", zipPath},
+		notaryCredentials(signing)...)
+	// Without --wait the command returns as soon as the upload finishes, and a release would
+	// continue on a submission that has not been judged yet.
+	arguments = append(arguments, "--wait", "--output-format", "json")
+	command := exec.Command("xcrun", arguments...)
+	command.Stderr = os.Stderr
+	output, err := command.Output()
+	if err != nil {
+		return fmt.Errorf("notarizing %s: %w\n%s", binaryPath, err, output)
+	}
+
+	verdict, err := readNotaryVerdict(output)
+	if err != nil {
+		return fmt.Errorf("notarizing %s: %w", binaryPath, err)
+	}
+	if verdict.Status != "Accepted" {
+		// Apple's log names each problem by file and reason, which is the only place the cause is.
+		logArguments := append([]string{"notarytool", "log", verdict.Identifier}, notaryCredentials(signing)...)
+		notaryLog, _ := exec.Command("xcrun", logArguments...).CombinedOutput()
+		return fmt.Errorf("the notary service answered %q for %s (submission %s)\n%s",
+			verdict.Status, binaryPath, verdict.Identifier, notaryLog)
+	}
+	fmt.Printf("notarized %s: Accepted, submission %s\n", binaryPath, verdict.Identifier)
 	return nil
+}
+
+// notaryCredentials are the arguments that name the stored profile, and its keychain when it has one.
+func notaryCredentials(signing Signing) []string {
+	arguments := []string{"--keychain-profile", signing.KeychainProfile}
+	if signing.NotaryKeychain != "" {
+		arguments = append(arguments, "--keychain", signing.NotaryKeychain)
+	}
+	return arguments
+}
+
+// notaryVerdict is the part of `notarytool submit --output-format json` a release reads.
+type notaryVerdict struct {
+	Identifier string `json:"id"`
+	Status     string `json:"status"`
+}
+
+// readNotaryVerdict reads notarytool's answer. One with no status is refused rather than read as
+// anything, since the status is the whole point of waiting for it.
+func readNotaryVerdict(output []byte) (notaryVerdict, error) {
+	var verdict notaryVerdict
+	if err := json.Unmarshal(output, &verdict); err != nil {
+		return notaryVerdict{}, fmt.Errorf("reading the notary service's answer: %w\n%s", err, output)
+	}
+	if verdict.Status == "" {
+		return notaryVerdict{}, fmt.Errorf("the notary service's answer carries no status\n%s", output)
+	}
+	return verdict, nil
 }
 
 // DescribeSigningState explains what signing did or did not happen, for the release summary.

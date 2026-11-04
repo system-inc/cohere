@@ -284,6 +284,16 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		}
 	}
 
+	// Each signed executable goes to Apple and must come back Accepted, before anything checks or packs
+	// it, so a binary the notary service refused never reaches a package.
+	if target.IsMacOS() && options.Signing.CanNotarize() {
+		for _, executable := range executables {
+			if err := Notarize(executable, options.Signing); err != nil {
+				return StagedPackage{}, err
+			}
+		}
+	}
+
 	// After signing, so the pair checked is the pair that ships.
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
 		if err := requireSwiftContract(binaryPath, enginePath, engineCommit); err != nil {

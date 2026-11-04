@@ -217,6 +217,10 @@ jobs:
                   # dies with the runner, so the certificate never persists anywhere.
                   security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
                   security default-keychain -s build.keychain
+                  # In the search list too, ahead of the runner's own, since that list is where codesign
+                  # looks for an identity, and a default keychain is not added to it.
+                  # shellcheck disable=SC2046
+                  security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
                   security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
                   # Without a timeout the keychain relocks partway through a long build and
                   # codesign starts failing halfway down the target list.
@@ -239,7 +243,9 @@ jobs:
               # An App Store Connect team key with the Developer role, not an Apple ID: it reaches this
               # one team and nothing in iCloud, where an app-specific password signs in as the whole
               # account. Stored as a profile so the key never sits on a command line, which every
-              # process on the machine can read, and the file it arrives in is removed at once.
+              # process on the machine can read, and the file it arrives in is removed at once. notarytool
+              # takes a keychain by path, never by name: `--keychain build.keychain` is refused as a file
+              # that doesn't exist, which is how 0.1.1's first dry run (41780606429) failed here.
               if: env.APPLE_API_KEY != ''
               run: |
                   key=$(mktemp)
@@ -248,7 +254,7 @@ jobs:
                       --key "$key" \
                       --key-id "$APPLE_API_KEY_ID" \
                       --issuer "$APPLE_API_ISSUER" \
-                      --keychain build.keychain
+                      --keychain "$HOME/Library/Keychains/build.keychain-db"
                   rm "$key"
 
             - name: Make sure this Mac can run an Intel binary
@@ -275,7 +281,8 @@ jobs:
                       --version "${{ needs.plan.outputs.version }}" \
                       --output dist \
                       --signing-identity "$MACOS_SIGNING_IDENTITY" \
-                      --notary-profile "$notary_profile"
+                      --notary-profile "$notary_profile" \
+                      --notary-keychain "$HOME/Library/Keychains/build.keychain-db"
 
             - name: Prove the binary this run produced actually runs
               # The build already checks that a file exists and is a plausible size. This checks

@@ -35,6 +35,7 @@ func run() error {
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
+	notaryKeychain := flag.String("notary-keychain", "", "the path of the keychain file holding --notary-profile; the user's own keychains when empty")
 	swiftScratch := flag.String("swift-scratch", "", "where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output")
 	flag.Parse()
 
@@ -60,7 +61,7 @@ func run() error {
 
 	fmt.Printf("staging cohere %s into %s\n", *version, outputRoot)
 
-	signing := release.Signing{Identity: *signingIdentity, KeychainProfile: *keychainProfile}
+	signing := release.Signing{Identity: *signingIdentity, KeychainProfile: *keychainProfile, NotaryKeychain: *notaryKeychain}
 
 	result, err := release.Build(release.Options{
 		ModuleDirectory: moduleRoot,
