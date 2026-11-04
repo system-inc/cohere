@@ -99,7 +99,17 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 		}
 	}
 
+	// A commit starts git's auto-maintenance in the background, detached, and it outlives the command:
+	// it can create and remove .git/objects/maintenance.lock while moduleWithCompiler copies the
+	// template, and the copy fails on a file that was listed and is gone. Release dry run 41784756965
+	// failed that way. Off in every repository here, so the template is still once it is built.
+	quiet := func(directory string) {
+		git(directory, "config", "maintenance.auto", "false")
+		git(directory, "config", "gc.auto", "0")
+	}
+
 	git(compiler, "init", "--quiet")
+	quiet(compiler)
 	write(filepath.Join(compiler, "checker.go"), "package checker\n")
 	git(compiler, "add", "checker.go")
 	git(compiler, "commit", "--quiet", "-m", "first")
@@ -109,7 +119,9 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 	later := git(compiler, "rev-parse", "HEAD")
 
 	git(module, "init", "--quiet")
+	quiet(module)
 	git(module, "clone", "--quiet", compiler, "TypeScript")
+	quiet(filepath.Join(module, "TypeScript"))
 	git(filepath.Join(module, "TypeScript"), "checkout", "--quiet", recorded)
 	write(filepath.Join(module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/system-inc/TypeScript.git\n\tbranch = adamic\n")
