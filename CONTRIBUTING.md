@@ -312,7 +312,7 @@ installs correctly and is never found, which on the machine is indistinguishable
 never shipped.
 
 ```sh
-go run ./command/cohere-release --version 1.0.0 --output dist
+go run ./command/cohere-release --version 0.1.0 --output dist
 ```
 
 One command builds all six from one machine, in about two minutes, and it stages rather than
@@ -337,8 +337,15 @@ hardcoded label would have survived the migration while quietly becoming false.
 
 ### Versioning and the changelog
 
-cohere is semver, starting at 1.0.0, and `release.Build` refuses any version below that or not semver
-(a prerelease like `1.0.0-rc.1` is allowed). What each part means, as Kirk set it:
+cohere is semver, starting at 0.1.0, and `release.Build` refuses any version below that or not semver
+(a prerelease like `0.1.0-rc.1` is allowed). Kirk set the start at 0.1.0 on 2026-11-03: the configuration
+and the rule sets are still settling, which is what a 0.x says.
+
+Below 1.0.0 the minor is semver's breaking slot. A minor (0.2.0) may do anything the list below gives a
+major or a minor, and a patch (0.1.1) may only relax or fix. npm's caret already reads 0.x this way, so a project
+on `^0.1.0` takes 0.1.x patches and never a 0.2.0 it didn't choose.
+
+From 1.0.0, what each part means, as Kirk set it:
 
 - **Major** breaks a configuration or a command line that worked: a key, a flag or a set name removed or
   reinterpreted, so an existing `CohereSettings.json` or script no longer means what it did.
@@ -350,13 +357,14 @@ The rule sets are where most of a release's visible change lives, and they can b
 part of `CHANGELOG.md` is generated:
 
 ```sh
-go run ./internal/release/tools/changelog --version 1.1.0 --previous 1.0.0
+go run ./internal/release/tools/changelog --version 0.2.0 --previous 0.1.0
 ```
 
-That diffs every set between the tag `v1.0.0` and `HEAD` and prints the release's section, with one
+That diffs every set between the tag `v0.1.0` and `HEAD` and prints the release's section, with one
 heading per changed set listing each rule turned on or off, each severity and option change, and each
 other setting that moved. It also refuses a version smaller than the diff allows: a set that turned a
-rule on can't ship as a patch, and a set that was removed can't ship without a major. The section goes
+rule on can't ship as a patch, and a set that was removed can't ship without a major, or below 1.0.0
+without a minor. The section goes
 above the last one in `CHANGELOG.md`, and what changed in cohere outside the sets is written under the
 same heading by hand. Each release is tagged `v<version>`, which is what the next one diffs against.
 

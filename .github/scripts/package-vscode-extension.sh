@@ -2,9 +2,9 @@
 # Packages the VS Code extension as a .vsix, versioned with the cohere release it ships beside.
 #
 #     package-vscode-extension.sh <version> <output-directory>
-#     package-vscode-extension.sh 1.0.0 dist
+#     package-vscode-extension.sh 0.1.0 dist
 #
-# The extension is versioned in lockstep with cohere, 1.0.0 with 1.0.0, so the version is stamped here
+# The extension is versioned in lockstep with cohere, 0.1.0 with 0.1.0, so the version is stamped here
 # from the release's own rather than kept in step by hand in editors/vscode/package.json. It packages a
 # copy, so the checkout is never written to.
 #

@@ -113,10 +113,34 @@ func TestRequireBump(t *testing.T) {
 		{"2.0.0", "1.9.9", Patch, false},
 		{"1.0.0", "1.1", Patch, false},
 		{"1.0.0", "v1.1.0", Patch, false},
+		// Below 1.0.0 the minor is the breaking slot.
+		{"0.1.0", "0.1.1", Patch, true},
+		{"0.1.0", "0.1.1", Minor, false},
+		{"0.1.0", "0.1.1", Major, false},
+		{"0.1.0", "0.2.0", Minor, true},
+		{"0.1.0", "0.2.0", Major, true},
+		{"0.3.2", "1.0.0", Major, true},
+		{"0.2.0", "0.1.9", Patch, false},
+		{"0.1.4", "0.1.4", Patch, false},
 	} {
 		err := RequireBump(testCase.previous, testCase.next, testCase.bump)
 		if (err == nil) != testCase.allowed {
 			t.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, err == nil, err)
+		}
+	}
+}
+
+// Below 1.0.0 a refused patch names the next minor as the fix, never a major: a major would leave 0.x
+// over a change semver puts in the minor.
+func TestRequireBumpBelowOneNamesTheMinor(t *testing.T) {
+	t.Parallel()
+	for _, bump := range []Bump{Minor, Major} {
+		err := RequireBump("0.1.0", "0.1.1", bump)
+		if err == nil {
+			t.Fatalf("0.1.0 -> 0.1.1 at %s was allowed", bump)
+		}
+		if !strings.Contains(err.Error(), "next minor") || strings.Contains(err.Error(), "needs a major") {
+			t.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, err)
 		}
 	}
 }

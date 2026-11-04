@@ -175,19 +175,20 @@ func Build(options Options) (Result, error) {
 // when comparing versions, so two releases differing only there would collide.
 var releaseVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 
-// requireReleaseVersion refuses a version that is not semver, or whose major version is below 1.
+// requireReleaseVersion refuses a version that is not semver, or that is below 0.1.0.
 //
-// cohere's versions start at 1.0.0, by Kirk's ruling on #ed2dp27. The version is typed by hand into
-// the release workflow, so the floor is enforced here rather than left to an example someone has to
-// remember: a `0.x` publish would tell every consumer the API is unstable, and npm cannot take a
-// published version back.
+// cohere's versions start at 0.1.0, by Kirk's ruling of 2026-11-03, which replaced the 1.0.0 of #ed2dp27:
+// a 0.x says the configuration and the rule sets are still settling, and semver gives 0.x its own
+// contract for that (CONTRIBUTING.md, "Versioning and the changelog"). A 0.0.x would read as a toy, so it
+// stays refused. The version is typed by hand into the release workflow, so the floor is enforced here
+// rather than left to an example someone has to remember, and npm cannot take a published version back.
 func requireReleaseVersion(version string) error {
 	match := releaseVersionPattern.FindStringSubmatch(version)
 	if match == nil {
-		return fmt.Errorf("%q is not a semantic version like 1.0.0 or 1.0.0-rc.1, so it cannot be published", version)
+		return fmt.Errorf("%q is not a semantic version like 0.1.0 or 0.1.0-rc.1, so it cannot be published", version)
 	}
-	if match[1] == "0" {
-		return fmt.Errorf("%q is below 1.0.0, and cohere's versions start at 1.0.0", version)
+	if match[1] == "0" && match[2] == "0" {
+		return fmt.Errorf("%q is below 0.1.0, and cohere's versions start at 0.1.0", version)
 	}
 	return nil
 }

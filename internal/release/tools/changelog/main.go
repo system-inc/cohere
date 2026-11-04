@@ -1,8 +1,8 @@
 // Command changelog prints a release's section of CHANGELOG.md from what changed in the rule sets, and
 // refuses a version smaller than that change allows.
 //
-//	go run ./internal/release/tools/changelog --version 1.1.0 --previous 1.0.0
-//	go run ./internal/release/tools/changelog --version 1.0.0
+//	go run ./internal/release/tools/changelog --version 0.2.0 --previous 0.1.0
+//	go run ./internal/release/tools/changelog --version 0.1.0
 //
 // The sets are compared between the previous release's tag, v<previous>, or the commit --from names, and
 // HEAD. With no previous version it writes the first release's section, which lists the sets. The section
@@ -28,7 +28,7 @@ func main() {
 
 func run() error {
 	version := flag.String("version", "", "the version being released, like 1.1.0")
-	previous := flag.String("previous", "", "the last released version, like 1.0.0; empty for the first release")
+	previous := flag.String("previous", "", "the last released version, like 0.1.0; empty for the first release")
 	from := flag.String("from", "", "the commit the last release was made from; v<previous> when empty")
 	to := flag.String("to", "HEAD", "the commit being released")
 	date := flag.String("date", time.Now().Format("2006-01-02"), "the release date")

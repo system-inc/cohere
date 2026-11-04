@@ -11,7 +11,7 @@
 #
 # release.yml calls this after it publishes. It can also be run by hand for any published version:
 #
-#     gh workflow run consumer.yml -f version=1.0.0
+#     gh workflow run consumer.yml -f version=0.1.0
 name: consumer
 
 on:
@@ -23,7 +23,7 @@ on:
     workflow_dispatch:
         inputs:
             version:
-                description: The published version of @system-inc/cohere to install, like 1.0.0
+                description: The published version of @system-inc/cohere to install, like 0.1.0
                 required: true
                 type: string
 

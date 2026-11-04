@@ -1,10 +1,12 @@
 // Package changelog writes a release's section of CHANGELOG.md from what changed in the rule sets cohere
 // carries, and says the smallest version that change allows.
 //
-// The versioning policy Kirk approved (#ed2dp27): cohere is semver from 1.0.0. Turning a rule on in a set
-// is a minor version, because a project that passed before can fail after it, which is a change a person
-// opts into by taking a minor. A major version is for breaking the configuration format or the command
-// line. The sets are the part of a release a diff can read exactly, so their entries are generated; what
+// The versioning policy Kirk approved (#ed2dp27), from 0.1.0 by his ruling of 2026-11-03: cohere is
+// semver. From 1.0.0, turning a rule on in a set is a minor version, because a project that passed before
+// can fail after it, which is a change a person opts into by taking a minor, and a major version is for
+// breaking the configuration format or the command line. Below 1.0.0, semver moves both of those into the
+// minor, so a patch only relaxes or fixes and anything that can fail a project or break a configuration
+// takes the next minor. The sets are the part of a release a diff can read exactly, so their entries are generated; what
 // changed in cohere itself is written by a person under the same heading.
 package changelog
 
@@ -327,6 +329,9 @@ func Render(version string, date string, changed map[string]SetChanges, first ma
 // RequireBump refuses a version that moves less than the change allows. Versions are compared as plain
 // major.minor.patch. A prerelease, which release.Build allows, has no section of its own: the section is
 // written for the release it leads to.
+//
+// Below 1.0.0 the minor is semver's breaking slot, so a Major change moves the minor rather than the
+// major: 0.3.0 may remove a set that 0.2.x carried. Leaving 0.x for 1.0.0 is always allowed.
 func RequireBump(previous string, next string, bump Bump) error {
 	from, err := parseVersion(previous)
 	if err != nil {
@@ -342,6 +347,13 @@ func RequireBump(previous string, next string, bump Bump) error {
 			return fmt.Errorf("%s comes before %s", next, previous)
 		}
 		return nil
+	case to[0] == 0 && to[1] != from[1]:
+		if to[1] < from[1] {
+			return fmt.Errorf("%s comes before %s", next, previous)
+		}
+		return nil
+	case to[0] == 0 && bump != Patch:
+		return fmt.Errorf("%s is a patch after %s, and a rule set changed in a way that can fail a project that passed or break a configuration, which below 1.0.0 needs the next minor version", next, previous)
 	case bump == Major:
 		return fmt.Errorf("%s keeps the major version of %s, and a rule set was removed, so a configuration that extends it no longer loads, which needs a major version", next, previous)
 	case to[1] != from[1]:

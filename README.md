@@ -365,7 +365,7 @@ the `cd` finds the same way for npm and pnpm installs:
 npm audit signatures
 
 cd "$(dirname "$(realpath node_modules/@system-inc/cohere)")"
-gh release download v1.0.0 --repo system-inc/cohere --pattern SHA256SUMS --output - | shasum -a 256 -c --ignore-missing
+gh release download v0.1.0 --repo system-inc/cohere --pattern SHA256SUMS --output - | shasum -a 256 -c --ignore-missing
 gh attestation verify cohere-darwin-arm64/bin/cohere --repo system-inc/cohere
 ```
 
