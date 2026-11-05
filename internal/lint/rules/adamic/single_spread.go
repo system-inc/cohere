@@ -80,12 +80,12 @@ var SingleSpread = rule.Rule{
 
 // spreadsALiteral is an object literal, or a conditional whose branches both are, through parentheses.
 func spreadsALiteral(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression:
 		return true
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return spreadsALiteral(conditional.WhenTrue) && spreadsALiteral(conditional.WhenFalse)
 	}
 	return false

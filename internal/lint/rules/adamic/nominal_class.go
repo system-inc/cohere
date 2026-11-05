@@ -16,6 +16,15 @@ var (
 	nominalClassTypeArgumentsDifferText = policy.MessageOf("adamic/nominal-class", "typeArgumentsDiffer")
 )
 
+type nominal int
+
+const (
+	nominalAccepted nominal = iota
+	nominalUndecided
+	nominalNotAnInstance
+	nominalTypeArgumentsDiffer
+)
+
 /*
  * NominalClass reports a value accepted as a class type that is not an instance of that class, or is one
  * with different type arguments (#drbrp8c).
@@ -167,15 +176,6 @@ func walkSite(walker *flow.Walker, site flow.Site, judge flow.Judge) (flow.Pair,
 	return first, failed
 }
 
-type nominal int
-
-const (
-	nominalAccepted nominal = iota
-	nominalUndecided
-	nominalNotAnInstance
-	nominalTypeArgumentsDiffer
-)
-
 // nominalVerdict judges a source against a class instance type.
 func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *checker.Type) nominal {
 	flags := source.Flags()
@@ -243,6 +243,7 @@ func typeArgumentsVerdict(typeChecker *checker.Checker, source *checker.Type, ta
 
 // inheritedVerdict walks an instance's bases, with its own type arguments mapped into them, for the target's class,
 // and judges the base it reaches as an instance of that class. found is false when no base is the class.
+// Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
 func inheritedVerdict(typeChecker *checker.Checker, instance *checker.Type, target *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) (verdict nominal, found bool) {
 	bases, mapped := instantiatedBases(typeChecker, instance)
 	for _, base := range bases {
@@ -300,11 +301,11 @@ func instantiatedBases(typeChecker *checker.Checker, instance *checker.Type) (ba
 }
 
 // classSymbol is the class an instance type is an instance of.
-func classSymbol(t *checker.Type) *ast.Symbol {
-	if t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil {
-		return t.Target().Symbol()
+func classSymbol(instance *checker.Type) *ast.Symbol {
+	if instance.ObjectFlags()&checker.ObjectFlagsReference != 0 && instance.Target() != nil {
+		return instance.Target().Symbol()
 	}
-	return t.Symbol()
+	return instance.Symbol()
 }
 
 // declaredClassType is the class's own declared type, whose base types the checker resolves.
@@ -316,6 +317,7 @@ func declaredClassType(typeChecker *checker.Checker, instance *checker.Type) *ch
 }
 
 // derivesFrom walks a class's base types for the target class.
+// Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
 func derivesFrom(typeChecker *checker.Checker, declared *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) bool {
 	if declared == nil || declared.ObjectFlags()&(checker.ObjectFlagsClass|checker.ObjectFlagsInterface) == 0 {
 		return false

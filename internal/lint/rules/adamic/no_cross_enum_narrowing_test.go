@@ -25,7 +25,7 @@ func crossEnumRun(test *testing.T, source string) rule_testing.Result {
 	return rule_testing.RunTypedFilesWithSetup(test, crossEnumSubject(), map[string]string{"Case.ts": source}, "Case.ts", func(directory string) {
 		// Enum syntax is the subject here; Adamic's shared harness forbids all enum syntax.
 		configuration := strings.Replace(adamicConfiguration, `"erasableSyntaxOnly": true`, `"erasableSyntaxOnly": false`, 1)
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0600); writeError != nil {
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o600); writeError != nil {
 			test.Fatal(writeError)
 		}
 	})

@@ -78,19 +78,19 @@ func readsIndexedAccess(typeChecker *checker.Checker, node *ast.Node, target *ch
 	if node == nil || !flow.IsTypeParameterIndexedAccess(target) {
 		return false
 	}
-	node = ast.SkipParentheses(node)
+	unwrapped := ast.SkipParentheses(node)
 	access := target.AsIndexedAccessType()
 	var receiver *ast.Node
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
+		property := unwrapped.AsPropertyAccessExpression()
 		key := access.IndexType()
 		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != property.Name().Text() {
 			return false
 		}
 		receiver = property.Expression
 	case ast.KindElementAccessExpression:
-		element := node.AsElementAccessExpression()
+		element := unwrapped.AsElementAccessExpression()
 		if !checker.Checker_isTypeIdenticalTo(typeChecker, typeChecker.GetTypeAtLocation(element.ArgumentExpression), access.IndexType()) {
 			return false
 		}
@@ -109,18 +109,19 @@ func projectsIndexedAccess(typeChecker *checker.Checker, source, target *checker
 	if source == nil || len(path) == 0 {
 		return false
 	}
-	for i := len(path) - 1; i >= 0; i-- {
-		if target.Flags()&checker.TypeFlagsIndexedAccess == 0 || path[i].Kind != flow.StepProperty {
+	walked := target
+	for index := len(path) - 1; index >= 0; index-- {
+		if walked.Flags()&checker.TypeFlagsIndexedAccess == 0 || path[index].Kind != flow.StepProperty {
 			return false
 		}
-		access := target.AsIndexedAccessType()
+		access := walked.AsIndexedAccessType()
 		key := access.IndexType()
-		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != path[i].Name {
+		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != path[index].Name {
 			return false
 		}
-		target = access.ObjectType()
+		walked = access.ObjectType()
 	}
-	return checker.Checker_isTypeIdenticalTo(typeChecker, source, target)
+	return checker.Checker_isTypeIdenticalTo(typeChecker, source, walked)
 }
 
 // An inferred function returning source.value has a number return type in tsgo,
@@ -130,17 +131,18 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 	if source == nil || len(path) == 0 || path[len(path)-1].Kind != flow.StepReturn {
 		return false
 	}
+	walked := source
 	for _, step := range path[:len(path)-1] {
 		if step.Kind != flow.StepProperty {
 			return false
 		}
-		property := checker.Checker_getPropertyOfType(typeChecker, source, step.Name)
+		property := checker.Checker_getPropertyOfType(typeChecker, walked, step.Name)
 		if property == nil {
 			return false
 		}
-		source = checker.Checker_getTypeOfSymbol(typeChecker, property)
+		walked = checker.Checker_getTypeOfSymbol(typeChecker, property)
 	}
-	signatures := checker.Checker_getSignaturesOfType(typeChecker, source, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(typeChecker, walked, checker.SignatureKindCall)
 	if len(signatures) != 1 {
 		return false
 	}

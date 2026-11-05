@@ -117,13 +117,13 @@ func adamicPrograms(test *testing.T) map[string]string {
 		if err != nil || entry.IsDir() {
 			return err
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
-		relative, err := filepath.Rel(root, path)
+		relative, relativeError := filepath.Rel(root, path)
 		programs[filepath.ToSlash(relative)] = string(contents)
-		return err
+		return relativeError
 	})
 	if walkError != nil {
 		test.Fatal(walkError)

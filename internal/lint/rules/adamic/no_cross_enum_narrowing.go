@@ -143,18 +143,18 @@ func crossEnumHasNarrowingConstituent(other crossEnumMember, types []*checker.Ty
 // forming a property union: Kind.A | number would otherwise collapse to number
 // and erase the enum member whose runtime tag collides (h.ts).
 func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return nil
 	}
 	var receiver *ast.Node
 	var key string
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := node.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		receiver, key = access.Expression, access.Name().Text()
 	case ast.KindElementAccessExpression:
-		access := node.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		typ := tc.GetTypeAtLocation(access.ArgumentExpression)
 		if typ != nil && typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
 			// A string literal type's value is a string; on a miss the receiver stays nil and nothing is recovered
@@ -184,10 +184,10 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 			return slots
 		}
 	}
-	if symbol := tc.GetSymbolAtLocation(node); symbol != nil && symbol.Flags&ast.SymbolFlagsAlias == 0 {
+	if symbol := tc.GetSymbolAtLocation(unwrapped); symbol != nil && symbol.Flags&ast.SymbolFlagsAlias == 0 {
 		return []*checker.Type{checker.Checker_getTypeOfSymbol(tc, symbol)}
 	}
-	return []*checker.Type{tc.GetTypeAtLocation(node)}
+	return []*checker.Type{tc.GetTypeAtLocation(unwrapped)}
 }
 
 // Unknown computed members still have an enum identity. They cannot supply a

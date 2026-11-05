@@ -92,12 +92,12 @@ func readsVoidValue(tc *checker.Checker, target *checker.Type) bool {
 
 // Like flow's library containers, Promise is recognized in declaration files;
 // a local class with an unused type argument merely wearing the name is not one.
-func isVoidPromise(t *checker.Type) bool {
-	if t.ObjectFlags()&checker.ObjectFlagsReference == 0 || t.Target() == nil ||
-		t.Target().Symbol() == nil || t.Target().Symbol().Name != "Promise" {
+func isVoidPromise(valueType *checker.Type) bool {
+	if valueType.ObjectFlags()&checker.ObjectFlagsReference == 0 || valueType.Target() == nil ||
+		valueType.Target().Symbol() == nil || valueType.Target().Symbol().Name != "Promise" {
 		return false
 	}
-	for _, declaration := range t.Target().Symbol().Declarations {
+	for _, declaration := range valueType.Target().Symbol().Declarations {
 		if sourceFile := ast.GetSourceFileOfNode(declaration); sourceFile != nil && sourceFile.IsDeclarationFile {
 			return true
 		}
@@ -148,23 +148,23 @@ func (p *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) bool {
 	if expression == nil || depth > 8 {
 		return false
 	}
-	expression = ast.SkipParentheses(expression)
-	if expression.Kind == ast.KindVoidExpression {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped.Kind == ast.KindVoidExpression {
 		return true
 	}
-	own := p.checker.GetTypeAtLocation(expression)
+	own := p.checker.GetTypeAtLocation(unwrapped)
 	if own != nil && own.Flags()&(checker.TypeFlagsUndefined|checker.TypeFlagsNever) != 0 {
 		return true
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindCallExpression:
-		return p.signatureEmpty(p.checker.GetResolvedSignature(expression))
+		return p.signatureEmpty(p.checker.GetResolvedSignature(unwrapped))
 	case ast.KindAwaitExpression:
-		return p.expressionEmpty(expression.AsAwaitExpression().Expression, depth+1)
+		return p.expressionEmpty(unwrapped.AsAwaitExpression().Expression, depth+1)
 	case ast.KindIdentifier:
 		// Only an inferred const retains its initializer's provenance. An annotation
 		// could already have erased a value, and a mutable binding could be replaced.
-		symbol := p.checker.GetSymbolAtLocation(expression)
+		symbol := p.checker.GetSymbolAtLocation(unwrapped)
 		if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 			return false
 		}
@@ -184,33 +184,34 @@ func (p *voidBodyProof) promiseOriginEmpty(node *ast.Node, source *checker.Type,
 	if len(path) == 0 {
 		return p.expressionEmpty(node, 0)
 	}
+	walked := source
 	for index, step := range path {
-		if source == nil {
+		if walked == nil {
 			return false
 		}
 		switch step.Kind {
 		case flow.StepReturn:
-			signatures := checker.Checker_getSignaturesOfType(p.checker, source, checker.SignatureKindCall)
+			signatures := checker.Checker_getSignaturesOfType(p.checker, walked, checker.SignatureKindCall)
 			if len(signatures) != 1 {
 				return false
 			}
 			if index == len(path)-1 {
 				return p.signatureEmpty(signatures[0])
 			}
-			source = checker.Checker_getReturnTypeOfSignature(p.checker, signatures[0])
+			walked = checker.Checker_getReturnTypeOfSignature(p.checker, signatures[0])
 		case flow.StepProperty:
-			property := checker.Checker_getPropertyOfType(p.checker, source, step.Name)
+			property := checker.Checker_getPropertyOfType(p.checker, walked, step.Name)
 			if property == nil {
 				return false
 			}
-			source = checker.Checker_getTypeOfSymbol(p.checker, property)
+			walked = checker.Checker_getTypeOfSymbol(p.checker, property)
 		case flow.StepElement, flow.StepTypeArgument:
 			// The walker may have selected a union member or expanded a constraint.
 			// Its original root then has no reference arguments we can safely inspect.
-			if source.Flags()&checker.TypeFlagsObject == 0 || source.ObjectFlags()&checker.ObjectFlagsReference == 0 {
+			if walked.Flags()&checker.TypeFlagsObject == 0 || walked.ObjectFlags()&checker.ObjectFlagsReference == 0 {
 				return false
 			}
-			arguments := checker.Checker_getTypeArguments(p.checker, source)
+			arguments := checker.Checker_getTypeArguments(p.checker, walked)
 			argument := step.Index
 			if argument < 0 {
 				argument = 0
@@ -218,7 +219,7 @@ func (p *voidBodyProof) promiseOriginEmpty(node *ast.Node, source *checker.Type,
 			if argument >= len(arguments) {
 				return false
 			}
-			source = arguments[argument]
+			walked = arguments[argument]
 		default:
 			return false
 		}

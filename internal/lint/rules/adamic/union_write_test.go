@@ -124,7 +124,7 @@ func TestUnionWriteNodeProbes(test *testing.T) {
 			}
 			run := func(source string) ([]byte, error) {
 				file := filepath.Join(test.TempDir(), "probe.mts")
-				if writeError := os.WriteFile(file, []byte(source), 0600); writeError != nil {
+				if writeError := os.WriteFile(file, []byte(source), 0o600); writeError != nil {
 					test.Fatal(writeError)
 				}
 				return exec.Command("node", file).CombinedOutput()
@@ -245,7 +245,7 @@ func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
 	run := func(source string) string {
 		file := filepath.Join(test.TempDir(), "probe.mts")
-		if writeError := os.WriteFile(file, []byte(source), 0600); writeError != nil {
+		if writeError := os.WriteFile(file, []byte(source), 0o600); writeError != nil {
 			test.Fatal(writeError)
 		}
 		output, outputError := exec.Command("node", file).CombinedOutput()
