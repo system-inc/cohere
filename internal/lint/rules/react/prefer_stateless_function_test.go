@@ -10,17 +10,17 @@ import (
 
 // preferStatelessFunctionFile is where the fixtures pretend to live.
 //
-// A .tsx extension because the corpus is full of JSX, and NO file-suffix gate exists in this rule.
+// A .tsx extension because the corpus is full of JSX, and no file-suffix gate exists in this rule.
 // Three shipped react rules here used to gate on .tsx or .jsx through an isJsxFileName helper,
 // which was oxc residue rather than upstream behavior; all three gates were removed and the helper
 // deleted. TestPreferStatelessFunctionHasNoFileSuffixGate below pins the absence.
 const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 
-// runPreferStatelessFunction routes every fixture through the rule's OWN exported decoder rather
+// runPreferStatelessFunction routes every fixture through the rule's own exported decoder rather
 // than building the options struct directly.
 //
 // That is what puts the decoder under test, and it is the line with no upstream counterpart. The
-// raw json is the BARE object, not upstream's [{...}] array: cohere's config layer unwraps the
+// raw json is the bare object, not upstream's [{...}] array: cohere's config layer unwraps the
 // [severity, options] tuple before dispatch, so copying ESLint's spelling fails on every row.
 func runPreferStatelessFunction(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
@@ -83,7 +83,7 @@ func TestPreferStatelessFunctionFires(test *testing.T) {
 	}
 }
 
-// **Three upstream VALID cases are deliberately absent from this table, and they are not lost.**
+// **Three upstream valid cases are deliberately absent from this table, and they are not lost.**
 // Each appears byte-identically in the fires table above, and the corpus lists it in both places
 // with opposite verdicts. The only discriminator is `settings.react.version`, which upstream reads
 // through `testReactVersion`: a stateless component could not return null before React 15, so a
@@ -96,7 +96,7 @@ func TestPreferStatelessFunctionFires(test *testing.T) {
 //
 // cohere has no React-version setting and this tree is on React 19, so the modern verdict is the
 // only one reachable here and the 0.14 rows would assert the opposite of what the rule must do.
-// Recorded rather than deleted, because a case whose verdict is decided ABOVE the rule is a fact
+// Recorded rather than deleted, because a case whose verdict is decided above the rule is a fact
 // about the configuration rather than about the rule, and the next reader meeting three
 // duplicate-looking entries deserves to know which axis separates them.
 //
@@ -186,8 +186,8 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(test *testing.T) {
 
 // TestPreferStatelessFunctionMemberBoundary pins the allowed-member list.
 //
-// Upstream asks whether ANY member is something other than the five React reads as configuration, so
-// this list is the allowed set and anything outside it exempts. Read by NAME rather than by member
+// Upstream asks whether any member is something other than the five React reads as configuration, so
+// this list is the allowed set and anything outside it exempts. Read by name rather than by member
 // kind, which is why a getter and a static field with the same name give the same answer.
 func TestPreferStatelessFunctionMemberBoundary(test *testing.T) {
 	test.Parallel()
@@ -355,8 +355,8 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 	test.Run("ignorePureComponents does not exempt a plain Component", func(test *testing.T) {
 		test.Parallel()
 		// The distinguishing case for the option's predicate. react.IsEs6ComponentClass accepts
-		// Component and PureComponent alike and is the RIGHT predicate for the outer gate and the
-		// WRONG one here; routing the option through it would exempt every class component.
+		// Component and PureComponent alike and is the right predicate for the outer gate and the
+		// wrong one here; routing the option through it would exempt every class component.
 		const sourceText = "class Foo extends React.Component { render() { return <div>{this.props.foo}</div>; } }"
 		rule_testing.ExpectFindings(test, runPreferStatelessFunction(test, sourceText, `{"ignorePureComponents":true}`), "componentShouldBePure")
 	})
@@ -372,9 +372,9 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 	})
 }
 
-// TestPreferStatelessFunctionSpan asserts WHERE the finding points.
+// TestPreferStatelessFunctionSpan asserts where the finding points.
 //
-// Upstream reports on the component node, which for a factory is the CALL rather than the variable
+// Upstream reports on the component node, which for a factory is the call rather than the variable
 // and for a class expression is the expression rather than the declaration. ExpectFindings cannot
 // see any of this.
 func TestPreferStatelessFunctionSpan(test *testing.T) {
@@ -419,10 +419,10 @@ func TestPreferStatelessFunctionSpan(test *testing.T) {
 	})
 }
 
-// TestPreferStatelessFunctionHasNoFileSuffixGate pins the ABSENCE of a suffix gate.
+// TestPreferStatelessFunctionHasNoFileSuffixGate pins the absence of a suffix gate.
 //
 // Three shipped react rules in this package used to decline every file not ending .tsx or .jsx,
-// which was oxc residue rather than upstream behavior, and each carried a TEST asserting the gate so
+// which was oxc residue rather than upstream behavior, and each carried a test asserting the gate so
 // the suite locked the bug in. All three gates are gone and the helper is deleted.
 //
 // A .ts file cannot hold JSX, so the JSX-carrying shapes are unreachable there. This uses a render

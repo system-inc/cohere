@@ -33,8 +33,8 @@ import (
 // `any`.
 //
 // The declarations below are the minimum of `@types/react` this rule reads, and one detail is
-// deliberate rather than incidental: `RefObject` is written as an INTERFACE. This rule's checker
-// predicate keys on the type's SYMBOL, which is populated for an interface and nil for an alias.
+// deliberate rather than incidental: `RefObject` is written as an interface. This rule's checker
+// predicate keys on the type's symbol, which is populated for an interface and nil for an alias.
 // A stub that made `RefObject` a type alias would test a checker behaviour that does not exist, and
 // the rule would pass its fixtures while reporting nothing on real code. `Dispatch` is written as
 // an alias for the same reason in reverse: it is the shape `set_state_in_render.go` keys on, and
@@ -64,12 +64,12 @@ declare module 'shared-runtime' {
 // Nineteen of the thirty fixtures call a bare `useRef` with no import, because the compiler harness
 // seeds a global table naming it and never asks a checker. This port asks the checker, so without
 // this line `useRef` is an undeclared global, the file is `any`, and the type signal cannot fire.
-// The fixture BODY is untouched; the prepend lives here rather than in the constant so the copied
+// The fixture body is untouched; the prepend lives here rather than in the constant so the copied
 // text stays byte-comparable against upstream.
 //
 // This is the same trade `set_state_in_render.go` documents and states plainly: the rule depends on
 // `@types/react` resolving, which is right for application code and wrong for a corpus written for
-// a compiler that infers its own types. Note that the NAME signal needs no import at all, which is
+// a compiler that infers its own types. Note that the name signal needs no import at all, which is
 // why the `props.ref` fixtures score with or without this line.
 const refsImport = "import {useRef, useState, useCallback, useMemo, useReducer, useEffect} from 'react';\n"
 
@@ -251,7 +251,7 @@ func runRefsFixture(test *testing.T, fixture refsFixture) rule_testing.Result {
 
 // TestRefsMatchesTheImportedCorpus asserts every imported fixture, id by id and in order.
 //
-// This is the whole score and it is an EXACT assertion rather than a count: 30 of 30 fixtures, with
+// This is the whole score and it is an exact assertion rather than a count: 30 of 30 fixtures, with
 // each fixture's message ids compared as an ordered sequence. An exact assertion is what makes the
 // number honest, because a fix and a regression landing together cannot net to zero the way they
 // can under a threshold.
@@ -266,7 +266,7 @@ func TestRefsMatchesTheImportedCorpus(test *testing.T) {
 			test.Parallel()
 			result := runRefsFixture(test, fixture)
 			// Routed through the harness rather than compared by hand: `ExpectFindings` asserts the
-			// ids AND the count in the order the rule produced them, which is the same assertion
+			// ids and the count in the order the rule produced them, which is the same assertion
 			// this made itself, and `TestEveryRuleShipsAFixturePair` in the registry reads for this
 			// call textually to prove the rule can be shown to fire at all.
 			rule_testing.ExpectFindings(test, result, fixture.Want...)
@@ -274,7 +274,7 @@ func TestRefsMatchesTheImportedCorpus(test *testing.T) {
 	}
 }
 
-// TestRefsReportsExactlyThisManyFindingsOnTheCorpus pins the TOTAL, so a fix and a regression
+// TestRefsReportsExactlyThisManyFindingsOnTheCorpus pins the total, so a fix and a regression
 // landing in the same change cannot cancel out.
 //
 // The brief calls an exact-count assertion the instrument that makes a subset honest. This rule is
@@ -292,10 +292,10 @@ func TestRefsReportsExactlyThisManyFindingsOnTheCorpus(test *testing.T) {
 	}
 }
 
-// refsCleanCases are inputs that must NOT report.
+// refsCleanCases are inputs that must not report.
 //
 // Upstream's `refs` corpus is all error fixtures, so there is no imported clean set for this rule
-// and every case here was written from reading the validator and then CHECKED against the running
+// and every case here was written from reading the validator and then checked against the running
 // `eslint-plugin-react-hooks` 7.1.1 rather than against my reading. The brief's warning about
 // invented fixtures applies with full force here: a clean case I invented encodes the same belief
 // as the rule, so each one below names the distinction it exists to protect and each was measured.
@@ -372,7 +372,7 @@ func TestRefsStaysSilent(test *testing.T) {
 	}
 }
 
-// TestRefsPointsAtTheAccess asserts the SPAN, which no message-id assertion can see.
+// TestRefsPointsAtTheAccess asserts the span, which no message-id assertion can see.
 //
 // The source is sliced with the finding's own range and compared against a literal typed here, not
 // against anything the rule computed. Note the harness writes each fixture as
@@ -459,12 +459,12 @@ func TestRefsMessagesReadCorrectly(test *testing.T) {
 //
 // This is the test that protects the single subtlety upstream bothers to document, and it is worth
 // stating why an ordinary equality test would not: the hazard is not that the comparison is wrong
-// about identity, it is that a comparison which is RIGHT about identity makes the fixpoint diverge.
+// about identity, it is that a comparison which is right about identity makes the fixpoint diverge.
 // `refsJoin` mints a fresh ref id on every merge of two different refs, so an equality that looked
 // at the id would report the environment as changed on every round forever.
 //
 // So `ref` must compare equal across different ids, `refValue` must compare equal when only its
-// origin differs, and `guard` must NOT, because a guard is sound only for the ref it guards.
+// origin differs, and `guard` must not, because a guard is sound only for the ref it guards.
 func TestRefsConvergenceEqualityIgnoresRefIdentity(test *testing.T) {
 	test.Parallel()
 
@@ -519,7 +519,7 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(test *testing.T) {
 
 // TestRefsJoinMintsAFreshIdentityForDifferentRefs is the other half of the convergence story.
 //
-// It asserts the behaviour that MAKES the equality above necessary, so the two tests fail
+// It asserts the behaviour that makes the equality above necessary, so the two tests fail
 // separately: if the join stopped minting, this fails while the equality test still passes, and a
 // reader would otherwise be left wondering why the equality is written so strangely.
 func TestRefsJoinMintsAFreshIdentityForDifferentRefs(test *testing.T) {
@@ -544,7 +544,7 @@ func TestRefsJoinMintsAFreshIdentityForDifferentRefs(test *testing.T) {
 	}
 }
 
-// TestRefsSettlesOnEveryCorpusFixture asserts the sweep CONVERGES.
+// TestRefsSettlesOnEveryCorpusFixture asserts the sweep converges.
 //
 // The non-convergence finding is upstream's own invariant diagnostic and it exists so a divergent
 // environment is loud rather than silent. Its presence anywhere in the corpus would mean the
@@ -564,7 +564,7 @@ func TestRefsSettlesOnEveryCorpusFixture(test *testing.T) {
 
 // TestRefsRequiresTheTypedHarness guards the checker declaration.
 //
-// A typed rule handed a nil checker goes SILENT rather than crashing, because `GetSymbolAtLocation`
+// A typed rule handed a nil checker goes silent rather than crashing, because `GetSymbolAtLocation`
 // on a nil checker returns nil rather than panicking. That is the dangerous failure mode: every
 // silence test would pass vacuously and every fires test would look like a rule bug. This asserts
 // the rule declares the checker, so a later revert of that field fails here loudly.
@@ -579,8 +579,8 @@ func TestRefsRequiresTheTypedHarness(test *testing.T) {
 // TestRefsNameSignalWorksWithoutTheChecker is the other half of the two-signal claim.
 //
 // The rule comment asserts that neither signal alone covers the corpus. This pins the direction that
-// is easy to lose: with NO React import at all, so `useRef` is an undeclared global and the file is
-// `any`, a ref arriving by NAME must still report. If someone deleted the name signal believing the
+// is easy to lose: with no React import at all, so `useRef` is an undeclared global and the file is
+// `any`, a ref arriving by name must still report. If someone deleted the name signal believing the
 // checker was sufficient, the imported corpus would still score 27 of 30 and only this would fail.
 func TestRefsNameSignalWorksWithoutTheChecker(test *testing.T) {
 	test.Parallel()
@@ -597,17 +597,17 @@ func TestRefsNameSignalWorksWithoutTheChecker(test *testing.T) {
 
 // TestRefsJoinsTaintAtABranchMerge covers the phi join, which no imported fixture reaches.
 //
-// A mutation deleting the phi loop SURVIVED the entire 30 fixture corpus, and reading the corpus
+// A mutation deleting the phi loop survived the entire 30 fixture corpus, and reading the corpus
 // says why rather than guessing: not one non-Flow refs fixture merges a ref across two branches.
 // The branch cases upstream ships for this rule are all Flow (`component C()` syntax), which our
 // parser cannot accept, so the whole discrimination is invisible to the imported set.
 //
-// Both inputs below were measured against the running `eslint-plugin-react-hooks` 7.1.1 BEFORE
+// Both inputs below were measured against the running `eslint-plugin-react-hooks` 7.1.1 before
 // being written here, because the brief's rule is that a fixture for a survivor is a hypothesis
 // until upstream has confirmed the verdict. Both report exactly one finding there.
 //
-// The second case is the one that carries the real weight. A ref arriving on only ONE path still
-// reports, which is what makes this a JOIN over the operands rather than a test that every operand
+// The second case is the one that carries the real weight. A ref arriving on only one path still
+// reports, which is what makes this a join over the operands rather than a test that every operand
 // is a ref: an implementation requiring agreement across predecessors would pass the first case and
 // fail the second.
 func TestRefsJoinsTaintAtABranchMerge(test *testing.T) {
@@ -645,15 +645,15 @@ func TestRefsJoinsTaintAtABranchMerge(test *testing.T) {
 
 // TestRefsExemptsTheMergeRefsShape covers the `RefCallback` result exemption.
 //
-// A mutant breaking the `bivarianceHack` match SURVIVED the whole corpus, correctly: no upstream
+// A mutant breaking the `bivarianceHack` match survived the whole corpus, correctly: no upstream
 // fixture merges refs. The case is real on production code, where it was 8 findings before the
 // exemption existed, one in every form-field component that forwards a ref.
 //
 // The declaration below is copied from the shape `@types/react` actually uses rather than the
 // obvious one. `RefCallback<T>` is an indexed access over `{ bivarianceHack(...): void }["bivarianceHack"]`
-// (`@types/react/index.d.ts:176-185`), and resolving it ERASES the type alias, leaving the method's
+// (`@types/react/index.d.ts:176-185`), and resolving it erases the type alias, leaving the method's
 // own symbol. A stub written as `type RefCallback<T> = (i: T) => void` keeps the alias, passes, and
-// tests a checker behaviour that does not occur on real code — the exact failure where the rule and
+// tests a checker behaviour that does not occur on real code, the exact failure where the rule and
 // its fixtures share one wrong belief. This fixture is written the real way for that reason.
 func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 	test.Parallel()
@@ -664,9 +664,9 @@ func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 		"  export type Ref<T> = RefCallback<T> | RefObject<T> | null;\n" +
 		"  export function useRef<T>(initial: T): RefObject<T>;\n" +
 		"}"
-	// The forwarded ref is DESTRUCTURED rather than read as `properties.ref`, and that difference is
+	// The forwarded ref is destructured rather than read as `properties.ref`, and that difference is
 	// upstream's rather than a convenience. Measured on the executable:
-	// `mergeReferences([inner, properties.ref])` reports TWICE while
+	// `mergeReferences([inner, properties.ref])` reports twice while
 	// `function Component({ref}) { mergeReferences([inner, ref]) }` is clean. The member form is a
 	// ref-value read in upstream's model regardless of what consumes it, and this port agrees on
 	// both spellings. My first version of this fixture asserted silence for the member form and was
@@ -691,9 +691,9 @@ func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 
 // TestRefsDoesNotTaintSiblingFieldsOfARefProp covers the aliasing restriction.
 //
-// A property load aliases its result to its OBJECT, which is how an alias chain keeps its identity.
+// A property load aliases its result to its object, which is how an alias chain keeps its identity.
 // Applied to a props bag holding a ref beside ordinary fields it is a disaster: reading the ref
-// field marks the whole object as a ref, and every OTHER field read off it then reports as a ref
+// field marks the whole object as a ref, and every other field read off it then reports as a ref
 // access. This was 6 findings in one file on Kirk's tree, all on a `currentWidth: number` and a
 // `columnId: string`, and no upstream fixture can see it because upstream types each property
 // independently rather than aliasing through the object.
@@ -732,7 +732,7 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
 		"}\n"
 	readingResult := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
 	if len(readingResult.Diagnostics) != 1 {
-		test.Errorf("reading the ref field's current gave %d findings, want 1 — the rule has gone blind to refs on props", len(readingResult.Diagnostics))
+		test.Errorf("reading the ref field's current gave %d findings, want 1 \u2014 the rule has gone blind to refs on props", len(readingResult.Diagnostics))
 	}
 }
 

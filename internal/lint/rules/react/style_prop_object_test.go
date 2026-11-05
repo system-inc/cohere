@@ -30,7 +30,7 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 
 // stylePropObjectOptions decodes a raw option body the way the config layer does.
 //
-// An empty body is the nil-options case, which here means an EMPTY allow list and therefore full
+// An empty body is the nil-options case, which here means an empty allow list and therefore full
 // enforcement. That is the opposite direction from the sibling forbid rules, where an empty list
 // means the rule declines everything.
 func stylePropObjectOptions(test *testing.T, raw string) any {
@@ -79,7 +79,7 @@ func TestStylePropObjectFires(test *testing.T) {
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
 		// Our parser keeps parenthesis nodes and upstream's folds them away, so without unwrapping
-		// this port would be SILENT on every shape below while the installed build reports each
+		// this port would be silent on every shape below while the installed build reports each
 		// one. No imported fixture can catch this, because upstream's corpus cannot express a node
 		// its own parser deletes.
 		{"a parenthesized string value", `<div style={('x')} />`, ``, 1},
@@ -94,14 +94,14 @@ func TestStylePropObjectFires(test *testing.T) {
 		{"a regular expression is a literal upstream", `<div style={/x/} />`, ``, 1},
 		{"a false keyword", `<div style={false} />`, ``, 1},
 
-		// The allow list only SKIPS, so a tag with no plain name to match is still examined. This
+		// The allow list only skips, so a tag with no plain name to match is still examined. This
 		// is the opposite of the sibling forbid rules, where an unreadable tag ends the check.
 		{"a member tag is still examined", `<a.b style="x" />`, ``, 1},
 		{"a namespaced tag is still examined", `<svg:a style="x" />`, ``, 1},
 		{"naming a member tag in the allow list does not exempt it", `<a.b style="x" />`, `{"allow":["a.b"]}`, 1},
 		{"an empty allow list exempts nothing", `<div style="x" />`, `{"allow":[]}`, 1},
 
-		// Upstream reads the FIRST declaration, so a name declared twice is judged by the one
+		// Upstream reads the first declaration, so a name declared twice is judged by the one
 		// written first. Its partner in the silent table is the same pair in the other order, and
 		// the two together are what separate index zero from a loop.
 		{"two declarations, the first is a string", "var s = 'x';\nvar s = {};\nconst q = <div style={s} />;", ``, 1},
@@ -296,9 +296,9 @@ func TestStylePropObjectStaysSilent(test *testing.T) {
 	}
 }
 
-// TestStylePropObjectAnchors pins WHERE each finding points, and the two arms differ.
+// TestStylePropObjectAnchors pins where each finding points, and the two arms differ.
 //
-// The JSX arm reports on the whole attribute, and the createElement arm reports on the VALUE
+// The JSX arm reports on the whole attribute, and the createElement arm reports on the value
 // expression rather than on the property or the call. A port using one anchor for both would pass
 // every message-id fixture above while pointing somewhere the reader was never shown in half the
 // cases. The identifier arm reports on the identifier in the value position, not on its
