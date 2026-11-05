@@ -58,7 +58,9 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	if isMultipleTupleTypeElement(path) {
 		return groupIn(
 			path,
-			concatIn(path, indentIn(path, concatIn(path, ifBreak(concatIn(path, doc.Text("("), softline), doc.Text("")), printed)),
+			concatIn(
+				path,
+				indentIn(path, concatIn(path, ifBreak(concatIn(path, doc.Text("("), softline), doc.Text("")), printed)),
 				softline,
 				ifBreak(doc.Text(")"), doc.Text("")),
 			),

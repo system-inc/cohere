@@ -103,7 +103,14 @@ func printTernaryTest(path *Path, options *Options, print PrintFunc) Doc {
 	if isConditionalExpression {
 		printed = print("test", nil)
 	} else {
-		printed = concatIn(path, print("checkType", nil), doc.Text(" "), doc.Text("extends"), doc.Text(" "), print("extendsType", nil))
+		printed = concatIn(
+			path,
+			print("checkType", nil),
+			doc.Text(" "),
+			doc.Text("extends"),
+			doc.Text(" "),
+			print("extendsType", nil),
+		)
 	}
 	/**
 	 *     a

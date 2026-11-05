@@ -70,7 +70,11 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 
 	var readonly Doc = emptyDoc
 	if current.Truthy("readonly") {
-		readonly = concatIn(path, textDoc(printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly")), doc.Text(" "))
+		readonly = concatIn(
+			path,
+			textDoc(printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly")),
+			doc.Text(" "),
+		)
 	}
 
 	var nameType Doc = emptyDoc

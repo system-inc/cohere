@@ -246,7 +246,16 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 	if parent.Is("AssignmentExpression") {
 		return groupIn(
 			path,
-			ifBreak(concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, printed)), softline, doc.Text(")")), printed),
+			ifBreak(
+				concatIn(
+					path,
+					doc.Text("("),
+					indentIn(path, concatIn(path, softline, printed)),
+					softline,
+					doc.Text(")"),
+				),
+				printed,
+			),
 		)
 	}
 	return printed

@@ -305,5 +305,10 @@ func printArrowFunctionBody(
 	if shouldPutBodyOnSameLine {
 		return concatIn(path, doc.Text(" "), bodyDoc, doc.Concat(bodyComments))
 	}
-	return concatIn(path, indentIn(path, concatIn(path, line, bodyDoc, doc.Concat(bodyComments))), trailingComma, trailingSpace)
+	return concatIn(
+		path,
+		indentIn(path, concatIn(path, line, bodyDoc, doc.Concat(bodyComments))),
+		trailingComma,
+		trailingSpace,
+	)
 }

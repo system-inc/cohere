@@ -73,7 +73,11 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		}
 		return concatIn(path, doc.Text("{"), indentIn(
 			path,
-			concatIn(path, hardline, join(concatIn(path, doc.Text(","), hardline), printAll(path, print, "properties"))),
+			concatIn(
+				path,
+				hardline,
+				join(concatIn(path, doc.Text(","), hardline), printAll(path, print, "properties")),
+			),
 		), hardline, doc.Text("}"))
 	case "ObjectProperty":
 		return concatIn(path, print("key", nil), doc.Text(": "), print("value", nil))

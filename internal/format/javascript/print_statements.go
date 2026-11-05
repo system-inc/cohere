@@ -78,7 +78,16 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 			doc.Text("for("),
 			groupIn(path, concatIn(path, indentIn(
 				path,
-				concatIn(path, softline, print("init", nil), doc.Text(";"), line, print("test", nil), doc.Text(";"), update),
+				concatIn(
+					path,
+					softline,
+					print("init", nil),
+					doc.Text(";"),
+					line,
+					print("test", nil),
+					doc.Text(";"),
+					update,
+				),
 			),
 				softline,
 			)),
@@ -174,7 +183,13 @@ func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
 		printedParameter := print("param", nil)
 		var parameter Doc
 		if parameterHasComments {
-			parameter = concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, printedParameter)), softline, doc.Text(") "))
+			parameter = concatIn(
+				path,
+				doc.Text("("),
+				indentIn(path, concatIn(path, softline, printedParameter)),
+				softline,
+				doc.Text(") "),
+			)
 		} else {
 			parameter = concatIn(path, doc.Text("("), printedParameter, doc.Text(") "))
 		}
@@ -223,7 +238,11 @@ func printSwitchCase(path *Path, options *Options, print PrintFunc) Doc {
 		parts = append(parts, doc.Text("default:"))
 	}
 	if hasComment(current, commentDangling, nil) {
-		parts = append(parts, doc.Text(" "), printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
+		parts = append(
+			parts,
+			doc.Text(" "),
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+		)
 	}
 	var consequent []Node
 	for _, statement := range current.List("consequent") {

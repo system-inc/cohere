@@ -229,7 +229,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	 */
 	multilineChildren := []Doc{emptyDoc}
 	// pushOntoLast is multilineChildren.push([multilineChildren.pop(), doc]).
-	pushOntoLast := func(document any) {
+	pushOntoLast := func(document Doc) {
 		last := len(multilineChildren) - 1
 		multilineChildren[last] = concatIn(path, multilineChildren[last], document)
 	}
@@ -244,7 +244,11 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 					continue
 				}
 				// Leading whitespace
-				multilineChildren = append(multilineChildren, concatIn(path, textDoc(rawJsxWhitespace), hardline), emptyDoc)
+				multilineChildren = append(
+					multilineChildren,
+					concatIn(path, textDoc(rawJsxWhitespace), hardline),
+					emptyDoc,
+				)
 				continue
 			}
 

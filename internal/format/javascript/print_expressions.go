@@ -19,7 +19,13 @@ func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) D
 	current := node(path)
 	argumentDoc := print(nil, nil)
 	if returnArgumentHasLeadingComment(current, options) {
-		return concatIn(path, doc.Text("("), indentIn(path, concatIn(path, hardline, argumentDoc)), hardline, doc.Text(")"))
+		return concatIn(
+			path,
+			doc.Text("("),
+			indentIn(path, concatIn(path, hardline, argumentDoc)),
+			hardline,
+			doc.Text(")"),
+		)
 	}
 	if isBinaryish(current) {
 		return groupIn(path, concatIn(

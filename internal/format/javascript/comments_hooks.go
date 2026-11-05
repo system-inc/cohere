@@ -15,7 +15,10 @@ import (
 func printComment(path *Path, options *Options) Doc {
 	comment := node(path)
 	if isLineComment(comment) {
-		return concatIn(path, textDoc(estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)])))
+		return concatIn(
+			path,
+			textDoc(estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)])),
+		)
 	}
 	if estree.IsIndentableBlockComment(comment) {
 		return printIndentableBlockComment(comment)

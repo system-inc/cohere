@@ -113,7 +113,11 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramete
 	}
 
 	return groupIn(path, concatIn(path, doc.Text("<"),
-		indentIn(path, concatIn(path, softline, join(concatIn(path, doc.Text(","), line), printAll(path, print, parametersKey)))),
+		indentIn(path, concatIn(
+			path,
+			softline,
+			join(concatIn(path, doc.Text(","), line), printAll(path, print, parametersKey)),
+		)),
 		trailingComma,
 		softline,
 		doc.Text(">"),
@@ -148,11 +152,11 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts := []Doc{textDoc(constKeyword)}
 
-	var name any
+	var name Doc
 	if current.Is("TSTypeParameter") {
 		name = print("name", nil)
 	} else {
-		name = current.String("name")
+		name = textDoc(current.String("name"))
 	}
 
 	if current.Truthy("variance") {

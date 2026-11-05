@@ -27,7 +27,12 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	elements := current.List(elementsProperty)
 	if len(elements) == 0 {
-		parts = append(parts, groupIn(path, concatIn(path, doc.Text("["), printDanglingCommentsInList(path, options, nil), doc.Text("]"))))
+		parts = append(parts, groupIn(path, concatIn(
+			path,
+			doc.Text("["),
+			printDanglingCommentsInList(path, options, nil),
+			doc.Text("]"),
+		)))
 	} else {
 		lastElem := elements[len(elements)-1]
 		canHaveTrailingComma := !lastElem.Is("RestElement")

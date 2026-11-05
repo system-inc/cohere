@@ -474,7 +474,13 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		}
 	}
 
-	return concatIn(path, doc.Text("`"), indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, doc.Text("`")), nil
+	return concatIn(
+		path,
+		doc.Text("`"),
+		indentIn(path, concatIn(path, hardline, join(hardline, parts))),
+		hardline,
+		doc.Text("`"),
+	), nil
 }
 
 // isCommentOrWhitespaceLine is upstream's /^\s*(?:#[^\n\r]*)?$/ over one line. JavaScript's \s reaches

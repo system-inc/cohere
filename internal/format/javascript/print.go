@@ -121,7 +121,13 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		return groupIn(
 			path,
-			concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, print("expression", nil))), softline, doc.Text(")")),
+			concatIn(
+				path,
+				doc.Text("("),
+				indentIn(path, concatIn(path, softline, print("expression", nil))),
+				softline,
+				doc.Text(")"),
+			),
 		)
 	case "AssignmentExpression":
 		return printAssignmentExpression(path, options, print)
@@ -212,7 +218,13 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		if hasAnyComment(current.Child("argument")) {
 			parts = append(parts, groupIn(
 				path,
-				concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, argumentDoc)), softline, doc.Text(")")),
+				concatIn(
+					path,
+					doc.Text("("),
+					indentIn(path, concatIn(path, softline, argumentDoc)),
+					softline,
+					doc.Text(")"),
+				),
 			))
 		} else {
 			parts = append(parts, argumentDoc)

@@ -8,14 +8,14 @@ import (
 // print/assignment.js. experimentalTernaries is always false, so the branches that read it keep only
 // the false side.
 
-// printAssignment is upstream's printAssignment. operator is `any` because upstream passes both a
-// string (" =", ":") and an array ([" ", node.operator]). An absent rightPropertyName is "".
+// printAssignment is upstream's printAssignment. Upstream passes operator as a string (" =", ":") or an
+// array ([" ", node.operator]); here either is a Doc. An absent rightPropertyName is "".
 func printAssignment(
 	path *Path,
 	options *Options,
 	print PrintFunc,
 	leftDoc Doc,
-	operator any,
+	operator Doc,
 	rightPropertyName string,
 ) Doc {
 	layout := chooseLayout(path, options, print, leftDoc, rightPropertyName)

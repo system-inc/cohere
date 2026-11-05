@@ -64,7 +64,11 @@ func printExportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	exported := current.Child("exported")
 
 	if hasComment(current, commentDangling, nil) {
-		parts = append(parts, doc.Text(" "), printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
+		parts = append(
+			parts,
+			doc.Text(" "),
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+		)
 
 		if needsHardlineAfterDanglingComment(current) {
 			parts = append(parts, hardline)

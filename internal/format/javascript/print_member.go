@@ -78,6 +78,13 @@ func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
 
 	return groupIn(
 		path,
-		concatIn(path, optional, doc.Text("["), indentIn(path, concatIn(path, softline, property)), softline, doc.Text("]")),
+		concatIn(
+			path,
+			optional,
+			doc.Text("["),
+			indentIn(path, concatIn(path, softline, property)),
+			softline,
+			doc.Text("]"),
+		),
 	)
 }
