@@ -92,7 +92,7 @@ func (pruner *alwaysInvalidatingPruner) visitInstruction(instruction *ReactiveIn
 		return
 	}
 
-	switch value := plain.Value.(type) {
+	switch shape := plain.Value.(type) {
 	case *ArrayExpression, *ObjectExpression, *JsxExpression, *JsxFragment, *NewExpression:
 		// The seeding set, and `CallExpression` is deliberately not here; see the package comment.
 		if instruction.LValue != nil {
@@ -105,27 +105,29 @@ func (pruner *alwaysInvalidatingPruner) visitInstruction(instruction *ReactiveIn
 	case *StoreLocal:
 		// Both sets flow through an assignment, separately: a value can be always-invalidating
 		// without being unmemoized, and copying it must preserve that difference.
-		if pruner.alwaysInvalidating[value.Value.Identifier] {
-			pruner.alwaysInvalidating[value.LValue.Identifier] = true
+		if pruner.alwaysInvalidating[shape.Value.Identifier] {
+			pruner.alwaysInvalidating[shape.LValue.Identifier] = true
 		}
-		if pruner.unmemoized[value.Value.Identifier] {
-			pruner.unmemoized[value.LValue.Identifier] = true
+		if pruner.unmemoized[shape.Value.Identifier] {
+			pruner.unmemoized[shape.LValue.Identifier] = true
 		}
 
 	case *LoadLocal:
 		if instruction.LValue == nil {
 			return
 		}
-		if pruner.alwaysInvalidating[value.Place.Identifier] {
+		if pruner.alwaysInvalidating[shape.Place.Identifier] {
 			pruner.alwaysInvalidating[instruction.LValue.Identifier] = true
 		}
-		if pruner.unmemoized[value.Place.Identifier] {
+		if pruner.unmemoized[shape.Place.Identifier] {
 			pruner.unmemoized[instruction.LValue.Identifier] = true
 		}
 	}
 }
 
 // visitScope prunes a scope depending on any unmemoized value, and propagates outward.
+//
+// Mutates: scope the pruning marks the caller's scope block pruned where it sits in the reactive tree
 func (pruner *alwaysInvalidatingPruner) visitScope(scope *ReactiveScopeBlock) {
 	if scope.Pruned {
 		return
