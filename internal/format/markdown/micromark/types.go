@@ -229,20 +229,20 @@ type Self struct {
 }
 
 // IsInterrupt reads `this.interrupt`.
-func (self *Self) IsInterrupt() bool {
-	if self.isView {
-		return self.viewInterrupt
+func (view *Self) IsInterrupt() bool {
+	if view.isView {
+		return view.viewInterrupt
 	}
-	return self.TokenizeContext.Interrupt
+	return view.TokenizeContext.Interrupt
 }
 
 // SetInterrupt writes `this.interrupt`, onto the view when there is one, as a property assignment would.
-func (self *Self) SetInterrupt(value bool) {
-	if self.isView {
-		self.viewInterrupt = value
+func (view *Self) SetInterrupt(value bool) {
+	if view.isView {
+		view.viewInterrupt = value
 		return
 	}
-	self.TokenizeContext.Interrupt = value
+	view.TokenizeContext.Interrupt = value
 }
 
 // Effects are the tools a construct tokenizes with.

@@ -27,7 +27,10 @@ func initializeTextFactory(field string) *InitialConstruct {
 				constructs = self.Parser.Constructs.Text
 			}
 
-			var start, notText, data, text State
+			var start State
+			var notText State
+			var data State
+			var text State
 
 			atBreak := func(code Code) bool {
 				if code == CodeEof {
@@ -84,6 +87,7 @@ func createTextResolver(
 	extraResolver func(events []Event, context *TokenizeContext) []Event,
 ) func(events []Event, context *TokenizeContext) []Event {
 	return func(events []Event, context *TokenizeContext) []Event {
+		mergedEvents := events
 		index := -1
 		enter := -1
 
@@ -91,19 +95,19 @@ func createTextResolver(
 		// 29%.
 		for {
 			index++
-			if index > len(events) {
+			if index > len(mergedEvents) {
 				break
 			}
 			if enter == -1 {
-				if index < len(events) && events[index].Token.Type == TypeData {
+				if index < len(mergedEvents) && mergedEvents[index].Token.Type == TypeData {
 					enter = index
 					index++
 				}
-			} else if index >= len(events) || events[index].Token.Type != TypeData {
+			} else if index >= len(mergedEvents) || mergedEvents[index].Token.Type != TypeData {
 				// Don’t do anything if there is one data token.
 				if index != enter+2 {
-					events[enter].Token.End = events[index-1].Token.End
-					events = splice(events, enter+2, index-enter-2, nil)
+					mergedEvents[enter].Token.End = mergedEvents[index-1].Token.End
+					mergedEvents = splice(mergedEvents, enter+2, index-enter-2, nil)
 					index = enter + 2
 				}
 
@@ -112,9 +116,9 @@ func createTextResolver(
 		}
 
 		if extraResolver != nil {
-			return extraResolver(events, context)
+			return extraResolver(mergedEvents, context)
 		}
-		return events
+		return mergedEvents
 	}
 }
 
@@ -122,16 +126,17 @@ func createTextResolver(
 // suffix or a hard break. Upstream calls it "a rather ugly set of instructions which again looks at
 // chunks in the input stream".
 func resolveAllLineSuffixes(events []Event, context *TokenizeContext) []Event {
+	resolvedEvents := events
 	eventIndex := 0 // Skip first.
 
 	for {
 		eventIndex++
-		if eventIndex > len(events) {
+		if eventIndex > len(resolvedEvents) {
 			break
 		}
-		if (eventIndex == len(events) || events[eventIndex].Token.Type == TypeLineEnding) &&
-			events[eventIndex-1].Token.Type == TypeData {
-			data := events[eventIndex-1].Token
+		if (eventIndex == len(resolvedEvents) || resolvedEvents[eventIndex].Token.Type == TypeLineEnding) &&
+			resolvedEvents[eventIndex-1].Token.Type == TypeData {
+			data := resolvedEvents[eventIndex-1].Token
 			chunks := context.SliceStream(data)
 			index := len(chunks)
 			bufferIndex := -1
@@ -172,13 +177,13 @@ func resolveAllLineSuffixes(events []Event, context *TokenizeContext) []Event {
 				}
 			}
 			// Allow final trailing whitespace.
-			if context.contentTypeTextTrailing && eventIndex == len(events) {
+			if context.contentTypeTextTrailing && eventIndex == len(resolvedEvents) {
 				size = 0
 			}
 
 			if size != 0 {
 				tokenType := TypeHardBreakTrailing
-				if eventIndex == len(events) || tabs || size < hardBreakPrefixSizeMin {
+				if eventIndex == len(resolvedEvents) || tabs || size < hardBreakPrefixSizeMin {
 					tokenType = TypeLineSuffix
 				}
 				startBufferIndex := bufferIndex
@@ -204,7 +209,7 @@ func resolveAllLineSuffixes(events []Event, context *TokenizeContext) []Event {
 					data.Start = token.Start
 					data.End = token.End
 				} else {
-					events = splice(events, eventIndex, 0, []Event{
+					resolvedEvents = splice(resolvedEvents, eventIndex, 0, []Event{
 						{Enter: true, Token: token, Context: context},
 						{Enter: false, Token: token, Context: context},
 					})
@@ -216,5 +221,5 @@ func resolveAllLineSuffixes(events []Event, context *TokenizeContext) []Event {
 		}
 	}
 
-	return events
+	return resolvedEvents
 }

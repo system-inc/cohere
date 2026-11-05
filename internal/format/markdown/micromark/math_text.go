@@ -1,5 +1,9 @@
 package micromark
 
+// mathTextResolver is upstream's module-level `resolveMathText`, one function shared by every
+// construct mathText returns.
+var mathTextResolver = &Resolver{Resolve: resolveMathText}
+
 // mathText is micromark-extension-math/lib/math-text.js, `mathText(options)`. single is the resolved
 // `singleDollarTextMath`: upstream turns null and undefined into true.
 //
@@ -16,10 +20,6 @@ func mathText(single bool) *Construct {
 	}
 }
 
-// mathTextResolver is upstream's module-level `resolveMathText`, one function shared by every
-// construct mathText returns.
-var mathTextResolver = &Resolver{Resolve: resolveMathText}
-
 // The token types math-text.js spells as literals. `space` is code_text.go's typeSpace.
 const (
 	typeMathText         = "mathText"
@@ -33,7 +33,11 @@ func tokenizeMathText(single bool, effects *Effects, ok State, nok State) State 
 	var size int
 	var token *Token
 
-	var start, sequenceOpen, between, data, sequenceClose State
+	var start State
+	var sequenceOpen State
+	var between State
+	var data State
+	var sequenceClose State
 
 	// Start of math (text).
 	//
@@ -169,22 +173,23 @@ func resolveMathText(events []Event, context *TokenizeContext) []Event {
 	}
 
 	// Merge adjacent spaces and data.
+	mergedEvents := events
 	index = headEnterIndex - 1
 	tailExitIndex++
 
 	for index++; index <= tailExitIndex; index++ {
 		if enter == -1 {
-			if index != tailExitIndex && events[index].Token.Type != TypeLineEnding {
+			if index != tailExitIndex && mergedEvents[index].Token.Type != TypeLineEnding {
 				enter = index
 			}
-		} else if index == tailExitIndex || events[index].Token.Type == TypeLineEnding {
-			events[enter].Token.Type = typeMathTextData
+		} else if index == tailExitIndex || mergedEvents[index].Token.Type == TypeLineEnding {
+			mergedEvents[enter].Token.Type = typeMathTextData
 
 			if index != enter+2 {
 				// The enter and exit events of the merged token share one Token, so moving its end moves
 				// both, as upstream's shared token object does.
-				events[enter].Token.End = events[index-1].Token.End
-				events = splice(events, enter+2, index-enter-2, nil)
+				mergedEvents[enter].Token.End = mergedEvents[index-1].Token.End
+				mergedEvents = splice(mergedEvents, enter+2, index-enter-2, nil)
 				tailExitIndex -= index - enter - 2
 				index = enter + 2
 			}
@@ -193,7 +198,7 @@ func resolveMathText(events []Event, context *TokenizeContext) []Event {
 		}
 	}
 
-	return events
+	return mergedEvents
 }
 
 func previousMathText(self *Self, code Code) bool {

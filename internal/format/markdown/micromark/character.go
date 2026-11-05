@@ -134,11 +134,6 @@ func decodeNumericCharacterReference(value string, base int) string {
 	return string(rune(code))
 }
 
-// sliceUnits converts code units to a Go string.
-func unitsToString(units []uint16) string {
-	return string(utf16.Decode(units))
-}
-
 // utf16Length is JavaScript's String.length.
 func utf16Length(text string) int {
 	return len(utf16.Encode([]rune(text)))

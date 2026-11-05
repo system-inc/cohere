@@ -198,7 +198,10 @@ func tokenizeGfmFootnoteCall(self *Self, effects *Effects, ok State, nok State) 
 	size := 0
 	data := false
 
-	var start, callStart, callData, callEscape State
+	var start State
+	var callStart State
+	var callData State
+	var callEscape State
 
 	// Note: the implementation of `markdown-rs` is different, because it houses
 	// core *and* extensions in one project.
@@ -304,7 +307,12 @@ func tokenizeGfmFootnoteDefinitionStart(self *Self, effects *Effects, ok State, 
 	size := 0
 	data := false
 
-	var start, labelAtMarker, labelInside, labelEscape, labelAfter, whitespaceAfter State
+	var start State
+	var labelAtMarker State
+	var labelInside State
+	var labelEscape State
+	var labelAfter State
+	var whitespaceAfter State
 
 	// Start of GFM footnote definition.
 	//
@@ -462,9 +470,7 @@ func gfmFootnoteDefinitionEnd(self *Self, effects *Effects) {
 }
 
 func tokenizeGfmFootnoteIndent(self *Self, effects *Effects, ok State, nok State) State {
-	var afterPrefix State
-
-	afterPrefix = func(code Code) State {
+	afterPrefix := func(code Code) State {
 		if len(self.Events) > 0 {
 			tail := self.Events[len(self.Events)-1]
 			if tail.Token.Type == typeGfmFootnoteDefinitionIndent &&

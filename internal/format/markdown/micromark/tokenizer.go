@@ -133,6 +133,8 @@ func (context *TokenizeContext) goCode(code Code) {
 	context.consumed = false
 	context.expectedCode = code
 	if context.state == nil {
+		// Invariant: a state returns nil only once it has consumed the end of file, the last chunk, so main
+		// has no code left to feed; upstream's development build asserts the same.
 		panic("micromark: expected state")
 	}
 	context.state = context.state(code)
@@ -140,6 +142,8 @@ func (context *TokenizeContext) goCode(code Code) {
 
 func (context *TokenizeContext) consume(code Code) {
 	if code != context.expectedCode {
+		// Invariant: a construct consumes only the code its state was just handed, as upstream's development
+		// build asserts, so a mismatch is a porting bug, never something the input can cause.
 		panic("micromark: expected given code to equal expected code")
 	}
 
@@ -178,21 +182,25 @@ func (context *TokenizeContext) consume(code Code) {
 }
 
 func (context *TokenizeContext) enter(tokenType string, token *Token) *Token {
-	if token == nil {
-		token = context.Parser.memory.tokens().New(Token{})
+	// enteredToken is the caller's token, or a fresh one from memory when it passed none.
+	enteredToken := token
+	if enteredToken == nil {
+		enteredToken = context.Parser.memory.tokens().New(Token{})
 	}
-	token.Type = tokenType
-	token.Start = context.Now()
+	enteredToken.Type = tokenType
+	enteredToken.Start = context.Now()
 
-	context.Events = append(context.Events, Event{Enter: true, Token: token, Context: context})
+	context.Events = append(context.Events, Event{Enter: true, Token: enteredToken, Context: context})
 
-	context.stack = append(context.stack, token)
+	context.stack = append(context.stack, enteredToken)
 
-	return token
+	return enteredToken
 }
 
 func (context *TokenizeContext) exit(tokenType string) *Token {
 	if len(context.stack) == 0 {
+		// Invariant: every construct exits only the tokens it entered, so an exit always has an open token
+		// on the stack; upstream's development build asserts the same.
 		panic("micromark: cannot close w/o open tokens")
 	}
 	token := context.stack[len(context.stack)-1]
@@ -200,6 +208,8 @@ func (context *TokenizeContext) exit(tokenType string) *Token {
 	token.End = context.Now()
 
 	if tokenType != token.Type {
+		// Invariant: constructs exit their tokens in the reverse order they entered them, as upstream's
+		// development build asserts, so the type named is always the innermost open token's.
 		panic("micromark: expected exit token to match current token, got " + tokenType + " for " + token.Type)
 	}
 
@@ -236,6 +246,8 @@ func (context *TokenizeContext) constructFactory(
 		case *ConstructRecord:
 			return run.handleMapOfConstructs(typed)
 		default:
+			// Invariant: Constructs is sealed by its unexported isConstructs method, and the three types
+			// above are the only ones that have it.
 			panic("micromark: unknown constructs")
 		}
 	}
@@ -288,6 +300,8 @@ func (run *attempt) handleListOfConstructs(list []*Construct) State {
 
 	if len(list) == 0 {
 		if run.bogusState == nil {
+			// Invariant: the only attempts in this package that pass no bogus state name a single construct,
+			// which becomes a one-item list, so an empty list always comes with a bogus state.
 			panic("micromark: expected `bogusState` to be given")
 		}
 		return run.bogusState
@@ -330,6 +344,8 @@ func (run *attempt) startPending(code Code) State {
 
 func (run *attempt) succeed(code Code) State {
 	if code != run.context.expectedCode {
+		// Invariant: a construct returns ok or nok with the code its state was handed, as upstream's
+		// development build asserts, so a mismatch is a porting bug, never something the input can cause.
 		panic("micromark: expected code")
 	}
 	run.context.consumed = true
@@ -339,6 +355,8 @@ func (run *attempt) succeed(code Code) State {
 
 func (run *attempt) fail(code Code) State {
 	if code != run.context.expectedCode {
+		// Invariant: a construct returns ok or nok with the code its state was handed, as upstream's
+		// development build asserts, so a mismatch is a porting bug, never something the input can cause.
 		panic("micromark: expected code")
 	}
 	run.context.consumed = true

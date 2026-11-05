@@ -1,5 +1,8 @@
 package micromark
 
+// wikiLink carries no name upstream (the object is `{ tokenize }`), so `disable` can never turn it off.
+var wikiLink = &Construct{Tokenize: tokenizeWikiLink}
+
 // wikiLinkExtension is @braindb/micromark-extension-wiki-link/dist/syntax.js (0.1.0), as the fork's
 // parse-markdown.js configures it: `wikiLinkSyntax({ aliasDivider: { charCodeAt: () => Number.NaN } })`.
 //
@@ -14,9 +17,6 @@ func wikiLinkExtension() *Extension {
 		Text: &ConstructRecord{ByCode: map[Code][]*Construct{CodeLeftSquareBracket: {wikiLink}}},
 	}
 }
-
-// wikiLink carries no name upstream (the object is `{ tokenize }`), so `disable` can never turn it off.
-var wikiLink = &Construct{Tokenize: tokenizeWikiLink}
 
 // The extension's own token types, upstream's string literals.
 const (
@@ -40,7 +40,11 @@ func tokenizeWikiLink(self *Self, effects *Effects, ok State, nok State) State {
 	startMarkerCursor := 0
 	endMarkerCursor := 0
 
-	var start, consumeStart, consumeData, consumeTarget, consumeEnd State
+	var start State
+	var consumeStart State
+	var consumeData State
+	var consumeTarget State
+	var consumeEnd State
 
 	start = func(code Code) State {
 		if code != wikiLinkStartMarker[startMarkerCursor] {
