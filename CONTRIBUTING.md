@@ -90,6 +90,15 @@ mid-gate, land merges it and gates again. A merge that conflicts is undone and i
 loaded morning a branch gated green eight times without landing, and every one of those gates compiled a
 merge that never existed again.
 
+Work starts in a worktree from `go run ./command/cohere-dev worktree <name>`, which prints its path,
+`../cohere-wt-<name>` beside the checkout of main, and makes it at main the first time, TypeScript a
+symlink to main's. After that it moves the same worktree to main with `git switch`, refusing one with
+changes or commits main does not hold, so the files that didn't change keep their modification times
+and Go's test cache keeps its hits: a fresh worktree's first fast run found 45 of 95 packages cached and
+took 65s, a reused one 79 and 28s. A name is per hand, not per member, so a lead fanning out several
+hands at once gives each its own, such as `system_cohere_tools_1`. `--branch <branch>` starts a branch
+in it, and `worktree remove <name>` retires one, under the same refusals.
+
 The Go build cache is held under a cap, 40 GB unless `COHERE_DEV_CACHE_GB` says otherwise (#jc6ca7r).
 When a token's run ends, at most once every ten minutes for the machine, `cohere-dev` looks at the
 cache in the background, and when it is over the cap it takes every token, trims the least recently
