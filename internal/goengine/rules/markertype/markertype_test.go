@@ -9,8 +9,9 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/rules/markertype"
 )
 
-// IsMarkerOnly holds a type with only empty, resultless methods to be a marker type, and any method with a statement,
-// a result or no body to be real, so a marker type that also has a real method is no marker type.
+// IsMarkerOnly holds a type with only empty methods taking nothing and answering nothing to be a marker type, and any
+// method with a parameter, a statement, a result or no body to be real, so a marker type that also has a real method
+// is no marker type.
 func TestIsMarkerOnlyTellsMarkersFromRealMethods(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -26,8 +27,12 @@ func TestIsMarkerOnlyTellsMarkersFromRealMethods(test *testing.T) {
 		{"a comment inside the body", "func (A) kind() {\n\t// A is a kind of node.\n}", true},
 		{"a block comment inside the body", "func (A) kind() { /* A is a kind. */ }", true},
 		{"an empty result list", "func (A) kind() () {}", true},
-		// The ruling names the body and the results, so a no-op taking arguments marks its type as well.
-		{"parameters and an empty body", "func (A) kind(depth int) {}", true},
+		// A method that takes something is an operation, and a null object performs it as nothing, so an empty body
+		// does not make it a marker, whatever its parameters are called.
+		{"a parameter and an empty body", "func (A) Trace(event string) {}", false},
+		{"a blank parameter and an empty body", "func (A) kind(_ int) {}", false},
+		{"an unnamed parameter and an empty body", "func (A) kind(int) {}", false},
+		{"a marker beside a no-op taking a parameter", "func (A) kind() {}\nfunc (A) Trace(event string) {}", false},
 		{"a statement in the body", "func (A) kind() { println() }", false},
 		{"a bare return in the body", "func (A) kind() { return }", false},
 		{"a result", "func (A) kind() int { return 0 }", false},
