@@ -96,7 +96,7 @@ func TestAConfigThatDoesNotParseStillRefusesTheBuild(t *testing.T) {
 				"index.ts":            "export const value = 1;\n",
 			})
 			output, code := runCohere(t, binary, root, "--no-fix", "--no-format")
-			if code == 0 || !strings.Contains(output, "building the type graph") {
+			if code == 0 || !strings.Contains(output, "Building the type graph") {
 				t.Fatalf("a tsconfig that does not parse built a graph (exit %d):\n%s", code, output)
 			}
 		})

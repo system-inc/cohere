@@ -31,6 +31,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/docsdata"
 	"github.com/system-inc/cohere/internal/docsdata/capture"
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 // capturedPackages are the tests that assert rule cases through the harness.
@@ -252,7 +253,8 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 	}
 	var kept []string
 	for _, line := range strings.Split(output.String(), "\n") {
-		if strings.HasPrefix(line, "Usage of ") || line == "cohere: flag: help requested" {
+		// The second is the flag package's help error as cohere prints a failure, one sentence (internal/sentence).
+		if strings.HasPrefix(line, "Usage of ") || line == "cohere: "+sentence.FromError(flag.ErrHelp) {
 			continue
 		}
 		kept = append(kept, line)

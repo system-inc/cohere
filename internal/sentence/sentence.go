@@ -21,13 +21,20 @@ func FromError(err error) string {
 }
 
 // Of is a clause as a sentence: its first letter capitalized when its first word is an ordinary word,
-// and a period closing it unless it already ends on one, a question mark or an exclamation mark.
+// and a period closing it when it is one line ending on an ordinary word.
 //
-// A first word that is a literal keeps its case, because capitalizing it would misspell it: a flag
-// (`--tsconfig`), a file (`go.work`, `tsconfig.json`), a path, an identifier with an underscore, or
-// anything in backticks. An ordinary word is one made only of letters, followed by nothing or by the
-// colon, semicolon or comma that ends a clause, such as "reading:". Empty text stays empty, since there
-// is no sentence in it to close.
+// A literal keeps its spelling at either end, because changing it would misspell it or change what a
+// reader copies. At the start that is a flag (`--tsconfig`), a file (`go.work`, `tsconfig.json`), a path,
+// an identifier with an underscore, or anything in backticks: an ordinary first word is made only of
+// letters, followed by nothing or by the colon, semicolon or comma that ends a clause, such as
+// "reading:". At the end it is a path, a file, a quoted or backticked value, or an assignment, any of
+// which a period would join: `/repo/go.work.` is a file that does not exist. A clause that ends on one is
+// left open; the cure is to reword the clause so it ends on words, not to close it wrong here.
+//
+// Text of several lines closes nothing: its first line is the sentence, and what follows is a list or
+// another tool's output, which is data, and a period after its last line would read as part of it.
+// Text that already ends on a period, a question mark or an exclamation mark is left as it is, and empty
+// text stays empty, since there is no sentence in it to close.
 func Of(clause string) string {
 	text := strings.TrimRightFunc(clause, unicode.IsSpace)
 	if text == "" {
@@ -37,11 +44,10 @@ func Of(clause string) string {
 	if unicode.IsLower(first) && isOrdinaryWord(firstWord(text)) {
 		text = string(unicode.ToUpper(first)) + text[size:]
 	}
-	last, _ := utf8.DecodeLastRuneInString(text)
-	if last != '.' && last != '?' && last != '!' {
-		text += "."
+	if strings.Contains(text, "\n") || endsClosed(text) || isLiteral(lastWord(text)) {
+		return text
 	}
-	return text
+	return text + "."
 }
 
 // firstWord is the text up to its first space or line break.
@@ -50,6 +56,25 @@ func firstWord(text string) string {
 		return text[:end]
 	}
 	return text
+}
+
+// lastWord is the text after its last space.
+func lastWord(text string) string {
+	return text[strings.LastIndexFunc(text, unicode.IsSpace)+1:]
+}
+
+// endsClosed reports whether text already ends a sentence, or ends on a colon, which opens one rather than
+// closing it.
+func endsClosed(text string) bool {
+	last, _ := utf8.DecodeLastRuneInString(text)
+	return last == '.' || last == '?' || last == '!' || last == ':'
+}
+
+// isLiteral reports whether a word is something a reader copies rather than reads: a path, a file name or
+// version with a dot inside it, a quoted or backticked value, or an assignment. A closing parenthesis or a
+// comma is not a literal's mark, so "(exit 2)" still closes.
+func isLiteral(word string) bool {
+	return strings.ContainsAny(word, "/\\`\"'=.")
 }
 
 // isOrdinaryWord reports whether a word is letters alone, allowing the punctuation that ends a clause.

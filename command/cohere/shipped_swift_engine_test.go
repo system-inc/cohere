@@ -180,7 +180,7 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := filepath.Join(installed, release.SwiftEngineFileName)
-	if !strings.Contains(output, "this cohere 1.0.0 install has no Swift engine: expected "+expected) ||
+	if !strings.Contains(output, "This cohere 1.0.0 install has no Swift engine: expected "+expected) ||
 		!strings.Contains(output, "reinstall cohere") {
 		t.Fatalf("the missing engine was not named with the way out:\n%s", output)
 	}
