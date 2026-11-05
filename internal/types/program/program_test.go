@@ -124,9 +124,9 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 		"main.ts":       "const counted: number = 41 + 1;\nconst named = 'ahra';\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	typeNames := []string{}
@@ -159,9 +159,9 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{typeReporter})
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{typeReporter})
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	if len(result.Diagnostics) != 2 {
@@ -192,9 +192,9 @@ func TestWalkReportsCoverage(test *testing.T) {
 		"main.ts":       "export const value = 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	listening := rule.Rule{
@@ -212,9 +212,9 @@ func TestWalkReportsCoverage(test *testing.T) {
 		Run:  func(ruleContext rule.Context, options any) rule.Listeners { return nil },
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening, declining})
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening, declining})
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	if result.Coverage.FilesWalked != 1 {
@@ -448,9 +448,9 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 		"other.ts":      "const named = 'ahra';\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	panicsInAListener := rule.Rule{
@@ -485,13 +485,13 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		[]rule.Rule{panicsInAListener, panicsInRun, witness},
 	)
-	if err != nil {
-		test.Fatalf("a panic in one rule ended the whole walk: %v", err)
+	if walkError != nil {
+		test.Fatalf("a panic in one rule ended the whole walk: %v", walkError)
 	}
 
 	if len(result.Coverage.FilesCrashed) != 0 {
@@ -540,9 +540,9 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 		"other.ts":      "const other: number = 2;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	var keptLock sync.Mutex
@@ -563,9 +563,9 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper})
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper})
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if len(result.Coverage.RulesCrashed) != 0 {
 		test.Fatalf("reading the program during its own file crashed the rule: %v", result.Coverage.RulesCrashed)
@@ -603,9 +603,9 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 		"main.ts":       "const counted: number = 41 + 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	quiet := rule.Rule{
@@ -619,9 +619,9 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet})
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet})
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	if len(result.Coverage.FilesCrashed) != 0 || len(result.Coverage.RulesCrashed) != 0 {

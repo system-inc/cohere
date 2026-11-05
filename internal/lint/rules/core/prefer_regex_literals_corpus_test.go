@@ -772,14 +772,14 @@ func TestPreferRegexLiteralsAgreesWithEsLint(test *testing.T) {
 	for index, testCase := range cases {
 		var options any
 		if testCase.options != "" {
-			decoded, err := decode([]byte(testCase.options))
-			if err != nil {
+			decoded, decodeError := decode([]byte(testCase.options))
+			if decodeError != nil {
 				test.Fatalf(
 					"case %d (%s): ESLint accepts %s and the decoder refused it: %v",
 					index,
 					testCase.origin,
 					testCase.options,
-					err,
+					decodeError,
 				)
 			}
 			options = decoded

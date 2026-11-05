@@ -340,9 +340,9 @@ func encodeCacheTableFile[Body any](section string, body Body, identity CacheTab
 	return buffer.Bytes(), nil
 }
 
-// errWrittenByAnotherCommit is a file whose header differs from this build's only in the cohere commit, the
+// errorWrittenByAnotherCommit is a file whose header differs from this build's only in the cohere commit, the
 // one difference the format record survives.
-var errWrittenByAnotherCommit = errors.New("written by another cohere commit")
+var errorWrittenByAnotherCommit = errors.New("written by another cohere commit")
 
 // decodeCacheTableFile decodes one file of the table into body, a pointer to the section's type. Anything but
 // a file of this section, written by this build, with nothing after its body, is an error: a file from
@@ -374,7 +374,7 @@ func decodeCacheTableFile[Body any](contents []byte, section string, identity Ca
 		}
 		otherCommit = fmt.Errorf(
 			"%w (%s, this is %s)",
-			errWrittenByAnotherCommit,
+			errorWrittenByAnotherCommit,
 			orUnknown(header.Identity.SelfCommit),
 			orUnknown(identity.SelfCommit),
 		)
@@ -508,24 +508,24 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 
 			Adamic: stored.Adamic,
 		}
-		var err error
-		if entry.Rules, err = list(stored.Rules); err != nil {
-			return nil, fmt.Errorf("entry %d rules: %w", position, err)
+		var listError error
+		if entry.Rules, listError = list(stored.Rules); listError != nil {
+			return nil, fmt.Errorf("entry %d rules: %w", position, listError)
 		}
-		if entry.TypedRules, err = list(stored.TypedRules); err != nil {
-			return nil, fmt.Errorf("entry %d typed rules: %w", position, err)
+		if entry.TypedRules, listError = list(stored.TypedRules); listError != nil {
+			return nil, fmt.Errorf("entry %d typed rules: %w", position, listError)
 		}
-		if entry.Listening, err = list(stored.Listening); err != nil {
-			return nil, fmt.Errorf("entry %d listening: %w", position, err)
+		if entry.Listening, listError = list(stored.Listening); listError != nil {
+			return nil, fmt.Errorf("entry %d listening: %w", position, listError)
 		}
-		if entry.ShapedRules, err = list(stored.ShapedRules); err != nil {
-			return nil, fmt.Errorf("entry %d shaped rules: %w", position, err)
+		if entry.ShapedRules, listError = list(stored.ShapedRules); listError != nil {
+			return nil, fmt.Errorf("entry %d shaped rules: %w", position, listError)
 		}
-		if entry.DesignRules, err = list(stored.DesignRules); err != nil {
-			return nil, fmt.Errorf("entry %d design-system rules: %w", position, err)
+		if entry.DesignRules, listError = list(stored.DesignRules); listError != nil {
+			return nil, fmt.Errorf("entry %d design-system rules: %w", position, listError)
 		}
-		if entry.DerivedRules, err = list(stored.DerivedRules); err != nil {
-			return nil, fmt.Errorf("entry %d derived rules: %w", position, err)
+		if entry.DerivedRules, listError = list(stored.DerivedRules); listError != nil {
+			return nil, fmt.Errorf("entry %d derived rules: %w", position, listError)
 		}
 		cache.Entries = append(cache.Entries, entry)
 	}
@@ -580,11 +580,11 @@ func readCacheTableSection[Body any](read *cacheTableRead, name string, section 
 	switch {
 	case err == nil:
 		return true
-	case errors.Is(err, errWrittenByAnotherCommit):
+	case errors.Is(err, errorWrittenByAnotherCommit):
 		if section == cacheTableFormatSection {
 			return true
 		}
-		read.anotherCommit = strings.TrimPrefix(err.Error(), errWrittenByAnotherCommit.Error()+" ")
+		read.anotherCommit = strings.TrimPrefix(err.Error(), errorWrittenByAnotherCommit.Error()+" ")
 		read.dropped = append(read.dropped, name)
 	default:
 		read.onlyAnotherCommit = false

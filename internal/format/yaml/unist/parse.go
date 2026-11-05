@@ -27,18 +27,18 @@ import (
 // root.comments before printing, and the printer never reads it.
 //
 // The nodes come from nodes, which may be nil; the tree is valid until it is Reset.
-func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
+func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			if thrown, isThrown := recovered.(*ThrownError); isThrown {
-				root, err = nil, thrown
+				root, parseError = nil, thrown
 				return
 			}
 			if runtimeError, isRuntimeError := recovered.(runtime.Error); isRuntimeError {
-				root, err = nil, fmt.Errorf("unist: %w", runtimeError)
+				root, parseError = nil, fmt.Errorf("unist: %w", runtimeError)
 				return
 			}
-			root, err = nil, fmt.Errorf("unist: %v", recovered)
+			root, parseError = nil, fmt.Errorf("unist: %v", recovered)
 		}
 	}()
 

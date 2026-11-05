@@ -112,19 +112,19 @@ func parseFlags(flags string) (flagSet, error) {
 // Compile compiles source under the given JavaScript flags, as
 // `new RegExp(source, flags)` would. Pass "" for no flags.
 func Compile(source string, flags string) (*RegExp, error) {
-	set, err := parseFlags(flags)
-	if err != nil {
-		return nil, err
+	set, parseFlagsError := parseFlags(flags)
+	if parseFlagsError != nil {
+		return nil, parseFlagsError
 	}
 
-	rewritten, exact, err := rewrite(source, rewriteOptions{
+	rewritten, exact, rewriteError := rewrite(source, rewriteOptions{
 		multiline:  set.multiline,
 		dotAll:     set.dotAll,
 		ignoreCase: set.ignoreCase,
 		unicode:    set.unicode,
 	})
-	if err != nil {
-		return nil, err
+	if rewriteError != nil {
+		return nil, rewriteError
 	}
 	if set.sticky {
 		// A sticky regexp matches only at `lastIndex`, which is 0 for one just
@@ -144,12 +144,12 @@ func Compile(source string, flags string) (*RegExp, error) {
 		options |= regexp2.IgnoreCase
 	}
 
-	re, err := regexp2.Compile(rewritten, options)
-	if err != nil {
+	re, compileError := regexp2.Compile(rewritten, options)
+	if compileError != nil {
 		// regexp2 quotes back the pattern it was handed, which is the
 		// rewritten one. A message naming `[Oo][Kk]` where its author wrote
 		// `ok` is no help, so the source goes back in as written.
-		return nil, errors.New(strings.ReplaceAll(err.Error(), rewritten, source))
+		return nil, errors.New(strings.ReplaceAll(compileError.Error(), rewritten, source))
 	}
 	re.MatchTimeout = MatchTimeout
 

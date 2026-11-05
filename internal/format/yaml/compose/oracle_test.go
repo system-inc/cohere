@@ -176,20 +176,20 @@ func upstreamOutputs(test *testing.T, texts []string) []string {
 
 func runOracle(test *testing.T, script string, texts []string) []string {
 	test.Helper()
-	encoded, err := json.Marshal(texts)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(texts)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			test.Fatalf("the composer oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the composer oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		test.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs []string
 	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
@@ -636,9 +636,9 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
 	}
 	var paths, texts []string
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir

@@ -23,13 +23,13 @@ func TestEmbeddedCodeMatchesTheFork(test *testing.T) {
 		"```json\n{ \"a\": 1, b: [1,2,], }\n```\n\n" +
 		"- item\n\n  ```tsx\n  <Nested prop={1} />\n  ```\n"
 	options := formatoptions.Default()
-	oracle, err := prettier.New(options)
-	if err != nil {
-		test.Fatal(err)
+	oracle, newPrettierError := prettier.New(options)
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
-	expected, err := oracle.Format("Probe.md", source)
-	if err != nil {
-		test.Fatal(err)
+	expected, formatError := oracle.Format("Probe.md", source)
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	// The fork's own output, asserted, so a native printer and an oracle that both lost the rule cannot
 	// agree their way past it: the lone JSX elements have no semicolon, the two statements keep theirs.
@@ -43,9 +43,9 @@ func TestEmbeddedCodeMatchesTheFork(test *testing.T) {
 			test.Fatalf("the fork's output lacks %q:\n%s", substring, expected)
 		}
 	}
-	actual, err := Formatter{Options: options}.Format("Probe.md", source)
-	if err != nil {
-		test.Fatal(err)
+	actual, formatError := Formatter{Options: options}.Format("Probe.md", source)
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	if actual != expected {
 		test.Fatalf("--- fork\n%s--- native\n%s", expected, actual)
@@ -117,13 +117,13 @@ func TestCssTemplatesMatchTheFork(test *testing.T) {
 	for _, width := range []int{120, 80} {
 		options := formatoptions.Default()
 		options.PrintWidth = width
-		oracle, err := prettier.New(options)
-		if err != nil {
-			test.Fatal(err)
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
-		expected, err := oracle.Format("Probe.tsx", cssTemplatesSource)
-		if err != nil {
-			test.Fatal(err)
+		expected, formatError := oracle.Format("Probe.tsx", cssTemplatesSource)
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		// The fork really formatted the CSS.
 		for _, substring := range []string{"    color: red;\n", "font-size: 2em;", "const empty = css``;"} {
@@ -131,9 +131,9 @@ func TestCssTemplatesMatchTheFork(test *testing.T) {
 				test.Fatalf("printWidth %d: the fork's output lacks %q:\n%s", width, substring, expected)
 			}
 		}
-		actual, err := Formatter{Options: options}.Format("Probe.tsx", cssTemplatesSource)
-		if err != nil {
-			test.Fatal(err)
+		actual, formatError := Formatter{Options: options}.Format("Probe.tsx", cssTemplatesSource)
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		if actual != expected {
 			test.Fatalf("printWidth %d:\n--- fork\n%s--- native\n%s", width, expected, actual)
@@ -149,13 +149,13 @@ func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 	for _, width := range []int{120, 80} {
 		options := formatoptions.Default()
 		options.PrintWidth = width
-		oracle, err := prettier.New(options)
-		if err != nil {
-			test.Fatal(err)
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
-		expected, err := oracle.Format("Probe.ts", graphqlTemplatesSource)
-		if err != nil {
-			test.Fatal(err)
+		expected, formatError := oracle.Format("Probe.ts", graphqlTemplatesSource)
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		// The fork really formatted the GraphQL: the cramped fragment is broken out.
 		for _, substring := range []string{
@@ -167,9 +167,9 @@ func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 				test.Fatalf("printWidth %d: the fork's output lacks %q:\n%s", width, substring, expected)
 			}
 		}
-		actual, err := Formatter{Options: options}.Format("Probe.ts", graphqlTemplatesSource)
-		if err != nil {
-			test.Fatal(err)
+		actual, formatError := Formatter{Options: options}.Format("Probe.ts", graphqlTemplatesSource)
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		if actual != expected {
 			test.Fatalf("printWidth %d:\n--- fork\n%s--- native\n%s", width, expected, actual)

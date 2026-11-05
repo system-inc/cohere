@@ -39,13 +39,13 @@ var ruleExports = sync.OnceValues(ruleTypes.Find)
 // the test on any error in any package read from source, naming each, so a walk never reads a partial tree.
 func loadRules(test *testing.T, moduleRoot string, patterns ...string) []*gotypes.Package {
 	test.Helper()
-	exports, err := ruleExports()
-	if err != nil {
-		test.Fatal(err)
+	exports, ruleExportsError := ruleExports()
+	if ruleExportsError != nil {
+		test.Fatal(ruleExportsError)
 	}
-	loaded, err := gotypes.Load(gotypes.Config{Directory: moduleRoot, Exports: exports}, patterns...)
-	if err != nil {
-		test.Fatalf("loading %v: %v", patterns, err)
+	loaded, loadError := gotypes.Load(gotypes.Config{Directory: moduleRoot, Exports: exports}, patterns...)
+	if loadError != nil {
+		test.Fatalf("loading %v: %v", patterns, loadError)
 	}
 	if problems := loaded.ErrorsAnywhere(); len(problems) > 0 {
 		for _, problem := range problems {

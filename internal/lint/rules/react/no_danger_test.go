@@ -30,16 +30,16 @@ func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_tes
 	test.Helper()
 	var decoded any
 	if rawOptions == "" {
-		var err error
-		decoded, err = DecodeNoDangerOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding absent options: %v", err)
+		var decodeNoDangerOptionsError error
+		decoded, decodeNoDangerOptionsError = DecodeNoDangerOptions(nil)
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding absent options: %v", decodeNoDangerOptionsError)
 		}
 	} else {
-		var err error
-		decoded, err = DecodeNoDangerOptions(json.RawMessage(rawOptions))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", rawOptions, err)
+		var decodeNoDangerOptionsError error
+		decoded, decodeNoDangerOptionsError = DecodeNoDangerOptions(json.RawMessage(rawOptions))
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding %s: %v", rawOptions, decodeNoDangerOptionsError)
 		}
 	}
 	return rule_testing.RunWithOptions(test, NoDanger, noDangerFile, sourceText, decoded)

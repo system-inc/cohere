@@ -90,13 +90,13 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options)
 
 		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ruleContext, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Error) {
 				return nil
 			}
 			return declineListeners(ruleContext, "enforce-consistent-variant-order", designSystem)

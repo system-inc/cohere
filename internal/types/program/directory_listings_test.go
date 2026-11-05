@@ -13,9 +13,9 @@ import (
 func listEverything(test *testing.T, root string) *program.DirectoryListings {
 	test.Helper()
 	listings := program.NewDirectoryListings()
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || !entry.IsDir() {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
+			return pathError
 		}
 		entries, readError := os.ReadDir(path)
 		if readError != nil {

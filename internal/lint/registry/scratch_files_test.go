@@ -79,9 +79,9 @@ func TestNoScratchFilesRemain(test *testing.T) {
 
 	examined := 0
 	for _, root := range roots {
-		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() {
 				return nil

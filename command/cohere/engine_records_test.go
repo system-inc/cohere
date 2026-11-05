@@ -671,7 +671,10 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 				"  not checked: "+engineRoot+"/Tools/Sim/Package.swift (a package manifest)\n",
 			)
 			if len(activeSummary.Gaps.UncheckedSwift) != 3 {
-				test.Errorf("yielding nothing listed %v as not checked, want 3 files", activeSummary.Gaps.UncheckedSwift)
+				test.Errorf(
+					"yielding nothing listed %v as not checked, want 3 files",
+					activeSummary.Gaps.UncheckedSwift,
+				)
 			}
 
 			// A file the engine could not read under a yielded directory is still named, and the run is
@@ -703,7 +706,12 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 // Not parallel: it renders a check run through engineRun and reads back the package-level activeSummary
 func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
 	activeSummary = runSummary{}
-	output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+	output, exitCode, renderRecordsError := renderRecords(
+		test,
+		engineModeCheck,
+		contractFixture(test, "Clean.jsonl"),
+		0,
+	)
 	if renderRecordsError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
@@ -740,7 +748,13 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	clean[1] = projectRecordAt(test, clean[1], "/project", excluded)
 
 	activeSummary = runSummary{}
-	output, exitCode, renderRecordsError := renderRecordsYielding(test, engineModeCheck, clean, 0, []string{"/project/App"})
+	output, exitCode, renderRecordsError := renderRecordsYielding(
+		test,
+		engineModeCheck,
+		clean,
+		0,
+		[]string{"/project/App"},
+	)
 	if renderRecordsError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
@@ -834,16 +848,17 @@ func TestSwiftRunListingModes(test *testing.T) {
 			`{"kind":"rule","name":"cohere-swift/no-try-bang","severity":"error"}`,
 			`{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"warning"}`,
 		}
-		output, exitCode, err := renderRecords(test, engineModeRules, lines, 0)
-		if err != nil || exitCode != 0 {
-			test.Fatalf("exit %d, err %v", exitCode, err)
+		output, exitCode, renderRecordsError := renderRecords(test, engineModeRules, lines, 0)
+		if renderRecordsError != nil || exitCode != 0 {
+			test.Fatalf("exit %d, err %v", exitCode, renderRecordsError)
 		}
 		if output != "cohere-swift/force-unwrapping\ncohere-swift/no-try-bang\n" {
 			test.Errorf("rules printed as %q", output)
 		}
-		enabled, _, err := renderRecords(test, engineModeRulesEnabled, lines, 0)
-		if err != nil || enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
-			test.Errorf("rules-enabled printed as %q (err %v)", enabled, err)
+		enabled, _, renderRecordsError := renderRecords(test, engineModeRulesEnabled, lines, 0)
+		if renderRecordsError != nil ||
+			enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
+			test.Errorf("rules-enabled printed as %q (err %v)", enabled, renderRecordsError)
 		}
 	})
 

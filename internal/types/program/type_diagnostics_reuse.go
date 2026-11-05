@@ -182,7 +182,10 @@ func (parts TypeDiagnosticParts) All() []*ast.Diagnostic {
 // much changed that the full check, which spreads every checker over every file, is the faster way.
 //
 // Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
-func (graph *Graph) CheckReusing(callerContext context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
+func (graph *Graph) CheckReusing(
+	callerContext context.Context,
+	reuse *TypeDiagnosticsReuse,
+) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
 	if stored == nil ||
 		stored.Version != typesSectionVersion ||

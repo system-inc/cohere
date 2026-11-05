@@ -756,9 +756,9 @@ func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]type_checking.TypeO
 // That matters most for `ignoreVoid`, whose default is true: binding it to a plain bool would make
 // an unconfigured rule behave as though it had been explicitly turned off.
 func DecodeNoFloatingPromisesOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
-	if err != nil {
-		return NoFloatingPromisesOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoFloatingPromisesOptions{}, decodeOptionsError
 	}
 
 	wire, _ := decoded.(noFloatingPromisesRawOptions)

@@ -537,9 +537,9 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	write(worktreeA, map[string]string{"inner/inner_test.go": failing})
 	fixture.git(worktreeA, "add", "inner/inner_test.go")
 	fixture.git(worktreeA, "commit", "-q", "-m", "plant a failing test in the nested module")
-	output, err := land()
-	if err == nil || !strings.Contains(output, "planted in the nested module") {
-		test.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", err, output)
+	output, landError := land()
+	if landError == nil || !strings.Contains(output, "planted in the nested module") {
+		test.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", landError, output)
 	}
 	if !strings.Contains(output, "gating 2 modules from go.work: ., inner") ||
 		!strings.Contains(output, "not gated, inside a submodule: library/mod") {
@@ -552,8 +552,8 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	write(worktreeA, map[string]string{"inner/inner_test.go": passing})
 	fixture.git(worktreeA, "add", "inner/inner_test.go")
 	fixture.git(worktreeA, "commit", "-q", "-m", "the nested module's test passes")
-	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
-		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", err, output)
+	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
+		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", landError, output)
 	}
 }
 
@@ -594,17 +594,19 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, err := land(); err == nil || !strings.Contains(output, "the docs data is stale, so nothing landed") ||
-		!strings.Contains(output, docsDataRecapture) || !strings.Contains(output, "stale: docs/data/example.txt") {
-		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", err, output)
+	if output, landError := land(); landError == nil ||
+		!strings.Contains(output, "the docs data is stale, so nothing landed") ||
+		!strings.Contains(output, docsDataRecapture) ||
+		!strings.Contains(output, "stale: docs/data/example.txt") {
+		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", landError, output)
 	}
 	write(map[string]string{"docs/data/example.txt": "fresh\n"})
 	fixture.git(worktreeA, "add", "docs/data/example.txt")
 	fixture.git(worktreeA, "commit", "-q", "-m", "the example recaptured")
-	if output, err := land(); err != nil ||
+	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "the docs data is current") ||
 		!strings.Contains(output, "landed") {
-		test.Errorf("the landing did not land once the example was fresh (%v):\n%s", err, output)
+		test.Errorf("the landing did not land once the example was fresh (%v):\n%s", landError, output)
 	}
 }
 

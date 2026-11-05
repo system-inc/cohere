@@ -94,17 +94,17 @@ func main() {
 // failure mode this whole approach exists to prevent, and it would otherwise look like a passing
 // run.
 func enumerate(packageRoot string) ([]byte, error) {
-	directory, err := toolDirectory()
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, packageRoot)
 	command.Stderr = os.Stderr
-	out, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("node %s: %w", script, err)
+	out, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("node %s: %w", script, outputError)
 	}
 
 	var parsed struct {

@@ -165,7 +165,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				// assertion first would leave regexp2 reading syntax
 				// JavaScript rejects as something it accepts.
 				if quantifierWidth(source[end:]) > 0 {
-					return "", false, errNothingToRepeat(source[end:])
+					return "", false, nothingToRepeatError(source[end:])
 				}
 				out.WriteString(wordBoundary(escape.negated, current))
 
@@ -187,13 +187,13 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			continue
 
 		case '[':
-			body, negated, width, err := readClass(source[index:])
-			if err != nil {
-				return "", false, err
+			body, negated, width, readClassError := readClass(source[index:])
+			if readClassError != nil {
+				return "", false, readClassError
 			}
-			atoms, classExact, err := classAtoms(body, current, context())
-			if err != nil {
-				return "", false, err
+			atoms, classExact, classAtomsError := classAtoms(body, current, context())
+			if classAtomsError != nil {
+				return "", false, classAtomsError
 			}
 			if !classExact {
 				exact = false
@@ -264,7 +264,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 
 		case '^':
 			if quantifierWidth(source[index+size:]) > 0 {
-				return "", false, errNothingToRepeat(source[index+size:])
+				return "", false, nothingToRepeatError(source[index+size:])
 			}
 			if current.multiline {
 				out.WriteString(lineStart)
@@ -276,7 +276,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 
 		case '$':
 			if quantifierWidth(source[index+size:]) > 0 {
-				return "", false, errNothingToRepeat(source[index+size:])
+				return "", false, nothingToRepeatError(source[index+size:])
 			}
 			if current.multiline {
 				out.WriteString(lineEnd)
@@ -302,7 +302,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	return out.String(), exact, nil
 }
 
-func errNothingToRepeat(quantifier string) error {
+func nothingToRepeatError(quantifier string) error {
 	return fmt.Errorf("%w: %s repeats an assertion", ErrUnsupportedSyntax, quantifier[:quantifierWidth(quantifier)])
 }
 
@@ -374,7 +374,7 @@ func checkGroupQuantifier(kind groupKind, rest string, options rewriteOptions) e
 	if kind == groupLookahead && !options.unicode {
 		return nil
 	}
-	return errNothingToRepeat(rest)
+	return nothingToRepeatError(rest)
 }
 
 // namedGroupOpener matches `(?<name>` at the start of source, returning it

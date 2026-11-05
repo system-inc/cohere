@@ -19,15 +19,24 @@ func TestASwiftBlockLoadsAndAnUnknownKeyBesideItIsStillRefused(test *testing.T) 
 	test.Parallel()
 	alone := writeConfigs(test, map[string]string{"CohereSettings.json": `{` + swiftBlock + `}`})
 	loadOrFail(test, filepath.Join(alone, "CohereSettings.json"))
-	if _, ignorePatternsOfError := IgnorePatternsOf(filepath.Join(alone, "CohereSettings.json")); ignorePatternsOfError != nil {
+	if _, ignorePatternsOfError := IgnorePatternsOf(
+		filepath.Join(alone, "CohereSettings.json"),
+	); ignorePatternsOfError != nil {
 		test.Errorf("discovery's read refused a swift block: %v", ignorePatternsOfError)
 	}
 
-	withRules := writeConfigs(test, map[string]string{"CohereSettings.json": `{"rules": {"no-debugger": "error"}, ` + swiftBlock + `}`})
+	withRules := writeConfigs(
+		test,
+		map[string]string{"CohereSettings.json": `{"rules": {"no-debugger": "error"}, ` + swiftBlock + `}`},
+	)
 	loadOrFail(test, filepath.Join(withRules, "CohereSettings.json"))
 
 	beside := writeConfigs(test, map[string]string{"CohereSettings.json": `{` + swiftBlock + `, "swiftRules": {}}`})
-	refusedWith(test, filepath.Join(beside, "CohereSettings.json"), `"swiftRules", which this loader does not implement`)
+	refusedWith(
+		test,
+		filepath.Join(beside, "CohereSettings.json"),
+		`"swiftRules", which this loader does not implement`,
+	)
 }
 
 // The Swift engine reads one file and never follows extends, so a swift block in a base configures nothing
@@ -42,7 +51,9 @@ func TestASwiftBlockInAnExtendedBaseIsRefusedNamingIt(test *testing.T) {
 	own := filepath.Join(directory, "CohereSettings.json")
 	want := `lint config ` + base + ` declares "swift", and it is extended by ` + own
 	refusedWith(test, own, want)
-	if _, ignorePatternsOfError := IgnorePatternsOf(own); ignorePatternsOfError == nil || !strings.Contains(ignorePatternsOfError.Error(), want) {
+	if _, ignorePatternsOfError := IgnorePatternsOf(
+		own,
+	); ignorePatternsOfError == nil || !strings.Contains(ignorePatternsOfError.Error(), want) {
 		test.Errorf("discovery's read did not refuse a swift block in a base, naming it: %v", ignorePatternsOfError)
 	}
 	// Control: the base alone, read as the project's own file, loads.
@@ -54,7 +65,9 @@ func TestASwiftBlockInAnExtendedBaseIsRefusedNamingIt(test *testing.T) {
 // Not parallel: it swaps the package's setFiles through withSetFiles, which every test reading a set sees.
 func TestASwiftBlockInASetIsRefused(test *testing.T) {
 	withSetFiles(test, map[string]string{"swifty": `{"rules": {}, ` + swiftBlock + `}`})
-	if _, loadError := Load(SetPrefix + "swifty"); loadError == nil || !strings.Contains(loadError.Error(), `rule set cohere:swifty declares "swift"`) {
+	if _, loadError := Load(
+		SetPrefix + "swifty",
+	); loadError == nil || !strings.Contains(loadError.Error(), `rule set cohere:swifty declares "swift"`) {
 		test.Errorf("a set holding a swift block, read directly, was not refused naming it: %v", loadError)
 	}
 	directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:swifty"}`})
@@ -73,13 +86,20 @@ func TestASwiftBlockBesideNoSwiftProjectIsRefused(test *testing.T) {
 		bundles []string
 		read    bool
 	}{
-		{name: "beside a Package.swift", files: map[string]string{"Package.swift": "// swift-tools-version:6.0\n"}, read: true},
+		{
+			name:  "beside a Package.swift",
+			files: map[string]string{"Package.swift": "// swift-tools-version:6.0\n"},
+			read:  true,
+		},
 		{name: "beside a project.yml", files: map[string]string{"project.yml": "name: App\n"}, read: true},
 		{name: "beside one .xcodeproj", bundles: []string{"App.xcodeproj"}, read: true},
 		{name: "beside two .xcodeproj", bundles: []string{"App.xcodeproj", "Other.xcodeproj"}},
 		{name: "beside only a tsconfig", files: map[string]string{"tsconfig.json": "{}"}},
 		{name: "beside a directory named Package.swift", bundles: []string{"Package.swift"}},
-		{name: "with a Package.swift only below it", files: map[string]string{"apple/Toy/Package.swift": "// swift-tools-version:6.0\n"}},
+		{
+			name:  "with a Package.swift only below it",
+			files: map[string]string{"apple/Toy/Package.swift": "// swift-tools-version:6.0\n"},
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -89,7 +109,10 @@ func TestASwiftBlockBesideNoSwiftProjectIsRefused(test *testing.T) {
 			}
 			directory := writeConfigs(test, files)
 			for _, bundle := range testCase.bundles {
-				if createDirectoryError := os.Mkdir(filepath.Join(directory, bundle), 0o755); createDirectoryError != nil {
+				if createDirectoryError := os.Mkdir(
+					filepath.Join(directory, bundle),
+					0o755,
+				); createDirectoryError != nil {
 					test.Fatal(createDirectoryError)
 				}
 			}
@@ -101,8 +124,14 @@ func TestASwiftBlockBesideNoSwiftProjectIsRefused(test *testing.T) {
 				}
 				return
 			}
-			if checkSwiftBlockHasAReaderError == nil || !strings.Contains(checkSwiftBlockHasAReaderError.Error(), `lint config `+path+` declares "swift", and `+directory+` holds no Swift project`) {
-				test.Fatalf("a swift block no Swift run reads was not refused naming the file: %v", checkSwiftBlockHasAReaderError)
+			if checkSwiftBlockHasAReaderError == nil || !strings.Contains(
+				checkSwiftBlockHasAReaderError.Error(),
+				`lint config `+path+` declares "swift", and `+directory+` holds no Swift project`,
+			) {
+				test.Fatalf(
+					"a swift block no Swift run reads was not refused naming the file: %v",
+					checkSwiftBlockHasAReaderError,
+				)
 			}
 		})
 	}
@@ -114,8 +143,14 @@ func TestASwiftBlockBesideNoSwiftProjectIsRefused(test *testing.T) {
 			"Broken.json":         `{"swift": `,
 		})
 		for _, name := range []string{"CohereSettings.json", "Broken.json"} {
-			if checkSwiftBlockHasAReaderError := CheckSwiftBlockHasAReader(filepath.Join(directory, name)); checkSwiftBlockHasAReaderError != nil {
-				test.Errorf("%s was refused, and it has no swift block to read: %v", name, checkSwiftBlockHasAReaderError)
+			if checkSwiftBlockHasAReaderError := CheckSwiftBlockHasAReader(
+				filepath.Join(directory, name),
+			); checkSwiftBlockHasAReaderError != nil {
+				test.Errorf(
+					"%s was refused, and it has no swift block to read: %v",
+					name,
+					checkSwiftBlockHasAReaderError,
+				)
 			}
 		}
 	})

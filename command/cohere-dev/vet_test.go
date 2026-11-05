@@ -54,14 +54,19 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, err := land(); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		test.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
+	if output, landError := land(); landError == nil ||
+		!strings.Contains(output, "struct literal uses unkeyed fields") {
+		test.Fatalf(
+			"an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s",
+			landError,
+			output,
+		)
 	}
 	writeFiles(test, worktreeA, map[string]string{"user/user.go": keyed})
 	fixture.git(worktreeA, "add", "user/user.go")
 	fixture.git(worktreeA, "commit", "-q", "-m", "its fields keyed")
-	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
-		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", err, output)
+	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
+		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", landError, output)
 	}
 }
 
@@ -84,10 +89,12 @@ func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
 		output, outputError := command.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, err := test("./user"); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", err, output)
+	if output, testError := test(
+		"./user",
+	); testError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
+		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", testError, output)
 	}
-	if output, err := test("-vet=off", "./user"); err != nil {
-		t.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", err, output)
+	if output, testError := test("-vet=off", "./user"); testError != nil {
+		t.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", testError, output)
 	}
 }

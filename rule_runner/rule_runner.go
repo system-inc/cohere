@@ -83,7 +83,7 @@ func RunRule(
 	typeChecker *checker.Checker,
 	files []*ast.SourceFile,
 	ruleName string,
-) (findings []Finding, err error) {
+) (findings []Finding, runRuleError error) {
 	subject, isAllowed := allowed[ruleName]
 	if !isAllowed {
 		return nil, NotAllowedError{Rule: ruleName}
@@ -97,9 +97,9 @@ func RunRule(
 		)
 	}
 	for _, sourceFile := range files {
-		diagnostics, fileErr := runOnFile(sourceFile, subject, program, typeChecker)
-		if fileErr != nil {
-			return nil, fileErr
+		diagnostics, fileError := runOnFile(sourceFile, subject, program, typeChecker)
+		if fileError != nil {
+			return nil, fileError
 		}
 		sort.SliceStable(diagnostics, func(left int, right int) bool {
 			return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -124,10 +124,15 @@ func runOnFile(
 	subject rule.Rule,
 	program *compiler.Program,
 	typeChecker *checker.Checker,
-) (diagnostics []rule.Diagnostic, err error) {
+) (diagnostics []rule.Diagnostic, runOnFileError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("rule_runner: %s panicked on %s: %v", subject.Name, sourceFile.FileName(), recovered)
+			runOnFileError = fmt.Errorf(
+				"rule_runner: %s panicked on %s: %v",
+				subject.Name,
+				sourceFile.FileName(),
+				recovered,
+			)
 		}
 	}()
 	return linter.LintFile(sourceFile, []rule.Rule{subject}, program, typeChecker), nil

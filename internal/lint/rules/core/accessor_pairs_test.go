@@ -45,13 +45,13 @@ func runAccessorPairs(test *testing.T, testCase accessorPairsCase) rule_testing.
 	if testCase.options == nil {
 		return rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeAccessorPairsOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeAccessorPairsOptionsError := DecodeAccessorPairsOptions(encoded)
+	if decodeAccessorPairsOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeAccessorPairsOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, AccessorPairs, accessorPairsFile,
 		testCase.sourceText, decoded)

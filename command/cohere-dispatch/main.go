@@ -149,14 +149,14 @@ func execute(binaryPath string, arguments []string, wait bool) error {
 // A stated limitation is not a lie; silence would be. This prints to stderr so it survives a caller
 // piping stdout, and it prints before the exec because after the exec there is no "after".
 func resolveFrozenBinary() (string, error) {
-	moduleDirectory, err := dispatch.FindModuleDirectory()
-	if err != nil {
-		return "", err
+	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
+	if findModuleDirectoryError != nil {
+		return "", findModuleDirectoryError
 	}
 
-	frozen, err := dispatch.ResolveFrozen(dispatch.DefaultPaths(moduleDirectory))
-	if err != nil {
-		return "", err
+	frozen, resolveFrozenError := dispatch.ResolveFrozen(dispatch.DefaultPaths(moduleDirectory))
+	if resolveFrozenError != nil {
+		return "", resolveFrozenError
 	}
 
 	fmt.Fprintf(streams.Errors, "cohere: --frozen, so the rules on disk were never checked against this binary.\n")
@@ -188,12 +188,12 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 		return release.Resolve(nil)
 	}
 
-	moduleDirectory, moduleErr := dispatch.FindModuleDirectory()
+	moduleDirectory, moduleError := dispatch.FindModuleDirectory()
 
 	// No module means an installed package: there is no source to build from, so the shipped
 	// binary is the only option, and a missing one is an error naming the platform.
-	if moduleErr != nil {
-		return resolveInstalled(moduleErr)
+	if moduleError != nil {
+		return resolveInstalled(moduleError)
 	}
 
 	if !dispatch.HasToolchain() {

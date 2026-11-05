@@ -696,9 +696,9 @@ type noMisusedSpreadRawOptions struct {
 // operands there is no default to restore on nil: a rule handed nil options allows nothing, which is
 // exactly upstream's `defaultOptions`.
 func DecodeNoMisusedSpreadOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noMisusedSpreadRawOptions]()(raw)
-	if err != nil {
-		return NoMisusedSpreadOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMisusedSpreadRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoMisusedSpreadOptions{}, decodeOptionsError
 	}
 
 	wire, _ := decoded.(noMisusedSpreadRawOptions)

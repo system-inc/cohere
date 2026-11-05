@@ -23,15 +23,15 @@ const trimCaller = "command/cohere-dev"
 // (#d0x1fhp). So no code outside cohere-dev calls Trim. Tests are exempt: they trim caches of their own.
 func TestOnlyCohereDevTrims(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	callers := []string{}
 	files := token.NewFileSet()
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		relative, _ := filepath.Rel(root, path)
 		relative = filepath.ToSlash(relative)
@@ -48,9 +48,9 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 			strings.HasPrefix(relative, trimCaller+"/") {
 			return nil
 		}
-		imports, err := parser.ParseFile(files, path, nil, parser.ImportsOnly)
-		if err != nil {
-			return err
+		imports, parseFileError := parser.ParseFile(files, path, nil, parser.ImportsOnly)
+		if parseFileError != nil {
+			return parseFileError
 		}
 		name := ""
 		for _, spec := range imports.Imports {
@@ -64,9 +64,9 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		if name == "" {
 			return nil
 		}
-		parsed, err := parser.ParseFile(files, path, nil, 0)
-		if err != nil {
-			return err
+		parsed, parseFileError := parser.ParseFile(files, path, nil, 0)
+		if parseFileError != nil {
+			return parseFileError
 		}
 		ast.Inspect(parsed, func(node ast.Node) bool {
 			if selector, ok := node.(*ast.SelectorExpr); ok && selector.Sel.Name == "Trim" {
@@ -78,8 +78,8 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		})
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	for _, caller := range callers {
 		test.Errorf(

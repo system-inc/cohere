@@ -451,9 +451,9 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			test.Fatalf("no cache table in the project %s", fixture.root)
 		}
 		// A walk that cannot read the home fails the test, rather than reading as a home with no table in it.
-		walkError := filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
 				test.Errorf("a cache table landed in the user's fixture.home: %s", path)

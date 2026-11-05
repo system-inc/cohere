@@ -62,30 +62,30 @@ func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(test *testing.T) 
 	test.Parallel()
 
 	paths, ages := seedPruneCache(test)
-	plan, err := PlanPrune(paths, nil, "", pruneNow)
-	if err != nil {
-		test.Fatal(err)
+	plan, planPruneError := PlanPrune(paths, nil, "", pruneNow)
+	if planPruneError != nil {
+		test.Fatal(planPruneError)
 	}
 
-	removed, err := ApplyPrune(paths, plan)
-	if err != nil {
-		test.Fatal(err)
+	removed, applyPruneError := ApplyPrune(paths, plan)
+	if applyPruneError != nil {
+		test.Fatal(applyPruneError)
 	}
 	if len(removed) != len(plan.Remove) {
 		test.Fatalf("removed %d of the %d planned", len(removed), len(plan.Remove))
 	}
 	for name := range ages {
-		_, statErr := os.Stat(filepath.Join(paths.BinaryDirectory(), name))
+		_, statError := os.Stat(filepath.Join(paths.BinaryDirectory(), name))
 		planned := false
 		for _, file := range plan.Remove {
 			planned = planned || file.Name == name
 		}
-		if planned != os.IsNotExist(statErr) {
+		if planned != os.IsNotExist(statError) {
 			test.Errorf(
 				"%s: planned=%v, but on disk the file %s",
 				name,
 				planned,
-				map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statErr)],
+				map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statError)],
 			)
 		}
 	}
@@ -112,8 +112,8 @@ func TestApplyPruneRefusesANameThatIsAPath(test *testing.T) {
 	if applyPruneError == nil {
 		test.Fatal("a name that walks out of the binary cache was accepted")
 	}
-	if _, statErr := os.Stat(outside); statErr != nil {
-		test.Fatalf("the file outside the binary cache was removed: %v", statErr)
+	if _, statError := os.Stat(outside); statError != nil {
+		test.Fatalf("the file outside the binary cache was removed: %v", statError)
 	}
 }
 
@@ -246,16 +246,16 @@ func TestEnsureCompilerMarksAReusedExtractionInUse(test *testing.T) {
 		test.Fatal(changeTimesError)
 	}
 
-	got, err := ensureCompiler(paths, commit)
-	if err != nil {
-		test.Fatal(err)
+	got, ensureCompilerError := ensureCompiler(paths, commit)
+	if ensureCompilerError != nil {
+		test.Fatal(ensureCompilerError)
 	}
 	if got != extraction {
 		test.Fatalf("reused %s, expected %s", got, extraction)
 	}
-	information, err := os.Stat(extraction)
-	if err != nil {
-		test.Fatal(err)
+	information, statError := os.Stat(extraction)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if time.Since(information.ModTime()) > time.Minute {
 		test.Fatalf(
@@ -276,8 +276,8 @@ func TestApplyPruneRefusesADirectoryNameThatIsAPath(test *testing.T) {
 	if applyPruneError == nil {
 		test.Fatal("a directory name that walks out of the compiler cache was accepted")
 	}
-	if _, statErr := os.Stat(filepath.Join(outside, "file")); statErr != nil {
-		test.Fatalf("the directory outside the compiler cache was removed: %v", statErr)
+	if _, statError := os.Stat(filepath.Join(outside, "file")); statError != nil {
+		test.Fatalf("the directory outside the compiler cache was removed: %v", statError)
 	}
 }
 
@@ -290,16 +290,16 @@ func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(test *testing.T) {
 	}
 	writeFile(test, filepath.Join(paths.BinaryDirectory(), "cohere-dev"), "binary\n")
 
-	plan, err := PlanPrune(paths, nil, "", pruneNow)
-	if err != nil {
-		test.Fatal(err)
+	plan, planPruneError := PlanPrune(paths, nil, "", pruneNow)
+	if planPruneError != nil {
+		test.Fatal(planPruneError)
 	}
 	if recordPruneError := RecordPrune(paths, plan, nil, pruneNow); recordPruneError != nil {
 		test.Fatal(recordPruneError)
 	}
-	logged, err := os.ReadFile(paths.PruneLogPath())
-	if err != nil {
-		test.Fatal(err)
+	logged, readError := os.ReadFile(paths.PruneLogPath())
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !strings.Contains(string(logged), "examined 1, removed 0 (0 bytes)") {
 		test.Fatalf("the log does not say what an empty prune looked at:\n%s", logged)

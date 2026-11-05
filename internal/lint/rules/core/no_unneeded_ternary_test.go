@@ -36,13 +36,13 @@ func runNoUnneededTernary(test *testing.T, testCase noUnneededTernaryCase) rule_
 	if testCase.options == nil {
 		return rule_testing.Run(test, NoUnneededTernary, noUnneededTernaryFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoUnneededTernaryOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoUnneededTernaryOptionsError := DecodeNoUnneededTernaryOptions(encoded)
+	if decodeNoUnneededTernaryOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoUnneededTernaryOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoUnneededTernary, noUnneededTernaryFile,
 		testCase.sourceText, decoded)

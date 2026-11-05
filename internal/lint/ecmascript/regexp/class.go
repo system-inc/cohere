@@ -119,7 +119,7 @@ func nonWordClassAtoms(options rewriteOptions) []classAtom {
 
 // readClass reads a character class off the front of source, which opens at
 // `[`, returning its body, whether it is negated and how many bytes it spans.
-func readClass(source string) (body string, negated bool, width int, err error) {
+func readClass(source string) (body string, negated bool, width int, readClassError error) {
 	index := len("[")
 	if index < len(source) && source[index] == '^' {
 		negated = true

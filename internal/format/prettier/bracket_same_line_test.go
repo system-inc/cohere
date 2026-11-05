@@ -21,13 +21,13 @@ func TestBracketSameLineReachesTheEngine(test *testing.T) {
 		options := formatoptions.Default()
 		options.PrintWidth = 60
 		options.BracketSameLine = sameLine
-		engine, err := New(options)
-		if err != nil {
-			test.Fatal(err)
+		engine, newPrettierError := New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
-		formatted, err := engine.Format("probe.tsx", source)
-		if err != nil {
-			test.Fatal(err)
+		formatted, formatError := engine.Format("probe.tsx", source)
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		return formatted
 	}

@@ -23,8 +23,8 @@ func realCommentCorpus(test *testing.T) []string {
 	fileCount := 0
 	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has none
 	// to return, and the count below catches a corpus that came back too small.
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || fileCount >= 400 {
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil || info.IsDir() || fileCount >= 400 {
 			return nil
 		}
 		if !strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".tsx") {

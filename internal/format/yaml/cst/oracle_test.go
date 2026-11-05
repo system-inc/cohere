@@ -108,20 +108,20 @@ func upstreamOutputs(test *testing.T, inputs []oracleInput) []string {
 
 func runOracle(test *testing.T, script string, inputs []oracleInput) []string {
 	test.Helper()
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			test.Fatalf("the CST oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the CST oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		test.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs []string
 	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
@@ -480,9 +480,9 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 	}
 	var paths []string
 	var inputs []oracleInput
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir

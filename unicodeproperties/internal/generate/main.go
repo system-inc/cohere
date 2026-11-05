@@ -18,13 +18,13 @@ func main() {
 	check := flag.Bool("check", false, "check generated tables for freshness")
 	output := flag.String("output", "tables_generated.go", "output file")
 	flag.Parse()
-	tables, err := ucd.Build()
-	if err != nil {
-		panic(err)
+	tables, buildError := ucd.Build()
+	if buildError != nil {
+		panic(buildError)
 	}
 	if *inventory {
-		if err = json.NewEncoder(os.Stdout).Encode(tables); err != nil {
-			panic(err)
+		if encodeError := json.NewEncoder(os.Stdout).Encode(tables); encodeError != nil {
+			panic(encodeError)
 		}
 		return
 	}
@@ -56,9 +56,9 @@ func main() {
 		fmt.Fprintf(&buffer, "%q:%q,\n", key, tables.Aliases[key])
 	}
 	fmt.Fprintln(&buffer, "}")
-	data, err := format.Source(buffer.Bytes())
-	if err != nil {
-		panic(err)
+	data, formatError := format.Source(buffer.Bytes())
+	if formatError != nil {
+		panic(formatError)
 	}
 	if *check {
 		old, readError := os.ReadFile(*output)
@@ -71,7 +71,7 @@ func main() {
 		}
 		return
 	}
-	if err = os.WriteFile(*output, data, 0644); err != nil {
-		panic(err)
+	if writeError := os.WriteFile(*output, data, 0644); writeError != nil {
+		panic(writeError)
 	}
 }

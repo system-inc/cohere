@@ -68,12 +68,12 @@ func queueDirectory(slotsDirectory string) string {
 
 // place counts the live tickets ahead of this one, and every live ticket in line with it. A ticket whose
 // lock can be taken is a waiter that is gone, however it ended, and is removed on the way.
-func (ticket *queueTicket) place() (ahead int, waiting int, err error) {
+func (ticket *queueTicket) place() (ahead int, waiting int, placeError error) {
 	queue := filepath.Dir(ticket.path)
 	// Sorted by name, which is arrival order.
-	entries, err := os.ReadDir(queue)
-	if err != nil {
-		return 0, 0, err
+	entries, readDirectoryError := os.ReadDir(queue)
+	if readDirectoryError != nil {
+		return 0, 0, readDirectoryError
 	}
 	mine := filepath.Base(ticket.path)
 	for _, entry := range entries {

@@ -121,13 +121,13 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 		raw = elements[0]
 	}
 
-	decoded, err := decode(raw)
-	if err != nil {
+	decoded, decodeError := decode(raw)
+	if decodeError != nil {
 		if len(raw) == 0 && !declared.Required {
 			// The rule tunes on options it did not get. Defaults are its own business.
 			return nil, nil
 		}
-		return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+		return nil, fmt.Errorf("rule %s: %w", ruleName, decodeError)
 	}
 
 	// A ported rule's options are also checked against upstream's own schema, so cohere accepts

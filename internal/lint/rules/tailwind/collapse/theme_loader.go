@@ -122,9 +122,9 @@ type themeLoader struct {
 }
 
 func (loader *themeLoader) loadFile(path string) error {
-	absolutePath, err := filepath.Abs(path)
-	if err != nil {
-		return fmt.Errorf("resolve %s: %w", path, err)
+	absolutePath, absolutePathError := filepath.Abs(path)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolve %s: %w", path, absolutePathError)
 	}
 
 	if loader.visiting[absolutePath] {
@@ -133,14 +133,14 @@ func (loader *themeLoader) loadFile(path string) error {
 	loader.visiting[absolutePath] = true
 	defer delete(loader.visiting, absolutePath)
 
-	content, err := os.ReadFile(absolutePath)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", absolutePath, err)
+	content, readError := os.ReadFile(absolutePath)
+	if readError != nil {
+		return fmt.Errorf("read %s: %w", absolutePath, readError)
 	}
 
-	nodes, err := ParseCSS(string(content))
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", absolutePath, err)
+	nodes, parseCssError := ParseCSS(string(content))
+	if parseCssError != nil {
+		return fmt.Errorf("parse %s: %w", absolutePath, parseCssError)
 	}
 
 	return loader.ingest(nodes, absolutePath)
@@ -217,9 +217,9 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 		)
 	}
 
-	resolved, err := loader.resolve(specifier, filepath.Dir(path))
-	if err != nil {
-		return fmt.Errorf("%s: resolve @import %q: %w", path, specifier, err)
+	resolved, resolveError := loader.resolve(specifier, filepath.Dir(path))
+	if resolveError != nil {
+		return fmt.Errorf("%s: resolve @import %q: %w", path, specifier, resolveError)
 	}
 	return loader.loadFile(resolved)
 }
@@ -247,7 +247,7 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 		loader.theme.Prefix = prefix
 	}
 
-	var walkErr error
+	var walkError error
 	Walk(node.Nodes, func(child *Node) WalkAction {
 		if child.Kind == KindAtRule && child.Name == "@keyframes" {
 			// Upstream collects these to re-emit; cohere emits no CSS. See theme.go.
@@ -266,7 +266,7 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 				child.Value,
 				options,
 			); addError != nil {
-				walkErr = fmt.Errorf("%s: %w", path, addError)
+				walkError = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}
 			return WalkContinue
@@ -279,14 +279,14 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 			return WalkContinue
 		}
 
-		walkErr = fmt.Errorf(
+		walkError = fmt.Errorf(
 			"%s: `@theme` blocks must only contain custom properties or `@keyframes`, found %s %q",
 			path, child.Kind, child.Property,
 		)
 		return WalkStop
 	})
 
-	return walkErr
+	return walkError
 }
 
 // parseThemeOptions reads an `@theme` block's params, and is upstream's `parseThemeOptions`.

@@ -87,14 +87,14 @@ func (paths Paths) DevelopmentBinaryPath() string {
 // The returned boolean reports whether a build ran, so a caller can tell the user why a normally
 // instant command took a second.
 func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
-	inputs, err := CollectInputs(paths.ModuleDirectory, packagePath, ReleaseBuildFlags)
-	if err != nil {
-		return "", false, err
+	inputs, collectInputsError := CollectInputs(paths.ModuleDirectory, packagePath, ReleaseBuildFlags)
+	if collectInputsError != nil {
+		return "", false, collectInputsError
 	}
 
-	hash, err := inputs.Compute()
-	if err != nil {
-		return "", false, err
+	hash, computeError := inputs.Compute()
+	if computeError != nil {
+		return "", false, computeError
 	}
 
 	// The binary name never changes, so its existence says nothing about whether it is current. The

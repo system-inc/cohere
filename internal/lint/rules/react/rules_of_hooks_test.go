@@ -1635,9 +1635,11 @@ const rulesOfHooksOptionFile = "/repository/source/RulesOfHooksOption.tsx"
 func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalHooks": "useCustomEffect"}`))
-	if err != nil {
-		test.Fatalf("decoding additionalHooks: %v", err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()(
+		[]byte(`{"additionalHooks": "useCustomEffect"}`),
+	)
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding additionalHooks: %v", decodeOptionsError)
 	}
 	const source = "function MyComponent(props) { if (props.on) { useCustomEffect(() => {}); useState(0); } }"
 	with := rule_testing.RunWithOptions(test, RulesOfHooks, rulesOfHooksOptionFile, source, decoded)
@@ -1646,7 +1648,9 @@ func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
 		test.Errorf("with the option %v, without %v; want the same, non-empty", with.MessageIds(), without.MessageIds())
 	}
 
-	if _, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalEffectHooks": "x"}`)); err == nil {
+	if _, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()(
+		[]byte(`{"additionalEffectHooks": "x"}`),
+	); decodeOptionsError == nil {
 		test.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
 	}
 }

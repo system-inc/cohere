@@ -235,9 +235,9 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -246,9 +246,9 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 				return nil
 			}
 			seen[path] = true
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -376,17 +376,17 @@ func normalizeGlueInput(text string) string {
 
 // dumpGlueParse parses one text and renders it the way the oracle script does, through JSON.
 func dumpGlueParse(text string) (any, error) {
-	root, err := parse(text)
-	if err != nil {
-		return nil, err
+	root, parseError := parse(text)
+	if parseError != nil {
+		return nil, parseError
 	}
-	encoded, err := json.Marshal(dumpGlueValue(root, utf16OffsetTable(text)))
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(dumpGlueValue(root, utf16OffsetTable(text)))
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 // dumpGlueValue renders a value in the oracle's shape. The absolute offsets (source.startOffset and

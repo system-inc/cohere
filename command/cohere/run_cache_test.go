@@ -64,9 +64,9 @@ func TestTheTagPrintersTagOnlyARecordedRun(test *testing.T) {
 // the real tee through a real pipe, since the pipe is the reason the tag travels in the stream.
 func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 	test.Parallel()
-	terminal, err := os.Create(filepath.Join(test.TempDir(), "terminal"))
-	if err != nil {
-		test.Fatal(err)
+	terminal, createError := os.Create(filepath.Join(test.TempDir(), "terminal"))
+	if createError != nil {
+		test.Fatal(createError)
 	}
 	// Ignored: written unbuffered by the tee and read back by name before this close, so it loses nothing.
 	defer terminal.Close()
@@ -87,9 +87,9 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 	if target != terminal {
 		test.Fatal("stop did not restore the real stream")
 	}
-	shown, err := os.ReadFile(terminal.Name())
-	if err != nil {
-		test.Fatal(err)
+	shown, readError := os.ReadFile(terminal.Name())
+	if readError != nil {
+		test.Fatal(readError)
 	}
 
 	wantShown := "fix: 0 of 5 files rewritten\ngraph built in 436ms\ncoverage: 460 rules\nphases: fix ran in 2.9s\n  total 4.0s\n  this binary was built from a modified tree\n"
@@ -147,9 +147,9 @@ func TestTheTeeRecordsWhatTheBufferedStreamHeld(test *testing.T) {
 // with no tag left anywhere.
 func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T) {
 	test.Parallel()
-	terminal, err := os.Create(filepath.Join(test.TempDir(), "terminal"))
-	if err != nil {
-		test.Fatal(err)
+	terminal, createError := os.Create(filepath.Join(test.TempDir(), "terminal"))
+	if createError != nil {
+		test.Fatal(createError)
 	}
 	// Ignored: written unbuffered by the tee and read back by name before this close, so it loses nothing.
 	defer terminal.Close()
@@ -164,9 +164,9 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 	fmt.Fprint(buffered, "coverage: 460 rules\n")
 	tee.stop(&target, buffered)
 
-	shown, err := os.ReadFile(terminal.Name())
-	if err != nil {
-		test.Fatal(err)
+	shown, readError := os.ReadFile(terminal.Name())
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(shown) != "fix: 0 of 5 files rewritten, 5 not formatted\ncoverage: 460 rules\n" {
 		test.Errorf("the terminal saw the tag or lost the line: %q", shown)

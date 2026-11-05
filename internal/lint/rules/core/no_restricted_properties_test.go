@@ -37,13 +37,13 @@ func runNoRestrictedProperties(
 		test.Fatalf("the case carries %T options, not NoRestrictedPropertiesOptions", testCase.options)
 	}
 	// Written the way upstream's config writes it: each restriction its own element.
-	encoded, err := json.Marshal(options.Restrictions)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(options.Restrictions)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoRestrictedPropertiesOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(encoded)
+	if decodeNoRestrictedPropertiesOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoRestrictedPropertiesOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoRestrictedProperties, noRestrictedPropertiesFile,
 		testCase.sourceText, decoded)

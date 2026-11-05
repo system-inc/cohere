@@ -419,9 +419,9 @@ func equal(left any, right any) bool {
 		if !is {
 			return false
 		}
-		leftValue, leftErr := typedLeft.Float64()
-		rightValue, rightErr := typedRight.Float64()
-		return leftErr == nil && rightErr == nil && leftValue == rightValue
+		leftValue, leftError := typedLeft.Float64()
+		rightValue, rightError := typedRight.Float64()
+		return leftError == nil && rightError == nil && leftValue == rightValue
 	case []any:
 		typedRight, is := right.([]any)
 		if !is || len(typedLeft) != len(typedRight) {

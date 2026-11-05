@@ -98,9 +98,9 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	base := settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc", "callees": ["mergeClassNames"]}`})
 	options := OptionsAt(base)
 
-	bare, err := options.Decode("better-tailwindcss/enforce-consistent-class-order", nil)
-	if err != nil {
-		test.Fatal(err)
+	bare, decodeError := options.Decode("better-tailwindcss/enforce-consistent-class-order", nil)
+	if decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	encoded, encodeError := json.Marshal(bare)
 	if encodeError != nil {
@@ -111,10 +111,10 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 		test.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
 	}
 
-	overridden, err := options.Decode("better-tailwindcss/enforce-consistent-class-order",
+	overridden, decodeError := options.Decode("better-tailwindcss/enforce-consistent-class-order",
 		[]json.RawMessage{json.RawMessage(`{"order": "asc"}`)})
-	if err != nil {
-		test.Fatal(err)
+	if decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	encoded, encodeError = json.Marshal(overridden)
 	if encodeError != nil {

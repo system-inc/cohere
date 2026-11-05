@@ -122,14 +122,17 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		object schemaObject
 		value  any
 	}{
-		"finding":                     {schema.Defs["finding"], findingJSON{}},
-		"changedFile":                 {schema.Defs["changedFile"], changedFileJSON{}},
-		"summary":                     {summary, summaryJSON{}},
-		"summary.phase":               {*summary.Properties["phases"].Items, phaseJSON{}},
-		"summary.cache":               {summary.Properties["cache"], cacheUse{}},
-		"summary.gaps":                {summary.Properties["gaps"], runGaps{}},
-		"summary.gaps.uncheckedSwift": {*summary.Properties["gaps"].Properties["uncheckedSwift"].Items, uncheckedSwiftFile{}},
-		"summary.gaps.crashes":        {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
+		"finding":       {schema.Defs["finding"], findingJSON{}},
+		"changedFile":   {schema.Defs["changedFile"], changedFileJSON{}},
+		"summary":       {summary, summaryJSON{}},
+		"summary.phase": {*summary.Properties["phases"].Items, phaseJSON{}},
+		"summary.cache": {summary.Properties["cache"], cacheUse{}},
+		"summary.gaps":  {summary.Properties["gaps"], runGaps{}},
+		"summary.gaps.uncheckedSwift": {
+			*summary.Properties["gaps"].Properties["uncheckedSwift"].Items,
+			uncheckedSwiftFile{},
+		},
+		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
 	} {
 		fields, required := jsonFields(reflect.TypeOf(check.value))
 		if got := schemaPropertyNames(check.object.Properties); strings.Join(got, ",") != strings.Join(fields, ",") {

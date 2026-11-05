@@ -76,8 +76,8 @@ func containsName(names []string, name string) bool {
 	return false
 }
 
-// errMemoryFSReadOnly is every write's answer.
-var errMemoryFSReadOnly = errors.New("program: the memory filesystem is read-only")
+// errorMemoryFsReadOnly is every write's answer.
+var errorMemoryFsReadOnly = errors.New("program: the memory filesystem is read-only")
 
 func (fileSystem *MemoryFS) CaseSensitivity() tspath.CaseSensitivity { return tspath.CaseSensitive }
 
@@ -126,14 +126,14 @@ func decodeUtf16LikeDisk(text string, order binary.ByteOrder) string {
 }
 
 func (fileSystem *MemoryFS) WriteFile(tspath.RootedFilePath, string) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
 func (fileSystem *MemoryFS) AppendFile(tspath.RootedFilePath, string) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
-func (fileSystem *MemoryFS) Remove(tspath.RootedPath) error { return errMemoryFSReadOnly }
+func (fileSystem *MemoryFS) Remove(tspath.RootedPath) error { return errorMemoryFsReadOnly }
 func (fileSystem *MemoryFS) Chtimes(tspath.RootedPath, time.Time, time.Time) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
 func (fileSystem *MemoryFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
 	return tspath.RootedPath(path.Clean(fileName.AsString()))

@@ -413,7 +413,7 @@ func StatedDivergenceNames() map[string]StatedDivergence {
 //     question is askable at all.
 //  4. Unresolvable types, but only for a type-aware rule. A syntax rule gets no such excuse.
 //  5. Whatever the comparison says.
-func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
+func Classify(fixture Fixture, result Result, candidateError error) FixtureVerdict {
 	rules, complete := fixture.Rules()
 	verdict := FixtureVerdict{
 		Name:     fixture.Name,
@@ -472,9 +472,9 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 		return verdict
 	}
 
-	if err != nil {
+	if candidateError != nil {
 		var unsupported *ErrUnsupported
-		if asUnsupported(err, &unsupported) {
+		if asUnsupported(candidateError, &unsupported) {
 			// A decline from the implementation on a fixture a shipped rule owns is a statement
 			// about the run, not about the fixture. Naming it `unreachable` would assert the
 			// corpus cannot ask this question, which is the opposite of true: these are the only
@@ -484,7 +484,7 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 			return verdict
 		}
 		verdict.Verdict = VerdictFailed
-		verdict.Reason = "analysis error: " + err.Error()
+		verdict.Reason = "analysis error: " + candidateError.Error()
 		return verdict
 	}
 
@@ -523,11 +523,11 @@ func Aggregate(fixtures []Fixture, implementation Implementation) (Report, error
 	report := Report{Considered: len(fixtures), Counts: map[Verdict]int{}}
 	for _, fixture := range fixtures {
 		var result Result
-		var err error
+		var analyzeError error
 		if !fixture.RequiresFlow() {
-			result, err = implementation.Analyze(fixture)
+			result, analyzeError = implementation.Analyze(fixture)
 		}
-		verdict := Classify(fixture, result, err)
+		verdict := Classify(fixture, result, analyzeError)
 		report.Counts[verdict.Verdict]++
 		report.Fixtures = append(report.Fixtures, verdict)
 	}

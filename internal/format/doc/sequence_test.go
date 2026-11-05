@@ -106,16 +106,16 @@ func f(d doc.Doc) {
 
 	// The test runs in internal/format/doc, so its parent is internal/format.
 	var found []string
-	walkError := filepath.WalkDir("..", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir("..", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		found = append(found, arrayTypeChecks(test, path, string(source))...)
 		return nil

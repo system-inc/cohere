@@ -38,9 +38,9 @@ type NoInvalidRegexpOptions struct {
 // nothing a single one does not, but upstream refuses the config outright, and a config cohere loads
 // where ESLint would not is a config that only works in one of them.
 func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
-	if err != nil {
-		return NoInvalidRegexpOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoInvalidRegexpOptions{}, decodeOptionsError
 	}
 	options, _ := decoded.(NoInvalidRegexpOptions)
 

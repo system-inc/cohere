@@ -83,15 +83,24 @@ type poolShape struct {
 // readPoolShape is the pool's shape, from the defaults and whatever the environment changes.
 func readPoolShape() (poolShape, error) {
 	var shape poolShape
-	var err error
-	if shape.tokens, err = positiveVariable(tokensVariable, defaultTokens); err != nil {
-		return shape, err
+	var positiveVariableError error
+	if shape.tokens, positiveVariableError = positiveVariable(
+		tokensVariable,
+		defaultTokens,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
-	if shape.packages, err = positiveVariable(packagesVariable, defaultPackages); err != nil {
-		return shape, err
+	if shape.packages, positiveVariableError = positiveVariable(
+		packagesVariable,
+		defaultPackages,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
-	if shape.threads, err = positiveVariable(threadsVariable, defaultThreads); err != nil {
-		return shape, err
+	if shape.threads, positiveVariableError = positiveVariable(
+		threadsVariable,
+		defaultThreads,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
 	return shape, nil
 }
@@ -169,19 +178,19 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 		// Inside a parent's share, which the parent rebalances: a nested run never steps.
 		return steps(func(string) []string { return os.Environ() })
 	}
-	shape, err := readPoolShape()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	shape, readPoolShapeError := readPoolShape()
+	if readPoolShapeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", readPoolShapeError)
 		return 2
 	}
 	tokens := shape.tokens
-	directory, err := poolDirectory()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
 
-	held, err := waitInLine(directory, tokens, what, "token", func() {
+	held, waitInLineError := waitInLine(directory, tokens, what, "token", func() {
 		fmt.Fprintf(
 			streams.Errors,
 			"cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
@@ -191,8 +200,8 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 			shape.threads,
 		)
 	})
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	if waitInLineError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitInLineError)
 		return 1
 	}
 	run := &tokenRun{directory: directory, shape: shape, held: held, what: what}
@@ -461,14 +470,14 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 
 // status prints the pool: its shape, who holds each token, and who waits in line, oldest first.
 func status() int {
-	shape, err := readPoolShape()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	shape, readPoolShapeError := readPoolShape()
+	if readPoolShapeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", readPoolShapeError)
 		return 2
 	}
-	directory, err := poolDirectory()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
 	fmt.Fprintf(
@@ -495,9 +504,9 @@ func status() int {
 		fmt.Fprintf(streams.Output, "  %s: %s\n", ordinal(place+1), waiter)
 	}
 	// Land's one lock and its own line (land.go), so a stalled landing shows here beside the tokens.
-	land, err := landDirectory()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	land, landDirectoryError := landDirectory()
+	if landDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landDirectoryError)
 		return 1
 	}
 	holder := "free"

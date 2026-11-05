@@ -95,20 +95,20 @@ func overlayKey(overlay map[string][]byte) string {
 }
 
 func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		return nil, err.Error()
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		return nil, absolutePathError.Error()
 	}
-	exports, err := lintExports()
-	if err != nil {
-		return nil, err.Error()
+	exports, lintExportsError := lintExports()
+	if lintExportsError != nil {
+		return nil, lintExportsError.Error()
 	}
-	loaded, err := gotypes.Load(
+	loaded, loadError := gotypes.Load(
 		gotypes.Config{Directory: root, Overlay: overlay, Exports: exports},
 		"./internal/lint/...",
 	)
-	if err != nil {
-		return nil, fmt.Sprintf("loading the rule packages: %v", err)
+	if loadError != nil {
+		return nil, fmt.Sprintf("loading the rule packages: %v", loadError)
 	}
 	// Every package read from source, a dependency of the rule packages too: one that does not type-check
 	// would hand the scans a partial tree.

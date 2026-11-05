@@ -513,9 +513,9 @@ func (specifier *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte
 // array and leaves as two typed fields, and because `from` is a string on the wire and an integer
 // enum in the struct.
 func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[preferPromiseRejectErrorsRawOptions]()(raw)
-	if err != nil {
-		return PreferPromiseRejectErrorsOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[preferPromiseRejectErrorsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return PreferPromiseRejectErrorsOptions{}, decodeOptionsError
 	}
 
 	wire, _ := decoded.(preferPromiseRejectErrorsRawOptions)

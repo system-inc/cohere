@@ -142,26 +142,26 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 	commit := run("rev-parse", "HEAD")
 
 	paths := Paths{ModuleDirectory: module, CacheDirectory: test.TempDir()}
-	first, err := swiftEngineInputObjects(paths, commit)
-	if err != nil {
-		test.Fatal(err)
+	first, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
+	if swiftEngineInputObjectsError != nil {
+		test.Fatal(swiftEngineInputObjectsError)
 	}
 
 	if renameError := os.Rename(filepath.Join(module, ".git"), filepath.Join(module, "not-git")); renameError != nil {
 		test.Fatal(renameError)
 	}
-	second, err := swiftEngineInputObjects(paths, commit)
-	if err != nil {
-		test.Fatalf("the second run asked git again: %v", err)
+	second, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
+	if swiftEngineInputObjectsError != nil {
+		test.Fatalf("the second run asked git again: %v", swiftEngineInputObjectsError)
 	}
 	if strings.Join(first, " ") != strings.Join(second, " ") {
 		test.Fatalf("the kept answer %v differs from git's %v", second, first)
 	}
 
 	// A kept answer that is not whole is asked again, which here fails loudly rather than being trusted.
-	entries, err := os.ReadDir(filepath.Join(paths.CacheDirectory, "swift-inputs"))
-	if err != nil || len(entries) != 1 {
-		test.Fatalf("expected one kept answer, found %v (err %v)", entries, err)
+	entries, readDirectoryError := os.ReadDir(filepath.Join(paths.CacheDirectory, "swift-inputs"))
+	if readDirectoryError != nil || len(entries) != 1 {
+		test.Fatalf("expected one kept answer, found %v (err %v)", entries, readDirectoryError)
 	}
 	writeFile(test, filepath.Join(paths.CacheDirectory, "swift-inputs", entries[0].Name()), first[0]+"\n")
 	if _, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit); swiftEngineInputObjectsError == nil {

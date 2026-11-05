@@ -74,21 +74,21 @@ func propertySource(name, escape string, shape int) string {
 }
 func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer {
 	test.Helper()
-	input, err := json.Marshal(probes)
-	if err != nil {
-		test.Fatal(err)
+	input, encodeError := json.Marshal(probes)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "-e", propertyOracle)
 	command.Stdin = bytes.NewReader(input)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
-	output, err := command.Output()
-	if err != nil {
-		test.Fatalf("Node oracle: %v: %s", err, stderr.String())
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("Node oracle: %v: %s", outputError, stderr.String())
 	}
 	var answers []propertyAnswer
-	if err = json.Unmarshal(output, &answers); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return answers
 }
@@ -241,12 +241,12 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		"p{Script=Greek}",
 		`\p{Script=Greek}`,
 	}
-	input, err := json.Marshal(struct {
+	input, encodeError := json.Marshal(struct {
 		Fixtures []fixture
 		Subjects []string
 	}{fixtures, subjects})
-	if err != nil {
-		test.Fatal(err)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command(
 		"node",
@@ -254,16 +254,16 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		`const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`,
 	)
 	command.Stdin = bytes.NewReader(input)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		test.Fatalf("Node: %v: %s", err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("Node: %v: %s", outputError, output)
 	}
 	var answers []struct {
 		Accepted bool
 		Bits     []bool
 	}
-	if err = json.Unmarshal(output, &answers); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	checks := 0
 	for fixtureIndex, fixture := range fixtures {

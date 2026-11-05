@@ -151,9 +151,9 @@ func goEnvironment(environment []string) []string {
 // goCommand runs one go command in directory and returns its standard output, or an error carrying its
 // standard error.
 func goCommand(directory string, environment []string, arguments ...string) ([]byte, error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return nil, err
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 	command := exec.Command("go", arguments...)
 	command.Dir = absolute
@@ -162,13 +162,13 @@ func goCommand(directory string, environment []string, arguments ...string) ([]b
 	command.Env = append(goEnvironment(environment), "PWD="+absolute)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		shown := strings.Join(arguments, " ")
 		if len(shown) > 300 {
 			shown = shown[:300] + "..."
 		}
-		return nil, fmt.Errorf("go %s: %w\n%s", shown, err, strings.TrimSpace(standardError.String()))
+		return nil, fmt.Errorf("go %s: %w\n%s", shown, outputError, strings.TrimSpace(standardError.String()))
 	}
 	return output, nil
 }
@@ -199,10 +199,10 @@ func goEnvironmentValues(directory string, environment []string) (map[string]str
 }
 
 // moduleAt is the directory of the go.mod at or above directory and the module path it declares.
-func moduleAt(directory string) (root string, path string, err error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return "", "", err
+func moduleAt(directory string) (root string, path string, moduleAtError error) {
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return "", "", absolutePathError
 	}
 	for current := absolute; ; current = filepath.Dir(current) {
 		content, readError := os.ReadFile(filepath.Join(current, "go.mod"))

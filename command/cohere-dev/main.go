@@ -268,16 +268,16 @@ func wholeModule(arguments []string) bool {
 // withWorkspaceModules replaces a ./... run from the repository's root with the patterns of every module
 // the landing gate covers, saying which. From anywhere else ./... means that directory's tree, and stays.
 func withWorkspaceModules(arguments []string) ([]string, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	root, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return nil, workingDirectoryError
 	}
 	if _, statError := os.Stat(filepath.Join(root, "go.work")); statError != nil {
 		return arguments, nil
 	}
-	covered, err := readGatedWorkspace(root)
-	if err != nil {
-		return nil, err
+	covered, readGatedWorkspaceError := readGatedWorkspace(root)
+	if readGatedWorkspaceError != nil {
+		return nil, readGatedWorkspaceError
 	}
 	reportWorkspace(covered, streams.Errors)
 	expanded := make([]string, 0, len(arguments)+len(covered.Modules))
@@ -420,14 +420,14 @@ func (held *heldSlot) release() {
 // takeSlot takes the first free token, or returns nil when every token is held.
 func takeSlot(directory string, slots int, what string) (*heldSlot, error) {
 	for slot := 1; slot <= slots; slot++ {
-		lock, err := os.OpenFile(lockPath(directory, slot), os.O_CREATE|os.O_RDWR, 0o644)
-		if err != nil {
-			return nil, err
+		lock, openError := os.OpenFile(lockPath(directory, slot), os.O_CREATE|os.O_RDWR, 0o644)
+		if openError != nil {
+			return nil, openError
 		}
-		taken, err := tryLockFile(lock)
-		if err != nil {
+		taken, tryLockFileError := tryLockFile(lock)
+		if tryLockFileError != nil {
 			_ = lock.Close() // Ignored: never written, and the lock's error is the one returned.
-			return nil, err
+			return nil, tryLockFileError
 		}
 		if !taken {
 			_ = lock.Close() // Ignored: never written, and never locked by this process.

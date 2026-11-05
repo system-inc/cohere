@@ -41,14 +41,14 @@ func (thrown *Error) Error() string { return thrown.Name + ": " + thrown.Message
 // Parse is `new Parser(value, options).parse()`: the Root, holding one Value, holding the nodes.
 // Everything the library throws comes back as an *Error marked printing.Syntax, which Prettier turns
 // into a value-unknown node.
-func Parse(value string, options Options) (result *estree.Node, err error) {
+func Parse(value string, options Options) (result *estree.Node, parseError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			if thrown, isThrown := recovered.(*Error); isThrown {
-				result, err = nil, printing.Syntax(thrown)
+				result, parseError = nil, printing.Syntax(thrown)
 				return
 			}
-			result, err = nil, fmt.Errorf("css values: parsing %q: %v", value, recovered)
+			result, parseError = nil, fmt.Errorf("css values: parsing %q: %v", value, recovered)
 		}
 	}()
 	return newParser(value, options).parse(), nil

@@ -51,10 +51,10 @@ func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name    string
-		raw     string
-		want    PreferNullishCoalescingPrimitives
-		wantErr bool
+		name      string
+		raw       string
+		want      PreferNullishCoalescingPrimitives
+		wantError bool
 	}{
 		{
 			name: "absent exempts nothing",
@@ -72,9 +72,9 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 		{
 			// The row a decoder gets wrong by being helpful. Upstream's `enum: [true]` makes this
 			// illegal, and accepting it means a config that loads here and fails in ESLint.
-			name:    "the literal false is REFUSED, because enum:[true] admits only one boolean",
-			raw:     `{"ignorePrimitives":false}`,
-			wantErr: true,
+			name:      "the literal false is REFUSED, because enum:[true] admits only one boolean",
+			raw:       `{"ignorePrimitives":false}`,
+			wantError: true,
 		},
 		{
 			name: "one primitive, leaving the other three reporting",
@@ -91,9 +91,9 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 			want: PreferNullishCoalescingPrimitives{Bigint: true, Boolean: true, Number: true, String: true},
 		},
 		{
-			name:    "an unknown primitive is refused, matching additionalProperties:false",
-			raw:     `{"ignorePrimitives":{"strings":true}}`,
-			wantErr: true,
+			name:      "an unknown primitive is refused, matching additionalProperties:false",
+			raw:       `{"ignorePrimitives":{"strings":true}}`,
+			wantError: true,
 		},
 	}
 
@@ -103,7 +103,7 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
 				json.RawMessage(testCase.raw),
 			)
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
@@ -131,10 +131,10 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name    string
-		raw     string
-		check   func(*testing.T, PreferNullishCoalescingOptions)
-		wantErr bool
+		name      string
+		raw       string
+		check     func(*testing.T, PreferNullishCoalescingOptions)
+		wantError bool
 	}{
 		{
 			name: "a bare \"error\" delivers no options at all",
@@ -163,9 +163,9 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 			},
 		},
 		{
-			name:    "a shape that is neither must error rather than decode to a default",
-			raw:     `"ignoreTernaryTests"`,
-			wantErr: true,
+			name:      "a shape that is neither must error rather than decode to a default",
+			raw:       `"ignoreTernaryTests"`,
+			wantError: true,
 		},
 	}
 
@@ -175,7 +175,7 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
 				json.RawMessage(testCase.raw),
 			)
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected a refusal, got %#v", decoded)
 				}

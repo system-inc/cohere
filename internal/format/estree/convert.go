@@ -94,7 +94,7 @@ var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
 //
 // The file must have parsed without diagnostics. Upstream throws the first parse diagnostic before
 // converting, and so does this. The tree's nodes come from nodes, or the heap when it is nil.
-func Convert(sourceFile *ast.SourceFile, nodes *Arena) (program *Node, comments []*Node, err error) {
+func Convert(sourceFile *ast.SourceFile, nodes *Arena) (program *Node, comments []*Node, convertError error) {
 	return convert(sourceFile, nil, nodes)
 }
 
@@ -102,7 +102,7 @@ func convert(
 	sourceFile *ast.SourceFile,
 	typeCastCommentEnds []int,
 	nodes *Arena,
-) (program *Node, comments []*Node, err error) {
+) (program *Node, comments []*Node, convertError error) {
 	if diagnostics := sourceFile.Diagnostics(); len(diagnostics) > 0 {
 		return nil, nil, fmt.Errorf("parse error at %d: %s", diagnostics[0].Pos(), diagnostics[0].String())
 	}
@@ -117,7 +117,7 @@ func convert(
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			program, comments, err = nil, nil, fmt.Errorf("converting to ESTree: %v", recovered)
+			program, comments, convertError = nil, nil, fmt.Errorf("converting to ESTree: %v", recovered)
 		}
 	}()
 

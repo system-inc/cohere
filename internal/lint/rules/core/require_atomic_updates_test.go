@@ -206,9 +206,9 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 
 	test.Run("allowProperties true suppresses only the property arm", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{"allowProperties": true}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{"allowProperties": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		options, ok := decoded.(RequireAtomicUpdatesOptions)
 		if !ok {
@@ -231,9 +231,9 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 
 	test.Run("allowProperties false keeps both arms", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{"allowProperties": false}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{"allowProperties": false}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
 		result := rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", property, decoded)
@@ -251,9 +251,9 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 
 	test.Run("an empty object decodes to the permissive-off default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		options, ok := decoded.(RequireAtomicUpdatesOptions)
 		if !ok {

@@ -85,8 +85,8 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 	counts := map[react_conformance.Verdict]int{}
 	var detail []string
 	for _, fixture := range scored {
-		result, analyzeErr := Analyze(subject, fixture, test.TempDir())
-		verdict := react_conformance.Classify(fixture, result, analyzeErr)
+		result, analyzeError := Analyze(subject, fixture, test.TempDir())
+		verdict := react_conformance.Classify(fixture, result, analyzeError)
 		counts[verdict.Verdict]++
 		detail = append(detail, "  "+fixture.Name+": "+string(verdict.Verdict))
 	}
@@ -160,8 +160,8 @@ func TestScoringHarnessCanFail(test *testing.T) {
 		if !complete || len(rules) != 1 || rules[0] != "globals" {
 			continue
 		}
-		result, analyzeErr := Analyze(silent, fixture, test.TempDir())
-		verdict := react_conformance.Classify(fixture, result, analyzeErr)
+		result, analyzeError := Analyze(silent, fixture, test.TempDir())
+		verdict := react_conformance.Classify(fixture, result, analyzeError)
 		if verdict.Verdict == react_conformance.VerdictPassed {
 			test.Errorf("%s: a rule that reports nothing scored a pass", fixture.Name)
 		}

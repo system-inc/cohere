@@ -605,9 +605,9 @@ func TestVendoredCorpusPairsAreComplete(test *testing.T) {
 	test.Parallel()
 	var inputs []string
 	var expectations []string
-	walkError := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			return nil

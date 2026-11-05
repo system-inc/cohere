@@ -138,7 +138,7 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 			table := program.NewCacheTable()
 			table.Runs["--no-fix"] = &program.RunCache{Key: marker(index)}
 			table.Findings = &program.LintCache{Key: program.HashRuleSet([]string{marker(index)})}
-			err := program.WriteCacheTable(
+			writeCacheTableError := program.WriteCacheTable(
 				directory,
 				table,
 				identity,
@@ -146,8 +146,8 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 				program.PathAnchor{},
 			)
 			time.Sleep(2 * time.Millisecond)
-			if err == nil {
-				err = program.WriteCacheTable(
+			if writeCacheTableError == nil {
+				writeCacheTableError = program.WriteCacheTable(
 					directory,
 					table,
 					identity,
@@ -156,8 +156,8 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 				)
 			}
 			release()
-			if err != nil {
-				writerError <- err
+			if writeCacheTableError != nil {
+				writerError <- writeCacheTableError
 				return
 			}
 			// Runs are never back to back with no gap at all, and flock is not fair: a writer retaking the lock

@@ -18,16 +18,16 @@ import (
 // publicThemeSystem is the public theme's design system, over the vendored tailwindcss.
 func publicThemeSystem(test *testing.T) DesignSystemResult {
 	test.Helper()
-	entryPoint, err := filepath.Abs(filepath.Join("collapse", "testdata", "public_theme", "theme.css"))
-	if err != nil {
-		test.Fatalf("resolving the public theme: %v", err)
+	entryPoint, absolutePathError := filepath.Abs(filepath.Join("collapse", "testdata", "public_theme", "theme.css"))
+	if absolutePathError != nil {
+		test.Fatalf("resolving the public theme: %v", absolutePathError)
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
-	if err != nil {
-		test.Fatalf("loading the public theme: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the public theme: %v", loadDesignSystemError)
 	}
 	return loadedDesignSystemResult(system, entryPoint)
 }

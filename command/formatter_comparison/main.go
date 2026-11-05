@@ -63,8 +63,8 @@ func main() {
 	examples := map[string][]string{}
 
 	for _, file := range files {
-		raw, readErr := os.ReadFile(file)
-		if readErr != nil {
+		raw, readError := os.ReadFile(file)
+		if readError != nil {
 			continue
 		}
 		text := string(raw)
@@ -248,8 +248,8 @@ func collect(root string, limit int) ([]string, error) {
 		"dist": true, "build": true, "out": true,
 	}
 
-	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if info.IsDir() {

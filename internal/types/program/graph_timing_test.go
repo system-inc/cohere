@@ -28,18 +28,18 @@ func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 		"node_modules/packaged/index.d.ts":   "export declare const packaged: number;\n",
 	})
 
-	untimed, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building untimed: %v", err)
+	untimed, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building untimed: %v", buildError)
 	}
 
 	timing := &program.GraphTiming{}
 	started := time.Now()
-	timed, err := program.Build(
+	timed, buildError := program.Build(
 		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Timing: timing},
 	)
-	if err != nil {
-		test.Fatalf("building timed: %v", err)
+	if buildError != nil {
+		test.Fatalf("building timed: %v", buildError)
 	}
 	wall := time.Since(started)
 

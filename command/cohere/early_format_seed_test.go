@@ -151,9 +151,9 @@ func sameResults(test *testing.T, label string, expected *formatSpeculation, act
 	}
 }
 
-func errorText(err error) string {
-	if err == nil {
+func errorText(sourceError error) string {
+	if sourceError == nil {
 		return ""
 	}
-	return err.Error()
+	return sourceError.Error()
 }

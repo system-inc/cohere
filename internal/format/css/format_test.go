@@ -204,9 +204,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range formatCases {
-			expected, err := oracle.Format("Probe.css", testCase.source)
-			if err != nil {
-				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+			expected, formatError := oracle.Format("Probe.css", testCase.source)
+			if formatError != nil {
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, formatError)
 			}
 			if expected == testCase.source {
 				test.Fatalf(
@@ -228,9 +228,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 					}
 				}
 			}
-			actual, err := Format(testCase.source, options)
-			if err != nil {
-				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+			actual, formatError := Format(testCase.source, options)
+			if formatError != nil {
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatError)
 				continue
 			}
 			if actual != expected {
@@ -249,9 +249,9 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsErr := Format(testCase.source, formatoptions.Default())
-			withOptions, optionsErr := Format(testCase.source, options)
-			if defaultsErr == nil && optionsErr == nil && withDefaults != withOptions {
+			withDefaults, defaultsError := Format(testCase.source, formatoptions.Default())
+			withOptions, optionsError := Format(testCase.source, options)
+			if defaultsError == nil && optionsError == nil && withDefaults != withOptions {
 				changed = true
 				break
 			}
@@ -282,13 +282,13 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
-		formatted, err := Format(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		formatted, formatError := Format(testCase.source, options)
+		if formatError != nil {
+			test.Fatalf("%s: %v", testCase.name, formatError)
 		}
-		document, err := PrintToDoc(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		document, printToDocError := PrintToDoc(testCase.source, options)
+		if printToDocError != nil {
+			test.Fatalf("%s: %v", testCase.name, printToDocError)
 		}
 		printed := doc.Print(
 			document,
@@ -313,8 +313,8 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 	}
 	var files []string
 	for _, root := range filepath.SplitList(roots) {
-		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
+		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() &&
@@ -347,16 +347,16 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 				test.Fatal(readError)
 			}
 			for _, variant := range []string{string(source), stripIndentation(string(source))} {
-				expected, err := oracle.Format("Probe.css", variant)
-				if err != nil {
-					test.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, err)
+				expected, formatError := oracle.Format("Probe.css", variant)
+				if formatError != nil {
+					test.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, formatError)
 				}
 				if expected != variant {
 					rewritten++
 				}
-				actual, err := Format(variant, options)
-				if err != nil {
-					test.Errorf("%s (%s): %v", file, optionsName, err)
+				actual, formatError := Format(variant, options)
+				if formatError != nil {
+					test.Errorf("%s (%s): %v", file, optionsName, formatError)
 					continue
 				}
 				if actual != expected {
@@ -402,8 +402,8 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "css")
 	var files []string
-	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
-		if err == nil && !entry.IsDir() && strings.HasSuffix(path, ".css") {
+	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError == nil && !entry.IsDir() && strings.HasSuffix(path, ".css") {
 			files = append(files, path)
 		}
 		return nil
@@ -420,7 +420,7 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 				test.Fatal(readError)
 			}
 			text := string(source)
-			actual, nativeErr := Format(text, options)
+			actual, nativeError := Format(text, options)
 
 			// A byte order mark is the shared layer's to strip, before any printer runs.
 			if strings.HasPrefix(text, "\xef\xbb\xbf") {
@@ -428,24 +428,24 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 			}
 			// yaml front matter is formatted by the yaml printer, which Format cannot reach, so it refuses.
 			if strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
-				if frontMatterRoot, parseErr := parse(text); parseErr == nil &&
+				if frontMatterRoot, parseError := parse(text); parseError == nil &&
 					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
 					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
-					if nativeErr == nil {
+					if nativeError == nil {
 						test.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
 					}
 					continue
 				}
 			}
 
-			expected, oracleErr := oracle.Format("Probe.css", text)
+			expected, oracleError := oracle.Format("Probe.css", text)
 			switch {
-			case oracleErr != nil && nativeErr != nil:
+			case oracleError != nil && nativeError != nil:
 				refusedByBoth++
-			case oracleErr != nil:
-				test.Errorf("%s (%s): the fork refused it (%v) and Format printed it", file, optionsName, oracleErr)
-			case nativeErr != nil:
-				test.Errorf("%s (%s): %v", file, optionsName, nativeErr)
+			case oracleError != nil:
+				test.Errorf("%s (%s): the fork refused it (%v) and Format printed it", file, optionsName, oracleError)
+			case nativeError != nil:
+				test.Errorf("%s (%s): %v", file, optionsName, nativeError)
 			default:
 				compared++
 				if actual != expected {
@@ -585,9 +585,9 @@ func TestFormatSCSSMatchesTheFork(test *testing.T) {
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range scssFormatCases {
-			expected, err := oracle.Format("Probe.scss", testCase.source)
-			if err != nil {
-				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+			expected, formatError := oracle.Format("Probe.scss", testCase.source)
+			if formatError != nil {
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, formatError)
 			}
 			if expected == testCase.source {
 				test.Fatalf(
@@ -609,9 +609,9 @@ func TestFormatSCSSMatchesTheFork(test *testing.T) {
 					}
 				}
 			}
-			actual, err := FormatSCSS(testCase.source, options)
-			if err != nil {
-				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+			actual, formatScssError := FormatSCSS(testCase.source, options)
+			if formatScssError != nil {
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatScssError)
 				continue
 			}
 			if actual != expected {
@@ -632,24 +632,31 @@ func TestFormatSCSSIsNotFormat(test *testing.T) {
 		"$map:(key1:value1,key2:value2);",
 		"@if $a==1{a{x:y}}@else{b{x:y}}",
 	} {
-		asCSS, cssErr := oracle.Format("Probe.css", source)
-		asSCSS, scssErr := oracle.Format("Probe.scss", source)
-		if scssErr != nil {
-			test.Fatalf("%q: the oracle refused it as scss: %v", source, scssErr)
+		asCSS, cssError := oracle.Format("Probe.css", source)
+		asSCSS, scssError := oracle.Format("Probe.scss", source)
+		if scssError != nil {
+			test.Fatalf("%q: the oracle refused it as scss: %v", source, scssError)
 		}
-		if cssErr == nil && asCSS == asSCSS {
+		if cssError == nil && asCSS == asSCSS {
 			test.Fatalf(
 				"%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing",
 				source,
 			)
 		}
-		actualSCSS, err := FormatSCSS(source, formatoptions.Default())
-		if err != nil || actualSCSS != asSCSS {
-			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, err, actualSCSS)
+		actualSCSS, formatScssError := FormatSCSS(source, formatoptions.Default())
+		if formatScssError != nil || actualSCSS != asSCSS {
+			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, formatScssError, actualSCSS)
 		}
-		actualCSS, err := Format(source, formatoptions.Default())
-		if (err == nil) != (cssErr == nil) || actualCSS != asCSS {
-			test.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssErr, asCSS, err, actualCSS)
+		actualCSS, formatError := Format(source, formatoptions.Default())
+		if (formatError == nil) != (cssError == nil) || actualCSS != asCSS {
+			test.Errorf(
+				"%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s",
+				source,
+				cssError,
+				asCSS,
+				formatError,
+				actualCSS,
+			)
 		}
 	}
 }
@@ -659,13 +666,13 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range scssFormatCases {
-		formatted, err := FormatSCSS(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		formatted, formatScssError := FormatSCSS(testCase.source, options)
+		if formatScssError != nil {
+			test.Fatalf("%s: %v", testCase.name, formatScssError)
 		}
-		document, err := PrintToDocSCSS(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		document, printToDocScssError := PrintToDocSCSS(testCase.source, options)
+		if printToDocScssError != nil {
+			test.Fatalf("%s: %v", testCase.name, printToDocScssError)
 		}
 		printed := doc.Print(
 			document,
@@ -685,8 +692,8 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "scss")
 	var files []string
-	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
-		if err == nil && !entry.IsDir() && strings.HasSuffix(path, ".scss") {
+	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError == nil && !entry.IsDir() && strings.HasSuffix(path, ".scss") {
 			files = append(files, path)
 		}
 		return nil
@@ -704,14 +711,14 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 			}
 			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
 			text := strings.ReplaceAll(string(source), "\r\n", "\n")
-			actual, nativeErr := FormatSCSS(text, options)
+			actual, nativeError := FormatSCSS(text, options)
 
 			// yaml front matter is formatted by the yaml printer, which FormatSCSS cannot reach, so it refuses.
 			if strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
-				if frontMatterRoot, parseErr := parseSCSS(text); parseErr == nil &&
+				if frontMatterRoot, parseError := parseSCSS(text); parseError == nil &&
 					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
 					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
-					if nativeErr == nil {
+					if nativeError == nil {
 						test.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
 					}
 					skipped++
@@ -719,14 +726,19 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 				}
 			}
 
-			expected, oracleErr := oracle.Format("Probe.scss", text)
+			expected, oracleError := oracle.Format("Probe.scss", text)
 			switch {
-			case oracleErr != nil && nativeErr != nil:
+			case oracleError != nil && nativeError != nil:
 				refusedByBoth++
-			case oracleErr != nil:
-				test.Errorf("%s (%s): the fork refused it (%v) and FormatSCSS printed it", file, optionsName, oracleErr)
-			case nativeErr != nil:
-				test.Errorf("%s (%s): %v", file, optionsName, nativeErr)
+			case oracleError != nil:
+				test.Errorf(
+					"%s (%s): the fork refused it (%v) and FormatSCSS printed it",
+					file,
+					optionsName,
+					oracleError,
+				)
+			case nativeError != nil:
+				test.Errorf("%s (%s): %v", file, optionsName, nativeError)
 			default:
 				compared++
 				if expected != text {

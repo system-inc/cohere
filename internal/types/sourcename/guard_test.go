@@ -214,14 +214,14 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 // tsDecisions loads every package of the module and finds every `.ts` decision outside this package.
 func tsDecisions(test *testing.T) []tsDecision {
 	test.Helper()
-	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	moduleRoot, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	// Syntax alone, which reads every file go list selects and compiles nothing (#qnnnkbf).
-	loaded, err := gotypes.Parse(gotypes.Config{Directory: moduleRoot}, "./...")
-	if err != nil {
-		test.Fatalf("loading the module: %v", err)
+	loaded, parseError := gotypes.Parse(gotypes.Config{Directory: moduleRoot}, "./...")
+	if parseError != nil {
+		test.Fatalf("loading the module: %v", parseError)
 	}
 	count := 0
 	for _, loadedPackage := range loaded {

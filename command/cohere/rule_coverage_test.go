@@ -115,7 +115,12 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 
 	output := renderLintReport(
-		lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: lintConfiguration, WalkCost: "in 1s"},
+		lintReport{
+			Result:     program.Result{Coverage: coverage},
+			Rules:      rules,
+			LintConfig: lintConfiguration,
+			WalkCost:   "in 1s",
+		},
 	)
 	total, terms := countedLineTerms(test, output)
 	printedSum := 0

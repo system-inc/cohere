@@ -86,14 +86,14 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 func TestTheCreatingGetterScanSeesAPlantedCall(test *testing.T) {
 	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
-	original, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	planted := strings.Replace(string(original), "range node.Locals()", "range ast.GetLocals(node)", 1)
 	if planted == string(original) {

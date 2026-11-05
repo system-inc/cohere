@@ -45,11 +45,11 @@ func NewStatSnapshot() *StatSnapshot {
 
 // note keeps what a stat already taken said about path: its information, or that nothing is there. An error
 // other than nothing being there, a permission error, notes nothing, so a build asks the disk itself.
-func (snapshot *StatSnapshot) note(path string, information os.FileInfo, err error) {
+func (snapshot *StatSnapshot) note(path string, information os.FileInfo, statError error) {
 	switch {
-	case err == nil:
+	case statError == nil:
 		snapshot.answers.Store(path, information)
-	case os.IsNotExist(err):
+	case os.IsNotExist(statError):
 		snapshot.answers.Store(path, absentAnswer{})
 	}
 }

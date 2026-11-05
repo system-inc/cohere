@@ -22,13 +22,13 @@ func indexedAccessSubject() rule.Rule {
 
 func TestIndexedAccessWrite(test *testing.T) {
 	test.Parallel()
-	refused, err := os.ReadFile("testdata/indexed-access/refused.ts")
-	if err != nil {
-		test.Fatal(err)
+	refused, readError := os.ReadFile("testdata/indexed-access/refused.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	accepted, err := os.ReadFile("testdata/indexed-access/accepted.ts")
-	if err != nil {
-		test.Fatal(err)
+	accepted, readError := os.ReadFile("testdata/indexed-access/accepted.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	for name, source := range map[string]string{
 		"runtime probe": string(refused),

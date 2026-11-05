@@ -45,13 +45,13 @@ func runImplicitGlobalsAsAScript(test *testing.T, fileName string, sourceText st
 // implicitGlobalsOptions routes the option through the rule's own exported decoder.
 func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) any {
 	test.Helper()
-	raw, err := json.Marshal(map[string]bool{"lexicalBindings": lexicalBindings})
-	if err != nil {
-		test.Fatalf("could not marshal the option: %v", err)
+	raw, encodeError := json.Marshal(map[string]bool{"lexicalBindings": lexicalBindings})
+	if encodeError != nil {
+		test.Fatalf("could not marshal the option: %v", encodeError)
 	}
-	decoded, err := DecodeNoImplicitGlobalsOptions(raw)
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(raw)
+	if decodeNoImplicitGlobalsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitGlobalsOptionsError)
 	}
 	return decoded
 }

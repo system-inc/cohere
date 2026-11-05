@@ -296,13 +296,13 @@ func TestJsxNoUndefAllowGlobals(test *testing.T) {
 	test.Parallel()
 
 	const globals = "/repository/source/globals.d.ts"
-	allowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": true}`))
-	if err != nil {
-		test.Fatalf("decoding allowGlobals: %v", err)
+	allowed, decodeOptionsError := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": true}`))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding allowGlobals: %v", decodeOptionsError)
 	}
-	disallowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": false}`))
-	if err != nil {
-		test.Fatalf("decoding allowGlobals false: %v", err)
+	disallowed, decodeOptionsError := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": false}`))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding allowGlobals false: %v", decodeOptionsError)
 	}
 
 	cases := []struct {

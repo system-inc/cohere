@@ -232,18 +232,18 @@ func htmlTextUpstreamEvents(test *testing.T, script string, inputs []string) [][
 	if writeError := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", path)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			test.Fatalf("the event oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the event oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		test.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs [][]string
 	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {

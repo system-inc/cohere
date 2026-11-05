@@ -259,14 +259,14 @@ func compareVersions(left semanticVersion, right semanticVersion) int {
 // compareIdentifiers orders prerelease identifiers: numeric ones numerically and below any
 // alphanumeric one, alphanumeric ones by ASCII.
 func compareIdentifiers(left string, right string) int {
-	leftNumber, leftErr := strconv.Atoi(left)
-	rightNumber, rightErr := strconv.Atoi(right)
+	leftNumber, leftError := strconv.Atoi(left)
+	rightNumber, rightError := strconv.Atoi(right)
 	switch {
-	case leftErr == nil && rightErr == nil:
+	case leftError == nil && rightError == nil:
 		return compareInts(leftNumber, rightNumber)
-	case leftErr == nil:
+	case leftError == nil:
 		return -1
-	case rightErr == nil:
+	case rightError == nil:
 		return 1
 	default:
 		return strings.Compare(left, right)

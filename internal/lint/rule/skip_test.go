@@ -18,9 +18,9 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 	test.Parallel()
 	covers := map[string]bool{"CoverTypeCheck": true}
 	calls := 0
-	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return err
+	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return pathError
 		}
 		file, parseError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 		if parseError != nil {

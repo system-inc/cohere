@@ -117,8 +117,8 @@ func parseFlagHelp(help []byte) ([]string, []CliFlag, error) {
 	}
 	for _, line := range strings.Split(strings.TrimRight(string(help), "\n"), "\n") {
 		if match := flagHeading.FindStringSubmatch(line); match != nil {
-			if err := finish(); err != nil {
-				return nil, nil, err
+			if finishError := finish(); finishError != nil {
+				return nil, nil, finishError
 			}
 			flags = append(flags, CliFlag{Name: match[1], Argument: match[2]})
 			continue
@@ -133,8 +133,8 @@ func parseFlagHelp(help []byte) ([]string, []CliFlag, error) {
 		}
 		usage = append(usage, continued)
 	}
-	if err := finish(); err != nil {
-		return nil, nil, err
+	if finishError := finish(); finishError != nil {
+		return nil, nil, finishError
 	}
 	if len(flags) == 0 {
 		return nil, nil, fmt.Errorf("no flags")

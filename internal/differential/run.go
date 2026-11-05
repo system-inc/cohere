@@ -127,37 +127,37 @@ type Control struct {
 // introduce a window in which the tree changed underneath the two runs — and on a tree with several
 // authors in it, that window is not theoretical.
 func Run(callerContext context.Context, options RunOptions) (Report, error) {
-	planted, cleanup, err := plantControls(options)
+	planted, cleanup, plantControlsError := plantControls(options)
 	// cleanup is deferred before the error check on purpose: plantControls may have written some
 	// files before failing, and leaving a planted violation behind in a shared tree would be a
 	// defect handed to whoever runs the gate next.
 	defer cleanup()
-	if err != nil {
-		return Report{}, err
+	if plantControlsError != nil {
+		return Report{}, plantControlsError
 	}
 
-	cohereCommand, removeConfiguration, err := cohereCommandWithExtraRules(options)
+	cohereCommand, removeConfiguration, cohereCommandWithExtraRulesError := cohereCommandWithExtraRules(options)
 	defer removeConfiguration()
-	if err != nil {
-		return Report{}, err
+	if cohereCommandWithExtraRulesError != nil {
+		return Report{}, cohereCommandWithExtraRulesError
 	}
 
-	verifyOutput, cohereErr := runGate(callerContext, cohereCommand)
-	if cohereErr != nil {
-		return Report{}, fmt.Errorf("running cohere: %w", cohereErr)
+	verifyOutput, cohereError := runGate(callerContext, cohereCommand)
+	if cohereError != nil {
+		return Report{}, fmt.Errorf("running cohere: %w", cohereError)
 	}
-	gateOutput, gateErr := runGate(callerContext, options.Gate)
-	if gateErr != nil {
-		return Report{}, fmt.Errorf("running the gate: %w", gateErr)
+	gateOutput, gateError := runGate(callerContext, options.Gate)
+	if gateError != nil {
+		return Report{}, fmt.Errorf("running the gate: %w", gateError)
 	}
 
-	cohereParsed, err := ParseCohere(verifyOutput, options.Root)
-	if err != nil {
-		return Report{}, fmt.Errorf("parsing cohere output: %w", err)
+	cohereParsed, parseCohereError := ParseCohere(verifyOutput, options.Root)
+	if parseCohereError != nil {
+		return Report{}, fmt.Errorf("parsing cohere output: %w", parseCohereError)
 	}
-	gateParsed, err := ParseGate(gateOutput, options.Root)
-	if err != nil {
-		return Report{}, fmt.Errorf("parsing gate output: %w", err)
+	gateParsed, parseGateError := ParseGate(gateOutput, options.Root)
+	if parseGateError != nil {
+		return Report{}, fmt.Errorf("parsing gate output: %w", parseGateError)
 	}
 
 	// An unparsed line is a finding the diff cannot see, so it is a hard failure rather than a
@@ -517,13 +517,13 @@ func cohereCoverageFrom(summaryLines []string) (int, int) {
 // The walk stops at root and never above it, so a control cannot cause a directory outside the
 // tree being linted to be removed. Ordered shallowest first; the caller unwinds in reverse.
 func missingDirectories(directory string, root string) ([]string, error) {
-	absoluteRoot, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
+	absoluteRoot, absolutePathError := filepath.Abs(root)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
-	absoluteDirectory, err := filepath.Abs(directory)
-	if err != nil {
-		return nil, err
+	absoluteDirectory, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 
 	var missing []string
@@ -567,9 +567,9 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	// them, and an unknown rule name makes oxlint refuse to start rather than skip the line. The
 	// two files split for that reason and this side must keep pointing at oxlint's.
 	configurationPath := filepath.Join(options.Root, ".oxlintrc.json")
-	existing, err := os.ReadFile(configurationPath)
-	if err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
+	existing, readError := os.ReadFile(configurationPath)
+	if readError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", readError)
 	}
 
 	var document map[string]any
@@ -595,9 +595,9 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	}
 	document["rules"] = rules
 
-	extended, err := json.Marshal(document)
-	if err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config: %w", err)
+	extended, encodeError := json.Marshal(document)
+	if encodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config: %w", encodeError)
 	}
 
 	// Beside the original, because the config's own directory is what relative ignore patterns and

@@ -192,7 +192,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 		Name    string
 		Fixture Fixture
 		Result  Result
-		Err     error
+		Error   error
 		Want    Verdict
 	}{
 		{
@@ -228,7 +228,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 		{
 			Name:    "not scored: the implementation declined",
 			Fixture: globalsFixture,
-			Err:     &ErrUnsupported{Reason: "no rule engine was run"},
+			Error:   &ErrUnsupported{Reason: "no rule engine was run"},
 			Want:    VerdictNotScored,
 		},
 		{
@@ -285,7 +285,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 	} {
 		test.Run(testCase.Name, func(test *testing.T) {
 			test.Parallel()
-			got := Classify(testCase.Fixture, testCase.Result, testCase.Err)
+			got := Classify(testCase.Fixture, testCase.Result, testCase.Error)
 			if got.Verdict != testCase.Want {
 				test.Errorf("classified as %q, want %q (reason: %s)", got.Verdict, testCase.Want, got.Reason)
 			}

@@ -100,9 +100,9 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 
 	test.Run("a passing ExpectFindings writes one record of the finding", func(test *testing.T) {
 		test.Parallel()
-		records, output, err := run(test, "Findings", true)
-		if err != nil {
-			test.Fatalf("the helper failed: %v\n%s", err, output)
+		records, output, runError := run(test, "Findings", true)
+		if runError != nil {
+			test.Fatalf("the helper failed: %v\n%s", runError, output)
 		}
 		if len(records) != 1 {
 			test.Fatalf("%d records, want 1: %+v", len(records), records)
@@ -130,9 +130,9 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 
 	test.Run("a passing ExpectClean writes a Clean record", func(test *testing.T) {
 		test.Parallel()
-		records, output, err := run(test, "Clean", true)
-		if err != nil {
-			test.Fatalf("the helper failed: %v\n%s", err, output)
+		records, output, runError := run(test, "Clean", true)
+		if runError != nil {
+			test.Fatalf("the helper failed: %v\n%s", runError, output)
 		}
 		if len(records) != 1 || records[0].Outcome != capture.OutcomeClean || len(records[0].Findings) != 0 {
 			test.Errorf("records %+v", records)
@@ -141,8 +141,8 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 
 	test.Run("a failing ExpectFixedSource writes nothing", func(test *testing.T) {
 		test.Parallel()
-		records, output, err := run(test, "FixedMismatch", true)
-		if err == nil {
+		records, output, runError := run(test, "FixedMismatch", true)
+		if runError == nil {
 			test.Fatalf("the helper passed, so the mismatch was never asserted:\n%s", output)
 		}
 		if len(records) != 0 {
@@ -152,9 +152,9 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 
 	test.Run("with capture off nothing is written", func(test *testing.T) {
 		test.Parallel()
-		records, output, err := run(test, "Findings", false)
-		if err != nil {
-			test.Fatalf("the helper failed: %v\n%s", err, output)
+		records, output, runError := run(test, "Findings", false)
+		if runError != nil {
+			test.Fatalf("the helper failed: %v\n%s", runError, output)
 		}
 		if len(records) != 0 {
 			test.Errorf("capture off recorded %+v", records)

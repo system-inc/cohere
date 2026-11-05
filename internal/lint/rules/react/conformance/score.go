@@ -184,8 +184,8 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 // asUnsupported reports whether an *ErrUnsupported is in the chain err unwraps to.
 //
 // Mutates: target receives the *ErrUnsupported found, as errors.As fills its target
-func asUnsupported(err error, target **ErrUnsupported) bool {
-	current := err
+func asUnsupported(candidateError error, target **ErrUnsupported) bool {
+	current := candidateError
 	for current != nil {
 		if unsupported, ok := current.(*ErrUnsupported); ok {
 			*target = unsupported

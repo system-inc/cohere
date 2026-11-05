@@ -631,16 +631,16 @@ func verifyTypeSubstitutions(
 		}
 
 		for _, argument := range probeArguments {
-			upstreamInstance, err := instantiate(upstreamType, argument)
-			if err != nil {
+			upstreamInstance, instantiateError := instantiate(upstreamType, argument)
+			if instantiateError != nil {
 				continue
 			}
-			standInInstance, err := instantiate(standInType, argument)
-			if err != nil {
+			standInInstance, instantiateError := instantiate(standInType, argument)
+			if instantiateError != nil {
 				problems = append(problems, fmt.Sprintf(
 					"substitution %q -> %q: the stand-in could not be instantiated at %s while the "+
 						"upstream type could, so their shapes differ: %v",
-					upstreamName, standInName, argument, err))
+					upstreamName, standInName, argument, instantiateError))
 				break
 			}
 
@@ -699,8 +699,8 @@ func typeCheckExtraDeclarations(
 	}
 
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
-	if err != nil {
+	parsed, parseFileError := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
+	if parseFileError != nil {
 		return nil
 	}
 	configuration := types.Config{
@@ -715,8 +715,8 @@ func typeCheckExtraDeclarations(
 		// unused-import complaint would be noise rather than a layout problem.
 		DisableUnusedImportCheck: true,
 	}
-	checked, err := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
-	if err != nil {
+	checked, checkError := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
+	if checkError != nil {
 		return nil
 	}
 	return checked.Scope()

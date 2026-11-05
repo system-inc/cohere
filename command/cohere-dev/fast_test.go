@@ -38,13 +38,13 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 			"CI is set: this measures the desk machine's CPU budget for the edit loop, which a runner's CPU says nothing about, so it runs on the desk",
 		)
 	}
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	packages, err := modulePackagesIn(root, os.Environ())
-	if err != nil {
-		test.Fatal(err)
+	packages, modulePackagesInError := modulePackagesIn(root, os.Environ())
+	if modulePackagesInError != nil {
+		test.Fatal(modulePackagesInError)
 	}
 	for _, entry := range landingGateOnly {
 		// Not parallel: each entry's measurement would compete with the others' for the cores.
@@ -176,9 +176,9 @@ func TestAnInnerRunInheritsTheOuterDeadline(test *testing.T) {
 // given is the one go list reads.
 func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	environment := []string{}
 	for _, variable := range os.Environ() {
@@ -186,12 +186,12 @@ func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 			environment = append(environment, variable)
 		}
 	}
-	_, err = modulePackagesIn(root, append(environment, "GOFLAGS=-not-a-go-flag"))
-	if err == nil {
+	_, modulePackagesInError := modulePackagesIn(root, append(environment, "GOFLAGS=-not-a-go-flag"))
+	if modulePackagesInError == nil {
 		test.Fatal("go list succeeded with a go flag it does not know, so it did not run in the environment given")
 	}
-	if !strings.Contains(err.Error(), "not-a-go-flag") {
-		test.Errorf("the failed listing says %q, want go's own reason, which names the flag", err)
+	if !strings.Contains(modulePackagesInError.Error(), "not-a-go-flag") {
+		test.Errorf("the failed listing says %q, want go's own reason, which names the flag", modulePackagesInError)
 	}
 }
 

@@ -91,15 +91,15 @@ func TestAFixtureHasOneRootWhateverWasBuiltBeforeIt(test *testing.T) {
 	withProgramCacheCapacity(test, 1)
 
 	files := map[string]string{"bound.ts": "export const planted100 = 100;\n"}
-	firstGraph, first, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		test.Fatal(err)
+	firstGraph, first, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatal(buildCachedProgramError)
 	}
 	cachedFixture(test, 101)
 	builds := programCacheBuilds
-	secondGraph, second, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		test.Fatal(err)
+	secondGraph, second, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatal(buildCachedProgramError)
 	}
 
 	// The second ask must be a real build, or the two roots agree because one entry answered both.

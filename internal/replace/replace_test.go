@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var errHeld = errors.New("the destination is held open")
+var errorHeld = errors.New("the destination is held open")
 
 // A rename refused while the destination is held succeeds once it is let go, and one refused for any
 // other reason fails at once. Windows refuses the way the fake below does; nothing else does.
@@ -18,13 +18,13 @@ func TestARenameRefusedWhileHeldIsRetriedUntilItIsLetGo(test *testing.T) {
 	rename := func(string, string) error {
 		if refusals > 0 {
 			refusals--
-			return errHeld
+			return errorHeld
 		}
 		return nil
 	}
 	slept := time.Duration(0)
 	sleep := func(pause time.Duration) { slept += pause }
-	held := func(err error) bool { return errors.Is(err, errHeld) }
+	held := func(candidateError error) bool { return errors.Is(candidateError, errorHeld) }
 
 	if replacingError := replacing(rename, held, sleep, "from", "to"); replacingError != nil {
 		test.Fatalf("a rename refused three times and then allowed failed: %v", replacingError)
@@ -55,9 +55,9 @@ func TestARenameRefusedWhileHeldIsRetriedUntilItIsLetGo(test *testing.T) {
 func TestARenameHeldForGoodFailsAfterTheBound(test *testing.T) {
 	test.Parallel()
 	slept := time.Duration(0)
-	replacingError := replacing(func(string, string) error { return errHeld }, func(error) bool { return true },
+	replacingError := replacing(func(string, string) error { return errorHeld }, func(error) bool { return true },
 		func(pause time.Duration) { slept += pause }, "from", "to")
-	if !errors.Is(replacingError, errHeld) {
+	if !errors.Is(replacingError, errorHeld) {
 		test.Fatalf("a held destination did not fail with its refusal: %v", replacingError)
 	}
 	if slept < retryBound || slept > retryBound+200*time.Millisecond {

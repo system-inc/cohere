@@ -185,13 +185,13 @@ func enumerate(packageRoot, corpusPath string, maximumClassLists int) ([]byte, e
 	arguments := []string{script, packageRoot}
 
 	if corpusPath != "" {
-		entries, err := readCorpus(corpusPath, maximumClassLists)
-		if err != nil {
-			return nil, err
+		entries, readCorpusError := readCorpus(corpusPath, maximumClassLists)
+		if readCorpusError != nil {
+			return nil, readCorpusError
 		}
-		harvested, err := json.Marshal(entries)
-		if err != nil {
-			return nil, fmt.Errorf("marshal harvested corpus: %w", err)
+		harvested, encodeError := json.Marshal(entries)
+		if encodeError != nil {
+			return nil, fmt.Errorf("marshal harvested corpus: %w", encodeError)
 		}
 		// Written beside the script rather than passed as an argument, because a repository's
 		// harvested class lists run to megabytes and an argv that size is a portability question
@@ -234,13 +234,13 @@ func readCorpus(corpusPath string, maximumClassLists int) ([]corpusEntry, error)
 			continue
 		}
 		// A corpus spelling such as "ahra:" names a private checkout, found the way the tests find it.
-		sourceRoot, err := corpus.Locate(entries[index].SourceRoot)
-		if err != nil {
-			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, err)
+		sourceRoot, locateError := corpus.Locate(entries[index].SourceRoot)
+		if locateError != nil {
+			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, locateError)
 		}
-		classLists, err := harvestClassLists(sourceRoot, maximumClassLists)
-		if err != nil {
-			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, err)
+		classLists, harvestClassListsError := harvestClassLists(sourceRoot, maximumClassLists)
+		if harvestClassListsError != nil {
+			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, harvestClassListsError)
 		}
 		entries[index].ClassLists = classLists
 	}
@@ -269,8 +269,8 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 	seen := map[string]bool{}
 	var keys []string
 
-	walkError := filepath.WalkDir(sourceRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
+	walkError := filepath.WalkDir(sourceRoot, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
 			// A tree this large has directories the walker cannot enter, and none of them hold
 			// class literals. Failing the whole harvest on one of them would make the fixture
 			// depend on the permissions of a directory it does not read.

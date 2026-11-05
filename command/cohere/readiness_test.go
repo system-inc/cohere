@@ -126,16 +126,16 @@ func TestTheFooterAndTheSummarySayReadiness(test *testing.T) {
 
 	// --json carries adamic only under --adamic-readiness (#9tgm3dq), and then always: a run that asked and did
 	// not lint says why.
-	unasked, err := json.Marshal(summaryAsJSON(runSummary{Total: time.Second}))
-	if err != nil {
-		test.Fatal(err)
+	unasked, encodeError := json.Marshal(summaryAsJSON(runSummary{Total: time.Second}))
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	if strings.Contains(string(unasked), `"adamic"`) {
 		test.Errorf("a run that did not ask for readiness carries adamic in its summary: %s", unasked)
 	}
-	asked, err := json.Marshal(summaryAsJSON(runSummary{Total: time.Second, AdamicRequested: true}))
-	if err != nil {
-		test.Fatal(err)
+	asked, encodeError := json.Marshal(summaryAsJSON(runSummary{Total: time.Second, AdamicRequested: true}))
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	if !strings.Contains(string(asked), `"adamic":{"measured":false,"reason":"lint did not run"`) {
 		test.Errorf("a run that asked and did not lint has no not-measured adamic object in its summary: %s", asked)

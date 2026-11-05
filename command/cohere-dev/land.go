@@ -40,18 +40,24 @@ func land(arguments []string) int {
 		)
 		return 2
 	}
-	worktree, err := gitOutput("", "rev-parse", "--show-toplevel")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: land runs inside the worktree to land: %v\n", err)
+	worktree, gitOutputError := gitOutput("", "rev-parse", "--show-toplevel")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: land runs inside the worktree to land: %v\n", gitOutputError)
 		return 2
 	}
 	// Tracked changes would be left behind by a landing of commits. Untracked files are the worktree's own.
 	// Submodules are checked apart (checkSubmodules): most worktrees are made with TypeScript a symlink to
 	// another checkout's, and git status refuses that outright, which used to read here as a dirty tree
 	// with no change named. A git that fails says so, as itself.
-	changes, err := gitOutput(worktree, "status", "--porcelain", "--untracked-files=no", "--ignore-submodules=all")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's status: %v\n", worktree, err)
+	changes, gitOutputError := gitOutput(
+		worktree,
+		"status",
+		"--porcelain",
+		"--untracked-files=no",
+		"--ignore-submodules=all",
+	)
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's status: %v\n", worktree, gitOutputError)
 		return 1
 	}
 	if changes != "" {
@@ -71,9 +77,9 @@ func land(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return 2
 	}
-	mainCheckout, err := checkoutOfMain(worktree)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	mainCheckout, checkoutOfMainError := checkoutOfMain(worktree)
+	if checkoutOfMainError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkoutOfMainError)
 		return 1
 	}
 	if mainCheckout == worktree {
@@ -84,22 +90,22 @@ func land(arguments []string) int {
 		return 2
 	}
 
-	directory, err := landDirectory()
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	directory, landDirectoryError := landDirectory()
+	if landDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landDirectoryError)
 		return 1
 	}
 	// Ignored: head only names the landing in the line a waiter reads; what lands is read again after the
 	// merge, and a head that can't be read stops the landing there.
 	head, _ := gitOutput(worktree, "rev-parse", "--short", "HEAD")
-	held, err := waitInLine(directory, 1, "landing "+head+" from "+worktree, "land lock", func() {
+	held, waitInLineError := waitInLine(directory, 1, "landing "+head+" from "+worktree, "land lock", func() {
 		fmt.Fprintln(
 			streams.Errors,
 			"cohere-dev: waiting to land; one landing runs at a time, merge to fast-forward, and this one holds it:",
 		)
 	})
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	if waitInLineError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitInLineError)
 		return 1
 	}
 	defer held.release()
@@ -209,18 +215,18 @@ func checkSubmodules(worktree string) error {
 		)
 		// An empty directory is a submodule never checked out, and git run in it answers for the repository
 		// around it, so its top level has to be the submodule's own path, symlinks resolved.
-		top, err := gitOutput(directory, "rev-parse", "--show-toplevel")
-		if err != nil {
+		top, gitOutputError := gitOutput(directory, "rev-parse", "--show-toplevel")
+		if gitOutputError != nil {
 			return notCheckedOut
 		}
-		resolvedTop, topErr := filepath.EvalSymlinks(top)
-		resolvedDirectory, directoryErr := filepath.EvalSymlinks(directory)
-		if topErr != nil || directoryErr != nil || resolvedTop != resolvedDirectory {
+		resolvedTop, topError := filepath.EvalSymlinks(top)
+		resolvedDirectory, directoryError := filepath.EvalSymlinks(directory)
+		if topError != nil || directoryError != nil || resolvedTop != resolvedDirectory {
 			return notCheckedOut
 		}
-		head, err := gitOutput(directory, "rev-parse", "HEAD")
-		if err != nil {
-			return fmt.Errorf("reading %s's head: %w", directory, err)
+		head, gitOutputError := gitOutput(directory, "rev-parse", "HEAD")
+		if gitOutputError != nil {
+			return fmt.Errorf("reading %s's head: %w", directory, gitOutputError)
 		}
 		if head != pin {
 			return fmt.Errorf("%s's %s is at %s, and the tree being landed pins %s, so the gate would build against "+
@@ -241,21 +247,21 @@ const gitlinkMode = "160000"
 // test run took in its packages, which panic under -trimpath. No gate failed, since each tests a disk where the
 // symlink resolves, so this reads the commit, never the disk, and runs before the tests, in seconds.
 func checkGitlinks(repository string, commit string) error {
-	resolved, err := gitOutput(repository, "rev-parse", "--verify", commit+"^{commit}")
-	if err != nil {
-		return fmt.Errorf("reading the commit %s to check its submodules: %w", commit, err)
+	resolved, gitOutputError := gitOutput(repository, "rev-parse", "--verify", commit+"^{commit}")
+	if gitOutputError != nil {
+		return fmt.Errorf("reading the commit %s to check its submodules: %w", commit, gitOutputError)
 	}
-	declared, err := gitOutput(repository, "ls-tree", resolved, "--", ".gitmodules")
-	if err != nil {
-		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), err)
+	declared, gitOutputError := gitOutput(repository, "ls-tree", resolved, "--", ".gitmodules")
+	if gitOutputError != nil {
+		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), gitOutputError)
 	}
 	if declared == "" {
 		return nil
 	}
 	// -z, so a path is read whole: each setting is its key, a newline, and its value.
-	settings, err := gitOutput(repository, "config", "--blob", resolved+":.gitmodules", "--list", "-z")
-	if err != nil {
-		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), err)
+	settings, gitOutputError := gitOutput(repository, "config", "--blob", resolved+":.gitmodules", "--list", "-z")
+	if gitOutputError != nil {
+		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), gitOutputError)
 	}
 	for _, setting := range strings.Split(settings, "\x00") {
 		key, path, found := strings.Cut(setting, "\n")
@@ -531,12 +537,12 @@ func gateEnvironment(budget []string) []string {
 	return environment
 }
 
-func exitCodeOf(err error) int {
+func exitCodeOf(runError error) int {
 	var exited *exec.ExitError
-	if errors.As(err, &exited) {
+	if errors.As(runError, &exited) {
 		return exited.ExitCode()
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", runError)
 	return 1
 }
 

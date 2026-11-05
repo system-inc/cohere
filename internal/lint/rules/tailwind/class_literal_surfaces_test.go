@@ -45,9 +45,9 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 			if testCase.raw != "" {
 				raw = []byte(testCase.raw)
 			}
-			decoded, err := decode(raw, testCase.base)
-			if err != nil {
-				test.Fatalf("%s, %s: %v", ruleName, testCase.name, err)
+			decoded, decodeError := decode(raw, testCase.base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s: %v", ruleName, testCase.name, decodeError)
 			}
 			if surfaces := surfacesOf(test, decoded); surfaces != testCase.want {
 				test.Errorf("%s, %s: decoded to surfaces of their own rather than the ones their settings "+

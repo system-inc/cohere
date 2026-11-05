@@ -128,9 +128,9 @@ func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
 // which is what parity, coverage and selector validation read. Resolve answers per file from the
 // variant that file gets.
 func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Config, error) {
-	root, err := filepath.Abs(filepath.Dir(path))
-	if err != nil {
-		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
+	root, absolutePathError := filepath.Abs(filepath.Dir(path))
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
 	var ownLayers []configLayer
 	if _, err := os.Stat(path); err == nil {
@@ -141,9 +141,15 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 
 	tailwind := detection.TailwindEntryPoint != ""
-	whole, err := loadHouseVariant(ownLayers, root, registeredNames, houseVariant{react: true, next: true}, true)
-	if err != nil {
-		return nil, err
+	whole, loadHouseVariantError := loadHouseVariant(
+		ownLayers,
+		root,
+		registeredNames,
+		houseVariant{react: true, next: true},
+		true,
+	)
+	if loadHouseVariantError != nil {
+		return nil, loadHouseVariantError
 	}
 	house := &houseSets{
 		detection:    detection,

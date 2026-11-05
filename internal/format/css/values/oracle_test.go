@@ -273,9 +273,9 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == ".next") {
 				return filepath.SkipDir
@@ -283,9 +283,9 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			if entry.IsDir() || filepath.Ext(path) != ".css" {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -439,17 +439,17 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 	}
 }
 
-func asError(err error, target **Error) bool {
-	for err != nil {
-		if thrown, isThrown := err.(*Error); isThrown {
+func asError(dumpValuesError error, target **Error) bool {
+	for dumpValuesError != nil {
+		if thrown, isThrown := dumpValuesError.(*Error); isThrown {
 			*target = thrown
 			return true
 		}
-		unwrapper, isUnwrapper := err.(interface{ Unwrap() error })
+		unwrapper, isUnwrapper := dumpValuesError.(interface{ Unwrap() error })
 		if !isUnwrapper {
 			return false
 		}
-		err = unwrapper.Unwrap()
+		dumpValuesError = unwrapper.Unwrap()
 	}
 	return false
 }
@@ -457,18 +457,18 @@ func asError(err error, target **Error) bool {
 // dumpValues parses one value and renders it the way the oracle script does, through JSON, with
 // sourceIndex converted back to UTF-16.
 func dumpValues(text string, options Options) (any, error) {
-	tree, err := Parse(text, options)
-	if err != nil {
-		return nil, err
+	tree, parseError := Parse(text, options)
+	if parseError != nil {
+		return nil, parseError
 	}
 	toUTF16 := utf16IndexOf(text)
-	encoded, err := json.Marshal(dumpValuesValue(tree, toUTF16))
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(dumpValuesValue(tree, toUTF16))
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 func dumpValuesValue(value any, toUTF16 func(int) int) any {

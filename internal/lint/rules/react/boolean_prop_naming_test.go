@@ -1238,7 +1238,7 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 		wantPropTypeNames []string
 		wantNested        bool
 		wantMessage       string
-		wantErr           bool
+		wantError         bool
 	}{
 		{
 			// Empty input is a rule configured as a bare `"error"`. The decoder refuses it, which
@@ -1246,7 +1246,7 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 			// decoder errors. A decoder returning defaults here would make the flag inert and the
 			// rule would run tree-wide on a configuration upstream treats as off.
 			name: "empty input is refused, which is what makes RequiresOptions work",
-			raw:  "", wantErr: true,
+			raw:  "", wantError: true,
 		},
 		{
 			name: "empty object resolves to the documented defaults",
@@ -1285,15 +1285,15 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 			raw:  `{"rule": "^(?=is[A-Z])"}`, wantRule: "^(?=is[A-Z])",
 			wantPropTypeNames: []string{"bool"},
 		},
-		{name: "an uncompilable pattern is an error", raw: `{"rule": "^(["}`, wantErr: true},
-		{name: "a wrong type is an error", raw: `{"validateNested": "yes"}`, wantErr: true},
+		{name: "an uncompilable pattern is an error", raw: `{"rule": "^(["}`, wantError: true},
+		{name: "a wrong type is an error", raw: `{"validateNested": "yes"}`, wantError: true},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeBooleanPropertyNamingOptionsError := DecodeBooleanPropNamingOptions([]byte(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeBooleanPropertyNamingOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}

@@ -217,9 +217,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
-	decoded, err := DecodeNoUnstableNestedComponentsOptions(nil)
-	if err != nil {
-		test.Fatalf("decoding empty input: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(nil)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding empty input: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok := decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {
@@ -233,9 +233,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	}
 
 	// An explicit pattern replaces the default.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
-	if err != nil {
-		test.Fatalf("decoding a pattern: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":"*Renderer"}`),
+	)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding a pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok = decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {
@@ -247,9 +249,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
-	if err != nil {
-		test.Fatalf("decoding an empty pattern: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":""}`),
+	)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding an empty pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok = decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {

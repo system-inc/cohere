@@ -77,13 +77,13 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(test *testing.T) {
 		}
 	}
 
-	resolving, err := NewResolving(root)
-	if err != nil {
-		test.Fatal(err)
+	resolving, newResolvingError := NewResolving(root)
+	if newResolvingError != nil {
+		test.Fatal(newResolvingError)
 	}
-	enumeration, err := resolving.Enumerate(root)
-	if err != nil {
-		test.Fatal(err)
+	enumeration, enumerateError := resolving.Enumerate(root)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
 	}
 	if len(enumeration.Files) != 1 || filepath.Base(enumeration.Files[0]) != "kept.offeredprobe" {
 		test.Fatalf("offered %v, want only kept.offeredprobe", enumeration.Files)

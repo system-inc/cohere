@@ -200,14 +200,14 @@ func Compare(
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			oracle, err := newOracle()
-			if err != nil {
-				errs <- fmt.Errorf("building the oracle: %w", err)
+			oracle, newOracleError := newOracle()
+			if newOracleError != nil {
+				errs <- fmt.Errorf("building the oracle: %w", newOracleError)
 				return
 			}
-			candidate, err := newCandidate()
-			if err != nil {
-				errs <- fmt.Errorf("building the candidate: %w", err)
+			candidate, newCandidateError := newCandidate()
+			if newCandidateError != nil {
+				errs <- fmt.Errorf("building the candidate: %w", newCandidateError)
 				return
 			}
 			for index := range indexes {
@@ -265,18 +265,18 @@ func Compare(
 func compareOne(path string, oracle Formatter, candidate Formatter, cache *OracleCache) FileResult {
 	result := FileResult{Path: path, Language: Language(path)}
 
-	source, err := os.ReadFile(path)
-	if err != nil {
+	source, readError := os.ReadFile(path)
+	if readError != nil {
 		result.Outcome = OracleFailed
-		result.Detail = "reading the file: " + err.Error()
+		result.Detail = "reading the file: " + readError.Error()
 		return result
 	}
 	text := string(source)
 
-	expected, err := cache.format(oracle, path, text)
-	if err != nil {
+	expected, formatError := cache.format(oracle, path, text)
+	if formatError != nil {
 		result.Outcome = OracleFailed
-		result.Detail = err.Error()
+		result.Detail = formatError.Error()
 		return result
 	}
 	result.OracleRewrites = expected != text
@@ -286,10 +286,10 @@ func compareOne(path string, oracle Formatter, candidate Formatter, cache *Oracl
 		result.Detail = "the candidate does not handle this file type"
 		return result
 	}
-	actual, err := candidate.Format(path, text)
-	if err != nil {
+	actual, formatError := candidate.Format(path, text)
+	if formatError != nil {
 		result.Outcome = CandidateRefused
-		result.Detail = err.Error()
+		result.Detail = formatError.Error()
 		return result
 	}
 

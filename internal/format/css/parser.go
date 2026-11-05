@@ -203,8 +203,8 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 					parse = parseScss
 				}
 				nestedOptions := *options
-				ast, err := parse(fakeContent, &nestedOptions)
-				if err != nil {
+				ast, parseError := parse(fakeContent, &nestedOptions)
+				if parseError != nil {
 					// noop
 					ast = nil
 				}
@@ -442,12 +442,12 @@ func parseWithParser(
 	frontMatter, textToParse := parseFrontMatter(text)
 
 	// Prevent file access https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
-	result, err := parse(textToParse)
-	if err != nil {
+	result, parseError := parse(textToParse)
+	if parseError != nil {
 		// Upstream rethrows a CssSyntaxError as createError(`${name}: ${reason}`, {loc}); postcss.Parse
 		// and postcss.ParseSCSS have already marked it printing.Syntax, with its name, reason, line and
 		// column.
-		return nil, err
+		return nil, parseError
 	}
 
 	options.originalText = text
@@ -481,21 +481,21 @@ func parseCatching(
 	parse func(string) (*estree.Node, error),
 	text string,
 	options *parseOptions,
-) (root *estree.Node, err error) {
+) (root *estree.Node, parseCatchingError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			root = nil
 			if thrown, isThrown := recovered.(javaScriptError); isThrown {
-				err = errors.New(thrown.message)
+				parseCatchingError = errors.New(thrown.message)
 				return
 			}
-			err = fmt.Errorf("css parse: %v", recovered)
+			parseCatchingError = fmt.Errorf("css parse: %v", recovered)
 		}
 	}()
 
-	root, err = parseWithParser(parse, text, options)
-	if err != nil {
-		return nil, err
+	root, parseCatchingError = parseWithParser(parse, text, options)
+	if parseCatchingError != nil {
+		return nil, parseCatchingError
 	}
 	setRanges(root)
 	return root, nil

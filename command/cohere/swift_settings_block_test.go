@@ -22,7 +22,10 @@ const swiftOnlySettings = "{ \"swift\": { \"rules\": { \"cohere-swift/file-lengt
 func loggingSwiftEngine(test *testing.T) (string, string) {
 	test.Helper()
 	log := filepath.Join(test.TempDir(), "arguments")
-	return fakeSwiftEngine(test, "echo \"$@\" >> '"+log+"'\ncat "+filepath.Join(contractDirectory(test), "Clean.jsonl")), log
+	return fakeSwiftEngine(
+		test,
+		"echo \"$@\" >> '"+log+"'\ncat "+filepath.Join(contractDirectory(test), "Clean.jsonl"),
+	), log
 }
 
 func readLog(test *testing.T, log string) string {
@@ -50,7 +53,10 @@ func TestASwiftPackageWhoseSettingsHoldOnlyASwiftBlockRuns(test *testing.T) {
 	if exitCode != 0 || strings.Contains(output, "does not implement") {
 		test.Fatalf("a package whose settings hold only a swift block did not run (exit %d):\n%s", exitCode, output)
 	}
-	if arguments := readLog(test, log); !strings.Contains(arguments, "--root ") || !strings.Contains(arguments, filepath.Base(root)) {
+	if arguments := readLog(
+		test,
+		log,
+	); !strings.Contains(arguments, "--root ") || !strings.Contains(arguments, filepath.Base(root)) {
 		test.Fatalf("the engine was not handed the package; it was given:\n%s\noutput:\n%s", arguments, output)
 	}
 }
@@ -66,8 +72,14 @@ func TestATypeScriptProgramAndASwiftPackageShareOneSettingsFile(test *testing.T)
 		"CohereSettings.json": "{ \"rules\": {}, \"swift\": { \"rules\": { \"cohere-swift/file-length\": \"error\" } } }\n",
 	})
 	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
-	if exitCode != 0 || !strings.Contains(output, "== . (TypeScript) ==") || !strings.Contains(output, "== . (Swift) ==") {
-		test.Fatalf("a shared settings file with a swift block did not let both engines run (exit %d):\n%s", exitCode, output)
+	if exitCode != 0 ||
+		!strings.Contains(output, "== . (TypeScript) ==") ||
+		!strings.Contains(output, "== . (Swift) ==") {
+		test.Fatalf(
+			"a shared settings file with a swift block did not let both engines run (exit %d):\n%s",
+			exitCode,
+			output,
+		)
 	}
 	if !strings.Contains(readLog(test, log), "--root ") {
 		test.Fatalf("the engine was not handed the package:\n%s", output)
@@ -91,18 +103,35 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 	})
 	for _, arguments := range [][]string{{"--no-fix"}, {"--no-fix", "--directory", typeScriptOnly}} {
 		output, exitCode := runWithEngine(test, binary, engine, typeScriptOnly, arguments...)
-		if exitCode == 0 || !strings.Contains(output, `CohereSettings.json declares "swift"`) || !strings.Contains(output, "holds no Swift project") {
-			test.Errorf("a swift block beside only a tsconfig was not refused by name, run with %v (exit %d):\n%s", arguments, exitCode, output)
+		if exitCode == 0 ||
+			!strings.Contains(output, `CohereSettings.json declares "swift"`) ||
+			!strings.Contains(output, "holds no Swift project") {
+			test.Errorf(
+				"a swift block beside only a tsconfig was not refused by name, run with %v (exit %d):\n%s",
+				arguments,
+				exitCode,
+				output,
+			)
 		}
 	}
 
 	// The block at the repository's root, the package below it: the package's run reads the settings beside
 	// its own Package.swift, so nothing reads the root's. Only discovery reads that file this side of the engine.
 	packageBelow := newRepository(test, map[string]string{"CohereSettings.json": swiftOnlySettings})
-	writeTree(test, filepath.Join(packageBelow, "apple", "Toy"), map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"})
+	writeTree(
+		test,
+		filepath.Join(packageBelow, "apple", "Toy"),
+		map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"},
+	)
 	output, exitCode := runWithEngine(test, binary, engine, packageBelow, "--no-fix")
-	if exitCode == 0 || !strings.Contains(output, `CohereSettings.json declares "swift"`) || !strings.Contains(output, "holds no Swift project") {
-		test.Errorf("a swift block at the root above the package was not refused by name (exit %d):\n%s", exitCode, output)
+	if exitCode == 0 ||
+		!strings.Contains(output, `CohereSettings.json declares "swift"`) ||
+		!strings.Contains(output, "holds no Swift project") {
+		test.Errorf(
+			"a swift block at the root above the package was not refused by name (exit %d):\n%s",
+			exitCode,
+			output,
+		)
 	}
 
 	inBase := newRepository(test, map[string]string{
@@ -130,11 +159,22 @@ func TestANamedSettingsFileAwayFromTheSwiftProjectIsNotRefused(test *testing.T) 
 	writeTree(test, filepath.Join(root, "settings"), map[string]string{
 		"Shared.json": "{ \"rules\": {}, \"swift\": { \"rules\": { \"cohere-swift/file-length\": \"error\" } } }\n",
 	})
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix", "--lint-config", filepath.Join(root, "settings", "Shared.json"))
+	output, exitCode := runWithEngine(
+		test,
+		binary,
+		engine,
+		root,
+		"--no-fix",
+		"--lint-config",
+		filepath.Join(root, "settings", "Shared.json"),
+	)
 	if exitCode != 0 || !strings.Contains(output, "apple/Toy (Swift): green") {
 		test.Fatalf("a named settings file with a swift block was refused (exit %d):\n%s", exitCode, output)
 	}
-	if arguments := readLog(test, log); !strings.Contains(arguments, "--lint-config "+filepath.Join(root, "settings", "Shared.json")) {
+	if arguments := readLog(
+		test,
+		log,
+	); !strings.Contains(arguments, "--lint-config "+filepath.Join(root, "settings", "Shared.json")) {
 		test.Fatalf("the engine was not handed the named file; it was given:\n%s", arguments)
 	}
 }

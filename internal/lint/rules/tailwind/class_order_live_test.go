@@ -151,7 +151,7 @@ func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[stri
 		packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 		if packageRoot == "" {
 			systems[list.entryPath] = DesignSystemResult{
-				Err: fmt.Errorf("no installed tailwindcss beside %s", entryPoint),
+				Error: fmt.Errorf("no installed tailwindcss beside %s", entryPoint),
 			}
 			continue
 		}
@@ -160,7 +160,7 @@ func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[stri
 			TailwindPackageRoot: packageRoot,
 		})
 		if loadDesignSystemError != nil {
-			systems[list.entryPath] = DesignSystemResult{Err: loadDesignSystemError}
+			systems[list.entryPath] = DesignSystemResult{Error: loadDesignSystemError}
 			continue
 		}
 		systems[list.entryPath] = DesignSystemResult{
@@ -209,7 +209,7 @@ func classOrderLiveMeasure(
 	measurement := classOrderLiveMeasurement{}
 	for _, list := range lists {
 		designSystem, hasSystem := systems[list.systemKey()]
-		if !hasSystem || designSystem.Err != nil {
+		if !hasSystem || designSystem.Error != nil {
 			continue
 		}
 
@@ -680,7 +680,7 @@ func TestClassOrderLiveDeclinesNoList(test *testing.T) {
 	declined := map[string]string{}
 	for _, list := range lists {
 		designSystem, hasSystem := systems[list.entryPath]
-		if !hasSystem || designSystem.Err != nil {
+		if !hasSystem || designSystem.Error != nil {
 			continue
 		}
 		_, placeable := partitionUnranked(classOrderLiveReversed(list.sorted), designSystem)

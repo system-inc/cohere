@@ -25,13 +25,13 @@ func TestAnAdamicFileFormatsAsTypeScript(test *testing.T) {
 		test.Fatal("no printer is registered for .a")
 	}
 	for _, source := range adamicSources {
-		asTypeScript, err := formatter.Format("/repo/Dog.ts", source)
-		if err != nil {
-			test.Fatalf("as .ts: %v", err)
+		asTypeScript, formatError := formatter.Format("/repo/Dog.ts", source)
+		if formatError != nil {
+			test.Fatalf("as .ts: %v", formatError)
 		}
-		asAdamic, err := formatter.Format("/repo/Dog.a", source)
-		if err != nil {
-			test.Fatalf("as .a: %v", err)
+		asAdamic, formatError := formatter.Format("/repo/Dog.a", source)
+		if formatError != nil {
+			test.Fatalf("as .a: %v", formatError)
 		}
 		if asAdamic != asTypeScript {
 			test.Errorf("%q formats as .a to\n%s\nand as .ts to\n%s", source, asAdamic, asTypeScript)

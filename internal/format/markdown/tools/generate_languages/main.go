@@ -68,9 +68,9 @@ type language struct {
 }
 
 func generate() ([]byte, error) {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
@@ -81,7 +81,7 @@ func generate() ([]byte, error) {
 
 	// inferParser: options.plugins.toReversed().flatMap((plugin) => plugin.languages ?? []), and a
 	// language answers with parsers[0].
-	value, err := runtime.RunString(`
+	value, runStringError := runtime.RunString(`
 		JSON.stringify(
 			Object.values(prettierPlugins)
 				.toReversed()
@@ -94,8 +94,8 @@ func generate() ([]byte, error) {
 				})),
 		)
 	`)
-	if err != nil {
-		return nil, err
+	if runStringError != nil {
+		return nil, runStringError
 	}
 	var languages []language
 	if decodeError := json.Unmarshal([]byte(value.String()), &languages); decodeError != nil {

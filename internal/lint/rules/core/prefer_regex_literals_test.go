@@ -1445,9 +1445,9 @@ func runPreferRegexLiterals(test *testing.T, row preferRegexLiteralsRow) rule_te
 	// so the wire shape and the json tag are under test too. cohere's config layer unwraps the
 	// `[severity, options]` tuple before dispatch, so the decoder receives the bare object even
 	// though upstream's corpus writes it inside an array.
-	decoded, err := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()([]byte(row.options))
-	if err != nil {
-		test.Fatalf("decoding options %s: %v", row.options, err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()([]byte(row.options))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding options %s: %v", row.options, decodeOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, PreferRegexLiterals, preferRegexLiteralsFile, row.source, decoded)
 }

@@ -55,10 +55,10 @@ exit 0
 		return string(output), outputError
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
-	if output, err := land(); err == nil ||
+	if output, landError := land(); landError == nil ||
 		!strings.Contains(output, "planted-rule 501ms > 500ms") ||
 		strings.Contains(output, "landed ") {
-		test.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
+		test.Fatalf("over-budget land was not refused (%v):\n%s", landError, output)
 	}
 	commands, readError := os.ReadFile(log)
 	if readError != nil {
@@ -80,10 +80,10 @@ exit 0
 	if writeError := os.WriteFile(marker, nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if output, err := land(); err != nil ||
+	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "rule CPU budget passed") ||
 		!strings.Contains(output, "landed ") {
-		test.Fatalf("under-budget land did not land (%v):\n%s", err, output)
+		test.Fatalf("under-budget land did not land (%v):\n%s", landError, output)
 	}
 }
 

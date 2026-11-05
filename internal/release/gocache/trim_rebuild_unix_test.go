@@ -61,13 +61,13 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	entries := func() map[string]uint64 {
 		test.Helper()
 		found := map[string]uint64{}
-		filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
-			if err != nil || entry.IsDir() || !(strings.HasSuffix(path, "-a") || strings.HasSuffix(path, "-d")) {
-				return err
+		filepath.WalkDir(cache, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil || entry.IsDir() || !(strings.HasSuffix(path, "-a") || strings.HasSuffix(path, "-d")) {
+				return pathError
 			}
-			information, err := os.Stat(path)
-			if err != nil {
-				return err
+			information, statError := os.Stat(path)
+			if statError != nil {
+				return statError
 			}
 			found[path] = inode(information)
 			return nil

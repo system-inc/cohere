@@ -638,21 +638,21 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 		seen[root] = true
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			test.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			test.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", root, len(enumeration.Files)))
 		for _, file := range enumeration.Files {

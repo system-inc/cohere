@@ -103,16 +103,16 @@ func runRenameVerb(arguments []string) error {
 		)
 	}
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   *configurationFileName,
 		CurrentDirectory: *directory,
 		SingleThreaded:   *singleThreaded,
 	})
-	if err != nil {
+	if buildError != nil {
 		// A program that fails to build is a loud failure and never an empty result, for the same
 		// reason the main pipeline says so: an empty file list is indistinguishable from a tree with
 		// nothing to rename.
-		return fmt.Errorf("building the type graph: %w", err)
+		return fmt.Errorf("building the type graph: %w", buildError)
 	}
 
 	backgroundContext := context.Background()
@@ -152,9 +152,9 @@ func runRenameVerb(arguments []string) error {
 		}
 	}
 
-	plan, err := rename.Build(backgroundContext, graph, position, newName)
-	if err != nil {
-		return err
+	plan, buildError := rename.Build(backgroundContext, graph, position, newName)
+	if buildError != nil {
+		return buildError
 	}
 
 	if len(plan.Refusals) > 0 {
@@ -172,9 +172,9 @@ func runRenameVerb(arguments []string) error {
 	rename.Write(streams.Output, plan, true)
 	streams.Show(streams.Output)
 
-	written, err := rename.Apply(plan)
-	if err != nil {
-		return fmt.Errorf("applying the rename: %w", err)
+	written, applyError := rename.Apply(plan)
+	if applyError != nil {
+		return fmt.Errorf("applying the rename: %w", applyError)
 	}
 	fmt.Fprintf(streams.Output, "\nwrote %d files.\n", written)
 	return nil

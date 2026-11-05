@@ -25,13 +25,13 @@ type noInferrableTypesCase struct {
 func runNoInferrableTypes(test *testing.T, testCase noInferrableTypesCase) rule_testing.Result {
 	test.Helper()
 
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoInferrableTypesOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoInferrableTypesOptionsError := DecodeNoInferrableTypesOptions(encoded)
+	if decodeNoInferrableTypesOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoInferrableTypesOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoInferrableTypes, noInferrableTypesFile,
 		testCase.sourceText, decoded)

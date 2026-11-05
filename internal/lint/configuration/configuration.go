@@ -369,14 +369,14 @@ func Load(path string) (*Config, error) {
 // LoadFor is Load knowing the registered rule names, so a key spelled differently from the one it
 // inherits is matched to it by the rules the two actually reach rather than by the shape of the names.
 func LoadFor(path string, registeredNames []string) (*Config, error) {
-	root, err := filepath.Abs(filepath.Dir(path))
-	if err != nil {
-		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
+	root, absolutePathError := filepath.Abs(filepath.Dir(path))
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
 
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	return loadLayers(layers, root, registeredNames)
 }
@@ -721,7 +721,11 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 	for key := range keyed {
 		present[key] = true
 	}
-	if checkSwiftBlockPlacementError := checkSwiftBlockPlacement(absolute, chain, present); checkSwiftBlockPlacementError != nil {
+	if checkSwiftBlockPlacementError := checkSwiftBlockPlacement(
+		absolute,
+		chain,
+		present,
+	); checkSwiftBlockPlacementError != nil {
 		return nil, checkSwiftBlockPlacementError
 	}
 

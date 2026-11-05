@@ -129,9 +129,9 @@ func TestPlantingRefusesToOverwriteAnExistingFile(test *testing.T) {
 	if plantControlsError == nil {
 		test.Fatal("planting over an existing file must be refused")
 	}
-	contents, readErr := os.ReadFile(existing)
-	if readErr != nil {
-		test.Fatal(readErr)
+	contents, readError := os.ReadFile(existing)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(contents) != "export const mine = 1;\n" {
 		test.Fatalf("the existing file was modified: %q", contents)
@@ -150,18 +150,18 @@ func TestPlantedControlsAreWrittenThenRemoved(test *testing.T) {
 		ExpectedSide: SideCohere,
 	}
 
-	planted, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
-	if err != nil {
-		test.Fatal(err)
+	planted, cleanup, plantControlsError := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	if plantControlsError != nil {
+		test.Fatal(plantControlsError)
 	}
 	if len(planted) != 1 {
 		test.Fatalf("expected one planted control, got %d", len(planted))
 	}
 
 	absolutePath := filepath.Join(root, control.RelativePath)
-	contents, err := os.ReadFile(absolutePath)
-	if err != nil {
-		test.Fatalf("the control was not written where the gates would lint it: %v", err)
+	contents, readError := os.ReadFile(absolutePath)
+	if readError != nil {
+		test.Fatalf("the control was not written where the gates would lint it: %v", readError)
 	}
 	if string(contents) != control.Contents {
 		test.Fatalf("the control's contents did not survive planting: %q", contents)
@@ -367,17 +367,17 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(test *testing.T) {
 // one side makes every finding on the other look one-sided while the report stays well-formed.
 func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(test *testing.T) {
 	test.Parallel()
-	_, err := runGate(context.Background(), GateCommand{
+	_, runGateError := runGate(context.Background(), GateCommand{
 		Name:      "crashes",
 		Program:   "/bin/sh",
 		Arguments: []string{"-c", "echo 'cannot find module oxlint' >&2; exit 1"},
 		Directory: test.TempDir(),
 	})
-	if err == nil {
+	if runGateError == nil {
 		test.Fatal("a gate that exited non-zero having printed no findings must be an error, not an empty result")
 	}
-	if !strings.Contains(err.Error(), "failed rather than found nothing") {
-		test.Fatalf("the error must say the gate broke rather than came back clean, got %v", err)
+	if !strings.Contains(runGateError.Error(), "failed rather than found nothing") {
+		test.Fatalf("the error must say the gate broke rather than came back clean, got %v", runGateError)
 	}
 
 	// The gate's own explanation has to reach the reader. Diagnosing this from an exit code alone
@@ -388,19 +388,19 @@ func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(test *testing.T) {
 	// surface the text and a mutation removing the capture stays green here. Verified by probing
 	// both forms rather than assumed. The assertion is still worth keeping, because what has to
 	// hold is that the text reaches the reader, not which mechanism delivered it.
-	if !strings.Contains(err.Error(), "cannot find module oxlint") {
-		test.Fatalf("the gate's stderr must be surfaced, got %v", err)
+	if !strings.Contains(runGateError.Error(), "cannot find module oxlint") {
+		test.Fatalf("the gate's stderr must be surfaced, got %v", runGateError)
 	}
 
 	// The control: the same non-zero exit WITH findings on stdout is normal and must still pass.
-	output, err := runGate(context.Background(), GateCommand{
+	output, runGateError := runGate(context.Background(), GateCommand{
 		Name:      "finds-something",
 		Program:   "/bin/sh",
 		Arguments: []string{"-c", "echo 'a.ts:1:1: error nexus(consistency-no-enum): found'; exit 1"},
 		Directory: test.TempDir(),
 	})
-	if err != nil {
-		test.Fatalf("a gate with findings exits non-zero and must not be an error: %v", err)
+	if runGateError != nil {
+		test.Fatalf("a gate with findings exits non-zero and must not be an error: %v", runGateError)
 	}
 	if !strings.Contains(output, "consistency-no-enum") {
 		test.Fatalf("the findings must survive, got %q", output)

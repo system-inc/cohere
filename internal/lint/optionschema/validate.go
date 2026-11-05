@@ -36,9 +36,9 @@ type file struct {
 }
 
 var (
-	loadOnce sync.Once
-	loaded   file
-	loadErr  error
+	loadOnce  sync.Once
+	loaded    file
+	loadError error
 
 	compiledMutex sync.Mutex
 	compiled      = map[string]*Schema{}
@@ -46,9 +46,9 @@ var (
 
 func load() (file, error) {
 	loadOnce.Do(func() {
-		loadErr = json.Unmarshal(schemasFile, &loaded)
+		loadError = json.Unmarshal(schemasFile, &loaded)
 	})
-	return loaded, loadErr
+	return loaded, loadError
 }
 
 // GeneratedFrom is the version of every package the embedded schemas were read from.
@@ -75,9 +75,9 @@ func RuleNames() []string {
 // For returns the compiled schema for a rule, or nil and false when upstream has none for it: either the
 // rule is not a port, or its upstream opts out of validation with `schema: false`.
 func For(ruleName string) (*Schema, bool, error) {
-	schemas, err := load()
-	if err != nil {
-		return nil, false, fmt.Errorf("reading the embedded option schemas: %w", err)
+	schemas, loadError := load()
+	if loadError != nil {
+		return nil, false, fmt.Errorf("reading the embedded option schemas: %w", loadError)
 	}
 	raw, present := schemas.Rules[ruleName]
 	// Go whitespace: raw JSON bytes of an embedded schema, whose whitespace is the same in both sets.
@@ -90,9 +90,9 @@ func For(ruleName string) (*Schema, bool, error) {
 	if schema, done := compiled[ruleName]; done {
 		return schema, true, nil
 	}
-	schema, err := Compile(raw)
-	if err != nil {
-		return nil, false, fmt.Errorf("compiling %s's upstream option schema: %w", ruleName, err)
+	schema, compileError := Compile(raw)
+	if compileError != nil {
+		return nil, false, fmt.Errorf("compiling %s's upstream option schema: %w", ruleName, compileError)
 	}
 	compiled[ruleName] = schema
 	return schema, true, nil
@@ -311,13 +311,16 @@ func (compiler *compiler) keyword(compiled *node, key string, value any, pointer
 		}
 		sort.Strings(sources)
 		for _, source := range sources {
-			pattern, compileErr := esregexp.Compile(source, "")
-			if compileErr != nil {
-				return compileErr
+			pattern, compileError := esregexp.Compile(source, "")
+			if compileError != nil {
+				return compileError
 			}
-			schema, compileErr := compiler.compile(entries[source], pointer+"/patternProperties/"+escapePointer(source))
-			if compileErr != nil {
-				return compileErr
+			schema, compileError := compiler.compile(
+				entries[source],
+				pointer+"/patternProperties/"+escapePointer(source),
+			)
+			if compileError != nil {
+				return compileError
 			}
 			compiled.patternProperties = append(
 				compiled.patternProperties,

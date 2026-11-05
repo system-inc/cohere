@@ -464,9 +464,9 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(test *testing.T) {
 	test.Parallel()
 	declared := test.TempDir()
 	project(test, declared, `{"tabWidth": 4, "ignore": ["pnpm-lock.yaml", "*.sqlite"]}`)
-	resolution, err := Resolve(declared)
-	if err != nil {
-		test.Fatal(err)
+	resolution, resolveError := Resolve(declared)
+	if resolveError != nil {
+		test.Fatal(resolveError)
 	}
 	if !resolution.HouseIgnoreDeclared ||
 		strings.Join(resolution.HouseIgnore, ",") != "pnpm-lock.yaml,*.sqlite" ||
@@ -477,9 +477,9 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(test *testing.T) {
 	// An outsider's block without the key keeps the house list, cohere:typescript's.
 	undeclared := test.TempDir()
 	project(test, undeclared, `{"tabWidth": 4}`)
-	house, err := houseResolution()
-	if err != nil {
-		test.Fatal(err)
+	house, houseResolutionError := houseResolution()
+	if houseResolutionError != nil {
+		test.Fatal(houseResolutionError)
 	}
 	if resolution, resolveError := Resolve(undeclared); resolveError != nil ||
 		!resolution.HouseIgnoreDeclared ||
@@ -604,8 +604,8 @@ func TestAResolverAnswersAsResolveDidOnOurTrees(test *testing.T) {
 			test.Parallel()
 			resolver := NewResolver()
 			directories, refusals := 0, 0
-			walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-				if err != nil || !entry.IsDir() {
+			walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+				if pathError != nil || !entry.IsDir() {
 					return nil
 				}
 				if skipped[entry.Name()] {

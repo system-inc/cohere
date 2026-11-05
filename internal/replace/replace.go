@@ -33,9 +33,9 @@ func replacing(
 	pause := 5 * time.Millisecond
 	waited := time.Duration(0)
 	for {
-		err := rename(from, to)
-		if err == nil || !retryable(err) || waited >= retryBound {
-			return err
+		renameError := rename(from, to)
+		if renameError == nil || !retryable(renameError) || waited >= retryBound {
+			return renameError
 		}
 		sleep(pause)
 		waited += pause

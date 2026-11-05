@@ -114,9 +114,9 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			// Ignored: a killed writer's Wait reports the kill, which is what the test did on purpose.
 			writer.Wait()
 
-			read, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
-			if err != nil {
-				test.Fatalf("the table is unreadable after the writer died before a rename: %v", err)
+			read, readCacheTableError := ReadCacheTable(directory, identity, sections, PathAnchor{})
+			if readCacheTableError != nil {
+				test.Fatalf("the table is unreadable after the writer died before a rename: %v", readCacheTableError)
 			}
 			wantRun, wantFindings := "old", "/old.ts"
 			if stopAt == 2 {
@@ -144,11 +144,11 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			); writeCacheTableError != nil {
 				test.Fatalf("the write after the kill failed: %v", writeCacheTableError)
 			}
-			rebuilt, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
-			if err != nil ||
+			rebuilt, readCacheTableError := ReadCacheTable(directory, identity, sections, PathAnchor{})
+			if readCacheTableError != nil ||
 				string(rebuilt.Runs["--no-fix"].Output) != "rebuilt" ||
 				rebuilt.Findings.Entries[0].Path != "/rebuilt.ts" {
-				test.Errorf("the table after the rebuild is not the rebuilt one: %v", err)
+				test.Errorf("the table after the rebuild is not the rebuilt one: %v", readCacheTableError)
 			}
 		})
 	}

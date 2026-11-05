@@ -245,13 +245,13 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	// file no longer formats with, it says nothing and the drift is reported.
 	thing := filepath.Join(library, "source", "Thing.ts")
 	contents := readForTest(test, thing)
-	options, err := engine.OptionsFingerprint(thing)
-	if err != nil {
-		test.Fatal(err)
+	options, optionsFingerprintError := engine.OptionsFingerprint(thing)
+	if optionsFingerprintError != nil {
+		test.Fatal(optionsFingerprintError)
 	}
-	key, err := formatRecordKey(library)
-	if err != nil {
-		test.Fatal(err)
+	key, formatRecordKeyError := formatRecordKey(library)
+	if formatRecordKeyError != nil {
+		test.Fatal(formatRecordKeyError)
 	}
 	vouch := func(key string, options string) {
 		test.Helper()
@@ -272,9 +272,9 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	// `--format-all` reads every nested file: an entry vouching for Thing.ts's misformatted bytes, under
 	// this formatter's key and options, says nothing to it.
 	vouch(key, options)
-	all, err := checkNestedRepositories(engine, root, true)
-	if err != nil {
-		test.Fatal(err)
+	all, checkNestedRepositoriesError := checkNestedRepositories(engine, root, true)
+	if checkNestedRepositoriesError != nil {
+		test.Fatal(checkNestedRepositoriesError)
 	}
 	if all.Checked != 4 || len(all.Drift) != 2 {
 		test.Fatalf(
