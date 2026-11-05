@@ -1,6 +1,7 @@
 package unused_exports
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -42,8 +43,12 @@ func Run(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, dee
 // with no denominator cannot be told apart from a broken probe. A report saying "0 unused" over a
 // tree of 3,400 files is far more likely to be a broken analysis than a clean codebase, and the
 // only thing that separates those two readings is the denominator printed beside the zero.
-func Write(out io.Writer, report *Report, showIntentional bool) {
-	fmt.Fprintf(out, "\nunused: a report, not a gate — nothing here fails a build\n")
+//
+// A bufio.Writer keeps the first failed write's error and hands it back from Flush, so the one check at the end
+// catches a report that never reached out, whichever section failed.
+func Write(out io.Writer, report *Report, showIntentional bool) error {
+	writer := bufio.NewWriter(out)
+	fmt.Fprintf(writer, "\nunused: a report, not a gate — nothing here fails a build\n")
 
 	intentionalFiles := 0
 	for _, file := range report.Files {
@@ -58,14 +63,14 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 		}
 	}
 
-	writeIslandSection(out, report, showIntentional)
-	writeFileSection(out, report, showIntentional, intentionalFiles)
-	writeExportSection(out, report, showIntentional, intentionalExports)
-	writeUnreachableSection(out, report)
+	writeIslandSection(writer, report, showIntentional)
+	writeFileSection(writer, report, showIntentional, intentionalFiles)
+	writeExportSection(writer, report, showIntentional, intentionalExports)
+	writeUnreachableSection(writer, report)
 
 	// The coverage line, in the same spirit as the lint phase's. It states what was looked at, not
 	// only what was found, so a run that analyzed nothing cannot read like a run that found nothing.
-	fmt.Fprintf(out,
+	fmt.Fprintf(writer,
 		"  looked at %d files (%d spared by a framework or dynamic-load convention) and %d exported declarations\n",
 		report.FilesAnalyzed, report.RootedFiles, report.ExportsAnalyzed,
 	)
@@ -80,11 +85,15 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 		// were byte-identical at 1042 clusters and 2051 declarations every time. The set is the
 		// result; the depth is a liveness signal about the traversal, and saying so stops a reader
 		// from reading a moving number as an unstable analysis.
-		fmt.Fprintf(out,
+		fmt.Fprintf(writer,
 			"  the closure walked %d declarations and reached a depth of at least %d\n",
 			report.DeclarationsAnalyzed, report.ClosurePasses,
 		)
 	}
+	if flushError := writer.Flush(); flushError != nil {
+		return fmt.Errorf("writing the unused report: %w", flushError)
+	}
+	return nil
 }
 
 // writeIslandSection prints the clusters, largest first.
@@ -93,7 +102,7 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 // the table only that helper read as three unrelated lines in three places, and the reader has to
 // reassemble them. Printing them as one block with a size is what turns the report from a list into
 // the "oh hey, this was written and never got used" it exists to produce.
-func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
+func writeIslandSection(out *bufio.Writer, report *Report, showIntentional bool) {
 	if len(report.Islands) == 0 {
 		return
 	}
@@ -160,7 +169,7 @@ func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
 	}
 }
 
-func writeFileSection(out io.Writer, report *Report, showIntentional bool, intentional int) {
+func writeFileSection(out *bufio.Writer, report *Report, showIntentional bool, intentional int) {
 	if len(report.Files) == 0 {
 		return
 	}
@@ -181,7 +190,7 @@ func writeFileSection(out io.Writer, report *Report, showIntentional bool, inten
 	}
 }
 
-func writeExportSection(out io.Writer, report *Report, showIntentional bool, intentional int) {
+func writeExportSection(out *bufio.Writer, report *Report, showIntentional bool, intentional int) {
 	if len(report.Unreferenced) == 0 {
 		return
 	}
@@ -202,7 +211,7 @@ func writeExportSection(out io.Writer, report *Report, showIntentional bool, int
 	}
 }
 
-func writeUnreachableSection(out io.Writer, report *Report) {
+func writeUnreachableSection(out *bufio.Writer, report *Report) {
 	if len(report.Unreachable) == 0 {
 		return
 	}

@@ -1536,7 +1536,9 @@ func run() error {
 		}
 		unusedDuration := time.Since(unusedStart)
 
-		unused_exports.Write(streams.Output, unusedResult, *unusedAll)
+		if writeError := unused_exports.Write(streams.Output, unusedResult, *unusedAll); writeError != nil {
+			return writeError
+		}
 
 		// Deliberately not added to `findings`. The exit code is the gate's verdict, and this phase
 		// is not part of the gate: an export held for an external consumer is unused and correct, so
