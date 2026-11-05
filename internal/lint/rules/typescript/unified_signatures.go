@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -912,11 +913,19 @@ func (checker *unifiedSignaturesChecker) unionMemberText(node *ast.Node) string 
 // past any line comment after it: `/** a */ // b` before a signature is documented by `a`. A scan back from
 // the signature that stopped at the first comment it met missed that one, so the ranges are read forwards
 // and the last block comment kept.
+//
+// The scanner's leading ranges alone are not that trivia. At any position but 0 they start after the first
+// newline, leaving what precedes it to the previous token as its trailing comment, so in
+// `f(a: string): void; /** b */` then `f(a: number): void;` on the next line the second overload read as
+// undocumented. `GetCommentsInRange` reads the trailing ranges up to that newline and then the leading
+// ones, which is every comment between the previous token and the signature, as upstream's lookup is. At
+// position 0 both reads start at the file's beginning and a first-line comment comes twice, which cannot
+// change which block comment is last.
 func (checker *unifiedSignaturesChecker) blockCommentFor(signature *ast.Node) string {
 	sourceText := checker.ctx.SourceFile.Text()
-	var factory ast.NodeFactory
+	trivia := shimcore.NewTextRange(signature.Pos(), rule.TokenRange(checker.ctx.SourceFile, signature).Pos())
 	text := ""
-	for commentRange := range scanner.GetLeadingCommentRanges(&factory, sourceText, signature.Pos()) {
+	for commentRange := range type_checking.GetCommentsInRange(checker.ctx.SourceFile, trivia) {
 		if commentRange.Kind == ast.KindMultiLineCommentTrivia {
 			text = sourceText[commentRange.Pos()+len("/*") : commentRange.End()-len("*/")]
 		}
