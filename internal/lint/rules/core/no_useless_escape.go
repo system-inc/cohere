@@ -409,6 +409,8 @@ func uselessPatternEscapes(pattern string, flags regexsyntax.RegexFlags) []int {
 // ask where this escape sits relative to *its own* class's brackets. Under the `v` flag classes
 // nest, and the innermost is the one that answers: in `/[[\.&]--[\.&]]/v` each dot sits at the start
 // of an inner class, not of the outer one.
+//
+// Mutates: offsets the walk appends every useless escape it finds, so one slice gathers every nested class
 func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classSpan, offsets *[]int) {
 	end := len(pattern)
 	start := 0

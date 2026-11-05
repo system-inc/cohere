@@ -175,6 +175,9 @@ type preferArrowCallbackWalker struct {
 	frames   []*preferArrowCallbackFrame
 }
 
+// walk visits a node and records on owner, the nearest enclosing function's frame, what the node uses.
+//
+// Mutates: owner the frame is the walk's record of its function, which judge reads once the body is walked
 func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallbackFrame) {
 	if node == nil {
 		return

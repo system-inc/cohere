@@ -123,55 +123,56 @@ var ValidTypeof = rule.Rule{
 // literal against the eight strings, then the global undefined, then, under requireStringLiterals,
 // anything that is not itself a typeof.
 func reportUnreachableTypeofComparison(ruleContext rule.Context, operand *ast.Node, settings ValidTypeofOptions) {
-	operand = unwrapParentheses(operand)
-	if operand == nil {
+	unwrapped := unwrapParentheses(operand)
+	if unwrapped == nil {
 		return
 	}
 
-	switch operand.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		// A template with no substitutions is a string literal wearing backticks, and the same
 		// typo is just as dead in that spelling.
-		if !typeofResults[operand.Text()] {
-			ruleContext.ReportNode(operand, messageInvalidTypeofValue(operand.Text()))
+		if !typeofResults[unwrapped.Text()] {
+			ruleContext.ReportNode(unwrapped, messageInvalidTypeofValue(unwrapped.Text()))
 		}
 		return
 
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindRegularExpressionLiteral,
 		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		// The rest of ESTree's Literal: no string, so no result of typeof equals it.
-		ruleContext.ReportNode(operand, messageInvalidTypeofNonString(ruleContext.NodeText(operand)))
+		ruleContext.ReportNode(unwrapped, messageInvalidTypeofNonString(ruleContext.NodeText(unwrapped)))
 		return
 
 	case ast.KindIdentifier:
-		if operand.Text() == "undefined" && !identifierIsShadowed(ruleContext, operand) {
+		if unwrapped.Text() == "undefined" && !identifierIsShadowed(ruleContext, unwrapped) {
 			message := messageInvalidTypeofNonString("undefined")
 			if settings.RequireStringLiterals {
 				message = messageTypeofNotString
 			}
-			ruleContext.ReportNodeWithSuggestions(operand, message, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(unwrapped, message, rule.Suggestion{
 				Message: messageSuggestTypeofString,
-				Fixes:   []rule.Fix{ruleContext.ReplaceNode(operand, `"undefined"`)},
+				Fixes:   []rule.Fix{ruleContext.ReplaceNode(unwrapped, `"undefined"`)},
 			})
 			return
 		}
 	}
 
-	if settings.RequireStringLiterals && operand.Kind != ast.KindTypeOfExpression {
-		ruleContext.ReportNode(operand, messageTypeofNotString)
+	if settings.RequireStringLiterals && unwrapped.Kind != ast.KindTypeOfExpression {
+		ruleContext.ReportNode(unwrapped, messageTypeofNotString)
 	}
 }
 
 // isTypeofExpression reports a typeof operator, looking through parentheses.
 func isTypeofExpression(node *ast.Node) bool {
-	node = unwrapParentheses(node)
-	return node != nil && node.Kind == ast.KindTypeOfExpression
+	unwrapped := unwrapParentheses(node)
+	return unwrapped != nil && unwrapped.Kind == ast.KindTypeOfExpression
 }
 
 // unwrapParentheses peels grouping, which changes nothing about what an expression is.
 func unwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }

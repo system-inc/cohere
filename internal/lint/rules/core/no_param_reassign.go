@@ -202,6 +202,8 @@ var NoParamReassign = rule.Rule{
 // through rest elements: `function foo([, {bar}])` binds only `bar`, and `function foo({a, ...rest})`
 // binds both. A default value inside the pattern is an expression rather than a binding and is not
 // collected, which is what keeps `function foo({a = b})` from anchoring on `b`.
+//
+// Mutates: into the walk records every binding it finds, so one map gathers a whole parameter list
 func collectParameterBindings(name *ast.Node, into map[*ast.Node]string) {
 	if name == nil {
 		return

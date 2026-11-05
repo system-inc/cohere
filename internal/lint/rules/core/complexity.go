@@ -36,6 +36,13 @@ func DefaultComplexitySettings() ComplexitySettings {
 	return ComplexitySettings{Maximum: 20, Variant: ComplexityClassic}
 }
 
+// complexityNeverReports is the threshold that reproduces upstream's `undefined`.
+//
+// A complexity is a count of syntactic constructs in one function, so it cannot approach this. Using
+// a sentinel rather than a flag keeps the comparison in one place; see the decoder for why the
+// `{"maximum": 0}` shape needs it at all.
+const complexityNeverReports = int(^uint(0) >> 1)
+
 // DecodeComplexityOptions reads the threshold and variant off the config.
 //
 // Hand rolled because upstream's schema is a `oneOf`: a bare integer, or an object carrying
@@ -97,13 +104,6 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 	}
 	return settings, nil
 }
-
-// complexityNeverReports is the threshold that reproduces upstream's `undefined`.
-//
-// A complexity is a count of syntactic constructs in one function, so it cannot approach this. Using
-// a sentinel rather than a flag keeps the comparison in one place; see the decoder for why the
-// `{"maximum": 0}` shape needs it at all.
-const complexityNeverReports = int(^uint(0) >> 1)
 
 // complexitySettingsFrom recovers the settings from whatever the config layer handed over.
 func complexitySettingsFrom(options any) ComplexitySettings {

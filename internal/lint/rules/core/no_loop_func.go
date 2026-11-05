@@ -207,6 +207,8 @@ var NoLoopFunc = rule.Rule{
 }
 
 // checkLoopFunc judges one function, which sits in loopNode.
+//
+// Mutates: skippedImmediatelyInvoked the set is shared across the file, so a skip here is seen by later judgements
 func checkLoopFunc(
 	ruleContext rule.Context,
 	node *ast.Node,
@@ -325,6 +327,17 @@ func loopFuncTopLoop(loopNode *ast.Node, excluded *ast.Node, skippedImmediatelyI
 	}
 	return result
 }
+
+// loopFuncBindingKind is the three-way classification upstream reads off the declaration's kind.
+type loopFuncBinding int
+
+const (
+	// loopFuncBindingOther is `var`, a parameter, a function, a class, an import: anything whose
+	// binding is neither block-scoped-per-iteration nor immutable.
+	loopFuncBindingOther loopFuncBinding = iota
+	loopFuncBindingLet
+	loopFuncBindingConstant
+)
 
 // loopFuncReferenceIsSafe answers upstream's `isSafe` for one resolved binding.
 func loopFuncReferenceIsSafe(
@@ -448,17 +461,6 @@ func loopFuncDeclarationBinding(identifier *ast.Node) *ast.Node {
 	}
 	return nil
 }
-
-// loopFuncBindingKind is the three-way classification upstream reads off the declaration's kind.
-type loopFuncBinding int
-
-const (
-	// loopFuncBindingOther is `var`, a parameter, a function, a class, an import: anything whose
-	// binding is neither block-scoped-per-iteration nor immutable.
-	loopFuncBindingOther loopFuncBinding = iota
-	loopFuncBindingLet
-	loopFuncBindingConstant
-)
 
 // loopFuncBindingKindOf classifies a declaration node.
 //

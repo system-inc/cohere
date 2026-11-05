@@ -211,6 +211,8 @@ func blockScopedVarIsVarDeclaration(declaration *ast.Node) bool {
 // A declaration is usually one name, and can be a destructuring pattern introducing several:
 // `{ var { foo, bar } = baz; } bar;` is one of upstream's own reporting cases, so a port reading
 // only `declaration.Name()` as an identifier goes silent on it.
+//
+// Mutates: into the walk appends every name it finds, so one slice gathers a whole pattern
 func blockScopedVarCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
 	if name == nil {
 		return

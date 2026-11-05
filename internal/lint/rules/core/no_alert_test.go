@@ -290,7 +290,7 @@ func TestNoAlertNeedsTheTypedHarness(test *testing.T) {
 // lint, silently unchecked while the run still printed green and the node count sat a quarter of a
 // million nodes low.
 //
-// The two shapes that occur are `super(...)` and `import(...)` — call expressions whose callee is a
+// The two shapes that occur are `super(...)` and `import(...)`, call expressions whose callee is a
 // bare keyword. Every subclass constructor carries a `super()`, which is why this was not a rare edge.
 //
 // # What this test does and does not prove
