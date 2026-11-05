@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -114,9 +115,13 @@ func run(verb string, arguments []string) int {
 		return withToken(strings.Join(arguments, " "), func(environment []string) int {
 			return runCommand(environment, arguments[0], arguments[1:])
 		})
-	case "build", "vet":
-		return withToken("go "+verb+" "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, "go", append([]string{verb}, arguments...))
+	case "build":
+		return withToken("go build "+strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(environment, "go", append([]string{"build"}, arguments...))
+		})
+	case "vet":
+		return withToken("go vet "+strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, arguments...))
 		})
 	}
 
@@ -133,7 +138,7 @@ func run(verb string, arguments []string) int {
 			return 2
 		}
 		return withToken("go test --fast "+strings.Join(arguments, " "), func(environment []string) int {
-			return fastTest(environment, arguments)
+			return fastTest(withoutVCSStamping(environment), arguments)
 		})
 	}
 	if wholeModule(arguments) && countsOnce(arguments) {
@@ -151,8 +156,42 @@ func run(verb string, arguments []string) int {
 		arguments = expanded
 	}
 	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
-		return goTest(environment, arguments)
+		return goTest(withoutVCSStamping(environment), arguments)
 	})
+}
+
+// withoutVCSStamping adds -buildvcs=false to a test or vet run's GOFLAGS, unless the caller chose a -buildvcs
+// of their own. Most worktrees are made with TypeScript a symlink to another checkout's, git status refuses
+// that tree, and so every go build a test runs failed "error obtaining VCS status": four of
+// @system_cohere_go's Circles set it by hand on 2026-11-05. The landing gate has run with it since
+// 2026-10-06 (gateEnvironment), so no test needs the stamp.
+//
+// Not for build or exec: a binary someone keeps is read for its stamp. packaging's version.go prints its
+// commit and whether its tree was modified, and the bench record marks a run dirty from it, so a build
+// without the stamp would read as clean.
+func withoutVCSStamping(environment []string) []string {
+	stamped := make([]string, 0, len(environment)+1)
+	hasFlags := false
+	for _, variable := range environment {
+		value, isFlags := strings.CutPrefix(variable, "GOFLAGS=")
+		if !isFlags {
+			stamped = append(stamped, variable)
+			continue
+		}
+		hasFlags = true
+		chosen := slices.ContainsFunc(strings.Fields(value), func(flag string) bool {
+			return flag == "-buildvcs" || strings.HasPrefix(flag, "-buildvcs=")
+		})
+		if chosen {
+			stamped = append(stamped, variable)
+			continue
+		}
+		stamped = append(stamped, "GOFLAGS="+strings.TrimSpace(value+" -buildvcs=false"))
+	}
+	if !hasFlags {
+		stamped = append(stamped, "GOFLAGS=-buildvcs=false")
+	}
+	return stamped
 }
 
 // withEveryVetCheck runs every check go vet runs, the landing gate's set, in a test run's vet, unless the caller
