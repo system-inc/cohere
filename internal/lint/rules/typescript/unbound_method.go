@@ -487,6 +487,25 @@ func accessedPropertyNames(ruleContext rule.Context, node *ast.Node, property *a
 	return names
 }
 
+// supportedGlobalTypeNames is upstream's `SUPPORTED_GLOBAL_TYPES`.
+//
+// These are the type names, which differ from the value names above: the value `Number` has the type
+// `NumberConstructor`, while `Math` and `JSON` are their own type names.
+var supportedGlobalTypeNames = []string{
+	"NumberConstructor",
+	"ObjectConstructor",
+	"StringConstructor",
+	"SymbolConstructor",
+	"ArrayConstructor",
+	"Array",
+	"ProxyConstructor",
+	"Console",
+	"DateConstructor",
+	"Atomics",
+	"Math",
+	"JSON",
+}
+
 // isNativelyBoundMember is upstream's `isNativelyBound`.
 //
 // Two routes, and the first exists because the second is not enough. Upstream's comment says a
@@ -672,25 +691,6 @@ func isThisMemberAccess(node *ast.Node) bool {
 		return false
 	}
 	return node.AsPropertyAccessExpression().Expression.Kind == ast.KindThisKeyword
-}
-
-// supportedGlobalTypeNames is upstream's `SUPPORTED_GLOBAL_TYPES`.
-//
-// These are the type names, which differ from the value names above: the value `Number` has the type
-// `NumberConstructor`, while `Math` and `JSON` are their own type names.
-var supportedGlobalTypeNames = []string{
-	"NumberConstructor",
-	"ObjectConstructor",
-	"StringConstructor",
-	"SymbolConstructor",
-	"ArrayConstructor",
-	"Array",
-	"ProxyConstructor",
-	"Console",
-	"DateConstructor",
-	"Atomics",
-	"Math",
-	"JSON",
 }
 
 // checkUnboundDestructuringAssignment is the assignment half of upstream's `ObjectPattern` visitor.

@@ -76,7 +76,7 @@ func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
 
 // consistentGenericConstructorsOptionsFor maps upstream's wire spelling to the internal one, refusing
 // a spelling upstream's schema would refuse.
-func consistentGenericConstructorsOptionsFor(mode string) (any, error) {
+func consistentGenericConstructorsOptionsFor(mode string) (ConsistentGenericConstructorsOptions, error) {
 	switch mode {
 	case "constructor":
 		return ConsistentGenericConstructorsOptions{Mode: ConsistentGenericConstructorsConstructor}, nil

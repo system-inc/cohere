@@ -1494,8 +1494,8 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 
 // TestSwitchExhaustivenessCheckShipsNoRepairs pins the absence of fixes and suggestions.
 //
-// This is the one rule in the tsgolint family whose repair would write new code — adding a missing
-// `case` clause rather than deleting or rewriting an existing one — so the porting brief expected
+// This is the one rule in the tsgolint family whose repair would write new code (adding a missing
+// `case` clause rather than deleting or rewriting an existing one), so the porting brief expected
 // repairs here and warned that `rule_testing` applies fixes but not suggestions. It ships neither.
 // `buildAddMissingCasesMessage` is declared and never called, every one of upstream's expected
 // suggestion outputs is commented out under `TODO(port): add support for suggestions`, and
@@ -1504,7 +1504,7 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 // Asserted rather than assumed, because "no repairs" is the kind of claim that stays true by
 // accident until a sync makes it false. If a later tsgolint implements them, a rule that suddenly
 // rewrites source would otherwise land here unannounced, and the whole imported corpus above would
-// stay green while it did — every case in it asserts message ids only.
+// stay green while it did, since every case in it asserts message ids only.
 func TestSwitchExhaustivenessCheckShipsNoRepairs(test *testing.T) {
 	test.Parallel()
 
@@ -1617,7 +1617,7 @@ switch (literal) {
 // rule made the listener ours to edit and made the nil case reachable, so both halves are asserted.
 //
 // The vacuous direction is the dangerous one and it is worse for this rule than for its siblings.
-// Handed no checker the rule does not panic, it reports nothing — and forty-nine of the
+// Handed no checker the rule does not panic, it reports nothing, and forty-nine of the
 // ninety-seven imported cases in this file are clean cases, which would all still pass. Half the
 // suite would keep proving something and half would be proving nothing, which reads as a healthy
 // suite.

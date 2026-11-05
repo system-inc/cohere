@@ -198,12 +198,12 @@ func TestNoDuplicateEnumValuesComparesTheParsedValueNotTheSpelling(test *testing
 //
 // oxc compares `s.value`, the cooked text. Measured: `enum E { A = "aAb", B = 'aAb' }` reports
 // on the release binary, and its message renders the cooked `'aAb'`. A port comparing raw source
-// would be silent here. The escape is built rather than typed, so nothing on the path to this file
-// could cook it early.
+// would be silent here. The escape's backslash is doubled, so Go keeps the six characters `\u0041`
+// in the source text and nothing on the path to this file could cook it early.
 func TestNoDuplicateEnumValuesComparesTheCookedStringValue(test *testing.T) {
 	test.Parallel()
 
-	sourceText := "enum E { A = " + "\"a\\u0041b\"" + ", B = 'aAb' }\n"
+	sourceText := "enum E { A = \"a\\u0041b\", B = 'aAb' }\n"
 	rule_testing.ExpectFindings(test,
 		rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText),
 		"noDuplicateEnumValues")
@@ -247,7 +247,7 @@ func TestNoDuplicateEnumValuesDeclinesTheShapesUpstreamDoesNotMatch(test *testin
 		// in its *fail* vector, which is upstream saying it knows and has not fixed it.
 		{"a negated number", "enum E { A = -1, B = -1 }\n"},
 		// A substitution-free template is a separate node kind. Upstream marks this with a literal
-		// TODO above two commented-out fail cases; @typescript-eslint resolves it and oxc does not.
+		// `TODO` above two commented-out fail cases; @typescript-eslint resolves it and oxc does not.
 		{"a template literal", "enum E { A = 'A', B = `A` }\n"},
 		{"two template literals", "enum E { A = `A`, B = `A` }\n"},
 		// A BigInt is KindBigIntLiteral rather than KindNumericLiteral.

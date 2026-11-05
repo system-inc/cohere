@@ -67,6 +67,21 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 	return options, nil
 }
 
+var noExtraneousClassEmptyMessage = rule.Message{
+	Id:          "empty",
+	Description: "Unexpected empty class.",
+}
+
+var noExtraneousClassOnlyConstructorMessage = rule.Message{
+	Id:          "onlyConstructor",
+	Description: "Unexpected class with only a constructor.",
+}
+
+var noExtraneousClassOnlyStaticMessage = rule.Message{
+	Id:          "onlyStatic",
+	Description: "Unexpected class with only static properties.",
+}
+
 // NoExtraneousClass flags a class that exists only to be a namespace.
 //
 //	valid:   class Foo { public prop = 1; constructor() {} }
@@ -383,21 +398,6 @@ func noExtraneousClassIsConstructorSlot(ruleContext rule.Context, reference *ast
 		}
 	}
 	return false
-}
-
-var noExtraneousClassEmptyMessage = rule.Message{
-	Id:          "empty",
-	Description: "Unexpected empty class.",
-}
-
-var noExtraneousClassOnlyConstructorMessage = rule.Message{
-	Id:          "onlyConstructor",
-	Description: "Unexpected class with only a constructor.",
-}
-
-var noExtraneousClassOnlyStaticMessage = rule.Message{
-	Id:          "onlyStatic",
-	Description: "Unexpected class with only static properties.",
 }
 
 // classAnchorRange is the span upstream reports when a class has no name to report on.

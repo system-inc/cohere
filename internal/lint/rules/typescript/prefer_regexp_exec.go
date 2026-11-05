@@ -91,6 +91,18 @@ var PreferRegexpExec = rule.Rule{
 	},
 }
 
+// preferRegexpExecArgumentClass is upstream's `ArgumentType` bitset, reduced to the three answers
+// the switch below distinguishes.
+type preferRegexpExecArgumentClass int
+
+const (
+	// preferRegexpExecArgumentOther is upstream's `Other` and its `Both`: neither is reported,
+	// because a union of a string and a regex has no single correct repair.
+	preferRegexpExecArgumentOther preferRegexpExecArgumentClass = iota
+	preferRegexpExecArgumentString
+	preferRegexpExecArgumentRegExp
+)
+
 // checkPreferRegexpExec is upstream's `CallExpression[arguments.length=1] > MemberExpression`
 // listener.
 //
@@ -164,18 +176,6 @@ func checkPreferRegexpExec(ruleContext rule.Context, node *ast.Node) {
 			preferRegexpExecWrappingFixTwo(ruleContext, node, "RegExp(", argument, ").exec(", receiver, ")"))
 	}
 }
-
-// preferRegexpExecArgumentClass is upstream's `ArgumentType` bitset, reduced to the three answers
-// the switch below distinguishes.
-type preferRegexpExecArgumentClass int
-
-const (
-	// preferRegexpExecArgumentOther is upstream's `Other` and its `Both`: neither is reported,
-	// because a union of a string and a regex has no single correct repair.
-	preferRegexpExecArgumentOther preferRegexpExecArgumentClass = iota
-	preferRegexpExecArgumentString
-	preferRegexpExecArgumentRegExp
-)
 
 // preferRegexpExecArgumentKind classifies the argument's type across its union constituents.
 //

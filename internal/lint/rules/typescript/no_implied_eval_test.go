@@ -151,7 +151,7 @@ func TestNoImpliedEvalFires(test *testing.T) {
 // case, which the single-file harness cannot express.
 //
 // The case is `import { Function } from './class'; new Function('foo');`, and upstream's fixture
-// directory supplies `class.ts` containing `export class Function {}` — a file whose comments
+// directory supplies `class.ts` containing `export class Function {}`, a file whose comments
 // name this rule as the reason it exists. Dropped into `RunTyped` unchanged the import resolves
 // to nothing, `IsBuiltinSymbolLike` cannot rule the type out, and the case reports: it would have
 // sat in the clean list above asserting the exact opposite of upstream while passing.
@@ -422,7 +422,7 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T
 //
 // The direction that makes this worth a test is not a crash. `GetTypeAtLocation` and
 // `GetSymbolAtLocation` on this shim return nil rather than panicking, and `isFunction` treats a
-// type it cannot call as not a function — so a checker-less run of an unguarded listener would
+// type it cannot call as not a function, so a checker-less run of an unguarded listener would
 // report every one of the corpus's valid `setTimeout(fn, 0)` cases while the same-file filter let
 // each one through on a nil symbol. That is a vacuous red rather than a vacuous green, and it is
 // what the guard below prevents.

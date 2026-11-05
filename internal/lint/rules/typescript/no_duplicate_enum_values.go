@@ -45,9 +45,10 @@ var messageNoDuplicateEnumValues = rule.Message{
 //     not fixed it. Six more commented-out fail cases sit beside it, all of them signs or coercions.
 //     Reproduced as silence rather than improved on, and the corpus pins the observable half:
 //     `A = -0, B = +0` and `A = -+-0, B = +-+0` are both shipped passing cases.
-//   - A template literal is a different node even with no substitution. `A = 'A', B = `+"`A`"+` is
-//     silent, and upstream marks that with a literal `TODO: Fix the following cases where there is a
-//     raw template literal` above two commented-out fail cases. `@typescript-eslint` **does** resolve
+//   - A template literal is a different node even with no substitution. `A = 'A'` beside a `B` set
+//     to the same text as a template literal is silent, and upstream marks that with a literal
+//     `TODO: Fix the following cases where there is a raw template literal` above two commented-out
+//     fail cases. `@typescript-eslint` **does** resolve
 //     a substitution-free template, so this is a real behavioral difference between the two
 //     upstreams and oxc's answer is the one that ships here.
 //   - A BigInt is `KindBigIntLiteral`, a separate kind, so `A = 1n, B = 1n` is silent in both tools.

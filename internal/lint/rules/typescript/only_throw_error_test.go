@@ -530,7 +530,11 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("false is distinguishable from absent", func(test *testing.T) {
 		test.Parallel()
-		decoded, _ := DecodeOnlyThrowErrorOptions(json.RawMessage(`{"allowThrowingAny": false}`))
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allowThrowingAny": false}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
 		options, isType := decoded.(OnlyThrowErrorOptions)
 		if !isType {
 			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)

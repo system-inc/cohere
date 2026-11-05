@@ -160,7 +160,8 @@ func templatePartsOf(ruleContext rule.Context, node *ast.Node, isType bool) (hea
 
 	previous := head
 	for _, span := range spans {
-		var interpolation, literal *ast.Node
+		var interpolation *ast.Node
+		var literal *ast.Node
 		if isType {
 			typeSpan := span.AsTemplateLiteralTypeSpan()
 			interpolation, literal = typeSpan.Type, typeSpan.Literal

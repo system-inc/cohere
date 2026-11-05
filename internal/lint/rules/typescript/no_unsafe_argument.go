@@ -27,7 +27,7 @@ import (
 // being spread: `unsafeSpread` for a bare `any`, `unsafeArraySpread` for an `any[]`, and
 // `unsafeTupleSpread` once per unsafe member when the spread is a tuple, since a tuple maps onto
 // several parameters and only some of them may be unsafe. Anything else iterable is deliberately
-// not handled, which upstream marks with a TODO and this reproduces rather than improves on.
+// not handled, which upstream marks with a `TODO` and this reproduces rather than improves on.
 //
 // # The parameter walk is the port, not the `any` test
 //
@@ -186,7 +186,7 @@ func checkUnsafeArguments(
 
 // checkUnsafeSpreadArgument handles the three spread shapes upstream distinguishes.
 //
-// The fourth shape, something merely iterable, is deliberately not handled. Upstream carries a TODO
+// The fourth shape, something merely iterable, is deliberately not handled. Upstream carries a `TODO`
 // there and this reproduces the gap rather than closing it, because closing it would report inputs
 // upstream is silent on.
 func checkUnsafeSpreadArgument(

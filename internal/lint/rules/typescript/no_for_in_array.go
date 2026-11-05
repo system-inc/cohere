@@ -122,7 +122,7 @@ import (
 //
 // It matters more than a crash-avoidance would suggest. `GetSymbolAtLocation` and its neighbours on
 // this shim return nil rather than panicking under a nil checker, so a missing guard here does not
-// crash — it buys a vacuous green, where every clean fixture passes having proven nothing and every
+// crash. It buys a vacuous green, where every clean fixture passes having proven nothing and every
 // reporting one fails. A test in this package pins the declaration and the guard together so a
 // later revert fails loudly.
 var NoForInArray = rule.Rule{

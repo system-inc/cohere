@@ -46,6 +46,19 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 	}
 }
 
+// ClassLiteralPropertyStyleSetting is upstream's one option, `'fields' | 'getters'`.
+type ClassLiteralPropertyStyleSetting string
+
+const (
+	// ClassLiteralPropertyStyleFields is `"fields"`, upstream's default: a literal is a readonly
+	// field and a getter returning a literal reports.
+	ClassLiteralPropertyStyleFields ClassLiteralPropertyStyleSetting = "fields"
+
+	// ClassLiteralPropertyStyleGetters is `"getters"`: a literal is a getter and a readonly field
+	// holding one reports.
+	ClassLiteralPropertyStyleGetters ClassLiteralPropertyStyleSetting = "getters"
+)
+
 // ClassLiteralPropertyStyle requires one spelling for a class literal, a readonly field or a getter.
 //
 //	valid (fields):   class C { readonly x = 1; }
@@ -859,19 +872,6 @@ func classLiteralNodeText(ruleContext rule.Context, node *ast.Node) (string, boo
 	}
 	return sourceText[trimmed.Pos():trimmed.End()], true
 }
-
-// ClassLiteralPropertyStyleSetting is upstream's one option, `'fields' | 'getters'`.
-type ClassLiteralPropertyStyleSetting string
-
-const (
-	// ClassLiteralPropertyStyleFields is `"fields"`, upstream's default: a literal is a readonly
-	// field and a getter returning a literal reports.
-	ClassLiteralPropertyStyleFields ClassLiteralPropertyStyleSetting = "fields"
-
-	// ClassLiteralPropertyStyleGetters is `"getters"`: a literal is a getter and a readonly field
-	// holding one reports.
-	ClassLiteralPropertyStyleGetters ClassLiteralPropertyStyleSetting = "getters"
-)
 
 // ClassLiteralPropertyStyleOptions is the rule's configuration.
 //

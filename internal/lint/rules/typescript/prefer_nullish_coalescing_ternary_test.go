@@ -30,69 +30,6 @@ type preferNullishCoalescingReplayedCase struct {
 	findings    []preferNullishCoalescingReplayed
 }
 
-// TestPreferNullishCoalescingTernaryAndIfFire runs every upstream invalid case that reports from the
-// ternary or the if-statement path, 221 of them, two of which also report a `||`.
-//
-// # Every expectation was replayed through the installed build, not copied from upstream's file
-//
-// Upstream's corpus was extracted by running its test file against a stub RuleTester, and each case
-// was then linted by ESLint 10 with typescript-eslint 8.67.0 on a strict program. The replay agreed
-// with upstream's own expected ids, spans and suggestion outputs on all 344 strict cases, so the rows
-// below are both: what upstream asserts and what the installed rule does.
-//
-// They assert more than the imported `||` corpus does. A ternary's suggestion rewrites the whole
-// expression, choosing the subject's spelling (the first mention, with its optional links), keeping
-// one pair of its parentheses, and parenthesising the fallback by precedence; an if's suggestion
-// carries comments out of the block. An id and a count see none of that, so each row pins the
-// spanned text and the whole file after the suggestion.
-func TestPreferNullishCoalescingTernaryAndIfFire(test *testing.T) {
-	test.Parallel()
-	cases := append(append([]preferNullishCoalescingReplayedCase(nil),
-		preferNullishCoalescingTernaryAndIfCases...), preferNullishCoalescingBeyondTheCorpusCases...)
-	for _, testCase := range cases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			result := runPreferNullishCoalescing(test, preferNullishCoalescingCase{
-				source: testCase.source, optionsJson: testCase.optionsJson,
-			})
-			wantIds := make([]string, 0, len(testCase.findings))
-			for _, expected := range testCase.findings {
-				wantIds = append(wantIds, expected.id)
-			}
-			rule_testing.ExpectFindings(test, result, wantIds...)
-
-			text := asTheTypedPreferNullishHarnessWroteIt(testCase.source)
-			for index, expected := range testCase.findings {
-				diagnostic := result.Diagnostics[index]
-
-				start := preferNullishCoalescingOffsetOf(test, testCase.source, expected.line, expected.column)
-				if diagnostic.Range.Pos() != start || diagnostic.Range.End() != start+len(expected.reported) {
-					test.Errorf("finding %d: expected the span %q at line %d column %d, got %q",
-						index, expected.reported, expected.line, expected.column,
-						text[diagnostic.Range.Pos():diagnostic.Range.End()])
-				}
-
-				if len(diagnostic.Suggestions) != 1 {
-					test.Fatalf("finding %d: expected one suggestion, got %d", index, len(diagnostic.Suggestions))
-				}
-				// Applied from the back, so an earlier edit never shifts a later one's offsets.
-				fixes := append([]rule.Fix(nil), diagnostic.Suggestions[0].Fixes...)
-				sort.Slice(fixes, func(left, right int) bool {
-					return fixes[left].Range.Pos() > fixes[right].Range.Pos()
-				})
-				applied := text
-				for _, fix := range fixes {
-					applied = applied[:fix.Range.Pos()] + fix.Text + applied[fix.Range.End():]
-				}
-				if applied != expected.suggested {
-					test.Errorf("finding %d: the suggestion writes\n%s\nupstream's writes\n%s",
-						index, applied, expected.suggested)
-				}
-			}
-		})
-	}
-}
-
 // preferNullishCoalescingBeyondTheCorpusCases report where upstream's corpus never looks, each
 // replayed through the installed build the same way.
 //
@@ -162,7 +99,7 @@ func TestPreferNullishCoalescingTernaryAndIfMessages(test *testing.T) {
 }
 
 // preferNullishCoalescingTernaryAndIfCases are upstream's invalid cases that report from the ternary
-// or if-statement path, generated from the replay described on the test above.
+// or if-statement path, generated from the replay described on TestPreferNullishCoalescingTernaryAndIfFire.
 var preferNullishCoalescingTernaryAndIfCases = []preferNullishCoalescingReplayedCase{
 	{name: "upstream invalid[8]", source: `x !== undefined && x !== null ? x : y;`, optionsJson: "{\"ignoreTernaryTests\":false}", findings: []preferNullishCoalescingReplayed{
 		{id: "preferNullishOverTernary", line: 1, column: 1, reported: `x !== undefined && x !== null ? x : y`, suggested: `x ?? y;
@@ -2140,59 +2077,67 @@ c ?? (c ? 1 : 2);
 	}},
 }
 
-// TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions covers the `reactCompiler` option,
-// which is ours rather than upstream's, on the if-statement check it gates.
+// TestPreferNullishCoalescingTernaryAndIfFire runs every upstream invalid case that reports from the
+// ternary or the if-statement path, 221 of them, two of which also report a `||`.
 //
-// The rows are shared verbatim with Nexus's NexusTypeScriptEsLintPlugin.test.ts, whose wrapper draws the
-// same line in ESLint, so one table proves the ruling in both engines (#cn8sthd). Three are the sites
-// the waves rewrote to `??=`, each of which lost its compilation to the rewrite, in their long form:
-// SecretRow, WebSocketViaSharedWorkerProviderInternal and ChatReasoningAndTools' component body. The
-// rest pin where the compiled region ends, from the measurements recorded in the react shelf's
-// compiled.go: a bare block, an outer function whose name claims nothing, a call wrapper, a non-ASCII
-// capital, primitive props, a second parameter that is not a ref, and JSX only inside a closure.
+// # Every expectation was replayed through the installed build, not copied from upstream's file
 //
-// Every row runs with the compiler on and off, so a silent row is shown to be the gate rather than a
-// shape the check never reported. The harness has no React types, so each ref is annotated: read as
-// `any`, its `current` is not nullable and the check would never fire.
-func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *testing.T) {
+// Upstream's corpus was extracted by running its test file against a stub RuleTester, and each case
+// was then linted by ESLint 10 with typescript-eslint 8.67.0 on a strict program. The replay agreed
+// with upstream's own expected ids, spans and suggestion outputs on all 344 strict cases, so the rows
+// it runs are both: what upstream asserts and what the installed rule does.
+//
+// They assert more than the imported `||` corpus does. A ternary's suggestion rewrites the whole
+// expression, choosing the subject's spelling (the first mention, with its optional links), keeping
+// one pair of its parentheses, and parenthesising the fallback by precedence; an if's suggestion
+// carries comments out of the block. An id and a count see none of that, so each row pins the
+// spanned text and the whole file after the suggestion.
+func TestPreferNullishCoalescingTernaryAndIfFire(test *testing.T) {
 	test.Parallel()
-
-	decode := func(raw string) PreferNullishCoalescingOptions {
-		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
-		if decodePreferNullishCoalescingOptionsError != nil {
-			test.Fatalf("decoding %s: %v", raw, decodePreferNullishCoalescingOptionsError)
-		}
-		options, isType := decoded.(PreferNullishCoalescingOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
-		}
-		return options
-	}
-	compilerOn := decode(`{}`)
-	compilerOff := decode(`{"reactCompiler": false}`)
-
-	for _, testCase := range preferNullishCoalescingCompiledRows {
+	cases := append(append([]preferNullishCoalescingReplayedCase(nil),
+		preferNullishCoalescingTernaryAndIfCases...), preferNullishCoalescingBeyondTheCorpusCases...)
+	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			off := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
-			rule_testing.ExpectFindings(test, off, "preferNullishOverAssignment")
-			on := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
-			if testCase.compiled {
-				rule_testing.ExpectClean(test, on)
-				return
+			result := runPreferNullishCoalescing(test, preferNullishCoalescingCase{
+				source: testCase.source, optionsJson: testCase.optionsJson,
+			})
+			wantIds := make([]string, 0, len(testCase.findings))
+			for _, expected := range testCase.findings {
+				wantIds = append(wantIds, expected.id)
 			}
-			rule_testing.ExpectFindings(test, on, "preferNullishOverAssignment")
+			rule_testing.ExpectFindings(test, result, wantIds...)
+
+			text := asTheTypedPreferNullishHarnessWroteIt(testCase.source)
+			for index, expected := range testCase.findings {
+				diagnostic := result.Diagnostics[index]
+
+				start := preferNullishCoalescingOffsetOf(test, testCase.source, expected.line, expected.column)
+				if diagnostic.Range.Pos() != start || diagnostic.Range.End() != start+len(expected.reported) {
+					test.Errorf("finding %d: expected the span %q at line %d column %d, got %q",
+						index, expected.reported, expected.line, expected.column,
+						text[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+
+				if len(diagnostic.Suggestions) != 1 {
+					test.Fatalf("finding %d: expected one suggestion, got %d", index, len(diagnostic.Suggestions))
+				}
+				// Applied from the back, so an earlier edit never shifts a later one's offsets.
+				fixes := append([]rule.Fix(nil), diagnostic.Suggestions[0].Fixes...)
+				sort.Slice(fixes, func(left, right int) bool {
+					return fixes[left].Range.Pos() > fixes[right].Range.Pos()
+				})
+				applied := text
+				for _, fix := range fixes {
+					applied = applied[:fix.Range.Pos()] + fix.Text + applied[fix.Range.End():]
+				}
+				if applied != expected.suggested {
+					test.Errorf("finding %d: the suggestion writes\n%s\nupstream's writes\n%s",
+						index, applied, expected.suggested)
+				}
+			}
 		})
 	}
-
-	// The ternary's repair is `??`, an expression the compiler lowers, so it still reports in a
-	// component with the compiler on.
-	ternary := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", `
-export function Badge(properties: { label: string | null }) {
-    const label = properties.label !== null ? properties.label : 'none';
-    return <span>{label}</span>;
-}`, compilerOn)
-	rule_testing.ExpectFindings(test, ternary, "preferNullishOverTernary")
 }
 
 // preferNullishCoalescingCompiledRows is the table both engines run: each source holds one `if` the
@@ -2332,4 +2277,59 @@ export const Badge = memo(function(properties: { label: string | null }) {
     return () => <span>{label}</span>;
 }
 `, false},
+}
+
+// TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions covers the `reactCompiler` option,
+// which is ours rather than upstream's, on the if-statement check it gates.
+//
+// The rows are shared verbatim with Nexus's NexusTypeScriptEsLintPlugin.test.ts, whose wrapper draws the
+// same line in ESLint, so one table proves the ruling in both engines (#cn8sthd). Three are the sites
+// the waves rewrote to `??=`, each of which lost its compilation to the rewrite, in their long form:
+// SecretRow, WebSocketViaSharedWorkerProviderInternal and ChatReasoningAndTools' component body. The
+// rest pin where the compiled region ends, from the measurements recorded in the react shelf's
+// compiled.go: a bare block, an outer function whose name claims nothing, a call wrapper, a non-ASCII
+// capital, primitive props, a second parameter that is not a ref, and JSX only inside a closure.
+//
+// Every row runs with the compiler on and off, so a silent row is shown to be the gate rather than a
+// shape the check never reported. The harness has no React types, so each ref is annotated: read as
+// `any`, its `current` is not nullable and the check would never fire.
+func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *testing.T) {
+	test.Parallel()
+
+	decode := func(raw string) PreferNullishCoalescingOptions {
+		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
+		if decodePreferNullishCoalescingOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodePreferNullishCoalescingOptionsError)
+		}
+		options, isType := decoded.(PreferNullishCoalescingOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
+		}
+		return options
+	}
+	compilerOn := decode(`{}`)
+	compilerOff := decode(`{"reactCompiler": false}`)
+
+	for _, testCase := range preferNullishCoalescingCompiledRows {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			off := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
+			rule_testing.ExpectFindings(test, off, "preferNullishOverAssignment")
+			on := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
+			if testCase.compiled {
+				rule_testing.ExpectClean(test, on)
+				return
+			}
+			rule_testing.ExpectFindings(test, on, "preferNullishOverAssignment")
+		})
+	}
+
+	// The ternary's repair is `??`, an expression the compiler lowers, so it still reports in a
+	// component with the compiler on.
+	ternary := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", `
+export function Badge(properties: { label: string | null }) {
+    const label = properties.label !== null ? properties.label : 'none';
+    return <span>{label}</span>;
+}`, compilerOn)
+	rule_testing.ExpectFindings(test, ternary, "preferNullishOverTernary")
 }

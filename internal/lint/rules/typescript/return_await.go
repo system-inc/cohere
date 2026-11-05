@@ -363,6 +363,16 @@ func enclosingFunctionOfReturn(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// tryPart names which of a try statement's three children contains the node.
+type tryPart int
+
+const (
+	tryPartNone tryPart = iota
+	tryPartTry
+	tryPartCatch
+	tryPartFinally
+)
+
 // affectsExplicitErrorHandling answers whether an exception from this position changes control flow.
 //
 // Upstream's recursion, reproduced. A `try` block always qualifies because a try is always followed
@@ -390,16 +400,6 @@ func affectsExplicitErrorHandling(node *ast.Node) bool {
 	}
 	return false
 }
-
-// tryPart names which of a try statement's three children contains the node.
-type tryPart int
-
-const (
-	tryPartNone tryPart = iota
-	tryPartTry
-	tryPartCatch
-	tryPartFinally
-)
 
 // containingTryStatement finds the nearest enclosing try statement, without crossing a function.
 //

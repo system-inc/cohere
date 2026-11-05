@@ -45,6 +45,17 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 	return options, nil
 }
 
+var preferLiteralEnumMemberNotLiteralMessage = rule.Message{
+	Id:          "notLiteral",
+	Description: "Explicit enum value must only be a literal value (string or number).",
+}
+
+var preferLiteralEnumMemberNotLiteralOrBitwiseMessage = rule.Message{
+	Id: "notLiteralOrBitwiseExpression",
+	Description: "Explicit enum value must only be a literal value (string or number) " +
+		"or a bitwise expression.",
+}
+
 // PreferLiteralEnumMember flags an enum member initialized to anything but a literal value.
 //
 //	valid:   enum Valid { A = 42, B = 'text', C = -1, D = null, E = /re/ }
@@ -162,17 +173,6 @@ var PreferLiteralEnumMember = rule.Rule{
 			},
 		}
 	},
-}
-
-var preferLiteralEnumMemberNotLiteralMessage = rule.Message{
-	Id:          "notLiteral",
-	Description: "Explicit enum value must only be a literal value (string or number).",
-}
-
-var preferLiteralEnumMemberNotLiteralOrBitwiseMessage = rule.Message{
-	Id: "notLiteralOrBitwiseExpression",
-	Description: "Explicit enum value must only be a literal value (string or number) " +
-		"or a bitwise expression.",
 }
 
 // enclosingEnumDeclaration walks up from a member to the enum that holds it.

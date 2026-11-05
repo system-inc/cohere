@@ -53,8 +53,7 @@ func consistentTypeExportsFixtureFiles(subject string) map[string]string {
 	// resolves to its index. Written under both names so the resolution works whichever the
 	// program prefers, and because one upstream case exports a name declared twice there, as a
 	// type and as a value, which is the shape its `NAME as Foo` case turns on.
-	files["consistent-type-exports/index.ts"] = files["consistent-type-exports/index.ts"] +
-		"export type NAME = 'name';\nexport const NAME2 = 'name';\n"
+	files["consistent-type-exports/index.ts"] += "export type NAME = 'name';\nexport const NAME2 = 'name';\n"
 	files["main.ts"] = subject
 	return files
 }
