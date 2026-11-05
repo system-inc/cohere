@@ -20,7 +20,7 @@ type samplesFile struct {
 		Elements []json.RawMessage `json:"elements"`
 		Keyword  string            `json:"keyword"`
 		Path     string            `json:"path"`
-		ESLint   string            `json:"eslint"`
+		EsLint   string            `json:"eslint"`
 	} `json:"samples"`
 }
 
@@ -45,7 +45,8 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		test.Fatalf("the samples were drawn from %v and the embedded schemas from %v; regenerate both together", samples.GeneratedFrom, GeneratedFrom())
 	}
 
-	var falseRefusals, falseAccepts []string
+	var falseRefusals []string
+	var falseAccepts []string
 	accepted, refused := 0, 0
 	for _, sample := range samples.Samples {
 		schema, found, optionSchemaForError := For(sample.Rule)
@@ -60,7 +61,7 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		if encodeError != nil {
 			test.Fatalf("%s: %v", sample.Rule, encodeError)
 		}
-		switch sample.ESLint {
+		switch sample.EsLint {
 		case "accepts":
 			accepted++
 			if violation != nil {
@@ -72,7 +73,7 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 				falseAccepts = append(falseAccepts, fmt.Sprintf("%s %s (%s at %s)", sample.Rule, encoded, sample.Keyword, sample.Path))
 			}
 		default:
-			test.Fatalf("%s: unknown verdict %q", sample.Rule, sample.ESLint)
+			test.Fatalf("%s: unknown verdict %q", sample.Rule, sample.EsLint)
 		}
 	}
 
