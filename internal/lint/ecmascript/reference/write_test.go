@@ -15,9 +15,9 @@ import (
 func answerFor(test *testing.T, source string, target string) []bool {
 	test.Helper()
 	var answers []bool
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "write-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if node.Text() != target {
@@ -273,9 +273,9 @@ func TestShelfAccessorStillDeclinesRestElements(test *testing.T) {
 	} {
 		full := "let a, b, c, d, o, xs;\n" + source
 		var shimAnswers []bool
-		rule_testing.Run(test, rule.Rule{
+		rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "shim-differential",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindIdentifier: func(node *ast.Node) {
 						if node.Text() != "a" {

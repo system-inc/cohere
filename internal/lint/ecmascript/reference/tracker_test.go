@@ -16,10 +16,10 @@ import (
 func trackedIn(test *testing.T, code string, traceMap map[string]*reference.TraceMap) []string {
 	test.Helper()
 	var rendered []string
-	rule_testing.RunTyped(test, rule.Rule{
+	rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 		Name:             "tracker-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
@@ -319,9 +319,9 @@ func TestConstantString(test *testing.T) {
 	for code, want := range cases {
 		var got string
 		var settled bool
-		rule_testing.Run(test, rule.Rule{
+		rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "constant-probe",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindElementAccessExpression: func(node *ast.Node) {
 						got, settled = reference.ConstantString(node.AsElementAccessExpression().ArgumentExpression)
@@ -371,10 +371,10 @@ func TestConstantStringIn(test *testing.T) {
 	for _, testCase := range cases {
 		var got string
 		var constant bool
-		rule_testing.RunTyped(test, rule.Rule{
+		rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 			Name:             "constant-in-probe",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
@@ -419,10 +419,10 @@ func TestIsConstantRegExpIn(test *testing.T) {
 	}
 	for code, want := range cases {
 		var got bool
-		rule_testing.RunTyped(test, rule.Rule{
+		rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 			Name:             "constant-regexp-probe",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
