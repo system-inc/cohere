@@ -41,7 +41,7 @@ func FrameworkStaticReading(name string) (Reading, bool) {
 		return Reading{}, false
 	}
 	sorted := PropertySort(nodesFromStaticDeclarations(declarations))
-	return Reading{Order: sorted.Order, Count: sorted.Count}, true
+	return Reading(sorted), true
 }
 
 // nodesFromStaticDeclarations rebuilds the declaration nodes PropertySort walks.

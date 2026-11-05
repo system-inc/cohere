@@ -73,14 +73,24 @@ func NewCanonicalizer(system *LoadedDesignSystem) *Canonicalizer {
 // the first time a rule's options ask for them.
 func (canonicalizer *Canonicalizer) WithFeatures(features SignatureFeatures) *Canonicalizer {
 	if existing, found := canonicalizer.shared.byFeatures.Load(features); found {
-		return existing.(*Canonicalizer)
+		typed, isCanonicalizer := existing.(*Canonicalizer)
+		if !isCanonicalizer {
+			// Invariant: byFeatures holds only the *Canonicalizer NewCanonicalizer and WithFeatures store.
+			panic("tailwind: the canonicalizer memo holds something other than a canonicalizer")
+		}
+		return typed
 	}
 	created, _ := canonicalizer.shared.byFeatures.LoadOrStore(features, &Canonicalizer{
 		system:   canonicalizer.system,
 		features: features,
 		shared:   canonicalizer.shared,
 	})
-	return created.(*Canonicalizer)
+	typed, isCanonicalizer := created.(*Canonicalizer)
+	if !isCanonicalizer {
+		// Invariant: byFeatures holds only the *Canonicalizer NewCanonicalizer and WithFeatures store.
+		panic("tailwind: the canonicalizer memo holds something other than a canonicalizer")
+	}
+	return typed
 }
 
 // CanonicalizeClass is what Tailwind rewrites className to on its own, or className itself when nothing
@@ -91,7 +101,12 @@ func (canonicalizer *Canonicalizer) WithFeatures(features SignatureFeatures) *Ca
 // for the first reading whatever it is. A bare class tries each reading until one prints differently.
 func (canonicalizer *Canonicalizer) CanonicalizeClass(className string) string {
 	if cached, isCached := canonicalizer.classes.Load(className); isCached {
-		return cached.(string)
+		canonical, isString := cached.(string)
+		if !isString {
+			// Invariant: classes holds only the string CanonicalizeClass stores below.
+			panic("tailwind: the class memo holds something other than a string")
+		}
+		return canonical
 	}
 	canonical := canonicalizer.canonicalizeClass(className)
 	canonicalizer.classes.Store(className, canonical)
@@ -191,7 +206,12 @@ var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) (ParsedCa
 func (canonicalizer *Canonicalizer) canonicalizeVariant(variant ParsedVariant) []ParsedVariant {
 	key := PrintVariant(variant)
 	if cached, isCached := canonicalizer.variants.Load(key); isCached {
-		return cached.([]ParsedVariant)
+		variants, isVariants := cached.([]ParsedVariant)
+		if !isVariants {
+			// Invariant: variants holds only the []ParsedVariant canonicalizeVariant stores below.
+			panic("tailwind: the variant memo holds something other than a variant list")
+		}
+		return variants
 	}
 
 	replacement := []ParsedVariant{cloneVariant(variant)}
