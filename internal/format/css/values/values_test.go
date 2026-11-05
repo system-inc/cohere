@@ -21,8 +21,17 @@ func parseNodes(test *testing.T, text string) []*estree.Node {
 	return root.List("nodes")[0].List("nodes")
 }
 
-func sourceColumn(node *estree.Node, edge string) any {
-	return node.Get("source").(map[string]any)[edge].(map[string]any)["column"]
+func sourceColumn(test *testing.T, node *estree.Node, edge string) any {
+	test.Helper()
+	nodeSource, isMap := node.Get("source").(map[string]any)
+	if !isMap {
+		test.Fatalf("%s source %v, want a {start, end} object", node.Type(), node.Get("source"))
+	}
+	edgePosition, isMap := nodeSource[edge].(map[string]any)
+	if !isMap {
+		test.Fatalf("%s source %s %v, want a {line, column} object", node.Type(), edge, nodeSource[edge])
+	}
+	return edgePosition["column"]
 }
 
 // TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
@@ -69,17 +78,17 @@ func TestParseShapes(test *testing.T) {
 
 	// A value opening with a paren ends that paren at column NaN; the next paren reuses a stale end.
 	parens := parseNodes(test, "(a)")
-	if column, isFloat := sourceColumn(parens[0], "end").(float64); !isFloat || !math.IsNaN(column) {
-		test.Errorf("first paren end column: want NaN, got %v", sourceColumn(parens[0], "end"))
+	if column, isFloat := sourceColumn(test, parens[0], "end").(float64); !isFloat || !math.IsNaN(column) {
+		test.Errorf("first paren end column: want NaN, got %v", sourceColumn(test, parens[0], "end"))
 	}
-	if sourceColumn(parens[2], "end") != 2 {
-		test.Errorf("closing paren end column: want 2, got %v", sourceColumn(parens[2], "end"))
+	if sourceColumn(test, parens[2], "end") != 2 {
+		test.Errorf("closing paren end column: want 2, got %v", sourceColumn(test, parens[2], "end"))
 	}
 
 	// sourceIndex is bytes; columns stay UTF-16 units.
 	multibyte := parseNodes(test, "\xc3\xa9 \xf0\x9f\x98\x80x b")
-	if multibyte[1].Get("sourceIndex") != 3 || multibyte[2].Get("sourceIndex") != 9 || sourceColumn(multibyte[2], "start") != 7 {
-		test.Errorf("non-ASCII: got sourceIndex %v and %v, column %v", multibyte[1].Get("sourceIndex"), multibyte[2].Get("sourceIndex"), sourceColumn(multibyte[2], "start"))
+	if multibyte[1].Get("sourceIndex") != 3 || multibyte[2].Get("sourceIndex") != 9 || sourceColumn(test, multibyte[2], "start") != 7 {
+		test.Errorf("non-ASCII: got sourceIndex %v and %v, column %v", multibyte[1].Get("sourceIndex"), multibyte[2].Get("sourceIndex"), sourceColumn(test, multibyte[2], "start"))
 	}
 
 	// Inline comments only in loose mode.

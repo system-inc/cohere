@@ -101,12 +101,23 @@ type printSettings struct {
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings.
 func settingsOf(options *printerOptions) formatoptions.Options {
-	return options.Settings.(printSettings).Options
+	return printSettingsOf(options).Options
 }
 
 // parserOf is options.parser.
 func parserOf(options *printerOptions) string {
-	return options.Settings.(printSettings).parser
+	return printSettingsOf(options).parser
+}
+
+// printSettingsOf is the printSettings a format carries in options.Settings.
+func printSettingsOf(options *printerOptions) printSettings {
+	settings, isPrintSettings := options.Settings.(printSettings)
+	if !isPrintSettings {
+		// Invariant: printToDoc is the only place a css printerOptions is built, and it always sets
+		// Settings to a printSettings; Format and PrintToDoc recover the panic into an error.
+		panic(fmt.Sprintf("css: options.Settings is %T, not printSettings", options.Settings))
+	}
+	return settings
 }
 
 // Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and
