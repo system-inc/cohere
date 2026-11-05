@@ -262,7 +262,7 @@ func firstBindingName(node *ast.Node) (string, bool) {
 	case ast.KindNamedImports:
 		// `imports.BindingsOf` answers which shapes a statement carries and is the right call almost
 		// everywhere, but it returns the three kinds as three separate fields and so discards the
-		// one thing this rule needs: which binding came FIRST. Upstream's `find_map` over the module
+		// one thing this rule needs: which binding came first. Upstream's `find_map` over the module
 		// record takes the first entry naming `next/script` whatever kind it is, so the order is the
 		// judgment rather than an implementation detail, and a caller reassembling it from three
 		// fields would be re-deriving what the grammar already fixed. Reached for directly for that
@@ -272,7 +272,7 @@ func firstBindingName(node *ast.Node) (string, bool) {
 			return "", false
 		}
 		for _, element := range elements.Nodes {
-			// The LOCAL name, which for `{ Foo as Bar }` is `Bar`. Probed: `<Bar>` reports and
+			// The local name, which for `{ Foo as Bar }` is `Bar`. Probed: `<Bar>` reports and
 			// `<Foo>` is silent, so reading the imported name here would invert both.
 			name := element.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {

@@ -31,7 +31,7 @@ type noNegatedConditionCase struct {
 
 // noNegatedConditionOffsetOf converts a 1-based line and column into a byte offset.
 //
-// `rule_testing.Run` does NOT trim its input, unlike RunTyped, so no rebasing is needed here. Stated
+// `rule_testing.Run` does not trim its input, unlike RunTyped, so no rebasing is needed here. Stated
 // because the sibling rules in this batch that need the typed harness do rebase, and a helper copied
 // between them without this line would be quietly wrong by one.
 func noNegatedConditionOffsetOf(test *testing.T, source string, line int, column int) int {
@@ -274,11 +274,11 @@ var noNegatedConditionReportingCases = []noNegatedConditionCase{
 // TestNoNegatedConditionOnlyTheBangOperatorCounts pins the unary arm against every other prefix.
 //
 // Upstream tests `operator === "!"` and its corpus never writes another prefix operator in a
-// condition that has an else, so a mutation widening the test to accept ANY prefix unary survives
+// condition that has an else, so a mutation widening the test to accept any prefix unary survives
 // the whole imported corpus. Every row here was measured against the installed 10.8.1 build.
 //
 // `~` is the one worth noting: it is a bitwise negation and reads as a negation in English, and it
-// is clean. `!!a` reports because its OUTER operator is `!`, which is the row that shows the test is
+// is clean. `!!a` reports because its outer operator is `!`, which is the row that shows the test is
 // on the operator rather than on whether the value is inverted.
 func TestNoNegatedConditionOnlyTheBangOperatorCounts(test *testing.T) {
 	test.Parallel()

@@ -175,8 +175,8 @@ func TestNoLoopFuncRequiresTheTypedHarness(test *testing.T) {
 // inside the loop is a fresh binding", and the border is never consulted. My first fixture for this
 // was that shape, asserted as firing, and the installed build says it is clean.
 //
-// The input that actually separates the two readings is a binding declared OUTSIDE both loops with
-// a write positioned BETWEEN them. That write is after the outer loop's start and before the inner
+// The input that actually separates the two readings is a binding declared outside both loops with
+// a write positioned between them. That write is after the outer loop's start and before the inner
 // loop's start, so taking the innermost containing loop as the border calls it safe and taking the
 // outermost calls it unsafe. Upstream takes the outermost, and an outer iteration really can run
 // that write and then re-enter the inner loop.
@@ -232,8 +232,8 @@ func TestNoLoopFuncBorderIsTheOutermostLoop(test *testing.T) {
 // the two, and a mutant that ignored the argument survived all 96 cases plus every other invented
 // one here.
 //
-// The distinguishing shape needs three things at once: a `let` declared inside an OUTER loop, the
-// function inside an INNER loop, and a write positioned between the `let` and the inner loop. With
+// The distinguishing shape needs three things at once: a `let` declared inside an outer loop, the
+// function inside an inner loop, and a write positioned between the `let` and the inner loop. With
 // the stop, the border is the `let`'s end and the write is before nothing that matters, so it is
 // safe. Without it, the border is the outer loop's start, the write sits after it, and the rule
 // reports.
@@ -281,7 +281,7 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(test *testing.T) {
 //
 // The corpus carries clean cases for the `for` initializer and the iterated expression, and neither
 // is evidence about this. `for (var x in xs.filter(function(x) { return x != upper; })) { }` passes
-// because `upper` is UNDECLARED, so the rule declines it before position is consulted at all;
+// because `upper` is undeclared, so the rule declines it before position is consulted at all;
 // removing the `filter` leaves it passing. A mutant treating the iterated expression as inside the
 // loop survived the whole corpus.
 //
@@ -290,7 +290,7 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(test *testing.T) {
 // reports, and the only difference is position.
 //
 // The `for` test is the other half and it goes the other way: upstream returns the loop for it, so
-// a function there IS in the loop, and only the initializer is outside.
+// a function there is in the loop, and only the initializer is outside.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(test *testing.T) {
@@ -350,7 +350,7 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(test *testing.T) {
 //
 // A name in the property position of a member access, or the key of an object literal, must not be
 // read as a reference to a like-named variable, and these rows assert that against the installed
-// eslint 10.8.1 build. What they do NOT do is exercise `loopFuncIsReadableReference`: a mutant
+// eslint 10.8.1 build. What they do not do is exercise `loopFuncIsReadableReference`: a mutant
 // neutralising that filter survives all of them, and the doc comment on that function records why.
 // Resolution already separates these positions, so the filter cannot change a verdict and no
 // fixture can make it.
@@ -359,7 +359,7 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(test *testing.T) {
 // a property name to the variable, these are the rows that would go red, and at that point the
 // filter would stop being equivalent and start being the thing that saves it.
 //
-// The fourth row runs the other direction: a function reading BOTH the property and the variable
+// The fourth row runs the other direction: a function reading both the property and the variable
 // still reports, and names the variable once rather than twice.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
@@ -417,13 +417,13 @@ func TestNoLoopFuncPropertyNamesAreNotReferences(test *testing.T) {
 // on one symbol. The corpus writes no redeclaration at all, so this shape is unexercised by it and
 // these rows are the only thing asserting the rule handles it.
 //
-// They do NOT pin the earliest-versus-latest choice in `loopFuncDeclarationFor`: a mutant taking
+// They do not pin the earliest-versus-latest choice in `loopFuncDeclarationFor`: a mutant taking
 // the latest survives them, and that function's doc comment records the measurement saying why it
 // must. The choice is unobservable because it is used as an index key everywhere except one arm,
 // and that arm only ever sees block-scoped bindings, which cannot be redeclared.
 //
 // The first two rows are still worth having: identical except for which declaration carries the
-// initializer, and upstream answers them differently, so they pin that the WRITE is found on
+// initializer, and upstream answers them differently, so they pin that the write is found on
 // whichever declaration carries it rather than only on a canonical one.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
@@ -631,7 +631,7 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(test *testing.T) {
 // to treat a method as a boundary too, or a closure written inside a method would climb past it,
 // find the loop outside, and be judged as though it ran per iteration.
 //
-// Measured against the installed eslint 10.8.1 build: the inner arrow is NOT reported, because its
+// Measured against the installed eslint 10.8.1 build: the inner arrow is not reported, because its
 // containing function is the method rather than the loop, and only the method itself is.
 func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(test *testing.T) {
 	test.Parallel()
