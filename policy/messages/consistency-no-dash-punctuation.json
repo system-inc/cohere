@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-dash-punctuation"
+  },
+  "phrases": {
+    "cure": "Readers clock it as generated text and tune out of the words around it. Use a comma or a period, or restructure the sentence so it needs neither."
+  },
+  "messages": {
+    "dashPunctuation": {
+      "text": "This is {{dash}}. <<cure>>"
+    },
+    "escapedDashPunctuation": {
+      "text": "This string spells {{dash}} with an escape, and it reaches the reader as the dash itself. <<cure>>"
+    }
+  }
+}
