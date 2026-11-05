@@ -27,7 +27,7 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_empty_function",
 	Doc: "Flags a function, method or function literal whose body holds no statement and no comment with words in " +
 		"it between its braces, tests included, since an empty test can never fail. A declaration with no body, " +
-		"implemented in assembly or linked by name, has nothing to judge, and a generated file is left alone.",
+		"implemented in assembly or linked by name, has nothing to judge.",
 	Run: run,
 }
 
@@ -38,11 +38,6 @@ var emptyFunctionMessage = policy.MessageOf(Name, "emptyFunction")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to write, and the generator's next run undoes a comment added by hand.
-		// This is the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		judgeFile(pass, file)
 	}
 	return nil, nil

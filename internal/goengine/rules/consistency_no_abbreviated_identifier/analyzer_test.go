@@ -25,8 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every kind of name Go declares, in every form the vocabulary judges, with
 // the descriptive advice where the bare expansion is already Go's. analysistest fails on a finding no want expects as
 // much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on full words,
-// uses, imported package names, embedded fields, methods another package's interface or type fixes, and generated
-// files.
+// uses, imported package names, embedded fields, and methods another package's interface or type fixes.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

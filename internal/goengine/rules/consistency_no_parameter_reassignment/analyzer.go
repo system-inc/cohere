@@ -41,11 +41,6 @@ var parameterAddressTakenMessage = policy.MessageOf(Name, "parameterAddressTaken
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to change, and the generator's next run undoes any edit by hand. A
-		// driver filter will take this over.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		parameters := parametersOf(pass, file)
 		if len(parameters) == 0 {
 			continue

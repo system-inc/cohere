@@ -9,8 +9,8 @@
 // masked as one text, each // line's slashes and the one space after them set aside the way a block comment's
 // gutter is. A fence, an indented code block, or a quote or backtick pair that wraps across a group's lines is then
 // code here as it is inside a block comment, and a command line on a // line is masked. Each comment still reports
-// only its own tokens, at itself. Go's own notations are not prose and are not read: directives, go/doc notes,
-// an example's output, and generated files.
+// only its own tokens, at itself. Go's own notations are not prose and are not read: directives, go/doc notes, an
+// example's output, and the marker a generated file opens with.
 package consistency_no_shouting
 
 import (
@@ -34,8 +34,8 @@ const Name = "cohere-go/consistency-no-shouting"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_shouting",
 	Doc: "Flags a comment holding an all-caps word that is not an acronym on the shared safe list, because shouting " +
-		"spreads to the next reader's comments. Code in backticks or quotes, directives, go/doc notes, an example's " +
-		"output and generated files are not read.",
+		"spreads to the next reader's comments. Code in backticks or quotes, directives, go/doc notes, an " +
+		"example's output and a generated file's `// Code generated ... DO NOT EDIT.` marker are not read.",
 	Run: run,
 }
 
@@ -58,23 +58,41 @@ var (
 	// exampleOutput is go/doc's test for the comment that holds an example's expected output, which is whatever
 	// the example prints, capitals and all.
 	exampleOutput = regexp.MustCompile(`(?i)^[[:space:]]*(unordered )?output:`)
+
+	// generatedMarker is the line go.dev/s/generatedcode says marks a file as generated, spelled exactly so tools
+	// can find it. Its capitals are the convention's, which no writer can lower, so it is notation.
+	generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 )
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file's comments are its generator's, and the fix belongs there.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		outputs := exampleOutputGroups(pass, file)
+		marker := generatedMarkerOf(file)
 		for _, group := range file.Comments {
 			if outputs[group] {
 				continue
 			}
-			judgeGroup(pass, group)
+			judgeGroup(pass, group, marker)
 		}
 	}
 	return nil, nil
+}
+
+// generatedMarkerOf is the first comment before file's package clause that is the generated-code marker, where
+// go/ast.IsGenerated looks for it, or nil when file has none. The convention counts the line only there, so the same
+// words after the package clause are a comment like any other and are read.
+func generatedMarkerOf(file *ast.File) *ast.Comment {
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			if comment.Pos() > file.Package {
+				return nil
+			}
+			if generatedMarker.MatchString(comment.Text) {
+				return comment
+			}
+		}
+	}
+	return nil
 }
 
 // commentSpan is where one comment's body sits in its group's joined text.
@@ -85,13 +103,14 @@ type commentSpan struct {
 }
 
 // judgeGroup masks a comment group as one text, then reports each comment whose own span of it still holds a shout.
-func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup) {
+// marker is the file's generated-code marker, or nil.
+func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Comment) {
 	var joined strings.Builder
 	spans := []commentSpan{}
 	for _, comment := range group.List {
 		// go/doc leaves a directive out of the comment's text, so it is neither read nor a line between its
-		// neighbours.
-		if directive.MatchString(comment.Text) {
+		// neighbours, and the generated-code marker is set aside the same way.
+		if comment == marker || directive.MatchString(comment.Text) {
 			continue
 		}
 		if len(spans) > 0 {

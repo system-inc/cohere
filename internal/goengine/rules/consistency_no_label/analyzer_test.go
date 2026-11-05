@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // an empty statement a goto lands on, a label stacked on another, and labels inside function literals, generic
 // functions and test files. analysistest fails on a finding no want expects as much as on a want nothing found, so
 // the allowed and lookalike fixtures prove the rule stays quiet on break and continue without a label, a function
-// literal that returns, a named boolean, a generated file, and the colons of case clauses, composite literal keys,
+// literal that returns, a named boolean, and the colons of case clauses, composite literal keys,
 // comments and strings.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()

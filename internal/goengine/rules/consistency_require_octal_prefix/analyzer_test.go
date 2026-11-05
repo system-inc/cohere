@@ -26,7 +26,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // analysistest fails on a finding no want expects as much as on a want nothing found. Its .golden file beside it is
 // the source with every offered fix applied, so a fix that writes the wrong digits fails even when the finding is
 // right. The allowed and lookalike fixtures prove the rule stays quiet on zero, the prefixed bases, decimals, floats
-// and imaginary literals that open with a zero, a generated file, and octal digits in strings, runes and comments.
+// and imaginary literals that open with a zero, and octal digits in strings, runes and comments.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.RunWithSuggestedFixes(

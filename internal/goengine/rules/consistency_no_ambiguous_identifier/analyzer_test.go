@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every declaration the rule must report, each once and none on a use, with
 // the guess and the suggestion an `e` finding makes. analysistest fails on a finding no want expects as much as on a
 // want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on words, coordinates, the
-// blank identifier, another package's letters, an embedded field, a label, an import's name and a generated file.
+// blank identifier, another package's letters, an embedded field, a label and an import's name.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

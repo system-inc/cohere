@@ -31,8 +31,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_abbreviated_identifier",
 	Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
 		"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded fields, " +
-		"a method whose name and signature another package's interface or type fixes, and generated files are not " +
-		"judged, since those names are someone else's.",
+		"and a method whose name and signature another package's interface or type fixes are not judged, since " +
+		"those names are someone else's.",
 	Run: run,
 }
 
@@ -67,10 +67,6 @@ type reach struct {
 func run(pass *analysis.Pass) (any, error) {
 	reachable := reachOf(pass.Pkg)
 	for _, file := range pass.Files {
-		// A generated file's names are its generator's, and the next run would write them back.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch typed := node.(type) {
 			case *ast.TypeSwitchStmt:

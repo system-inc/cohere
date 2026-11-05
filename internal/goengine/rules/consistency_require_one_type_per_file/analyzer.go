@@ -28,7 +28,7 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_one_type_per_file",
 	Doc: "Flags every type with methods after the first that a file serves, where a file serves each type it " +
 		"declares that has a method anywhere in the package and each type it declares a method of. A type without " +
-		"methods, an interface among them, never counts, and a generated file is left alone.",
+		"methods, an interface among them, never counts.",
 	Run: run,
 }
 
@@ -58,11 +58,6 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	for _, file := range pass.Files {
-		// A generated file is its generator's to lay out, and the generator's next run undoes any split by hand. This
-		// is the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		judgeFile(pass, file, hasMethods)
 	}
 	return nil, nil

@@ -23,9 +23,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 
 // The flagged fixtures carry a // want on every comment the rule must report, naming the tokens it must name, and
 // analysistest fails on a finding no want expects as much as on a want nothing found. The TypeScript rule's own test
-// cases sit in the fixtures as Go comments, in both directions, to show the engines agree on the same text. The
-// allowed and lookalike fixtures prove the rule stays quiet on acronyms, masked code, Go's directives, notes and
-// example output, a generated file, and capitals that are not in a comment at all.
+// cases sit in the fixtures as Go comments, in both directions, to show the engines agree on the same text. A
+// generated file is read like any other, so a shout past its marker is flagged, and so is the marker's line after the
+// package clause, where it marks nothing. The allowed and lookalike fixtures prove the rule stays quiet on acronyms,
+// masked code, Go's directives, notes, example output and generated-code marker, and capitals that are not in a
+// comment at all.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

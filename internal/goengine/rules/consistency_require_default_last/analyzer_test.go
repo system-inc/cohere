@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every default the rule must report, first or in the middle of a switch,
 // a type switch and a select, nested or not, and analysistest fails on a finding no want expects as much as on a want
 // nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on a default last, a statement with
-// no default, a default tied to its neighbour by fallthrough, and a generated file.
+// no default, and a default tied to its neighbour by fallthrough.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every empty function, method, function literal and test, the ones whose
 // only comment sits outside the braces or has no words included, and analysistest fails on a finding no want expects
 // as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on a body that
-// says why, a declaration without a body, a generated file, and empty braces that belong to no function.
+// says why, a declaration without a body, and empty braces that belong to no function.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

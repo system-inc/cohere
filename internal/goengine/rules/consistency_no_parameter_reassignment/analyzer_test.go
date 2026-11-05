@@ -28,7 +28,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // parameter, a range with =, ++, --, a receiver reassigned, an outer parameter reassigned from a function literal,
 // and &parameter. analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed
 // and lookalike fixtures prove the rule stays quiet on writes through a parameter, named results, a shadowing := in
-// an inner scope, a local or package variable of a parameter's name, and a generated file.
+// an inner scope, and a local or package variable of a parameter's name.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

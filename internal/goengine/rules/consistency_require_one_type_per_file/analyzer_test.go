@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every extra type a file serves, declared or receiver only, generic or in a
 // test file, and analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed
 // and lookalike fixtures prove the rule stays quiet on one type and its themed method files, plain structs and
-// interfaces beside a type, a generated file, an alias, and a function or method value that only uses another type.
+// interfaces beside a type, an alias, and a function or method value that only uses another type.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

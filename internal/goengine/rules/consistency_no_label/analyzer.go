@@ -23,7 +23,7 @@ const Name = "cohere-go/consistency-no-label"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_label",
 	Doc: "Flags every labeled statement at its label, the target of a labeled break or continue and of a goto " +
-		"alike, because a jump to a label lands where a reader is not looking. A generated file is left alone.",
+		"alike, because a jump to a label lands where a reader is not looking.",
 	Run: run,
 }
 
@@ -34,11 +34,6 @@ var labelMessage = policy.MessageOf(Name, "label")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to write, and the generator's next run puts any label back. This is the
-		// one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// Every labeled statement is a jump target whatever it labels, a loop, a select, a block or an empty
 		// statement at the end of a function, and the walk reaches those inside function literals too.
 		ast.Inspect(file, func(node ast.Node) bool {

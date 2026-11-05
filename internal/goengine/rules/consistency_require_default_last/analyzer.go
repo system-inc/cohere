@@ -26,7 +26,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a default clause that is not the last clause of its switch, type switch or select, since Go picks " +
 		"the default only when nothing else matches and a reader looks for that fallback at the bottom. A default " +
 		"that falls through into the next clause, or that the clause before falls through into, is left alone, " +
-		"since there its place is the program's meaning, and a generated file is left alone.",
+		"since there its place is the program's meaning.",
 	Run: run,
 }
 
@@ -37,11 +37,6 @@ var defaultNotLastMessage = policy.MessageOf(Name, "defaultNotLast")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to order, and the generator's next run undoes any move by hand. This is
-		// the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch statement := node.(type) {
 			case *ast.SwitchStmt:

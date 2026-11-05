@@ -34,8 +34,8 @@ var Analyzer = &analysis.Analyzer{
 		"MixedCaps form with exported names kept exported, because Go marks word boundaries and export with " +
 		"capitals. Not judged: the blank identifier, an example's name, the test, benchmark or fuzz prefix of a " +
 		"test's name, a name an //export or //go:linkname directive gives out, a constant assigned from or compared " +
-		"against a constant of syscall or golang.org/x/sys, a name whose MixedCaps form would not be an identifier " +
-		"(type_ would be the keyword type), and generated files.",
+		"against a constant of syscall or golang.org/x/sys, and a name whose MixedCaps form would not be an " +
+		"identifier (type_ would be the keyword type).",
 	Run: run,
 }
 
@@ -58,11 +58,6 @@ func run(pass *analysis.Pass) (any, error) {
 	mirrored := mirroredConstants(pass)
 	directed := directedNames(pass)
 	for _, file := range pass.Files {
-		// A generated file's names are its generator's, and a finding there would be fixed by hand and lost on the
-		// next generation.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		isTestFile := strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go")
 		ast.Inspect(file, func(node ast.Node) bool {

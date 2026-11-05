@@ -1,8 +1,8 @@
 // Package consistency_no_long_line is the Go engine's rule that a line fits in 120 columns.
 //
 // A line past the limit runs off the edge of a review pane or a split editor, and its end goes unread. gofmt never
-// wraps a line, so the limit is the writer's to keep. What cannot wrap is left alone: a generated file, an import
-// path, a //go: directive, a raw string's body, a string literal alone on its line or after only a struct field's
+// wraps a line, so the limit is the writer's to keep. What cannot wrap is left alone: an import path, a //go:
+// directive, a raw string's body, a string literal alone on its line or after only a struct field's
 // names and type or a return, and a comment that overruns only on one token too long for a comment line of its own,
 // such as a URL.
 package consistency_no_long_line
@@ -31,7 +31,7 @@ const Name = "cohere-go/consistency-no-long-line"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_long_line",
 	Doc: "Flags a line longer than 120 columns, a tab counted as 4 and every other rune as 1, at its 121st column. " +
-		"A generated file, an import line, a //go: directive, a raw string's body, a string literal alone on its " +
+		"An import line, a //go: directive, a raw string's body, a string literal alone on its " +
 		"line or after only a struct field's names and type or a return, and a comment that overruns only on one " +
 		"token too long to wrap, such as a URL, are left alone.",
 	Run: run,
@@ -72,10 +72,6 @@ type sourceFile struct {
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to wrap, and the generator's next run undoes any edit by hand.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		tokenFile := pass.Fset.File(file.FileStart)
 		content, readError := pass.ReadFile(tokenFile.Name())
 		if readError != nil {

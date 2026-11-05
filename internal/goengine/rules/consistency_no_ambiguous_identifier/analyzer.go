@@ -30,7 +30,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a single lowercase letter as a name where it is declared: a variable, constant, parameter, result, " +
 		"receiver, type parameter, function, method, type or struct field, apart from the coordinates x, y and z, " +
 		"because a letter makes every reader find the declaration to learn what it holds. An uppercase letter, a " +
-		"type parameter by convention, and generated files are not judged.",
+		"type parameter by convention, is not judged.",
 	Run: run,
 }
 
@@ -66,11 +66,6 @@ var errorInterface = func() *types.Interface {
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file's names are its generator's, and a finding there would be fixed by hand and lost on the
-		// next generation.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.PreorderStack(file, nil, func(node ast.Node, stack []ast.Node) bool {
 			switch declaring := node.(type) {
 			case *ast.Ident:

@@ -37,7 +37,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a declared name holding an initialism of two or more capitals, userID, ParseURL, JSONEncoder or ID, " +
 		"and suggests it spelled as a word, userId, ParseUrl, JsonEncoder, Id, since the house capitalizes only an " +
 		"initialism's first letter. Uses, package names, methods an interface of another package fixes, " +
-		"//go:linkname and cgo //export names, Example functions, screaming snake case and generated files are left.",
+		"//go:linkname and cgo //export names, Example functions and screaming snake case are left.",
 	Run: run,
 }
 
@@ -50,10 +50,6 @@ func run(pass *analysis.Pass) (any, error) {
 	directed := directedObjects(pass)
 	interfaces := &foreignInterfaces{pass: pass}
 	for _, file := range pass.Files {
-		// A generated file's names are its generator's, and a rename by hand is lost on the next generation.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds examples.
 		isTestFile := strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go")
 		ast.Inspect(file, func(node ast.Node) bool {

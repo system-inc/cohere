@@ -4,13 +4,11 @@
 // seams in it to split along. The limit is the house max-lines and cohere-swift's file-length, and lines are counted
 // the way both count them and an editor shows them: every line, comments and blank lines included, with a final
 // newline ending the last line rather than starting another. A comment is part of what a reader holds, and a count
-// that skipped comments would reward moving explanation out of the file. A generated file is left alone, since its
-// length is its generator's.
+// that skipped comments would reward moving explanation out of the file.
 package consistency_no_long_file
 
 import (
 	"fmt"
-	"go/ast"
 	"strconv"
 
 	"golang.org/x/tools/go/analysis"
@@ -30,8 +28,7 @@ func NewAnalyzer() *analysis.Analyzer {
 		Name: "consistency_no_long_file",
 		Doc: "Flags a file of more than 2,000 lines once, at the start of its 2,001st line. Every line counts, " +
 			"comments and blank lines included, and a final newline ends the last line rather than adding one, " +
-			"so a file of 2,000 lines ending in a newline is not over. A generated file is left alone. The limit " +
-			"option sets a stricter limit.",
+			"so a file of 2,000 lines ending in a newline is not over. The limit option sets a stricter limit.",
 		Run: run,
 	}
 	// A repository may hold its files to fewer lines than the house does, so the limit is an option. Its value is
@@ -95,11 +92,6 @@ func limitOf(pass *analysis.Pass) int {
 func run(pass *analysis.Pass) (any, error) {
 	limit := limitOf(pass)
 	for _, file := range pass.Files {
-		// A generated file's length is its generator's, and a split by hand is undone on the next generation. This
-		// is the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// The line table counts every newline the scanner read, in comments and raw strings too, and a newline at
 		// the very end starts no line, which is the count an editor shows. It is the file as written, which a
 		// //line directive does not change.

@@ -24,7 +24,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // At the house limit, the flagged fixture of 2,001 lines carries a want at the start of its last line, and
 // analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike
 // fixtures prove the rule stays quiet on a file of exactly 2,000 lines ending in a newline, one of 2,000 with no
-// final newline, a generated file of 3,000, and a short file a //line directive numbers past the limit.
+// final newline, and a short file a //line directive numbers past the limit.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

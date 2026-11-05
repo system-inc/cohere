@@ -26,7 +26,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // initialism in capitals, and analysistest fails on a finding no want expects as much as on a want nothing found, so
 // the allowed and lookalike fixtures prove the rule stays quiet on names spelled as words, on uses and package names,
 // on methods an interface of another package fixes, on directive names and examples, on one capital before a word,
-// on screaming snake case, and on generated files.
+// and on screaming snake case.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

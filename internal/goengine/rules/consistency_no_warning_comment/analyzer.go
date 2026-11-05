@@ -30,7 +30,7 @@ const Name = "cohere-go/consistency-no-warning-comment"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_warning_comment",
 	Doc: "Flags TODO, FIXME or XXX written as a whole word in a comment, because a deferred task kept in a comment " +
-		"rots where nobody is reminded of it. Directives, words in backticks and generated files are not read.",
+		"rots where nobody is reminded of it. Directives and words in backticks are not read.",
 	Run: run,
 }
 
@@ -55,11 +55,6 @@ var (
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file's comments are its generator's, and the fix belongs there. This is the one place the rule
-		// skips them, until a driver filter does it for every rule.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		tokenFile := pass.Fset.File(file.Pos())
 		for _, group := range file.Comments {
 			judgeGroup(pass, tokenFile, group)

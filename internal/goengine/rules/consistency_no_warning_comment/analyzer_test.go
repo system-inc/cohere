@@ -26,7 +26,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 
 // The flagged fixtures carry a // want on every line the rule must report, one pattern per word, and analysistest
 // fails on a finding no want expects as much as on a want nothing found. The allowed and lookalike fixtures prove the
-// rule stays quiet on directives, words in backticks, a generated file, the words in another case or inside a longer
+// rule stays quiet on directives, words in backticks, the words in another case or inside a longer
 // word, and the words outside a comment. analysistest checks only lines, so every finding's range is also read back
 // from the source and must be the word itself.
 func TestAnalyzer(test *testing.T) {

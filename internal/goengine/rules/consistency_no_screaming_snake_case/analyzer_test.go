@@ -26,7 +26,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // declared as, with the suggestion each must offer. analysistest fails on a finding no want expects as much as on a
 // want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on MixedCaps names, the blank
 // identifier, uses of another package's snake-case names, test and example grammar, directive names, constants
-// mirroring syscall or golang.org/x/sys, names with no MixedCaps form, and generated files.
+// mirroring syscall or golang.org/x/sys, and names with no MixedCaps form.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

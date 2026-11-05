@@ -26,8 +26,8 @@ const Name = "cohere-go/consistency-require-octal-prefix"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_octal_prefix",
 	Doc: "Flags an integer literal written in legacy octal, a leading zero followed by digits like 0755, and offers " +
-		"0o755 in its place, because only the zero says the number is not decimal. Floats, imaginary literals and " +
-		"generated files are not judged.",
+		"0o755 in its place, because only the zero says the number is not decimal. Floats and imaginary literals " +
+		"are not judged.",
 	Run: run,
 }
 
@@ -38,10 +38,6 @@ var legacyOctalMessage = policy.MessageOf(Name, "legacyOctal")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file's literals are its generator's, and the fix belongs there.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			literal, isLiteral := node.(*ast.BasicLit)
 			if isLiteral && isLegacyOctal(literal) {

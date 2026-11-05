@@ -42,11 +42,6 @@ var severalNamesMessage = policy.MessageOf(Name, "severalNames")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to lay out, and the generator's next run undoes any split by hand. This
-		// is the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// A declaration statement exists only inside a block, so walking for one reaches every function body, a
 		// literal's at package level included, and never a package-level declaration, which is a bare GenDecl.
 		ast.Inspect(file, func(node ast.Node) bool {
