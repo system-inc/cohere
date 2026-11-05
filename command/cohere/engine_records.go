@@ -265,6 +265,11 @@ type engineRun struct {
 
 // newEngineRun starts rendering one engine's run, naming the step nothing can skip by what the engine
 // describes first, its package, module or workspace.
+//
+// The run's `--no-cache` is the front door's flag, passed to the engine through its arguments, so the report reads
+// it here: the summary's `cache.off` and the account's note say it, as a TypeScript run's do, in the words of what
+// the engine keeps (engineLanguage.CacheOffDetail). Without it every Swift summary said the cache was on under
+// `--no-cache`, a report that lies about what ran.
 func newEngineRun(
 	out *bufio.Writer,
 	mode engineMode,
@@ -281,6 +286,8 @@ func newEngineRun(
 			rootNote:              rootNote,
 			graphLabel:            language.Container,
 			graphNotBuiltSentence: fmt.Sprintf("no %s was described and no phase ran", language.Container),
+			cacheOff:              cacheOff,
+			cacheOffDetail:        language.CacheOffDetail,
 		},
 	}
 }

@@ -46,7 +46,7 @@ type stdinRequest struct {
 //     typo; the gate reports it.
 //   - An error on stderr and nothing on stdout, exit 1, for a formatter or fixer that broke. The hook
 //     shows it and saves the buffer as typed.
-func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output io.Writer) error {
+func runStdin(callerContext context.Context, request stdinRequest, input io.Reader, output io.Writer) error {
 	buffer, err := io.ReadAll(input)
 	if err != nil {
 		return fmt.Errorf("reading the buffer from stdin: %w", err)
@@ -65,7 +65,7 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 		return err
 	}
 
-	propose, held, err := stdinProposals(ctx, request, path, text)
+	propose, held, err := stdinProposals(callerContext, request, path, text)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func stdinTransform(
 // and only the format transform applies, which is what the gate does with a .md or a .css. held is the
 // program's Adamic `.a` files, for the format transform to know whether this one is source.
 func stdinProposals(
-	ctx context.Context,
+	callerContext context.Context,
 	request stdinRequest,
 	path string,
 	text string,
@@ -167,7 +167,7 @@ func stdinProposals(
 		return nil, nil, configureLintError
 	}
 	rules := registry.All()
-	walk, err := graph.Walk(ctx, []*ast.SourceFile{sourceFile}, rules)
+	walk, err := graph.Walk(callerContext, []*ast.SourceFile{sourceFile}, rules)
 	if err != nil {
 		return nil, nil, fmt.Errorf("collecting proposals: %w", err)
 	}

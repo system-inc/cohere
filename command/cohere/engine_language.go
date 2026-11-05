@@ -37,6 +37,10 @@ type engineLanguage struct {
 	// engine that rewords one makes the gap louder and never hides it. Nil keeps no gap: only Swift's are
 	// known, and its gap is said as Swift files, in `gaps.uncheckedSwift` and on the footer.
 	ExpectedExclusionReasons map[string]bool
+
+	// CacheOffDetail is what `--no-cache` kept the run from, said after "cache: off, by --no-cache:" in the
+	// account. An engine keeps no cache table of the TypeScript pipeline's, so each says what is true of its own.
+	CacheOffDetail string
 }
 
 // theEngine is how a sentence names the engine, "the Swift engine", so every error and unfinished
@@ -60,6 +64,8 @@ var swiftLanguage = engineLanguage{
 		"vendored under Vendor/": true,
 		"a package manifest":     true,
 	},
+	CacheOffDetail: "nothing was read from or written to this package's cache, since the engine described " +
+		"and built it in a scratch of its own and removed it",
 }
 
 // swiftVersionLines is the Swift engine's `--version` lines. Only Swift has the source-commit line,
@@ -87,6 +93,11 @@ func goLanguage(container string) engineLanguage {
 		FileNoun:      "Go files",
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
+		// The Go engine keeps no cache of its own: it loads the packages through the go command, whose build
+		// cache is go's (internal/goengine/load). A Go run refuses `--no-cache` today (goFlags), so this is
+		// said only once the flag reaches it.
+		CacheOffDetail: "the Go engine keeps no cache of its own, and the go command's build cache, which " +
+			"loading the packages reads and may fill, is go's to keep",
 	}
 }
 
