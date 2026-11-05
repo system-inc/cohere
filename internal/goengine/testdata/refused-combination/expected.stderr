@@ -1,0 +1,1 @@
+--format-only cannot be named with --lint, since the two ask for opposite runs.

@@ -39,22 +39,24 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(t *testing.T) {
 		got  []string
 		want []string
 	}{
-		// The switch (13), the early group (7) and exactAbbreviations (10). Whole-word matches cannot
-		// overlap, so this one is compared as a set.
+		// The switch (13), the early group (7), exactAbbreviations (10) and the thirteen Go words @system_cohere
+		// added for every engine on #ec8mvbg. Whole-word matches cannot overlap, so this one is compared as a set.
 		{"whole", wholeWords, sortedCopy([]string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc", "char", "fn", "str",
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		})},
 		// The early group's loop, in its order.
 		{"early prefix", abbreviationsOf(vocabulary.earlyPrefixes), []string{
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 		}},
-		// The late group (9), the role prefixes (3) and prefixAbbreviations (10). No two of these can
-		// match one name, so their relative order was never observable; the file's order is pinned.
+		// The late group (9), the role prefixes (3), prefixAbbreviations (10) and the thirteen Go words. No two
+		// of these can match one name, so their relative order was never observable; the file's order is pinned.
 		{"late prefix", abbreviationsOf(vocabulary.latePrefixes), []string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		}},
 		// The hand-written suffix chain (12), the millisecond check where it ran, and
 		// suffixAbbreviations (10), in the chain's order.
@@ -62,9 +64,11 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(t *testing.T) {
 			"prop", "props", "param", "params", "ms", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 		}},
-		// wordSegmentAbbreviations (10), in order.
+		// wordSegmentAbbreviations (10), in order, then the thirteen Go words @system_cohere added for every engine
+		// on #ec8mvbg, after them so no earlier entry's order moves.
 		{"segment", abbreviationsOf(vocabulary.segments), []string{
 			"cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		}},
 		{"allowed segment", vocabulary.allowedSegments, []string{"InnoDb"}},
 	}
@@ -125,9 +129,29 @@ func TestAbbreviationVocabularyJudgesEveryForm(t *testing.T) {
 		}
 		judged++
 	}
-	// 30 whole, 29 prefix, 23 suffix, 10 segment: the counts the table above pins.
-	if judged != 92 {
-		t.Errorf("judged %d forms, want 92", judged)
+	// 43 whole, 42 prefix, 23 suffix, 23 segment: the counts the table above pins.
+	if judged != 131 {
+		t.Errorf("judged %d forms, want 131", judged)
+	}
+}
+
+// TestAbbreviationSegmentsJudgeOnlyTheWholeWord: the short Go words are judged only as a whole camelCase word, so a
+// name that holds their letters inside a longer word is not an abbreviation. `ch` must never read `Check`, nor `pos`
+// read `Posix`, nor `buf` read `Buffer`.
+func TestAbbreviationSegmentsJudgeOnlyTheWholeWord(test *testing.T) {
+	test.Parallel()
+	for _, name := range []string{
+		"checkName", "widgetCheckName", "changeSet", "posixPath", "postOffice", "bufferSize", "widgetBuffer",
+		"muteButton", "multiplier", "temporaryFile", "sourceMap", "commandLine", "packageName", "position",
+	} {
+		if finding, found := vocabulary.find(name); found {
+			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
+		}
+	}
+	for _, name := range []string{"chList", "readCh", "posValue", "bufSize", "widgetMu", "sb"} {
+		if _, found := vocabulary.find(name); !found {
+			test.Errorf("%q holds a whole abbreviated word and was not judged", name)
+		}
 	}
 }
 

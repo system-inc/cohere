@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/system-inc/cohere/internal/goengine"
 	"github.com/system-inc/cohere/internal/sentence"
 )
 
@@ -23,12 +24,10 @@ const goEngineVerb = "go-engine"
 const goEngineChildVariable = "COHERE_GO_ENGINE_CHILD"
 
 // runGoEngineVerb is the hidden `go-engine` mode, matched by main before anything else reads the command
-// line. The engine itself (internal/goengine) has not landed in this branch, so it says so and exits 2, the
-// contract's "did not run", and the front door that started it reports that nothing was checked.
-func runGoEngineVerb(standardError io.Writer) int {
-	fmt.Fprintf(standardError, "cohere %s: %s\n", goEngineVerb,
-		sentence.Of("the Go engine is not built into this cohere yet, so nothing was checked"))
-	return 2
+// line: the Go engine, given everything after the verb, writing contract 3 to standardOutput for the front
+// door that started it.
+func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
+	return goengine.Main(arguments, standardOutput, standardError)
 }
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded

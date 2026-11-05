@@ -32,15 +32,23 @@ var fieldsNotWritten = map[Kind][]string{
 	KindProvenance: {"swiftSyntax", "swiftFormat"},
 }
 
+// additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
+// front door ignores them until it reads them. Each must be written, and none is compared with the contract.
+var additiveFields = map[Kind][]string{
+	KindLint: {"withheldBySuppression", "withheldAsGenerated"},
+}
+
 // dictionaryFields are objects keyed by data (a reason, a rule name) rather than by field names, so their
 // keys are values and are not compared.
 var dictionaryFields = map[string]bool{
-	"refusalsByReason":    true,
-	"notFormattedReasons": true,
-	"fixedBy":             true,
-	"rulesScopedOff":      true,
-	"filesNotChecked":     true,
-	"skipped":             true,
+	"refusalsByReason":      true,
+	"notFormattedReasons":   true,
+	"fixedBy":               true,
+	"rulesScopedOff":        true,
+	"filesNotChecked":       true,
+	"skipped":               true,
+	"withheldBySuppression": true,
+	"withheldAsGenerated":   true,
 }
 
 // shape is a JSON object's field names, each with the shape of its value: nil for a value with no fields,
@@ -218,7 +226,8 @@ func populatedRecords() []Record {
 		TypesRecord{Diagnostics: 1, Files: 2, ElapsedMilliseconds: 900, FilesWithoutRecord: []string{"/project/d.go"}, Build: "go list -deps -test"},
 		LintRecord{Findings: 1, RulesRun: 4, FilesWalked: 2, NodesVisited: 640, ElapsedMilliseconds: 12, ReusedFrom: "fix",
 			RulesSilent: []string{"cohere-go/copylock"}, RulesWatchedAndQuiet: 2, Crashes: []Crash{{File: "/project/a.go", Error: "a panic"}},
-			RulesScopedOff: map[string]int{"cohere-go/printf": 1}, RulesNotConfigured: []string{"cohere-go/SA4006"}, ConfigNote: "a note"},
+			RulesScopedOff: map[string]int{"cohere-go/printf": 1}, RulesNotConfigured: []string{"cohere-go/SA4006"}, ConfigNote: "a note",
+			WithheldBySuppression: map[string]int{"cohere-go/printf": 1}, WithheldAsGenerated: map[string]int{"cohere-go/x": 2}},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
@@ -259,6 +268,12 @@ func TestEveryRecordWritesTheContractsFields(t *testing.T) {
 		written[record.kind()] = true
 		ours := shapeOf("", object)
 		delete(ours, "kind")
+		for _, additive := range additiveFields[record.kind()] {
+			if _, present := ours[additive]; !present {
+				t.Errorf("%s does not write its additive field %s", record.kind(), additive)
+			}
+			delete(ours, additive)
+		}
 		theirs, inContract := shapes[record.kind()]
 		if !inContract {
 			t.Errorf("%s is written and the contract shows no such record", record.kind())
@@ -345,6 +360,14 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 			if decodeError := json.Unmarshal([]byte(line), &original); decodeError != nil {
 				t.Fatal(decodeError)
 			}
+			// A fixture from before an additive field has none, and this engine always writes it.
+			if reencodedObject, isObject := reencoded.(map[string]any); isObject {
+				for _, additive := range additiveFields[envelope.Kind] {
+					if !strings.Contains(line, `"`+additive+`"`) {
+						delete(reencodedObject, additive)
+					}
+				}
+			}
 			if !reflect.DeepEqual(reencoded, original) {
 				t.Errorf("%s: a %s record reencodes differently\n got: %s want: %s", filepath.Base(fixture), envelope.Kind, output.String(), line)
 			}
@@ -352,5 +375,23 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 	}
 	if compared == 0 {
 		t.Error("no fixture line was compared")
+	}
+}
+
+// TestLintRecordWritesEmptyWithheldCountsAsObjects keeps an unset count from encoding as null, which would read
+// as "not counted" rather than "none withheld".
+func TestLintRecordWritesEmptyWithheldCountsAsObjects(t *testing.T) {
+	t.Parallel()
+	var output bytes.Buffer
+	writer := NewWriter(&output)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, LintRecord{}} {
+		if writeError := writer.Write(record); writeError != nil {
+			t.Fatal(writeError)
+		}
+	}
+	for _, field := range []string{`"withheldBySuppression":{}`, `"withheldAsGenerated":{}`} {
+		if !strings.Contains(output.String(), field) {
+			t.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
+		}
 	}
 }

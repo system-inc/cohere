@@ -1,0 +1,7 @@
+{"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
+{"kind":"project","root":"/project","package":"example.com/typeerror","elapsedMilliseconds":0,"filesInPackage":1,"filesOurs":1,"filesInScope":1,"scopeDescription":"","targets":[{"name":"example.com/typeerror","kind":"module","files":1,"languageMode":"1.24"}],"excluded":[]}
+{"kind":"phase","name":"fix","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"phase","name":"types","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"phase","name":"lint","outcome":"notReached","elapsedMilliseconds":0,"detail":"the load found 1 type errors, so lint findings against wrong semantics would be noise; run with --types to see them"}
+{"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"summary","findings":0,"complete":false,"exitCode":1}

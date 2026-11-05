@@ -1,0 +1,1 @@
+/project/.. is outside the root /project, so the run cannot narrow to it.

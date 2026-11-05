@@ -46,10 +46,19 @@ var messageFiles embed.FS
 const (
 	MessageLanguageTypeScript = "TypeScript"
 	MessageLanguageSwift      = "Swift"
+	MessageLanguageGo         = "Go"
 )
 
 // messageLanguages are the languages a file may name.
-var messageLanguages = map[string]bool{MessageLanguageTypeScript: true, MessageLanguageSwift: true}
+var messageLanguages = map[string]bool{
+	MessageLanguageTypeScript: true,
+	MessageLanguageSwift:      true,
+	MessageLanguageGo:         true,
+}
+
+// messageLanguagesNamingTheFile is the order a file's idea is read from its rules: the TypeScript rule, the
+// original, then Swift's, then Go's, so a twin file keeps the name it had before Go joined it.
+var messageLanguagesNamingTheFile = []string{MessageLanguageTypeScript, MessageLanguageSwift, MessageLanguageGo}
 
 // messageFile is one file under messages/, as written.
 type messageFile struct {
@@ -175,7 +184,7 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 	}
 	for language, ruleName := range file.Rules {
 		if !messageLanguages[language] {
-			return fmt.Errorf("rules: %q is not %q or %q", language, MessageLanguageTypeScript, MessageLanguageSwift)
+			return fmt.Errorf("rules: %q is not %q, %q or %q", language, MessageLanguageTypeScript, MessageLanguageSwift, MessageLanguageGo)
 		}
 		if _, leaf, found := strings.Cut(ruleName, "/"); !found || leaf == "" {
 			return fmt.Errorf("rules: %q is not a namespaced rule name", ruleName)
@@ -184,11 +193,14 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 			return fmt.Errorf("rules: %q is named by another message file too", ruleName)
 		}
 	}
-	// The file is named for its idea: the TypeScript rule's name after its namespace, the original, or
-	// the Swift rule's when there is no TypeScript one.
-	namedFor := file.Rules[MessageLanguageTypeScript]
-	if namedFor == "" {
-		namedFor = file.Rules[MessageLanguageSwift]
+	// The file is named for its idea: the first rule messageLanguagesNamingTheFile finds, after its
+	// namespace.
+	namedFor := ""
+	for _, language := range messageLanguagesNamingTheFile {
+		if ruleName := file.Rules[language]; ruleName != "" {
+			namedFor = ruleName
+			break
+		}
 	}
 	if _, leaf, _ := strings.Cut(namedFor, "/"); leaf != idea {
 		return fmt.Errorf("is named %q, and its idea is %q", idea, leaf)

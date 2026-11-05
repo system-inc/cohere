@@ -24,6 +24,9 @@ const (
 	OriginVet Origin = "vet"
 	// OriginStaticcheck is one of staticcheck's checks, ported under its own name.
 	OriginStaticcheck Origin = "staticcheck"
+	// OriginTools is one of golang.org/x/tools' own analysis passes that cmd/vet leaves out, ported under its
+	// own name.
+	OriginTools Origin = "tools"
 )
 
 // Rule is one rule of the Go engine: an analyzer, plus the naming and provenance cohere adds to it.
@@ -41,8 +44,13 @@ type Rule struct {
 	UpstreamName string
 	// TypeAware is whether the rule reads type information, for the docs, as swift/Rules.json's typeAware.
 	TypeAware bool
-	// Analyzer is what runs.
+	// Analyzer is what runs. Its options are flags on Analyzer.Flags, which the engine sets from the
+	// options object of the rule's entry in the settings.
 	Analyzer *analysis.Analyzer
+	// ConfiguredBy names the options without which the rule reports nothing, each a flag on Analyzer.Flags.
+	// While any of them is empty the engine lists the rule in the lint record's rulesNotConfigured, so a rule
+	// that cannot report reads as not configured rather than as quiet.
+	ConfiguredBy []string
 }
 
 // Validate refuses a rule the registry should never hold, so a malformed rule fails a test at the
@@ -52,7 +60,9 @@ func (rule Rule) Validate() error {
 		return fmt.Errorf("a rule has no name")
 	}
 	if !strings.HasPrefix(rule.Name, Namespace) {
-		return fmt.Errorf("rule %q does not start with %q, the namespace every Go rule's name opens with", rule.Name, Namespace)
+		return fmt.Errorf(
+			"rule %q does not start with %q, the namespace every Go rule's name opens with", rule.Name, Namespace,
+		)
 	}
 	if rule.Name == Namespace {
 		return fmt.Errorf("rule %q is the namespace alone, with no name after it", rule.Name)
@@ -63,14 +73,31 @@ func (rule Rule) Validate() error {
 	switch rule.Origin {
 	case OriginHouse:
 		if rule.UpstreamName != "" {
-			return fmt.Errorf("rule %q is a house rule and names upstream %q; a house rule has no upstream", rule.Name, rule.UpstreamName)
+			return fmt.Errorf(
+				"rule %q is a house rule and names upstream %q; a house rule has no upstream",
+				rule.Name, rule.UpstreamName,
+			)
 		}
-	case OriginVet, OriginStaticcheck:
+	case OriginVet, OriginStaticcheck, OriginTools:
 		if rule.UpstreamName == "" {
-			return fmt.Errorf("rule %q is ported from %s and names no upstream rule, so nobody can find what it ports", rule.Name, rule.Origin)
+			return fmt.Errorf(
+				"rule %q is ported from %s and names no upstream rule, so nobody can find what it ports",
+				rule.Name, rule.Origin,
+			)
 		}
 	default:
-		return fmt.Errorf("rule %q has origin %q, which is none of %q, %q and %q", rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck)
+		return fmt.Errorf(
+			"rule %q has origin %q, which is none of %q, %q, %q and %q",
+			rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck, OriginTools,
+		)
+	}
+	// A name with no flag behind it could never be set, so the rule would read as not configured forever.
+	for _, option := range rule.ConfiguredBy {
+		if rule.Analyzer.Flags.Lookup(option) == nil {
+			return fmt.Errorf(
+				"rule %q is configured by option %q, which its analyzer has no flag for", rule.Name, option,
+			)
+		}
 	}
 	return nil
 }
