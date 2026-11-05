@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "Go": "cohere-go/correctness-require-invariant-reason"
+  },
+  "messages": {
+    "unexplainedPanic": {
+      "text": "This panic stops the process and says nothing about why it can never happen. If the case can happen, return an error so a caller can handle it. If it truly cannot, say what holds in a `// Invariant: <reason>` comment directly above it or at the end of its line, so the next reader knows what they would break before changing the code around it."
+    },
+    "invariantWithoutReason": {
+      "text": "This panic is marked as an invariant and gives no reason. Say what holds after `Invariant:`, such as the table built from constants or the caller that already checked, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    },
+    "mustOutsideInitialization": {
+      "text": "`{{name}}` panics on a bad input, and called here it turns that input into a crash at the moment of use. Call it only in the initializer of a package-level `var`, where a bad constant stops the program the moment it starts, or call the form that returns an error and handle it."
+    }
+  }
+}
