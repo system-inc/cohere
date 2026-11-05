@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "61435a5fb4d922e644b6286e3835d882b44ed395354cb7849537c58cd06a6f4a"
+    static let sourceDigest = "3ff174301bf29fcc8f4e461773ee0afa170c399ba822376e8cd3db08e61c6993"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -51,8 +51,11 @@ enum RuleMessages {
         "SecurityNoInterpolatedShellCommand.interpolatedShellCommand",
         "SecurityNoInterpolatedSqlString.interpolatedSqlString",
         "ToolchainRequireStrictMemorySafety.strictMemorySafetyMissing",
+        "ToolchainRequireStrictMemorySafety.strictMemorySafetyMissingInXcode",
         "ToolchainRequireSwift6LanguageMode.languageModeBelowSix",
+        "ToolchainRequireSwift6LanguageMode.languageModeBelowSixInXcode",
         "ToolchainRequireUpcomingFeatures.upcomingFeatureMissing",
+        "ToolchainRequireUpcomingFeatures.upcomingFeatureMissingInXcode",
     ]
 
     /* cohere-swift/always-use-lower-camel-case */
@@ -487,6 +490,42 @@ enum RuleMessages {
                     #"\#(target) does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."#,
             )
         }
+
+        enum Configurations {
+            case every
+            case some(configurations: String)
+        }
+
+        enum Located {
+            case found
+            case notFound(definition: String)
+        }
+
+        static func strictMemorySafetyMissingInXcode(
+            target: String,
+            configurations: Configurations,
+            located: Located,
+        ) -> Message {
+            let configurationsText =
+                switch configurations {
+                    case .every:
+                        #""#
+                    case .some(let configurations):
+                        #" in \#(configurations)"#
+                }
+            let locatedText =
+                switch located {
+                    case .found:
+                        #""#
+                    case .notFound(let definition):
+                        #" It points at the first line of \#(definition), because the target's own line there was not found."#
+                }
+            return Message(
+                id: "strictMemorySafetyMissingInXcode",
+                text:
+                    #"\#(target) does not compile under strict memory safety\#(configurationsText). Set the target's SWIFT_STRICT_MEMORY_SAFETY build setting to YES in every configuration, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be.\#(locatedText)"#,
+            )
+        }
     }
 
     /* cohere-swift/toolchain-require-swift-6-language-mode */
@@ -496,6 +535,43 @@ enum RuleMessages {
                 id: "languageModeBelowSix",
                 text:
                     #"\#(target) compiles in Swift \#(languageMode) language mode. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set .swiftLanguageMode(.v6) on the target, or remove the setting that lowers it."#,
+            )
+        }
+
+        enum Configurations {
+            case every
+            case some(configurations: String)
+        }
+
+        enum Located {
+            case found
+            case notFound(definition: String)
+        }
+
+        static func languageModeBelowSixInXcode(
+            target: String,
+            languageMode: String,
+            configurations: Configurations,
+            located: Located,
+        ) -> Message {
+            let configurationsText =
+                switch configurations {
+                    case .every:
+                        #""#
+                    case .some(let configurations):
+                        #" in \#(configurations)"#
+                }
+            let locatedText =
+                switch located {
+                    case .found:
+                        #""#
+                    case .notFound(let definition):
+                        #" It points at the first line of \#(definition), because the target's own line there was not found."#
+                }
+            return Message(
+                id: "languageModeBelowSixInXcode",
+                text:
+                    #"\#(target) compiles in Swift \#(languageMode) language mode\#(configurationsText). Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set the target's SWIFT_VERSION build setting to 6.0 in every configuration, or remove the setting that lowers it.\#(locatedText)"#,
             )
         }
     }
@@ -512,6 +588,32 @@ enum RuleMessages {
                 id: "upcomingFeatureMissing",
                 text:
                     #"\#(target) does not enable \#(features). Add \#(settings) to its swiftSettings. \#(reasons)."#,
+            )
+        }
+
+        enum Located {
+            case found
+            case notFound(definition: String)
+        }
+
+        static func upcomingFeatureMissingInXcode(
+            target: String,
+            features: String,
+            settings: String,
+            reasons: String,
+            located: Located,
+        ) -> Message {
+            let locatedText =
+                switch located {
+                    case .found:
+                        #""#
+                    case .notFound(let definition):
+                        #" It points at the first line of \#(definition), because the target's own line there was not found."#
+                }
+            return Message(
+                id: "upcomingFeatureMissingInXcode",
+                text:
+                    #"\#(target) does not enable \#(features). Set \#(settings) to YES in the target's build settings, in every configuration. \#(reasons).\#(locatedText)"#,
             )
         }
     }

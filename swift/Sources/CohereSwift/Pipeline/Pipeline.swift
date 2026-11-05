@@ -75,9 +75,13 @@ public struct Pipeline {
          The file the config is looked for beside, which its note names: the Package.swift that wins below, else the
          Xcode project's definition. A root that holds neither, or two projects, is refused below before any note prints.
          */
-        let definition =
-            FileManager.default.fileExists(atPath: configurationRoot.appendingPathComponent("Package.swift").path)
-            ? "Package.swift" : (try? XcodeProject.source(at: configurationRoot))?.fileName ?? "Package.swift"
+        let definition: String
+        if case let .xcode(source) = try? XcodeProject.rootProject(at: configurationRoot) {
+            definition = source.fileName
+        }
+        else {
+            definition = "Package.swift"
+        }
         let configuration = try RuleConfiguration.load(
             packageRoot: configurationRoot,
             explicitPath: options.lintConfiguration,
@@ -97,24 +101,22 @@ public struct Pipeline {
         guard let root = options.root else {
             throw RunFailure(description: "no --root was given, so there is no package to check")
         }
-        /* A Package.swift wins over an Xcode project beside it, as it did before Xcode projects were checked at all. */
         let xcodeSource: XcodeProject.Source?
-        if FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) {
-            xcodeSource = nil
+        do {
+            switch try XcodeProject.rootProject(at: root) {
+                case .swiftPackage:
+                    xcodeSource = nil
+                case let .xcode(source):
+                    xcodeSource = source
+                case nil:
+                    throw RunFailure(
+                        description:
+                            "\(root.path) holds no Package.swift, project.yml or .xcodeproj, so there is nothing to check"
+                    )
+            }
         }
-        else {
-            do {
-                xcodeSource = try XcodeProject.source(at: root)
-            }
-            catch let ambiguous as XcodeProject.AmbiguousRoot {
-                throw RunFailure(description: ambiguous.description)
-            }
-            guard xcodeSource != nil else {
-                throw RunFailure(
-                    description:
-                        "\(root.path) holds no Package.swift, project.yml or .xcodeproj, so there is nothing to check"
-                )
-            }
+        catch let ambiguous as XcodeProject.AmbiguousRoot {
+            throw RunFailure(description: ambiguous.description)
         }
 
         /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
@@ -484,8 +486,25 @@ public struct Pipeline {
                     "\($0), since the build this run made for the typed rules failed: \(lintBuildFailure)"
                 }
             }
+            /*
+             At an Xcode root, Xcode's own answer for each target's toolchain settings, which only the toolchain rules
+             read, so it is asked for here, when one of them is enabled. Its time is in the lint phase's elapsed. Asked
+             after the build, it finds the packages that build resolved, and a run whose types bailed never asks.
+             */
+            var judged = package
+            if let loaded = xcodeProject,
+                RuleRegistry.packageRules.contains(where: { configuration.severity(of: $0.name) != .off })
+            {
+                judged = toolchainSettingsRead(
+                    into: package,
+                    project: loaded,
+                    fileSet: fileSet,
+                    root: root,
+                    toolchain: toolchain,
+                )
+            }
             let lint = await linter.run(
-                package: package,
+                package: judged,
                 manifests: await manifests(of: package),
                 files: parsed.files,
                 reusable: reusableFindings,
@@ -556,6 +575,43 @@ public struct Pipeline {
             toolchain: toolchain,
         )
         return (package, nil)
+    }
+
+    /*
+     The model with Xcode's answer for each owned target's toolchain settings (`XcodeBuildSettings`), read through the
+     invocation the types phase builds with, so it resolves and writes exactly where that build does, and findings
+     about a target point at its line in the project's definition. At an xcodegen root the spec's text goes with it, for
+     the edit a finding suggests; a committed project file is never offered one.
+     */
+    private func toolchainSettingsRead(
+        into package: PackageModel,
+        project: XcodeProject.Loaded,
+        fileSet: FileSet,
+        root: URL,
+        toolchain: String,
+    ) -> PackageModel {
+        let phase = XcodeTypesPhase(
+            package: package,
+            project: project,
+            files: fileSet.owned,
+            scratchPath: runScratch(for: root),
+            resolutionAllowed: !options.noFix,
+            toolchain: toolchain,
+            runner: runner,
+        )
+        let definitionText = try? String(contentsOf: project.definition, encoding: .utf8)
+        let isSpecification = package.projectKind == .xcodeGen
+        let targetLines =
+            isSpecification
+            ? XcodeGenSpecification(text: definitionText ?? "").targetLines
+            : XcodeBuildSettings.targetLines(inProjectFile: definitionText ?? "", targets: project.projectFile.targets)
+        return XcodeBuildSettings.read(
+            phase: phase,
+            definition: project.definition,
+            targetLines: targetLines,
+            specification: isSpecification ? definitionText : nil,
+        )
+        .applied(to: package)
     }
 
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
@@ -792,7 +848,7 @@ public struct Pipeline {
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
     private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
-        /* An Xcode project has no manifest, and the package rules that would read one do not run on it (`Linter`). */
+        /* An Xcode project has no manifest: its package rules read the settings Xcode resolved and point at its definition (`XcodeBuildSettings`). */
         guard package.projectKind == .swiftPackage else { return [:] }
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         let files = owned.map {
