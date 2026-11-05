@@ -126,8 +126,8 @@ func number(text []uint16) float64 {
 	if len(trimmed) == 0 {
 		return 0
 	}
-	value, err := strconv.ParseFloat(asciiView(trimmed), 64)
-	if err != nil && value == 0 {
+	value, parseError := strconv.ParseFloat(asciiView(trimmed), 64)
+	if parseError != nil && value == 0 {
 		return nan()
 	}
 	return value

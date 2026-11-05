@@ -513,8 +513,8 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 // Aggregate runs an implementation over the corpus and produces the categorised report.
 func Aggregate(fixtures []Fixture, implementation Implementation) (Report, error) {
 	for _, fixture := range fixtures {
-		if err := CheckPragmas(fixture.Name, fixture.Pragmas); err != nil {
-			return Report{}, err
+		if checkPragmasError := CheckPragmas(fixture.Name, fixture.Pragmas); checkPragmasError != nil {
+			return Report{}, checkPragmasError
 		}
 	}
 
@@ -533,8 +533,8 @@ func Aggregate(fixtures []Fixture, implementation Implementation) (Report, error
 	sort.Slice(report.Fixtures, func(first, second int) bool {
 		return report.Fixtures[first].Name < report.Fixtures[second].Name
 	})
-	if err := report.Check(); err != nil {
-		return Report{}, err
+	if checkError := report.Check(); checkError != nil {
+		return Report{}, checkError
 	}
 	return report, nil
 }

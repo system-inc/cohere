@@ -35,9 +35,9 @@ func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string)
 	if optionsJson == "" {
 		return DefaultConsistentIndexedObjectStyleSettings()
 	}
-	decoded, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(optionsJson))
+	if decodeConsistentIndexedObjectStyleOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeConsistentIndexedObjectStyleOptionsError)
 	}
 	return decoded
 }
@@ -814,9 +814,9 @@ func TestDecodeConsistentIndexedObjectStyleOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
+			if decodeConsistentIndexedObjectStyleOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeConsistentIndexedObjectStyleOptionsError)
 			}
 			options, isOptions := decoded.(ConsistentIndexedObjectStyleOptions)
 			if !isOptions {
@@ -870,12 +870,12 @@ func TestDecodeConsistentIndexedObjectStyleOptionsRefusesAValueUpstreamRefuses(t
 	} {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
-			_, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
-			if err == nil {
+			_, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
+			if decodeConsistentIndexedObjectStyleOptionsError == nil {
 				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.raw)
 			}
-			if !strings.Contains(err.Error(), testCase.named) {
-				test.Fatalf("%s was refused without naming %q: %v", testCase.raw, testCase.named, err)
+			if !strings.Contains(decodeConsistentIndexedObjectStyleOptionsError.Error(), testCase.named) {
+				test.Fatalf("%s was refused without naming %q: %v", testCase.raw, testCase.named, decodeConsistentIndexedObjectStyleOptionsError)
 			}
 		})
 	}

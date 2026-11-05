@@ -108,8 +108,8 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 	}
 
 	var wire jsxNoTargetBlankWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	options.AllowReferrer = wire.AllowReferrer

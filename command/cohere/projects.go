@@ -235,9 +235,9 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
 		label := projectLabel(project)
-		yieldFile, err := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
-		if err != nil {
-			runs[index] = projectRun{project: project, exitCode: 1, err: fmt.Errorf("writing what it yields: %w", err)}
+		yieldFile, writeProjectYieldError := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
+		if writeProjectYieldError != nil {
+			runs[index] = projectRun{project: project, exitCode: 1, err: fmt.Errorf("writing what it yields: %w", writeProjectYieldError)}
 			continue
 		}
 		projectArguments := arguments
@@ -391,7 +391,7 @@ func runProject(
 	}
 
 	started := time.Now()
-	err := children.run(child)
+	runError := children.run(child)
 	run := projectRun{
 		project:       project,
 		output:        output.Bytes(),
@@ -403,13 +403,13 @@ func runProject(
 	}
 	var exited *exec.ExitError
 	switch {
-	case err == nil:
-	case errors.As(err, &exited) && exited.ExitCode() > 0:
+	case runError == nil:
+	case errors.As(runError, &exited) && exited.ExitCode() > 0:
 		run.exitCode = exited.ExitCode()
 	default:
 		// Killed by a signal, or never started: a project that was not checked is a failure.
 		run.exitCode = 1
-		run.err = err
+		run.err = runError
 	}
 	return run
 }

@@ -167,16 +167,16 @@ func Compile(raw []byte) (*Schema, error) {
 	var document any
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
-	if err := decoder.Decode(&document); err != nil {
-		return nil, err
+	if decodeError := decoder.Decode(&document); decodeError != nil {
+		return nil, decodeError
 	}
 	compiler := &compiler{document: document, byPointer: map[string]*node{}}
-	root, err := compiler.compile(document, "#")
-	if err != nil {
-		return nil, err
+	root, compileError := compiler.compile(document, "#")
+	if compileError != nil {
+		return nil, compileError
 	}
-	if err := compiler.resolveReferences(); err != nil {
-		return nil, err
+	if resolveReferencesError := compiler.resolveReferences(); resolveReferencesError != nil {
+		return nil, resolveReferencesError
 	}
 	return &Schema{root: root}, nil
 }
@@ -205,16 +205,16 @@ func (c *compiler) compile(value any, pointer string) (*node, error) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if err := c.keyword(compiled, key, typed[key], pointer); err != nil {
-				return nil, fmt.Errorf("%s/%s: %w", pointer, key, err)
+			if keywordError := c.keyword(compiled, key, typed[key], pointer); keywordError != nil {
+				return nil, fmt.Errorf("%s/%s: %w", pointer, key, keywordError)
 			}
 		}
 		// Nested definitions are compiled so a $ref can land on them by pointer.
 		for _, definitions := range []string{"$defs", "definitions"} {
 			if entries, isObject := typed[definitions].(map[string]any); isObject {
 				for name, entry := range entries {
-					if _, err := c.compile(entry, pointer+"/"+definitions+"/"+escapePointer(name)); err != nil {
-						return nil, err
+					if _, compileError := c.compile(entry, pointer+"/"+definitions+"/"+escapePointer(name)); compileError != nil {
+						return nil, compileError
 					}
 				}
 			}
@@ -236,9 +236,9 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 		}
 		nodes := make([]*node, len(list))
 		for index, item := range list {
-			compiledItem, err := c.compile(item, pointer+"/"+name+"/"+strconv.Itoa(index))
-			if err != nil {
-				return nil, err
+			compiledItem, compileError := c.compile(item, pointer+"/"+name+"/"+strconv.Itoa(index))
+			if compileError != nil {
+				return nil, compileError
 			}
 			nodes[index] = compiledItem
 		}
@@ -392,12 +392,12 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 func (c *compiler) resolveReferences() error {
 	for _, referring := range c.pending {
 		if _, found := c.byPointer[referring.reference]; !found {
-			target, err := pointerTarget(c.document, referring.reference)
-			if err != nil {
-				return err
+			target, pointerTargetError := pointerTarget(c.document, referring.reference)
+			if pointerTargetError != nil {
+				return pointerTargetError
 			}
-			if _, err := c.compile(target, referring.reference); err != nil {
-				return err
+			if _, compileError := c.compile(target, referring.reference); compileError != nil {
+				return compileError
 			}
 		}
 	}

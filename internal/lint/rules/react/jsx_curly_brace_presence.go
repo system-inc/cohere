@@ -76,7 +76,7 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
 	// The bare string form. Upstream reads it as both halves at once, and pins the third axis to
 	// `ignore` rather than carrying the value across.
 	var shorthand string
-	if err := json.Unmarshal(raw, &shorthand); err == nil {
+	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
 		value := jsxCurlyBracePresenceSetting(shorthand)
 		if !jsxCurlyBracePresenceIsValidSetting(value) {
 			return settings, nil
@@ -97,8 +97,8 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
 		Children          *string `json:"children"`
 		PropElementValues *string `json:"propElementValues"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	for _, field := range []struct {
 		value  *string
@@ -717,7 +717,7 @@ func jsxCurlyBracePresenceQuote(text string) string {
 	var builder strings.Builder
 	encoder := json.NewEncoder(&builder)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(text); err != nil {
+	if encodeError := encoder.Encode(text); encodeError != nil {
 		return strconv.Quote(text)
 	}
 	return strings.TrimSuffix(builder.String(), "\n")

@@ -316,14 +316,14 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noRestrictedTypesRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return nil, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return nil, unmarshalOptionsError
 	}
 
 	for spelling, entry := range wire.Types {
-		ban, include, err := decodeNoRestrictedTypesBan(entry)
-		if err != nil {
-			return nil, fmt.Errorf("types[%q]: %w", spelling, err)
+		ban, include, decodeNoRestrictedTypesBanError := decodeNoRestrictedTypesBan(entry)
+		if decodeNoRestrictedTypesBanError != nil {
+			return nil, fmt.Errorf("types[%q]: %w", spelling, decodeNoRestrictedTypesBanError)
 		}
 		if !include {
 			continue
@@ -354,13 +354,13 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 	}
 
 	var asBoolean bool
-	if err := json.Unmarshal(entry, &asBoolean); err == nil {
+	if decodeError := json.Unmarshal(entry, &asBoolean); decodeError == nil {
 		// `true` bans with the standard message; `false` explicitly does not ban.
 		return NoRestrictedTypesBan{Allowed: !asBoolean}, true, nil
 	}
 
 	var asString string
-	if err := json.Unmarshal(entry, &asString); err == nil {
+	if decodeError := json.Unmarshal(entry, &asString); decodeError == nil {
 		return NoRestrictedTypesBan{Message: asString}, true, nil
 	}
 
@@ -370,8 +370,8 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 		Suggest []string `json:"suggest"`
 	}
 	if strings.HasPrefix(trimmed, "{") {
-		if err := rule.UnmarshalOptions(entry, &asObject); err != nil {
-			return NoRestrictedTypesBan{}, false, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(entry, &asObject); unmarshalOptionsError != nil {
+			return NoRestrictedTypesBan{}, false, unmarshalOptionsError
 		}
 		return NoRestrictedTypesBan{
 			Message: asObject.Message,

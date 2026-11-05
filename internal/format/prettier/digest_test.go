@@ -10,9 +10,9 @@ import (
 func embeddedBundleCopy(test *testing.T) map[string][]byte {
 	test.Helper()
 
-	source, err := Bundles()
-	if err != nil {
-		test.Fatalf("reading the embedded bundles: %v", err)
+	source, bundlesError := Bundles()
+	if bundlesError != nil {
+		test.Fatalf("reading the embedded bundles: %v", bundlesError)
 	}
 
 	files := make(map[string][]byte, len(source.Files))
@@ -61,12 +61,12 @@ func TestDigestRefusesAnAbsentBundle(test *testing.T) {
 	missing := BundleFiles[len(BundleFiles)-1]
 	delete(files, missing)
 
-	digest, err := DigestBundles(files)
-	if err == nil {
+	digest, digestBundlesError := DigestBundles(files)
+	if digestBundlesError == nil {
 		test.Fatalf("a set missing %s digested to %s instead of failing", missing, digest)
 	}
-	if !strings.Contains(err.Error(), missing) {
-		test.Fatalf("the error does not name the absent bundle: %v", err)
+	if !strings.Contains(digestBundlesError.Error(), missing) {
+		test.Fatalf("the error does not name the absent bundle: %v", digestBundlesError)
 	}
 }
 

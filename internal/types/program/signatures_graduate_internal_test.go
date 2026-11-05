@@ -16,18 +16,18 @@ func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceF
 	test.Helper()
 	root := test.TempDir()
 	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for _, name := range names {
 		text := "export function " + name + "(value: number): number {\n  return value + 1;\n}\n"
-		if err := os.WriteFile(filepath.Join(root, name+".ts"), []byte(text), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name+".ts"), []byte(text), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	var sources []*ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {

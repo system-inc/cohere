@@ -23,13 +23,13 @@ func declarationsProbe(test *testing.T) (shared *ast.Symbol, first *ast.SourceFi
 		"second.ts":     "interface Shared { b: string }\ndeclare const fromSecond: Shared;\n",
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
 		switch filepath.Base(sourceFile.FileName().AsString()) {
@@ -136,16 +136,16 @@ func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(test *testing.T) {
 	}
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	var subject *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -232,13 +232,13 @@ func TestIsResolvedSymbolRequiresADeclaration(test *testing.T) {
 		"subject.ts":    "import type { Missing } from './missing'; interface PageProps {} declare const page: PageProps; declare const absent: Absent; declare const imported: Missing; declare const untyped: any;",
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	subject := graph.ProjectFiles()[0]
 	if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), subject); len(diagnostics) != 2 {

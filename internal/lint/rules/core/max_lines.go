@@ -51,7 +51,7 @@ func DecodeMaxLinesOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var maximum int
-	if err := json.Unmarshal(raw, &maximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &maximum); decodeError == nil {
 		if maximum < 0 {
 			return DefaultMaxLinesOptions(), fmt.Errorf("max-lines takes a maximum of at least 0, got %d", maximum)
 		}
@@ -59,8 +59,8 @@ func DecodeMaxLinesOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var object maxLinesObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxLinesOptions(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxLinesOptions(), unmarshalOptionsError
 	}
 	if object.Max != nil {
 		if *object.Max < 0 {

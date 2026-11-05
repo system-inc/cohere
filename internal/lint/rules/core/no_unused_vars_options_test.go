@@ -156,9 +156,9 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *tes
 			test.Run(column.label+" "+column.options+": "+testCase.body, func(test *testing.T) {
 				test.Parallel()
 
-				options, err := DecodeNoUnusedVarsOptions(json.RawMessage(column.options))
-				if err != nil {
-					test.Fatalf("decoding %s: %v", column.options, err)
+				options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(column.options))
+				if decodeNoUnusedVariablesOptionsError != nil {
+					test.Fatalf("decoding %s: %v", column.options, decodeNoUnusedVariablesOptionsError)
 				}
 				prelude := ""
 				if testCase.withPrelude {
@@ -168,8 +168,8 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *tes
 				source := strings.TrimSpace(prelude+testCase.body) + "\n"
 				result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"a.ts": source}, "a.ts", options,
 					func(directory string) {
-						if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsScriptTsConfig), 0o644); err != nil {
-							test.Fatalf("writing the tsconfig: %v", err)
+						if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsScriptTsConfig), 0o644); writeError != nil {
+							test.Fatalf("writing the tsconfig: %v", writeError)
 						}
 					})
 				var got []string
@@ -211,9 +211,9 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 		},
 	}
 	for raw, want := range accepted {
-		decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
-		if err != nil {
-			test.Errorf("%s was refused: %v", raw, err)
+		decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
+		if decodeNoUnusedVariablesOptionsError != nil {
+			test.Errorf("%s was refused: %v", raw, decodeNoUnusedVariablesOptionsError)
 			continue
 		}
 		if decoded != want {
@@ -231,13 +231,13 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 		`{"Vars": "local"}`:                  `"Vars"`,
 	}
 	for raw, naming := range refused {
-		_, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
-		if err == nil {
+		_, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
+		if decodeNoUnusedVariablesOptionsError == nil {
 			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
 			continue
 		}
-		if !strings.Contains(err.Error(), naming) {
-			test.Errorf("%s was refused, but the error does not name %s: %v", raw, naming, err)
+		if !strings.Contains(decodeNoUnusedVariablesOptionsError.Error(), naming) {
+			test.Errorf("%s was refused, but the error does not name %s: %v", raw, naming, decodeNoUnusedVariablesOptionsError)
 		}
 	}
 }
@@ -302,9 +302,9 @@ func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(test *testing.T) {
 		test.Run(testCase.options+" "+testCase.body, func(test *testing.T) {
 			test.Parallel()
 
-			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.options, err)
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+			if decodeNoUnusedVariablesOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.options, decodeNoUnusedVariablesOptionsError)
 			}
 			source := prelude + testCase.body + "\nexport {};\n"
 			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", source, options)

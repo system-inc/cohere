@@ -197,11 +197,11 @@ func TestEveryKnownGateDefectStatesAReasonAndAnAnchor(test *testing.T) {
 func TestSourceLineReaderReadsTheTreesLinesOneBased(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "app"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(root, "app"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(filepath.Join(root, "app", "Probe.tsx"), []byte("first\nsecond\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "app", "Probe.tsx"), []byte("first\nsecond\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	read := sourceLineReaderAt(root)
 	for _, testCase := range []struct {

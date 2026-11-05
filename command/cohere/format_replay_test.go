@@ -43,12 +43,12 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(test *testing.T) {
 		command := exec.Command(binary, "--verbose", "--no-fix", "--format")
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
-		output, err := command.CombinedOutput()
-		if exitError, isExit := err.(*exec.ExitError); isExit {
+		output, outputError := command.CombinedOutput()
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
 			return string(output), childExitCode(test, exitError)
 		}
-		if err != nil {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+		if outputError != nil {
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
 		return string(output), 0
 	}
@@ -83,8 +83,8 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(test *testing.T) {
 
 	write("quiet/added.json", "{ \"d\":   4 }\n")
 	reports("an unformatted file added where the build reads nothing", "added.json")
-	if err := os.Remove(filepath.Join(root, "quiet", "added.json")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(filepath.Join(root, "quiet", "added.json")); removeError != nil {
+		test.Fatal(removeError)
 	}
 	replays("with the added file removed")
 
@@ -124,12 +124,12 @@ func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(test *testing.T) {
 		command := exec.Command(binary, "--verbose", "--no-fix", "--format")
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
-		output, err := command.CombinedOutput()
-		if exitError, isExit := err.(*exec.ExitError); isExit {
+		output, outputError := command.CombinedOutput()
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
 			return string(output), childExitCode(test, exitError)
 		}
-		if err != nil {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+		if outputError != nil {
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
 		return string(output), 0
 	}
@@ -170,8 +170,8 @@ func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(test *testing.T) {
 	if output := fresh("info/exclude created to ignore stray.json"); strings.Contains(output, "stray.json") {
 		test.Fatalf("the run still reported stray.json, which info/exclude now ignores:\n%s", output)
 	}
-	if err := os.Remove(filepath.Join(root, ".git", "info", "exclude")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(filepath.Join(root, ".git", "info", "exclude")); removeError != nil {
+		test.Fatal(removeError)
 	}
 	if output := fresh("info/exclude removed again"); !strings.Contains(output, "stray.json") {
 		test.Fatalf("the run did not report stray.json once info/exclude was gone:\n%s", output)

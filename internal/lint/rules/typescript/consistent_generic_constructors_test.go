@@ -22,9 +22,9 @@ func consistentGenericConstructorsCaseName(index int) string {
 // empty mode that matches no arm.
 func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) any {
 	test.Helper()
-	decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(wire))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", wire, err)
+	decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(wire))
+	if decodeConsistentGenericConstructorsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", wire, decodeConsistentGenericConstructorsOptionsError)
 	}
 	return decoded
 }
@@ -505,9 +505,9 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T
 	for _, testCase := range cases {
 		test.Run(testCase.wire, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.wire, err)
+			decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
+			if decodeConsistentGenericConstructorsOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.wire, decodeConsistentGenericConstructorsOptionsError)
 			}
 			settings, isSettings := decoded.(ConsistentGenericConstructorsOptions)
 			if !isSettings {
@@ -550,12 +550,12 @@ func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(test *
 	} {
 		test.Run(testCase.wire, func(test *testing.T) {
 			test.Parallel()
-			_, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
-			if err == nil {
+			_, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
+			if decodeConsistentGenericConstructorsOptionsError == nil {
 				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
 			}
-			if !strings.Contains(err.Error(), testCase.named) {
-				test.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, err)
+			if !strings.Contains(decodeConsistentGenericConstructorsOptionsError.Error(), testCase.named) {
+				test.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, decodeConsistentGenericConstructorsOptionsError)
 			}
 		})
 	}

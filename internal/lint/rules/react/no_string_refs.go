@@ -532,8 +532,8 @@ func DecodeNoStringRefsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return NoStringRefsOptions{}, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return NoStringRefsOptions{}, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoStringRefsOptions{}, unmarshalOptionsError
 	}
 
 	options := NoStringRefsOptions{NoTemplateLiterals: wire.NoTemplateLiterals}

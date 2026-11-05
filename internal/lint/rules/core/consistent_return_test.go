@@ -36,9 +36,9 @@ func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) a
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
+	if decodeConsistentReturnOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
 	return decoded
 }
@@ -425,9 +425,9 @@ func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
+			if decodeConsistentReturnOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeConsistentReturnOptionsError)
 			}
 			if got := decoded.(ConsistentReturnSettings).TreatUndefinedAsUnspecified; got != testCase.want {
 				test.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)

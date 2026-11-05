@@ -28,8 +28,8 @@ const benchmarksSourceNote = "Each record is one bench/quiet_machine.sh --record
 func buildBenchmarks(records []benchresults.Record) (Benchmarks, error) {
 	ordered := append([]benchresults.Record{}, records...)
 	for _, record := range ordered {
-		if err := benchresults.Validate(record); err != nil {
-			return Benchmarks{}, fmt.Errorf("docsdata: benchmark record %s: %w", benchresults.FileName(record), err)
+		if validateError := benchresults.Validate(record); validateError != nil {
+			return Benchmarks{}, fmt.Errorf("docsdata: benchmark record %s: %w", benchresults.FileName(record), validateError)
 		}
 	}
 	sort.SliceStable(ordered, func(left, right int) bool {

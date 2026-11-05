@@ -94,8 +94,8 @@ var nextConventionFiles = map[string]bool{"middleware": true, "instrumentation":
 // isNextConventionFile reports whether a file is one Next reads by where it sits: anything under an
 // app/ or pages/ router root, or middleware, instrumentation and next.config at the root or in src/.
 func isNextConventionFile(projectRoot string, fileName string) bool {
-	relative, err := filepath.Rel(projectRoot, fileName)
-	if err != nil || strings.HasPrefix(relative, "..") {
+	relative, relativePathError := filepath.Rel(projectRoot, fileName)
+	if relativePathError != nil || strings.HasPrefix(relative, "..") {
 		return false
 	}
 	relative = filepath.ToSlash(relative)
@@ -130,9 +130,9 @@ var tailwindConfigFiles = []string{
 func detectTailwind(projectRoot string, fileSystem FileSystem, settings map[string]json.RawMessage, settingsDirectory string) (string, string) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	if location, named := tailwind.LocationInSettings(settings, settingsDirectory); named {
-		entryPoint, _, err := tailwind.ConfiguredEntryPoint(projectRoot, location, fileExists)
-		if err != nil {
-			return "", "the location settings[\"better-tailwindcss\"] name does not resolve (" + err.Error() + "), so its rules are skipped"
+		entryPoint, _, configuredEntryPointError := tailwind.ConfiguredEntryPoint(projectRoot, location, fileExists)
+		if configuredEntryPointError != nil {
+			return "", "the location settings[\"better-tailwindcss\"] name does not resolve (" + configuredEntryPointError.Error() + "), so its rules are skipped"
 		}
 		return entryPoint, ""
 	}
@@ -148,8 +148,8 @@ func detectTailwind(projectRoot string, fileSystem FileSystem, settings map[stri
 			return entryPoint, ""
 		}
 	}
-	relative, err := filepath.Rel(projectRoot, entryPoint)
-	if err != nil {
+	relative, relativePathError := filepath.Rel(projectRoot, entryPoint)
+	if relativePathError != nil {
 		relative = entryPoint
 	}
 	return "", filepath.ToSlash(relative) + " does not import tailwindcss and there is no tailwind.config, so its rules are skipped"

@@ -383,11 +383,11 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 	write := func(relative string) string {
 		test.Helper()
 		path := filepath.Join(directory, relative)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte("const a = 1;\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte("const a = 1;\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		return path
 	}
@@ -399,9 +399,9 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 
 	test.Run("one file is one file", func(test *testing.T) {
 		test.Parallel()
-		scope, err := namedPathsScope(directory, directory, []string{"source/Named.ts"})
-		if err != nil {
-			test.Fatal(err)
+		scope, namedPathsScopeError := namedPathsScope(directory, directory, []string{"source/Named.ts"})
+		if namedPathsScopeError != nil {
+			test.Fatal(namedPathsScopeError)
 		}
 		if scope.Everything {
 			test.Fatal("a named file produced a whole-tree scope, which is the defect this replaces")
@@ -417,9 +417,9 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 
 	test.Run("a directory is everything under it", func(test *testing.T) {
 		test.Parallel()
-		scope, err := namedPathsScope(directory, directory, []string{"source"})
-		if err != nil {
-			test.Fatal(err)
+		scope, namedPathsScopeError := namedPathsScope(directory, directory, []string{"source"})
+		if namedPathsScopeError != nil {
+			test.Fatal(namedPathsScopeError)
 		}
 		for _, want := range []string{named, sibling, nested} {
 			if !scope.includes(want) {
@@ -435,9 +435,9 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 	// would make it a subset of one directory entry, silently.
 	test.Run("the working directory itself is the whole tree", func(test *testing.T) {
 		test.Parallel()
-		scope, err := namedPathsScope(directory, directory, []string{"."})
-		if err != nil {
-			test.Fatal(err)
+		scope, namedPathsScopeError := namedPathsScope(directory, directory, []string{"."})
+		if namedPathsScopeError != nil {
+			test.Fatal(namedPathsScopeError)
 		}
 		if !scope.Everything {
 			test.Fatalf("`.` narrowed instead of meaning everything: %v", scope.FileNames)
@@ -448,7 +448,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 	// and this scope reached it once during development by resolving against an empty directory.
 	test.Run("a path that does not exist is an error", func(test *testing.T) {
 		test.Parallel()
-		if _, err := namedPathsScope(directory, directory, []string{"source/Missing.ts"}); err == nil {
+		if _, namedPathsScopeError := namedPathsScope(directory, directory, []string{"source/Missing.ts"}); namedPathsScopeError == nil {
 			test.Fatal("a nonexistent path resolved without error")
 		}
 	})
@@ -458,9 +458,9 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 	// every named path fell out of scope and the run checked nothing while reporting success.
 	test.Run("an empty working directory resolves against the process", func(test *testing.T) {
 		test.Parallel()
-		scope, err := namedPathsScope("", "", []string{"scope.go"})
-		if err != nil {
-			test.Fatal(err)
+		scope, namedPathsScopeError := namedPathsScope("", "", []string{"scope.go"})
+		if namedPathsScopeError != nil {
+			test.Fatal(namedPathsScopeError)
 		}
 		for _, name := range scope.FileNames {
 			if !filepath.IsAbs(name) {

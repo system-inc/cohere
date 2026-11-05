@@ -334,9 +334,9 @@ func TestDecodeNoInvalidThisOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoInvalidThisOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decode returned %v", err)
+			decoded, decodeNoInvalidThisOptionsError := DecodeNoInvalidThisOptions([]byte(testCase.raw))
+			if decodeNoInvalidThisOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeNoInvalidThisOptionsError)
 			}
 			settings, ok := decoded.(noInvalidThisSettings)
 			if !ok {

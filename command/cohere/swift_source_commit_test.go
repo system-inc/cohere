@@ -25,11 +25,11 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) 
 		var out bytes.Buffer
 		run := newEngineRun(&out, engineModeVersion, swiftLanguage, "", time.Now())
 		run.engineSourceCommit = sourceCommit
-		if err := run.accept([]byte(provenance)); err != nil {
-			test.Fatal(err)
+		if acceptError := run.accept([]byte(provenance)); acceptError != nil {
+			test.Fatal(acceptError)
 		}
-		if _, err := run.finish(0, "exited 0"); err != nil {
-			test.Fatal(err)
+		if _, finishError := run.finish(0, "exited 0"); finishError != nil {
+			test.Fatal(finishError)
 		}
 		return out.String()
 	}
@@ -71,16 +71,16 @@ func TestOnlyACleanNamedCohereOffersACommitToTheSwiftEngine(test *testing.T) {
 // Not parallel: it sets the Swift engine override variable with test.Setenv, which a parallel test may not
 func TestAnEngineNamedByTheOverrideVouchesForNoCommit(test *testing.T) {
 	engine := filepath.Join(test.TempDir(), "cohere-swift")
-	if err := os.WriteFile(engine, []byte("#!/bin/sh\n"), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(engine, []byte("#!/bin/sh\n"), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	test.Setenv(dispatch.SwiftEngineOverrideVariable, engine)
 
 	// A clean named commit, so a resolver that handed the committed source to the override would show it.
 	clean := release.Provenance{SelfCommit: "a97349d9534c52c831ec0835fe7ceba880637fd1"}
-	binaryPath, sourceCommit, err := resolveSwiftEngineBinary(projectLocation{}, clean)
-	if err != nil {
-		test.Fatal(err)
+	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(projectLocation{}, clean)
+	if resolveSwiftEngineBinaryError != nil {
+		test.Fatal(resolveSwiftEngineBinaryError)
 	}
 	if binaryPath != engine {
 		test.Fatalf("resolved %s, the override named %s", binaryPath, engine)

@@ -62,9 +62,9 @@ func TestRulePackagesDoNotShadowSharedUtilities(test *testing.T) {
 func TestRulePackageHelperCensus(test *testing.T) {
 	test.Parallel()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	byPackage := map[string][]string{}
@@ -108,9 +108,9 @@ type ruleLocalFunction struct {
 func ruleLocalFunctionNames(test *testing.T) []ruleLocalFunction {
 	test.Helper()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 	if len(files) == 0 {
 		// A glob that matched nothing finds no helper to refuse, which passes for the wrong reason.
@@ -218,9 +218,9 @@ func functionNamesIn(test *testing.T, path string) []string {
 func parseGoFile(test *testing.T, path string) *ast.File {
 	test.Helper()
 
-	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-	if err != nil {
-		test.Fatalf("parsing %s: %v", path, err)
+	parsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if parseFileError != nil {
+		test.Fatalf("parsing %s: %v", path, parseFileError)
 	}
 	return parsed
 }
@@ -288,9 +288,9 @@ var wrappedAccessors = []wrappedAccessor{
 func TestRulePackagesDoNotReachPastWrappedAccessors(test *testing.T) {
 	test.Parallel()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 	if len(files) == 0 {
 		// A sweep with nothing to read passes for the wrong reason, which is the same shape as the
@@ -303,9 +303,9 @@ func TestRulePackagesDoNotReachPastWrappedAccessors(test *testing.T) {
 		if strings.HasSuffix(filepath.Base(path), "_test.go") {
 			continue
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatalf("reading %s: %v", path, err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatalf("reading %s: %v", path, readError)
 		}
 		checked++
 

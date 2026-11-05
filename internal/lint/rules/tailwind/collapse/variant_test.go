@@ -132,14 +132,14 @@ func loadVariantOrderCorpus(test *testing.T) variantOrderCorpus {
 	test.Helper()
 
 	path := filepath.Join("testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var corpus variantOrderCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if corpus.TailwindVersion != "4.3.3" {
 		test.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3", corpus.TailwindVersion)

@@ -168,8 +168,8 @@ func decodeSet(text []byte) (map[string]any, error) {
 	if text == nil {
 		return decoded, nil
 	}
-	if err := json.Unmarshal(text, &decoded); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(text, &decoded); decodeError != nil {
+		return nil, decodeError
 	}
 	return decoded, nil
 }
@@ -215,9 +215,9 @@ func Diff(before map[string][]byte, after map[string][]byte) (map[string]SetChan
 		names[name] = true
 	}
 	for name := range names {
-		changes, err := DiffSet(before[name], after[name])
-		if err != nil {
-			return nil, Patch, fmt.Errorf("cohere:%s: %w", name, err)
+		changes, diffSetError := DiffSet(before[name], after[name])
+		if diffSetError != nil {
+			return nil, Patch, fmt.Errorf("cohere:%s: %w", name, diffSetError)
 		}
 		if changes.Empty() {
 			continue
@@ -234,7 +234,7 @@ func SetsAt(moduleDirectory string, ref string) (map[string][]byte, error) {
 	sets := map[string][]byte{}
 	if ref == "" {
 		root := filepath.Join(moduleDirectory, SetDirectory)
-		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 			if err != nil || entry.IsDir() || filepath.Ext(path) != ".json" {
 				return err
 			}
@@ -246,20 +246,20 @@ func SetsAt(moduleDirectory string, ref string) (map[string][]byte, error) {
 			sets[strings.TrimSuffix(filepath.ToSlash(relative), ".json")] = contents
 			return nil
 		})
-		return sets, err
+		return sets, walkError
 	}
 
-	listing, err := git(moduleDirectory, "ls-tree", "-r", "--name-only", ref, "--", SetDirectory)
-	if err != nil {
-		return nil, err
+	listing, gitError := git(moduleDirectory, "ls-tree", "-r", "--name-only", ref, "--", SetDirectory)
+	if gitError != nil {
+		return nil, gitError
 	}
 	for _, path := range strings.Fields(string(listing)) {
 		if filepath.Ext(path) != ".json" {
 			continue
 		}
-		contents, err := git(moduleDirectory, "show", ref+":"+path)
-		if err != nil {
-			return nil, err
+		contents, gitError := git(moduleDirectory, "show", ref+":"+path)
+		if gitError != nil {
+			return nil, gitError
 		}
 		sets[strings.TrimSuffix(strings.TrimPrefix(path, SetDirectory+"/"), ".json")] = contents
 	}
@@ -270,9 +270,9 @@ func git(directory string, arguments ...string) ([]byte, error) {
 	command := exec.Command("git", append([]string{"-C", directory}, arguments...)...)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), err, strings.TrimSpace(standardError.String()))
+	output, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
 	}
 	return output, nil
 }
@@ -290,7 +290,7 @@ func Render(version string, date string, changed map[string]SetChanges, first ma
 			rules, _ := decoded["rules"].(map[string]any)
 			on := 0
 			for ruleName := range rules {
-				if level, err := severityOf(rules, ruleName); err == nil && level > 0 {
+				if level, severityOfError := severityOf(rules, ruleName); severityOfError == nil && level > 0 {
 					on++
 				}
 			}
@@ -371,7 +371,7 @@ func RequireBump(previous string, next string, bump Bump) error {
 
 func parseVersion(version string) ([3]int, error) {
 	var parsed [3]int
-	if _, err := fmt.Sscanf(version, "%d.%d.%d", &parsed[0], &parsed[1], &parsed[2]); err != nil ||
+	if _, scanError := fmt.Sscanf(version, "%d.%d.%d", &parsed[0], &parsed[1], &parsed[2]); scanError != nil ||
 		fmt.Sprintf("%d.%d.%d", parsed[0], parsed[1], parsed[2]) != version {
 		return parsed, fmt.Errorf("%q is not a major.minor.patch version", version)
 	}

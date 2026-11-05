@@ -329,12 +329,12 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(test *testing.T) {
 		{"no options at all", ``, false},
 	}
 	for _, testCase := range cases {
-		_, err := DecodeNoRestrictedExportsOptions([]byte(testCase.configured))
-		if testCase.wantError && err == nil {
+		_, decodeNoRestrictedExportsOptionsError := DecodeNoRestrictedExportsOptions([]byte(testCase.configured))
+		if testCase.wantError && decodeNoRestrictedExportsOptionsError == nil {
 			test.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
 		}
-		if !testCase.wantError && err != nil {
-			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
+		if !testCase.wantError && decodeNoRestrictedExportsOptionsError != nil {
+			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, decodeNoRestrictedExportsOptionsError)
 		}
 	}
 }

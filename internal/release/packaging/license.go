@@ -44,15 +44,15 @@ const (
 // credit.
 func stageLicenses(moduleDirectory string, packageDirectory string) error {
 	for _, name := range LegalFileNames {
-		contents, err := os.ReadFile(filepath.Join(moduleDirectory, name))
-		if err != nil {
-			return fmt.Errorf("reading the license every package ships: %w", err)
+		contents, readError := os.ReadFile(filepath.Join(moduleDirectory, name))
+		if readError != nil {
+			return fmt.Errorf("reading the license every package ships: %w", readError)
 		}
 		if len(bytes.TrimSpace(contents)) == 0 {
 			return fmt.Errorf("%s is empty, so the package would ship a license or notice with nothing in it", name)
 		}
-		if err := os.WriteFile(filepath.Join(packageDirectory, name), contents, 0o644); err != nil {
-			return fmt.Errorf("staging %s: %w", name, err)
+		if writeError := os.WriteFile(filepath.Join(packageDirectory, name), contents, 0o644); writeError != nil {
+			return fmt.Errorf("staging %s: %w", name, writeError)
 		}
 	}
 	return nil

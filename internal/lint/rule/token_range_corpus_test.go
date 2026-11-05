@@ -66,12 +66,12 @@ func TestTokenRangeStartsWhereTheScannerDoes(test *testing.T) {
 // repositoryRoot is the module's root, where the fixtures are.
 func repositoryRoot(test *testing.T) string {
 	test.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		test.Fatal(err)
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)

@@ -49,9 +49,9 @@ func noMeaninglessVoidOperatorOptionsFor(test *testing.T, optionsJson string) an
 	if optionsJson == "" {
 		return DefaultNoMeaninglessVoidOperatorSettings()
 	}
-	decoded, err := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(optionsJson))
+	if decodeNoMeaninglessVoidOperatorOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoMeaninglessVoidOperatorOptionsError)
 	}
 	return decoded
 }
@@ -684,9 +684,9 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.raw, err)
+			decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(testCase.raw))
+			if decodeNoMeaninglessVoidOperatorOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoMeaninglessVoidOperatorOptionsError)
 			}
 			options, isOptions := decoded.(NoMeaninglessVoidOperatorOptions)
 			if !isOptions {

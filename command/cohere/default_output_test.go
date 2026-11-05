@@ -32,8 +32,8 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 	} {
 		command := exec.Command("git", arguments...)
 		command.Dir = root
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 		}
 	}
 
@@ -43,13 +43,13 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, append([]string{"--no-format"}, arguments...)...)
 		command.Dir = root
-		output, err := command.CombinedOutput()
-		if err == nil {
+		output, outputError := command.CombinedOutput()
+		if outputError == nil {
 			return string(output), 0
 		}
-		exitError, isExit := err.(*exec.ExitError)
+		exitError, isExit := outputError.(*exec.ExitError)
 		if !isExit {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
 		return string(output), childExitCode(test, exitError)
 	}
@@ -60,8 +60,8 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 			test.Fatalf("no cache table in %s, so there is nothing for a run to discard", root)
 		}
 		for _, table := range tables {
-			if err := os.WriteFile(table, []byte("not a cache table"), 0o600); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(table, []byte("not a cache table"), 0o600); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}
@@ -83,7 +83,7 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 		test.Errorf("the default run printed a note:\n%s", output)
 	}
 	for _, table := range cacheTableFiles(test, root) {
-		if contents, err := os.ReadFile(table); err == nil && string(contents) == "not a cache table" {
+		if contents, readError := os.ReadFile(table); readError == nil && string(contents) == "not a cache table" {
 			test.Fatalf("the run never read the discarded table, so its silence proves nothing: %s", table)
 		}
 	}

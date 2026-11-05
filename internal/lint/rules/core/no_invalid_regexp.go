@@ -260,13 +260,13 @@ func invalidPatternMessage(pattern string, flags string) string {
 		compileFlags += "u"
 	}
 
-	if _, err := esregexp.Compile(pattern, compileFlags); err != nil {
-		text := err.Error()
+	if _, compileError := esregexp.Compile(pattern, compileFlags); compileError != nil {
+		text := compileError.Error()
 		// The underlying engine prefixes "error parsing regexp: ", which repeats what the message
 		// already says. Trimming to the first ": " drops it. Our parser's own refusals put the
 		// refused construct after that same separator, so trimming there would keep the construct
 		// and throw away the explanation, which is why they are excluded.
-		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
+		if !errors.Is(compileError, esregexp.ErrUnsupportedSyntax) && !errors.Is(compileError, esregexp.ErrUnsupportedFlag) {
 			if separator := strings.Index(text, ": "); separator != -1 {
 				text = text[separator+2:]
 			}

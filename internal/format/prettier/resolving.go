@@ -107,9 +107,9 @@ func (resolving *Resolving) engineFor(options formatoptions.Options) (*Engine, e
 	if engine, present := resolving.engines[options]; present {
 		return engine, nil
 	}
-	engine, err := New(options)
-	if err != nil {
-		return nil, err
+	engine, newPrettierError := New(options)
+	if newPrettierError != nil {
+		return nil, newPrettierError
 	}
 	resolving.engines[options] = engine
 	return engine, nil

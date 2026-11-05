@@ -57,8 +57,8 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 
 	target := terminal
 	var tee teeStream
-	if err := tee.start(&target); err != nil {
-		test.Fatal(err)
+	if startError := tee.start(&target); startError != nil {
+		test.Fatal(startError)
 	}
 	fmt.Fprint(target, "fix: 0 of 5 files rewritten\n")
 	fmt.Fprint(&taggingWriter{out: target, tag: invocationTag, atLineStart: true}, "graph built in 436ms\n")
@@ -101,8 +101,8 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 
 	target := terminal
 	var tee teeStream
-	if err := tee.start(&target); err != nil {
-		test.Fatal(err)
+	if startError := tee.start(&target); startError != nil {
+		test.Fatal(startError)
 	}
 	fmt.Fprintln(&taggingWriter{out: target, tag: provenanceTag, atLineStart: true}, "fix: 0 of 5 files rewritten, 5 not formatted")
 	fmt.Fprint(target, "coverage: 460 rules\n")

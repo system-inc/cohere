@@ -434,9 +434,9 @@ var sortCompSilentCases = []sortCompCase{
 // explicitly empty `order` distinct from an absent one.
 func decodedSortCompOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeSortCompOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	decoded, decodeSortCompOptionsError := DecodeSortCompOptions([]byte(raw))
+	if decodeSortCompOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeSortCompOptionsError)
 	}
 	return decoded
 }

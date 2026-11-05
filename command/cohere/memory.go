@@ -124,9 +124,9 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 		if !ok {
 			continue
 		}
-		kilobytes, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")), 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("reading MemAvailable from /proc/meminfo: %w", err)
+		kilobytes, parseError := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")), 10, 64)
+		if parseError != nil {
+			return 0, fmt.Errorf("reading MemAvailable from /proc/meminfo: %w", parseError)
 		}
 		available, found = kilobytes*1024, true
 		break
@@ -136,12 +136,12 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 	}
 	for _, pair := range [][2][]byte{{cgroup.v2Max, cgroup.v2Current}, {cgroup.v1Limit, cgroup.v1Usage}} {
 		// memory.max reads "max" when there is no limit, which fails the parse and so applies none.
-		limit, err := strconv.ParseUint(strings.TrimSpace(string(pair[0])), 10, 64)
-		if err != nil {
+		limit, parseError := strconv.ParseUint(strings.TrimSpace(string(pair[0])), 10, 64)
+		if parseError != nil {
 			continue
 		}
 		room := limit
-		if used, err := strconv.ParseUint(strings.TrimSpace(string(pair[1])), 10, 64); err == nil {
+		if used, parseError := strconv.ParseUint(strings.TrimSpace(string(pair[1])), 10, 64); parseError == nil {
 			room = 0
 			if used < limit {
 				room = limit - used

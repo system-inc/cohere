@@ -43,13 +43,13 @@ func loadFrameworkVariantFixture(test *testing.T) frameworkVariantFixture {
 	test.Helper()
 
 	path := filepath.Join("testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 	var fixture frameworkVariantFixture
-	if err := json.Unmarshal(contents, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if fixture.TailwindVersion != TailwindVersion {
 		test.Fatalf(
@@ -325,8 +325,8 @@ func frameworkVariantStylesheet(test *testing.T, entry string) (string, string) 
 
 	directory := test.TempDir()
 	packageRoot := filepath.Join(directory, "node_modules", "tailwindcss")
-	if err := os.MkdirAll(packageRoot, 0o755); err != nil {
-		test.Fatalf("mkdir: %v", err)
+	if createDirectoryError := os.MkdirAll(packageRoot, 0o755); createDirectoryError != nil {
+		test.Fatalf("mkdir: %v", createDirectoryError)
 	}
 	// The framework's own breakpoint and container scales, which is what `@import "tailwindcss"`
 	// contributes and what an unmodified repository inherits.
@@ -341,13 +341,13 @@ func frameworkVariantStylesheet(test *testing.T, entry string) (string, string) 
   --container-lg: 32rem;
 }
 `
-	if err := os.WriteFile(filepath.Join(packageRoot, "index.css"), []byte(framework), 0o644); err != nil {
-		test.Fatalf("write framework: %v", err)
+	if writeError := os.WriteFile(filepath.Join(packageRoot, "index.css"), []byte(framework), 0o644); writeError != nil {
+		test.Fatalf("write framework: %v", writeError)
 	}
 
 	entryPoint := filepath.Join(directory, "theme.css")
-	if err := os.WriteFile(entryPoint, []byte(entry), 0o644); err != nil {
-		test.Fatalf("write entry: %v", err)
+	if writeError := os.WriteFile(entryPoint, []byte(entry), 0o644); writeError != nil {
+		test.Fatalf("write entry: %v", writeError)
 	}
 	return entryPoint, packageRoot
 }
@@ -387,9 +387,9 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(test *testing.T) {
 @custom-variant dark (&:where(.dark *));
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	if got := len(system.Variants().Registrations()); got != len(FrameworkVariantRegistrations) {
@@ -430,9 +430,9 @@ func TestLoadedDesignSystemParsesVariantBearingClasses(test *testing.T) {
 @custom-variant dark (&:where(.dark *));
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	// Every one of these was measured unparseable against the real ahra design system before this
@@ -463,9 +463,9 @@ func TestFrameworkBreakpointsOrderByResolvedWidth(test *testing.T) {
 	test.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	indices := frameworkVariantIndices(test, system, []string{"sm", "md", "lg", "xl", "2xl"})
@@ -499,9 +499,9 @@ func TestBreakpointComparisonReadsTheLiveTheme(test *testing.T) {
 }
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	indices := frameworkVariantIndices(test, system, []string{"sm", "md", "lg", "xl", "2xl"})
@@ -533,9 +533,9 @@ func TestContainerQueriesReadTheContainerNamespace(test *testing.T) {
 }
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	// `@sm` and `@lg` are functional variants over the `@` root, not static ones.
@@ -580,9 +580,9 @@ func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(test *testing.T) {
 }
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	// The registration itself, which is the half a resolver alone would miss.
@@ -631,9 +631,9 @@ func TestThemeContainerKeysRegisterNothing(test *testing.T) {
 }
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	if system.HasVariant("huge") {
@@ -661,9 +661,9 @@ func TestRedefiningAFrameworkBreakpointDoesNotRegisterAgain(test *testing.T) {
 }
 `)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	if got := len(system.Variants().Registrations()); got != len(FrameworkVariantRegistrations) {

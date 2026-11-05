@@ -29,26 +29,26 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(test *testing.T) {
 	fileLink := filepath.Join(root, "file-link.ts")
 	directoryLink := filepath.Join(root, "directory-link")
 	absent := filepath.Join(root, "absent.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.Mkdir(directory, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.Mkdir(directory, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.Symlink(file, fileLink); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(file, fileLink); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
-	if err := os.Symlink(directory, directoryLink); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(directory, directoryLink); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 
-	recorded, err := RecordRunCache("key", []string{file, directory, fileLink, directoryLink}, nil, []string{absent}, nil, []byte("verdict"), 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	recorded, recordRunCacheError := RecordRunCache("key", []string{file, directory, fileLink, directoryLink}, nil, []string{absent}, nil, []byte("verdict"), 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 	snapshot := NewStatSnapshot()
-	if err := recorded.CheckNoting("key", snapshot); err != nil {
-		test.Fatalf("an untouched tree missed: %v", err)
+	if checkNotingError := recorded.CheckNoting("key", snapshot); checkNotingError != nil {
+		test.Fatalf("an untouched tree missed: %v", checkNotingError)
 	}
 
 	disk := osvfs.FS()

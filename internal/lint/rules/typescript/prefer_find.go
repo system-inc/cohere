@@ -431,8 +431,8 @@ func optionalMemberAccess(callee *ast.Node) bool {
 // which is why `.at('a')` reports. That differs from the member-access coercion, deliberately, and
 // the corpus pins the difference on `0.2`.
 func isTreatedAsZeroByArrayAt(value string) bool {
-	asNumber, err := strconv.ParseFloat(value, 64)
-	if err != nil {
+	asNumber, parseError := strconv.ParseFloat(value, 64)
+	if parseError != nil {
 		// `Number('a')` is not a number, which upstream treats as zero. Go's parser also refuses
 		// the two spellings JavaScript accepts as numbers, so they are named before this point.
 		return true

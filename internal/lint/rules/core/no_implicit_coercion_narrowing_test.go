@@ -46,16 +46,16 @@ func compileErrors(test *testing.T, source string) []string {
 	test.Helper()
 	directory := test.TempDir()
 	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"moduleDetection":"force","types":[],"noEmit":true},"include":["*.ts"]}`
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	fileName := filepath.Join(directory, "fixture.ts")
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 	messages := []string{}
 	for _, sourceFile := range graph.ProjectFiles() {

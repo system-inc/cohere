@@ -52,9 +52,9 @@ type HouseRuleName struct {
 var Naming = mustLoadRuleNaming(ruleNamingFile)
 
 func mustLoadRuleNaming(data []byte) RuleNaming {
-	loaded, err := loadRuleNaming(data)
-	if err != nil {
-		panic(fmt.Sprintf("RuleNaming.json: %v", err))
+	loaded, loadRuleNamingError := loadRuleNaming(data)
+	if loadRuleNamingError != nil {
+		panic(fmt.Sprintf("RuleNaming.json: %v", loadRuleNamingError))
 	}
 	return loaded
 }
@@ -66,8 +66,8 @@ func loadRuleNaming(data []byte) (RuleNaming, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var naming RuleNaming
-	if err := decoder.Decode(&naming); err != nil {
-		return RuleNaming{}, err
+	if decodeError := decoder.Decode(&naming); decodeError != nil {
+		return RuleNaming{}, decodeError
 	}
 	lists := []struct {
 		label string

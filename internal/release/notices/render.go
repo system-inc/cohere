@@ -26,9 +26,9 @@ const compilerFork = "https://github.com/system-inc/TypeScript"
 // (.gitattributes), so the copy is written with LF. A CRLF copy would be converted on commit, and every
 // fresh clone would then differ from what this writes.
 func renderNotice(moduleDirectory string) ([]byte, error) {
-	microsoft, err := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "NOTICE.txt"))
-	if err != nil {
-		return nil, fmt.Errorf("reading the TypeScript compiler's NOTICE.txt, which NOTICE carries unmodified: %w", err)
+	microsoft, readError := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "NOTICE.txt"))
+	if readError != nil {
+		return nil, fmt.Errorf("reading the TypeScript compiler's NOTICE.txt, which NOTICE carries unmodified: %w", readError)
 	}
 	microsoft = bytes.ReplaceAll(microsoft, []byte("\r\n"), []byte("\n"))
 	var builder strings.Builder
@@ -76,8 +76,8 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 		Text:    string(compilerLicense)})
 
 	for _, module := range compiled {
-		if err := writeModule(&builder, module, "A Go module in cohere's build graph."); err != nil {
-			return nil, err
+		if writeModuleError := writeModule(&builder, module, "A Go module in cohere's build graph."); writeModuleError != nil {
+			return nil, writeModuleError
 		}
 	}
 
@@ -87,8 +87,8 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 		if upstream.Reach != Compiled {
 			continue
 		}
-		if err := writeUpstream(&builder, upstream); err != nil {
-			return nil, err
+		if writeUpstreamError := writeUpstream(&builder, upstream); writeUpstreamError != nil {
+			return nil, writeUpstreamError
 		}
 	}
 
@@ -100,9 +100,9 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 		if !known {
 			return nil, fmt.Errorf("the Swift engine resolves %s (%s), which has no license recorded in swiftLicenses", pin.Identity, pin.Location)
 		}
-		text, err := licenseTexts.ReadFile("licenses/" + license.File)
-		if err != nil {
-			return nil, err
+		text, readFileError := licenseTexts.ReadFile("licenses/" + license.File)
+		if readFileError != nil {
+			return nil, readFileError
 		}
 		writeEntry(&builder, entry{Name: pin.Identity, URL: pin.Location, Version: pin.Version, License: license.Expression,
 			Carries: "A Swift package compiled into cohere-swift.", Text: string(text)})
@@ -111,16 +111,16 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 	builder.WriteString("## In this repository only\n\n")
 	builder.WriteString("Used by tests and tools, or kept for them. None of these ship in any package.\n\n")
 	for _, module := range repositoryOnly {
-		if err := writeModule(&builder, module, "A Go module that tests and tools import."); err != nil {
-			return nil, err
+		if writeModuleError := writeModule(&builder, module, "A Go module that tests and tools import."); writeModuleError != nil {
+			return nil, writeModuleError
 		}
 	}
 	for _, upstream := range Upstreams {
 		if upstream.Reach != RepositoryOnly {
 			continue
 		}
-		if err := writeUpstream(&builder, upstream); err != nil {
-			return nil, err
+		if writeUpstreamError := writeUpstream(&builder, upstream); writeUpstreamError != nil {
+			return nil, writeUpstreamError
 		}
 	}
 
@@ -178,9 +178,9 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 	if !known {
 		return fmt.Errorf("%s@%s is in cohere's module graph with no license recorded in moduleLicenses: read its license and add it", module.Path, module.Version)
 	}
-	text, err := readModuleLicense(module)
-	if err != nil {
-		return err
+	text, readModuleLicenseError := readModuleLicense(module)
+	if readModuleLicenseError != nil {
+		return readModuleLicenseError
 	}
 	thirdPartyFile, thirdPartyText, readError := readModuleThirdPartyCredit(module)
 	if readError != nil {
@@ -204,9 +204,9 @@ func writeUpstream(builder *strings.Builder, upstream Upstream) error {
 			Carries: upstream.Carries, Note: upstream.Note})
 		return nil
 	}
-	text, err := licenseTexts.ReadFile("licenses/" + upstream.LicenseFile)
-	if err != nil {
-		return fmt.Errorf("%s names the license file %s, which isn't in internal/release/notices/licenses: %w", upstream.Name, upstream.LicenseFile, err)
+	text, readFileError := licenseTexts.ReadFile("licenses/" + upstream.LicenseFile)
+	if readFileError != nil {
+		return fmt.Errorf("%s names the license file %s, which isn't in internal/release/notices/licenses: %w", upstream.Name, upstream.LicenseFile, readFileError)
 	}
 	writeEntry(builder, entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
 		Carries: upstream.Carries, Text: string(text)})

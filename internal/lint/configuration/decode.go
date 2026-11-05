@@ -34,8 +34,8 @@ func DecodeInto[Options any]() Decoder {
 		if len(raw) == 0 {
 			return decoded, fmt.Errorf("no options were configured")
 		}
-		if err := json.Unmarshal(raw, &decoded); err != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+		if decodeError := json.Unmarshal(raw, &decoded); decodeError != nil {
+			return decoded, fmt.Errorf("decoding %T: %w", decoded, decodeError)
 		}
 		return decoded, nil
 	}
@@ -96,8 +96,8 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 		return nil, nil
 	}
 
-	if err := refuseNulls(elements); err != nil {
-		return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+	if refuseNullsError := refuseNulls(elements); refuseNullsError != nil {
+		return nil, fmt.Errorf("rule %s: %w", ruleName, refuseNullsError)
 	}
 
 	var raw json.RawMessage
@@ -106,9 +106,9 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 	case declared.DecodeList != nil:
 		decode = declared.DecodeList
 		if len(elements) > 0 {
-			list, err := json.Marshal(elements)
-			if err != nil {
-				return nil, fmt.Errorf("rule %s: re-encoding its option elements: %w", ruleName, err)
+			list, encodeError := json.Marshal(elements)
+			if encodeError != nil {
+				return nil, fmt.Errorf("rule %s: re-encoding its option elements: %w", ruleName, encodeError)
 			}
 			raw = list
 		}
@@ -141,8 +141,8 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 	// schema's refusal is for what the decoder let through. A bare severity is not checked, since no
 	// upstream schema refuses an empty list (TestEverySchemaAcceptsTheBareSeverity).
 	if len(elements) > 0 {
-		if err := optionschema.Check(ruleName, elements); err != nil {
-			return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+		if checkError := optionschema.Check(ruleName, elements); checkError != nil {
+			return nil, fmt.Errorf("rule %s: %w", ruleName, checkError)
 		}
 	}
 	return decoded, nil
@@ -162,7 +162,7 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
 		var value any
-		if err := json.Unmarshal(element, &value); err != nil {
+		if decodeError := json.Unmarshal(element, &value); decodeError != nil {
 			// Malformed JSON is the decoder's to report, in its own words.
 			continue
 		}

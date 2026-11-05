@@ -19,13 +19,13 @@ import (
 func FindModuleDirectory() (string, error) {
 	candidates := []string{}
 
-	if executable, err := os.Executable(); err == nil {
-		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+	if executable, executableError := os.Executable(); executableError == nil {
+		if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 			executable = resolved
 		}
 		candidates = append(candidates, filepath.Dir(executable))
 	}
-	if workingDirectory, err := os.Getwd(); err == nil {
+	if workingDirectory, workingDirectoryError := os.Getwd(); workingDirectoryError == nil {
 		candidates = append(candidates, workingDirectory)
 	}
 
@@ -42,8 +42,8 @@ func FindModuleDirectory() (string, error) {
 func walkUpForModule(start string) (string, bool) {
 	directory := start
 	for {
-		contents, err := os.ReadFile(filepath.Join(directory, "go.mod"))
-		if err == nil && isCohereModule(contents) {
+		contents, readError := os.ReadFile(filepath.Join(directory, "go.mod"))
+		if readError == nil && isCohereModule(contents) {
 			return directory, true
 		}
 

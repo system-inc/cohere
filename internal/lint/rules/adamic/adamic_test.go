@@ -61,11 +61,11 @@ func writeAdamicSupport(test *testing.T) func(directory string) {
 	return func(directory string) {
 		for name, contents := range adamicSupport {
 			path := filepath.Join(directory, name)
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				test.Fatal(err)
+			if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
 			}
-			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}
@@ -113,7 +113,7 @@ func adamicPrograms(test *testing.T) map[string]string {
 	test.Helper()
 	programs := map[string]string{}
 	root := filepath.Join("testdata", "programs")
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
@@ -125,8 +125,8 @@ func adamicPrograms(test *testing.T) map[string]string {
 		programs[filepath.ToSlash(relative)] = string(contents)
 		return err
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	// Eleven files: ten programs, the seventh in two modules.
 	if len(programs) != 11 {

@@ -165,8 +165,8 @@ func preferNumericLiteralsRadixValue(node *ast.Node) (int, bool) {
 	}
 	// The node's own Text is the canonical rendering of the double, so `0x10` reads as 16 here and
 	// the radix written in another base still resolves.
-	value, err := strconv.ParseFloat(node.Text(), 64)
-	if err != nil || value != math.Trunc(value) {
+	value, parseError := strconv.ParseFloat(node.Text(), 64)
+	if parseError != nil || value != math.Trunc(value) {
 		return 0, false
 	}
 	return int(value), true
@@ -301,8 +301,8 @@ func preferNumericLiteralsLiteralValue(literal string) (float64, bool) {
 	default:
 		return 0, false
 	}
-	value, err := strconv.ParseUint(literal[2:], base, 64)
-	if err != nil {
+	value, parseError := strconv.ParseUint(literal[2:], base, 64)
+	if parseError != nil {
 		return 0, false
 	}
 	return float64(value), true

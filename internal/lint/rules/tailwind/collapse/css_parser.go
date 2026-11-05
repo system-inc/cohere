@@ -202,9 +202,9 @@ func ParseCSS(input string) ([]*Node, error) {
 		// Start of a string. The whole string, quotes included, joins the buffer verbatim; a `;`,
 		// `}` or `:` inside it is text rather than structure.
 		case currentChar == byteSingleQuote || currentChar == byteDoubleQuote:
-			end, err := parseCSSString(input, i, currentChar)
-			if err != nil {
-				return nil, err
+			end, parseCSSStringError := parseCSSString(input, i, currentChar)
+			if parseCSSStringError != nil {
+				return nil, parseCSSStringError
 			}
 			appendToBuffer(input[i : end+1])
 			i = end
@@ -262,9 +262,9 @@ func ParseCSS(input string) ([]*Node, error) {
 					j++
 
 				case peekChar == byteSingleQuote || peekChar == byteDoubleQuote:
-					end, err := parseCSSString(input, j, peekChar)
-					if err != nil {
-						return nil, err
+					end, parseCSSStringError := parseCSSString(input, j, peekChar)
+					if parseCSSStringError != nil {
+						return nil, parseCSSStringError
 					}
 					j = end
 

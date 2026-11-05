@@ -1646,9 +1646,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// customValidators is in upstream's schema and unread by this rule. It must decode rather than
 	// error, or a configuration carrying it would fail to load.
-	if _, err := DecodeNoUnstableNestedComponentsOptions(
-		[]byte(`{"customValidators":["./x"],"allowAsProps":true}`)); err != nil {
-		test.Fatalf("decoding customValidators: %v", err)
+	if _, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"customValidators":["./x"],"allowAsProps":true}`)); decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding customValidators: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 }
 

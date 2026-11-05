@@ -14,7 +14,7 @@ func TestUnregisteredTypesAreRefused(test *testing.T) {
 	if formatter.Handles("probe.unregistered") {
 		test.Fatal("Handles said yes to a type nothing registered")
 	}
-	if _, err := formatter.Format("probe.unregistered", "x"); err == nil {
+	if _, formatError := formatter.Format("probe.unregistered", "x"); formatError == nil {
 		test.Fatal("formatting a type nothing registered succeeded")
 	}
 }
@@ -29,9 +29,9 @@ func TestRegisteredPrinterReceivesTheOptions(test *testing.T) {
 
 	options := formatoptions.Default()
 	options.TabWidth = 3
-	formatted, err := Formatter{Options: options}.Format("A.PROBE", "x")
-	if err != nil {
-		test.Fatal(err)
+	formatted, formatError := Formatter{Options: options}.Format("A.PROBE", "x")
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	if formatted != "   x" {
 		test.Fatalf("formatted %q, want the options' tab width applied by the registered printer", formatted)

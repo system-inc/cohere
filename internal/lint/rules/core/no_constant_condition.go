@@ -42,7 +42,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 		return fmt.Errorf("checkLoops is null, which upstream's schema refuses")
 	}
 	var enabled bool
-	if err := json.Unmarshal(raw, &enabled); err == nil {
+	if decodeError := json.Unmarshal(raw, &enabled); decodeError == nil {
 		*checkLoops = "none"
 		if enabled {
 			*checkLoops = "all"
@@ -50,7 +50,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 		return nil
 	}
 	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
+	if decodeError := json.Unmarshal(raw, &spelling); decodeError != nil {
 		return fmt.Errorf(`checkLoops is %s, which is neither a string nor a boolean`, raw)
 	}
 	switch spelling {

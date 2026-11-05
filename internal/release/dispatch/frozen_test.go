@@ -19,16 +19,16 @@ func TestResolveFrozenRefusesWhenTheCacheIsEmpty(test *testing.T) {
 	// everywhere else. Returning a path that does not exist, or an empty one, would hand the caller
 	// something to exec that fails later and further from the cause.
 	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
-	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		test.Fatalf("creating the binary directory: %v", err)
+	if createDirectoryError := os.MkdirAll(paths.BinaryDirectory(), 0o755); createDirectoryError != nil {
+		test.Fatalf("creating the binary directory: %v", createDirectoryError)
 	}
 
-	frozen, err := ResolveFrozen(paths)
-	if err == nil {
+	frozen, resolveFrozenError := ResolveFrozen(paths)
+	if resolveFrozenError == nil {
 		test.Fatalf("freezing an empty cache succeeded and selected %q", frozen.Path)
 	}
-	if !strings.Contains(err.Error(), "nothing was run") {
-		test.Errorf("the error does not say that nothing ran, so a reader could take it for a warning: %v", err)
+	if !strings.Contains(resolveFrozenError.Error(), "nothing was run") {
+		test.Errorf("the error does not say that nothing ran, so a reader could take it for a warning: %v", resolveFrozenError)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestResolveFrozenRefusesWhenTheCacheIsMissing(test *testing.T) {
 	// no build has ever run here — and it must be just as loud rather than treated as "no results".
 	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: filepath.Join(test.TempDir(), "absent")}
 
-	if _, err := ResolveFrozen(paths); err == nil {
+	if _, resolveFrozenError := ResolveFrozen(paths); resolveFrozenError == nil {
 		test.Fatal("freezing against a cache directory that does not exist succeeded")
 	}
 }
@@ -52,9 +52,9 @@ func TestResolveFrozenNamesWhatItSelected(test *testing.T) {
 	// ordinary one, which is the whole thing being guarded against.
 	paths := newCacheWithBinaries(test, map[string]string{platformBinaryPrefix() + "abc123def4560000": "binary"})
 
-	frozen, err := ResolveFrozen(paths)
-	if err != nil {
-		test.Fatalf("freezing a cache with one binary failed: %v", err)
+	frozen, resolveFrozenError := ResolveFrozen(paths)
+	if resolveFrozenError != nil {
+		test.Fatalf("freezing a cache with one binary failed: %v", resolveFrozenError)
 	}
 
 	if frozen.Hash != "abc123def4560000" {
@@ -85,9 +85,9 @@ func TestResolveFrozenPicksTheNewestBinary(test *testing.T) {
 		platformBinaryPrefix() + "3333333333333333",
 	})
 
-	frozen, err := ResolveFrozen(paths)
-	if err != nil {
-		test.Fatalf("freezing failed: %v", err)
+	frozen, resolveFrozenError := ResolveFrozen(paths)
+	if resolveFrozenError != nil {
+		test.Fatalf("freezing failed: %v", resolveFrozenError)
 	}
 	if frozen.Hash != "3333333333333333" {
 		test.Errorf("selected %q rather than the newest binary", frozen.Hash)
@@ -103,13 +103,13 @@ func TestResolveFrozenIgnoresNonExecutableEntries(test *testing.T) {
 	paths := newCacheWithBinaries(test, map[string]string{platformBinaryPrefix() + "abc123def4560000": "binary"})
 
 	hashSidecar := filepath.Join(paths.BinaryDirectory(), "cohere-dev.hash")
-	if err := os.WriteFile(hashSidecar, []byte("abc123def4560000\n"), 0o644); err != nil {
-		test.Fatalf("writing the sidecar: %v", err)
+	if writeError := os.WriteFile(hashSidecar, []byte("abc123def4560000\n"), 0o644); writeError != nil {
+		test.Fatalf("writing the sidecar: %v", writeError)
 	}
 
-	frozen, err := ResolveFrozen(paths)
-	if err != nil {
-		test.Fatalf("freezing failed: %v", err)
+	frozen, resolveFrozenError := ResolveFrozen(paths)
+	if resolveFrozenError != nil {
+		test.Fatalf("freezing failed: %v", resolveFrozenError)
 	}
 	if strings.HasSuffix(frozen.Path, ".hash") {
 		test.Errorf("selected the hash sidecar %q, which is metadata rather than a binary", frozen.Path)
@@ -121,14 +121,14 @@ func newCacheWithBinaries(test *testing.T, binaries map[string]string) Paths {
 	test.Helper()
 
 	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
-	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		test.Fatalf("creating the binary directory: %v", err)
+	if createDirectoryError := os.MkdirAll(paths.BinaryDirectory(), 0o755); createDirectoryError != nil {
+		test.Fatalf("creating the binary directory: %v", createDirectoryError)
 	}
 
 	for name, contents := range binaries {
 		path := filepath.Join(paths.BinaryDirectory(), name)
-		if err := os.WriteFile(path, []byte(contents), 0o755); err != nil {
-			test.Fatalf("writing %s: %v", name, err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o755); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
 	return paths
@@ -145,8 +145,8 @@ func setModificationTimes(test *testing.T, paths Paths, oldestFirst []string) {
 	base := time.Date(2026, time.August, 23, 1, 0, 0, 0, time.UTC)
 	for index, name := range oldestFirst {
 		stamp := base.Add(time.Duration(index) * time.Second)
-		if err := os.Chtimes(filepath.Join(paths.BinaryDirectory(), name), stamp, stamp); err != nil {
-			test.Fatalf("stamping %s: %v", name, err)
+		if changeTimesError := os.Chtimes(filepath.Join(paths.BinaryDirectory(), name), stamp, stamp); changeTimesError != nil {
+			test.Fatalf("stamping %s: %v", name, changeTimesError)
 		}
 	}
 }

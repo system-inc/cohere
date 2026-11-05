@@ -30,8 +30,8 @@ func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
 	oldBody := strings.Repeat("const alpha = 'old';\n", 4000)
 	newBody := strings.Repeat("const alpha = 'new';\n", 4000)
 
-	if err := os.WriteFile(fileName, []byte(oldBody), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(oldBody), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	stop := make(chan struct{})
@@ -50,10 +50,10 @@ func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
 					return
 				default:
 				}
-				contents, err := os.ReadFile(fileName)
-				if err != nil {
+				contents, readError := os.ReadFile(fileName)
+				if readError != nil {
 					mutex.Lock()
-					torn = append(torn, "reader "+string(rune('a'+reader))+": "+err.Error())
+					torn = append(torn, "reader "+string(rune('a'+reader))+": "+readError.Error())
 					mutex.Unlock()
 					continue
 				}
@@ -75,10 +75,10 @@ func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
 		if round%2 == 1 {
 			body = oldBody
 		}
-		if err := WriteAtomically(fileName, body); err != nil {
+		if writeAtomicallyError := WriteAtomically(fileName, body); writeAtomicallyError != nil {
 			close(stop)
 			waitGroup.Wait()
-			test.Fatalf("write failed on round %d: %v", round, err)
+			test.Fatalf("write failed on round %d: %v", round, writeAtomicallyError)
 		}
 	}
 
@@ -126,13 +126,13 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	nested := filepath.Join(directory, "nested")
-	if err := os.Mkdir(nested, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.Mkdir(nested, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	fileName := filepath.Join(nested, "target.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	// Watch the directory during the write by racing a reader that records what it sees.
@@ -147,8 +147,8 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 				return
 			default:
 			}
-			entries, err := os.ReadDir(nested)
-			if err != nil {
+			entries, readDirectoryError := os.ReadDir(nested)
+			if readDirectoryError != nil {
 				continue
 			}
 			for _, entry := range entries {
@@ -158,15 +158,15 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 	}()
 
 	for range 200 {
-		if err := WriteAtomically(fileName, "const a = 2;\n"); err != nil {
+		if writeAtomicallyError := WriteAtomically(fileName, "const a = 2;\n"); writeAtomicallyError != nil {
 			close(stop)
 			<-done
-			test.Fatal(err)
+			test.Fatal(writeAtomicallyError)
 		}
-		if err := WriteAtomically(fileName, "const a = 1;\n"); err != nil {
+		if writeAtomicallyError := WriteAtomically(fileName, "const a = 1;\n"); writeAtomicallyError != nil {
 			close(stop)
 			<-done
-			test.Fatal(err)
+			test.Fatal(writeAtomicallyError)
 		}
 	}
 	close(stop)
@@ -183,9 +183,9 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 	}
 
 	// And none may survive.
-	entries, err := os.ReadDir(nested)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(nested)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	for _, entry := range entries {
 		if entry.Name() != "target.ts" {
@@ -206,7 +206,7 @@ func keysOf(set map[string]bool) []string {
 func TestWriteIntoAMissingDirectoryFails(test *testing.T) {
 	test.Parallel()
 	missing := filepath.Join(test.TempDir(), "absent", "target.ts")
-	if err := WriteAtomically(missing, "const a = 1;\n"); err == nil {
+	if writeAtomicallyError := WriteAtomically(missing, "const a = 1;\n"); writeAtomicallyError == nil {
 		test.Fatalf("expected an error writing into a directory that does not exist")
 	}
 }

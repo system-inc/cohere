@@ -436,13 +436,13 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 		fromBases := maps.Clone(loaded.Rules)
 		departed := map[string]bool{}
 		holdsToReasons := inOurTiers || IsSet(layer.path)
-		if err := checkReasons(layer); err != nil {
-			return nil, err
+		if checkReasonsError := checkReasons(layer); checkReasonsError != nil {
+			return nil, checkReasonsError
 		}
 		for name, value := range layer.raw.Rules {
-			setting, err := parseRuleSetting(value)
-			if err != nil {
-				return nil, fmt.Errorf("rule %q in %s: %w", name, layer.path, err)
+			setting, parseRuleSettingError := parseRuleSetting(value)
+			if parseRuleSettingError != nil {
+				return nil, fmt.Errorf("rule %q in %s: %w", name, layer.path, parseRuleSettingError)
 			}
 
 			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, reach)
@@ -521,9 +521,9 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 			}
 			coversEverything := coversEveryFileOfItsKind(rawOverride.Files)
 			for name, value := range rawOverride.Rules {
-				setting, err := parseRuleSetting(value)
-				if err != nil {
-					return nil, fmt.Errorf("override %d, rule %q in %s: %w", overrideIndex, name, layer.path, err)
+				setting, parseRuleSettingError := parseRuleSetting(value)
+				if parseRuleSettingError != nil {
+					return nil, fmt.Errorf("override %d, rule %q in %s: %w", overrideIndex, name, layer.path, parseRuleSettingError)
 				}
 				override.Rules[name] = setting
 
@@ -572,8 +572,8 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 		}
 	}
 
-	if err := refuseUnreasonedOffs(loaded, writtenBy, inOurTiers); err != nil {
-		return nil, err
+	if refuseUnreasonedOffsError := refuseUnreasonedOffs(loaded, writtenBy, inOurTiers); refuseUnreasonedOffsError != nil {
+		return nil, refuseUnreasonedOffsError
 	}
 
 	// Applied after every layer's rules, and reading them: an explicit line is a decision and a
@@ -597,12 +597,12 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 	}
 
 	if own := layers[len(layers)-1]; own.present["cohere"] {
-		versionRange, err := ParseVersionRange(own.raw.Cohere)
-		if err != nil {
-			return nil, fmt.Errorf("lint config %s: %w", own.path, err)
+		versionRange, parseVersionRangeError := ParseVersionRange(own.raw.Cohere)
+		if parseVersionRangeError != nil {
+			return nil, fmt.Errorf("lint config %s: %w", own.path, parseVersionRangeError)
 		}
-		if err := checkCoherePin(own.path, versionRange); err != nil {
-			return nil, err
+		if checkCoherePinError := checkCoherePin(own.path, versionRange); checkCoherePinError != nil {
+			return nil, checkCoherePinError
 		}
 		loaded.CohereVersion = &versionRange
 	}
@@ -621,9 +621,9 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 // own file alone. With `extends`, an edit to a base changes what runs exactly as an edit to the
 // project's file does, and a key blind to the base replays the old verdict.
 func SourcesOf(path string) ([]string, error) {
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	sources := make([]string, 0, len(layers))
 	for index := len(layers) - 1; index >= 0; index-- {
@@ -640,9 +640,9 @@ func SourcesOf(path string) ([]string, error) {
 // has no opinion on rules, and a rule key Load would refuse must not stop the formatter from knowing
 // which files it may touch.
 func IgnorePatternsOf(path string) ([]string, error) {
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	var patterns []string
 	for _, layer := range layers {
@@ -670,9 +670,9 @@ type configLayer struct {
 func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 	absolute := path
 	if !IsSet(path) {
-		resolved, err := filepath.Abs(path)
-		if err != nil {
-			return nil, fmt.Errorf("resolving lint config %s: %w", path, err)
+		resolved, absolutePathError := filepath.Abs(path)
+		if absolutePathError != nil {
+			return nil, fmt.Errorf("resolving lint config %s: %w", path, absolutePathError)
 		}
 		absolute = resolved
 	}
@@ -683,24 +683,24 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 		}
 	}
 
-	contents, err := SourceContents(absolute)
-	if err != nil {
-		return nil, fmt.Errorf("reading lint config %s: %w", absolute, err)
+	contents, sourceContentsError := SourceContents(absolute)
+	if sourceContentsError != nil {
+		return nil, fmt.Errorf("reading lint config %s: %w", absolute, sourceContentsError)
 	}
-	if err := checkTopLevelKeys(contents, absolute); err != nil {
-		return nil, err
+	if checkTopLevelKeysError := checkTopLevelKeys(contents, absolute); checkTopLevelKeysError != nil {
+		return nil, checkTopLevelKeysError
 	}
-	if err := checkOverrideKeys(contents, absolute); err != nil {
-		return nil, err
+	if checkOverrideKeysError := checkOverrideKeys(contents, absolute); checkOverrideKeysError != nil {
+		return nil, checkOverrideKeysError
 	}
 
 	var raw rawConfig
-	if err := json.Unmarshal(contents, &raw); err != nil {
-		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, err)
+	if decodeError := json.Unmarshal(contents, &raw); decodeError != nil {
+		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, decodeError)
 	}
 	var keyed map[string]json.RawMessage
-	if err := json.Unmarshal(contents, &keyed); err != nil {
-		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, err)
+	if decodeError := json.Unmarshal(contents, &keyed); decodeError != nil {
+		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, decodeError)
 	}
 	present := make(map[string]bool, len(keyed))
 	for key := range keyed {
@@ -723,9 +723,9 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 				base = filepath.Join(filepath.Dir(absolute), base)
 			}
 		}
-		baseLayers, err := readConfigLayers(base, append(chain, absolute))
-		if err != nil {
-			return nil, fmt.Errorf("lint config %s extends %s: %w", absolute, extended, err)
+		baseLayers, readConfigurationLayersError := readConfigLayers(base, append(chain, absolute))
+		if readConfigurationLayersError != nil {
+			return nil, fmt.Errorf("lint config %s extends %s: %w", absolute, extended, readConfigurationLayersError)
 		}
 		for _, baseLayer := range baseLayers {
 			if !read[baseLayer.path] {
@@ -884,7 +884,7 @@ func sameRuleSetting(left RuleSetting, right RuleSetting) bool {
 // parse, which parseRuleSetting has already ruled out.
 func compactJson(raw json.RawMessage) string {
 	var buffer bytes.Buffer
-	if err := json.Compact(&buffer, raw); err != nil {
+	if compactError := json.Compact(&buffer, raw); compactError != nil {
 		return string(raw)
 	}
 	return buffer.String()
@@ -911,8 +911,8 @@ func checkReasons(layer configLayer) error {
 		value, written := layer.raw.Rules[name]
 		turnsOff := false
 		if written {
-			setting, err := parseRuleSetting(value)
-			turnsOff = err == nil && setting.Severity == SeverityOff
+			setting, parseRuleSettingError := parseRuleSetting(value)
+			turnsOff = parseRuleSettingError == nil && setting.Severity == SeverityOff
 		}
 		if !turnsOff {
 			return fmt.Errorf("lint config %s names %q under \"reasons\", but it does not turn that rule "+
@@ -1039,7 +1039,7 @@ var ignoredTopLevelKeys = map[string]string{
 // the error names the key and the file, so the fix is one edit rather than an investigation.
 func checkTopLevelKeys(contents []byte, path string) error {
 	var keyed map[string]json.RawMessage
-	if err := json.Unmarshal(contents, &keyed); err != nil {
+	if decodeError := json.Unmarshal(contents, &keyed); decodeError != nil {
 		// Not this function's error to report. Returning nil hands the real parse failure to the
 		// caller's own Unmarshal, which produces the better message for a malformed file.
 		return nil
@@ -1101,7 +1101,7 @@ func checkOverrideKeys(contents []byte, path string) error {
 	var shaped struct {
 		Overrides []map[string]json.RawMessage `json:"overrides"`
 	}
-	if err := json.Unmarshal(contents, &shaped); err != nil {
+	if decodeError := json.Unmarshal(contents, &shaped); decodeError != nil {
 		// The caller's own Unmarshal reports a malformed file with the better message.
 		return nil
 	}
@@ -1132,25 +1132,25 @@ func checkOverrideKeys(contents []byte, path string) error {
 // must not do is decide by truncating.
 func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 	var severityName string
-	if err := json.Unmarshal(value, &severityName); err == nil {
-		severity, err := parseSeverity(severityName)
-		return RuleSetting{Severity: severity}, err
+	if decodeError := json.Unmarshal(value, &severityName); decodeError == nil {
+		severity, parseSeverityError := parseSeverity(severityName)
+		return RuleSetting{Severity: severity}, parseSeverityError
 	}
 
 	var tuple []json.RawMessage
-	if err := json.Unmarshal(value, &tuple); err != nil {
+	if decodeError := json.Unmarshal(value, &tuple); decodeError != nil {
 		return RuleSetting{}, fmt.Errorf("expected a severity string or a [severity, ...options] array, got %s", truncate(string(value)))
 	}
 	if len(tuple) == 0 {
 		return RuleSetting{}, fmt.Errorf("empty rule configuration array")
 	}
 
-	if err := json.Unmarshal(tuple[0], &severityName); err != nil {
+	if decodeError := json.Unmarshal(tuple[0], &severityName); decodeError != nil {
 		return RuleSetting{}, fmt.Errorf("first element is not a severity string: %s", truncate(string(tuple[0])))
 	}
-	severity, err := parseSeverity(severityName)
-	if err != nil {
-		return RuleSetting{}, err
+	severity, parseSeverityError := parseSeverity(severityName)
+	if parseSeverityError != nil {
+		return RuleSetting{}, parseSeverityError
 	}
 
 	setting := RuleSetting{Severity: severity}

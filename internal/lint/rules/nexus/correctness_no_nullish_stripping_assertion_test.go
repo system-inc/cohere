@@ -63,8 +63,8 @@ func correctnessNoNullishStrippingAssertionRunRule(test *testing.T, subject rule
 		correctnessNoNullishStrippingAssertionFile: sourceText,
 	}, correctnessNoNullishStrippingAssertionFile, func(directory string) {
 		configPath := filepath.Join(directory, "tsconfig.json")
-		if err := os.WriteFile(configPath, []byte(correctnessNoNullishStrippingAssertionTsConfig), 0o644); err != nil {
-			test.Fatalf("writing the fixture tsconfig: %v", err)
+		if writeError := os.WriteFile(configPath, []byte(correctnessNoNullishStrippingAssertionTsConfig), 0o644); writeError != nil {
+			test.Fatalf("writing the fixture tsconfig: %v", writeError)
 		}
 	})
 }

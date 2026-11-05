@@ -34,9 +34,9 @@ func asTheTypedNoBaseToStringHarnessWroteIt(text string) string {
 // a fixture routed through the decoder can see that.
 func decodeNoBaseToStringOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoBaseToStringOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoBaseToStringOptionsError := DecodeNoBaseToStringOptions(json.RawMessage(raw))
+	if decodeNoBaseToStringOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoBaseToStringOptionsError)
 	}
 	return decoded
 }

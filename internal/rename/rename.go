@@ -177,10 +177,10 @@ func ParsePosition(argument string) (Position, bool) {
 		return Position{}, false
 	}
 	var line, column int
-	if _, err := fmt.Sscanf(argument[secondColon+1:lastColon], "%d", &line); err != nil {
+	if _, scanError := fmt.Sscanf(argument[secondColon+1:lastColon], "%d", &line); scanError != nil {
 		return Position{}, false
 	}
-	if _, err := fmt.Sscanf(argument[lastColon+1:], "%d", &column); err != nil {
+	if _, scanError := fmt.Sscanf(argument[lastColon+1:], "%d", &column); scanError != nil {
 		return Position{}, false
 	}
 	if line < 1 || column < 1 {

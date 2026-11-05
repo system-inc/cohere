@@ -54,9 +54,9 @@ type oneVarFixCase struct {
 // delivers, and the decoder answers with upstream's `defaultOptions: ["always"]`.
 func decodedOneVar(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeOneVarOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding one-var options %q: %v", raw, err)
+	decoded, decodeOneVariableOptionsError := DecodeOneVarOptions([]byte(raw))
+	if decodeOneVariableOptionsError != nil {
+		test.Fatalf("decoding one-var options %q: %v", raw, decodeOneVariableOptionsError)
 	}
 	return decoded
 }

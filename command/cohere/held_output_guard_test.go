@@ -96,10 +96,10 @@ func heldOutputReport(stack string, waited time.Duration) string {
 	var report strings.Builder
 	fmt.Fprintf(&report, "a command exited and its output has stayed open at least %s since:\n\n%s\n\n",
 		waited.Round(time.Second), stack)
-	holders, err := pipeHolders()
+	holders, pipeHoldersError := pipeHolders()
 	switch {
-	case err != nil:
-		fmt.Fprintf(&report, "the holders could not be listed: %v\n", err)
+	case pipeHoldersError != nil:
+		fmt.Fprintf(&report, "the holders could not be listed: %v\n", pipeHoldersError)
 	case len(holders) == 0:
 		report.WriteString("no other process holds the other end of any pipe this process reads, so the read end was most " +
 			"likely closed out from under the poller: look for a second *os.File made on one descriptor (os.NewFile on a " +

@@ -170,7 +170,7 @@ func TestComputeFailsOnUnreadableInput(test *testing.T) {
 	// we could not actually see, which is staleness wearing a different hat.
 	inputs := Inputs{SourceFiles: []string{filepath.Join(test.TempDir(), "absent.go")}}
 
-	if _, err := inputs.Compute(); err == nil {
+	if _, computeError := inputs.Compute(); computeError == nil {
 		test.Fatal("hashing a missing input succeeded, so an unreadable tree would hash as if it were fine")
 	}
 }
@@ -181,8 +181,8 @@ func TestCollectInputsRejectsAnEmptyFileSet(test *testing.T) {
 	// An empty input set hashes to a perfectly stable digest for a tree containing nothing, and
 	// every later run hits that entry. A run that measured nothing must not look like a run that
 	// found nothing.
-	_, err := CollectInputs(test.TempDir(), "./cmd/does-not-exist", ReleaseBuildFlags)
-	if err == nil {
+	_, collectInputsError := CollectInputs(test.TempDir(), "./cmd/does-not-exist", ReleaseBuildFlags)
+	if collectInputsError == nil {
 		test.Fatal("collecting inputs for a package that does not exist succeeded")
 	}
 }
@@ -191,9 +191,9 @@ func TestCollectInputsRejectsAnEmptyFileSet(test *testing.T) {
 func compute(test *testing.T, inputs Inputs) string {
 	test.Helper()
 
-	hash, err := inputs.Compute()
-	if err != nil {
-		test.Fatalf("computing the hash: %v", err)
+	hash, computeError := inputs.Compute()
+	if computeError != nil {
+		test.Fatalf("computing the hash: %v", computeError)
 	}
 	if hash == "" {
 		test.Fatal("the hash came back empty")
@@ -205,10 +205,10 @@ func compute(test *testing.T, inputs Inputs) string {
 func writeFile(test *testing.T, path string, contents string) {
 	test.Helper()
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatalf("creating the directory for %s: %v", path, err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatalf("creating the directory for %s: %v", path, createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing %s: %v", path, err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing %s: %v", path, writeError)
 	}
 }

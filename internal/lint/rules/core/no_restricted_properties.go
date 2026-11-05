@@ -61,15 +61,15 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 		return options, nil
 	}
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
 		return options, fmt.Errorf(
-			"no-restricted-properties: the option list is not a JSON array: %w", err)
+			"no-restricted-properties: the option list is not a JSON array: %w", decodeError)
 	}
 	for index, element := range elements {
 		var restriction NoRestrictedPropertiesRestriction
-		if err := rule.UnmarshalOptions(element, &restriction); err != nil {
+		if unmarshalOptionsError := rule.UnmarshalOptions(element, &restriction); unmarshalOptionsError != nil {
 			return NoRestrictedPropertiesOptions{}, fmt.Errorf(
-				"no-restricted-properties element %d: %w", index+1, err)
+				"no-restricted-properties element %d: %w", index+1, unmarshalOptionsError)
 		}
 		options.Restrictions = append(options.Restrictions, restriction)
 	}

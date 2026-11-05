@@ -80,14 +80,14 @@ type oracleInput struct {
 // upstreamOutputs runs the oracle over inputs, one Node process per batch of a few megabytes.
 func upstreamOutputs(test *testing.T, inputs []oracleInput) []string {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the CST oracle needs it")
 	}
 	root := forkRoot(test)
 	directory := test.TempDir()
 	script := filepath.Join(directory, "oracle.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	var outputs []string
 	for start := 0; start < len(inputs); {
@@ -120,8 +120,8 @@ func runOracle(test *testing.T, script string, inputs []oracleInput) []string {
 		test.Fatal(err)
 	}
 	var outputs []string
-	if err := json.Unmarshal(output, &outputs); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(outputs) != len(inputs) {
 		test.Fatalf("the CST oracle returned %d outputs for %d inputs", len(outputs), len(inputs))
@@ -435,7 +435,7 @@ func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	root := forkRoot(test)
 	suite := filepath.Join(root, "node_modules", "yaml-test-suite", "index.js")
-	if _, err := os.Stat(suite); err != nil {
+	if _, statError := os.Stat(suite); statError != nil {
 		test.Skip("the fork has no yaml-test-suite package")
 	}
 	script := filepath.Join(test.TempDir(), "suite.mjs")
@@ -443,16 +443,16 @@ func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 const inputs = [];
 for (const test of suite) for (const testCase of test.cases) if (typeof testCase.yaml === "string") inputs.push(testCase.yaml);
 process.stdout.write(JSON.stringify(inputs));`
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	output, err := exec.Command("node", script).Output()
-	if err != nil {
-		test.Fatalf("listing the yaml-test-suite failed: %v", err)
+	output, outputError := exec.Command("node", script).Output()
+	if outputError != nil {
+		test.Fatalf("listing the yaml-test-suite failed: %v", outputError)
 	}
 	var texts []string
-	if err := json.Unmarshal(output, &texts); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &texts); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	var inputs []oracleInput
 	for _, text := range texts {
@@ -472,7 +472,7 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 	}
 	var paths []string
 	var inputs []oracleInput
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -481,17 +481,17 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 		}
 		extension := strings.ToLower(filepath.Ext(path))
 		if !entry.IsDir() && entry.Type().IsRegular() && (extension == ".yaml" || extension == ".yml") {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			paths = append(paths, path)
 			inputs = append(inputs, oracleInput{Text: normalize(string(source))})
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	expected := upstreamOutputs(test, inputs)
 	failures := 0

@@ -151,7 +151,7 @@ func discoveryRoot(location projectLocation, locateError error, workingDirectory
 func enclosingRepository(start string) string {
 	directory := filepath.Clean(start)
 	for {
-		if information, err := os.Stat(filepath.Join(directory, ".git")); err == nil && information.IsDir() {
+		if information, statError := os.Stat(filepath.Join(directory, ".git")); statError == nil && information.IsDir() {
 			return directory
 		}
 		parent := filepath.Dir(directory)
@@ -192,9 +192,9 @@ const (
 )
 
 func repositoryKind(directory string) nestedRepository {
-	information, err := os.Lstat(filepath.Join(directory, ".git"))
+	information, statError := os.Lstat(filepath.Join(directory, ".git"))
 	switch {
-	case err != nil:
+	case statError != nil:
 		return noRepository
 	case information.IsDir():
 		return cloneRepository

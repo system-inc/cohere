@@ -199,7 +199,7 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -220,8 +220,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
@@ -235,9 +235,9 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -247,8 +247,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	oracle := map[string]map[string]any{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
@@ -256,8 +256,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			continue
 		}
 		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		oracle[record["name"].(string)] = record
 	}
@@ -279,11 +279,11 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			fail("%s: the fixture says malformed=%v and graphql-js says %v", each.Name, expectMalformed, want)
 			continue
 		}
-		got, err := dumpParse(each.Text)
+		got, dumpParseError := dumpParse(each.Text)
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				fail("%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s", each.Name, wantError, err.Error())
+		case oracleRefused && dumpParseError != nil:
+			if dumpParseError.Error() != wantError {
+				fail("%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s", each.Name, wantError, dumpParseError.Error())
 				continue
 			}
 			refusedByBoth++
@@ -292,8 +292,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			}
 		case oracleRefused:
 			fail("%s: graphql-js refuses it (%s) and Go parsed it", each.Name, wantError)
-		case err != nil:
-			fail("%s: graphql-js parses it and Go refused: %v", each.Name, err)
+		case dumpParseError != nil:
+			fail("%s: graphql-js parses it and Go refused: %v", each.Name, dumpParseError)
 		default:
 			difference := firstParseDifference(want["ast"], got["ast"], "ast") + firstParseDifference(want["comments"], got["comments"], "comments")
 			if difference != "" {

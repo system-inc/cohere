@@ -21,9 +21,9 @@ func decodedOperatorAssignmentOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeOperatorAssignmentOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeOperatorAssignmentOptionsError := DecodeOperatorAssignmentOptions(json.RawMessage(raw))
+	if decodeOperatorAssignmentOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeOperatorAssignmentOptionsError)
 	}
 	return options
 }

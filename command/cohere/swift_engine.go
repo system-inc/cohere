@@ -105,8 +105,8 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 	}
 
 	if !provenance.IsDevelopment() {
-		binaryPath, err := shippedSwiftEngine(provenance)
-		return binaryPath, "", err
+		binaryPath, shippedSwiftEngineError := shippedSwiftEngine(provenance)
+		return binaryPath, "", shippedSwiftEngineError
 	}
 
 	moduleDirectory, err := dispatch.FindModuleDirectory()
@@ -130,11 +130,11 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 // install, and it says so rather than checking nothing. It vouches for no commit: the release stamps
 // none into cohere, and the engine's own provenance record names what it was built from.
 func shippedSwiftEngine(provenance release.Provenance) (string, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("finding this cohere's own executable, beside which its Swift engine ships: %w", err)
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		return "", fmt.Errorf("finding this cohere's own executable, beside which its Swift engine ships: %w", executableError)
 	}
-	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
 	binaryPath := filepath.Join(filepath.Dir(executable), release.SwiftEngineFileName)

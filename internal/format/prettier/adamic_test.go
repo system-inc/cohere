@@ -29,9 +29,9 @@ func TestTheEngineFormatsAnAdamicFileAsTypeScript(test *testing.T) {
 			test.Errorf("%q formats as .a to\n%s\nand as .ts to\n%s", source, asAdamic, asTypeScript)
 		}
 	}
-	asTSX, err := engine.Format("/repo/Dog.tsx", sources[0])
-	if err != nil {
-		test.Fatal(err)
+	asTSX, formatError := engine.Format("/repo/Dog.tsx", sources[0])
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	if asAdamic, _ := engine.Format("/repo/Dog.a", sources[0]); asAdamic == asTSX {
 		test.Errorf("the .tsx control formats `<T,>` as .a does, so the comparison above proves nothing:\n%s", asTSX)

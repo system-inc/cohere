@@ -45,9 +45,9 @@ func Build(ruleNames []string) (map[string][]byte, error) {
 	}
 	files := map[string][]byte{}
 	for path, schema := range map[string]map[string]any{ProjectSchemaPath: project, NexusSchemaPath: nexus} {
-		encoded, err := encode(schema)
-		if err != nil {
-			return nil, err
+		encoded, encodeError := encode(schema)
+		if encodeError != nil {
+			return nil, encodeError
 		}
 		files[path] = encoded
 	}
@@ -63,17 +63,17 @@ func document(ruleNames []string, nexusTier bool) (map[string]any, error) {
 		if !described {
 			return nil, fmt.Errorf("settingsschema: the loader accepts %q and nothing describes it; add it to topLevelDescriptions", key.Name)
 		}
-		shape, err := keyShape(key)
-		if err != nil {
-			return nil, err
+		shape, keyShapeError := keyShape(key)
+		if keyShapeError != nil {
+			return nil, keyShapeError
 		}
 		shape["description"] = description
 		properties[key.Name] = shape
 	}
 
-	defs, err := definitions(ruleNames)
-	if err != nil {
-		return nil, err
+	defs, definitionsError := definitions(ruleNames)
+	if definitionsError != nil {
+		return nil, definitionsError
 	}
 
 	title := "CohereSettings.json"
@@ -251,9 +251,9 @@ func definitions(ruleNames []string) (map[string]any, error) {
 	}
 	overrideProperties := map[string]any{}
 	for _, field := range configuration.OverrideFields() {
-		shape, err := typeShape("overrides."+field.Name, field.Field)
-		if err != nil {
-			return nil, err
+		shape, typeShapeError := typeShape("overrides."+field.Name, field.Field)
+		if typeShapeError != nil {
+			return nil, typeShapeError
 		}
 		description, described := overrideDescriptions[field.Name]
 		if !described {
@@ -309,8 +309,8 @@ func encode(schema map[string]any) ([]byte, error) {
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(schema); err != nil {
-		return nil, err
+	if encodeError := encoder.Encode(schema); encodeError != nil {
+		return nil, encodeError
 	}
 	return buffer.Bytes(), nil
 }
@@ -320,8 +320,8 @@ func SchemaKeys(encoded []byte) ([]string, error) {
 	var schema struct {
 		Properties map[string]json.RawMessage `json:"properties"`
 	}
-	if err := json.Unmarshal(encoded, &schema); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(encoded, &schema); decodeError != nil {
+		return nil, decodeError
 	}
 	keys := make([]string, 0, len(schema.Properties))
 	for key := range schema.Properties {

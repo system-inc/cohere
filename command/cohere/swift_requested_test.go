@@ -16,12 +16,12 @@ func renderRequested(test *testing.T, lines []string, requested map[phaseName]bo
 	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
 	run.requested = requested
 	for index, line := range lines {
-		if err := run.accept([]byte(line)); err != nil {
-			return out.String(), 1, &recordError{index: index, err: err}
+		if acceptError := run.accept([]byte(line)); acceptError != nil {
+			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
-	exitCode, err := run.finish(engineExit, "exited")
-	return out.String(), exitCode, err
+	exitCode, finishError := run.finish(engineExit, "exited")
+	return out.String(), exitCode, finishError
 }
 
 // flagsOf states a command line's boolean flags for engineRequestedPhases.
@@ -44,15 +44,15 @@ func editRecords(test *testing.T, lines []string, edit func(record map[string]an
 	edited := []string{}
 	for _, line := range lines {
 		record := map[string]any{}
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		if !edit(record) {
 			continue
 		}
-		encoded, err := json.Marshal(record)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(record)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		edited = append(edited, string(encoded))
 	}
@@ -169,15 +169,15 @@ func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
 		test.Fatalf("--format-only requested %v, want fix alone", requested)
 	}
-	output, exitCode, err := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), requested, 1)
-	if err != nil {
-		test.Fatalf("the format-only stream was refused: %v\n%s", err, output)
+	output, exitCode, renderRequestedError := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), requested, 1)
+	if renderRequestedError != nil {
+		test.Fatalf("the format-only stream was refused: %v\n%s", renderRequestedError, output)
 	}
 	if exitCode != 1 {
 		test.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
 	}
 	everything := engineRequestedPhases(flagsOf("no-fix"))
-	if _, _, err := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), everything, 1); err == nil {
+	if _, _, renderRequestedError := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), everything, 1); renderRequestedError == nil {
 		test.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
 	}
 }

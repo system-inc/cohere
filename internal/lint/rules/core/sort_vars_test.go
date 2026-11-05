@@ -13,9 +13,9 @@ const sortVarsFile = "/repository/source/SortVars.ts"
 //
 // The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder.
 func sortVarsOf(optionJson string) any {
-	settings, err := DecodeSortVarsOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodeSortVariablesOptionsError := DecodeSortVarsOptions([]byte(optionJson))
+	if decodeSortVariablesOptionsError != nil {
+		panic(decodeSortVariablesOptionsError)
 	}
 	return settings
 }

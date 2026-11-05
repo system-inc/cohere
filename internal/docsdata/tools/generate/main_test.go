@@ -22,16 +22,16 @@ func moduleCopy(test *testing.T) string {
 	test.Helper()
 	root := test.TempDir()
 	copyFile := func(relative string) {
-		contents, err := os.ReadFile(filepath.Join(moduleRoot, relative))
-		if err != nil {
-			test.Fatal(err)
+		contents, readError := os.ReadFile(filepath.Join(moduleRoot, relative))
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		destination := filepath.Join(root, relative)
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(destination), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(destination, contents, 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(destination, contents, 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	for _, relative := range []string{"swift/HouseRuleVerdicts.json", "swift/Rules.json", "CHANGELOG.md"} {
@@ -95,23 +95,23 @@ func recordsReproducing(examples docsdata.Examples) []capture.Record {
 // the real capture records when the committed examples are current.
 func lintTestsAsCommitted(test *testing.T) func(directory string) error {
 	test.Helper()
-	committed, err := docsdata.ReadCommittedExamples(moduleRoot)
-	if err != nil {
-		test.Fatal(err)
+	committed, readCommittedExamplesError := docsdata.ReadCommittedExamples(moduleRoot)
+	if readCommittedExamplesError != nil {
+		test.Fatal(readCommittedExamplesError)
 	}
 	if len(committed) == 0 {
 		test.Fatal("the module has no committed examples, so a check against them would prove nothing")
 	}
 	return func(directory string) error {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return err
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return createDirectoryError
 		}
 		var lines []string
 		for _, examples := range committed {
 			for _, record := range recordsReproducing(examples) {
-				encoded, err := json.Marshal(record)
-				if err != nil {
-					return err
+				encoded, encodeError := json.Marshal(record)
+				if encodeError != nil {
+					return encodeError
 				}
 				lines = append(lines, string(encoded))
 			}
@@ -148,8 +148,8 @@ func plantStaleExample(test *testing.T, root string) string {
 		test.Fatal(err)
 	}
 	path := docsdata.ExamplePath(planted.Rule)
-	if err := os.WriteFile(filepath.Join(root, path), append(encoded, '\n'), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, path), append(encoded, '\n'), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return path
 }
@@ -164,9 +164,9 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 	test.Run("a fresh tree passes -check", func(test *testing.T) {
 		test.Parallel()
 		root := moduleCopy(test)
-		stale, err := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
-		if err != nil {
-			test.Fatal(err)
+		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
+		if staleFilesError != nil {
+			test.Fatal(staleFilesError)
 		}
 		if len(stale) > 0 {
 			test.Errorf("a copy of the module's own files is stale: %v", stale)
@@ -177,9 +177,9 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 		test.Parallel()
 		root := moduleCopy(test)
 		planted := plantStaleExample(test, root)
-		stale, err := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
-		if err != nil {
-			test.Fatal(err)
+		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
+		if staleFilesError != nil {
+			test.Fatal(staleFilesError)
 		}
 		if !slices.Contains(stale, planted) {
 			test.Errorf("-check missed the planted %s: %v", planted, stale)
@@ -194,9 +194,9 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 			test.Error("the rendering depth ran the lint tests")
 			return nil
 		}
-		stale, err := staleFiles(sources{root: root, help: noHelp, capture: noCapture}, test.TempDir(), false)
-		if err != nil {
-			test.Fatal(err)
+		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: noCapture}, test.TempDir(), false)
+		if staleFilesError != nil {
+			test.Fatal(staleFilesError)
 		}
 		if len(stale) > 0 {
 			test.Errorf("the rendering depth reads the examples back, so it should find nothing stale here: %v", stale)
@@ -206,9 +206,9 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 	test.Run("a capture that recorded nothing is refused", func(test *testing.T) {
 		test.Parallel()
 		recordsNothing := func(directory string) error { return os.MkdirAll(directory, 0o755) }
-		_, err := staleFiles(sources{root: moduleCopy(test), help: noHelp, capture: recordsNothing}, test.TempDir(), true)
-		if err == nil || !strings.Contains(err.Error(), "recorded no case") {
-			test.Errorf("an empty capture passed as a check: %v", err)
+		_, staleFilesError := staleFiles(sources{root: moduleCopy(test), help: noHelp, capture: recordsNothing}, test.TempDir(), true)
+		if staleFilesError == nil || !strings.Contains(staleFilesError.Error(), "recorded no case") {
+			test.Errorf("an empty capture passed as a check: %v", staleFilesError)
 		}
 	})
 }

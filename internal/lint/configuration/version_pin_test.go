@@ -30,18 +30,18 @@ func TestVersionRangeAdmitsExactlyWhatNpmWould(test *testing.T) {
 		{"1.0.0-rc.1", []string{"1.0.0-rc.1"}, []string{"1.0.0-rc.2", "1.0.0"}},
 	}
 	for _, testCase := range cases {
-		parsed, err := ParseVersionRange(testCase.versionRange)
-		if err != nil {
-			test.Fatalf("%q: %v", testCase.versionRange, err)
+		parsed, parseVersionRangeError := ParseVersionRange(testCase.versionRange)
+		if parseVersionRangeError != nil {
+			test.Fatalf("%q: %v", testCase.versionRange, parseVersionRangeError)
 		}
 		for _, version := range testCase.admitted {
-			if admitted, err := parsed.Admits(version); err != nil || !admitted {
-				test.Errorf("%q should admit %s (got %v, %v)", testCase.versionRange, version, admitted, err)
+			if admitted, admitsError := parsed.Admits(version); admitsError != nil || !admitted {
+				test.Errorf("%q should admit %s (got %v, %v)", testCase.versionRange, version, admitted, admitsError)
 			}
 		}
 		for _, version := range testCase.refused {
-			if admitted, err := parsed.Admits(version); err != nil || admitted {
-				test.Errorf("%q should refuse %s (got %v, %v)", testCase.versionRange, version, admitted, err)
+			if admitted, admitsError := parsed.Admits(version); admitsError != nil || admitted {
+				test.Errorf("%q should refuse %s (got %v, %v)", testCase.versionRange, version, admitted, admitsError)
 			}
 		}
 	}
@@ -67,7 +67,7 @@ func TestVersionPrecedenceIsSemverOrder(test *testing.T) {
 func TestVersionRangeRefusesWhatItCannotReadExactly(test *testing.T) {
 	test.Parallel()
 	for _, text := range []string{"", "  ", "1.x", "*", "1.0", "1.0.0 - 2.0.0", "01.0.0", "^1.0", "||", "^1.0.0 ||", "1.0.0-", "latest"} {
-		if _, err := ParseVersionRange(text); err == nil {
+		if _, parseVersionRangeError := ParseVersionRange(text); parseVersionRangeError == nil {
 			test.Errorf("%q should be refused", text)
 		}
 	}
@@ -77,8 +77,8 @@ func writeSettingsFiles(test *testing.T, files map[string]string) string {
 	test.Helper()
 	directory := test.TempDir()
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return filepath.Join(directory, "CohereSettings.json")
@@ -126,19 +126,19 @@ func TestAPublishedReleaseOutsideThePinRefusesNamingBothVersions(test *testing.T
 
 	// The baseline: a release inside the range loads.
 	releaseVersion = func() string { return "1.4.0" }
-	if _, err := Load(path); err != nil {
-		test.Fatalf("1.4.0 is inside ^1.0.0 and should load: %v", err)
+	if _, loadError := Load(path); loadError != nil {
+		test.Fatalf("1.4.0 is inside ^1.0.0 and should load: %v", loadError)
 	}
 
 	releaseVersion = func() string { return "2.0.0" }
-	_, err := Load(path)
-	if err == nil || !strings.Contains(err.Error(), "^1.0.0") || !strings.Contains(err.Error(), "cohere 2.0.0") {
-		test.Fatalf("2.0.0 is outside ^1.0.0 and should refuse naming both, got %v", err)
+	_, loadError := Load(path)
+	if loadError == nil || !strings.Contains(loadError.Error(), "^1.0.0") || !strings.Contains(loadError.Error(), "cohere 2.0.0") {
+		test.Fatalf("2.0.0 is outside ^1.0.0 and should refuse naming both, got %v", loadError)
 	}
 
 	// A local build names no release, so the pin cannot judge it.
 	releaseVersion = func() string { return "dev" }
-	if _, err := Load(path); err != nil {
-		test.Fatalf("a dev build should not be held to the pin: %v", err)
+	if _, loadError := Load(path); loadError != nil {
+		test.Fatalf("a dev build should not be held to the pin: %v", loadError)
 	}
 }

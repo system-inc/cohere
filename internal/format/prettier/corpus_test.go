@@ -29,9 +29,9 @@ func TestCorpus(test *testing.T) {
 	}
 
 	engine := newTestEngine(test)
-	listBytes, err := os.ReadFile(listPath)
-	if err != nil {
-		test.Fatalf("reading the list: %v", err)
+	listBytes, readError := os.ReadFile(listPath)
+	if readError != nil {
+		test.Fatalf("reading the list: %v", readError)
 	}
 
 	var formatted, failed, refused int
@@ -44,8 +44,8 @@ func TestCorpus(test *testing.T) {
 			refused++
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		text, formatError := engine.Format(path, string(source))
@@ -55,8 +55,8 @@ func TestCorpus(test *testing.T) {
 			continue
 		}
 		flat := strings.ReplaceAll(strings.TrimPrefix(path, "/"), "/", "_")
-		if err := os.WriteFile(filepath.Join(outDirectory, flat), []byte(text), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", flat, err)
+		if writeError := os.WriteFile(filepath.Join(outDirectory, flat), []byte(text), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", flat, writeError)
 		}
 		formatted++
 	}

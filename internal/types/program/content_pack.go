@@ -269,15 +269,15 @@ func (p *ContentPack) Save() error {
 	if len(p.added) == 0 && p.damaged == 0 {
 		return nil
 	}
-	if err := os.MkdirAll(p.directory, 0o755); err != nil {
-		return err
+	if createDirectoryError := os.MkdirAll(p.directory, 0o755); createDirectoryError != nil {
+		return createDirectoryError
 	}
 
 	// Read again under the lock: another run may have appended or rewritten since this one opened.
 	current := map[string]contentPackEntry{}
 	currentData := ""
-	if index, err := os.ReadFile(filepath.Join(p.directory, contentPackIndexName)); err == nil {
-		if dataName, entries, err := parseContentPackIndex(index); err == nil {
+	if index, readError := os.ReadFile(filepath.Join(p.directory, contentPackIndexName)); readError == nil {
+		if dataName, entries, parseContentPackIndexError := parseContentPackIndex(index); parseContentPackIndexError == nil {
 			currentData, current = dataName, entries
 		}
 	}
@@ -292,7 +292,7 @@ func (p *ContentPack) Save() error {
 				live += entry.length
 			}
 		}
-		if information, err := os.Stat(filepath.Join(p.directory, currentData)); err == nil {
+		if information, statError := os.Stat(filepath.Join(p.directory, currentData)); statError == nil {
 			size = information.Size()
 		}
 		for _, added := range p.added {
@@ -323,12 +323,12 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 	for path, added := range p.added {
 		entries[path] = writer.add(added.identity, added.contents)
 	}
-	if err := writer.finish(); err != nil {
+	if finishError := writer.finish(); finishError != nil {
 		file.Close()
-		return err
+		return finishError
 	}
-	if err := file.Close(); err != nil {
-		return err
+	if closeError := file.Close(); closeError != nil {
+		return closeError
 	}
 	return writeContentPackIndex(p.directory, dataName, entries)
 }
@@ -337,9 +337,9 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 // every older data file.
 func (p *ContentPack) rewrite() error {
 	dataName := "contents-" + strconv.FormatInt(time.Now().UnixNano(), 36) + ".pack"
-	file, err := os.OpenFile(filepath.Join(p.directory, dataName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return err
+	file, openError := os.OpenFile(filepath.Join(p.directory, dataName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if openError != nil {
+		return openError
 	}
 	writer := newPackWriter(file, 0)
 	entries := make(map[string]contentPackEntry, len(p.used)+len(p.added))
@@ -357,20 +357,20 @@ func (p *ContentPack) rewrite() error {
 	for path, added := range p.added {
 		entries[path] = writer.add(added.identity, added.contents)
 	}
-	if err := writer.finish(); err != nil {
+	if finishError := writer.finish(); finishError != nil {
 		file.Close()
 		os.Remove(file.Name())
-		return err
+		return finishError
 	}
-	if err := file.Close(); err != nil {
+	if closeError := file.Close(); closeError != nil {
 		os.Remove(file.Name())
-		return err
+		return closeError
 	}
-	if err := writeContentPackIndex(p.directory, dataName, entries); err != nil {
+	if writeContentPackIndexError := writeContentPackIndex(p.directory, dataName, entries); writeContentPackIndexError != nil {
 		os.Remove(file.Name())
-		return err
+		return writeContentPackIndexError
 	}
-	if older, err := filepath.Glob(filepath.Join(p.directory, "contents-*.pack")); err == nil {
+	if older, globError := filepath.Glob(filepath.Join(p.directory, "contents-*.pack")); globError == nil {
 		for _, path := range older {
 			if filepath.Base(path) != dataName {
 				os.Remove(path)
@@ -447,22 +447,22 @@ func writeContentPackIndex(directory string, dataName string, entries map[string
 	}
 	index = binary.LittleEndian.AppendUint32(index, crc32.Checksum(index, castagnoli))
 
-	temporary, err := os.CreateTemp(directory, contentPackIndexName+".*")
-	if err != nil {
-		return err
+	temporary, temporaryFileError := os.CreateTemp(directory, contentPackIndexName+".*")
+	if temporaryFileError != nil {
+		return temporaryFileError
 	}
-	if _, err := temporary.Write(index); err != nil {
+	if _, writeError := temporary.Write(index); writeError != nil {
 		temporary.Close()
 		os.Remove(temporary.Name())
-		return err
+		return writeError
 	}
-	if err := temporary.Close(); err != nil {
+	if closeError := temporary.Close(); closeError != nil {
 		os.Remove(temporary.Name())
-		return err
+		return closeError
 	}
-	if err := os.Rename(temporary.Name(), filepath.Join(directory, contentPackIndexName)); err != nil {
+	if renameError := os.Rename(temporary.Name(), filepath.Join(directory, contentPackIndexName)); renameError != nil {
 		os.Remove(temporary.Name())
-		return err
+		return renameError
 	}
 	return nil
 }

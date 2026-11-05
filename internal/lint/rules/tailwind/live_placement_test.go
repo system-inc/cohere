@@ -62,14 +62,14 @@ func livePlacementLiterals(test *testing.T) map[string][][]string {
 	test.Helper()
 
 	path := filepath.Join("collapse", "testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var fixture livePlacementCorpus
-	if err := json.Unmarshal(contents, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 
 	literals := map[string][][]string{}
@@ -105,12 +105,12 @@ func livePlacementSystem(test *testing.T, spelling string) DesignSystemResult {
 	if packageRoot == "" {
 		return DesignSystemResult{Err: os.ErrNotExist}
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
-	if err != nil {
-		return DesignSystemResult{Err: err}
+	if loadDesignSystemError != nil {
+		return DesignSystemResult{Err: loadDesignSystemError}
 	}
 	return loadedDesignSystemResult(system, entryPoint)
 }

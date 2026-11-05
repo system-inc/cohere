@@ -199,8 +199,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		opts = new(Options)
 	}
 
-	if err := analysis.Validate(analyzers); err != nil {
-		return nil, err
+	if validateError := analysis.Validate(analyzers); validateError != nil {
+		return nil, validateError
 	}
 
 	// Construct the action graph.
@@ -456,8 +456,8 @@ func (act *Action) execOnce() {
 		ResultOf: inputs,
 		Report: func(d analysis.Diagnostic) {
 			// Assert that SuggestedFixes are well formed.
-			if err := ValidateFixes(act.Package.Fset, act.Analyzer, d.SuggestedFixes); err != nil {
-				panic(err)
+			if validateFixesError := ValidateFixes(act.Package.Fset, act.Analyzer, d.SuggestedFixes); validateFixesError != nil {
+				panic(validateFixesError)
 			}
 			act.Diagnostics = append(act.Diagnostics, d)
 		},
@@ -494,9 +494,9 @@ func (act *Action) execOnce() {
 
 		// resolve diagnostic URLs
 		for i := range act.Diagnostics {
-			url, err := ResolveURL(act.Analyzer, act.Diagnostics[i])
-			if err != nil {
-				return nil, err
+			url, resolveURLError := ResolveURL(act.Analyzer, act.Diagnostics[i])
+			if resolveURLError != nil {
+				return nil, resolveURLError
 			}
 			act.Diagnostics[i].URL = url
 		}
@@ -571,9 +571,9 @@ func inheritFacts(act, dep *Action) {
 		// Optionally serialize/deserialize fact
 		// to verify that it works across address spaces.
 		if act.opts.SanityCheck {
-			encodedFact, err := codeFact(fact)
-			if err != nil {
-				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, err)
+			encodedFact, codeFactError := codeFact(fact)
+			if codeFactError != nil {
+				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, codeFactError)
 			}
 			fact = encodedFact
 		}
@@ -605,9 +605,9 @@ func inheritFacts(act, dep *Action) {
 		// to verify that it works across address spaces
 		// and is deterministic.
 		if act.opts.SanityCheck {
-			encodedFact, err := codeFact(fact)
-			if err != nil {
-				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, err)
+			encodedFact, codeFactError := codeFact(fact)
+			if codeFactError != nil {
+				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, codeFactError)
 			}
 			fact = encodedFact
 		}
@@ -626,15 +626,15 @@ func codeFact(fact analysis.Fact) (analysis.Fact, error) {
 	// A real modular driver would emit all facts
 	// into one encoder to improve gob efficiency.
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(fact); err != nil {
-		return nil, err
+	if encodeError := gob.NewEncoder(&buf).Encode(fact); encodeError != nil {
+		return nil, encodeError
 	}
 
 	// Encode it twice and assert that we get the same bits.
 	// This helps detect nondeterministic Gob encoding (e.g. of maps).
 	var buf2 bytes.Buffer
-	if err := gob.NewEncoder(&buf2).Encode(fact); err != nil {
-		return nil, err
+	if encodeError := gob.NewEncoder(&buf2).Encode(fact); encodeError != nil {
+		return nil, encodeError
 	}
 	if !bytes.Equal(buf.Bytes(), buf2.Bytes()) {
 		return nil, fmt.Errorf("encoding of %T fact is nondeterministic", fact)
@@ -646,8 +646,8 @@ func codeFact(fact analysis.Fact) (analysis.Fact, error) {
 	if !isFact {
 		return nil, fmt.Errorf("decoding a %T fact: a new value of its type is not a fact", fact)
 	}
-	if err := gob.NewDecoder(&buf).Decode(new); err != nil {
-		return nil, err
+	if decodeError := gob.NewDecoder(&buf).Decode(new); decodeError != nil {
+		return nil, decodeError
 	}
 	return new, nil
 }

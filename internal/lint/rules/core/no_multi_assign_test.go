@@ -22,9 +22,9 @@ func decodedMultiAssignOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeNoMultiAssignOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoMultiAssignOptionsError := DecodeNoMultiAssignOptions(json.RawMessage(raw))
+	if decodeNoMultiAssignOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoMultiAssignOptionsError)
 	}
 	return options
 }
@@ -296,9 +296,9 @@ func TestDecodeNoMultiAssignOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoMultiAssignOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+			decoded, decodeNoMultiAssignOptionsError := DecodeNoMultiAssignOptions(json.RawMessage(testCase.raw))
+			if decodeNoMultiAssignOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoMultiAssignOptionsError)
 			}
 			options, isOptions := decoded.(NoMultiAssignOptions)
 			if !isOptions {

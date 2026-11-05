@@ -64,8 +64,8 @@ func TestChecksumsCheckWithShasumAndFailOnAFlippedByte(test *testing.T) {
 
 	check := exec.Command(shasum, "-a", "256", "-c", ChecksumsFileName)
 	check.Dir = output
-	if result, err := check.CombinedOutput(); err != nil {
-		test.Fatalf("shasum refused the sums of the files they were taken from: %v\n%s", err, result)
+	if result, outputError := check.CombinedOutput(); outputError != nil {
+		test.Fatalf("shasum refused the sums of the files they were taken from: %v\n%s", outputError, result)
 	}
 
 	flipByte(test, filepath.Join(output, "cohere-linux-x64", "bin", "cohere"))
@@ -84,14 +84,14 @@ func TestChecksumsRefuseAPackageWithNothingToCheck(test *testing.T) {
 	test.Parallel()
 
 	output := test.TempDir()
-	if err := os.MkdirAll(filepath.Join(output, "cohere-linux-x64", "bin"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(output, "cohere-linux-x64", "bin"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if checksums, err := Checksums(output, []string{"cohere-linux-x64"}); err == nil {
+	if checksums, checksumsError := Checksums(output, []string{"cohere-linux-x64"}); checksumsError == nil {
 		test.Fatalf("an empty bin/ produced sums %q, so a release with no binary would look checked", checksums)
 	}
 
-	if checksums, err := Checksums(output, []string{"cohere-darwin-arm64"}); err == nil {
+	if checksums, checksumsError := Checksums(output, []string{"cohere-darwin-arm64"}); checksumsError == nil {
 		test.Fatalf("a package that was never staged produced sums %q", checksums)
 	}
 }
@@ -104,10 +104,10 @@ func TestChecksumsRefuseALinkInBin(test *testing.T) {
 	}
 	output := test.TempDir()
 	stageFixturePlatform(test, output, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"})
-	if err := os.Symlink("/bin/sh", filepath.Join(output, "cohere-linux-x64", "bin", "shell")); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink("/bin/sh", filepath.Join(output, "cohere-linux-x64", "bin", "shell")); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
-	if checksums, err := Checksums(output, []string{"cohere-linux-x64"}); err == nil {
+	if checksums, checksumsError := Checksums(output, []string{"cohere-linux-x64"}); checksumsError == nil {
 		test.Fatalf("a link in bin/ was hashed as though it were the package's own file:\n%s", checksums)
 	}
 }
@@ -139,7 +139,7 @@ func TestDispatcherPublishesItsChecksums(test *testing.T) {
 		test.Fatalf("the dispatcher holds %q, not the sums it was given", shipped)
 	}
 
-	if _, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, nil); err == nil {
+	if _, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, nil); buildDispatcherPackageError == nil {
 		test.Fatalf("a dispatcher was staged with no checksums, and its launcher would run nothing anywhere")
 	}
 }
@@ -154,8 +154,8 @@ func TestLauncherRunsAnIntactRelease(test *testing.T) {
 	result := installation.run(test, "--version")
 	result.requireRan(test, "--version")
 
-	if _, err := os.Stat(installation.verdictPath(test)); err != nil {
-		test.Fatalf("a passing check left no remembered verdict, so every run would hash the binaries again: %v", err)
+	if _, statError := os.Stat(installation.verdictPath(test)); statError != nil {
+		test.Fatalf("a passing check left no remembered verdict, so every run would hash the binaries again: %v", statError)
 	}
 }
 
@@ -183,8 +183,8 @@ func TestLauncherRefusesATamperAfterAVerdictIsRemembered(test *testing.T) {
 		test.Fatal(err)
 	}
 	flipByte(test, installation.binary)
-	if err := os.Chtimes(installation.binary, before.ModTime(), before.ModTime()); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(installation.binary, before.ModTime(), before.ModTime()); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 	after, err := os.Stat(installation.binary)
 	if err != nil {
@@ -238,8 +238,8 @@ func TestLauncherRefusesWithoutItsChecksums(test *testing.T) {
 	test.Parallel()
 
 	installation := stageInstalledRelease(test)
-	if err := os.Remove(installation.checksums); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(installation.checksums); removeError != nil {
+		test.Fatal(removeError)
 	}
 	installation.run(test, "--version").requireRefused(test, installation.checksums, "is missing")
 }
@@ -262,8 +262,8 @@ func TestLauncherRefusesWhenAShippedFileIsMissing(test *testing.T) {
 	// nowhere.
 	installation := stageInstalledRelease(test)
 	engine := filepath.Join(filepath.Dir(installation.binary), SwiftEngineFileName)
-	if err := os.Remove(engine); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(engine); removeError != nil {
+		test.Fatal(removeError)
 	}
 	installation.run(test, "--version").requireRefused(test, engine, "is missing")
 }
@@ -308,8 +308,8 @@ func stageInstalledRelease(test *testing.T) installedRelease {
 	if runtime.GOOS == "windows" {
 		test.Skip("the fixture binary is a shell script; the Windows package is proven by check-platform-package.sh on Windows")
 	}
-	if _, err := exec.LookPath("node"); err != nil {
-		test.Fatalf("node is not installed, and the launcher is a Node script, so it cannot be tested: %v", err)
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
+		test.Fatalf("node is not installed, and the launcher is a Node script, so it cannot be tested: %v", lookPathError)
 	}
 
 	// Through every link, as Node resolves the launcher and the package, so the paths its messages name
@@ -349,9 +349,9 @@ func stageInstalledRelease(test *testing.T) installedRelease {
 // under this test's home, keyed by the package directory as Node resolves it, through every link.
 func (installation installedRelease) verdictPath(test *testing.T) string {
 	test.Helper()
-	packageDirectory, err := filepath.EvalSymlinks(filepath.Dir(filepath.Dir(installation.binary)))
-	if err != nil {
-		test.Fatal(err)
+	packageDirectory, resolveSymlinksError := filepath.EvalSymlinks(filepath.Dir(filepath.Dir(installation.binary)))
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	cache := filepath.Join(installation.home, ".cache")
 	if runtime.GOOS == "darwin" {
@@ -386,12 +386,12 @@ func (installation installedRelease) run(test *testing.T, argument string, envir
 	var standardOutput, standardError bytes.Buffer
 	command.Stdout = &standardOutput
 	command.Stderr = &standardError
-	err := command.Run()
+	runError := command.Run()
 	exitCode := 0
-	if exitError, isExit := err.(*exec.ExitError); isExit {
+	if exitError, isExit := runError.(*exec.ExitError); isExit {
 		exitCode = exitError.ExitCode()
-	} else if err != nil {
-		test.Fatalf("running the launcher: %v", err)
+	} else if runError != nil {
+		test.Fatalf("running the launcher: %v", runError)
 	}
 	return launcherRun{exitCode: exitCode, standardOutput: standardOutput.String(), standardError: standardError.String()}
 }
@@ -422,9 +422,9 @@ func (result launcherRun) requireRefused(test *testing.T, file string, reason st
 func stageFixturePlatform(test *testing.T, output string, target Target) {
 	test.Helper()
 	directory := filepath.Join(output, target.DirectoryName())
-	manifest, err := PlatformManifest(target, "1.0.0")
-	if err != nil {
-		test.Fatal(err)
+	manifest, platformManifestError := PlatformManifest(target, "1.0.0")
+	if platformManifestError != nil {
+		test.Fatal(platformManifestError)
 	}
 	writeFile(test, filepath.Join(directory, "package.json"), string(manifest))
 	for _, name := range []string{BinaryFileName(target.GoOperatingSystem), SwiftEngineFileName} {
@@ -436,8 +436,8 @@ func stageFixturePlatform(test *testing.T, output string, target Target) {
 func writeFixtureExecutable(test *testing.T, path string) {
 	test.Helper()
 	writeExecutable(test, path, 0o755)
-	if err := os.WriteFile(path, []byte(fixtureScript), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(fixtureScript), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 }
 
@@ -445,17 +445,17 @@ func writeFixtureExecutable(test *testing.T, path string) {
 // "fixture" into "Fixture" and leaves a script that still runs.
 func flipByte(test *testing.T, path string) {
 	test.Helper()
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	index := bytes.IndexByte(contents, 'f')
 	if index < 0 {
 		index = len(contents) / 2
 	}
 	contents[index] ^= 0x20
-	if err := os.WriteFile(path, contents, 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, contents, 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 }
 

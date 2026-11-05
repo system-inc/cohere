@@ -26,9 +26,9 @@ func returnAwaitOptionsFor(test *testing.T, optionsJson string) any {
 	if optionsJson == "" || optionsJson == "null" {
 		return DefaultReturnAwaitSettings()
 	}
-	decoded, err := DecodeReturnAwaitOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeReturnAwaitOptionsError := DecodeReturnAwaitOptions(json.RawMessage(optionsJson))
+	if decodeReturnAwaitOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeReturnAwaitOptionsError)
 	}
 	return decoded
 }

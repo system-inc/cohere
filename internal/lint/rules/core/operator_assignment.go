@@ -76,8 +76,8 @@ func DecodeOperatorAssignmentOptions(raw []byte) (any, error) {
 	}
 
 	var configured string
-	if err := json.Unmarshal(raw, &configured); err != nil {
-		return DefaultOperatorAssignmentSettings(), err
+	if decodeError := json.Unmarshal(raw, &configured); decodeError != nil {
+		return DefaultOperatorAssignmentSettings(), decodeError
 	}
 
 	setting := OperatorAssignmentSetting(configured)

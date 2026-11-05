@@ -113,15 +113,15 @@ func DecodeNoRestrictedImportsOptions(list []byte) (any, error) {
 	}
 
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
-		return options, fmt.Errorf("no-restricted-imports: the option list is not a JSON array: %w", err)
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
+		return options, fmt.Errorf("no-restricted-imports: the option list is not a JSON array: %w", decodeError)
 	}
 	if len(elements) == 0 {
 		return options, nil
 	}
 
 	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(elements[0], &probe); err == nil {
+	if decodeError := json.Unmarshal(elements[0], &probe); decodeError == nil {
 		// `[{}]`, the object form with nothing in it, restricts nothing. Upstream's schema accepts it
 		// through the object branch, since a path object requires a name, and `[{}, "foo"]` fails
 		// both branches. Kept divergence, ruled on #e06zm4b (#d21war2): upstream's runtime finds no
@@ -150,9 +150,9 @@ func DecodeNoRestrictedImportsOptions(list []byte) (any, error) {
 	}
 
 	// Every element is a restricted path, a string or a path object.
-	paths, err := noRestrictedImportsDecodePaths(list)
-	if err != nil {
-		return options, err
+	paths, noRestrictedImportsDecodePathsError := noRestrictedImportsDecodePaths(list)
+	if noRestrictedImportsDecodePathsError != nil {
+		return options, noRestrictedImportsDecodePathsError
 	}
 	options.Paths = paths
 	return options, noRestrictedImportsValidate(&options)
@@ -165,9 +165,9 @@ func noRestrictedImportsDecodeObjectForm(
 	var options NoRestrictedImportsOptions
 
 	if rawPaths, present := probe["paths"]; present {
-		paths, err := noRestrictedImportsDecodePaths(rawPaths)
-		if err != nil {
-			return options, err
+		paths, noRestrictedImportsDecodePathsError := noRestrictedImportsDecodePaths(rawPaths)
+		if noRestrictedImportsDecodePathsError != nil {
+			return options, noRestrictedImportsDecodePathsError
 		}
 		options.Paths = paths
 	}
@@ -182,14 +182,14 @@ func noRestrictedImportsDecodeObjectForm(
 		var asStrings []string
 		if len(rawPatterns) == 0 {
 			asStrings = nil
-		} else if err := json.Unmarshal(rawPatterns, &asStrings); err == nil {
+		} else if decodeError := json.Unmarshal(rawPatterns, &asStrings); decodeError == nil {
 			if len(asStrings) > 0 {
 				options.Patterns = []NoRestrictedImportsPattern{{Group: asStrings}}
 			}
 		} else {
 			var asObjects []noRestrictedImportsRawPattern
-			if err := rule.UnmarshalOptions(rawPatterns, &asObjects); err != nil {
-				return options, err
+			if unmarshalOptionsError := rule.UnmarshalOptions(rawPatterns, &asObjects); unmarshalOptionsError != nil {
+				return options, unmarshalOptionsError
 			}
 			options.Patterns = asObjects
 		}
@@ -210,25 +210,25 @@ func noRestrictedImportsDecodePaths(raw json.RawMessage) ([]NoRestrictedImportsP
 	}
 
 	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
+	if decodeError := json.Unmarshal(raw, &single); decodeError == nil {
 		return []NoRestrictedImportsPath{{Name: single}}, nil
 	}
 
 	var entries []json.RawMessage
-	if err := json.Unmarshal(raw, &entries); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(raw, &entries); decodeError != nil {
+		return nil, decodeError
 	}
 
 	paths := make([]NoRestrictedImportsPath, 0, len(entries))
 	for _, entry := range entries {
 		var name string
-		if err := json.Unmarshal(entry, &name); err == nil {
+		if decodeError := json.Unmarshal(entry, &name); decodeError == nil {
 			paths = append(paths, NoRestrictedImportsPath{Name: name})
 			continue
 		}
 		var object NoRestrictedImportsPath
-		if err := rule.UnmarshalOptions(entry, &object); err != nil {
-			return nil, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(entry, &object); unmarshalOptionsError != nil {
+			return nil, unmarshalOptionsError
 		}
 		paths = append(paths, object)
 	}
@@ -295,18 +295,18 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 			flags = "u"
 		}
 		if hasRegex {
-			if _, err := esregexp.Compile(pattern.Regex, flags); err != nil {
+			if _, compileError := esregexp.Compile(pattern.Regex, flags); compileError != nil {
 				return fmt.Errorf("no-restricted-imports: patterns entry %d has an invalid regex "+
-					"%q: %w", index, pattern.Regex, err)
+					"%q: %w", index, pattern.Regex, compileError)
 			}
 		}
 		for _, source := range []string{pattern.ImportNamePattern, pattern.AllowImportNamePattern} {
 			if source == "" {
 				continue
 			}
-			if _, err := esregexp.Compile(source, "u"); err != nil {
+			if _, compileError := esregexp.Compile(source, "u"); compileError != nil {
 				return fmt.Errorf("no-restricted-imports: patterns entry %d has an invalid import "+
-					"name pattern %q: %w", index, source, err)
+					"name pattern %q: %w", index, source, compileError)
 			}
 		}
 		if hasGroup {
@@ -444,8 +444,8 @@ func newNoRestrictedImportsChecker(
 			compiled.matcher = matcher
 		}
 		if entry.Regex != "" {
-			expression, err := esregexp.Compile(entry.Regex, flags)
-			if err != nil {
+			expression, compileError := esregexp.Compile(entry.Regex, flags)
+			if compileError != nil {
 				return nil, false
 			}
 			compiled.regularExpression = expression
@@ -453,15 +453,15 @@ func newNoRestrictedImportsChecker(
 		// The import-name patterns are always `u`, never `iu`. `caseSensitive` governs the module
 		// path only, which upstream expresses by building these two with a bare "u" regardless.
 		if entry.ImportNamePattern != "" {
-			expression, err := esregexp.Compile(entry.ImportNamePattern, "u")
-			if err != nil {
+			expression, compileError := esregexp.Compile(entry.ImportNamePattern, "u")
+			if compileError != nil {
 				return nil, false
 			}
 			compiled.importNamePattern = expression
 		}
 		if entry.AllowImportNamePattern != "" {
-			expression, err := esregexp.Compile(entry.AllowImportNamePattern, "u")
-			if err != nil {
+			expression, compileError := esregexp.Compile(entry.AllowImportNamePattern, "u")
+			if compileError != nil {
 				return nil, false
 			}
 			compiled.allowedNamePattern = expression

@@ -206,7 +206,7 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 		childDirectory := filepath.Join(matcher.root, filepath.FromSlash(child))
 		if matcher.listedAbsent(childDirectory, ".git") {
 			// Not there, as the lstat would have found.
-		} else if _, err := os.Lstat(filepath.Join(childDirectory, ".git")); err == nil {
+		} else if _, statError := os.Lstat(filepath.Join(childDirectory, ".git")); statError == nil {
 			return nil, fmt.Errorf("gitignore: %s %w", childDirectory, ErrNestedRepository)
 		}
 		entered.directory = child
@@ -222,9 +222,9 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 			entered.files = append(entered.files, nil)
 			continue
 		}
-		rules, err := readTreeFile(matcher.root, child)
-		if err != nil {
-			return nil, err
+		rules, readTreeFileError := readTreeFile(matcher.root, child)
+		if readTreeFileError != nil {
+			return nil, readTreeFileError
 		}
 		entered.files = append(entered.files, rules)
 	}
@@ -268,9 +268,9 @@ func (matcher *Matcher) IgnoredPath(relativePath string, isDirectory bool) (bool
 	if parent == "." {
 		parent = ""
 	}
-	scope, err := matcher.Enter(parent)
-	if err != nil {
-		return false, Source{}, err
+	scope, enterError := matcher.Enter(parent)
+	if enterError != nil {
+		return false, Source{}, enterError
 	}
 	ignored, source := scope.Ignored(relativePath, isDirectory)
 	return ignored, source, nil
@@ -355,9 +355,9 @@ func (candidate *rule) matches(relativePath string, baseName string) bool {
 // none.
 func readTreeFile(root string, directory string) ([]rule, error) {
 	relativeFile := joinRelative(directory, IgnoreFileName)
-	contents, err := readIgnoreFile(filepath.Join(root, filepath.FromSlash(relativeFile)), false)
-	if err != nil || contents == nil {
-		return nil, err
+	contents, readIgnoreFileError := readIgnoreFile(filepath.Join(root, filepath.FromSlash(relativeFile)), false)
+	if readIgnoreFileError != nil || contents == nil {
+		return nil, readIgnoreFileError
 	}
 	return parseRules(contents, relativeFile, directory)
 }

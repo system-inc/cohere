@@ -25,8 +25,8 @@ func (recorder *errorRecorder) Errorf(format string, arguments ...any) {
 func exitErrorOf(test *testing.T, script string) *exec.ExitError {
 	test.Helper()
 	var exitError *exec.ExitError
-	if err := exec.Command("sh", "-c", script).Run(); !errors.As(err, &exitError) {
-		test.Fatalf("sh -c %q ended with %v, want an exit error", script, err)
+	if runError := exec.Command("sh", "-c", script).Run(); !errors.As(runError, &exitError) {
+		test.Fatalf("sh -c %q ended with %v, want an exit error", script, runError)
 	}
 	return exitError
 }

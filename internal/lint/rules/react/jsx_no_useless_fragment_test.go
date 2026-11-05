@@ -150,9 +150,9 @@ func TestJsxNoUselessFragmentStaysSilent(test *testing.T) {
 // would produce byte-correct repairs that all fail on a trailing newline.
 func runJsxNoUselessFragment(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeJsxNoUselessFragmentOptions([]byte(rawOptions))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", rawOptions, err)
+	decoded, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(rawOptions))
+	if decodeJsxNoUselessFragmentOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodeJsxNoUselessFragmentOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, JsxNoUselessFragment, jsxNoUselessFragmentFile, sourceText, decoded)
 }
@@ -510,9 +510,9 @@ func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeJsxNoUselessFragmentOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(testCase.raw))
+			if decodeJsxNoUselessFragmentOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoUselessFragmentOptionsError)
 			}
 			settings, ok := decoded.(JsxNoUselessFragmentOptions)
 			if !ok {
@@ -529,10 +529,10 @@ func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
 func TestJsxNoUselessFragmentRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, err := DecodeJsxNoUselessFragmentOptions([]byte(`{"allowExpressions":`)); err == nil {
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(`{"allowExpressions":`)); decodeJsxNoUselessFragmentOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, err := DecodeJsxNoUselessFragmentOptions([]byte(`"error"`)); err == nil {
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(`"error"`)); decodeJsxNoUselessFragmentOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }

@@ -93,15 +93,15 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	if options.RestrictedNamedExportsPattern != "" {
-		if _, err := esregexp.Compile(options.RestrictedNamedExportsPattern, "u"); err != nil {
+		if _, compileError := esregexp.Compile(options.RestrictedNamedExportsPattern, "u"); compileError != nil {
 			return options, fmt.Errorf(
 				"no-restricted-exports: restrictedNamedExportsPattern %q is not a valid regular "+
-					"expression: %w", options.RestrictedNamedExportsPattern, err)
+					"expression: %w", options.RestrictedNamedExportsPattern, compileError)
 		}
 	}
 
@@ -213,8 +213,8 @@ var NoRestrictedExports = rule.Rule{
 			// rule was handed options that never went through it. Falling back to no pattern is the
 			// quiet answer and the wrong one; there is nothing to report against, so the rule simply
 			// does not apply the pattern rather than pretending it matched nothing.
-			compiled, err := esregexp.Compile(settings.RestrictedNamedExportsPattern, "u")
-			if err == nil {
+			compiled, compileError := esregexp.Compile(settings.RestrictedNamedExportsPattern, "u")
+			if compileError == nil {
 				pattern = compiled
 			}
 		}

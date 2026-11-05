@@ -58,9 +58,9 @@ func fixScopeProject(test *testing.T, root string, extra map[string]string) {
 
 func readForTest(test *testing.T, path string) string {
 	test.Helper()
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	return string(contents)
 }

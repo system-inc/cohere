@@ -253,9 +253,9 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 			original, fixed, _ := runConsistentTypeImportsFix(test, testCase.options, testCase.code)
 			settings := DefaultConsistentTypeImportsOptions()
 			if testCase.options != "" {
-				decoded, err := DecodeConsistentTypeImportsOptions([]byte(testCase.options))
-				if err != nil {
-					test.Fatalf("decoding %s: %v", testCase.options, err)
+				decoded, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions([]byte(testCase.options))
+				if decodeConsistentTypeImportsOptionsError != nil {
+					test.Fatalf("decoding %s: %v", testCase.options, decodeConsistentTypeImportsOptionsError)
 				}
 				settings = decoded.(ConsistentTypeImportsOptions)
 			}

@@ -33,9 +33,9 @@ var (
 // input to a function that trims one, says so where a reader will see it.
 func HomePaths(fileName string, source []byte) ([]HomePath, error) {
 	files := token.NewFileSet()
-	file, err := parser.ParseFile(files, fileName, source, parser.ParseComments)
-	if err != nil {
-		return nil, err
+	file, parseFileError := parser.ParseFile(files, fileName, source, parser.ParseComments)
+	if parseFileError != nil {
+		return nil, parseFileError
 	}
 	// A marker excuses its own line, for a comment at a literal's end, and the whole of the node that starts on
 	// the line below it, for a comment above a statement or declaration.
@@ -63,8 +63,8 @@ func HomePaths(fileName string, source []byte) ([]HomePath, error) {
 		if !isLiteral || literal.Kind != token.STRING {
 			return true
 		}
-		value, err := strconv.Unquote(literal.Value)
-		if err != nil || !homeDirectory.MatchString(value) {
+		value, unquoteError := strconv.Unquote(literal.Value)
+		if unquoteError != nil || !homeDirectory.MatchString(value) {
 			return true
 		}
 		position := files.Position(literal.Pos())

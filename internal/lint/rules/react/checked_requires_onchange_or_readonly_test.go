@@ -138,9 +138,9 @@ func TestCheckedRequiresStaysSilent(test *testing.T) {
 // with a case that only the typed path can report.
 func runCheckedRequires(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(rawOptions))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", rawOptions, err)
+	decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(rawOptions))
+	if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, CheckedRequiresOnChangeOrReadOnly,
 		checkedRequiresFile, sourceText, decoded)
@@ -525,9 +525,9 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(testCase.raw))
+			if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 			}
 			settings, ok := decoded.(CheckedRequiresOnChangeOrReadOnlyOptions)
 			if !ok {
@@ -547,10 +547,10 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 func TestCheckedRequiresRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(`{"ignoreMissingProperties":`)); err == nil {
+	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(`{"ignoreMissingProperties":`)); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(json.RawMessage(`"error"`)); err == nil {
+	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(json.RawMessage(`"error"`)); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }

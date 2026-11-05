@@ -28,9 +28,9 @@ func initDeclarationsCaseName(index int) string {
 // pass the list, which is now what the config layer delivers; the decoder test pins that it does.
 func decodeInitDeclarationsOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(json.RawMessage(raw))
+	if decodeInitDeclarationsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeInitDeclarationsOptionsError)
 	}
 	return decoded
 }
@@ -579,7 +579,7 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		`"never"`,
 		`{"mode": "never", "ignoreForLoopInit": true}`,
 	} {
-		if decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw)); err == nil {
+		if decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(json.RawMessage(raw)); decodeInitDeclarationsOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

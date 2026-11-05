@@ -25,17 +25,17 @@ func crossEnumRun(test *testing.T, source string) rule_testing.Result {
 	return rule_testing.RunTypedFilesWithSetup(test, crossEnumSubject(), map[string]string{"Case.ts": source}, "Case.ts", func(directory string) {
 		// Enum syntax is the subject here; Adamic's shared harness forbids all enum syntax.
 		configuration := strings.Replace(adamicConfiguration, `"erasableSyntaxOnly": true`, `"erasableSyntaxOnly": false`, 1)
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0600); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0600); writeError != nil {
+			test.Fatal(writeError)
 		}
 	})
 }
 
 func TestCrossEnumNarrowingRefused(test *testing.T) {
 	test.Parallel()
-	files, err := filepath.Glob("testdata/cross-enum/*.ts")
-	if err != nil {
-		test.Fatal(err)
+	files, globError := filepath.Glob("testdata/cross-enum/*.ts")
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	if len(files) != 22 {
 		test.Fatalf("fixtures: %d, want 22", len(files))
@@ -43,9 +43,9 @@ func TestCrossEnumNarrowingRefused(test *testing.T) {
 	for _, file := range files {
 		test.Run(strings.TrimSuffix(filepath.Base(file), ".ts"), func(test *testing.T) {
 			test.Parallel()
-			data, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			data, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			result := crossEnumRun(test, string(data))
 			count := 1
@@ -77,9 +77,9 @@ func TestCrossEnumNarrowingLegal(test *testing.T) {
 	}
 	quiet := map[string]string{}
 	for _, name := range []string{"any", "number-intersection", "literal-union", "string-literal", "wrong-number", "wrong-string"} {
-		bytes, err := os.ReadFile("testdata/cross-enum-" + name + ".ts")
-		if err != nil {
-			test.Fatal(err)
+		bytes, readError := os.ReadFile("testdata/cross-enum-" + name + ".ts")
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		quiet[name] = string(bytes)
 	}
@@ -116,9 +116,9 @@ func TestCrossEnumNarrowingLegal(test *testing.T) {
 
 func TestWholeComputedEnumNarrowing(test *testing.T) {
 	test.Parallel()
-	data, err := os.ReadFile("testdata/cross-enum-whole-computed.ts")
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile("testdata/cross-enum-whole-computed.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	rule_testing.ExpectFindings(test, crossEnumRun(test, string(data)), "crossEnumNarrowing")
 }

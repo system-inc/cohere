@@ -51,12 +51,12 @@ func runEngineBinaryUntil(
 	command.Stderr = standardError
 	startInOwnProcessGroup(command)
 	command.WaitDelay = engineWaitDelay
-	standardOutput, err := command.StdoutPipe()
-	if err != nil {
-		return 1, fmt.Errorf("connecting to %s's output: %w", run.language.theEngine(), err)
+	standardOutput, stdoutPipeError := command.StdoutPipe()
+	if stdoutPipeError != nil {
+		return 1, fmt.Errorf("connecting to %s's output: %w", run.language.theEngine(), stdoutPipeError)
 	}
-	if err := command.Start(); err != nil {
-		return 1, fmt.Errorf("starting %s %s: %w", run.language.theEngine(), binaryPath, err)
+	if startError := command.Start(); startError != nil {
+		return 1, fmt.Errorf("starting %s %s: %w", run.language.theEngine(), binaryPath, startError)
 	}
 
 	// With Setpgid the engine leads its group, so the group's id is the engine's process id.

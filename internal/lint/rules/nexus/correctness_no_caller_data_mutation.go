@@ -614,8 +614,8 @@ func correctnessNoCallerDataMutationLiteralIndex(expression *ast.Node) (int, boo
 	if expression.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	index, err := strconv.Atoi(expression.Text())
-	return sign * index, err == nil
+	index, parseError := strconv.Atoi(expression.Text())
+	return sign * index, parseError == nil
 }
 
 // Only the default library's Array/ReadonlyArray methods have these identity contracts. A project's

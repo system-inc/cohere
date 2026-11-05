@@ -24,9 +24,9 @@ func noRestrictedTypesCaseName(index int) string {
 // severity tuple before a decoder ever sees it.
 func noRestrictedTypesDecoded(test *testing.T, optionsJson string) any {
 	test.Helper()
-	decoded, err := DecodeNoRestrictedTypesOptions([]byte(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoRestrictedTypesOptionsError := DecodeNoRestrictedTypesOptions([]byte(optionsJson))
+	if decodeNoRestrictedTypesOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoRestrictedTypesOptionsError)
 	}
 	return decoded
 }
@@ -746,9 +746,9 @@ func TestNoRestrictedTypesSurvivesNilOptions(test *testing.T) {
 	test.Parallel()
 
 	for _, raw := range [][]byte{nil, []byte("")} {
-		decoded, err := DecodeNoRestrictedTypesOptions(raw)
-		if err != nil {
-			test.Fatalf("decoding %q: %v", raw, err)
+		decoded, decodeNoRestrictedTypesOptionsError := DecodeNoRestrictedTypesOptions(raw)
+		if decodeNoRestrictedTypesOptionsError != nil {
+			test.Fatalf("decoding %q: %v", raw, decodeNoRestrictedTypesOptionsError)
 		}
 		settings, ok := decoded.(NoRestrictedTypesOptions)
 		if !ok {

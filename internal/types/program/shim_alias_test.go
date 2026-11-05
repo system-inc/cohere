@@ -249,8 +249,8 @@ func buildAliasSubject(test *testing.T, otherSource string) (*checker.Checker, *
 		"renamed();\n"
 
 	write := func(name string, contents string) {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", name, err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
 	write("Subject.ts", subjectSource)
@@ -259,13 +259,13 @@ func buildAliasSubject(test *testing.T, otherSource string) (*checker.Checker, *
 		`{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"types":[]},`+
 			`"include":["*.ts"]}`)
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the type graph: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the type graph: %v", buildError)
 	}
 
 	var subject *ast.SourceFile

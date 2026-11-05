@@ -12,13 +12,13 @@ import (
 func writeGolden(test *testing.T, contents record) string {
 	test.Helper()
 	path := filepath.Join(test.TempDir(), "golden.json.gz")
-	file, err := os.Create(path)
-	if err != nil {
-		test.Fatal(err)
+	file, createError := os.Create(path)
+	if createError != nil {
+		test.Fatal(createError)
 	}
 	zipped := gzip.NewWriter(file)
-	if err := json.NewEncoder(zipped).Encode(contents); err != nil {
-		test.Fatal(err)
+	if encodeError := json.NewEncoder(zipped).Encode(contents); encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	zipped.Close()
 	file.Close()
@@ -30,20 +30,20 @@ func writeGolden(test *testing.T, contents record) string {
 func TestAGoldenFromOtherBundlesIsRefused(test *testing.T) {
 	test.Parallel()
 	path := writeGolden(test, record{Digest: "recorded", Answers: map[string]Answer{"k": {Output: "x"}}})
-	if _, err := read(path, "embedded"); err == nil || !strings.Contains(err.Error(), "recorded from Prettier bundles recorded") {
-		test.Fatalf("a golden from other bundles was read: %v", err)
+	if _, readError := read(path, "embedded"); readError == nil || !strings.Contains(readError.Error(), "recorded from Prettier bundles recorded") {
+		test.Fatalf("a golden from other bundles was read: %v", readError)
 	}
 	// The control: the same file, with the digest it was recorded under, reads.
-	answers, err := read(path, "recorded")
-	if err != nil || answers["k"].Output != "x" {
-		test.Fatalf("a golden from these bundles was refused: %v, %v", answers, err)
+	answers, readError := read(path, "recorded")
+	if readError != nil || answers["k"].Output != "x" {
+		test.Fatalf("a golden from these bundles was refused: %v, %v", answers, readError)
 	}
 }
 
 // TestAMissingGoldenIsRefused: no golden is a failure that says how to record one, never an empty pass.
 func TestAMissingGoldenIsRefused(test *testing.T) {
 	test.Parallel()
-	if _, err := read(filepath.Join(test.TempDir(), "absent.json.gz"), "embedded"); err == nil {
+	if _, readError := read(filepath.Join(test.TempDir(), "absent.json.gz"), "embedded"); readError == nil {
 		test.Fatal("a missing golden read as empty")
 	}
 }
@@ -62,8 +62,8 @@ func TestKeysDoNotRunTogether(test *testing.T) {
 // TestTheBundlesHaveADigest: the digest every golden is stamped with is readable from this build.
 func TestTheBundlesHaveADigest(test *testing.T) {
 	test.Parallel()
-	digest, err := BundlesDigest()
-	if err != nil || len(digest) != 64 {
-		test.Fatalf("no digest for the embedded bundles: %q, %v", digest, err)
+	digest, bundlesDigestError := BundlesDigest()
+	if bundlesDigestError != nil || len(digest) != 64 {
+		test.Fatalf("no digest for the embedded bundles: %q, %v", digest, bundlesDigestError)
 	}
 }

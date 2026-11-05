@@ -41,23 +41,23 @@ var seedSources = map[string]string{
 func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *testing.T) {
 	test.Parallel()
 	// Resolved, so the names are the program's own: on macOS the temporary directory is behind a symbolic link.
-	directory, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	directory, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	var candidates []string
 	for name, source := range seedSources {
 		for index := range 8 {
 			fileName := filepath.Join(directory, fmt.Sprintf("%d%s", index, name))
-			if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			candidates = append(candidates, fileName)
 		}
 	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","jsx":"preserve","lib":["esnext","esnext.disposable"]},"include":["**/*.ts","**/*.tsx"]}`
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	formatter := native.Formatter{Options: formatoptions.Default()}
@@ -77,9 +77,9 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 	reference.wait()
 
 	for round := range 6 {
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatal(err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatal(buildError)
 		}
 		var programs programOffer
 		programs.offer(graph)

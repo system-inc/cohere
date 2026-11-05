@@ -69,7 +69,7 @@ func underscoredInternalPackageNames(test *testing.T) map[string]bool {
 	test.Helper()
 
 	names := map[string]bool{}
-	err := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkErr error) error {
+	walkError := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -85,8 +85,8 @@ func underscoredInternalPackageNames(test *testing.T) map[string]bool {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking internal/: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking internal/: %v", walkError)
 	}
 	return names
 }
@@ -108,7 +108,7 @@ func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
 
 	var found []messageDescription
 	fileSet := token.NewFileSet()
-	err := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, walkErr error) error {
+	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -141,8 +141,8 @@ func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
 		})
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking internal/lint/rules: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking internal/lint/rules: %v", walkError)
 	}
 	return found
 }
@@ -155,8 +155,8 @@ func stringLiteralsIn(expression ast.Expr) string {
 		if !isLiteral || literal.Kind != token.STRING {
 			return true
 		}
-		unquoted, err := strconv.Unquote(literal.Value)
-		if err != nil {
+		unquoted, unquoteError := strconv.Unquote(literal.Value)
+		if unquoteError != nil {
 			unquoted = literal.Value
 		}
 		parts = append(parts, unquoted)

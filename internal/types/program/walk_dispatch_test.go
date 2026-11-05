@@ -133,9 +133,9 @@ func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const kept = 1;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	var kept func(rule.Diagnostic)
@@ -146,8 +146,8 @@ func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
 			return nil
 		},
 	}
-	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper}); err != nil {
-		test.Fatalf("walking: %v", err)
+	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper}); walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if kept == nil {
 		test.Fatal("the rule never ran, so there is no Report to call late")

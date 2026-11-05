@@ -21,8 +21,8 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		dispatch.Report.Fail("cohere: %s", sentence.FromError(err))
+	if runError := run(); runError != nil {
+		dispatch.Report.Fail("cohere: %s", sentence.FromError(runError))
 		os.Exit(1)
 	}
 }
@@ -61,16 +61,16 @@ parsed:
 	dispatch.Report.SetVerbose(verbose || asksForVerbose(arguments))
 
 	if frozen {
-		binaryPath, err := resolveFrozenBinary()
-		if err != nil {
-			return err
+		binaryPath, resolveFrozenBinaryError := resolveFrozenBinary()
+		if resolveFrozenBinaryError != nil {
+			return resolveFrozenBinaryError
 		}
 		return execute(binaryPath, arguments, wait)
 	}
 
-	binaryPath, err := resolveBinary(development, verbose)
-	if err != nil {
-		return err
+	binaryPath, resolveBinaryError := resolveBinary(development, verbose)
+	if resolveBinaryError != nil {
+		return resolveBinaryError
 	}
 
 	dispatch.Report.Clear()
@@ -184,9 +184,9 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 	paths := dispatch.DefaultPaths(moduleDirectory)
 
 	if development {
-		binaryPath, built, err := dispatch.ResolveWorkingTree(paths, "./command/cohere")
-		if err != nil {
-			return "", err
+		binaryPath, built, resolveWorkingTreeError := dispatch.ResolveWorkingTree(paths, "./command/cohere")
+		if resolveWorkingTreeError != nil {
+			return "", resolveWorkingTreeError
 		}
 		// On every run, not only when it rebuilds. The binary carries every member's uncommitted edits
 		// in the shared checkout, and a reader of its findings has to know that before they read them.
@@ -198,9 +198,9 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 		return binaryPath, nil
 	}
 
-	binaryPath, commit, built, err := dispatch.ResolveCommitted(paths, "./command/cohere")
-	if err != nil {
-		return "", err
+	binaryPath, commit, built, resolveCommittedError := dispatch.ResolveCommitted(paths, "./command/cohere")
+	if resolveCommittedError != nil {
+		return "", resolveCommittedError
 	}
 	if built && verbose {
 		fmt.Fprintf(os.Stderr, "cohere: built %s from commit %s\n", filepath.Base(binaryPath), commit)
@@ -217,18 +217,18 @@ func resolveInstalled(reason error) (string, error) {
 	workingDirectory, _ := os.Getwd()
 
 	executablePath := ""
-	if executable, err := os.Executable(); err == nil {
+	if executable, executableError := os.Executable(); executableError == nil {
 		// Symlinks are resolved because `node_modules/.bin/cohere` is one, and the package holding
 		// the platform binary sits beside the real file rather than beside the link.
-		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 			executable = resolved
 		}
 		executablePath = executable
 	}
 
-	binaryPath, err := release.Resolve(release.SearchRoots(workingDirectory, executablePath))
-	if err != nil {
-		return "", fmt.Errorf("%w\n(no local build was possible: %s)", err, reason)
+	binaryPath, resolveError := release.Resolve(release.SearchRoots(workingDirectory, executablePath))
+	if resolveError != nil {
+		return "", fmt.Errorf("%w\n(no local build was possible: %s)", resolveError, reason)
 	}
 	return binaryPath, nil
 }

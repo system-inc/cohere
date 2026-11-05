@@ -40,9 +40,9 @@ func oracleTextToDoc(test *testing.T, options formatoptions.Options) printing.Te
 	if os.Getenv("COHERE_MARKDOWN_EMBED_ORACLE") == "" {
 		return nil
 	}
-	engine, err := prettier.New(options)
-	if err != nil {
-		test.Fatal(err)
+	engine, newPrettierError := prettier.New(options)
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	fileNames := map[string]string{
 		"typescript": "embedded.tsx", "babel": "embedded.js", "json": "embedded.json", "json5": "embedded.json5",
@@ -54,9 +54,9 @@ func oracleTextToDoc(test *testing.T, options formatoptions.Options) printing.Te
 		if !strings.Contains(parser, ".") {
 			fileName = fileNames[parser]
 		}
-		formatted, err := engine.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := engine.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
 	}
@@ -88,9 +88,9 @@ type markdownCorpus struct {
 // engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []markdownCorpus
 	pending := strings.Split(roots, ":")
@@ -173,9 +173,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			test.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
@@ -192,9 +192,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			return markdownCandidate{options: options, textToDoc: oracleTextToDoc(test, options)}, nil
 		}
 
-		compared, err := differential.Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", root, err)
+		compared, compareError := differential.Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", root, compareError)
 		}
 
 		type count struct{ identical, measured, rewriteIdentical, rewriteTotal int }
@@ -209,9 +209,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(root, path)
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			embedded := dependsOnEmbed(string(source))
 			for _, tally := range []*count{&all, &withoutEmbed} {
@@ -262,8 +262,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 
 	if path := os.Getenv("COHERE_MARKDOWN_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(report.String()), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(report.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

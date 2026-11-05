@@ -28,8 +28,8 @@ func styleFor(stream *os.File) textStyle {
 	if _, set := os.LookupEnv("NO_COLOR"); set {
 		return textStyle{}
 	}
-	information, err := stream.Stat()
-	if err != nil {
+	information, statError := stream.Stat()
+	if statError != nil {
 		return textStyle{}
 	}
 	return textStyle{color: information.Mode()&os.ModeCharDevice != 0}

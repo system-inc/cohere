@@ -17,9 +17,9 @@ const thisAliasFile = "/repository/source/Thing.ts"
 // would test the rule while leaving the two most breakable lines in the port unasserted.
 func decodeThisAliasOptionsForTest(test *testing.T, configuration string) any {
 	test.Helper()
-	options, err := DecodeNoThisAliasOptions(json.RawMessage(configuration))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", configuration, err)
+	options, decodeNoThisAliasOptionsError := DecodeNoThisAliasOptions(json.RawMessage(configuration))
+	if decodeNoThisAliasOptionsError != nil {
+		test.Fatalf("decoding %s: %v", configuration, decodeNoThisAliasOptionsError)
 	}
 	return options
 }
@@ -276,9 +276,9 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoThisAliasOptions(json.RawMessage(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding: %v", err)
+			decoded, decodeNoThisAliasOptionsError := DecodeNoThisAliasOptions(json.RawMessage(testCase.configuration))
+			if decodeNoThisAliasOptionsError != nil {
+				test.Fatalf("decoding: %v", decodeNoThisAliasOptionsError)
 			}
 			options, ok := decoded.(NoThisAliasOptions)
 			if !ok {

@@ -119,6 +119,6 @@ func (progress *Progress) clearLocked() {
 
 // isTerminal reports whether a stream is a terminal rather than a pipe or a file.
 func isTerminal(stream *os.File) bool {
-	information, err := stream.Stat()
-	return err == nil && information.Mode()&os.ModeCharDevice != 0
+	information, statError := stream.Stat()
+	return statError == nil && information.Mode()&os.ModeCharDevice != 0
 }

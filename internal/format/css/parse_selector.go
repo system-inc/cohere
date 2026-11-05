@@ -23,8 +23,8 @@ func parseSelector(selectorText string) *estree.Node {
 		return estree.New("selector-unknown", 0, 0, "value", trim(selectorText))
 	}
 
-	result, err := selector.Parse(selectorText)
-	if err != nil {
+	result, parseError := selector.Parse(selectorText)
+	if parseError != nil {
 		// Fail silently. It's better to print it as is than to try and parse it
 		// Note: A common failure is for SCSS nested properties. `background:
 		// none { color: red; }` is parsed as a NestedDeclaration by

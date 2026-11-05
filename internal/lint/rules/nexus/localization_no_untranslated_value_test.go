@@ -74,17 +74,17 @@ func buildTranslations(test *testing.T, files map[string]string) (*program.Graph
 	files["tsconfig.json"] = translationsConfig
 	for name, contents := range files {
 		full := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			test.Fatalf("creating %s: %v", filepath.Dir(full), err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
+			test.Fatalf("creating %s: %v", filepath.Dir(full), createDirectoryError)
 		}
-		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", full, err)
+		if writeError := os.WriteFile(full, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", full, writeError)
 		}
 	}
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 	return graph, directory
 }

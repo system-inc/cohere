@@ -289,21 +289,21 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 	name := filepath.Base(fixture.Name)
 
 	path := filepath.Join(directory, name)
-	if err := os.WriteFile(path, []byte(fixture.Source), 0o644); err != nil {
-		return react_conformance.Result{}, err
+	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
+		return react_conformance.Result{}, writeError
 	}
 	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(tsConfigText), 0o644); err != nil {
-		return react_conformance.Result{}, err
+	if writeError := os.WriteFile(configPath, []byte(tsConfigText), 0o644); writeError != nil {
+		return react_conformance.Result{}, writeError
 	}
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   configPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + err.Error()}
+	if buildError != nil {
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + buildError.Error()}
 	}
 
 	projectFiles := graph.ProjectFiles()
@@ -397,21 +397,21 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) ([]string, error) {
 	name := filepath.Base(fixture.Name)
 	path := filepath.Join(directory, name)
-	if err := os.WriteFile(path, []byte(fixture.Source), 0o644); err != nil {
-		return nil, err
+	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
+		return nil, writeError
 	}
 	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(tsConfigText), 0o644); err != nil {
-		return nil, err
+	if writeError := os.WriteFile(configPath, []byte(tsConfigText), 0o644); writeError != nil {
+		return nil, writeError
 	}
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   configPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + err.Error()}
+	if buildError != nil {
+		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + buildError.Error()}
 	}
 
 	var sourceFile *ast.SourceFile
@@ -454,9 +454,9 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 func analyzeRaw(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) ([]string, error) {
 	probe := subject
 	probe.Messages = nil
-	ids, err := collectMessageIds(probe, fixture, directory)
-	if err != nil {
-		return nil, err
+	ids, collectMessageIdsError := collectMessageIds(probe, fixture, directory)
+	if collectMessageIdsError != nil {
+		return nil, collectMessageIdsError
 	}
 	return ids, nil
 }

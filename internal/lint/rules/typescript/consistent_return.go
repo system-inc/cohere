@@ -46,8 +46,8 @@ func DecodeConsistentReturnOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire consistentReturnWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.TreatUndefinedAsUnspecified != nil {
 		settings.TreatUndefinedAsUnspecified = *wire.TreatUndefinedAsUnspecified

@@ -20,8 +20,8 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "changelog:", err)
+	if runError := run(); runError != nil {
+		fmt.Fprintln(os.Stderr, "changelog:", runError)
 		os.Exit(1)
 	}
 }
@@ -58,8 +58,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := changelog.RequireBump(*previous, *version, bump); err != nil {
-		return err
+	if requireBumpError := changelog.RequireBump(*previous, *version, bump); requireBumpError != nil {
+		return requireBumpError
 	}
 	fmt.Print(changelog.Render(*version, *date, changed, nil))
 	return nil

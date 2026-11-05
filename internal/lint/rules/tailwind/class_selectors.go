@@ -84,7 +84,7 @@ type SelectorTarget struct {
 // that is not an integer is refused rather than read, since upstream indexes with it and crashes.
 func (target *SelectorTarget) UnmarshalJSON(raw []byte) error {
 	var word string
-	if err := json.Unmarshal(raw, &word); err == nil {
+	if decodeError := json.Unmarshal(raw, &word); decodeError == nil {
 		switch word {
 		case "all", "first", "last":
 			*target = SelectorTarget{Word: word}
@@ -93,7 +93,7 @@ func (target *SelectorTarget) UnmarshalJSON(raw []byte) error {
 		return fmt.Errorf("a target is all, first, last or a number, not %q", word)
 	}
 	var number float64
-	if err := json.Unmarshal(raw, &number); err != nil {
+	if decodeError := json.Unmarshal(raw, &number); decodeError != nil {
 		return fmt.Errorf("a target is all, first, last or a number, not %s", raw)
 	}
 	if number != math.Trunc(number) || math.Abs(number) > 1<<31 {
@@ -132,20 +132,20 @@ type legacyMatcher struct {
 // rule.UnmarshalOptions here.
 func (legacy *LegacySelector) UnmarshalJSON(raw []byte) error {
 	var name string
-	if err := json.Unmarshal(raw, &name); err == nil {
+	if decodeError := json.Unmarshal(raw, &name); decodeError == nil {
 		*legacy = LegacySelector{Name: name}
 		return nil
 	}
 	var pair []json.RawMessage
-	if err := json.Unmarshal(raw, &pair); err != nil || len(pair) != 2 {
+	if decodeError := json.Unmarshal(raw, &pair); decodeError != nil || len(pair) != 2 {
 		return fmt.Errorf("a selector is a name, or a name and its matchers, not %s", raw)
 	}
-	if err := json.Unmarshal(pair[0], &name); err != nil {
+	if decodeError := json.Unmarshal(pair[0], &name); decodeError != nil {
 		return fmt.Errorf("a selector's name is a string, not %s", pair[0])
 	}
 	var matchers []legacyMatcher
-	if err := rule.UnmarshalOptions(pair[1], &matchers); err != nil {
-		return fmt.Errorf("selector %q's matchers: %w", name, err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(pair[1], &matchers); unmarshalOptionsError != nil {
+		return fmt.Errorf("selector %q's matchers: %w", name, unmarshalOptionsError)
 	}
 	match := make([]SelectorMatcher, 0, len(matchers))
 	for _, matcher := range matchers {
@@ -198,8 +198,8 @@ var DefaultSelectors = sync.OnceValue(func() []Selector {
 	var selectors []Selector
 	decoder := json.NewDecoder(bytes.NewReader(defaultSelectorsJSON))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&selectors); err != nil {
-		panic(fmt.Sprintf("default_selectors.json does not decode, so it was not written by tools/generate_class_literals: %v", err))
+	if decodeError := decoder.Decode(&selectors); decodeError != nil {
+		panic(fmt.Sprintf("default_selectors.json does not decode, so it was not written by tools/generate_class_literals: %v", decodeError))
 	}
 	return selectors
 })
@@ -228,8 +228,8 @@ func checkSelectors(selectors []Selector) error {
 		if selector.Kind != SelectorKindCallee && selector.Kind != SelectorKindTag && selector.Path != "" {
 			return fmt.Errorf("selectors[%d]: only a callee or tag selector takes a path", index)
 		}
-		if err := checkMatchers(selector.Match, true); err != nil {
-			return fmt.Errorf("selectors[%d]: %w", index, err)
+		if checkMatchersError := checkMatchers(selector.Match, true); checkMatchersError != nil {
+			return fmt.Errorf("selectors[%d]: %w", index, checkMatchersError)
 		}
 	}
 	return nil
@@ -253,8 +253,8 @@ func checkMatchers(matchers []SelectorMatcher, isTopLevel bool) error {
 			if matcher.Path != "" {
 				return fmt.Errorf("an anonymousFunctionReturn matcher takes no path")
 			}
-			if err := checkMatchers(matcher.Match, false); err != nil {
-				return err
+			if checkMatchersError := checkMatchers(matcher.Match, false); checkMatchersError != nil {
+				return checkMatchersError
 			}
 		default:
 			return fmt.Errorf("a matcher is strings, objectKeys, objectValues or anonymousFunctionReturn, not %q", matcher.Type)

@@ -24,7 +24,7 @@ func (violation *Violation) Error() string {
 	where := violation.Path
 	if rest, isElement := strings.CutPrefix(violation.Path, "["); isElement {
 		if closing := strings.Index(rest, "]"); closing > 0 {
-			if index, err := strconv.Atoi(rest[:closing]); err == nil {
+			if index, parseError := strconv.Atoi(rest[:closing]); parseError == nil {
 				where = "element " + strconv.Itoa(index+1)
 				if inner := strings.TrimPrefix(rest[closing+1:], "."); inner != "" {
 					where += " at " + inner
@@ -61,9 +61,9 @@ var Extensions = []Extension{
 // Check validates a rule's option elements, the list after the severity, against upstream's schema. A
 // rule with no schema here, either not a port or one whose upstream opts out, passes unchecked.
 func Check(ruleName string, elements []json.RawMessage) error {
-	schema, found, err := For(ruleName)
-	if err != nil || !found {
-		return err
+	schema, found, optionschemaForError := For(ruleName)
+	if optionschemaForError != nil || !found {
+		return optionschemaForError
 	}
 	return schema.Validate(withoutExtensions(ruleName, elements))
 }
@@ -84,8 +84,8 @@ func withoutExtensions(ruleName string, elements []json.RawMessage) []json.RawMe
 			continue
 		}
 		delete(object, extension.Key)
-		encoded, err := json.Marshal(object)
-		if err != nil {
+		encoded, encodeError := json.Marshal(object)
+		if encodeError != nil {
 			continue
 		}
 		if stripped == nil {
@@ -105,8 +105,8 @@ func (schema *Schema) Validate(elements []json.RawMessage) error {
 	for index, element := range elements {
 		decoder := json.NewDecoder(bytes.NewReader(element))
 		decoder.UseNumber()
-		if err := decoder.Decode(&list[index]); err != nil {
-			return fmt.Errorf("element %d is not JSON: %w", index+1, err)
+		if decodeError := decoder.Decode(&list[index]); decodeError != nil {
+			return fmt.Errorf("element %d is not JSON: %w", index+1, decodeError)
 		}
 	}
 	if violation := validate(schema.root, list, ""); violation != nil {
@@ -331,8 +331,8 @@ func hasAnyType(value any, types []string) bool {
 			}
 		case "integer":
 			if number, is := value.(json.Number); is {
-				parsed, err := number.Float64()
-				if err == nil && !math.IsInf(parsed, 0) && parsed == math.Trunc(parsed) {
+				parsed, float64Error := number.Float64()
+				if float64Error == nil && !math.IsInf(parsed, 0) && parsed == math.Trunc(parsed) {
 					return true
 				}
 			}
@@ -400,8 +400,8 @@ func count(value any) (*int, error) {
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
-	parsed, err := strconv.Atoi(string(number))
-	if err != nil || parsed < 0 {
+	parsed, parseError := strconv.Atoi(string(number))
+	if parseError != nil || parsed < 0 {
 		return nil, fmt.Errorf("must be a non-negative integer")
 	}
 	return &parsed, nil
@@ -412,9 +412,9 @@ func number(value any) (*float64, error) {
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
-	parsed, err := typed.Float64()
-	if err != nil {
-		return nil, err
+	parsed, float64Error := typed.Float64()
+	if float64Error != nil {
+		return nil, float64Error
 	}
 	return &parsed, nil
 }
@@ -443,8 +443,8 @@ func pointerTarget(document any, reference string) (any, error) {
 			}
 			current = next
 		case []any:
-			index, err := strconv.Atoi(part)
-			if err != nil || index < 0 || index >= len(typed) {
+			index, parseError := strconv.Atoi(part)
+			if parseError != nil || index < 0 || index >= len(typed) {
 				return nil, fmt.Errorf("$ref %q names item %q, which is not there", reference, part)
 			}
 			current = typed[index]
@@ -474,8 +474,8 @@ func formatNumber(value float64) string {
 }
 
 func encode(value any) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
+	encoded, encodeError := json.Marshal(value)
+	if encodeError != nil {
 		return fmt.Sprint(value)
 	}
 	return string(encoded)

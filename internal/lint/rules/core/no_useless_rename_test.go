@@ -581,9 +581,9 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 
 	test.Run("an absent option leaves all three off", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUselessRenameOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused an absent option: %v", err)
+		decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(nil)
+		if decodeNoUselessRenameOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoUselessRenameOptionsError)
 		}
 		settings := decoded.(NoUselessRenameSettings)
 		if settings.IgnoreDestructuring || settings.IgnoreImport || settings.IgnoreExport {
@@ -593,10 +593,10 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 
 	test.Run("each option is read independently", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUselessRenameOptions(
+		decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(
 			json.RawMessage(`{"ignoreImport":true}`))
-		if err != nil {
-			test.Fatalf("the decoder refused a partial object: %v", err)
+		if decodeNoUselessRenameOptionsError != nil {
+			test.Fatalf("the decoder refused a partial object: %v", decodeNoUselessRenameOptionsError)
 		}
 		settings := decoded.(NoUselessRenameSettings)
 		if !settings.IgnoreImport || settings.IgnoreDestructuring || settings.IgnoreExport {

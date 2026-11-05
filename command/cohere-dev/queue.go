@@ -26,26 +26,26 @@ type queueTicket struct {
 // never sees it unlocked and removes it as a dead waiter's.
 func joinQueue(slotsDirectory string) (*queueTicket, error) {
 	queue := queueDirectory(slotsDirectory)
-	if err := os.MkdirAll(queue, 0o755); err != nil {
-		return nil, err
+	if createDirectoryError := os.MkdirAll(queue, 0o755); createDirectoryError != nil {
+		return nil, createDirectoryError
 	}
 	name := fmt.Sprintf("%020d-%d", time.Now().UnixNano(), os.Getpid())
 	pending := filepath.Join(queue, "."+name)
-	file, err := os.OpenFile(pending, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, err
+	file, openError := os.OpenFile(pending, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o644)
+	if openError != nil {
+		return nil, openError
 	}
-	if taken, err := tryLockFile(file); err != nil || !taken {
+	if taken, tryLockFileError := tryLockFile(file); tryLockFileError != nil || !taken {
 		file.Close()
 		os.Remove(pending)
-		return nil, fmt.Errorf("locking a new queue ticket: %v", err)
+		return nil, fmt.Errorf("locking a new queue ticket: %v", tryLockFileError)
 	}
 	path := filepath.Join(queue, name)
-	if err := os.Rename(pending, path); err != nil {
+	if renameError := os.Rename(pending, path); renameError != nil {
 		unlockFile(file)
 		file.Close()
 		os.Remove(pending)
-		return nil, err
+		return nil, renameError
 	}
 	return &queueTicket{file: file, path: path}, nil
 }
@@ -75,8 +75,8 @@ func (ticket *queueTicket) place() (ahead int, waiting int, err error) {
 			continue
 		}
 		path := filepath.Join(queue, name)
-		other, err := os.OpenFile(path, os.O_RDWR, 0)
-		if err != nil {
+		other, openError := os.OpenFile(path, os.O_RDWR, 0)
+		if openError != nil {
 			// Removed since the listing, by its waiter taking a slot or by another waiter's cleanup.
 			continue
 		}

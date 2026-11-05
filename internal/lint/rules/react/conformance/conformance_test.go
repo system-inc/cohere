@@ -20,9 +20,9 @@ const fixtureRoot = "testdata/fixtures"
 
 func load(test *testing.T) []Fixture {
 	test.Helper()
-	fixtures, err := Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 	return fixtures
 }
@@ -240,8 +240,8 @@ func TestEveryPragmaInTheCorpusIsModelled(test *testing.T) {
 		for _, pragma := range fixture.Pragmas {
 			seen[pragma.Key]++
 		}
-		if err := CheckPragmas(fixture.Name, fixture.Pragmas); err != nil {
-			test.Errorf("%v", err)
+		if checkPragmasError := CheckPragmas(fixture.Name, fixture.Pragmas); checkPragmasError != nil {
+			test.Errorf("%v", checkPragmasError)
 		}
 	}
 
@@ -264,20 +264,20 @@ func TestUnknownPragmaIsRefusedNotSkipped(test *testing.T) {
 	test.Parallel()
 	pragmas := ParsePragmas("// @validateRefAccessDuringRender @enableSomethingNobodyModelled")
 
-	err := CheckPragmas("error.hypothetical.js", pragmas)
-	if err == nil {
+	checkPragmasError := CheckPragmas("error.hypothetical.js", pragmas)
+	if checkPragmasError == nil {
 		test.Fatal("CheckPragmas accepted an unmodelled directive; the whole point of this package is that it does not")
 	}
 
 	var unknown *UnknownPragmaError
-	if !errors.As(err, &unknown) {
-		test.Fatalf("got %T, want *UnknownPragmaError", err)
+	if !errors.As(checkPragmasError, &unknown) {
+		test.Fatalf("got %T, want *UnknownPragmaError", checkPragmasError)
 	}
 	if unknown.Pragma.Key != "enableSomethingNobodyModelled" {
 		test.Errorf("refused %q, want the unmodelled directive", unknown.Pragma.Key)
 	}
-	if !strings.Contains(err.Error(), "error.hypothetical.js") {
-		test.Errorf("the refusal does not name the fixture: %v", err)
+	if !strings.Contains(checkPragmasError.Error(), "error.hypothetical.js") {
+		test.Errorf("the refusal does not name the fixture: %v", checkPragmasError)
 	}
 }
 
@@ -293,7 +293,7 @@ func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(test *testing.T) {
 		{Name: "error.bad.js", Pragmas: ParsePragmas("// @somethingUnmodelled")},
 	}
 
-	if _, err := Run(fixtures, NothingImplemented{}, Options{}); err == nil {
+	if _, runError := Run(fixtures, NothingImplemented{}, Options{}); runError == nil {
 		test.Fatal("Run scored a corpus containing an unmodelled directive")
 	}
 }
@@ -416,9 +416,9 @@ func TestRunnerCanDetectAPass(test *testing.T) {
 	test.Parallel()
 	fixtures := load(test)
 
-	score, err := Run(fixtures, perfectImplementation{}, Options{})
-	if err != nil {
-		test.Fatalf("scoring a deliberately-correct implementation: %v", err)
+	score, runError := Run(fixtures, perfectImplementation{}, Options{})
+	if runError != nil {
+		test.Fatalf("scoring a deliberately-correct implementation: %v", runError)
 	}
 
 	if score.Passed != len(fixtures) {
@@ -493,9 +493,9 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(test *testing.T) {
 	test.Parallel()
 	fixtures := load(test)
 
-	score, err := Run(fixtures, NothingImplemented{}, Options{})
-	if err != nil {
-		test.Fatalf("scoring the unimplemented engine: %v", err)
+	score, runError := Run(fixtures, NothingImplemented{}, Options{})
+	if runError != nil {
+		test.Fatalf("scoring the unimplemented engine: %v", runError)
 	}
 
 	if score.Considered != ExpectedFixtureCount {
@@ -525,9 +525,9 @@ func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
 	test.Parallel()
 	fixtures := load(test)
 
-	score, err := Run(fixtures, NothingImplemented{}, Options{SkipFlowFixtures: true})
-	if err != nil {
-		test.Fatalf("scoring with Flow fixtures excluded: %v", err)
+	score, runError := Run(fixtures, NothingImplemented{}, Options{SkipFlowFixtures: true})
+	if runError != nil {
+		test.Fatalf("scoring with Flow fixtures excluded: %v", runError)
 	}
 
 	if score.Considered != ExpectedFixtureCount {
@@ -558,7 +558,7 @@ func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
 func TestVendoredCorpusPairsAreComplete(test *testing.T) {
 	test.Parallel()
 	var inputs, expectations []string
-	err := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -572,8 +572,8 @@ func TestVendoredCorpusPairsAreComplete(test *testing.T) {
 		inputs = append(inputs, path)
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking the vendored corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the vendored corpus: %v", walkError)
 	}
 
 	const wantPairs = ExpectedErrorFixtureCount + ExpectedCleanFixtureCount

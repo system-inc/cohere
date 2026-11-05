@@ -204,18 +204,18 @@ func TestLauncherDoesNotReportSuccessForASignalledRun(test *testing.T) {
 
 func mustPlatformManifest(test *testing.T, target Target, version string) []byte {
 	test.Helper()
-	encoded, err := PlatformManifest(target, version)
-	if err != nil {
-		test.Fatal(err)
+	encoded, platformManifestError := PlatformManifest(target, version)
+	if platformManifestError != nil {
+		test.Fatal(platformManifestError)
 	}
 	return encoded
 }
 
 func mustDispatcherManifest(test *testing.T, version string) []byte {
 	test.Helper()
-	encoded, err := DispatcherManifest(version)
-	if err != nil {
-		test.Fatal(err)
+	encoded, dispatcherManifestError := DispatcherManifest(version)
+	if dispatcherManifestError != nil {
+		test.Fatal(dispatcherManifestError)
 	}
 	return encoded
 }
@@ -224,8 +224,8 @@ func mustDispatcherManifest(test *testing.T, version string) []byte {
 func decodeManifest(test *testing.T, encoded []byte) map[string]any {
 	test.Helper()
 	manifest := map[string]any{}
-	if err := json.Unmarshal(encoded, &manifest); err != nil {
-		test.Fatalf("the generated manifest is not valid JSON, so npm would reject the package: %v", err)
+	if decodeError := json.Unmarshal(encoded, &manifest); decodeError != nil {
+		test.Fatalf("the generated manifest is not valid JSON, so npm would reject the package: %v", decodeError)
 	}
 	return manifest
 }

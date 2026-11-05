@@ -35,9 +35,9 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 
 	compared, hashbangs, unparseable, mutantsCaught := 0, 0, 0, 0
 	for _, fileName := range files {
-		contents, err := os.ReadFile(fileName)
-		if err != nil {
-			test.Fatal(err)
+		contents, readError := os.ReadFile(fileName)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		text := string(contents)
 		if strings.HasPrefix(text, "#!") {
@@ -56,8 +56,8 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, err := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); err != nil {
-			test.Fatalf("%s: %v", fileName, err)
+		if _, fixAndTransformTextError := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); fixAndTransformTextError != nil {
+			test.Fatalf("%s: %v", fileName, fixAndTransformTextError)
 		}
 		if guards == nil {
 			test.Errorf("%s: the engine handed the transform no tree", fileName)
@@ -122,12 +122,12 @@ func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile)
 // moduleRoot is the module's root, where the fixtures are.
 func moduleRoot(test *testing.T) string {
 	test.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		test.Fatal(err)
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)

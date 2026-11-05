@@ -22,9 +22,9 @@ func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 	if testing.Short() {
 		test.Skip("builds a TypeScript program per fixture")
 	}
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	// The ids the join is EXPECTED to carry, written as literals rather than read from
@@ -63,8 +63,8 @@ func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 		subject := Rules[upstream]
 		// Widen the table to catch everything, then compare against the real one.
 		for _, fixture := range SelectFixtures(fixtures, upstream) {
-			raw, err := analyzeRaw(subject, fixture, test.TempDir())
-			if err != nil {
+			raw, analyzeRawError := analyzeRaw(subject, fixture, test.TempDir())
+			if analyzeRawError != nil {
 				continue
 			}
 			for _, id := range raw {

@@ -13,13 +13,13 @@ var profileFile *os.File
 
 // startProfile begins writing a Go CPU profile of the rest of the run to path, for `go tool pprof`.
 func startProfile(path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("creating the profile: %w", err)
+	file, createError := os.Create(path)
+	if createError != nil {
+		return fmt.Errorf("creating the profile: %w", createError)
 	}
-	if err := pprof.StartCPUProfile(file); err != nil {
+	if startCPUProfileError := pprof.StartCPUProfile(file); startCPUProfileError != nil {
 		file.Close()
-		return fmt.Errorf("starting the profile: %w", err)
+		return fmt.Errorf("starting the profile: %w", startCPUProfileError)
 	}
 	profileFile = file
 	// A profiled run never returns early: the profile is something the caller reads, and it is complete
@@ -35,8 +35,8 @@ func exitProcess(code int) {
 	finishOpen()
 	if profileFile != nil {
 		pprof.StopCPUProfile()
-		if err := profileFile.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("closing the profile: %w", err)))
+		if closeError := profileFile.Close(); closeError != nil {
+			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("closing the profile: %w", closeError)))
 		}
 		profileFile = nil
 	}

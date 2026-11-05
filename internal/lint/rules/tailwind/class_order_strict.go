@@ -136,6 +136,6 @@ func jsKeyOrder(keys []string) []string {
 
 // isArrayIndexKey reports whether a JavaScript object would treat a key as an array index.
 func isArrayIndexKey(key string) bool {
-	value, err := strconv.ParseUint(key, 10, 64)
-	return err == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == key
+	value, parseError := strconv.ParseUint(key, 10, 64)
+	return parseError == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == key
 }

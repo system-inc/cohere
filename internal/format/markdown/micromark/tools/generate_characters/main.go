@@ -41,16 +41,16 @@ func main() {
 	check := flag.Bool("check", false, "regenerate and fail if the committed file disagrees")
 	flag.Parse()
 
-	generated, err := generate()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	generated, generateError := generate()
+	if generateError != nil {
+		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
@@ -60,8 +60,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}
 }
@@ -122,7 +122,7 @@ func generate() ([]byte, error) {
 func unitRanges(runtime *goja.Runtime, pattern string, flags string) ([][2]int, error) {
 	runtime.Set("__pattern", pattern)
 	runtime.Set("__flags", flags)
-	value, err := runtime.RunString(`
+	value, runStringError := runtime.RunString(`
 		(function () {
 			const regex = new RegExp(__pattern, __flags);
 			const ranges = [];
@@ -135,12 +135,12 @@ func unitRanges(runtime *goja.Runtime, pattern string, flags string) ([][2]int, 
 			return JSON.stringify(ranges);
 		})()
 	`)
-	if err != nil {
-		return nil, err
+	if runStringError != nil {
+		return nil, runStringError
 	}
 	var ranges [][2]int
-	if err := json.Unmarshal([]byte(value.String()), &ranges); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal([]byte(value.String()), &ranges); decodeError != nil {
+		return nil, decodeError
 	}
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("%q matched no code unit", pattern)

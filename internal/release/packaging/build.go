@@ -105,8 +105,8 @@ func Build(options Options) (Result, error) {
 		return Result{}, fmt.Errorf("a release needs a version")
 	}
 
-	if err := requireReleaseVersion(options.Version); err != nil {
-		return Result{}, err
+	if requireReleaseVersionError := requireReleaseVersion(options.Version); requireReleaseVersionError != nil {
+		return Result{}, requireReleaseVersionError
 	}
 
 	scratch, err := swiftScratchDirectory(options)
@@ -124,8 +124,8 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
-	if err := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); err != nil {
-		return Result{}, err
+	if requireAncestorError := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); requireAncestorError != nil {
+		return Result{}, requireAncestorError
 	}
 
 	targets := options.Targets
@@ -142,9 +142,9 @@ func Build(options Options) (Result, error) {
 
 	packageDirectoryNames := []string{}
 	for _, target := range targets {
-		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
-		if err != nil {
-			return Result{}, fmt.Errorf("building %s: %w", target, err)
+		staged, buildPlatformPackageError := buildPlatformPackage(options, target, pin, goToolchain)
+		if buildPlatformPackageError != nil {
+			return Result{}, fmt.Errorf("building %s: %w", target, buildPlatformPackageError)
 		}
 		result.Packages = append(result.Packages, staged)
 		packageDirectoryNames = append(packageDirectoryNames, target.DirectoryName())
@@ -157,8 +157,8 @@ func Build(options Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := os.WriteFile(filepath.Join(options.OutputDirectory, ChecksumsFileName), checksums, 0o644); err != nil {
-		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, err)
+	if writeError := os.WriteFile(filepath.Join(options.OutputDirectory, ChecksumsFileName), checksums, 0o644); writeError != nil {
+		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, writeError)
 	}
 
 	dispatcher, err := buildDispatcherPackage(options, checksums)
@@ -220,13 +220,13 @@ const minimumReleaseReason = "older engines ignore CohereSettings.json's format 
 // tell is not a check that passed.
 func requireAncestor(moduleDirectory string, minimum string, reason string) error {
 	command := exec.Command("git", "-C", moduleDirectory, "merge-base", "--is-ancestor", minimum, "HEAD")
-	output, err := command.CombinedOutput()
-	if err == nil {
+	output, outputError := command.CombinedOutput()
+	if outputError == nil {
 		return nil
 	}
 
 	var exitError *exec.ExitError
-	if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
+	if errors.As(outputError, &exitError) && exitError.ExitCode() == 1 {
 		return fmt.Errorf(
 			"this release would be built from a commit that does not contain %s, and %s. Release from a checkout that includes it",
 			ShortCommit(minimum), reason,
@@ -234,7 +234,7 @@ func requireAncestor(moduleDirectory string, minimum string, reason string) erro
 	}
 	return fmt.Errorf(
 		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
-		ShortCommit(minimum), err, strings.TrimSpace(string(output)),
+		ShortCommit(minimum), outputError, strings.TrimSpace(string(output)),
 	)
 }
 
@@ -243,12 +243,12 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", createDirectoryError)
 	}
 
-	if err := compile(options, target, binaryPath, pin, goToolchain); err != nil {
-		return StagedPackage{}, err
+	if compileError := compile(options, target, binaryPath, pin, goToolchain); compileError != nil {
+		return StagedPackage{}, compileError
 	}
 
 	size, err := cohereBinary(binaryPath, target)
@@ -267,8 +267,8 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		if err != nil {
 			return StagedPackage{}, err
 		}
-		if err := buildSwiftEngine(options.ModuleDirectory, options.SwiftScratchDirectory, target, enginePath, engineCommit); err != nil {
-			return StagedPackage{}, err
+		if buildSwiftEngineError := buildSwiftEngine(options.ModuleDirectory, options.SwiftScratchDirectory, target, enginePath, engineCommit); buildSwiftEngineError != nil {
+			return StagedPackage{}, buildSwiftEngineError
 		}
 		executables = append(executables, enginePath)
 	}
@@ -278,8 +278,8 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// equivalent gate on an npm-installed binary.
 	if target.IsMacOS() && options.Signing.IsConfigured() {
 		for _, executable := range executables {
-			if err := Sign(executable, options.Signing); err != nil {
-				return StagedPackage{}, err
+			if signError := Sign(executable, options.Signing); signError != nil {
+				return StagedPackage{}, signError
 			}
 		}
 	}
@@ -288,16 +288,16 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// it, so a binary the notary service refused never reaches a package.
 	if target.IsMacOS() && options.Signing.CanNotarize() {
 		for _, executable := range executables {
-			if err := Notarize(executable, options.Signing); err != nil {
-				return StagedPackage{}, err
+			if notarizeError := Notarize(executable, options.Signing); notarizeError != nil {
+				return StagedPackage{}, notarizeError
 			}
 		}
 	}
 
 	// After signing, so the pair checked is the pair that ships.
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		if err := requireSwiftContract(binaryPath, enginePath, engineCommit); err != nil {
-			return StagedPackage{}, err
+		if requireSwiftContractError := requireSwiftContract(binaryPath, enginePath, engineCommit); requireSwiftContractError != nil {
+			return StagedPackage{}, requireSwiftContractError
 		}
 	}
 
@@ -305,13 +305,13 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	if err != nil {
 		return StagedPackage{}, err
 	}
-	if err := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", err)
+	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", writeError)
 	}
 
 	// Beside bin/, not in it, so the checksums stay a list of executables.
-	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageLicensesError := stageLicenses(options.ModuleDirectory, directory); stageLicensesError != nil {
+		return StagedPackage{}, stageLicensesError
 	}
 
 	return StagedPackage{
@@ -343,39 +343,39 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 	}
 
 	directory := filepath.Join(options.OutputDirectory, UnscopedDispatcherPackageName)
-	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); createDirectoryError != nil {
+		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", createDirectoryError)
 	}
 
-	manifest, err := DispatcherManifest(options.Version)
-	if err != nil {
-		return StagedPackage{}, err
+	manifest, dispatcherManifestError := DispatcherManifest(options.Version)
+	if dispatcherManifestError != nil {
+		return StagedPackage{}, dispatcherManifestError
 	}
-	if err := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher manifest: %w", err)
+	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher manifest: %w", writeError)
 	}
 
 	launcher := DispatcherLauncher()
 	launcherPath := filepath.Join(directory, "bin", FullCommandName)
-	if err := os.WriteFile(launcherPath, []byte(launcher), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher launcher: %w", err)
+	if writeError := os.WriteFile(launcherPath, []byte(launcher), 0o755); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher launcher: %w", writeError)
 	}
 	// WriteFile's mode is masked by umask, so the executable bit is set explicitly. A launcher that
 	// ships without it fails at exec with a permission error on every machine that installs it.
-	if err := os.Chmod(launcherPath, 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", err)
+	if changeModeError := os.Chmod(launcherPath, 0o755); changeModeError != nil {
+		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", changeModeError)
 	}
 
-	if err := stageSettingsSchemas(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageSettingsSchemasError := stageSettingsSchemas(options.ModuleDirectory, directory); stageSettingsSchemasError != nil {
+		return StagedPackage{}, stageSettingsSchemasError
 	}
 
-	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageLicensesError := stageLicenses(options.ModuleDirectory, directory); stageLicensesError != nil {
+		return StagedPackage{}, stageLicensesError
 	}
 
-	if err := os.WriteFile(filepath.Join(directory, ChecksumsFileName), checksums, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher's %s: %w", ChecksumsFileName, err)
+	if writeError := os.WriteFile(filepath.Join(directory, ChecksumsFileName), checksums, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher's %s: %w", ChecksumsFileName, writeError)
 	}
 
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil
@@ -387,9 +387,9 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 func swiftScratchDirectory(options Options) (string, error) {
 	scratch := options.SwiftScratchDirectory
 	if scratch == "" {
-		cache, err := os.UserCacheDir()
-		if err != nil {
-			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", err)
+		cache, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", userCacheDirectoryError)
 		}
 		scratch = filepath.Join(cache, "cohere", "release-swift-build")
 	}
@@ -401,7 +401,7 @@ func swiftScratchDirectory(options Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if relative, err := filepath.Rel(output, scratch); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	if relative, relativePathError := filepath.Rel(output, scratch); relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole", scratch, output)
 	}
 	return scratch, nil
@@ -423,21 +423,21 @@ var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCoher
 // release: a "$schema" path that resolves to nothing validates nothing, and an editor shows no error for
 // that, so it would read as a settings file with no mistakes in it.
 func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error {
-	if err := os.MkdirAll(filepath.Join(packageDirectory, SchemaDirectoryName), 0o755); err != nil {
-		return fmt.Errorf("creating the dispatcher's schema directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(packageDirectory, SchemaDirectoryName), 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating the dispatcher's schema directory: %w", createDirectoryError)
 	}
 	for _, name := range SettingsSchemaFileNames {
 		source := filepath.Join(moduleDirectory, SchemaDirectoryName, name)
-		contents, err := os.ReadFile(source)
-		if err != nil {
-			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", err)
+		contents, readError := os.ReadFile(source)
+		if readError != nil {
+			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", readError)
 		}
 		var schema map[string]any
-		if err := json.Unmarshal(contents, &schema); err != nil || len(schema) == 0 {
-			return fmt.Errorf("%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing", source, err)
+		if decodeError := json.Unmarshal(contents, &schema); decodeError != nil || len(schema) == 0 {
+			return fmt.Errorf("%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing", source, decodeError)
 		}
-		if err := os.WriteFile(filepath.Join(packageDirectory, SchemaDirectoryName, name), contents, 0o644); err != nil {
-			return fmt.Errorf("staging the settings schema %s: %w", name, err)
+		if writeError := os.WriteFile(filepath.Join(packageDirectory, SchemaDirectoryName, name), contents, 0o644); writeError != nil {
+			return fmt.Errorf("staging the settings schema %s: %w", name, writeError)
 		}
 	}
 	return nil
@@ -460,8 +460,8 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	command := GoBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("go build: %w", err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("go build: %w", runError)
 	}
 	return nil
 }
@@ -503,9 +503,9 @@ func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, b
 // install rather than as the packaging mistake it is. Magic bytes separate all three families we
 // ship, so the check costs four bytes of read.
 func cohereBinary(path string, target Target) (int64, error) {
-	information, err := os.Stat(path)
-	if err != nil {
-		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, err)
+	information, statError := os.Stat(path)
+	if statError != nil {
+		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, statError)
 	}
 
 	// A real cohere binary statically links the whole TypeScript compiler and is over ten megabytes.
@@ -516,8 +516,8 @@ func cohereBinary(path string, target Target) (int64, error) {
 		return 0, fmt.Errorf("the binary at %s is %d bytes, which is far too small to be a real build", path, information.Size())
 	}
 
-	if err := requireExecutableFormat(path, target); err != nil {
-		return 0, err
+	if requireExecutableFormatError := requireExecutableFormat(path, target); requireExecutableFormatError != nil {
+		return 0, requireExecutableFormatError
 	}
 
 	return information.Size(), nil
@@ -551,15 +551,15 @@ func requireExecutableFormat(path string, target Target) error {
 		return nil
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("reading the binary at %s: %w", path, err)
+	file, openError := os.Open(path)
+	if openError != nil {
+		return fmt.Errorf("reading the binary at %s: %w", path, openError)
 	}
 	defer file.Close()
 
 	header := make([]byte, len(magic))
-	if _, err := io.ReadFull(file, header); err != nil {
-		return fmt.Errorf("reading the header of %s: %w", path, err)
+	if _, readFullError := io.ReadFull(file, header); readFullError != nil {
+		return fmt.Errorf("reading the header of %s: %w", path, readFullError)
 	}
 
 	if !bytes.Equal(header, magic) {
@@ -632,9 +632,9 @@ func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error)
 	command := exec.Command("git", "-C", moduleDirectory, "ls-tree", commit, "TypeScript")
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the compiler pin from %s: %w: %s", ShortCommit(commit), err, strings.TrimSpace(standardError.String()))
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf("reading the compiler pin from %s: %w: %s", ShortCommit(commit), outputError, strings.TrimSpace(standardError.String()))
 	}
 	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
 	// a compiler at all, and building would pick one up from somewhere unnamed.
@@ -694,8 +694,8 @@ func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 // A file that does not say degrades to "unknown" rather than failing the release. The commit is the
 // fact a bug report needs most, and it was already read from the commit and checked above.
 func readCompilerUpstream(moduleDirectory string) string {
-	output, err := exec.Command("git", "-C", moduleDirectory, "show", "HEAD:.gitmodules").Output()
-	if err != nil {
+	output, outputError := exec.Command("git", "-C", moduleDirectory, "show", "HEAD:.gitmodules").Output()
+	if outputError != nil {
 		return "unknown"
 	}
 	return CompilerUpstreamFromGitmodules(string(output))
@@ -781,9 +781,9 @@ func readGoToolchain(moduleDirectory string) (string, error) {
 	command := exec.Command("go", "env", "GOVERSION")
 	command.Dir = moduleDirectory
 
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the Go toolchain version: %w", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf("reading the Go toolchain version: %w", outputError)
 	}
 
 	toolchain := strings.TrimSpace(string(output))

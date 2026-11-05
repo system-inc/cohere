@@ -54,11 +54,11 @@ func runConflictFixtureWithOptions(
 	}
 	plantPackage := func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			test.Fatalf("creating the fixture node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the fixture node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", symlinkError)
 		}
 	}
 
@@ -510,11 +510,11 @@ func TestSelectorShapeCannotProduceAWrongFinding(test *testing.T) {
 	}
 
 	staging := test.TempDir()
-	if err := os.MkdirAll(filepath.Join(staging, "node_modules"), 0o755); err != nil {
-		test.Fatalf("creating the staging node_modules: %v", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(staging, "node_modules"), 0o755); createDirectoryError != nil {
+		test.Fatalf("creating the staging node_modules: %v", createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(staging, "node_modules", "tailwindcss")); err != nil {
-		test.Fatalf("linking the installed tailwindcss: %v", err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(staging, "node_modules", "tailwindcss")); symlinkError != nil {
+		test.Fatalf("linking the installed tailwindcss: %v", symlinkError)
 	}
 
 	// A repository utility that emits under a nested selector, which is the one mechanism that can
@@ -526,16 +526,16 @@ func TestSelectorShapeCannotProduceAWrongFinding(test *testing.T) {
 }
 `
 	entryPoint := filepath.Join(staging, "theme.css")
-	if err := os.WriteFile(entryPoint, []byte(stylesheet), 0o644); err != nil {
-		test.Fatalf("writing the staging stylesheet: %v", err)
+	if writeError := os.WriteFile(entryPoint, []byte(stylesheet), 0o644); writeError != nil {
+		test.Fatalf("writing the staging stylesheet: %v", writeError)
 	}
 
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
-	if err != nil {
-		test.Fatalf("loading the nested-utility design system: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the nested-utility design system: %v", loadDesignSystemError)
 	}
 	designSystem := loadedDesignSystemResult(system, "")
 

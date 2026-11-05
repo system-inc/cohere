@@ -33,8 +33,8 @@ func (options *NoShadowRestrictedNamesOptions) UnmarshalJSON(raw []byte) error {
 	var wire struct {
 		ReportGlobalThis *bool `json:"reportGlobalThis"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	options.AllowGlobalThis = wire.ReportGlobalThis != nil && !*wire.ReportGlobalThis
 	return nil

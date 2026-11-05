@@ -37,8 +37,8 @@ func buildProject(test *testing.T, files map[string]string) *program.Graph {
 		test.Fatal(err)
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
@@ -157,14 +157,14 @@ func TestRunRuleRefusesARuleOffTheAllowlist(test *testing.T) {
 	defer done()
 
 	// Allowed first: a refusal that refused everything would pass both cases below.
-	if _, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), nexus.CorrectnessNoImportCycleLoadTimeRead.Name); err != nil {
-		test.Fatalf("the allowed rule was refused: %v", err)
+	if _, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), nexus.CorrectnessNoImportCycleLoadTimeRead.Name); runRuleError != nil {
+		test.Fatalf("the allowed rule was refused: %v", runRuleError)
 	}
 	for _, name := range []string{"no-console", "nexus/correctness-no-such-rule"} {
-		findings, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
+		findings, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
 		var notAllowed rule_runner.NotAllowedError
-		if !errors.As(err, &notAllowed) || notAllowed.Rule != name {
-			test.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, err)
+		if !errors.As(runRuleError, &notAllowed) || notAllowed.Rule != name {
+			test.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, runRuleError)
 		}
 	}
 }

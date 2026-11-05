@@ -404,8 +404,8 @@ func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(test *testing.T) {
 	// The harness forces every file to be a module; these two must be scripts to share a scope.
 	scripts := func(directory string) {
 		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			test.Fatalf("writing the tsconfig: %v", err)
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}
 	files := map[string]string{

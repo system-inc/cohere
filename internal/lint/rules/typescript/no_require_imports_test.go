@@ -30,9 +30,9 @@ func decodeRequireImportsOptions(test *testing.T, optionsText string) any {
 	if optionsText == "" {
 		return nil
 	}
-	decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
-	if err != nil {
-		test.Fatalf("decoding the options %s: %v", optionsText, err)
+	decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
+	if decodeNoRequireImportsOptionsError != nil {
+		test.Fatalf("decoding the options %s: %v", optionsText, decodeNoRequireImportsOptionsError)
 	}
 	return decoded
 }
@@ -402,9 +402,9 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 
 	test.Run("an absent allowAsImport is false", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if options.AllowAsImport {
@@ -417,10 +417,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 
 	test.Run("patterns compile", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["/package\\.json$", "^some-package$"] }`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 2 {
@@ -438,10 +438,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 	// read as JavaScript reads it now, and in Node new RegExp("(?<=x)y", "u") tests true on "xy".
 	test.Run("a pattern RE2 refuses compiles as JavaScript", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(?<=x)y"] }`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 1 {
@@ -456,10 +456,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 	// rule creation; here the entry is dropped.
 	test.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(", "^ok$"] }`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 1 {

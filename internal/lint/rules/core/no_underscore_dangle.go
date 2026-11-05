@@ -70,8 +70,8 @@ func DecodeNoUnderscoreDangleOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("no-underscore-dangle: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("no-underscore-dangle: %w", unmarshalOptionsError)
 	}
 	return options, nil
 }

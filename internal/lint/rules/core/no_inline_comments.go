@@ -103,7 +103,7 @@ var NoInlineComments = rule.Rule{
 			// (#7mztrdd). A pattern that does not compile is dropped rather than crashing the run,
 			// which reports MORE rather than less. Upstream's `new RegExp` throws and takes every
 			// other rule's verdict on that file with it, because the walk recovers per file.
-			if compiled, err := esregexp.Compile(resolved.IgnorePattern, "u"); err == nil {
+			if compiled, compileError := esregexp.Compile(resolved.IgnorePattern, "u"); compileError == nil {
 				ignorePattern = compiled
 			}
 		}
@@ -276,8 +276,8 @@ func DecodeNoInlineCommentsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

@@ -31,9 +31,9 @@ func requireArraySortCompareOptionsFor(test *testing.T, optionsJson string) any 
 	if optionsJson == "" {
 		return DefaultRequireArraySortCompareSettings()
 	}
-	decoded, err := DecodeRequireArraySortCompareOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(json.RawMessage(optionsJson))
+	if decodeRequireArraySortCompareOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeRequireArraySortCompareOptionsError)
 	}
 	return decoded
 }
@@ -307,9 +307,9 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeRequireArraySortCompareOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.raw, err)
+			decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(json.RawMessage(testCase.raw))
+			if decodeRequireArraySortCompareOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeRequireArraySortCompareOptionsError)
 			}
 			options, isOptions := decoded.(RequireArraySortCompareOptions)
 			if !isOptions {

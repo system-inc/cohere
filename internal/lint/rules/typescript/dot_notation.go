@@ -163,8 +163,8 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var decoded DotNotationOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.AllowKeywords == nil {
 		decoded.AllowKeywords = options.AllowKeywords

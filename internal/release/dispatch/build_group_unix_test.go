@@ -28,7 +28,7 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 
 	compiler := 0
 	for deadline := time.Now().Add(time.Minute); compiler == 0 && time.Now().Before(deadline); {
-		if contents, err := os.ReadFile(compilerPID); err == nil {
+		if contents, readError := os.ReadFile(compilerPID); readError == nil {
 			compiler, _ = strconv.Atoi(strings.TrimSpace(string(contents)))
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -60,10 +60,10 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 // A build that ends on its own reports its own result, untouched by the grouping.
 func TestABuildToolThatEndsReportsItsOwnExit(test *testing.T) {
 	test.Parallel()
-	if err := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 0"), make(chan os.Signal)); err != nil {
-		test.Errorf("a tool that succeeded reported %v", err)
+	if runBuildToolUntilError := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 0"), make(chan os.Signal)); runBuildToolUntilError != nil {
+		test.Errorf("a tool that succeeded reported %v", runBuildToolUntilError)
 	}
-	if err := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 3"), make(chan os.Signal)); err == nil {
+	if runBuildToolUntilError := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 3"), make(chan os.Signal)); runBuildToolUntilError == nil {
 		test.Error("a tool that failed reported success")
 	}
 }

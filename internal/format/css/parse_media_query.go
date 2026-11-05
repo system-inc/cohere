@@ -8,8 +8,8 @@ import (
 )
 
 func parseMediaQuery(params string) *estree.Node {
-	result, err := mediaquery.Parse(params)
-	if err != nil {
+	result, parseError := mediaquery.Parse(params)
+	if parseError != nil {
 		// Ignore bad media queries
 		/* c8 ignore next 4 */
 		return estree.New("selector-unknown", 0, 0, "value", params)
