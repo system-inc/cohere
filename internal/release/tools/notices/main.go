@@ -20,6 +20,7 @@ import (
 func main() {
 	files, generateError := notices.Generate(".")
 	if generateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "notices: %v\n", generateError)
 		os.Exit(1)
 	}
@@ -30,9 +31,11 @@ func main() {
 	slices.Sort(names)
 	for _, name := range names {
 		if writeError := os.WriteFile(filepath.Join(".", name), files[name], 0o644); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "notices: writing %s: %v\n", name, writeError)
 			os.Exit(1)
 		}
+		// Ignored: the file is written, which is the command's whole work, and this line only reports it.
 		fmt.Printf("wrote %s (%d bytes)\n", name, len(files[name]))
 	}
 }

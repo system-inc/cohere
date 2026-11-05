@@ -235,15 +235,16 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 		return readError
 	}
 	// A module only some platforms link says which, since the rest ship without it.
+	described := carries
 	if len(module.Targets) > 0 {
-		carries += " Linked on " + strings.Join(module.Targets, ", ") + " only."
+		described += " Linked on " + strings.Join(module.Targets, ", ") + " only."
 	}
 	writeEntry(builder, entry{
 		Name:           module.Path,
 		URL:            "https://pkg.go.dev/" + module.Path + "@" + module.Version,
 		Version:        module.Version,
 		License:        license,
-		Carries:        carries,
+		Carries:        described,
 		Text:           text,
 		ThirdPartyFile: thirdPartyFile,
 		ThirdPartyText: thirdPartyText,
