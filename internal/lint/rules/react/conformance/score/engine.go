@@ -99,7 +99,7 @@ const (
 var Rules = map[string]RuleUnderTest{
 	"globals": {
 		Upstream: "globals",
-		Rule:     react.Globals,
+		Rule:     unconfigured(react.Globals),
 		Messages: map[string]UpstreamMessage{
 			"globalReassignment": {
 				Heading: "Error",
@@ -109,7 +109,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"hooks": {
 		Upstream: "hooks",
-		Rule:     react.RulesOfHooks,
+		Rule:     unconfigured(react.RulesOfHooks),
 		Messages: map[string]UpstreamMessage{
 			"rulesOfHooksConditional": {Heading: "Error", Text: hooksConditional},
 			"rulesOfHooksLoop":        {Heading: "Error", Text: hooksConditional},
@@ -124,7 +124,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"set-state-in-render": {
 		Upstream: "set-state-in-render",
-		Rule:     react.SetStateInRender,
+		Rule:     unconfigured(react.SetStateInRender),
 		Messages: map[string]UpstreamMessage{
 			"setStateInRender":  {Heading: "Error", Text: "Cannot call setState during render"},
 			"setStateInUseMemo": {Heading: "Error", Text: "Calling setState from useMemo may trigger an infinite loop"},
@@ -132,7 +132,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"use-memo": {
 		Upstream: "use-memo",
-		Rule:     react.UseMemo,
+		Rule:     unconfigured(react.UseMemo),
 		Messages: map[string]UpstreamMessage{
 			"useMemoCallbackNotInline": {
 				Heading: "Error",
@@ -158,14 +158,14 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"config": {
 		Upstream: "config",
-		Rule:     react.Config,
+		Rule:     unconfigured(react.Config),
 		Messages: map[string]UpstreamMessage{
 			"invalidTypeConfiguration": {Heading: "Error", Text: "Invalid type configuration for module"},
 		},
 	},
 	"gating": {
 		Upstream: "gating",
-		Rule:     react.Gating,
+		Rule:     unconfigured(react.Gating),
 		Messages: map[string]UpstreamMessage{
 			"invalidGatingDirective": {
 				Heading: "Error",
@@ -175,7 +175,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"unsupported-syntax": {
 		Upstream: "unsupported-syntax",
-		Rule:     react.UnsupportedSyntax,
+		Rule:     unconfigured(react.UnsupportedSyntax),
 		Messages: map[string]UpstreamMessage{
 			"unsupportedEval": {Heading: "Compilation Skipped", Text: "The 'eval' function is not supported"},
 		},
@@ -255,10 +255,18 @@ type UpstreamMessage struct {
 }
 
 // RuleUnderTest pairs a cohere rule with the upstream rule name it implements and the message join.
+//
+// Rule is bound with no options, as a config naming it with a bare severity runs it: the table holds rules
+// whose options types differ, and the corpus scores each rule's default behaviour.
 type RuleUnderTest struct {
 	Upstream string
-	Rule     rule.Rule
+	Rule     rule.Bound
 	Messages map[string]UpstreamMessage
+}
+
+// unconfigured is subject as a bare severity runs it, handed no options.
+func unconfigured[Options any](subject rule.Rule[Options]) rule.Bound {
+	return rule.Bind(subject, rule.Given[Options]{})
 }
 
 // tsConfigText is the compiler configuration each fixture is built under.
@@ -371,7 +379,7 @@ func Analyze(
 	var diagnostics []rule.Diagnostic
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule.Traits),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
@@ -383,7 +391,7 @@ func Analyze(
 		},
 	}
 
-	listeners := subject.Rule.Run(ruleContext, nil)
+	listeners := subject.Rule.Run(ruleContext)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
@@ -462,14 +470,14 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 	var ids []string
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule.Traits),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
 			ids = append(ids, diagnostic.Message.Id)
 		},
 	}
-	listeners := subject.Rule.Run(ruleContext, nil)
+	listeners := subject.Rule.Run(ruleContext)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}

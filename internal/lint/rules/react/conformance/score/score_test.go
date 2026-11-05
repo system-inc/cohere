@@ -146,10 +146,10 @@ func TestScoringHarnessCanFail(test *testing.T) {
 		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
-	silent := RuleUnderTest{Upstream: "globals", Rule: rule.Rule{
+	silent := RuleUnderTest{Upstream: "globals", Rule: unconfigured(rule.Rule[rule.NoOptions]{
 		Name: "probe-reports-nothing",
-		Run:  func(rule.Context, any) rule.Listeners { return nil },
-	}}
+		Run:  func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners { return nil },
+	})}
 
 	checked := 0
 	for _, fixture := range fixtures {
