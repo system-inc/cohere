@@ -119,7 +119,11 @@ func honestRecord() Record {
 // 4, every round primed, all three modes measured.
 func loadSchemaRecord() Record {
 	record := honestRecord()
-	record.Schema, record.IdleFloor, record.LoadCeiling, record.MeasuredModes, record.Band = loadSchemaVersion, 0, 4, nil, 0
+	record.Schema = loadSchemaVersion
+	record.IdleFloor = 0
+	record.LoadCeiling = 4
+	record.MeasuredModes = nil
+	record.Band = 0
 	for index := range record.Runs {
 		record.Runs[index].IdleBefore, record.Runs[index].IdleAfter = 0, 0
 		record.Runs[index].Quiet = record.Runs[index].LoadBefore <= 4 && record.Runs[index].LoadAfter <= 4
