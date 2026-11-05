@@ -102,3 +102,6 @@ func TestReasonWithoutColon(test *testing.T) {} // want `This test runs alone`
 func TestReasonSeparated(test *testing.T) { // want `This test runs alone`
 	test.Log("serial")
 }
+
+// TestMarkerMidSentence was once Not parallel: the marker sits mid-sentence here, so it is no excuse.
+func TestMarkerMidSentence(test *testing.T) {} // want `This test runs alone`

@@ -14,11 +14,14 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/policy"
 )
 
+// Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-require-parallel"
 
+// Analyzer runs the rule over one package.
 var Analyzer = &analysis.Analyzer{
 	Name: "testing_require_parallel",
 	Doc: "Flags a test or subtest in a _test.go file whose first statement is not Parallel on its own *testing.T, " +
@@ -26,6 +29,9 @@ var Analyzer = &analysis.Analyzer{
 		"literal or a function declared in the same package is not judged, because its body cannot be seen.",
 	Run: run,
 }
+
+// Rule is this rule's entry in the Go engine's registry.
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var notParallelMessage = policy.MessageOf(Name, "notParallel")
 
@@ -244,7 +250,7 @@ func isPointerToTestingT(candidate types.Type) bool {
 	return named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "testing" && named.Obj().Name() == "T"
 }
 
-// excuseOf reads a comment group for the marker: on any line of any comment in it, with the */ that closes a block
+// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
 // comment no part of the reason. A nil group says nothing.
 func excuseOf(group *ast.CommentGroup) excuse {
 	if group == nil {
@@ -253,7 +259,10 @@ func excuseOf(group *ast.CommentGroup) excuse {
 	found := excuseNone
 	for _, comment := range group.List {
 		for _, line := range strings.Split(comment.Text, "\n") {
-			_, reason, hasMarker := strings.Cut(line, notParallelMarker)
+			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
+			// mentions it, "this was Not parallel: once", excuses nothing.
+			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
+			reason, hasMarker := strings.CutPrefix(opening, notParallelMarker)
 			if !hasMarker {
 				continue
 			}

@@ -6,7 +6,20 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_require_parallel"
+	"github.com/system-inc/cohere/policy"
 )
+
+// The registry's entry is well formed and its name fits the house scheme, so the rule reaches a finding line as a
+// name a reader can look up.
+func TestRuleIsAWellFormedHouseRule(test *testing.T) {
+	test.Parallel()
+	if validateError := testing_require_parallel.Rule.Validate(); validateError != nil {
+		test.Fatal(validateError)
+	}
+	if _, parseError := policy.Naming.ParseRuleName("cohere-go", "testing-require-parallel"); parseError != nil {
+		test.Fatal(parseError)
+	}
+}
 
 // The flagged fixtures carry a // want on every test and subtest the rule must report, and analysistest fails on a
 // finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule
