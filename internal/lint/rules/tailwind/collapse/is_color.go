@@ -42,15 +42,6 @@ func IsColor(value string) bool {
 	return IsNamedColor(value)
 }
 
-// IsNamedColor reports whether value is a CSS named color, keyword, or system color.
-//
-// Lowercased before lookup, matching `NAMED_COLORS.has(value.toLowerCase())`. JavaScript's
-// `toLowerCase` is Unicode-aware and Go's strings.ToLower is too; they agree on every ASCII input,
-// and every member of the set is ASCII, so a non-ASCII input fails the lookup under both.
-func IsNamedColor(value string) bool {
-	return namedColors[strings.ToLower(value)]
-}
-
 // namedColors is the upstream set: CSS Level 1, Level 2/3, the `transparent` and `currentcolor`
 // keywords, and the system colors. Generated from the source rather than retyped.
 var namedColors = map[string]bool{
@@ -97,4 +88,13 @@ var namedColors = map[string]bool{
 	"highlight": true, "highlighttext": true, "selecteditem": true, "selecteditemtext": true,
 	"mark": true, "marktext": true, "graytext": true, "accentcolor": true,
 	"accentcolortext": true,
+}
+
+// IsNamedColor reports whether value is a CSS named color, keyword, or system color.
+//
+// Lowercased before lookup, matching `NAMED_COLORS.has(value.toLowerCase())`. JavaScript's
+// `toLowerCase` is Unicode-aware and Go's strings.ToLower is too; they agree on every ASCII input,
+// and every member of the set is ASCII, so a non-ASCII input fails the lookup under both.
+func IsNamedColor(value string) bool {
+	return namedColors[strings.ToLower(value)]
 }

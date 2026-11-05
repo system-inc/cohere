@@ -693,20 +693,20 @@ func WriteCacheTable(
 	sections CacheTableSections,
 	anchor PathAnchor,
 ) error {
-	table = table.anchored(anchor)
+	anchored := table.anchored(anchor)
 	if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
 	}
 	invocations := sections.Runs
 	if sections.AllRuns {
 		invocations = invocations[:0:0]
-		for invocation := range table.Runs {
+		for invocation := range anchored.Runs {
 			invocations = append(invocations, invocation)
 		}
 		sort.Strings(invocations)
 	}
 	for _, invocation := range invocations {
-		if run := table.Runs[invocation]; run != nil {
+		if run := anchored.Runs[invocation]; run != nil {
 			body := cacheTableRunBody{Invocation: invocation, Run: run}
 			name := cacheTableRunFile(invocation)
 			if writeCacheTableSectionError := writeCacheTableSection(
@@ -720,35 +720,35 @@ func WriteCacheTable(
 			}
 		}
 	}
-	if sections.Findings && table.Findings != nil {
+	if sections.Findings && anchored.Findings != nil {
 		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableFindingsSection),
-			cacheTableFindingsSection, table.Findings.wire(), identity); writeCacheTableSectionError != nil {
+			cacheTableFindingsSection, anchored.Findings.wire(), identity); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError
 		}
 	}
-	if sections.Signatures && table.Signatures != nil {
+	if sections.Signatures && anchored.Signatures != nil {
 		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableSignaturesSection),
-			cacheTableSignaturesSection, table.Signatures, identity); writeCacheTableSectionError != nil {
+			cacheTableSignaturesSection, anchored.Signatures, identity); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError
 		}
 	}
-	if sections.Formatted && table.Formatted != nil {
+	if sections.Formatted && anchored.Formatted != nil {
 		if writeCacheTableSectionError := writeCacheTableSection(
 			directory,
 			cacheTableFile(cacheTableFormatSection),
 			cacheTableFormatSection,
-			table.Formatted,
+			anchored.Formatted,
 			identity,
 		); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError
 		}
 	}
-	if sections.Types && table.Types != nil {
+	if sections.Types && anchored.Types != nil {
 		if writeCacheTableSectionError := writeCacheTableSection(
 			directory,
 			cacheTableFile(cacheTableTypesSection),
 			cacheTableTypesSection,
-			table.Types,
+			anchored.Types,
 			identity,
 		); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError

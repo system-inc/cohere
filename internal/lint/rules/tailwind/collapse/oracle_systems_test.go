@@ -24,7 +24,8 @@ import (
 //	    node $T/generate_functional/$w.mjs $P --resolve-root ahra: > $D/${w}_fixtures_public.json
 //	done
 //	node $T/generate_descriptor_table/fixtures.mjs $P --resolve-root ahra: > $D/descriptor_fixtures_public.json
-//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root ahra: --no-corpus > /dev/null
+//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root ahra: \
+//	    --no-corpus > /dev/null
 //	node $T/generate_descriptor_table/context.mjs $P --resolve-root ahra: > $D/descriptor_context_public.json
 //	node $T/generate_utility/enumerate.mjs $P --resolve-root ahra: > $D/utility_fixtures_public.json
 var oracleCopies = []struct {
@@ -80,7 +81,7 @@ func oracleSystem(test *testing.T, entryPoint string) *LoadedDesignSystem {
 	}
 	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          corpus.Resolve(test, entryPoint),
-		TailwindPackageRoot: vendored.TailwindPackageRoot(),
+		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
 	if loadDesignSystemError != nil {
 		test.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, loadDesignSystemError)

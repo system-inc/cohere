@@ -117,8 +117,8 @@ func subtestFunction(
 	argument ast.Expr,
 	declarations map[*types.Func]*ast.FuncDecl,
 ) (*ast.BlockStmt, *types.Var, *ast.CommentGroup) {
-	argument = ast.Unparen(argument)
-	if literal, isLiteral := argument.(*ast.FuncLit); isLiteral {
+	unwrapped := ast.Unparen(argument)
+	if literal, isLiteral := unwrapped.(*ast.FuncLit); isLiteral {
 		signature, isSignature := pass.TypesInfo.TypeOf(literal).(*types.Signature)
 		if !isSignature || signature.Params().Len() != 1 {
 			return nil, nil, nil
@@ -128,14 +128,14 @@ func subtestFunction(
 	// An instantiated generic function, helper[int] or helper[int, string], runs the generic function's body, so the
 	// type arguments are set aside and the name they instantiate is resolved. An index into a slice or map of
 	// functions unwraps to a variable, which is no function and so is never judged.
-	switch instantiated := argument.(type) {
+	switch instantiated := unwrapped.(type) {
 	case *ast.IndexExpr:
-		argument = ast.Unparen(instantiated.X)
+		unwrapped = ast.Unparen(instantiated.X)
 	case *ast.IndexListExpr:
-		argument = ast.Unparen(instantiated.X)
+		unwrapped = ast.Unparen(instantiated.X)
 	}
 	var object types.Object
-	switch named := argument.(type) {
+	switch named := unwrapped.(type) {
 	case *ast.Ident:
 		object = pass.TypesInfo.Uses[named]
 	case *ast.SelectorExpr:

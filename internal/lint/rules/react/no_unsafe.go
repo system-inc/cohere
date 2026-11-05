@@ -222,12 +222,13 @@ var NoUnsafe = rule.Rule{
 			//
 			// Found by asserting the span, which is the whole reason step 8 is not optional here:
 			// every identifier assertion in this file was already green with the brackets included.
-			if name != nil && name.Kind == ast.KindComputedPropertyName {
-				if inner := name.AsComputedPropertyName().Expression; inner != nil {
-					name = inner
+			key := name
+			if key != nil && key.Kind == ast.KindComputedPropertyName {
+				if inner := key.AsComputedPropertyName().Expression; inner != nil {
+					key = inner
 				}
 			}
-			ruleContext.ReportNode(name, message)
+			ruleContext.ReportNode(key, message)
 		}
 
 		judge := func(name *ast.Node) (rule.Message, bool) {

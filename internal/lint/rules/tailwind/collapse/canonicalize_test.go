@@ -140,7 +140,7 @@ func TestCanonicalizeAgreesWithTailwind(test *testing.T) {
 
 // readJsonFixture decodes a committed fixture, failing the test rather than skipping when it is absent,
 // because an oracle that silently goes missing is a test that silently stops comparing.
-func readJsonFixture(test *testing.T, name string, into any) {
+func readJsonFixture[Fixture any](test *testing.T, name string, into *Fixture) {
 	test.Helper()
 	contents, readError := os.ReadFile(filepath.Clean(name))
 	if readError != nil {

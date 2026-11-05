@@ -412,7 +412,8 @@ func (matcher liveMatcher) evaluate(node esNode) (matcherResult, []liveMatcher) 
 			return matcherNoMatch, nil
 		}
 		switch node.node.Kind {
-		case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration, ast.KindVariableDeclaration:
+		case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration,
+			ast.KindVariableDeclaration:
 			return matcherUncrossable, nil
 		case ast.KindCallExpression:
 			if isUncrossable(node.node) {
@@ -540,14 +541,15 @@ func esParent(node *ast.Node) *ast.Node {
 // a computed key's brackets. Comparing a child against skipOuter of a parent's field is ESTree's
 // `parent.field === node`.
 func skipOuter(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindComputedPropertyName:
-			node = node.AsComputedPropertyName().Expression
+			current = current.AsComputedPropertyName().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil

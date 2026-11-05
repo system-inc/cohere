@@ -599,18 +599,18 @@ func (walker *walker) resolve(call *ast.CallExpr, callee *function, parameter or
 
 // evaluate is where the value of an expression comes from, or of one result of it when result isn't -1.
 func (walker *walker) evaluate(expression ast.Expr, result int) origins {
-	expression = ast.Unparen(expression)
+	unwrapped := ast.Unparen(expression)
 	if result != -1 {
-		call, isCall := expression.(*ast.CallExpr)
+		call, isCall := unwrapped.(*ast.CallExpr)
 		if !isCall {
 			return origins{}
 		}
 		return walker.callResult(call, result)
 	}
-	if value, isString := walker.constantString(expression); isString {
-		return walker.source(expression.Pos(), value)
+	if value, isString := walker.constantString(unwrapped); isString {
+		return walker.source(unwrapped.Pos(), value)
 	}
-	switch expression := expression.(type) {
+	switch expression := unwrapped.(type) {
 	case *ast.Ident:
 		if variable := walker.variableOf(expression); variable != nil {
 			found := origins{}

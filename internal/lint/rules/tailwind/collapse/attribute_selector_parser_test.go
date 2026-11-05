@@ -17,7 +17,8 @@ import (
 
 // attributeSelectorValue is a present Value, spelled inline in a table.
 func attributeSelectorValue(value string) *string {
-	return &value
+	present := value
+	return &present
 }
 
 func TestParseAttributeSelectorRejectsInvalid(test *testing.T) {

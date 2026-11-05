@@ -58,7 +58,11 @@ func liveEntryPointFor(test testing.TB, spelling string) (entryPoint, packageRoo
 // the vendored tailwindcss.
 func liveTableForOracle(test *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
 	test.Helper()
-	if _, _, spelled, _ := corpus.Spelled(entryPoint); spelled {
+	_, _, spelled, spelledError := corpus.Spelled(entryPoint)
+	if spelledError != nil {
+		test.Fatalf("reading the corpus %s names: %v", entryPoint, spelledError)
+	}
+	if spelled {
 		return liveTableFor(test, entryPoint)
 	}
 	system := oracleSystem(test, entryPoint)

@@ -551,18 +551,18 @@ func (loader *loader) resolve(
 	if path == "unsafe" {
 		return types.Unsafe, nil
 	}
-	path = canonical(importer, path)
-	if overridden := overrides[path]; overridden != nil {
+	canonicalPath := canonical(importer, path)
+	if overridden := overrides[canonicalPath]; overridden != nil {
 		return overridden, nil
 	}
-	if loader.fromExports[path] {
-		return loader.importExported(path)
+	if loader.fromExports[canonicalPath] {
+		return loader.importExported(canonicalPath)
 	}
 	loader.checkedLock.Lock()
-	checked := loader.checked[path]
+	checked := loader.checked[canonicalPath]
 	loader.checkedLock.Unlock()
 	if checked == nil || checked.Types == nil {
-		return nil, fmt.Errorf("%s imports %s, which this load did not type-check", importer.ImportPath, path)
+		return nil, fmt.Errorf("%s imports %s, which this load did not type-check", importer.ImportPath, canonicalPath)
 	}
 	return checked.Types, nil
 }

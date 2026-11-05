@@ -36,6 +36,13 @@ type EnforceConsistentVariableSyntaxOptions struct {
 	Syntax string `json:"syntax"`
 }
 
+const (
+	// variableSyntaxShorthand is v4's parenthesised custom property: `text-(--x)`.
+	variableSyntaxShorthand = "shorthand"
+	// variableSyntaxVariable is the bracketed call form: `text-[var(--x)]`.
+	variableSyntaxVariable = "variable"
+)
+
 // EnforceConsistentVariableSyntax reports a custom property written as an arbitrary value.
 //
 //	valid:   <div className="text-(--brand)" />
@@ -105,13 +112,6 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 		return listeners
 	},
 }
-
-const (
-	// variableSyntaxShorthand is v4's parenthesised custom property: `text-(--x)`.
-	variableSyntaxShorthand = "shorthand"
-	// variableSyntaxVariable is the bracketed call form: `text-[var(--x)]`.
-	variableSyntaxVariable = "variable"
-)
 
 // correctedVariableSyntax returns the class with its custom property in the configured form.
 func correctedVariableSyntax(className string, syntax string) (string, bool) {

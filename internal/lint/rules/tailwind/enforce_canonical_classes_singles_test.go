@@ -203,7 +203,8 @@ func TestCanonicalSingleBailsOnARepositoryTwin(test *testing.T) {
 
 	control := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source, theme, nil)
 	rule_testing.ExpectFindings(test, control, "canonicalSingle")
-	if got := control.Diagnostics[0].Message.Description; got != `The class: "bg-(--color-content-1)" can be simplified to "bg-content-1".` {
+	if got := control.Diagnostics[0].Message.Description; got != `The class: "bg-(--color-content-1)" `+
+		`can be simplified to "bg-content-1".` {
 		test.Errorf("control message: %s", got)
 	}
 
@@ -315,7 +316,7 @@ func TestCanonicalSinglesReportWithCollapseOff(test *testing.T) {
 	off := false
 	result := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="px-4 py-4 end-0" />;`,
-		EnforceCanonicalClassesOptions{Collapse: &off})
+		&EnforceCanonicalClassesOptions{Collapse: &off})
 	rule_testing.ExpectFindings(test, result, "canonicalSingle")
 }
 
@@ -325,7 +326,7 @@ func TestCanonicalSinglesSkipWhatUpstreamDoesNotAsk(test *testing.T) {
 	test.Parallel()
 	ignored := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="end-0" />;`,
-		EnforceCanonicalClassesOptions{Ignore: []string{"^end-"}})
+		&EnforceCanonicalClassesOptions{Ignore: []string{"^end-"}})
 	rule_testing.ExpectClean(test, ignored)
 
 	// It parses, its variant would modernize to `*:`, and `zz` is no inset value, so it compiles to

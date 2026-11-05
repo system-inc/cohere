@@ -16,6 +16,9 @@ package tailwind
 // replacement already in place. A one-node replacement keeps every sibling's index, so assigning
 // into the slice is that splice. Upstream descends into any node with a non-empty `nodes`, which in
 // a value tree is a function with arguments.
+//
+// Mutates: nodes each replacement is written into the caller's tree in place, which is how a calc pass
+// rewrites the value it was handed
 func walkValueExit(
 	nodes []ValueNode,
 	parent *ValueNode,

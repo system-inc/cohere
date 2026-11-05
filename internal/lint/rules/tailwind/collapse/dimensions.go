@@ -113,6 +113,7 @@ func javaScriptNumberString(value float64) string {
 	scientific := strconv.FormatFloat(value, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(scientific, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: the `e` form of a finite number always ends in a signed decimal exponent, so this parses.
 	exponent, _ := strconv.Atoi(exponentText)
 	digitCount := len(digits)
 	decimalExponent := exponent + 1

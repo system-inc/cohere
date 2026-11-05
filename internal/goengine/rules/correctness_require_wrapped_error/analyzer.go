@@ -148,14 +148,14 @@ func judgeErrorf(pass *analysis.Pass, call *ast.CallExpr) {
 // concatenation, `"reading: " + readError.Error()`, since every one of them is an error whose chain the new error
 // drops.
 func reportRebuilds(pass *analysis.Pass, expression ast.Expr) {
-	expression = ast.Unparen(expression)
-	if binary, isBinary := expression.(*ast.BinaryExpr); isBinary && binary.Op == token.ADD {
+	unwrapped := ast.Unparen(expression)
+	if binary, isBinary := unwrapped.(*ast.BinaryExpr); isBinary && binary.Op == token.ADD {
 		reportRebuilds(pass, binary.X)
 		reportRebuilds(pass, binary.Y)
 		return
 	}
-	if receiver := errorTextReceiver(pass, expression); receiver != nil {
-		reportRebuild(pass, expression, receiver)
+	if receiver := errorTextReceiver(pass, unwrapped); receiver != nil {
+		reportRebuild(pass, unwrapped, receiver)
 	}
 }
 
@@ -213,11 +213,11 @@ func isAnyOf(pass *analysis.Pass, expression ast.Expr, candidates []ast.Expr) bo
 }
 
 func sameValue(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
-	left = ast.Unparen(left)
-	right = ast.Unparen(right)
-	switch leftNode := left.(type) {
+	unwrappedLeft := ast.Unparen(left)
+	unwrappedRight := ast.Unparen(right)
+	switch leftNode := unwrappedLeft.(type) {
 	case *ast.Ident:
-		rightNode, isIdentifier := right.(*ast.Ident)
+		rightNode, isIdentifier := unwrappedRight.(*ast.Ident)
 		if !isIdentifier {
 			return false
 		}
@@ -225,7 +225,7 @@ func sameValue(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 		_, isVariable := object.(*types.Var)
 		return isVariable && object == pass.TypesInfo.Uses[rightNode]
 	case *ast.SelectorExpr:
-		rightNode, isSelector := right.(*ast.SelectorExpr)
+		rightNode, isSelector := unwrappedRight.(*ast.SelectorExpr)
 		if !isSelector {
 			return false
 		}
@@ -341,8 +341,9 @@ func argumentNumber(format string, index int, argument int, argumentCount int) (
 }
 
 func skipDigits(text string, index int) int {
-	for index < len(text) && text[index] >= '0' && text[index] <= '9' {
-		index++
+	end := index
+	for end < len(text) && text[end] >= '0' && text[end] <= '9' {
+		end++
 	}
-	return index
+	return end
 }

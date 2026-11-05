@@ -73,16 +73,17 @@ func (reuse *FindingsReuse) MeasureReadiness() {
 // The previous cache's lookup index is built here, before any worker runs. Lookup would otherwise
 // build it on first use, and sixteen workers missing at once would race to build it.
 func NewFindingsReuse(key [sha256.Size]byte, previous *LintCache, anchor PathAnchor) *FindingsReuse {
-	if previous != nil && previous.Key != key {
-		previous = nil
+	usable := previous
+	if usable != nil && usable.Key != key {
+		usable = nil
 	}
-	reuse := &FindingsReuse{key: key, previous: previous, anchor: anchor, next: map[string]LintCacheEntry{}}
-	if previous != nil {
-		previous.ensureIndex()
+	reuse := &FindingsReuse{key: key, previous: usable, anchor: anchor, next: map[string]LintCacheEntry{}}
+	if usable != nil {
+		usable.ensureIndex()
 		// Checked once, here, by re-hashing what the design system read last time: a few stats and small reads,
 		// against building the design system to find out.
-		if previous.DesignSystem.stillHolds(anchor) {
-			reuse.designFingerprint = previous.DesignSystem.Fingerprint
+		if usable.DesignSystem.stillHolds(anchor) {
+			reuse.designFingerprint = usable.DesignSystem.Fingerprint
 		}
 	}
 	return reuse

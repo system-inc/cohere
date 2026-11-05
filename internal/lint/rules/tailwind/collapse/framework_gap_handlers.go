@@ -171,6 +171,13 @@ func (branch UtilityBranch) isOneOf(types ...DataType) bool {
 // two: a class with no rules has no reading at all.
 type GapEmitter func(branch UtilityBranch) []*Node
 
+// gapEmitterValue is what every ported declaration here carries.
+//
+// Named rather than spelled at 200 call sites so that the one place a value is meaningful, the
+// absent-valued alpha declaration below, is visibly a different thing rather than a different
+// string.
+const gapEmitterValue = "zzsentinel"
+
 // declarations is the common tail of these bodies: a fixed property list, all carrying the value.
 //
 // The value is a sentinel for the same reason it is in the other two slices. `PropertySort` reads a
@@ -183,13 +190,6 @@ func declarations(properties ...string) []*Node {
 	}
 	return nodes
 }
-
-// gapEmitterValue is what every ported declaration here carries.
-//
-// Named rather than spelled at 200 call sites so that the one place a value is meaningful, the
-// absent-valued alpha declaration below, is visibly a different thing rather than a different
-// string.
-const gapEmitterValue = "zzsentinel"
 
 // absentValued is a declaration upstream emits with an undefined value.
 //
@@ -695,38 +695,19 @@ func EmitGapRoot(root string, branch UtilityBranch) []*Node {
 	return withResolvedValue(root, nodes, branch.Value)
 }
 
-// withResolvedValue restates a gap root's declarations for one concrete value.
-//
-// The 58 `declarations` call sites in this file all carry the sentinel, because every consumer but
-// one reads property names. Rewriting here rather than threading a value through all 58 keeps one
-// seam: an arm added later gets this by construction, and the arms stay readable against upstream's
-// source, which is the property this file was built for.
-//
-// Two rules, and the split is the whole of composition. A `--tw-*` custom property is the root's own
-// contribution and takes the value, so `shadow-sm` and `shadow-lg` write different `--tw-shadow`.
-// A shared property its family layers through takes that family's constant, which names every
-// sibling variable and mentions no value, so both write an identical `box-shadow` and stack rather
-// than overwrite. A property in neither set is an ordinary declaration and takes the value, which is
-// what makes `border-2` and `border-4` collide.
-//
-// The declarations are copied rather than mutated. The emitters build fresh nodes per call today,
-// and a caller that reads property names must not observe a value another caller asked for.
-func withResolvedValue(root string, nodes []*Node, value string) []*Node {
-	rewritten := make([]*Node, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Kind != KindDeclaration || !node.ValuePresent {
-			rewritten = append(rewritten, node)
-			continue
-		}
-		replacement := *node
-		if constant, shared := composedAggregateValues[composedAggregate{root: root, property: node.Property}]; shared {
-			replacement.Value = constant
-		} else {
-			replacement.Value = value
-		}
-		rewritten = append(rewritten, &replacement)
-	}
-	return rewritten
+// The shared constants these gap roots write, read from the shipped 4.3.3 source.
+const (
+	cssBoxShadowValue      = "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)"
+	cssConicGradientValue  = "conic-gradient(var(--tw-gradient-stops))"
+	cssLinearGradientValue = "linear-gradient(var(--tw-gradient-stops))"
+	cssRadialGradientValue = "radial-gradient(var(--tw-gradient-stops))"
+	cssMaskCompositeValue  = "intersect"
+)
+
+// composedAggregate is one root's use of one shared property.
+type composedAggregate struct {
+	root     string
+	property string
 }
 
 // composedAggregateValues is the constant each layering family writes to its shared property.
@@ -800,17 +781,36 @@ var composedAggregateValues = map[composedAggregate]string{
 	{root: "mask-conic-to", property: "mask-composite"}:    cssMaskCompositeValue,
 }
 
-// composedAggregate is one root's use of one shared property.
-type composedAggregate struct {
-	root     string
-	property string
+// withResolvedValue restates a gap root's declarations for one concrete value.
+//
+// The 58 `declarations` call sites in this file all carry the sentinel, because every consumer but
+// one reads property names. Rewriting here rather than threading a value through all 58 keeps one
+// seam: an arm added later gets this by construction, and the arms stay readable against upstream's
+// source, which is the property this file was built for.
+//
+// Two rules, and the split is the whole of composition. A `--tw-*` custom property is the root's own
+// contribution and takes the value, so `shadow-sm` and `shadow-lg` write different `--tw-shadow`.
+// A shared property its family layers through takes that family's constant, which names every
+// sibling variable and mentions no value, so both write an identical `box-shadow` and stack rather
+// than overwrite. A property in neither set is an ordinary declaration and takes the value, which is
+// what makes `border-2` and `border-4` collide.
+//
+// The declarations are copied rather than mutated. The emitters build fresh nodes per call today,
+// and a caller that reads property names must not observe a value another caller asked for.
+func withResolvedValue(root string, nodes []*Node, value string) []*Node {
+	rewritten := make([]*Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Kind != KindDeclaration || !node.ValuePresent {
+			rewritten = append(rewritten, node)
+			continue
+		}
+		replacement := *node
+		if constant, shared := composedAggregateValues[composedAggregate{root: root, property: node.Property}]; shared {
+			replacement.Value = constant
+		} else {
+			replacement.Value = value
+		}
+		rewritten = append(rewritten, &replacement)
+	}
+	return rewritten
 }
-
-// The shared constants these gap roots write, read from the shipped 4.3.3 source.
-const (
-	cssBoxShadowValue      = "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)"
-	cssConicGradientValue  = "conic-gradient(var(--tw-gradient-stops))"
-	cssLinearGradientValue = "linear-gradient(var(--tw-gradient-stops))"
-	cssRadialGradientValue = "radial-gradient(var(--tw-gradient-stops))"
-	cssMaskCompositeValue  = "intersect"
-)

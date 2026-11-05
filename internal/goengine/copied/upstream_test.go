@@ -24,6 +24,10 @@ import (
 // module cache holds. A module missing from the cache fails, never skips, since a skipped check reads as a copy
 // that matched.
 
+// skippedDirectories are what the walk leaves out: the TypeScript submodule, which is upstream's own tree rather
+// than a copy in ours; npm's node_modules; and testdata, whose planted copies TestPlantedCopies reads.
+var skippedDirectories = []string{"TypeScript", "node_modules", "testdata"}
+
 // TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges walks the module for every Go file outside testdata that
 // declares itself a copy and holds each to its upstream file.
 func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
@@ -82,10 +86,6 @@ func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
 		}
 	}
 }
-
-// skippedDirectories are what the walk leaves out: the TypeScript submodule, which is upstream's own tree rather
-// than a copy in ours; npm's node_modules; and testdata, whose planted copies TestPlantedCopies reads.
-var skippedDirectories = []string{"TypeScript", "node_modules", "testdata"}
 
 // TestPlantedCopies holds the check to both answers on planted copies of x/tools' driverutil/url.go: a faithful
 // copy with a marked change passes, and an unmarked edit, a header with no until and a module the cache does not

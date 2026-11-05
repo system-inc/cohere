@@ -228,12 +228,12 @@ func destructuredPropertyName(binding *ast.BindingElement) (string, bool) {
 func forbiddenDefaultTypeOf(initializer *ast.Node) (string, bool) {
 	// Our parser keeps parentheses where upstream's folds them away, so `{a = ({})}` would reach
 	// upstream's switch as the object literal itself. Unwrapped in a loop because `(({}))` nests.
-	initializer = skipParenthesesOptional(initializer)
-	if initializer == nil {
+	unwrapped := skipParenthesesOptional(initializer)
+	if unwrapped == nil {
 		return "", false
 	}
 
-	switch initializer.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression:
 		return "object literal", true
 	case ast.KindArrayLiteralExpression:
@@ -269,7 +269,7 @@ func forbiddenDefaultTypeOf(initializer *ast.Node) (string, bool) {
 		// Only a call to the bare identifier `Symbol`. Upstream tests
 		// `callee.type === 'Identifier' && callee.name === 'Symbol'`, so `Symbol.for(1)` is a
 		// member callee and is silent. Measured against the installed build.
-		callee := skipParenthesesOptional(initializer.AsCallExpression().Expression)
+		callee := skipParenthesesOptional(unwrapped.AsCallExpression().Expression)
 		if callee != nil && callee.Kind == ast.KindIdentifier && callee.Text() == "Symbol" {
 			return "Symbol literal", true
 		}

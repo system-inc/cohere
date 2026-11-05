@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_class_order [-systems <systems.json>] [-output <fixture.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_class_order \
+//	    [-systems <systems.json>] [-output <fixture.json>] [-check]
 //
 // # Why this tool exists next to six that look like it
 //

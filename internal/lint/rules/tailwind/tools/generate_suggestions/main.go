@@ -152,7 +152,12 @@ var SuggestedFractions = %s
 // it. The false ones are the deprecated spellings Tailwind still compiles and no longer offers, whose
 // `+"`suggest`"+` returns nothing.
 var FrameworkStaticSuggested = map[string]bool{
-`, file.TailwindVersion, file.ProbedNamespaces, stringSlice(file.DefaultSpacingSuggestions), stringSlice(file.SuggestedFractions))
+`,
+		file.TailwindVersion,
+		file.ProbedNamespaces,
+		stringSlice(file.DefaultSpacingSuggestions),
+		stringSlice(file.SuggestedFractions),
+	)
 
 	names := make([]string, 0, len(file.Statics))
 	for name := range file.Statics {

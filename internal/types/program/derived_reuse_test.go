@@ -309,7 +309,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+					`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 					`"include":["**/*.ts"]}`,
 				"red-marker.ts":  "// red\n",
 				"blue-marker.ts": "// blue\n",
@@ -450,7 +451,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+			`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 			`"include":["**/*.ts"]}`,
 	}
 	for _, directory := range []string{"a", "b", "c"} {

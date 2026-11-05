@@ -54,16 +54,17 @@ func TestShorthandMatcherAgreesWithTheExpressions(test *testing.T) {
 
 	// A decoration a collapse has to agree on: variants, sign, marker.
 	decorate := func(className string, variant string, negative bool, marker int) string {
+		decorated := className
 		switch marker {
 		case 1:
-			className = "!" + className
+			decorated = "!" + decorated
 		case 2:
-			className += "!"
+			decorated += "!"
 		}
 		if negative {
-			className = "-" + className
+			decorated = "-" + decorated
 		}
-		return variant + className
+		return variant + decorated
 	}
 
 	collapsing := 0
