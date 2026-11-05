@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -17,7 +18,7 @@ const sequencesFile = "/repository/source/Sequences.ts"
 // the one line of this rule with no upstream counterpart: it has to turn an absent key into `true`
 // where the generic helper would hand back a zero-value struct reading as `false`. A struct-built
 // fixture states its own answer and cannot see that.
-func decodedSequenceOptions(test *testing.T, raw string) any {
+func decodedSequenceOptions(test *testing.T, raw string) NoSequencesOptions {
 	test.Helper()
 	decoded, decodeNoSequencesOptionsError := DecodeNoSequencesOptions([]byte(raw))
 	if decodeNoSequencesOptionsError != nil {
@@ -41,107 +42,135 @@ func TestNoSequencesFires(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoSequencesOptions]
 		column     int
 	}{
-		{"1, 2;", nil, 2},
-		{"a = 1, 2", nil, 6},
-		{"do {} while (doSomething(), !!test);", nil, 27},
-		{"for (; doSomething(), !!test; );", nil, 21},
-		{"if (doSomething(), !!test);", nil, 18},
-		{"switch (doSomething(), val) {}", nil, 22},
-		{"while (doSomething(), !!test);", nil, 21},
-		{"with (doSomething(), val) {}", nil, 20},
-		{"a => (doSomething(), a)", nil, 20},
-		{"(1), 2", nil, 4},
-		{"((1)) , (2)", nil, 7},
-		{"while((1) , 2);", nil, 11},
-		{"var foo = (1, 2);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 13},
-		{"(0,eval)(\"foo()\");", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 3},
-		{"foo(a, (b, c), d);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 10},
-		{"do {} while ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 28},
-		{"for (; (doSomething(), !!test); );", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 22},
-		{"if ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 19},
-		{"switch ((doSomething(), val)) {}", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 23},
-		{"while ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 22},
-		{"with ((doSomething(), val)) {}", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 21},
-		{"a => ((doSomething(), a))", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 21},
+		{"1, 2;", rule.Given[NoSequencesOptions]{}, 2},
+		{"a = 1, 2", rule.Given[NoSequencesOptions]{}, 6},
+		{"do {} while (doSomething(), !!test);", rule.Given[NoSequencesOptions]{}, 27},
+		{"for (; doSomething(), !!test; );", rule.Given[NoSequencesOptions]{}, 21},
+		{"if (doSomething(), !!test);", rule.Given[NoSequencesOptions]{}, 18},
+		{"switch (doSomething(), val) {}", rule.Given[NoSequencesOptions]{}, 22},
+		{"while (doSomething(), !!test);", rule.Given[NoSequencesOptions]{}, 21},
+		{"with (doSomething(), val) {}", rule.Given[NoSequencesOptions]{}, 20},
+		{"a => (doSomething(), a)", rule.Given[NoSequencesOptions]{}, 20},
+		{"(1), 2", rule.Given[NoSequencesOptions]{}, 4},
+		{"((1)) , (2)", rule.Given[NoSequencesOptions]{}, 7},
+		{"while((1) , 2);", rule.Given[NoSequencesOptions]{}, 11},
+		{"var foo = (1, 2);", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)), 13},
+		{"(0,eval)(\"foo()\");", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)), 3},
+		{"foo(a, (b, c), d);", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)), 10},
+		{
+			"do {} while ((doSomething(), !!test));",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			28,
+		},
+		{
+			"for (; (doSomething(), !!test); );",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			22,
+		},
+		{
+			"if ((doSomething(), !!test));",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			19,
+		},
+		{
+			"switch ((doSomething(), val)) {}",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			23,
+		},
+		{
+			"while ((doSomething(), !!test));",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			22,
+		},
+		{
+			"with ((doSomething(), val)) {}",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			21,
+		},
+		{
+			"a => ((doSomething(), a))",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+			21,
+		},
 
 		// Beyond the corpus. Chained commas are one node upstream and several here, so these pin the
 		// count as well as the position: measured against the installed rule, both report exactly
 		// once and both at column 2, which is the chain's first comma rather than its outermost.
-		{"a, b, c;", nil, 2},
-		{"a, b, c, d;", nil, 2},
-		{"a, b, c, d, e;", nil, 2},
+		{"a, b, c;", rule.Given[NoSequencesOptions]{}, 2},
+		{"a, b, c, d;", rule.Given[NoSequencesOptions]{}, 2},
+		{"a, b, c, d, e;", rule.Given[NoSequencesOptions]{}, 2},
 
 		// A three-element chain in a position that is not exempt, paired with the five silent cases
 		// below. These are the inputs that caught the chain-deduplication running in the wrong
 		// direction: standing down on the outer node instead of the inner one still reports here,
 		// so a fixture in this direction alone cannot see the defect and the silent half is the
 		// load-bearing one. Measured against the installed rule.
-		{"if (a, b, c);", nil, 6},
-		{"for (; a, b, c ;);", nil, 9},
-		{"a => (a, b, c)", nil, 8},
-		{"function f(){ return a, b, c; }", nil, 23},
-		{"`${a, b, c}`", nil, 5},
+		{"if (a, b, c);", rule.Given[NoSequencesOptions]{}, 6},
+		{"for (; a, b, c ;);", rule.Given[NoSequencesOptions]{}, 9},
+		{"a => (a, b, c)", rule.Given[NoSequencesOptions]{}, 8},
+		{"function f(){ return a, b, c; }", rule.Given[NoSequencesOptions]{}, 23},
+		{"`${a, b, c}`", rule.Given[NoSequencesOptions]{}, 5},
 
 		// The same shape with a parenthesis in it, which is where the flattening stops. Upstream
 		// builds two SequenceExpression nodes here and reports only on the unparenthesized one.
 		// Measured: `(a, b), c` reports at 7 and `a, (b, c)` at 2.
-		{"(a, b), c;", nil, 7},
-		{"a, (b, c);", nil, 2},
-		{"((a, b)), c;", nil, 9},
+		{"(a, b), c;", rule.Given[NoSequencesOptions]{}, 7},
+		{"a, (b, c);", rule.Given[NoSequencesOptions]{}, 2},
+		{"((a, b)), c;", rule.Given[NoSequencesOptions]{}, 9},
 
 		// The `for` exemption is the initializer and the update, and not the condition. The corpus
 		// covers the condition; these two pin that the exemption is positional rather than a blanket
 		// exemption for the statement, which a structural port could easily get backwards.
-		{"for (; a, b ;);", nil, 9},
+		{"for (; a, b ;);", rule.Given[NoSequencesOptions]{}, 9},
 
 		// The `for` slot comparison has to see through parentheses, and it has to happen before the
 		// paren allowance. This is the inner half of the pair upstream's two `allowInParentheses:
 		// false` clean cases establish: the outer sequence is the initializer and is exempt, the
 		// inner one's parent is that sequence rather than the statement, and it reports. Measured
 		// against the installed rule at column 8.
-		{"for ((a, b), c; ; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 8},
-		{"for (;; (a, b), c);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 11},
+		{"for ((a, b), c; ; );", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)), 8},
+		{"for (;; (a, b), c);", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)), 11},
 
 		// The arrow body needs two parenthesis nodes where every other position needs one, because
 		// its parentheses are part of the expression rather than a statement's grammar. The corpus
 		// covers both arrow forms with `doSomething()`; this is the minimal pair.
-		{"a => (b, c)", nil, 8},
+		{"a => (b, c)", rule.Given[NoSequencesOptions]{}, 8},
 
 		// A comma inside a template substitution and inside an optional element access. Neither is
 		// an argument list, so neither is a separator, and both report upstream.
-		{"`${a, b}`", nil, 5},
-		{"x?.[a, b]", nil, 6},
+		{"`${a, b}`", rule.Given[NoSequencesOptions]{}, 5},
+		{"x?.[a, b]", rule.Given[NoSequencesOptions]{}, 6},
 
 		// A sequence on the right of an assignment whose own left is parenthesized. This separates
 		// "the sequence is parenthesized" from "something inside it is", which is the discrimination
 		// `while((1) , 2)` makes in the corpus and which a paren check reading the wrong node would
 		// invert.
-		{"a = (b, c) , d", nil, 12},
+		{"a = (b, c) , d", rule.Given[NoSequencesOptions]{}, 12},
 
 		// A chain whose last element is a parenthesized sequence. The outer chain is unparenthesized
 		// and reports at its first comma; the inner one is excused. Measured at column 2.
-		{"a, b, (c, d);", nil, 2},
+		{"a, b, (c, d);", rule.Given[NoSequencesOptions]{}, 2},
 
 		// Two parenthesized sequences joined by a bare comma. Both inner ones are excused and the
 		// comma between them is what reports. Written first as a clean case, on the reading that
 		// everything in sight was parenthesized; the comma joining them is not. Measured at 7.
-		{"(a, b), (c, d);", nil, 7},
+		{"(a, b), (c, d);", rule.Given[NoSequencesOptions]{}, 7},
 
 		// A whole chain wrapped in parentheses, then extended. The parenthesized part is excused and
 		// is a separate node upstream; what reports is the comma outside the parentheses. Written
 		// first with the expectation of column 3, on the reasoning that the leftmost comma of the
 		// chain is reported -- which is true only when the chain is unbroken. Measured at 12, and
 		// the rule was right where the reasoning was not.
-		{"((a, b), c), d;", nil, 12},
+		{"((a, b), c), d;", rule.Given[NoSequencesOptions]{}, 12},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				NoSequences,
 				sequencesFile,
@@ -177,37 +206,43 @@ func TestNoSequencesStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoSequencesOptions]
 	}{
-		{"var arr = [1, 2];", nil},
-		{"var obj = {a: 1, b: 2};", nil},
-		{"var a = 1, b = 2;", nil},
-		{"var foo = (1, 2);", nil},
-		{"(0,eval)(\"foo()\");", nil},
-		{"for (i = 1, j = 2;; i++, j++);", nil},
-		{"foo(a, (b, c), d);", nil},
-		{"do {} while ((doSomething(), !!test));", nil},
-		{"for ((doSomething(), somethingElse()); (doSomething(), !!test); );", nil},
-		{"if ((doSomething(), !!test));", nil},
-		{"switch ((doSomething(), val)) {}", nil},
-		{"while ((doSomething(), !!test));", nil},
-		{"with ((doSomething(), val)) {}", nil},
-		{"a => ((doSomething(), a))", nil},
-		{"var foo = (1, 2);", decodedSequenceOptions(test, `{}`)},
-		{"var foo = (1, 2);", decodedSequenceOptions(test, `{"allowInParentheses": true}`)},
-		{"for ((i = 0, j = 0); test; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
-		{"for (; test; (i++, j++));", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
-		{"const foo = () => { return ((bar = 123), 10) }", nil},
-		{"const foo = () => (((bar = 123), 10));", nil},
+		{"var arr = [1, 2];", rule.Given[NoSequencesOptions]{}},
+		{"var obj = {a: 1, b: 2};", rule.Given[NoSequencesOptions]{}},
+		{"var a = 1, b = 2;", rule.Given[NoSequencesOptions]{}},
+		{"var foo = (1, 2);", rule.Given[NoSequencesOptions]{}},
+		{"(0,eval)(\"foo()\");", rule.Given[NoSequencesOptions]{}},
+		{"for (i = 1, j = 2;; i++, j++);", rule.Given[NoSequencesOptions]{}},
+		{"foo(a, (b, c), d);", rule.Given[NoSequencesOptions]{}},
+		{"do {} while ((doSomething(), !!test));", rule.Given[NoSequencesOptions]{}},
+		{"for ((doSomething(), somethingElse()); (doSomething(), !!test); );", rule.Given[NoSequencesOptions]{}},
+		{"if ((doSomething(), !!test));", rule.Given[NoSequencesOptions]{}},
+		{"switch ((doSomething(), val)) {}", rule.Given[NoSequencesOptions]{}},
+		{"while ((doSomething(), !!test));", rule.Given[NoSequencesOptions]{}},
+		{"with ((doSomething(), val)) {}", rule.Given[NoSequencesOptions]{}},
+		{"a => ((doSomething(), a))", rule.Given[NoSequencesOptions]{}},
+		{"var foo = (1, 2);", rule.Configured(decodedSequenceOptions(test, `{}`))},
+		{"var foo = (1, 2);", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": true}`))},
+		{
+			"for ((i = 0, j = 0); test; );",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+		},
+		{"for (; test; (i++, j++));", rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`))},
+		{"const foo = () => { return ((bar = 123), 10) }", rule.Given[NoSequencesOptions]{}},
+		{"const foo = () => (((bar = 123), 10));", rule.Given[NoSequencesOptions]{}},
 
 		// Beyond the corpus. The initializer and the update of a `for`, separately, because the
 		// corpus only ever writes them together and a port could exempt one and not the other.
-		{"for (a, b;;);", nil},
-		{"for (;; a, b);", nil},
+		{"for (a, b;;);", rule.Given[NoSequencesOptions]{}},
+		{"for (;; a, b);", rule.Given[NoSequencesOptions]{}},
 
 		// The exemption reaches through two parenthesis levels as well as one, because upstream's
 		// comparison is made on a tree where parentheses are not nodes at all. Measured silent.
-		{"for (((i = 0, j = 0)); test; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
+		{
+			"for (((i = 0, j = 0)); test; );",
+			rule.Configured(decodedSequenceOptions(test, `{"allowInParentheses": false}`)),
+		},
 
 		// A three-element chain in each exempt position. These are the cases a mutation sweep found
 		// and the imported corpus could not, because upstream never writes a chain longer than two.
@@ -215,47 +250,47 @@ func TestNoSequencesStaysSilent(test *testing.T) {
 		// them: the inner node's parent is the outer comma expression rather than the statement, so
 		// the `for` exemption and the paren allowance are both asked about the wrong node and both
 		// decline. Measured silent against the installed rule.
-		{"for (a, b, c;;);", nil},
-		{"for (;; a, b, c);", nil},
-		{"(a, b, c);", nil},
-		{"if ((a, b, c));", nil},
-		{"a => ((a, b, c))", nil},
-		{"var x = (a, b, c);", nil},
-		{"while ((a, b, c));", nil},
-		{"switch ((a, b, c)) {}", nil},
-		{"function f(){ return (a, b, c); }", nil},
-		{"for (var i = (a, b, c);;);", nil},
+		{"for (a, b, c;;);", rule.Given[NoSequencesOptions]{}},
+		{"for (;; a, b, c);", rule.Given[NoSequencesOptions]{}},
+		{"(a, b, c);", rule.Given[NoSequencesOptions]{}},
+		{"if ((a, b, c));", rule.Given[NoSequencesOptions]{}},
+		{"a => ((a, b, c))", rule.Given[NoSequencesOptions]{}},
+		{"var x = (a, b, c);", rule.Given[NoSequencesOptions]{}},
+		{"while ((a, b, c));", rule.Given[NoSequencesOptions]{}},
+		{"switch ((a, b, c)) {}", rule.Given[NoSequencesOptions]{}},
+		{"function f(){ return (a, b, c); }", rule.Given[NoSequencesOptions]{}},
+		{"for (var i = (a, b, c);;);", rule.Given[NoSequencesOptions]{}},
 
 		// The arrow body with its second parenthesis, the silent half of the minimal pair above.
-		{"a => ((b, c))", nil},
+		{"a => ((b, c))", rule.Given[NoSequencesOptions]{}},
 
 		// Positions where one parenthesis is enough and the corpus does not write them: an
 		// assignment right-hand side, a template substitution, an optional element access, a
 		// `throw`, a computed class member, and a spread.
-		{"x = (a, b);", nil},
-		{"`${(a, b)}`", nil},
-		{"x?.[(a, b)]", nil},
-		{"throw (a, b);", nil},
-		{"class C { [(a, b)]() {} }", nil},
-		{"({...(a, b)})", nil},
+		{"x = (a, b);", rule.Given[NoSequencesOptions]{}},
+		{"`${(a, b)}`", rule.Given[NoSequencesOptions]{}},
+		{"x?.[(a, b)]", rule.Given[NoSequencesOptions]{}},
+		{"throw (a, b);", rule.Given[NoSequencesOptions]{}},
+		{"class C { [(a, b)]() {} }", rule.Given[NoSequencesOptions]{}},
+		{"({...(a, b)})", rule.Given[NoSequencesOptions]{}},
 
 		// Arrow parameters are a separator list rather than a sequence, and they parse into a shape
 		// that has no comma operator in it at all. Written because a rule reaching for a comma token
 		// would find one here.
-		{"(a, b) => c", nil},
+		{"(a, b) => c", rule.Given[NoSequencesOptions]{}},
 
 		// `new C(a, b)` and `foo(a, b)` are argument separators, which upstream's comment calls out
 		// as never reaching the rule. The corpus writes the call form only with a parenthesized
 		// sequence inside it.
-		{"new C(a, b)", nil},
-		{"[a, b]", nil},
+		{"new C(a, b)", rule.Given[NoSequencesOptions]{}},
+		{"[a, b]", rule.Given[NoSequencesOptions]{}},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunWithOptions(test, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
+				rule_testing.RunGiven(test, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -310,7 +345,7 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(test *testing.T) {
 // The decoder is the one line of this rule with no upstream counterpart, so it gets its own test.
 //
 // An absent key and an explicit `true` must both mean allowed, an explicit `false` must mean not
-// allowed, and `nil` options -- which is what the live config produces for a rule configured as bare
+// allowed, and no options -- which is what the live config produces for a rule configured as bare
 // "error" -- must mean allowed. That last one is the case no fixture routed through the decoder can
 // reach, because it is the shape the config layer produces when the decoder is never called.
 func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
@@ -318,11 +353,11 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
 
 	parenthesized := "var foo = (1, 2);"
 
-	test.Run("nil options, the shape the live config produces", func(test *testing.T) {
+	test.Run("no options, the shape the live config produces", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(
 			test,
-			rule_testing.RunWithOptions(test, NoSequences, sequencesFile, parenthesized, nil),
+			rule_testing.Run(test, NoSequences, sequencesFile, parenthesized),
 		)
 	})
 
