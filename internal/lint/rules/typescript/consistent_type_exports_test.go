@@ -49,12 +49,11 @@ func consistentTypeExportsFixtureFiles(subject string) map[string]string {
 		"consistent-type-exports/reexport-2-named.ts": "import { A } from './reexport-1';\n" +
 			"const A = 1;\nexport { A };\n",
 	}
-	// Several upstream cases import from the DIRECTORY rather than from a file in it, which
+	// Several upstream cases import from the directory rather than from a file in it, which
 	// resolves to its index. Written under both names so the resolution works whichever the
 	// program prefers, and because one upstream case exports a name declared twice there, as a
 	// type and as a value, which is the shape its `NAME as Foo` case turns on.
-	files["consistent-type-exports/index.ts"] = files["consistent-type-exports/index.ts"] +
-		"export type NAME = 'name';\nexport const NAME2 = 'name';\n"
+	files["consistent-type-exports/index.ts"] += "export type NAME = 'name';\nexport const NAME2 = 'name';\n"
 	files["main.ts"] = subject
 	return files
 }
@@ -82,7 +81,7 @@ func decodeConsistentTypeExportsOptions(test *testing.T, configuration string) a
 // build over a real program with the plugin's own fixture files on disk, which reported nothing on
 // all twenty-four.
 //
-// Ten of them import from another module and are silent because of what THAT module exports, which
+// Ten of them import from another module and are silent because of what that module exports, which
 // is the half of this rule no single-file fixture can reach.
 func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(test *testing.T) {
 	test.Parallel()
@@ -207,7 +206,7 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(test *testing.T) {
 // Three things are asserted per row. The ids say which of the three arms ran, and they differ in
 // what they name. The spans say where the finding points, which is the whole statement. And the
 // applied source says what the edit engine will write unattended, which for the mixed cases is a
-// statement SPLIT into two and is the thing a message-id assertion cannot see at all.
+// statement split into two and is the thing a message-id assertion cannot see at all.
 func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
 
@@ -427,12 +426,12 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 
 // TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries is the type-safety fixture.
 //
-// This rule's repair SPLITS a statement, which is the shape the coordinator flagged as the riskiest
+// This rule's repair splits a statement, which is the shape the coordinator flagged as the riskiest
 // in this batch: the rewrite has to decide what text each specifier keeps, and upstream re-renders
 // each one from its names rather than copying its source text.
 //
 // It is safe because a specifier holds only names. There is no annotation, no generic, no modifier
-// and no assertion inside one, so re-rendering can lose nothing a copy would have kept. What it CAN
+// and no assertion inside one, so re-rendering can lose nothing a copy would have kept. What it can
 // lose is spelling, and these rows pin the two spellings that carry more than a bare identifier: an
 // alias, and a string-literal export name whose quotes and escapes must survive verbatim.
 //
@@ -520,7 +519,7 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(test *tes
 			reason:        "a value export is clean",
 		},
 		{
-			// An unresolvable name is upstream's `undefined` case and it is LEFT ALONE rather than
+			// An unresolvable name is upstream's `undefined` case and it is left alone rather than
 			// guessed at. The whole imported corpus declares every name it exports, so a mutant
 			// bucketing an unresolved specifier as type-based survived all forty-nine cases; these
 			// rows are what separates the arm from its neighbours. Measured clean upstream, against

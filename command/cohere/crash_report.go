@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -50,7 +50,7 @@ func (crash runCrash) message() string {
 
 // printCrash prints one crash in the view the run asked for: a line in the human view, a line of JSON under
 // `--json`. `--verbose` names crashes in its coverage notes, in the same words.
-func printCrash(out io.Writer, crash runCrash) {
+func printCrash(out *bufio.Writer, crash runCrash) {
 	switch activeOutput.Mode {
 	case outputJSON:
 		writeJSONLine(out, crashJSON{Kind: "crash", runCrash: crash})

@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // concurrent port has to edit, so two ports landing at once conflict on a file neither is really
 // changing.
 //
-// The Decode entry names the rule's own decoder. Its single option defaults to FALSE, so the generic
+// The Decode entry names the rule's own decoder. Its single option defaults to false, so the generic
 // helper would happen to produce the right zero value, and the hand-rolled one is used anyway:
 // relying on that coincidence leaves the next person to add a default-true key here inheriting a
 // decoder that silently inverts their rule.

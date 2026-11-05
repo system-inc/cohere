@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -156,7 +156,7 @@ func prepareNestedCacheDirectories(root string) {
 		if ignored, _, ignoredPathError := matcher.IgnoredPath(".cache/cohere/findings.gob", false); ignoredPathError != nil || !ignored {
 			continue
 		}
-		// A directory that could not be made costs this library what it cost before: a whole check.
+		// Ignored: a directory that could not be made costs this library what it cost before, a whole check.
 		_ = os.MkdirAll(cacheDirectory(repositoryRoot), 0o755)
 	}
 }
@@ -348,7 +348,7 @@ func nestedSummary(check nestedDriftCheck) string {
 
 // printNestedDrift reports each drifted file as a finding, in the shape every other finding prints,
 // naming the repository whose own run fixes it.
-func printNestedDrift(out io.Writer, check nestedDriftCheck) {
+func printNestedDrift(out *bufio.Writer, check nestedDriftCheck) {
 	for _, drift := range check.Drift {
 		message := fmt.Sprintf("the formatter would rewrite this file in nested repository %s, which a run here never writes: run cohere there", drift.Repository)
 		printFinding(out,

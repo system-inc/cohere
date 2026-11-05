@@ -45,7 +45,7 @@ type ExtraShim struct {
 	// # Adding a name here obliges a row in TestShimFieldAccessorsReadTheFieldsTheyName
 	//
 	// A generated reader dereferences a mirror by field offset through `unsafe.Pointer`, so an
-	// accessor that reads the WRONG field compiles, runs, and returns a plausible value. The only
+	// accessor that reads the wrong field compiles, runs, and returns a plausible value. The only
 	// thing that catches it is `internal/types/program/shim_layout_test.go`, which compares each
 	// accessor's result against the checker's own name for what it should have returned.
 	//
@@ -70,11 +70,11 @@ type ExtraShim struct {
 	// vocabulary, and it drifts. Four were needed for the move from typescript-go to
 	// microsoft/TypeScript alone.
 	//
-	// PER-FIELD OFFSET IS THE CONTRACT. Identical size and alignment is the cheap proxy that catches
+	// The contract is each field's offset. Identical size and alignment is the cheap proxy that catches
 	// most violations of it, and verifyTypeSubstitutions below enforces that proxy, but the two are
-	// not the same claim: a stand-in of the right width whose fields are in the wrong ORDER passes
+	// not the same claim: a stand-in of the right width whose fields are in the wrong order passes
 	// every size comparison and still moves the fields that follow it. That was measured, not
-	// reasoned about — swapping two 8-byte pointer fields in a mirror survived a whole-struct size
+	// reasoned about: swapping two 8-byte pointer fields in a mirror survived a whole-struct size
 	// check while breaking the read. `reflect` can enumerate all 319 of Checker's fields with their
 	// names and offsets even though they are unexported, so a per-field guard is possible; it has
 	// not been built, and this comment is the record of that gap.
@@ -87,7 +87,7 @@ type ExtraShim struct {
 	// rule that depended on it went silent on every input. Anything mirroring a struct with more
 	// than one field needs ExtraDeclarations below rather than a bare rename.
 	//
-	// WHERE a substitution appears decides whether its width is load-bearing at all, and the four
+	// Where a substitution appears decides whether its width is load-bearing at all, and the four
 	// here are not four equal risks. Three of them are only ever reached inside a map type
 	// (`map[*ast.Symbol]int32`, `map[uint64][]*ast.Symbol`), and a Go map is one pointer word
 	// whatever its key and value widths are, so those three cannot shift an offset at any size.
@@ -126,7 +126,7 @@ func main() {
 	}
 
 	packages, loadError := packages.Load(&packages.Config{
-		// TODO: path relative to repo root
+		// Relative to the directory the generator runs in, the repository root.
 		Dir:  "./TypeScript-shim/compiler",
 		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
@@ -144,6 +144,7 @@ func main() {
 		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
 		if data, readError := os.ReadFile(extraShimFilePath); readError == nil {
 			if decodeError := json.Unmarshal(data, &extraShim); decodeError != nil {
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 				fmt.Printf("error parsing %v: %v", extraShimFilePath, decodeError)
 				return
 			}
@@ -164,15 +165,17 @@ func main() {
 		// Refuse a bad substitution rather than emitting one. This runs before this package's own
 		// shim is written, so a mirror whose stand-ins are the wrong width never reaches the tree.
 		//
-		// The abort is not transactional across packages: shims for packages processed earlier in
-		// this loop are already on disk when it fires. That is deliberate rather than overlooked —
-		// making it atomic would mean buffering every package before writing any, and the failure
-		// it would prevent is a stale shim for an UNRELATED package, which the next successful run
+		// The abort is not transactional across packages: shims for packages processed earlier in this
+		// loop are already on disk when it fires. That is deliberate rather than overlooked: making it
+		// atomic would mean buffering every package before writing any, and the failure it would
+		// prevent is a stale shim for a package unrelated to the bad one, which the next successful run
 		// overwrites. What must never exist is the bad mirror itself, and that is what this stops.
 		if problems := verifyTypeSubstitutions(pkg, packages, extraShim); len(problems) > 0 {
+			// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 			fmt.Printf("ERROR: %v declares type substitutions that do not preserve layout.\n",
 				extraShimFilePath)
 			for _, problem := range problems {
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 				fmt.Printf("  - %v\n", problem)
 			}
 			os.Exit(1)
@@ -461,6 +464,7 @@ func main() {
 			if found {
 				continue
 			}
+			// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 			fmt.Printf("ERROR: couldn't find %v function\n", fnName)
 			exit = true
 		}
@@ -469,6 +473,7 @@ func main() {
 				if found {
 					continue
 				}
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 				fmt.Printf("ERROR: couldn't find %v.%v method\n", name, methodName)
 				exit = true
 			}
@@ -521,13 +526,13 @@ func main() {
 // mirror exists so `unsafe` can reach a field by offset, so a stand-in that is the wrong width
 // shifts every field declared after it, and the read then returns a perfectly valid value of the
 // right Go type that is simply not the field asked for. Nothing crashes and no test fails; the one
-// rule downstream of it goes silent. The comment on TypeSubstitutions above has said IDENTICAL SIZE
-// IS THE WHOLE CONTRACT since that defect was fixed, but a comment cannot enforce a contract, and
+// rule downstream of it goes silent. The comment on TypeSubstitutions above has said that identical
+// size is the whole contract since that defect was fixed, but a comment cannot enforce a contract, and
 // the substitution that violated it was accepted by this generator without a word.
 //
 // So this runs before anything is written. A check here is worth more than a check in a test
 // because it fails before the wrong code exists, and it covers substitutions no accessor reads
-// today — a field read added later inherits a layout that was already proven rather than one that
+// today: a field read added later inherits a layout that was already proven rather than one that
 // happened to be right.
 //
 // Alignment is checked alongside size because a stand-in can be the right width by accident and

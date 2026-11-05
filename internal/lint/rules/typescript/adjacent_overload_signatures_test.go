@@ -355,7 +355,7 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(test
 			reason:     "anything else keys by the source text of the key",
 		},
 		{
-			// The expression arm keys by SOURCE TEXT, so whether that text carries the key's leading
+			// The expression arm keys by source text, so whether that text carries the key's leading
 			// trivia decides whether two spellings of one key match. `Pos()` includes trivia and
 			// upstream's `range` does not, and this is the input that separates them: with trivia
 			// the two keys read as `Symbol.iterator` and a newline-and-spaces followed by
@@ -584,7 +584,7 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(test *testing.T) 
 
 // TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList is a crash fixture.
 //
-// `Members()` and `Statements()` both PANIC on a kind that has no such list, and the listener map is
+// `Members()` and `Statements()` both panic on a kind that has no such list, and the listener map is
 // the only thing keeping each call on a kind that does. The walk recovers per file rather than per
 // rule, so one panic would cost every rule that file rather than one finding. Probed directly:
 // `Members()` on a `KindSourceFile` panics with `Unhandled case in Node.MemberList`.

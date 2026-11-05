@@ -11,7 +11,7 @@ import (
 type UnboundMethodOptions struct {
 	// IgnoreStatic skips a `static` method, which cannot lose an instance it never had.
 	//
-	// It defaults to FALSE, so the generic decoder would happen to produce the right zero value. The
+	// It defaults to false, so the generic decoder would happen to produce the right zero value. The
 	// decoder below is hand-rolled anyway: relying on that coincidence leaves the next person to add
 	// a default-true key here inheriting a decoder that silently inverts the rule.
 	IgnoreStatic bool
@@ -76,14 +76,14 @@ func DecodeUnboundMethodOptions(raw []byte) (any, error) {
 // where the value never outlives the expression. Two entries recurse: an assertion wrapper and a
 // logical expression pass the question up, since `a && o.m` still yields the method reference.
 //
-// # A natively bound global is exempt, and the NAME list is load bearing for five cases
+// # A natively bound global is exempt, and the name list is load bearing for five cases
 //
-// Upstream keeps a set of `Namespace.member` strings built by REFLECTING over the running Node
+// Upstream keeps a set of `Namespace.member` strings built by reflecting over the running Node
 // global object at module load, then falls back to a type-level check. That reflection cannot be
 // reproduced in a compiled binary, so the question was whether the type-level check alone suffices.
 //
 // Measured rather than assumed: the installed rule was patched to answer false from the name lookup
-// and the whole corpus re-run. Exactly FIVE of two hundred and eleven verdicts moved, and three of
+// and the whole corpus re-run. Exactly five of two hundred and eleven verdicts moved, and three of
 // them are `console`. Upstream's own comment says why: `console` is declared in `@types/node`
 // rather than in the default library, so `isSymbolFromDefaultLibrary` answers false for it and only
 // the name list saves it.
@@ -97,7 +97,7 @@ func DecodeUnboundMethodOptions(raw []byte) (any, error) {
 // `any` here because our fixture programs load no node types, and an `any` object type declines
 // before any of this is consulted.
 //
-// # This rule reads the PROGRAM, not just the checker
+// # This rule reads the program, not just the checker
 //
 // `IsBuiltinSymbolLike` and `IsSymbolFromDefaultLibrary` both walk the program's own default-library
 // files, and the not-imported test compares against the current source file. Those are reads outside
@@ -145,11 +145,11 @@ var UnboundMethod = rule.Rule{
 				}
 				checkUnboundDestructuring(ruleContext, settings, node)
 			},
-			// The SECOND half of upstream's one ObjectPattern visitor.
+			// The second half of upstream's one ObjectPattern visitor.
 			//
 			// Upstream's parser calls both `const { m } = o` and `({ m } = o)` an ObjectPattern, so
 			// one visitor covers both. Ours only calls the first a binding pattern; a destructuring
-			// ASSIGNMENT target parses as an object LITERAL and reaches a different kind entirely.
+			// assignment target parses as an object literal and reaches a different kind entirely.
 			// Confirmed by running upstream's own parser on the two spellings and watching both come
 			// back ObjectPattern.
 			//
@@ -221,7 +221,7 @@ func checkUnboundMemberAccess(
 // checkUnboundDestructuring is upstream's `ObjectPattern` visitor.
 //
 // Pulling a method out of an object by destructuring detaches it exactly as a member access does, and
-// upstream reports on the KEY rather than on the whole pattern, so `const { a, method } = o` points at
+// upstream reports on the key rather than on the whole pattern, so `const { a, method } = o` points at
 // `method` alone.
 func checkUnboundDestructuring(ruleContext rule.Context, settings UnboundMethodOptions, node *ast.Node) {
 	if isInsideTypeDeclaration(node) {
@@ -261,7 +261,7 @@ func checkUnboundDestructuring(ruleContext rule.Context, settings UnboundMethodO
 	for _, element := range node.AsBindingPattern().Elements.Nodes {
 		binding := element.AsBindingElement()
 
-		// Upstream requires the property KEY be an identifier. A shorthand binding has no separate
+		// Upstream requires the property key be an identifier. A shorthand binding has no separate
 		// property name here, so the key is the binding's own name; a renamed one carries both.
 		key := binding.PropertyName
 		if key == nil {
@@ -318,12 +318,12 @@ func reportUnboundConstituent(
 	return false
 }
 
-// unboundThisParameterState is upstream's `firstParamIsThis`, which is a TRI-state.
+// unboundThisParameterState is upstream's `firstParamIsThis`, which is a tri-state.
 //
 // Upstream types it `boolean | undefined` and its message test is `firstParamIsThis === false`, a
 // strict comparison. So the two boolean values are not the whole story: a declaration that was never
 // examined for a `this` parameter leaves the field undefined, and undefined is not false, so it takes
-// the SHORT message rather than the long one.
+// the short message rather than the long one.
 //
 // Modelling this as a Go bool is the natural port and it is wrong. It cost twenty-one of upstream's
 // sixty-nine findings, every one of them reporting the right node with the wrong message.
@@ -332,7 +332,7 @@ type unboundThisParameterState int
 const (
 	// unboundThisParameterUnexamined is upstream's `undefined`: the declaration was judged dangerous
 	// without its parameter list ever being read, which happens for a class property holding a plain
-	// function expression. Upstream reports the SHORT message here.
+	// function expression. Upstream reports the short message here.
 	unboundThisParameterUnexamined unboundThisParameterState = iota
 	// unboundThisParameterPresent is upstream's `true`: a first parameter named `this` exists and is
 	// typed as something other than void, so the author has already thought about `this`.
@@ -370,7 +370,7 @@ func reportIfUnboundMethod(
 
 // isDangerousUnboundMethod is upstream's `checkIfMethod`.
 //
-// The switch is over the property's VALUE DECLARATION, which is what separates a method from an
+// The switch is over the property's value declaration, which is what separates a method from an
 // arrow-function property that captured `this` at construction. Measured against our checker: a class
 // method arrives as KindMethodDeclaration, an interface or type-literal method as KindMethodSignature,
 // an arrow or function property as KindPropertyDeclaration, and an object-literal member as
@@ -390,7 +390,7 @@ func isDangerousUnboundMethod(
 		// A class property is dangerous only when it holds a plain `function` expression, which has
 		// its own `this`. An arrow function captured the instance and is safe.
 		//
-		// The parameter list is deliberately NOT read here, matching upstream, which returns only
+		// The parameter list is deliberately not read here, matching upstream, which returns only
 		// `{ dangerous }` from this arm and leaves `firstParamIsThis` undefined. That is why
 		// `class Foo { unbound = function () {} }` takes the short message while
 		// `class Foo { unbound() {} }` takes the long one, on the same reference.
@@ -420,7 +420,7 @@ func isDangerousUnboundMethod(
 // methodIsDangerous is upstream's `checkMethod`.
 //
 // A method is safe only when it explicitly declares `this: void`, or when it is static and the option
-// says to skip those. Declaring `this` as anything ELSE is still dangerous, and that is what selects
+// says to skip those. Declaring `this` as anything else is still dangerous, and that is what selects
 // the shorter of the two messages: the author has already thought about `this` here, so telling them
 // to annotate it would be wrong.
 func methodIsDangerous(
@@ -428,7 +428,7 @@ func methodIsDangerous(
 	parameters *ast.NodeList,
 	ignoreStatic bool,
 ) (bool, unboundThisParameterState) {
-	// This arm DID read the parameter list, so its answer is never the unexamined state. That is the
+	// This arm did read the parameter list, so its answer is never the unexamined state. That is the
 	// whole distinction between here and the property-declaration arm above.
 	thisParameter := unboundThisParameterAbsent
 	thisParameterIsVoid := false
@@ -487,6 +487,25 @@ func accessedPropertyNames(ruleContext rule.Context, node *ast.Node, property *a
 	return names
 }
 
+// supportedGlobalTypeNames is upstream's `SUPPORTED_GLOBAL_TYPES`.
+//
+// These are the type names, which differ from the value names above: the value `Number` has the type
+// `NumberConstructor`, while `Math` and `JSON` are their own type names.
+var supportedGlobalTypeNames = []string{
+	"NumberConstructor",
+	"ObjectConstructor",
+	"StringConstructor",
+	"SymbolConstructor",
+	"ArrayConstructor",
+	"Array",
+	"ProxyConstructor",
+	"Console",
+	"DateConstructor",
+	"Atomics",
+	"Math",
+	"JSON",
+}
+
 // isNativelyBoundMember is upstream's `isNativelyBound`.
 //
 // Two routes, and the first exists because the second is not enough. Upstream's comment says a
@@ -523,7 +542,7 @@ func isNativelyBoundMember(ruleContext rule.Context, object *ast.Node, property 
 
 // isSymbolNotFromThisFile is upstream's `isNotImported`, named for what it measures.
 //
-// Upstream asks whether the symbol's declaration lives in a file OTHER than the one being linted, and
+// Upstream asks whether the symbol's declaration lives in a file other than the one being linted, and
 // calls that "not imported", which reads backwards: a global like `Math` is declared in a library
 // file and is therefore "not imported" in this sense, while a locally declared `const Math = ...`
 // shadows it and is. The name here says what the comparison does rather than what it implies.
@@ -586,7 +605,7 @@ func isSafeUnboundUse(node *ast.Node) bool {
 		return true
 
 	case ast.KindCallExpression:
-		// Safe only as the CALLEE. Passed as an argument it is being detached, which is the whole
+		// Safe only as the callee. Passed as an argument it is being detached, which is the whole
 		// shape this rule exists to catch.
 		return parent.AsCallExpression().Expression == node
 
@@ -622,7 +641,7 @@ func isSafeUnboundUse(node *ast.Node) bool {
 			return true
 
 		case ast.KindEqualsToken:
-			// Assigning TO the member is defining it rather than detaching it. The second arm is
+			// Assigning to the member is defining it rather than detaching it. The second arm is
 			// upstream's `super.m = this.m` carve-out, where the right side is a super member
 			// access being installed on the instance.
 			if binary.Left == node {
@@ -631,7 +650,7 @@ func isSafeUnboundUse(node *ast.Node) bool {
 			return isSuperMemberAccess(node) && isThisMemberAccess(binary.Left)
 
 		case ast.KindAmpersandAmpersandToken:
-			// `o.m && ...` is safe on the LEFT, because `&&` yields the left operand only when it
+			// `o.m && ...` is safe on the left, because `&&` yields the left operand only when it
 			// is falsy and a method reference never is. Anywhere else the expression can still
 			// produce the reference, so the question passes up.
 			if binary.Left == node {
@@ -674,30 +693,11 @@ func isThisMemberAccess(node *ast.Node) bool {
 	return node.AsPropertyAccessExpression().Expression.Kind == ast.KindThisKeyword
 }
 
-// supportedGlobalTypeNames is upstream's `SUPPORTED_GLOBAL_TYPES`.
-//
-// These are the TYPE names, which differ from the value names above: the value `Number` has the type
-// `NumberConstructor`, while `Math` and `JSON` are their own type names.
-var supportedGlobalTypeNames = []string{
-	"NumberConstructor",
-	"ObjectConstructor",
-	"StringConstructor",
-	"SymbolConstructor",
-	"ArrayConstructor",
-	"Array",
-	"ProxyConstructor",
-	"Console",
-	"DateConstructor",
-	"Atomics",
-	"Math",
-	"JSON",
-}
-
 // checkUnboundDestructuringAssignment is the assignment half of upstream's `ObjectPattern` visitor.
 //
 // `({ m } = o)` detaches `m` exactly as `const { m } = o` does, and upstream reaches both through one
 // node type. Ours parses the assignment target as an object literal, so the shape has to be
-// recognized by POSITION: an object literal directly on the left of an assignment is a destructuring
+// recognized by position: an object literal directly on the left of an assignment is a destructuring
 // target, and one anywhere else is an ordinary object being constructed.
 //
 // The initializer is the assignment's right side, which is upstream's `node.parent.right` arm.
@@ -722,7 +722,7 @@ func checkUnboundDestructuringAssignment(ruleContext rule.Context, settings Unbo
 	for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 		// Upstream requires the property be a Property whose key is an identifier. A shorthand
 		// assignment target is its own kind here and carries the name directly; a renamed one is a
-		// property assignment whose NAME is the key being read off the source object.
+		// property assignment whose name is the key being read off the source object.
 		var key *ast.Node
 		switch property.Kind {
 		case ast.KindShorthandPropertyAssignment:

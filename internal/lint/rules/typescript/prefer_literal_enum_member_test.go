@@ -70,7 +70,7 @@ func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(test *testing.T) 
 // corpus under allowBitwiseExpressions, verbatim.
 //
 // The options go through the rule's own decoder rather than being built as a struct, because this
-// rule's only key defaults to FALSE and reads TRUE here, so a decoder that dropped the key would
+// rule's only key defaults to false and reads true here, so a decoder that dropped the key would
 // leave every one of these eight cases reporting and the failure would name the rule rather than the
 // decoder.
 //
@@ -103,7 +103,7 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(test
 // TestPreferLiteralEnumMemberFiresOnUpstreamFailCases is the imported failing corpus at the rule's
 // default settings, verbatim, with the span of every finding asserted.
 //
-// The span matters more here than the count. Upstream reports on `node.id`, the member's NAME, while
+// The span matters more here than the count. Upstream reports on `node.id`, the member's name, while
 // the thing being judged is its initializer, so a port that anchored on the member or on the
 // initializer would satisfy every message id in this table and point somewhere upstream never
 // points. Each expected span below is sliced out of upstream's own line and column numbers rather
@@ -562,7 +562,7 @@ func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(test *testing.T) {
 // TestPreferLiteralEnumMemberRendersUpstreamsMessageText asserts what a reader is actually told.
 //
 // rule.Message is {Id, Description} with no interpolation, so there is nothing to render and nothing
-// a format string could get wrong. What there IS to get wrong is the text itself, and every other
+// a format string could get wrong. What there is to get wrong is the text itself, and every other
 // fixture in this file goes through ExpectFindings, which compares message ids and count and nothing
 // else. A mutation rewriting both descriptions survived the entire suite until this test existed.
 //

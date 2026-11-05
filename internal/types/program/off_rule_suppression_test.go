@@ -23,13 +23,17 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	quiet := rule.Rule{
 		Name: "test-quiet",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
 		},
 	}
 	registeredOff := rule.Rule{
 		Name: "test-registered-off",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
 		},
 	}
 	// Registered with its plugin, as every typescript-eslint, nexus and structure rule is. A walk that
@@ -38,7 +42,9 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	prefixed := rule.Rule{
 		Name: "plugin/test-prefixed",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
 		},
 	}
 	settings := `{"rules": {
@@ -120,7 +126,9 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 	quiet := rule.Rule{
 		Name: "test-quiet",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
 		},
 	}
 	directory := writeProject(test, map[string]string{

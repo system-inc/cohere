@@ -107,7 +107,7 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(test *testing.T) {
 // TestNoUnnecessaryTemplateExpressionFires is upstream's one hundred seventeen reporting cases.
 //
 // Every row asserts the span and the count. The span carries more than usual here: the finding
-// covers `${x}` INCLUDING both delimiters, computed from our head-and-spans model rather than from
+// covers `${x}` including both delimiters, computed from our head-and-spans model rather than from
 // upstream's parallel quasi arrays, so an off-by-one in that mapping points the reader at the
 // wrong characters while every message id still passes.
 //
@@ -440,7 +440,7 @@ func TestNoUnnecessaryTemplateExpressionFires(test *testing.T) {
 		},
 		{
 			sourceText: "` $${`${''}${`${``}`}`}${`{a}`} `;\n",
-			// The finding SET matches upstream exactly; only the emission ORDER differs, and the
+			// The finding set matches upstream exactly; only the emission order differs, and the
 			// cause is the walk rather than the rule. A template nested inside another
 			// interpolation is a separate node visit, so its findings arrive after every finding of
 			// the enclosing template, while upstream emits in ascending source position because
@@ -631,12 +631,12 @@ func TestNoUnnecessaryTemplateExpressionFires(test *testing.T) {
 	}
 }
 
-// TestNoUnnecessaryTemplateExpressionFixes asserts the rewrite on every case where ONE pass of the
+// TestNoUnnecessaryTemplateExpressionFixes asserts the rewrite on every case where one pass of the
 // harness can express it.
 //
-// Twenty of upstream's cases record an ARRAY of outputs rather than a string, because the fixer's
+// Twenty of upstream's cases record an array of outputs rather than a string, because the fixer's
 // own result is reportable and ESLint re-runs it to convergence. `ExpectFixedSource` applies a
-// single pass and refuses overlapping edits, so the expectation here is the FIRST pass rather than
+// single pass and refuses overlapping edits, so the expectation here is the first pass rather than
 // the converged text. Asserting the converged text against a one-pass harness reads as a broken
 // fixer and is not.
 //

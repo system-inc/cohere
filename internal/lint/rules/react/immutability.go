@@ -36,13 +36,13 @@ import (
 // rule file makes a large port look trivial. Six diagnostic sites carry this category: three inside
 // the inference pass and three inside the two validators.
 //
-// # This rule DOES need the abstract interpretation, and that was measured rather than inherited
+// # This rule does need the abstract interpretation, and that was measured rather than inherited
 //
 // Three rules shipped onto this representation before this one found their scoping measurement
 // overturned, so the claim that this one genuinely needs a value lattice was treated as a
 // hypothesis and tested against React's own executable before any of it was written.
 //
-// The hypothesis holds, and the input that settles it is an ORDERING pair. Both of these compile,
+// The hypothesis holds, and the input that settles it is an ordering pair. Both of these compile,
 // both mutate the same locally-created object, and they differ only in which statement comes first:
 //
 //	const o = {a: 0}; useFoo(o); o.a = 1;    REPORTS
@@ -50,7 +50,7 @@ import (
 //
 // So freezing is not a property of where a value came from, and a rule keyed on origin -- "props
 // and state are immutable, locals are not" -- gets exactly half of that pair wrong while looking
-// entirely reasonable. Freezing is a fact that a value ACQUIRES at a program point and carries
+// entirely reasonable. Freezing is a fact that a value acquires at a program point and carries
 // forward, which is a dataflow fact and nothing cheaper. The same probe run through an alias
 // (`const alias = o; useFoo(alias); o.a = 1;`) also reports, so the fact propagates through
 // aliasing as well as through order, which rules out a purely per-binding table.
@@ -64,7 +64,7 @@ import (
 //
 // The join here is `immutabilityMergeKinds`, transcribed from upstream's `merge_value_kinds`, and
 // the thing that makes it not an ordering is that `Frozen` joined with `Mutable` is `MaybeFrozen`,
-// a THIRD element that is neither operand. No ordering of six constants expresses that, so the
+// a third element that is neither operand. No ordering of six constants expresses that, so the
 // meet cannot be recovered by sorting them differently.
 //
 // Verified against React's executable rather than transcribed on faith, one probe per join edge,
@@ -77,18 +77,18 @@ import (
 //	if (c) { x = aGlobal;   } else { x = {}; }   x.q = 1   CLEAN     Global  join Mutable   = Mutable
 //
 // The fifth row is the one worth keeping: joining a global with a local produces something this
-// rule is silent on, even though the global ALONE reports. A lattice built by intuition would make
+// rule is silent on, even though the global alone reports. A lattice built by intuition would make
 // Global absorbing and would report there.
 //
 // # Convergence equality is not identity equality
 //
 // `refs.go` records this hazard from the neighbouring validator and it applies here for a different
 // reason, so it is restated rather than cross-referenced. Upstream's abstract value is a kind plus
-// a REASON SET, and the reason set only ever grows. If the fixpoint's "did anything move" test
+// a reason set, and the reason set only ever grows. If the fixpoint's "did anything move" test
 // compared whole abstract values with Go's `==`, a value whose kind had settled but whose reason
 // set was still absorbing bits from a back edge would report movement on every round.
 //
-// `immutabilityStateChanged` therefore compares the KIND for change and treats the reason set as
+// `immutabilityStateChanged` therefore compares the kind for change and treats the reason set as
 // monotone bookkeeping: a round counts as having moved only when some value's kind moved or some
 // binding gained a new value, never when a reason bit arrived at a value whose kind is already
 // final. Reasons still merge -- they select the message text -- they simply do not vote on
@@ -106,7 +106,7 @@ import (
 // does not use it.
 //
 // The reason is that upstream is not a per-block entry/exit solve either. It is a worklist over
-// blocks carrying one `InferenceState` each, and the state is keyed by VALUE identity rather than
+// blocks carrying one `InferenceState` each, and the state is keyed by value identity rather than
 // by binding, with an aliasing side map that lets several bindings share one value. Reproduced here
 // as a bounded whole-function sweep in reverse postorder, which is the same shape `refs.go` uses
 // and which settles an acyclic region in a single round because `Function.Blocks` is already in
@@ -118,7 +118,7 @@ import (
 // `high_level_intermediate_representation.Phi.Operands` is sorted by predecessor block id, so ranging
 // it is deterministic, but the answer here does not rely on that. A sibling rule shipped a message
 // that named a different builtin between runs because an operand walk's order varied. The join used
-// here is commutative and associative, so the resulting KIND is order-independent by construction;
+// here is commutative and associative, so the resulting kind is order-independent by construction;
 // the reason set is a bitset union, which is likewise. The message text is selected from the merged
 // reason set by a fixed priority order and never from "whichever operand arrived first", so no
 // output of this rule can vary between runs.
@@ -134,7 +134,7 @@ import (
 //
 // The gate lives in `unsupported_syntax.go` and is reused whole. Its parameter test is load-bearing
 // and not obvious: a component may take at most two parameters and a second one must be named for a
-// ref, so `function Component(props, cond) { props.a = 1; return <div />; }` is SILENT while the
+// ref, so `function Component(props, cond) { props.a = 1; return <div />; }` is silent while the
 // same body with one parameter reports. That was measured here independently before the shared
 // predicate was found, and an earlier reading of the same evidence produced a confident wrong
 // theory that conditional mutation of props was exempt -- every probe supporting it had quietly
@@ -183,7 +183,7 @@ var Immutability = rule.Rule{
 // Identical in shape to the walkers in refs.go and static_components.go, and deliberately not
 // shared: two porters collided on unprefixed helper names in this package and both then removed
 // their copies at once, turning a redeclaration error into an undefined-symbol error pointing at
-// nobody. Every helper here carries the rule's name. This is the THIRD copy of this traversal, which
+// nobody. Every helper here carries the rule's name. This is the third copy of this traversal, which
 // is the evidence threshold task `#g29j9ab` names for lifting it onto the shelf; see the report for
 // what the shared shape actually is now that three exist.
 func immutabilityForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
@@ -228,10 +228,10 @@ func immutabilityAnalyzeCompilationUnit(ruleContext rule.Context, function *high
 //
 // Delegates wholly to the shared gate in unsupported_syntax.go, which is React's
 // `getComponentOrHookLike`: the name must look like a component or a hook, the body must actually
-// create JSX or call a hook, and a COMPONENT additionally has to have component-shaped parameters.
+// create JSX or call a hook, and a component additionally has to have component-shaped parameters.
 // The parameter half is what makes a two-parameter component silent, measured above.
 //
-// `high_level_intermediate_representation.Function.Kind` is deliberately NOT the gate here even though refs.go uses it. That field is a
+// `high_level_intermediate_representation.Function.Kind` is deliberately not the gate here even though refs.go uses it. That field is a
 // name-only guess recorded at lowering time and it does not ask the parameter question, so a
 // two-parameter component passes it. Measured: keying on the field alone reports four inputs React
 // is silent on.
@@ -306,7 +306,7 @@ const (
 	// the write is wrong on at least one path and React cannot tell which path ran.
 	immutabilityMaybeFrozen
 	// immutabilityGlobal is a value declared outside the component. Writing to one reports with a
-	// different reason, and joining one with a mutable value produces a MUTABLE result rather than
+	// different reason, and joining one with a mutable value produces a mutable result rather than
 	// an absorbing global. Measured; see the rule comment.
 	immutabilityGlobal
 	// immutabilityContext is a local captured and written by a nested function. Mutable for the
@@ -357,7 +357,7 @@ func immutabilityMergeKinds(a, b immutabilityValueKind) immutabilityValueKind {
 
 // immutabilityReason is why a value is frozen, which selects the message rather than the verdict.
 //
-// The kind decides WHETHER to report; the reason decides WHAT IT SAYS. Conflating the two is the
+// The kind decides whether to report; the reason decides what it says. Conflating the two is the
 // most natural mistake here, because the reason names are the ones a reader recognizes.
 type immutabilityReason uint16
 
@@ -377,7 +377,7 @@ const (
 
 // immutabilityAbstractValue is one value's kind plus the set of reasons that produced it.
 //
-// The reason set is a BITSET rather than a slice, so two sets that absorbed the same reasons in a
+// The reason set is a bitset rather than a slice, so two sets that absorbed the same reasons in a
 // different order compare equal. That keeps the merged value independent of the order phi operands
 // arrive in, which a slice-backed set would make it depend on.
 type immutabilityAbstractValue struct {
@@ -395,7 +395,7 @@ func immutabilityMergeValues(a, b immutabilityAbstractValue) immutabilityAbstrac
 
 // immutabilityMutationResult is what writing to a value of a given kind does.
 //
-// Transcribed from upstream's `mutate_with_span`, which is the ACTUAL gate on all three inference
+// Transcribed from upstream's `mutate_with_span`, which is the actual gate on all three inference
 // diagnostics. The scoping measurement for this rule described that gate as
 // `abstract_value.kind == ValueKind::Frozen`, and that is the branch which picks the message, not
 // the branch which decides to report: `MaybeFrozen` reports through the same path and `Global`
@@ -418,7 +418,7 @@ const (
 //
 // The `Primitive` arm is not an optimization: writing a property onto a number is silently
 // discarded at runtime rather than being an immutability violation, and React says nothing about
-// it. Verified: `let x = 3; x.q = 1;` inside a compiled component is CLEAN.
+// it. Verified: `let x = 3; x.q = 1;` inside a compiled component is clean.
 func immutabilityMutate(kind immutabilityValueKind) immutabilityMutationResult {
 	switch kind {
 	case immutabilityMutable, immutabilityContext:
@@ -471,7 +471,7 @@ type immutabilityFinding struct {
 
 // immutabilityState is the abstract interpretation's state.
 //
-// Keyed by VALUE rather than by binding, with `aliases` mapping a binding onto the value it names.
+// Keyed by value rather than by binding, with `aliases` mapping a binding onto the value it names.
 // That indirection is upstream's `variables`/`values` split and it is what makes freezing propagate
 // through an alias: `const alias = o; useFoo(alias); o.a = 1;` reports because `alias` and `o` name
 // one value, and freezing reaches the value rather than the name.
@@ -511,7 +511,7 @@ type immutabilityReassignment struct {
 	Variable string
 	Node     *ast.Node
 	IsAsync  bool
-	// Target is the DECLARATION written. Compared by declaration rather than by identifier because
+	// Target is the declaration written. Compared by declaration rather than by identifier because
 	// the capture edge and the store name the same binding under two different single-assignment
 	// numberings; see the caller.
 	Target static_single_assignment.DeclarationId
@@ -523,7 +523,7 @@ type immutabilityReassignment struct {
 
 // immutabilityFilterOwned keeps only the reassignments that write a binding this function owns.
 //
-// A write from the immediate closure is matched against the capture edge. A write from a DEEPER
+// A write from the immediate closure is matched against the capture edge. A write from a deeper
 // closure is dropped rather than matched, because its identifier ids live in yet another space and
 // translating them would need the capture edge chained through every level. That is a real
 // narrowing and it is stated rather than hidden: a two-level closure reassigning a render local is
@@ -592,7 +592,7 @@ func (state *immutabilityState) kindOf(id static_single_assignment.IdentifierId)
 	if found, ok := state.values[resolved]; ok {
 		return found
 	}
-	// Fall back to whatever the same source BINDING holds elsewhere in this function, which
+	// Fall back to whatever the same source binding holds elsewhere in this function, which
 	// recovers a value whose single-assignment numbering did not unify with the one that was
 	// written. refs.go measures the same gap on its own corpus.
 	if declaration, ok := state.declarations[resolved]; ok {
@@ -605,7 +605,7 @@ func (state *immutabilityState) kindOf(id static_single_assignment.IdentifierId)
 	return immutabilityAbstractValue{Kind: immutabilityMutable}
 }
 
-// setKind writes a value's abstract value, recording whether the KIND moved.
+// setKind writes a value's abstract value, recording whether the kind moved.
 //
 // This is the convergence test and it deliberately ignores the reason set. See the rule comment:
 // reasons only ever grow, so counting a reason arrival as movement makes any function with a loop
@@ -643,7 +643,7 @@ func (state *immutabilityState) freeze(id static_single_assignment.IdentifierId,
 		return
 	}
 	state.setKind(id, immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: current.Reasons | reason})
-	// Only a freeze that happened INSIDE a loop body may travel around the back edge into the next
+	// Only a freeze that happened inside a loop body may travel around the back edge into the next
 	// round. See the sweep for why carrying every freeze forward reports ordinary accumulator loops.
 	if state.insideLoop {
 		state.frozenInsideLoop[state.resolve(id)] = true
@@ -719,7 +719,7 @@ func (state *immutabilityState) nameOf(function *high_level_intermediate_represe
 // what lets a single forward pass settle an acyclic region in one round; a loop needs a second
 // round, which is what the bound is for.
 //
-// Unlike refs.go this does NOT return early once a finding exists. That rule reproduces upstream's
+// Unlike refs.go this does not return early once a finding exists. That rule reproduces upstream's
 // early return, which is sound there because its diagnostics are per-function. Here upstream keeps
 // analysing and reports every distinct mutation, and the imported corpus contains functions with
 // two and three findings, so returning early would drop them.
@@ -727,12 +727,12 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 	state := newImmutabilityState()
 	immutabilityCollectAliases(function, state)
 
-	// `entry` is the state a round STARTS from, and it is what carries a fact across a back edge.
+	// `entry` is the state a round starts from, and it is what carries a fact across a back edge.
 	// The working state is reset to it at the top of every round, which is the single most important
 	// line in this sweep and the one a straightforward reading gets wrong.
 	//
 	// Without the reset, a freeze discovered late in round one is still present when round two
-	// re-executes the instructions ABOVE it, and this rule's entire content is that a write before a
+	// re-executes the instructions above it, and this rule's entire content is that a write before a
 	// freeze is legal while the same write after it is not. Measured: with the state carried
 	// forward, `const o = {}; o.a = 1; useThing(o);` reports on round two, which is the exact input
 	// React is silent on and the exact input that distinguishes this rule from an origin-based one.
@@ -740,14 +740,14 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 	//
 	// What legitimately crosses a round is a fact that reached the entry through a loop back edge,
 	// which is what `entry` holds and what the merge below accumulates.
-	// Parameters are seeded into the ENTRY state rather than into the working state, because the
+	// Parameters are seeded into the entry state rather than into the working state, because the
 	// working state is cleared at the top of every round and a seed written into it would be wiped
 	// before the first instruction ran. That is the whole seeding bug: every props fixture went
 	// silent at once and every ordering fixture kept passing, which reads as a props-specific defect
 	// and is really a lifetime one.
 	entry := map[static_single_assignment.IdentifierId]immutabilityAbstractValue{}
 	immutabilitySeedParameters(function, entry)
-	// A function with no back edge settles in ONE round: `Function.Blocks` is in reverse postorder,
+	// A function with no back edge settles in one round: `Function.Blocks` is in reverse postorder,
 	// so a single forward pass already visits every definition before every use. Iterating such a
 	// function again cannot discover anything and can only do harm, because round two re-executes
 	// the writes that round one correctly permitted while holding the freezes round one discovered
@@ -765,17 +765,17 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 		}
 		state.changed = false
 		findings = immutabilityRunOneRound(ruleContext, function, state)
-		// Accumulate into the entry state ONLY what was frozen at a point that can reach the back
+		// Accumulate into the entry state only what was frozen at a point that can reach the back
 		// edge, which is what `state.frozenInsideLoop` records.
 		//
 		// Carrying every conclusion forward is the obvious thing and it is wrong in a way the
-		// fixtures cannot see. A value frozen AFTER the loop -- the accumulator built in a `for`
+		// fixtures cannot see. A value frozen after the loop -- the accumulator built in a `for`
 		// and then handed to a hook on the next line -- would arrive at round two already frozen,
 		// and round two re-executes the loop body and reports the writes that built it. That was 3
 		// of the last 10 findings on Kirk's tree, all of them ordinary
 		// `for (...) { totals[key] = value; }` followed by a hook call, and React is silent on all
-		// of them: measured, `for (...) { acc[u.id] = 1; } useThing(acc);` is CLEAN while
-		// `for (...) { useThing(acc); acc[u.id] = 1; }` REPORTS. The freeze has to be inside the
+		// of them: measured, `for (...) { acc[u.id] = 1; } useThing(acc);` is clean while
+		// `for (...) { useThing(acc); acc[u.id] = 1; }` reports. The freeze has to be inside the
 		// loop for the back edge to carry it.
 		moved := false
 		for id := range state.frozenInsideLoop {
@@ -809,6 +809,8 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 // Destructuring is handled by the ordinary instruction arms rather than here: a destructured
 // parameter lowers to a temporary in `Params` plus destructuring instructions in the entry block,
 // so freezing the temporary reaches every bound name through `Destructure`.
+//
+// Mutates: entry gains each parameter's starting kind, the state the sweep starts from
 func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[static_single_assignment.IdentifierId]immutabilityAbstractValue) {
 	for _, param := range function.Params {
 		entry[param.Identifier] = immutabilityAbstractValue{
@@ -822,6 +824,8 @@ func immutabilitySeedParameters(function *high_level_intermediate_representation
 //
 // Gathered once rather than per round because aliasing is a syntactic fact that does not depend on
 // the abstract state, and because a use can precede its definition across a back edge.
+//
+// Mutates: state takes the alias side map, and its changed flag is cleared so the first round starts clean
 func immutabilityCollectAliases(function *high_level_intermediate_representation.Function, state *immutabilityState) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -859,46 +863,48 @@ func immutabilityCollectAliases(function *high_level_intermediate_representation
 		}
 	}
 	// The alias map is a syntactic fact settled before the first round. Movement recorded while
-	// building it is not movement of the ABSTRACT state, so clearing the flag here keeps the
+	// building it is not movement of the abstract state, so clearing the flag here keeps the
 	// fixpoint's termination signal about the lattice rather than about the side map.
 	state.changed = false
 }
 
 // immutabilityRunOneRound is one pass over every block, phi and instruction.
 //
-// A hook's RETURN deliberately does not freeze what it hands back, and that is a removal rather than
+// A hook's return deliberately does not freeze what it hands back, and that is a removal rather than
 // an omission. Freezing at the return terminal was the obvious transcription of "the caller owns it
 // now", and it was the last false positive on Kirk's tree: `useTranslations` builds a local `result`
 // in a loop and returns it, and because every return terminal was visited before the instruction
 // walk, the freeze landed on the accumulator before the loop that fills it had run.
 //
 // Measured before removing it rather than after: both `useThing(d) { const r = {}; for (...) { r[k]
-// = d[k]; } return r; }` and the same shape behind an early return are CLEAN under React, against a
+// = d[k]; } return r; }` and the same shape behind an early return are clean under React, against a
 // control that reports. A hook building a value and returning it is what hooks are for; the freeze
-// that matters is the one the CALLER applies when it receives the value, and that is already
+// that matters is the one the caller applies when it receives the value, and that is already
 // modelled at the call site by `immutabilityHookResultKind`.
+//
+// Mutates: state is the fixpoint's abstract state, which each round advances and marks in or out of a loop
 func immutabilityRunOneRound(ruleContext rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState) []immutabilityFinding {
 	var findings []immutabilityFinding
 	order := 0
 
 	loopBlocks := immutabilityLoopBlocks(function)
-	// Phis are resolved over every block first, then instructions are walked in INSTRUCTION-ID
+	// Phis are resolved over every block first, then instructions are walked in instruction-id
 	// order rather than in block order, and that ordering is the correctness point rather than a
 	// tidiness one.
 	//
 	// `Function.Blocks` is in reverse postorder, which is the right order for a lattice to converge
-	// in and the WRONG order for a rule whose whole content is "did the freeze happen before the
+	// in and the wrong order for a rule whose whole content is "did the freeze happen before the
 	// write". Measured by dumping the representation for
 	// `const acc = {}; for (const u of list) { acc[u.id] = 1; } useThing(acc);`: reverse postorder
-	// visits b5, holding the `useThing` call at instruction 14, BEFORE b4, holding the loop body's
+	// visits b5, holding the `useThing` call at instruction 14, before b4, holding the loop body's
 	// write at instruction 11. So the freeze was applied before the write was checked, on the very
 	// first round, and the accumulator loop reported. Instruction ids are assigned in lowering
 	// order, which is source order, so walking them recovers the order a reader sees.
 	//
 	// The first theory for this was a multi-round leak and it was wrong: instrumenting the sweep
-	// showed the finding present in ROUND ZERO, which no amount of round bookkeeping could explain.
+	// showed the finding present in round zero, which no amount of round bookkeeping could explain.
 	// That measurement is what redirected this from the fixpoint to the walk order.
-	// Phis are resolved when the walk REACHES their block rather than up front, because a phi's
+	// Phis are resolved when the walk reaches their block rather than up front, because a phi's
 	// operands are defined by instructions and resolving every phi first would read them before they
 	// held anything. Keyed by the block's first instruction so the resolution lands in source order
 	// with everything else.
@@ -986,15 +992,15 @@ func immutabilityDeduplicate(findings []immutabilityFinding) []immutabilityFindi
 // The arms fall into three groups and it is worth naming them, because reading the switch as one
 // flat list hides the structure:
 //
-//   - Arms that FREEZE. A hook call freezes its arguments, JSX freezes what it interpolates, a hook
+//   - Arms that freeze. A hook call freezes its arguments, JSX freezes what it interpolates, a hook
 //     return freezes what it hands back. These are the sources of every finding this rule produces.
-//   - Arms that WRITE. A property store, a computed store, a delete, an update operator. Each asks
+//   - Arms that write. A property store, a computed store, a delete, an update operator. Each asks
 //     the lattice what writing to that value does, and reports when the answer is not "allowed".
-//   - Arms that PROPAGATE. Object and array construction, destructuring, calls. These move kinds
+//   - Arms that propagate. Object and array construction, destructuring, calls. These move kinds
 //     around without deciding anything.
 //
 // The default arm deliberately does nothing. Unlike refs.go, whose default arm reports
-// conservatively, an unmodelled instruction here must NOT report: this rule's finding is a write,
+// conservatively, an unmodelled instruction here must not report: this rule's finding is a write,
 // and inventing writes from instructions we do not model would report ordinary code. Failing toward
 // silence is the safe direction for a mutation rule and toward reporting is the safe direction for
 // an access rule, which is why the two neighbours differ.
@@ -1013,13 +1019,13 @@ func immutabilityTransfer(
 	// --- Freezing ---------------------------------------------------------
 
 	// JSX freezes every value it interpolates: React has read it to render, so a later write
-	// changes what the program sees and not what React saw. Measured: the same mutation BEFORE the
+	// changes what the program sees and not what React saw. Measured: the same mutation before the
 	// JSX is clean and after it reports.
 	case *high_level_intermediate_representation.JsxExpression:
 		for _, attribute := range value.Props {
 			// A callback handed to JSX is held by React past the end of this render, exactly as one
 			// handed to a hook is, so the known-mutable-function check belongs here too. Measured:
-			// `let l = 0; const cb = () => { l = 1; }; return <div onClick={cb} />;` reports TWICE
+			// `let l = 0; const cb = () => { l = 1; }; return <div onClick={cb} />;` reports twice
 			// under React, once at the reassignment and once at the attribute. Checking only hook
 			// arguments left both findings missing and the rule silent on the single most common
 			// spelling of this mistake.
@@ -1052,11 +1058,11 @@ func immutabilityTransfer(
 	case *high_level_intermediate_representation.ComputedDelete:
 		findings = immutabilityCheckWrite(ruleContext, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
-	// `props.count++` and `props.count += 1` are deliberately NOT handled here, and the reason is a
+	// `props.count++` and `props.count += 1` are deliberately not handled here, and the reason is a
 	// property of the lowering rather than of React. Dumping the representation for `props.count++`
 	// shows five instructions: a load of `props`, a property load of `count`, the update itself,
-	// another load of `props`, and a PROPERTY STORE writing the result back. The update's operand is
-	// the loaded NUMBER, not the object, so an arm here would ask the lattice about a primitive and
+	// another load of `props`, and a property store writing the result back. The update's operand is
+	// the loaded number, not the object, so an arm here would ask the lattice about a primitive and
 	// answer nothing, while the store that follows is the real write and is already handled above.
 	//
 	// Both spellings report through that store, measured, with the span on the member access. An arm
@@ -1064,8 +1070,8 @@ func immutabilityTransfer(
 	// produced a second finding on every compound assignment in the tree.
 
 	// A write to a global binding is upstream's `global_reassignment`, which carries the Globals
-	// category rather than this one, so it is deliberately not reported here. The GLOBAL VALUE's
-	// kind is still recorded, because a property store THROUGH a global does belong to this rule.
+	// category rather than this one, so it is deliberately not reported here. The global value's
+	// kind is still recorded, because a property store through a global does belong to this rule.
 	case *high_level_intermediate_representation.StoreGlobal:
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityGlobal, Reasons: immutabilityReasonGlobal})
 
@@ -1101,7 +1107,7 @@ func immutabilityTransfer(
 
 	// A literal is a fresh mutable value: this code just made it and nothing has read it yet.
 	// A literal is a fresh mutable value: this code just made it and nothing has read it yet. What it
-	// HOLDS is recorded so that freezing the aggregate later reaches its contents, which is what
+	// holds is recorded so that freezing the aggregate later reaches its contents, which is what
 	// makes `useMemo(() => 1, [o]); o.a = 1;` report: the freeze lands on the dependency array and
 	// has to travel one hop inward to reach `o`. Without that hop the array froze and the value it
 	// named did not, and the fixture read as a missing hook rather than as a missing edge.
@@ -1117,7 +1123,7 @@ func immutabilityTransfer(
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityPrimitive})
 
 	// A nested function is analysed as an inner subject: which locals it reassigns is recorded on
-	// the VALUE, so the finding lands where the function is handed to React rather than at the
+	// the value, so the finding lands where the function is handed to React rather than at the
 	// reassignment. That is what makes the two reassignment diagnostics point where they do.
 	case *high_level_intermediate_representation.FunctionExpression:
 		findings = immutabilityNestedFunctionTransfer(ruleContext, function, state, value, target, findings, order)
@@ -1141,7 +1147,7 @@ func immutabilityTransfer(
 // A member of a frozen value is frozen; a member of a mutable value is mutable. The reasons travel
 // with it so the message still names the original source.
 //
-// A member of a PRIMITIVE is treated as mutable rather than primitive: reading a property off a
+// A member of a primitive is treated as mutable rather than primitive: reading a property off a
 // number yields undefined, not another primitive, and carrying `Primitive` forward would make a
 // later write silent for the wrong reason.
 func immutabilityPropagate(state *immutabilityState, object static_single_assignment.IdentifierId) immutabilityAbstractValue {
@@ -1153,6 +1159,8 @@ func immutabilityPropagate(state *immutabilityState, object static_single_assign
 }
 
 // immutabilityCheckWrite asks the lattice what writing to a value does and reports when it must.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCheckWrite(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
@@ -1162,8 +1170,8 @@ func immutabilityCheckWrite(
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
-	// A REF is exempt before the lattice is consulted at all, which is upstream's `MutateRef` arm:
-	// `mutate_with_span` asks `is_ref_or_ref_value(ty)` FIRST and returns before it looks at any
+	// A ref is exempt before the lattice is consulted at all, which is upstream's `MutateRef` arm:
+	// `mutate_with_span` asks `is_ref_or_ref_value(ty)` first and returns before it looks at any
 	// kind. Writing `something.current` is the sanctioned way to hold a value across renders, and a
 	// ref is deliberately outside React's data flow, so the whole premise of this rule does not
 	// apply to it.
@@ -1177,7 +1185,7 @@ func immutabilityCheckWrite(
 	// `r.current = 1` is clean in render, in an effect and in a callback, while a non-ref value from
 	// the same hook shape reports.
 	//
-	// `refs.go` OWNS the render-time half of this question and reports a ref access during render
+	// `refs.go` owns the render-time half of this question and reports a ref access during render
 	// under its own rule, so the exemption here loses no coverage; it routes the finding to the rule
 	// whose name matches it.
 	if immutabilityIsRefValue(ruleContext, function, state, object) || immutabilityWriteTargetIsRef(ruleContext, node) {
@@ -1200,7 +1208,7 @@ func immutabilityCheckWrite(
 
 // immutabilityMutatedObjectNode is the syntax React underlines for a write.
 //
-// React points at the OBJECT BEING MUTATED rather than at the assignment or at the member access,
+// React points at the object being mutated rather than at the assignment or at the member access,
 // and the difference is one node in each direction, so a span assertion is the only fixture that can
 // see it. Measured on the executable, reading the rendered underline for each shape:
 //
@@ -1209,7 +1217,7 @@ func immutabilityCheckWrite(
 //	delete props.a     underlines `props`
 //	props.a = 1 inside a callback   underlines `props`
 //
-// So the node wanted is the LEFT-HAND side of the member expression being written, which is the
+// So the node wanted is the left-hand side of the member expression being written, which is the
 // instruction node's own object. Falling back to the instruction node keeps a finding rather than
 // dropping one when the shape is not a member expression.
 func immutabilityMutatedObjectNode(node *ast.Node, object static_single_assignment.IdentifierId, function *high_level_intermediate_representation.Function) *ast.Node {
@@ -1243,13 +1251,13 @@ func immutabilityMutatedObjectNode(node *ast.Node, object static_single_assignme
 
 // immutabilityCallTransfer handles a call, which is where most freezing happens.
 //
-// A HOOK call freezes every argument, because React holds onto what it is given across renders. It
+// A hook call freezes every argument, because React holds onto what it is given across renders. It
 // also decides the result's kind: `useState` and `useReducer` return frozen state, `useContext`
 // returns a frozen context value, and any other hook returns a frozen hook return. Those three
 // reasons select three different messages over one verdict.
 //
 // A plain call freezes nothing. That is not a simplification: measured on React's executable,
-// `const o = {}; doThing(o); o.a = 1;` is CLEAN while the same code with `useThing` reports. React
+// `const o = {}; doThing(o); o.a = 1;` is clean while the same code with `useThing` reports. React
 // only freezes at boundaries it controls.
 func immutabilityCallTransfer(
 	ruleContext rule.Context,
@@ -1265,7 +1273,7 @@ func immutabilityCallTransfer(
 	name := state.nameOf(function, callee)
 	if !immutabilityIsHookName(name) {
 		// A non-hook call leaves everything alone, but a function value that reassigns a local is
-		// still being CALLED here rather than handed to React, and calling it during render is
+		// still being called here rather than handed to React, and calling it during render is
 		// ordinary. Nothing to do.
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
 		return findings
@@ -1288,7 +1296,7 @@ func immutabilityCallTransfer(
 
 // immutabilityDependencyArrayIsExempt reports whether this hook leaves its dependencies unread.
 //
-// The exemption is NOT a property of the array-literal shape alone, which is where the first version
+// The exemption is not a property of the array-literal shape alone, which is where the first version
 // of this went wrong. Measured across eight hooks with the identical `hook(() => 1, [o]); o.a = 1;`
 // body, so the shape is held constant and only the callee varies:
 //
@@ -1299,7 +1307,7 @@ func immutabilityCallTransfer(
 //	useDeferredValue      CLEAN
 //	useThing (unknown)    CLEAN
 //
-// The split is exactly the two MEMOIZATION hooks, and the reason is that their callbacks run during
+// The split is exactly the two memoization hooks, and the reason is that their callbacks run during
 // render, so React reads the dependencies on the spot; every other hook defers past the end of
 // render and only stores them. So the test is on the hook rather than on the argument, and an
 // unknown hook falls on the exempt side because that is where every measured unknown falls.
@@ -1313,7 +1321,7 @@ func immutabilityDependencyArrayIsExempt(name string) bool {
 
 // immutabilityIsDependencyArray reports whether an argument is an inline array literal.
 //
-// A dependency array is NOT a capture, and this is the one arm of the hook-freezing rule that
+// A dependency array is not a capture, and this is the one arm of the hook-freezing rule that
 // reading the source would not have produced. Measured on React's executable with a live control in
 // the same batch:
 //
@@ -1322,15 +1330,15 @@ func immutabilityDependencyArrayIsExempt(name string) bool {
 //	useEffect(() => {}, [o]);     o.a = 1    CLEAN     same shape, the common spelling of it
 //	useEffect(() => { read(o); }, []); o.a=1 REPORTS   the value is captured by the callback
 //
-// The distinction is not about which hook it is. `useMemo(() => 1, [o])` REPORTS, and it has the
+// The distinction is not about which hook it is. `useMemo(() => 1, [o])` reports, and it has the
 // identical shape, because a memo callback runs during render and React reads what it closes over.
-// So the array itself is frozen either way; what differs is whether anything reads the ELEMENTS,
+// So the array itself is frozen either way; what differs is whether anything reads the elements,
 // and only an inline array literal in argument position is exempt from distributing its freeze
 // inward. Anything reached some other way, including an array built into a variable first, is not
 // covered by this and freezes normally, which is upstream's behaviour and is why the test is on the
 // argument's own instruction rather than on the value's kind.
 //
-// Note this is a lookup on the DEFINING instruction rather than on syntax: a value whose defining
+// Note this is a lookup on the defining instruction rather than on syntax: a value whose defining
 // instruction is an array literal is the exemption, and a value that merely happens to hold an
 // array is not.
 func immutabilityIsDependencyArray(function *high_level_intermediate_representation.Function, state *immutabilityState, id static_single_assignment.IdentifierId) bool {
@@ -1378,13 +1386,13 @@ func immutabilityHookResultKind(name string) immutabilityAbstractValue {
 
 // immutabilityMethodCallTransfer handles `object.method(...)`.
 //
-// The hook test reads the PROPERTY name, so `React.useEffect(...)` behaves like the bare import.
+// The hook test reads the property name, so `React.useEffect(...)` behaves like the bare import.
 // refs.go measured this as 235 false positives on Kirk's tree when it was missing, and the same
 // shape is live here: a value frozen inside a `React.useCallback` callback must be frozen by the
 // same rule as one frozen inside `useCallback`.
 //
-// A method call on a value does NOT freeze the receiver and does not report a mutation through it.
-// Measured: `props.list.push(1)` and `Object.assign(props, {a:1})` are both CLEAN under React, which
+// A method call on a value does not freeze the receiver and does not report a mutation through it.
+// Measured: `props.list.push(1)` and `Object.assign(props, {a:1})` are both clean under React, which
 // is upstream declining to model an unknown method's effects rather than deciding the write is
 // fine. Reproduced as silence deliberately; a rule that helpfully reported `props.list.push(1)`
 // would disagree with React on ordinary code.
@@ -1416,7 +1424,7 @@ func immutabilityMethodCallTransfer(
 
 // immutabilityMethodName is the property being called, read from the syntax.
 //
-// The representation gives a method call a Place for the property, but the property's NAME lives on
+// The representation gives a method call a Place for the property, but the property's name lives on
 // the syntax rather than on the value, so it is read back from the node. Identical in shape to
 // refs.go's helper and kept separate for the naming reason given at the top of this file.
 func immutabilityMethodName(instruction *high_level_intermediate_representation.Instruction) string {
@@ -1446,7 +1454,7 @@ func immutabilityMethodName(instruction *high_level_intermediate_representation.
 // render completes" rather than about the write itself: the write is fine, the problem is that it
 // happens at a time when nothing will re-render.
 //
-// The inner function is examined through its OWN identifier space. Identifier ids are per-function
+// The inner function is examined through its own identifier space. Identifier ids are per-function
 // and they overlap, which refs.go measured as a wrong-finding rather than a missing one, so the
 // inner walk here reads only names and syntax and never indexes the outer state by an inner id.
 func immutabilityNestedFunctionTransfer(
@@ -1463,13 +1471,13 @@ func immutabilityNestedFunctionTransfer(
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
 		return findings
 	}
-	// A closure that WRITES THROUGH a captured value is a different finding from one that reassigns
+	// A closure that writes through a captured value is a different finding from one that reassigns
 	// a captured binding, and it lands at the write rather than where the closure is handed over.
 	// Measured: `const cb = () => { props.a = 1; };` reports on line 2, inside the callback, while
 	// `const cb = () => { local = 1; };` reports on the line that hands `cb` to JSX. The two look
 	// alike in source and are opposite in where they point.
 	findings = immutabilityCapturedWrites(ruleContext, state, inner, value, findings, order)
-	// A reassignment only matters when the binding belongs to THIS function, which is the render
+	// A reassignment only matters when the binding belongs to this function, which is the render
 	// whose end outlives it. `Function.Context` names what the closure captured from here, so a
 	// write to anything else is a write to a binding some intermediate scope owns and the render has
 	// no stake in it.
@@ -1484,8 +1492,8 @@ func immutabilityNestedFunctionTransfer(
 	// Every one declares its variable inside a callback and writes it from a deeper callback, so the
 	// binding never belonged to the render at all. The cleanup-function idiom is the most common of
 	// the three and it is the single most idiomatic thing in React effects.
-	// Compared by DECLARATION rather than by identifier id, which is the trap here. The context
-	// value and the store's lvalue are two single-assignment numberings of the SAME binding and
+	// Compared by declaration rather than by identifier id, which is the trap here. The context
+	// value and the store's lvalue are two single-assignment numberings of the same binding and
 	// carry different ids: measured on `let local = 0; const cb = () => { local = 1; };`, the
 	// capture arrives as context id 2 while the store writes id 6. An identifier comparison answers
 	// false for every real case and silences the rule completely, which is what it did on the first
@@ -1507,8 +1515,8 @@ func immutabilityNestedFunctionTransfer(
 		state.functionsReassigning[state.resolve(target)] = reassignments
 	}
 	// The values this closure captures are recorded on the function value, so that freezing the
-	// FUNCTION freezes what it closes over. That is upstream's
-	// `enableTransitivelyFreezeFunctionExpressions`, which defaults to TRUE, and it is what makes
+	// function freezes what it closes over. That is upstream's
+	// `enableTransitivelyFreezeFunctionExpressions`, which defaults to `true`, and it is what makes
 	// `const o = {}; useEffect(() => { read(o); }, []); o.a = 1;` report while the same value named
 	// only in the dependency array stays clean. Both were measured; the pair is the fixture
 	// `f_useEffect_callback_captures` against `s_useEffect_dependency_array`.
@@ -1523,11 +1531,11 @@ func immutabilityNestedFunctionTransfer(
 
 // immutabilityWriteTargetIsRef asks the checker whether the thing being written to is a ref.
 //
-// Asked through the WRITE'S OWN SYNTAX rather than through the value's identifier, and that is the
+// Asked through the write's own syntax rather than through the value's identifier, and that is the
 // whole trick. A property store's object is a temporary produced by a load, so
 // `high_level_intermediate_representation.Identifier.Node` is nil for it and every type question asked that way answers nothing. The
 // member expression on the left of the assignment still names the object in source, and handing
-// THAT to the checker resolves.
+// that member expression to the checker resolves.
 //
 // Measured, and the measurement is the reason this function exists in this shape. Asking through
 // the identifier returned a nil symbol for all 281 findings, which reads exactly like "the checker
@@ -1538,7 +1546,7 @@ func immutabilityNestedFunctionTransfer(
 // A hand-written `react.d.ts` stub cannot reproduce this either way, which is why it was measured on
 // the real tree rather than in a fixture: `rule_testing`'s tsconfig sets `types: []` and resolves no
 // `node_modules`, so `@types/react` never resolves there and every symbol is nil. The fixtures
-// therefore cannot see this exemption at all, and the two ref fixtures below pin the NAME half only.
+// therefore cannot see this exemption at all, and the two ref fixtures below pin the name half only.
 func immutabilityWriteTargetIsRef(ruleContext rule.Context, node *ast.Node) bool {
 	if ruleContext.TypeChecker == nil || node == nil {
 		return false
@@ -1556,7 +1564,7 @@ func immutabilityWriteTargetIsRef(ruleContext rule.Context, node *ast.Node) bool
 	if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
 		return false
 	}
-	// Walk OUT through the whole member chain rather than testing only the immediate object.
+	// Walk out through the whole member chain rather than testing only the immediate object.
 	//
 	// `reference.current.style.height = ''` writes to the DOM node a ref holds, and the immediate
 	// object is a `CSSStyleDeclaration` rather than a `RefObject`, so a test on one level answers
@@ -1589,20 +1597,20 @@ func immutabilityWriteTargetIsRef(ruleContext rule.Context, node *ast.Node) bool
 	return false
 }
 
-// immutabilityCapturedWrites reports a nested function writing THROUGH a captured frozen value.
+// immutabilityCapturedWrites reports a nested function writing through a captured frozen value.
 //
 // The write happens inside the closure and is reported there, which is upstream's own placement and
-// is measurably different from where a captured-binding REASSIGNMENT reports. The two are easy to
+// is measurably different from where a captured-binding reassignment reports. The two are easy to
 // conflate because both are "a closure touching an outer value".
 //
 // The capture edge is what makes this answerable: `FunctionExpression.Captures` at the call site and
 // `Function.Context` inside are positionally paired, so the Nth capture is the Nth context value.
 // That translation is required rather than convenient, because identifier ids are per-function and
-// OVERLAP, so indexing the outer state with an inner id silently reads an unrelated value. refs.go
+// overlap, so indexing the outer state with an inner id silently reads an unrelated value. refs.go
 // measured that failure as a wrong finding rather than a missing one.
 //
 // Recurses one level only. A closure inside a closure writing through a doubly-captured value is a
-// real shape and it is NOT covered here; see the report for what that costs.
+// real shape and it is not covered here; see the report for what that costs.
 func immutabilityCapturedWrites(
 	ruleContext rule.Context,
 	state *immutabilityState,
@@ -1666,6 +1674,8 @@ func immutabilityCapturedWrites(
 }
 
 // immutabilityCapturedWriteFinding reports one write through a captured value when it is frozen.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCapturedWriteFinding(
 	ruleContext rule.Context,
 	inner *high_level_intermediate_representation.Function,
@@ -1713,7 +1723,7 @@ func immutabilityNestedFunction(function *high_level_intermediate_representation
 
 // immutabilityReassignmentsIn collects the captured locals a function writes to.
 //
-// A write to a CONTEXT value is the tell: lowering emits `StoreContext` for a write to a binding
+// A write to a context value is the tell: lowering emits `StoreContext` for a write to a binding
 // the function closed over, and `StoreLocal` for one it owns. That distinction is exactly the
 // question "does this write escape the function", and it comes free from the representation rather
 // than needing a capture analysis.
@@ -1780,6 +1790,8 @@ func immutabilityReassignmentsInner(function *high_level_intermediate_representa
 // is upstream's own split between `reassigned_after_render` and `reassigned_in_async_function`.
 // Both are reported at the reassignment, plus one `known_mutable_function` at the site where the
 // function is handed over, which is why React emits two diagnostics for a single such callback.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCheckFrozenFunction(
 	state *immutabilityState,
 	id static_single_assignment.IdentifierId,
@@ -1833,10 +1845,10 @@ const immutabilityWhyFrozenValuesMatter = "React re-renders by comparing values 
 	"interface keeps showing the old value until some unrelated update happens to schedule a " +
 	"render."
 
-// immutabilityReasonText is the sentence that names WHY a value is frozen.
+// immutabilityReasonText is the sentence that names why a value is frozen.
 //
 // The reason set is a bitset and several bits can be present at once, so the arms below are a fixed
-// PRIORITY ORDER rather than a switch on a single value. That order is upstream's own
+// priority order rather than a switch on a single value. That order is upstream's own
 // `get_write_error_reason`, read top to bottom, and reproducing it exactly is what makes the
 // message deterministic: without a fixed order, a value frozen by both JSX and a hook would name
 // whichever bit happened to be tested first.
@@ -1916,7 +1928,7 @@ func immutabilityMessageFor(finding immutabilityFinding) rule.Message {
 // immutabilityReport points a finding at the syntax it came from.
 //
 // Through `ctx.ReportNode` rather than a Place's range, because a Place's range is the range of the
-// node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
+// node that produced the instruction, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness.
 func immutabilityReport(ruleContext rule.Context, function *high_level_intermediate_representation.Function, finding immutabilityFinding) {
 	message := immutabilityMessageFor(finding)
@@ -1952,16 +1964,16 @@ func immutabilityHasBackEdge(function *high_level_intermediate_representation.Fu
 
 // immutabilityIsRefValue reports whether a value is a React ref, which is exempt from this rule.
 //
-// Two signals, and BOTH are needed for the same reason refs.go documents at length: the checker
+// Two signals, and both are needed for the same reason refs.go documents at length: the checker
 // sees a `useRef` call and cannot see a ref arriving as an untyped prop, while the name test sees
 // the prop and would over-match on its own.
 //
-//   - The checker. `useRef` returns `RefObject`, identified by the TYPE'S SYMBOL rather than its
+//   - The checker. `useRef` returns `RefObject`, identified by the type's symbol rather than its
 //     alias, because `RefObject` is an interface and its alias is correctly nil. That asymmetry is
 //     measured in refs.go against the opposite case, where `Dispatch` lands on the alias.
 //   - The name. React's `enableTreatRefLikeIdentifiersAsRefs` defaults to true and matches
 //     `/^(?:[a-zA-Z$_][\w$]*)Ref$|^ref$/` against the binding whose `current` is accessed. Kirk's
-//     tree spells these `handlersReference` rather than `handlersRef`, so the NAME half does not
+//     tree spells these `handlersReference` rather than `handlersRef`, so the name half does not
 //     fire on most of them and the checker half is what actually carries this exemption here.
 //
 // The property name is checked too, because the exemption is for writing a ref's `current` and not
@@ -1996,14 +2008,14 @@ func immutabilityIsRefValue(ruleContext rule.Context, function *high_level_inter
 
 // immutabilityLoopBlocks is the set of blocks a back edge can re-enter.
 //
-// A back edge is an edge from a LATCH to a HEADER, found by reverse postorder position: a
+// A back edge is an edge from a latch to a header, found by reverse postorder position: a
 // predecessor at or after its successor in `Function.Blocks` is one. The blocks in the loop are then
-// the header plus everything that can REACH the latch through predecessors without leaving through
+// the header plus everything that can reach the latch through predecessors without leaving through
 // the header, which is the standard natural-loop body.
 //
-// Position ranges are NOT sufficient and that was measured rather than assumed. For
+// Position ranges are not sufficient and that was measured rather than assumed. For
 // `for (const u of list) { acc[u.id] = 1; } useThing(acc);` the reverse postorder is b1 b2 b3 b5 b4,
-// with b4 the latch and b5 the block AFTER the loop; taking the contiguous run from header to latch
+// with b4 the latch and b5 the block after the loop; taking the contiguous run from header to latch
 // swept b5 in, so the `useThing` freeze counted as happening inside the loop and travelled back into
 // the body on the next round, reporting the writes that built the accumulator. The predecessor walk
 // gets b5 right because b5 cannot reach the latch.

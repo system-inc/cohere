@@ -8,6 +8,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/goengine"
 	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // goEngineVerb is the hidden first argument that runs this binary as the Go engine rather than as the front
@@ -55,9 +56,10 @@ var goFlags = engineFlags{
 func runGoEngine(location projectLocation, given map[string]bool, positionals []string) (int, error) {
 	if os.Getenv(goEngineChildVariable) != "" {
 		// Exit 2, the contract's "did not run", so the front door above reports nothing checked.
-		fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.Of(fmt.Sprintf(
+		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.Of(fmt.Sprintf(
 			"this process was started as a Go engine (%s is set) and was about to start another, "+
 				"so it refused, and nothing was checked", goEngineChildVariable)))
+		showWarning()
 		return 2, nil
 	}
 	if given["tsconfig"] {
@@ -75,7 +77,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 		return 1, fmt.Errorf("finding this cohere's own executable, which runs as the Go engine: %w", executableError)
 	}
 
-	run := newEngineRun(os.Stdout, mode, language, location.rootNote(), processStart)
+	run := newEngineRun(streams.Output, mode, language, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}

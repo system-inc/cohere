@@ -19,7 +19,7 @@ func noMeaninglessVoidOperatorCaseName(index int) string {
 
 // noMeaninglessVoidOperatorFinding is one expected finding with every layer it can be wrong at.
 //
-// wantRepair carries the branch, because this rule offers the SAME edit three ways: as a fix
+// wantRepair carries the branch, because this rule offers the same edit three ways: as a fix
 // (removing the operator cannot change behavior), as a suggestion (checkNever, where the call does
 // not return), and not at all (a non-call void that is not a whole statement, where removing it
 // changes the expression's value). A row asserts which one arrived as much as what it writes.
@@ -78,7 +78,7 @@ func applyNoMeaninglessVoidOperatorSuggestion(test *testing.T, source string, su
 // The corpus is typescript-eslint 8.71.0's own, extracted mechanically, plus rows added here.
 //
 // Upstream's test file at the v8.71.0 tag was loaded with its RuleTester stubbed so every row came out
-// as data, then every row was replayed against the INSTALLED 8.71.0 over a real program (strict, lib
+// as data, then every row was replayed against the installed 8.71.0 over a real program (strict, lib
 // ES2022) to record what it reports: the message id, the span, the rendered message, whether the
 // repair is a fix, a suggestion or nothing, and the file the fixes compose to. The replay reproduced
 // all 43 of upstream's own assertions before anything was taken from it, which is what says the
@@ -665,7 +665,7 @@ func TestNoMeaninglessVoidOperatorCorpusIsWhole(test *testing.T) {
 
 // TestDecodeNoMeaninglessVoidOperatorOptions pins the decoder against its default.
 //
-// This option defaults to FALSE, so an absent key and a zero value happen to agree and the generic
+// This option defaults to false, so an absent key and a zero value happen to agree and the generic
 // decoder would work by luck. The decoder is hand-rolled anyway and tested anyway, because the
 // coincidence is not a property of the option surface: adding one default-true key would make the
 // generic path silently wrong, and this test is what would notice.

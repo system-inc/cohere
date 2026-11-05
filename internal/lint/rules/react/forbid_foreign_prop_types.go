@@ -88,8 +88,8 @@ type ForbidForeignPropTypesOptions struct {
 //
 // # The parenthesis difference costs a false positive here, in the direction that reports
 //
-// `(Foo.propTypes) = {}` is CLEAN upstream, measured. Its parser folds the parenthesis away, so the
-// member access IS the assignment's `left`. Ours keeps a `KindParenthesizedExpression` between
+// `(Foo.propTypes) = {}` is clean upstream, measured. Its parser folds the parenthesis away, so the
+// member access is the assignment's `left`. Ours keeps a `KindParenthesizedExpression` between
 // them, so a naive `node.Parent` test sees a parenthesis rather than an assignment, concludes the
 // access is not a target, and reports where upstream is silent. The parent walk unwraps
 // parentheses in a loop, because `((Foo.propTypes)) = {}` nests. Written as a loop rather than with
@@ -106,17 +106,17 @@ type ForbidForeignPropTypesOptions struct {
 //	class C { static propTypes = { a: () => Q.propTypes.c }; }   exempt, through a closure
 //	Foo.other = Bar.propTypes                            REPORTS, the left property is not propTypes
 //
-// All measured under `{allowInPropTypes: true}`. The class-property walk does NOT require `static`,
+// All measured under `{allowInPropTypes: true}`. The class-property walk does not require `static`,
 // measured: `class C { propTypes = { a: Q.propTypes.b }; }` is exempt too. And a computed class key
 // declines, because upstream reads `classProperty.key.name`, which a computed key does not have.
 //
 // The two walks are separate in upstream and are kept separate here, because the assignment walk
-// tests the assignment's LEFT while the class walk tests the declaration's own key, and collapsing
+// tests the assignment's left side while the class walk tests the declaration's own key, and collapsing
 // them into one upward scan would need a different test at each stop anyway.
 //
 // # The destructuring arm reports once per pattern and points at the whole member
 //
-// Upstream uses `properties.find`, so a pattern naming `propTypes` twice reports ONCE. Measured:
+// Upstream uses `properties.find`, so a pattern naming `propTypes` twice reports once. Measured:
 // `const { propTypes, propTypes: q } = Foo` produces a single finding. The finding is anchored on
 // the matched property rather than on its key, so `const { propTypes: p } = Foo` spans
 // `propTypes: p` and not just the key. Both are reproduced.
@@ -131,7 +131,7 @@ type ForbidForeignPropTypesOptions struct {
 //	const [ propTypes ] = Foo            CLEAN, an array pattern is not an ObjectPattern
 //	function f({ propTypes }) {}         reports, any object pattern counts
 //
-// All measured. `allowInPropTypes` is NOT consulted on this arm, upstream, which is visible in the
+// All measured. `allowInPropTypes` is not consulted on this arm, upstream, which is visible in the
 // source rather than measured: the `ObjectPattern` handler calls neither `isAllowedAssignment` nor
 // anything like it. Reproduced.
 var ForbidForeignPropTypes = rule.Rule{
@@ -214,7 +214,7 @@ var ForbidForeignPropTypes = rule.Rule{
 		}
 
 		// reportProperty is the shared tail of both member arms. Upstream anchors the finding on the
-		// PROPERTY node rather than on the whole member access, so `Foo.propTypes` spans
+		// property node rather than on the whole member access, so `Foo.propTypes` spans
 		// `propTypes` and `Foo["propTypes"]` spans `"propTypes"` with its quotes.
 		reportProperty := func(access *ast.Node, property *ast.Node) {
 			if isAssignmentTarget(access) || isAllowedAssignment(access) {
@@ -276,7 +276,7 @@ var ForbidForeignPropTypes = rule.Rule{
 
 // bindingElementPropertyKey returns the key a destructuring element reads from its source object.
 //
-// This is the half of a binding element that names the PROPERTY, which is not always the half that
+// This is the half of a binding element that names the property, which is not always the half that
 // names the local variable, and the distinction is the whole reason this function exists:
 //
 //	const { propTypes } = Foo        PropertyName is nil, Name() is `propTypes`, both roles at once

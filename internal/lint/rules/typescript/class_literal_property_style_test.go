@@ -198,7 +198,7 @@ func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(test *testing.T
 // rather than assumed equal to the finding count.
 //
 // Four things are asserted on each row and each catches a different defect. The ids say which of the
-// two directions ran. The spans say where the finding points, which is the member's KEY rather than
+// two directions ran. The spans say where the finding points, which is the member's key rather than
 // the member, so a reader is shown the name while the repair rewrites the whole declaration. The
 // suggestion count says whether a repair was offered at all. And the applied source says what a
 // human accepting that suggestion would get, which no message-id assertion can see.
@@ -420,7 +420,7 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(test *testing.T) {
 // shipped that way tonight: one widened eight declarations to `any` by stranding a type annotation,
 // and one dropped a `: void` return type it could not see from the parameter list.
 //
-// This rule does not rebuild the signature. It splices the RAW SOURCE between the parameter list's
+// This rule does not rebuild the signature. It splices the raw source between the parameter list's
 // closing parenthesis and the body's opening brace, so anything living there survives byte for byte
 // without being enumerated. These rows are what proves that: the annotation, its unusual spacing,
 // and a comment written in the same span all reach the rewritten source unchanged.
@@ -795,7 +795,7 @@ func TestClassLiteralPropertyStyleNilOptionsFallsBackToUpstreamDefault(test *tes
 //
 // The field direction scans backwards from the body for the parameter list's closing parenthesis,
 // and error recovery produces members that have a body and no parenthesis at all. The walk recovers
-// per FILE rather than per rule, so one panic would cost every rule that file rather than one
+// per file rather than per rule, so one panic would cost every rule that file rather than one
 // finding.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach most
@@ -830,16 +830,16 @@ func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(test *testing.T)
 // quieter than ESLint.
 //
 // Upstream skips a member written `override`, because converting an overriding member changes what
-// it overrides, but it only sees the KEYWORD. Without `noImplicitOverride` an override carries no
+// it overrides, but it only sees the keyword. Without `noImplicitOverride` an override carries no
 // keyword, and upstream reports a conversion the compiler rejects: a property overriding a concrete
-// base ACCESSOR is TS2610, and an accessor overriding a concrete base PROPERTY is TS2611 (the
+// base accessor is TS2610, and an accessor overriding a concrete base property is TS2611 (the
 // vendored checker's checkKindsOfPropertyMemberOverrides). cohere asks the checker for the base member
 // and stays silent exactly there.
 //
 // The first silent row is the real site: `nexus/source/validation/schema/StringSchema.ts:37` in ahra,
 // a `typeDefault` getter returning the empty string, overriding `BaseSchema`'s concrete getter.
 // ESLint reports it and its suggested field does not compile. The same class's `typeName`, which
-// implements an ABSTRACT getter, is a true positive (a field may implement an abstract accessor) and
+// implements an abstract getter, is a true positive (a field may implement an abstract accessor) and
 // stays in the reporting rows, as do overrides of abstract and interface-merged members, a member
 // with no base counterpart, and a static override, which the checker does not compare.
 func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(test *testing.T) {
@@ -917,7 +917,7 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(test *tes
 		{"a field over a mapped-type base property, getters style", "\"getters\"",
 			"type Shape = { [K in 'x']: number };\ndeclare const Base: new () => Shape;\nclass B extends Base { readonly x = 1; }\n",
 			[]string{"preferGetterStyle"}},
-		// An intersection base property is exempt when ANY of its declarations is abstract or from an
+		// An intersection base property is exempt when any of its declarations is abstract or from an
 		// interface, where an ordinary one needs all of them; the checker accepts the getter.
 		{"a field over an intersection property, one side an interface, getters style", "\"getters\"",
 			"interface I { readonly x: number; }\ndeclare class C { readonly x: number; }\ndeclare const Base: new () => I & C;\nclass D extends Base { readonly x = 1; }\n",

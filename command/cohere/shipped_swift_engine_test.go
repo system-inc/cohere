@@ -135,7 +135,10 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	if readError != nil {
 		test.Fatalf("the engine beside cohere was never run:\n%s", output)
 	}
-	resolvedRoot, _ := filepath.EvalSymlinks(root)
+	resolvedRoot, evalSymlinksError := filepath.EvalSymlinks(root)
+	if evalSymlinksError != nil {
+		test.Fatal(evalSymlinksError)
+	}
 	if want := "--contract 3 --root "; !strings.HasPrefix(string(recorded), want) ||
 		!(strings.Contains(string(recorded), root) || strings.Contains(string(recorded), resolvedRoot)) {
 		test.Fatalf("the shipped engine was run with %q, expected the contract and the package root %s", recorded, root)

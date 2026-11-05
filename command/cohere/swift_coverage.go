@@ -12,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // Swift coverage is how a repository with several Swift packages gets each package's files in one report
@@ -67,6 +68,8 @@ type coveredPackagesRecord struct {
 
 // resolveSwiftCoverage asks each Swift project which packages its run covers, when there is more than one,
 // and drops the projects a running project covers. found.Projects is rewritten to the projects that run.
+//
+// Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveSwiftCoverage(found *discovery) swiftCoverage {
 	decided := swiftCoverage{}
 	var swiftProjects []discoveredProject
@@ -151,7 +154,10 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	}
 
 	// Resolved the way a Swift run resolves it, so the answer comes from the engine that will check. A
-	// development cohere may build it here, a step its progress shows and clears before the report.
+	// development cohere may build it here, a step its progress shows and clears before the report. The progress
+	// writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(activeOutput.Mode == outputVerbose)
 	binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(projectLocation{Root: directories[0], Engine: engineSwift}, release.Current())
 	dispatch.Report.Clear()
@@ -198,7 +204,8 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesRecord, error) {
 	command := exec.Command(binaryPath, "--contract", fmt.Sprint(engineContractVersion), "--root", directory, "--covered-packages")
 	command.Dir = directory
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	command.Stdout = &standardOutput
 	command.Stderr = &standardError
 	runError := command.Run()

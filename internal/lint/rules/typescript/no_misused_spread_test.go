@@ -11,17 +11,17 @@ import (
 
 // The corpus for no-misused-spread, taken verbatim from upstream's own tester.
 //
-// Extracted by PARSING the upstream test file with the TypeScript compiler and serialising each
+// Extracted by parsing the upstream test file with the TypeScript compiler and serialising each
 // string through a JSON encoder, so nothing was retyped or passed through a shell, then byte-compared
 // against the source with a control asserted absent: all 131 cases match, one of them under the
 // backtick escaping a template literal requires.
 //
-// The whole corpus was driven through the INSTALLED rule at 8.67.0 on a real type graph, honouring
+// The whole corpus was driven through the installed rule at 8.67.0 on a real type graph, honouring
 // each case's own options and giving the nine JSX cases a .tsx filename. It agreed with upstream's
 // recorded expectations on all 131 inputs and reproduced all 21 recorded suggestion outputs, so the
 // oracle used to settle the questions below is pinned against the corpus rather than trusted.
 //
-// One upstream case is absent below and it is a HARNESS fact rather than a rule fact. See
+// One upstream case is absent below and it is a harness fact rather than a rule fact. See
 // TestNoMisusedSpreadCaseThatCannotBeExpressedHere.
 const (
 	noMisusedSpreadFile    = "file.ts"
@@ -243,7 +243,7 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(test *testing.T) {
 // TestNoMisusedSpreadSuggestions applies each suggested repair and compares the whole rewritten file
 // against the output upstream records for it.
 //
-// Every repair this rule offers is a SUGGESTION, which the engine never applies unattended, so
+// Every repair this rule offers is a suggestion, which the engine never applies unattended, so
 // ExpectFixedSource cannot be used and the applier is the one await-thenable already needed.
 //
 // These 21 rows are where this rule can be wrong invisibly, and they cover both fixers. The await
@@ -316,10 +316,10 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 	}
 }
 
-// TestNoMisusedSpreadSpans asserts WHERE each finding points, which no id assertion can see.
+// TestNoMisusedSpreadSpans asserts where each finding points, which no id assertion can see.
 //
 // The span is the whole spread, including the three dots, rather than the argument. The JSX rows are
-// the sharper half: there the span includes the surrounding BRACES, so `{...A}` and not `...A` and
+// the sharper half: there the span includes the surrounding braces, so `{...A}` and not `...A` and
 // not `A`, which pins that a JSX spread attribute is reported as its own node rather than being
 // routed through the object-literal shape it otherwise behaves like.
 //
@@ -367,7 +367,7 @@ func TestNoMisusedSpreadSpans(test *testing.T) {
 }
 
 // TestNoMisusedSpreadCaseThatCannotBeExpressedHere records the one upstream invalid case absent from
-// the imported list above, and why its absence is a fact about the HARNESS rather than about the
+// the imported list above, and why its absence is a fact about the harness rather than about the
 // rule.
 //
 // Upstream's invalid case 61 spreads a type imported from an ambient `declare module 'module'`, and
@@ -378,15 +378,15 @@ func TestNoMisusedSpreadSpans(test *testing.T) {
 // installed near the temp directory and pass or fail by machine. With no node types the input is
 // TypeScript error 2664, "Invalid module name in augmentation", and the rule is silent.
 //
-// This was measured rather than assumed, and the FIRST hypothesis was wrong, which is why the
+// This was measured rather than assumed, and the first hypothesis was wrong, which is why the
 // evidence is recorded rather than the conclusion. The obvious suspect was `moduleDetection: "force"`,
 // which a sibling rule hit on the same shape. Rebuilding the oracle without it changed nothing:
-// still silent. Printing the FULL diagnostic list rather than grepping for the rule's own findings
+// still silent. Printing the full diagnostic list rather than grepping for the rule's own findings
 // showed error 2664 and 2591, and adding `types: ["node"]` made the same input report
 // `noIterableSpreadInObject` exactly as upstream records.
 //
 // So the case is left out of the imported list rather than being weakened into passing, and the
-// half of it that CAN be expressed is pinned below: the same iterable shape without the ambient
+// half of it that can be expressed is pinned below: the same iterable shape without the ambient
 // module reports, which is the control saying the arm works and only the module resolution is
 // missing.
 func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(test *testing.T) {
@@ -416,7 +416,7 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(test *testing.T) {
 // exercises but never isolates.
 //
 // Several of these types satisfy more than one arm at once, and the message they get is decided by
-// which arm is asked first. A Map is iterable AND a class instance; an array is iterable; a Set is
+// which arm is asked first. A Map is iterable and a class instance; an array is iterable; a Set is
 // iterable and a class instance. Reversing any adjacent pair changes a real input's message while
 // leaving the finding count alone, which every id fixture above would still accept for the wrong
 // reason if it were checking only that something reported.
@@ -586,19 +586,19 @@ func TestNoMisusedSpreadDecoder(test *testing.T) {
 // TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses pins a repair the imported corpus cannot
 // see, and which this port originally got wrong.
 //
-// When the spread has SIBLING properties the Map suggestion rewrites the argument in place, and
+// When the spread has sibling properties the Map suggestion rewrites the argument in place, and
 // upstream replaces the node its own tree hands it, which is the unparenthesized expression. So
 // parentheses already in the source survive: `{ ...(map), other: 1 }` becomes
 // `{ ...(Object.fromEntries(map)), other: 1 }`, keeping a pair that is now redundant.
 //
 // This port first replaced the whole argument including those parentheses, producing the tidier
 // `{ ...Object.fromEntries(map), other: 1 }`. All 151 imported rows stayed green over that, because
-// the corpus writes a parenthesized argument ONLY in the sole-property shape, where the whole object
+// the corpus writes a parenthesized argument only in the sole-property shape, where the whole object
 // literal is replaced and this branch never runs. Found by mutation, then settled against the
 // installed rule rather than by reading, which is what showed the tidier answer was the wrong one.
 //
 // The last row is the control that keeps the two decisions apart: a comma expression is weak
-// precedence, so it gets parentheses ADDED by this rule regardless, and it would still pass if the
+// precedence, so it gets parentheses added by this rule regardless, and it would still pass if the
 // keep-existing-parentheses behaviour were lost.
 func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(test *testing.T) {
 	test.Parallel()

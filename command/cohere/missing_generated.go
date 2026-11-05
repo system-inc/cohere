@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/gitignore"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -69,7 +69,7 @@ func missingGeneratedMessage(input program.MissingInput) string {
 func printMissingGenerated(missing []program.MissingInput) {
 	for _, input := range missing {
 		message := missingGeneratedMessage(input)
-		printFinding(os.Stdout, runFinding{
+		printFinding(streams.Output, runFinding{
 			Path:     input.Importer,
 			Line:     input.Line,
 			Column:   input.Column,
@@ -86,7 +86,7 @@ func foldTypeDiagnostics(missing []program.MissingInput, diagnostics []*ast.Diag
 	if len(missing) == 0 || len(diagnostics) == 0 || activeOutput.Mode != outputHuman {
 		return false
 	}
-	fmt.Fprintln(os.Stdout, activeOutput.Style.dim(foldedLine(diagnostics)))
+	fmt.Fprintln(streams.Output, activeOutput.Style.dim(foldedLine(diagnostics)))
 	return true
 }
 

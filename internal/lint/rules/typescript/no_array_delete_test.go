@@ -23,8 +23,8 @@ const noArrayDeleteFile = "noArrayDelete.ts"
 // than by reading, because a fixture I invent encodes the same belief as the port, so it passes
 // for exactly the reason the code would be wrong.
 //
-// The set is more pointed than its size suggests. Three cases separate a PROPERTY access from an
-// ELEMENT access on a receiver that really is an array, which is the distinction a port written
+// The set is more pointed than its size suggests. Three cases separate a property access from an
+// element access on a receiver that really is an array, which is the distinction a port written
 // from the message text alone would miss. Three more pin that `any`, `unknown` and `never` are
 // silent, and they are silent because none of them is an array rather than through any explicit
 // skip. The last one, `delete console.log()`, is not an access at all.
@@ -47,7 +47,7 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 
 		// Beyond upstream's corpus, and each one measured rather than reasoned about.
 		//
-		// A UNION MIXING an array with a non-array is the case tsgolint's corpus never writes, and
+		// A union mixing an array with a non-array is the case tsgolint's corpus never writes, and
 		// its absence is what let a mutant rewriting the union arm from every to some survive the
 		// whole imported set. Upstream's only union case is `number[] | string[] | boolean[]`,
 		// where every member is an array and both spellings therefore report, so nothing in the
@@ -57,18 +57,18 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 		{"a union mixing an array with an object", "declare const arr: number[] | { a: 1 };\ndelete arr[0];\n"},
 		{"a union with no array member at all", "declare const arr: { a: 1 } | { b: 2 };\ndelete arr[\"a\"];\n"},
 
-		// The intersection arm's opposite direction, for symmetry. An intersection reports when ANY
+		// The intersection arm's opposite direction, for symmetry. An intersection reports when any
 		// member is an array, so one with none must be silent, and the imported corpus only ever
-		// writes intersections that DO contain an array.
+		// writes intersections that do contain an array.
 		{"an intersection with no array member", "declare const arr: { a: 1 } & { b: 2 };\ndelete arr[\"a\"];\n"},
 
-		// A DOTTED property access on a genuine array, which is where the two upstreams actually
+		// A dotted property access on a genuine array, which is where the two upstreams actually
 		// disagree and where the disagreement is invisible from either rule file alone.
 		//
 		// tsgolint guards with `ast.IsElementAccessExpression`, and in the TypeScript AST a dotted
 		// access is a PropertyAccessExpression rather than an element access, so this declines.
 		// @typescript-eslint guards with `argument.type !== MemberExpression`, and in the ESTree
-		// AST a dotted access IS a MemberExpression, so it passes the guard, reaches the type test,
+		// AST a dotted access is a MemberExpression, so it passes the guard, reaches the type test,
 		// finds a real array, and reports.
 		//
 		// Measured rather than read, because the two guards look equivalent until you know which
@@ -78,7 +78,7 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 		// runs, so silence is both the faithful answer and the defensible one.
 		//
 		// Upstream's own valid corpus already contains dotted accesses, but only on receivers that
-		// are NOT arrays, so every one of them is silent for two independent reasons at once and
+		// are not arrays, so every one of them is silent for two independent reasons at once and
 		// none can isolate this guard.
 		{"a dotted property access on a genuine array", "declare const arr: number[];\ndelete arr.length;\n"},
 	}
@@ -96,8 +96,8 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 // is no per-input recovery to do.
 //
 // The composite type cases are the ones worth naming, because they pin an asymmetry the rule file
-// makes easy to read as one predicate. A UNION reports only when every member is an array, and
-// `number[] | string[] | boolean[]` is here to hold that direction down. An INTERSECTION reports
+// makes easy to read as one predicate. A union reports only when every member is an array, and
+// `number[] | string[] | boolean[]` is here to hold that direction down. An intersection reports
 // when any member is, which is why `number[] & unknown` and `string & Array<number>` both report
 // even though neither is wholly an array.
 func TestNoArrayDeleteFires(test *testing.T) {
@@ -133,7 +133,7 @@ func TestNoArrayDeleteFires(test *testing.T) {
 		// Beyond upstream's corpus, and each one measured through the @typescript-eslint Linter API
 		// on a real program before being written here rather than reasoned about from the source.
 		//
-		// A READONLY array and a READONLY tuple both report. That is worth pinning because the
+		// A readonly array and a readonly tuple both report. That is worth pinning because the
 		// intuitive reading is the opposite: `delete` on a readonly receiver is already a type
 		// error, so a reader may expect the rule to defer to the compiler and stay quiet. It does
 		// not, in either implementation, and a port that "helpfully" skipped them would be silently
@@ -141,7 +141,7 @@ func TestNoArrayDeleteFires(test *testing.T) {
 		{"a readonly array", "declare const arr: readonly number[];\ndelete arr[0];\n"},
 		{"a readonly tuple", "declare const arr: readonly [number, string];\ndelete arr[0];\n"},
 
-		// A union of an array and a TUPLE, which is the every-arm's positive direction: both members
+		// A union of an array and a tuple, which is the every-arm's positive direction: both members
 		// satisfy the predicate through its two different halves rather than through the same one.
 		{"a union of an array and a tuple", "declare const arr: number[] | [string, number];\ndelete arr[0];\n"},
 
@@ -149,14 +149,14 @@ func TestNoArrayDeleteFires(test *testing.T) {
 		// that is a plain object rather than the `unknown` and `string` the corpus writes.
 		{"an intersection of an array and an object", "declare const arr: number[] & { a: 1 };\ndelete arr[0];\n"},
 
-		// Index EXPRESSION shapes, which the rule never inspects at all. Nothing reads the argument
+		// Index expression shapes, which the rule never inspects at all. Nothing reads the argument
 		// beyond taking its range, so a negative literal and a computed string key both report on an
 		// array receiver exactly as a plain numeric literal does. Written because the intuitive
 		// reading is that a rule about array indices would look at the index, and it does not.
 		{"a negative index on an array", "declare const arr: number[];\ndelete arr[-1];\n"},
 		{"a computed string key on an array", "declare const arr: number[];\ndelete arr[\"length\"];\n"},
 
-		// Parentheses around the RECEIVER, distinct from upstream's case parenthesizing the whole
+		// Parentheses around the receiver, distinct from upstream's case parenthesizing the whole
 		// access. The rule skips parentheses on the delete operand only, so this reaches the element
 		// access through a different route than `delete ((a[b]))` does.
 		{"parentheses around the receiver", "declare const arr: number[];\ndelete (arr)[0];\n"},
@@ -173,7 +173,7 @@ func TestNoArrayDeleteFires(test *testing.T) {
 // against the output tsgolint records for it.
 //
 // This is the assertion the harness does not supply and the one that can catch what no message id
-// can. ExpectFixedSource applies FIXES, and the repair here is a SUGGESTION, which the engine
+// can. ExpectFixedSource applies fixes, and the repair here is a suggestion, which the engine
 // never applies unattended. So the applier below is hand-rolled. It is worth the twenty lines
 // because a finding carrying a repair that deletes the wrong range satisfies its message id
 // perfectly, and every id fixture above stays green over it.
@@ -184,7 +184,7 @@ func TestNoArrayDeleteFires(test *testing.T) {
 // human has to choose. Applying it unattended would silently change behavior.
 //
 // All twenty two of upstream's exact outputs are here rather than a sample, because the three
-// edits this repair makes are each independently wrong-able. THE LEADING SPACE is the cheapest
+// edits this repair makes are each independently wrong-able. The leading space is the cheapest
 // signal in the whole file: every expected output begins with one, because only the `delete`
 // keyword token is removed and the space after it is not, so a repair that widened its removal by
 // a single byte would fail all twenty two while satisfying every id assertion.
@@ -242,12 +242,12 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 			}
 			// The harness trims the fixture before building the program, so offsets are against
 			// the trimmed text rather than against the literal written above, and the expected
-			// output has to be trimmed the SAME way rather than the obvious way.
+			// output has to be trimmed the same way rather than the obvious way.
 			//
 			// TrimSpace on both sides is wrong here and it took a red fixture to see it, then a
 			// second red one to see it properly. Upstream writes every case indented inside a raw
 			// string, so trimming the input at both ends is right and matches the harness. But the
-			// repair's whole signature is the LEADING SPACE it leaves where the `delete` keyword
+			// repair's whole signature is the leading space it leaves where the `delete` keyword
 			// was, and `delete [1, 2, 3][0];` is the one case whose keyword sits at offset zero,
 			// so trimming its expected output destroys the single byte the assertion exists to
 			// check and the test then demands the opposite of upstream while looking reasonable.
@@ -294,7 +294,7 @@ func applyNoArrayDeleteSuggestion(test *testing.T, source string, suggestion rul
 // TestNoArrayDeleteSpans asserts where each finding points, by slicing the source with the
 // finding's own range and comparing the text.
 //
-// ExpectFindings asserts message ids and a count and NOTHING else, so a rule pointing at the wrong
+// ExpectFindings asserts message ids and a count and nothing else, so a rule pointing at the wrong
 // node passes a complete fixture pair while being wrong. That is not hypothetical for an adapted
 // rule: the adapter's node-report forms once passed raw node.Loc, which includes leading trivia, so
 // an indented statement reported text beginning at the end of the previous line. It reaches a user
@@ -302,7 +302,7 @@ func applyNoArrayDeleteSuggestion(test *testing.T, source string, suggestion rul
 //
 // The eighteen cases here are every upstream invalid case that records an explicit Line, Column and
 // EndColumn. Those three numbers are converted to the text they select, so what is asserted below
-// is tsgolint's own recorded span rather than a span I chose. All eighteen select the WHOLE delete
+// is tsgolint's own recorded span rather than a span I chose. All eighteen select the whole delete
 // expression, `delete` keyword included, which is what makes the four cases at column eleven worth
 // keeping: they are indented inside a function body, so a trivia-including range would begin on the
 // line above and they are the ones that would catch a regression.
@@ -385,12 +385,12 @@ func TestNoArrayDeleteSpans(test *testing.T) {
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
 // two. The listener dereferences ctx.TypeChecker, and under rule_testing.Run that field is nil, so a
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
-// case pass VACUOUSLY, having proven nothing at all.
+// case pass vacuously, having proven nothing at all.
 //
 // The nil guard the standing advice asks for now lives at the top of the listener, because
 // absorbing the rule off the adapter made that listener ours to edit. It is unreachable through
 // registration, since NeedsTypeChecker is declared; it covers the harness path, where a Context is
-// built by hand. This test pins the declaration AND the guard, so losing either one fails loudly
+// built by hand. This test pins the declaration and the guard, so losing either one fails loudly
 // rather than going vacuously green.
 func TestNoArrayDeleteRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()

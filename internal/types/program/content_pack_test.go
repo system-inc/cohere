@@ -66,7 +66,10 @@ func (f *packFixture) run(names ...string) (map[string]string, int, int, int) {
 
 func (f *packFixture) dataFile() string {
 	f.t.Helper()
-	matches, _ := filepath.Glob(filepath.Join(f.cache, "contents-*.pack"))
+	matches, globError := filepath.Glob(filepath.Join(f.cache, "contents-*.pack"))
+	if globError != nil {
+		f.t.Fatalf("listing the data files: %v", globError)
+	}
 	if len(matches) != 1 {
 		f.t.Fatalf("want one data file, found %v", matches)
 	}
@@ -111,7 +114,11 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 			if changeTimesError := os.Chtimes(f.path("a.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
 				f.t.Fatal(changeTimesError)
 			}
-			if after, _ := os.Stat(f.path("a.ts")); !after.ModTime().Equal(information.ModTime()) || after.Size() != information.Size() {
+			after, statAfterError := os.Stat(f.path("a.ts"))
+			if statAfterError != nil {
+				f.t.Fatal(statAfterError)
+			}
+			if !after.ModTime().Equal(information.ModTime()) || after.Size() != information.Size() {
 				f.t.Fatal("the fixture did not restore the size and modification time, so this proves nothing")
 			}
 		}},
@@ -139,7 +146,10 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			change.change(fixture)
 			read, hits, _, _ := fixture.run("a.ts")
-			want, _ := os.ReadFile(fixture.path("a.ts"))
+			want, readError := os.ReadFile(fixture.path("a.ts"))
+			if readError != nil {
+				test.Fatal(readError)
+			}
 			if read["a.ts"] != string(want) || hits != 0 {
 				test.Fatalf("after %s the pack served %q (%d hits), and the disk holds %q", change.name, read["a.ts"], hits, want)
 			}
@@ -160,21 +170,40 @@ func TestADamagedContentPackIsReadAround(test *testing.T) {
 		damagedRead bool
 	}{
 		{"a flipped byte in the data", func(f *packFixture) {
-			data, _ := os.ReadFile(f.dataFile())
+			data, readError := os.ReadFile(f.dataFile())
+			if readError != nil {
+				f.t.Fatal(readError)
+			}
 			data[3] ^= 0xff
-			os.WriteFile(f.dataFile(), data, 0o644)
+			if writeError := os.WriteFile(f.dataFile(), data, 0o644); writeError != nil {
+				f.t.Fatal(writeError)
+			}
 		}, true},
 		{"a data file truncated to half", func(f *packFixture) {
-			information, _ := os.Stat(f.dataFile())
-			os.Truncate(f.dataFile(), information.Size()/2)
+			information, statError := os.Stat(f.dataFile())
+			if statError != nil {
+				f.t.Fatal(statError)
+			}
+			if truncateError := os.Truncate(f.dataFile(), information.Size()/2); truncateError != nil {
+				f.t.Fatal(truncateError)
+			}
 		}, true},
 		{"a flipped byte in the index", func(f *packFixture) {
 			index := filepath.Join(f.cache, contentPackIndexName)
-			data, _ := os.ReadFile(index)
+			data, readError := os.ReadFile(index)
+			if readError != nil {
+				f.t.Fatal(readError)
+			}
 			data[len(data)/2] ^= 0xff
-			os.WriteFile(index, data, 0o644)
+			if writeError := os.WriteFile(index, data, 0o644); writeError != nil {
+				f.t.Fatal(writeError)
+			}
 		}, false},
-		{"a data file deleted", func(f *packFixture) { os.Remove(f.dataFile()) }, false},
+		{"a data file deleted", func(f *packFixture) {
+			if removeError := os.Remove(f.dataFile()); removeError != nil {
+				f.t.Fatal(removeError)
+			}
+		}, false},
 	} {
 		test.Run(damage.name, func(test *testing.T) {
 			test.Parallel()
@@ -275,7 +304,9 @@ func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(test *testing.T) {
 	if !ok {
 		test.Fatal("the pack served nothing, so nothing below is about a served file")
 	}
+	// Unsafe: the address is only compared, never followed.
 	start := uintptr(unsafe.Pointer(unsafe.StringData(served)))
+	// Unsafe: the address is only compared, never followed.
 	mapped := uintptr(unsafe.Pointer(&pack.mapped[0]))
 	if start < mapped || start+uintptr(len(served)) > mapped+uintptr(len(pack.mapped)) {
 		test.Errorf("the served file lies outside the pack's mapping, so it was copied")

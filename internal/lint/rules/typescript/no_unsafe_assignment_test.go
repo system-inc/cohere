@@ -41,7 +41,7 @@ func noUnsafeAssignmentOnDisk(sourceText string) string {
 // shell or a keyboard on the way here. Every one was additionally run through the installed 8.67.0
 // build over a real program, which reported nothing on all thirty-six.
 //
-// These carry most of the rule's judgment. An inferred variable is silent because its type IS the
+// These carry most of the rule's judgment. An inferred variable is silent because its type is the
 // value's, `unknown` is silent because absorbing an `any` is what `unknown` is for, and a generic
 // whose argument matches is silent because nothing disagrees.
 func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(test *testing.T) {
@@ -691,7 +691,7 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(test *testin
 			reason:     "the control: a tuple of the same length does report",
 		},
 		{
-			// The spread anchor's parent test. A spread in a CALL is `no-unsafe-argument`'s
+			// The spread anchor's parent test. A spread in a call is `no-unsafe-argument`'s
 			// question rather than this rule's, and without the test this reports there too.
 			sourceText: "declare const a: any[];\ndeclare function f(...xs: string[]): void;\nf(...a);",
 			wantIds:    nil,
@@ -757,7 +757,7 @@ func TestNoUnsafeAssignmentRequiresTheTypedHarness(test *testing.T) {
 // Two hazards meet in this rule. `Elements()` and `Properties()` panic on a kind that has neither,
 // and the shelf's `IsTypeAnyArrayType` indexes `getTypeArguments(t)[0]` with no length test, so an
 // array type carrying no arguments panics one call in. Both are guarded, and the walk recovers per
-// FILE rather than per rule, so either would cost every rule in the package every finding in that
+// file rather than per rule, so either would cost every rule in the package every finding in that
 // file while the run still printed a plausible summary.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach most

@@ -38,6 +38,17 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 	}
 }
 
+// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
+type MethodSignatureStyleSetting string
+
+const (
+	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
+	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
+
+	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
+	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
+)
+
 // MethodSignatureStyle requires one spelling for a signature, a shorthand method or a property.
 //
 //	valid (property): interface I { m: (a: string) => void; }
@@ -53,8 +64,8 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // # The repair rebuilds a signature, and it is type-safe because it copies rather than re-renders
 //
 // This is the shape that lost type information twice in this project: a fixer that constructs a
-// replacement drops whatever it does not think to re-render. Upstream avoids it by splicing RAW
-// SOURCE for the two parts that can hold anything: the parameter list is copied from its opening
+// replacement drops whatever it does not think to re-render. Upstream avoids it by splicing raw
+// source for the two parts that can hold anything: the parameter list is copied from its opening
 // parenthesis to its closing one, and the type parameter list is copied whole. Only the key, the
 // arrow and the return type are assembled.
 //
@@ -72,7 +83,7 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // # An absent return type becomes an explicit `any`, and that is not a widening
 //
 // `getMethodReturnType` returns the literal string `any` when there is no annotation, because a
-// method signature with no return type already IS `any` and the property form has nowhere to put an
+// method signature with no return type already is `any` and the property form has nowhere to put an
 // implicit one. Measured through the compiler: `m(a: string);` and `m: (a: string) => any;` are both
 // `(a: string) => any`. Reproduced rather than declined.
 //
@@ -82,7 +93,7 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // else, so the finding fires and the repair is withheld. A member inside a module declaration is
 // reported without a repair, which upstream does not explain and which is reproduced rather than
 // improved. And a `readonly` function property converts to a method that is no longer readonly,
-// which is a behavior change, so upstream offers it as a SUGGESTION rather than a fix.
+// which is a behavior change, so upstream offers it as a suggestion rather than a fix.
 //
 // The `readonly` case is the one worth naming: it is the same judgment this project applies when it
 // declines a fixer that would drop a type, arrived at independently by upstream, and it is why this
@@ -170,7 +181,7 @@ func reportMethodSignatureShouldBeProperty(ruleContext rule.Context, node *ast.N
 	}
 
 	if len(duplicates) > 0 {
-		// Every signature in the group reports, and only the FIRST one carries the repair.
+		// Every signature in the group reports, and only the first one carries the repair.
 		//
 		// Upstream attaches the same whole-group rewrite to every signature, so its two findings
 		// carry two overlapping fixes. That works there because ESLint applies one fix per pass and
@@ -218,7 +229,7 @@ func reportMethodSignatureShouldBeProperty(ruleContext rule.Context, node *ast.N
 
 // methodSignatureOverloadFixes builds upstream's intersection repair for a duplicated key.
 //
-// Every signature sharing the key becomes one function type, joined with `&`, written at the FIRST
+// Every signature sharing the key becomes one function type, joined with `&`, written at the first
 // of them in source order, and the rest are deleted along with the whitespace that followed them.
 func methodSignatureOverloadFixes(
 	ruleContext rule.Context,
@@ -253,7 +264,7 @@ func methodSignatureOverloadFixes(
 			builder.WriteString(" & ")
 		}
 		// Upstream writes `(${params} => ${returnType})`, and `params` already carries its own
-		// parentheses, so the rendered constituent is `((a: string) => void)` from ONE pair written
+		// parentheses, so the rendered constituent is `((a: string) => void)` from one pair written
 		// here. Writing two produced `((( ... ` and left the parentheses unbalanced.
 		builder.WriteString("(")
 		builder.WriteString(parameters)
@@ -264,7 +275,7 @@ func methodSignatureOverloadFixes(
 
 	// One replacement over the whole group rather than a rewrite plus a removal per duplicate.
 	//
-	// Upstream emits exactly that pair, and ESLint then MERGES a finding's fixes into a single
+	// Upstream emits exactly that pair, and ESLint then merges a finding's fixes into a single
 	// range running from the first edit's start to the last edit's end, splicing the untouched text
 	// between them back in. Measured on a three-overload case: upstream's rule yields a rewrite and
 	// two removals, and the fix ESLint actually applies is one replacement of `[19,61)` whose text
@@ -333,7 +344,7 @@ func reportMethodSignaturePropertyShouldBeMethod(ruleContext rule.Context, node 
 //
 // The key's own source text, with the brackets already on it for a computed key, and a `?` appended
 // for an optional member. Upstream re-adds the brackets because TSESTree's `key` is the inner
-// expression; our `Name()` for a computed member IS the bracketed node, so its text already carries
+// expression; our `Name()` for a computed member is the bracketed node, so its text already carries
 // them and re-adding would double them.
 func methodSignatureKeyText(ruleContext rule.Context, member *ast.Node, name *ast.Node) (string, bool) {
 	text, readable := methodSignatureNodeText(ruleContext, name)
@@ -359,7 +370,7 @@ func methodSignatureQuestionTokenOf(member *ast.Node) *ast.Node {
 
 // methodSignatureParametersText is upstream's `getMethodParams`.
 //
-// The parameter list is copied as RAW SOURCE from its opening parenthesis to its closing one, and
+// The parameter list is copied as raw source from its opening parenthesis to its closing one, and
 // the type parameter list is copied whole and prepended. Nothing in either is re-rendered, which is
 // what makes an optional parameter, a rest parameter, a generic constraint, a default and a comment
 // all survive the rewrite. A fixer that enumerated those would lose whichever it forgot, which is
@@ -441,7 +452,7 @@ func methodSignatureScanForwardFor(sourceText string, from int, ceiling int, wan
 // methodSignatureReturnTypeText is upstream's `getMethodReturnType`.
 //
 // An absent annotation renders as the literal `any`, because a method signature with no return type
-// already IS `any` and the property form has nowhere to put an implicit one. Measured through the
+// already is `any` and the property form has nowhere to put an implicit one. Measured through the
 // compiler: `m(a: string);` and `m: (a: string) => any;` are the same type.
 func methodSignatureReturnTypeText(ruleContext rule.Context, returnType *ast.Node) string {
 	if returnType == nil {
@@ -521,8 +532,8 @@ func methodSignatureIsInsideModule(node *ast.Node) bool {
 
 // methodSignatureSiblingsOf returns the members of the interface or type literal holding a member.
 //
-// `Members()` PANICS on a kind with no member list, so the kinds are named rather than tried. The
-// walk recovers per FILE rather than per rule, so one panic would cost every rule that file.
+// `Members()` panics on a kind with no member list, so the kinds are named rather than tried. The
+// walk recovers per file rather than per rule, so one panic would cost every rule that file.
 func methodSignatureSiblingsOf(node *ast.Node) []*ast.Node {
 	parent := node.Parent
 	if parent == nil {
@@ -562,20 +573,9 @@ func methodSignatureNodeText(ruleContext rule.Context, node *ast.Node) (string, 
 	return sourceText[trimmed.Pos():trimmed.End()], true
 }
 
-// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
-type MethodSignatureStyleSetting string
-
-const (
-	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
-	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
-
-	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
-	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
-)
-
 // MethodSignatureStyleOptions is the rule's configuration.
 //
-// Upstream's schema is a bare STRING rather than an object, matching
+// Upstream's schema is a bare string rather than an object, matching
 // `class-literal-property-style` in this package, and `defaultOptions` is `['property']`.
 type MethodSignatureStyleOptions struct {
 	Style MethodSignatureStyleSetting

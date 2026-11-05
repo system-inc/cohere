@@ -200,8 +200,12 @@ func newComparison(pass *analysis.Pass) *comparison {
 var (
 	positionType     = reflect.TypeFor[token.Pos]()
 	commentGroupType = reflect.TypeFor[*ast.CommentGroup]()
-	objectType       = reflect.TypeFor[*ast.Object]()
-	scopeType        = reflect.TypeFor[*ast.Scope]()
+	// The walk names the deprecated ast.Object and ast.Scope only to skip their fields, and matching them by name
+	// as strings would hide that dependency from the compiler.
+	//cohere:ignore SA1019 named only so the walk can skip these deprecated fields
+	objectType = reflect.TypeFor[*ast.Object]()
+	//cohere:ignore SA1019 named only so the walk can skip these deprecated fields
+	scopeType = reflect.TypeFor[*ast.Scope]()
 )
 
 func (comparison *comparison) sameStatements(left []ast.Stmt, right []ast.Stmt) bool {

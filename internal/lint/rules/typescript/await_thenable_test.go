@@ -20,7 +20,7 @@ const awaitThenableFile = "/repository/source/Await.ts"
 // `AsyncDisposable` and `Symbol.asyncDispose` do not resolve. Probed rather than assumed: under the
 // default harness `declare const d: Disposable; await using x = d` produces a type whose flags
 // report `any`, which is the error type, and `IsTypeAnyType` then skips the declarator. The case
-// goes SILENT while upstream reports it.
+// goes silent while upstream reports it.
 //
 // That is the dangerous direction. Three of upstream's failing cases and three of its passing ones
 // mention these types, and dropping them into the fixture tables unchanged would have put three
@@ -29,7 +29,7 @@ const awaitThenableFile = "/repository/source/Await.ts"
 //
 // Declaring the interfaces locally is not enough either, and that was also measured: a local
 // `interface AsyncDisposable` gave a `Symbol.asyncDispose` that is not the real well-known symbol,
-// so `GetWellKnownSymbolPropertyOfType` missed it and a correct AsyncDisposable REPORTED. Merging
+// so `GetWellKnownSymbolPropertyOfType` missed it and a correct AsyncDisposable reported. Merging
 // onto the global `SymbolConstructor` is what makes the symbol unique and the lookup succeed, which
 // is why this is a `declare global` block in a second file rather than a prelude in the first.
 const disposeGlobals = `
@@ -144,7 +144,7 @@ func TestAwaitThenableStaysSilent(test *testing.T) {
 //
 // Splitting these out is what keeps them honest. Run under the default harness these six all pass
 // too, three by reporting nothing where nothing is expected and three by reporting nothing where a
-// finding IS expected, so the failing half is the only reason the gap was visible at all. See the
+// finding is expected, so the failing half is the only reason the gap was visible at all. See the
 // note on disposeGlobals.
 func TestAwaitThenableDisposable(test *testing.T) {
 	test.Parallel()
@@ -180,10 +180,10 @@ func TestAwaitThenableDisposable(test *testing.T) {
 // and each is asserted against a literal typed here rather than against the rule's own message
 // constant, because a constant compared to itself moves under mutation and stays green.
 //
-// The await arm points at the WHOLE await expression rather than at its operand, which is worth
+// The await arm points at the whole await expression rather than at its operand, which is worth
 // pinning because reporting the operand is the natural way to write it and no id fixture could see
-// the difference. The `for await` arm points at the loop HEAD, a computed range ending where the
-// body begins, not at any single node. The `await using` arm points at the INITIALIZER rather than
+// the difference. The `for await` arm points at the loop `HEAD`, a computed range ending where the
+// body begins, not at any single node. The `await using` arm points at the initializer rather than
 // at the declaration, so five declarators produce findings at five different offsets.
 func TestAwaitThenableSpans(test *testing.T) {
 	test.Parallel()
@@ -216,7 +216,7 @@ func TestAwaitThenableSpans(test *testing.T) {
 			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		finding := result.Diagnostics[0]
-		// The range ends at the body's Pos(), which sits BEFORE the whitespace separating the head
+		// The range ends at the body's Pos(), which sits before the whitespace separating the head
 		// from the brace, so the slice carries no trailing space. Upstream's own doc draws the
 		// carets the same way, under `for await (const foo of bar)` and stopping there. This is
 		// asserted rather than trimmed because the end offset is the half a rename cannot change
@@ -259,14 +259,14 @@ func TestAwaitThenableSpans(test *testing.T) {
 // against the output upstream records for it.
 //
 // This is the assertion the brief calls non-optional and the harness does not supply: ExpectFixedSource
-// applies FIXES, and every repair this rule offers is a SUGGESTION, which the engine never applies
+// applies fixes, and every repair this rule offers is a suggestion, which the engine never applies
 // unattended. So the applier is hand-rolled below over a single suggestion's fix list.
 //
 // It is worth the twenty lines because a suggestion is where this rule can be wrong invisibly. A
 // finding carrying a repair that deletes the wrong range satisfies its message id perfectly, and
 // every id fixture above stays green over it. Upstream ships fourteen `removeAwait` outputs and two
 // `convertToOrdinaryFor` outputs, each an exact before-and-after pair, and they pin that the removal
-// takes the `await` KEYWORD and nothing else. Two of them, cases 2 and 3 here, differ only in whether
+// takes the `await` keyword and nothing else. Two of them, cases 2 and 3 here, differ only in whether
 // a space follows the keyword, which is what makes them a real test of the range rather than of the
 // intent.
 func TestAwaitThenableSuggestions(test *testing.T) {
@@ -345,13 +345,13 @@ func applySuggestion(test *testing.T, source string, suggestion rule.Suggestion)
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
 // two. Every listener dereferences ctx.TypeChecker, and under rule_testing.Run that field is nil, so a
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
-// case pass VACUOUSLY, having proven nothing at all. The count below is what makes that visible.
+// case pass vacuously, having proven nothing at all. The count below is what makes that visible.
 //
 // The nil guard the standing advice asks for now lives in this rule, because absorbing it off the
 // adapter made the listeners ours to edit. It sits in Run rather than in each listener, so a nil
 // checker declines the file once instead of being re-tested per node. The guard is unreachable
 // through registration, since NeedsTypeChecker is declared; it covers the harness path, where a
-// Context is built by hand. This test pins the declaration AND the decline, so losing either one
+// Context is built by hand. This test pins the declaration and the decline, so losing either one
 // fails loudly rather than going vacuously green.
 func TestAwaitThenableRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()

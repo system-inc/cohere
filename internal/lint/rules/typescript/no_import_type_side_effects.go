@@ -74,7 +74,7 @@ var messageUseTopLevelQualifier = rule.Message{
 // inserted qualifier lands immediately after the `import` keyword rather than before the brace, so
 // the result carries `import type   {`.
 //
-// The imported name is the SOURCE side of a rename, not the local binding. In `type A as AA`, upstream
+// The imported name is the source side of a rename, not the local binding. In `type A as AA`, upstream
 // removes up to `A`. Here that is `PropertyName` when a rename is present and the specifier's own name
 // otherwise, which is the opposite of the reflexive choice: `Name()` alone would remove `type A as `
 // and produce `import type { AA } from 'mod'`, silently changing which export is imported.
@@ -133,7 +133,7 @@ var NoImportTypeSideEffects = rule.Rule{
 	},
 }
 
-// importedNameOf returns the SOURCE-side name of an import specifier, which is what upstream's
+// importedNameOf returns the source-side name of an import specifier, which is what upstream's
 // `specifier.imported` names.
 //
 // For `A as AA` that is `A`, carried on PropertyName; for a bare `A` there is no PropertyName and the

@@ -1,12 +1,12 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-redeclare.test.ts and edge rows. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-redeclare.test.ts and edge rows. Do not edit by hand.
 //
 // The 21 valid and 31 invalid rows were extracted by loading upstream's test file with its RuleTester stubbed,
 // and 34 edge rows were added for what that corpus leaves open. Before recording, every upstream row
 // was linted untyped, as upstream's RuleTester runs it, with its own parser options, globals and directives, and
 // agreed with upstream's own assertions: message ids, lines and columns. Every row was then replayed against the
-// INSTALLED rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under noRedeclareCorpusTsconfig, its
+// installed rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under noRedeclareCorpusTsconfig, its
 // lib replaced where the row names one, on the bytes this harness writes: the source trimmed plus one newline.
 // Each finding records the message id and the exact text the installed rule's location covers.
 //

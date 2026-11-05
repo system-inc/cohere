@@ -146,8 +146,7 @@ func typeName(key configuration.TopLevelKey) string {
 	case key.Field == configuration.ExtendsListType:
 		return "string or array of strings"
 	case key.Field == nil:
-		shape := ignoredKeyShapes[key.Name]()
-		return fmt.Sprint(shape["type"])
+		return ignoredKeyShapes[key.Name]().Type
 	case key.Field.Kind() == reflect.String:
 		return "string"
 	case key.Field.Kind() == reflect.Slice && key.Field.Elem().Kind() == reflect.String:

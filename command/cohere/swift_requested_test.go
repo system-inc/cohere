@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,14 +15,17 @@ import (
 func renderRequested(test *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 	run.requested = requested
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
+			flushStream(test, stream)
 			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited")
+	flushStream(test, stream)
 	return out.String(), exitCode, finishError
 }
 
@@ -38,12 +43,14 @@ func flagsOf(names ...string) (map[string]bool, func(string) string) {
 	}
 }
 
-// editRecords rewrites the records of a fixture: drop removes a record, and edit changes one in place.
-func editRecords(test *testing.T, lines []string, edit func(record map[string]any) (keep bool)) []string {
+// editRecords rewrites the records of a fixture: drop removes a record, and edit changes one in place. Each
+// record is its members as raw JSON, so an edit reads one with recordText and writes one as the JSON it holds,
+// and a member no edit touches is written back as it was.
+func editRecords(test *testing.T, lines []string, edit func(record map[string]json.RawMessage) (keep bool)) []string {
 	test.Helper()
 	edited := []string{}
 	for _, line := range lines {
-		record := map[string]any{}
+		record := map[string]json.RawMessage{}
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
@@ -57,6 +64,14 @@ func editRecords(test *testing.T, lines []string, edit func(record map[string]an
 		edited = append(edited, string(encoded))
 	}
 	return edited
+}
+
+// recordText is a record's member read as a string, or "" when it is absent or holds another kind.
+func recordText(record map[string]json.RawMessage, key string) string {
+	text := ""
+	// Ignored: a member absent or of another kind reads as "", which is no kind or name an edit looks for.
+	_ = json.Unmarshal(record[key], &text)
+	return text
 }
 
 // A command line asks for the phases the TypeScript run would run for it.
@@ -104,14 +119,14 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 	)
 
 	// The same run with nothing found passes.
-	clean := editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]any) bool {
-		switch record["kind"] {
+	clean := editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]json.RawMessage) bool {
+		switch recordText(record, "kind") {
 		case "finding":
 			return false
 		case "lint", "summary":
-			record["findings"] = 0
-			if record["kind"] == "summary" {
-				record["exitCode"] = 0
+			record["findings"] = json.RawMessage("0")
+			if recordText(record, "kind") == "summary" {
+				record["exitCode"] = json.RawMessage("0")
 			}
 		}
 		return true
@@ -135,13 +150,13 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 	// Skipped for any other reason, under --lint, while calling the run complete: the contradiction the
 	// summary check exists for.
 	otherSkip := func(complete bool) []string {
-		return editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]any) bool {
-			if record["kind"] == "phase" && record["name"] == "lint" {
-				record["outcome"] = "skipped"
-				record["detail"] = "no rule was configured"
+		return editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]json.RawMessage) bool {
+			if recordText(record, "kind") == "phase" && recordText(record, "name") == "lint" {
+				record["outcome"] = json.RawMessage(`"skipped"`)
+				record["detail"] = json.RawMessage(`"no rule was configured"`)
 			}
-			if record["kind"] == "summary" {
-				record["complete"] = complete
+			if recordText(record, "kind") == "summary" {
+				record["complete"] = json.RawMessage(strconv.FormatBool(complete))
 			}
 			return true
 		})

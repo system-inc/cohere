@@ -19,15 +19,15 @@ import (
 // exported one, which is itself an alias of the original, and a `@deprecated` tag can be written on
 // any link in that chain.
 //
-// Before these accessors existed the chain was unreachable and the answer was silently WRONG rather
-// than absent. Measured on the seeded case below: reading the resolved symbol's own declarations
+// Before these accessors existed the chain was unreachable and the answer was silently wrong, not
+// merely absent. Measured on the seeded case below: reading the resolved symbol's own declarations
 // answers "not deprecated" for an export whose alias carries the tag. That is a false negative,
 // which costs findings and announces nothing.
 //
 // # What each assertion has to survive
 //
-// The precedent in this package sets the standard and it applies here: assert what the value IS,
-// never that it is present. A nil check on `resolveAlias` passes for a chain that resolves to the
+// The precedent in this package sets the standard and it applies here: assert what the value is,
+// never merely that it is present. A nil check on `resolveAlias` passes for a chain that resolves to the
 // wrong symbol entirely, and "the walk found a deprecation" passes for a walk that reports one on
 // every input. So each case below names the symbol the chain must reach, and the negative case is
 // carried alongside the two positives rather than assumed.
@@ -40,11 +40,11 @@ import (
 //
 // Without the third, a walk that answered "deprecated" unconditionally would pass the first two.
 //
-// # BOTH accessors panic on a non-alias, and the caller-side gate is mandatory
+// # Both accessors panic on a non-alias, and the caller-side gate is mandatory
 //
 // Each one opens by testing `SymbolFlagsAlias` and panicking when it is unset. That reads like a
 // guard and is an assertion: `if symbol.Flags&ast.SymbolFlagsAlias == 0 { panic(...) }` at
-// checker.go:2162 and 16361. A rule's walk recovers per FILE rather than per rule, so one unguarded
+// checker.go:2162 and 16361. A rule's walk recovers per file rather than per rule, so one unguarded
 // call costs every rule that file, which is how this project lost 167 files once already.
 //
 // This is written down because the first version of this test asserted the opposite. It expected
@@ -60,8 +60,8 @@ func TestAliasAccessorsWalkTheChainToADeprecation(test *testing.T) {
 		otherSource string
 		// wantChainFindsDeprecation is what the alias walk must conclude.
 		wantChainFindsDeprecation bool
-		// wantResolvedFindsDeprecation is what reading the FINAL symbol alone concludes, which is
-		// what a rule would answer without these accessors.
+		// wantResolvedFindsDeprecation is what reading the final symbol alone, the chain's end, concludes,
+		// which is what a rule would answer without these accessors.
 		wantResolvedFindsDeprecation bool
 	}{
 		{
@@ -93,7 +93,7 @@ func TestAliasAccessorsWalkTheChainToADeprecation(test *testing.T) {
 
 			importedUse := aliasSubjectImportedUse(test, fileChecker, sourceFile)
 
-			// The symbol an import produces must BE an alias, or the two accessors below are never
+			// The symbol an import produces must itself be an alias, or the two accessors below are never
 			// reached and every assertion after this is vacuous.
 			if importedUse.Flags&ast.SymbolFlagsAlias == 0 {
 				test.Fatalf("the imported symbol does not carry SymbolFlagsAlias, so the alias "+
@@ -105,12 +105,13 @@ func TestAliasAccessorsWalkTheChainToADeprecation(test *testing.T) {
 			if resolved == nil {
 				test.Fatal("Checker_resolveAlias returned nil for a symbol carrying the alias flag")
 			}
-			// It must reach the ORIGINAL, not merely something. A chain that stopped at the export
+			// It must reach the original, not merely something. A chain that stopped at the export
 			// would satisfy a nil check and answer the wrong question.
 			// The import is renamed, so the alias is `renamed` and the original is `exported`.
 			// Naming both sides makes a chain that never moved fail loudly rather than reporting
 			// a name that happens to match.
-			const aliasName, originalName = "renamed", "exported"
+			const aliasName = "renamed"
+			const originalName = "exported"
 			if resolved.Name != originalName {
 				test.Errorf("Checker_resolveAlias reached %q; it must reach the original %q rather "+
 					"than stopping at the alias %q", resolved.Name, originalName, aliasName)
@@ -240,7 +241,7 @@ func buildAliasSubject(test *testing.T, otherSource string) (*checker.Checker, *
 	test.Helper()
 	directory := test.TempDir()
 
-	// The import is RENAMED so that "the chain reached the original" is falsifiable. With both
+	// The import is renamed so that "the chain reached the original" is falsifiable. With both
 	// names spelled the same, an assertion that the resolved symbol is named `original` passes for
 	// a chain that never moved at all, and a mutation removing the check survives. Measured: it
 	// did survive, until the rename made the two names differ.
@@ -283,7 +284,7 @@ func buildAliasSubject(test *testing.T, otherSource string) (*checker.Checker, *
 
 // aliasSubjectImportedUse returns the symbol at the `original()` call site.
 //
-// The USE site rather than the import specifier, because that is what a rule visiting identifiers
+// The use site rather than the import specifier, because that is what a rule visiting identifiers
 // is handed and the two need not resolve identically.
 func aliasSubjectImportedUse(
 	test *testing.T,

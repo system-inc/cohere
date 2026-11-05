@@ -717,8 +717,8 @@ func TestUnboundMethodResolvesAcrossAModuleBoundary(test *testing.T) {
 // recorded as a divergence rather than made to pass.
 //
 // The input destructures `floor` out of `Foo | Math`, where `Foo.floor` is a property holding a
-// function expression and `Math.floor` is a method signature. Both are dangerous, so BOTH orderings
-// report, on the same node, with the same span. They disagree only about WHICH MESSAGE, because the
+// function expression and `Math.floor` is a method signature. Both are dangerous, so both orderings
+// report, on the same node, with the same span. They disagree only about which message, because the
 // two constituents reach different arms of the danger test: the property arm never reads a parameter
 // list and takes the short message, the signature arm reads one, finds no `this`, and takes the long
 // one.
@@ -876,7 +876,7 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(test *testing.T)
 // tests only in the extremes.
 //
 // The first is the `this` parameter. Upstream writes `this: void` and methods with no `this` at all,
-// and never a `this` typed as a third thing, so the test for the void KEYWORD specifically can be
+// and never a `this` typed as a third thing, so the test for the void keyword specifically can be
 // widened to accept any annotation and every imported row stays green. It matters because such a
 // method is still dangerous and takes the shorter message: the author has already reasoned about
 // `this`, so the advice to annotate it would be wrong.
@@ -965,8 +965,8 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(test *testing.T) 
 //
 // A computed access can name several properties at once, because its subscript type may be a union
 // of literals, and upstream asks about each in turn and stops at the first that reports. The stop is
-// over NAMES, not over union constituents of the object, which is easy to misread: the first fixture
-// written for this mutation used a union OBJECT with two dangerous constituents and could not see
+// over names, not over union constituents of the object, which is easy to misread: the first fixture
+// written for this mutation used a union object with two dangerous constituents and could not see
 // the line at all, because the checker hands a union one synthetic property and the inner walk
 // already stops on its own.
 //

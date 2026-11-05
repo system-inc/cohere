@@ -1,0 +1,41 @@
+// Package markertype decides whether a type's methods only mark it, the way a sum type's variants are spelled in Go:
+// an interface with an unexported method, `instructionValue()`, and each variant declaring it with an empty body,
+// `func (*Await) instructionValue() {}`. Such a method carries no behavior to find; it is Go's spelling of union
+// membership, the way a member of a discriminated union is a type in TypeScript, which max-classes-per-file never
+// counted. So a variant stays beside its interface, and a file of them serves no type with methods.
+//
+// The answer lives once because two tools must give it alike: consistency-require-one-type-per-file, which decides
+// which types a file serves, and the codemod that splits files by type, which must move exactly the types the rule
+// counts and leave the variants where the rule leaves them. The codemod reads syntax alone, with no type information,
+// so this works from go/ast and the standard library only. A package under internal/ is importable only from inside
+// cohere's module, so the codemod is built from inside cohere's tree to call it.
+package markertype
+
+import "go/ast"
+
+// IsMarkerOnly is whether methods, every method a type declares, are all marker methods, so the type counts as no type
+// with methods. A marker method has a receiver, an empty body and no results: `func (A) kind() int { return 0 }`
+// answers something and is a real method, and so is one with no body at all, which is written in assembly. An empty
+// body is one with no statements, so a comment inside it, which an empty function is asked to carry to say why it is
+// empty, keeps it empty. A type with no methods at all is no marker type, so IsMarkerOnly of none is false: whether a
+// method-less type counts is its caller's question, and a caller that already skips those never asks this.
+func IsMarkerOnly(methods []*ast.FuncDecl) bool {
+	if len(methods) == 0 {
+		return false
+	}
+	for _, method := range methods {
+		if !isMarkerMethod(method) {
+			return false
+		}
+	}
+	return true
+}
+
+// isMarkerMethod is whether method declares membership and nothing else. NumFields is zero both for no result list
+// and for an empty one, `func (A) kind() ()`, which declares no result either. In code that compiles a method with a
+// result always ends in a return, so its body is never empty, but the results are still read: a caller working from
+// syntax alone can be handed `func (A) kind() int {}`, which parses, and it is no marker.
+func isMarkerMethod(method *ast.FuncDecl) bool {
+	return method.Recv != nil && method.Body != nil && len(method.Body.List) == 0 &&
+		method.Type.Results.NumFields() == 0
+}

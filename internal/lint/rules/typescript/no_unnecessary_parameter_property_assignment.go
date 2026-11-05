@@ -48,7 +48,7 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // Upstream's visitor overrides `visit_assignment_expression` and never calls the default walker
 // from it, so an assignment expression is a dead end: neither side is descended into. It separately
 // overrides `visit_function`, which stops function declarations, function expressions and methods
-// because each rebinds `this`. An arrow function is NOT stopped, because it closes over `this`.
+// because each rebinds `this`. An arrow function is not stopped, because it closes over `this`.
 //
 // Reading the corpus alone suggests the opposite, because the one clean arrow case
 // (`this.bar = () => { this.foo = foo; }`) looks like evidence that arrows are skipped. It is not.
@@ -58,7 +58,7 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // expression statement reports. Both would be silent under an arrow skip. A port that skipped
 // arrows would pass every imported fixture and go silent on both of those.
 //
-// # A prior write to the parameter does NOT rescue the assignment
+// # A prior write to the parameter does not rescue the assignment
 //
 // `constructor(public foo: string) { foo = foo.trim(); this.foo = foo; }` **reports** on the
 // release binary, even though the property and the parameter now genuinely differ. Upstream's
@@ -137,14 +137,14 @@ var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
 						}
 						// Upstream's `get_binding_identifier` answers nothing for a destructuring
 						// pattern. TypeScript rejects one on a parameter property with error 1187,
-						// so this never appears in code that compiles, but the PARSER still builds
+						// so this never appears in code that compiles, but the parser still builds
 						// the node and sets the modifier flag on it, and a linter has to survive
 						// invalid source.
 						//
 						// This is crash protection rather than a behavioral filter, which is why a
 						// mutation removing it survived the whole fixture set: no `ExpectFindings`
 						// case can observe a panic. Measured directly on
-						// `constructor(public { a }: { a: string })` — the parameter carries
+						// `constructor(public { a }: { a: string })`: the parameter carries
 						// ModifierFlagsParameterPropertyModifier, its name is a
 						// KindObjectBindingPattern, and `Text()` panics with "Unhandled case in
 						// Node.Text: *ast.BindingPattern". That is a fourth panicking shape beside
@@ -199,7 +199,7 @@ func (v *parameterPropertyAssignmentVisitor) visit(node *ast.Node) {
 	// property. An arrow function is deliberately absent: it closes over `this` and upstream walks
 	// into it.
 	//
-	// A nested CONSTRUCTOR belongs here and its absence was a real defect, caught by upstream case
+	// A nested constructor belongs here and its absence was a real defect, caught by upstream case
 	// 16 and by nothing else. Upstream's `MethodDefinition` holds a `Function` as its value, so a
 	// nested class's constructor is stopped by the same override that stops a method. Without this
 	// arm the descent reports the inner assignment, and then the rule's own KindConstructor
@@ -275,7 +275,7 @@ func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 	}
 
 	// Anchored on the reported range rather than on `node.Pos()`. A node's `Pos()` is the position
-	// BEFORE its leading trivia, so a deletion starting there swallows the indentation of the line
+	// before its leading trivia, so a deletion starting there swallows the indentation of the line
 	// as well as the assignment, and every one of upstream's 21 fix vectors keeps that indentation.
 	// `rule.TokenRange` is the same trivia-stripped span the diagnostic itself carries, which is
 	// also what makes the finding and its repair point at the same bytes.
@@ -321,7 +321,7 @@ func isUnnecessaryAssignmentOperator(operator ast.Kind) bool {
 // The parenthesis skip on the target has no counterpart in upstream's source and is required to
 // match it. oxc's parser converts a parenthesized assignment target into the bare target before the
 // rule runs, so `(this.foo) = foo` reports there; our parser keeps the node. The `this` object
-// underneath is matched by kind with NO skip, because upstream matches `Expression::ThisExpression`
+// underneath is matched by kind with no skip, because upstream matches `Expression::ThisExpression`
 // directly and `(this).foo = foo` is silent on the release binary.
 func thisPropertyNameOfAssignmentTarget(target *ast.Node) (string, bool) {
 	target = skipParentheses(target)
@@ -421,7 +421,7 @@ func identifierIsShadowedBefore(identifier *ast.Node, name string) bool {
 // blockDeclaresName answers whether a statement container declares the name directly.
 //
 // The kind test is not an optimization. `Node.Statements()` routes through `Node.StatementList()`,
-// which PANICS with "Unhandled case in Node.StatementList" on anything that is not one of these
+// which panics with "Unhandled case in Node.StatementList" on anything that is not one of these
 // three kinds, exactly the way `Node.ParameterList()` and `Node.Text()` panic off their own kinds.
 // This walk climbs through arbitrary ancestors, so it meets a BinaryExpression on the second case
 // it ever sees, and the unguarded version took the whole test binary down.
@@ -483,7 +483,7 @@ func functionParametersDeclareName(node *ast.Node, name string) bool {
 // function whose body assigns. Position in the class does not matter, which was measured rather
 // than read: `init = (this.foo = 1)` silences the constructor from above it and from below it.
 //
-// The parenthesis skip here IS in upstream's source, as `without_parentheses()`, and it is
+// The parenthesis skip here is in upstream's source, as `without_parentheses()`, and it is
 // load-bearing on our tree because every corpus case writes the initializer as `(this.foo += 1)`.
 func propertiesAssignedInClassBody(class *ast.Node) map[string]bool {
 	assigned := map[string]bool{}
@@ -525,7 +525,7 @@ func assignmentsInsideInitializer(expression *ast.Node) []*ast.Node {
 		return assignments
 	}
 
-	// Deliberately NOT unwrapping parentheses, and this is the single most counter-intuitive line
+	// Deliberately not unwrapping parentheses, and this is the single most counter-intuitive line
 	// in the rule. Upstream calls `without_parentheses()` on the initializer and on the callee and
 	// nowhere else, so a parenthesized assignment reached through either arm below is simply not
 	// recognized and the suppression does not happen. Adding a skip here reads as a free

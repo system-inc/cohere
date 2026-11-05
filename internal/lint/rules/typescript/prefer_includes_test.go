@@ -476,9 +476,9 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T)
 			reason:     "an argument whose type has no includes declines",
 		},
 		{
-			// The function-like test is the ONLY thing declining this, and it took a survivor to
+			// The function-like test is the only thing declining this, and it took a survivor to
 			// find an input that can see it. Upstream's own clean case pairs `includes: boolean`
-			// with a two-parameter `indexOf`, so the parameter COUNT guard declines it first and a
+			// with a two-parameter `indexOf`, so the parameter count guard declines it first and a
 			// mutant treating a property as a zero-parameter function survives the whole corpus.
 			// Giving `indexOf` no parameters makes both counts zero, so only the function-like test
 			// is left. Measured clean upstream against the control below, which reports.

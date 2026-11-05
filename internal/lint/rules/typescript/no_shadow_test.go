@@ -53,7 +53,7 @@ func TestNoShadowNeedsTheTypedHarness(test *testing.T) {
 	}
 }
 
-// TestNoShadowSpanAndMessage asserts WHERE a finding points and WHAT it says.
+// TestNoShadowSpanAndMessage asserts where a finding points and what it says.
 //
 // ExpectFindings asserts ids and count and nothing else, so a rule pointing at the wrong node or
 // rendering the wrong text passes every case above. The message interpolates the shadowed
@@ -125,7 +125,7 @@ func TestNoShadowEnumMessage(test *testing.T) {
 // at all, and the exemption that keeps `var a = function a() {}` clean is reached through an
 // identity test that a KindParenthesizedExpression would break. A destructured parameter is the
 // other shape: reading a binding name without a kind guard panics on a binding pattern, and the
-// walk recovers per FILE, so one such parameter would cost every rule in the package its verdict.
+// walk recovers per file, so one such parameter would cost every rule in the package its verdict.
 func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(test *testing.T) {
 	test.Parallel()
 
@@ -167,7 +167,7 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(test *testing.T) {
 	}
 
 	// Control for the two parenthesized cases above: without the parentheses the exemption applies
-	// and the case is clean, so a wrapped call must still REPORT. If this went silent the unwrap
+	// and the case is clean, so a wrapped call must still report. If this went silent the unwrap
 	// would be over-reaching rather than correct.
 	test.Run("parenthesized wrapped call still reports", func(test *testing.T) {
 		test.Parallel()
@@ -178,7 +178,7 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(test *testing.T) {
 
 // TestNoShadowInferTypeParameters pins the infer-over-infer exemption and its boundary.
 //
-// Upstream default corpus contains exactly ONE infer case, and it is clean, so a port that
+// Upstream default corpus contains exactly one infer case, and it is clean, so a port that
 // exempted `infer` outright would pass the whole imported set while silencing two shapes upstream
 // reports. Every verdict below was measured by driving the installed rule at 8.67.0 rather than
 // read off the source; the commands are recorded in the helper doc comment.
@@ -195,7 +195,7 @@ func TestNoShadowInferTypeParameters(test *testing.T) {
 		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source))
 	})
 
-	// The two boundary cases. Both REPORT on the installed rule, and both would go silent under a
+	// The two boundary cases. Both report on the installed rule, and both would go silent under a
 	// blanket infer exemption.
 	test.Run("infer over an outer type alias reports", func(test *testing.T) {
 		test.Parallel()
@@ -222,7 +222,7 @@ func TestNoShadowInferTypeParameters(test *testing.T) {
 //
 // Two `enum A` declarations merge onto one symbol, so the Exports table reached from either lists
 // every member of both. Without the containment test in collectEnumMembers this input reports
-// TWICE at the identical span, which reads as a correct finding in any count and is visible only
+// twice at the identical span, which reads as a correct finding in any count and is visible only
 // in the count itself.
 func TestNoShadowMergedEnumReportsOnce(test *testing.T) {
 	test.Parallel()
@@ -235,9 +235,9 @@ func TestNoShadowMergedEnumReportsOnce(test *testing.T) {
 // TestNoShadowFunctionTypeParameterNames covers a shape upstream corpus does not write.
 //
 // The defaults corpus tests `ignoreFunctionTypeParameterNameValueShadow` only where the outer
-// binding is a TYPE, and that case is already clean for a different reason: a type shadowed by a
+// binding is a type, and that case is already clean for a different reason: a type shadowed by a
 // value crosses the declaration-space boundary. So the guard for this option survived a mutation of
-// the whole imported set, and the shape that separates them is an outer VALUE.
+// the whole imported set, and the shape that separates them is an outer value.
 //
 // Every verdict was measured by driving the installed rule at 8.67.0. Five type-position parameter
 // forms are clean over an outer value; a real function parameter over the same value reports.
@@ -265,7 +265,7 @@ func TestNoShadowFunctionTypeParameterNames(test *testing.T) {
 	}
 
 	// The control that makes the five above mean something: the same outer value shadowed by a
-	// REAL parameter reports, so the exemption is about type position rather than about the name.
+	// real parameter reports, so the exemption is about type position rather than about the name.
 	test.Run("control: a real function parameter reports", func(test *testing.T) {
 		test.Parallel()
 		source := "const cb = 1;\nfunction foo(cb: number) {}\n"
@@ -277,7 +277,7 @@ func TestNoShadowFunctionTypeParameterNames(test *testing.T) {
 // load bearing, and it is a shape upstream corpus does not write.
 //
 // A function-expression name is collected from AST shape rather than from a locals table, so two of
-// them in the same scope land in the same slice. They are SIBLINGS, not nested, and upstream gives
+// them in the same scope land in the same slice. They are siblings, not nested, and upstream gives
 // each its own scope so neither can see the other. Without the containment test in
 // findEnclosingBinding the second would be paired with the first and reported.
 //
@@ -315,9 +315,9 @@ func TestNoShadowSiblingExpressionNames(test *testing.T) {
 
 // TestNoShadowInterfaceTypeParameters covers the third substrate gap of the enum family.
 //
-// An interface declaration is NOT a locals container, so its type parameters are invisible to the
+// An interface declaration is not a locals container, so its type parameters are invisible to the
 // scope walk exactly the way an enum's members are, and they need collecting from AST shape. A type
-// ALIAS is a locals container and needs none of this, which is what makes the absence easy to miss:
+// alias is a locals container and needs none of this, which is what makes the absence easy to miss:
 // the two read as the same construct and behave differently.
 //
 // Upstream default corpus writes no interface type parameter anywhere, so nothing imported can see
@@ -339,10 +339,10 @@ func TestNoShadowInterfaceTypeParameters(test *testing.T) {
 		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
-	// An interface with NO type parameters is the common case and its TypeParameters field is nil.
-	// Dereferencing it would panic, and the walk recovers per FILE, so one such interface would
+	// An interface with no type parameters is the common case and its TypeParameters field is nil.
+	// Dereferencing it would panic, and the walk recovers per file, so one such interface would
 	// cost every rule in the package its verdict on that file. The assertion is that a binding
-	// nested INSIDE the interface's members is still reached, which a bare early return would lose.
+	// nested inside the interface's members is still reached, which a bare early return would lose.
 	test.Run("plain interface does not abandon the subtree", func(test *testing.T) {
 		test.Parallel()
 		source := "type T = 1;\ninterface Plain {\n  x: number;\n}\nfunction f<T>(a: T) {}\n"
@@ -353,7 +353,7 @@ func TestNoShadowInterfaceTypeParameters(test *testing.T) {
 // TestNoShadowTemporalDeadZone covers the two halves of the default hoist setting that upstream
 // corpus exercises only partially.
 //
-// `hoist` defaults to `functions-and-types`, so an inner binding written textually BEFORE the outer
+// `hoist` defaults to `functions-and-types`, so an inner binding written textually before the outer
 // one it shadows reports only when the outer declaration hoists. The corpus writes the function
 // case and the plain `var`/`let` cases; it writes no interface or type alias in that position, so
 // the other two thirds of the hoisting set survived a mutation of the whole imported suite.
@@ -372,7 +372,7 @@ func TestNoShadowTemporalDeadZone(test *testing.T) {
 		{"outer type alias", "{\n  type a = 1;\n}\ntype a = 2;\n"},
 		// Not a dead zone at all: the parameter's name sits inside the function's own name range,
 		// so the inner binding does not precede the outer one. This is the case that separates a
-		// comparison against the outer name POSITION from one against its END.
+		// comparison against the outer name position from one against its end.
 		{"overlapping positions", "function a(a) {}\n"},
 	}
 	for _, testCase := range reports {
@@ -383,7 +383,7 @@ func TestNoShadowTemporalDeadZone(test *testing.T) {
 		})
 	}
 
-	// The counterpart: a declaration that does NOT hoist leaves the earlier inner binding clean.
+	// The counterpart: a declaration that does not hoist leaves the earlier inner binding clean.
 	// Without these the hoisting set could be widened to everything and nothing would notice.
 	clean := []struct {
 		name   string

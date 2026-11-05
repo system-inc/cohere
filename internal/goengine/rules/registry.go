@@ -71,7 +71,7 @@ import (
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
 // x/tools v0.49.0 and staticcheck v0.8.1. Every other pass in vet's suite reads pass.TypesInfo, nilness and
-// unusedwrite read the SSA form built from it, and staticcheck's checks read it through the helpers they
+// unusedwrite read the `SSA` form built from it, and staticcheck's checks read it through the helpers they
 // share (analysis/code, pattern, buildir). A pass missing from this table counts as type aware, so a pass a
 // newer release adds is never described as running without types before someone has read it.
 var syntaxOnly = map[string]bool{

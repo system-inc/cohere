@@ -125,7 +125,7 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(test *testing.T) {
 // span and the rendered message of every finding asserted.
 //
 // The span is the whole reason this rule exists as a TypeScript wrapper rather than as the core rule
-// alone. Under "always" the finding covers the NAME only, so `let arr: string;` reports three
+// alone. Under "always" the finding covers the name only, so `let arr: string;` reports three
 // characters and leaves the annotation out; under "never" it covers the whole declarator including
 // the annotation and the initializer. Two spans from one rule, decided by the mode, and no message
 // id assertion can tell them apart.
@@ -352,7 +352,7 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
 //
 // Upstream reports only on an identifier binding and says at the line that its span narrowing
 // depends on that, which is true here too: the narrowed span is the identifier's own text and a
-// pattern has none to take. But its corpus never writes a pattern WITHOUT an initializer, so the
+// pattern has none to take. But its corpus never writes a pattern without an initializer, so the
 // guard decides nothing there and a mutation removing it survives all seventy-seven imported rows.
 //
 // Measured against the installed 8.x build, with a reporting control for each mode in the same runs.
@@ -561,7 +561,7 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(test *testing.T) {
 
 // TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses is the other half of the table above.
 //
-// A mode outside the schema's enum is a CONFIGURATION error upstream and never reaches the rule:
+// A mode outside the schema's enum is a configuration error upstream and never reaches the rule:
 // ESLint refuses the key outright rather than running with a fallback. Measured. This decoder used to
 // resolve it to the inert unconfigured mode, the closest spelling of "this rule never ran" it had,
 // which is silence; the config layer now surfaces a decoder error at startup, so it is refused.
@@ -603,7 +603,7 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 // mode, and it puts 512 findings on the real tree that the gate being replaced does not report. The
 // first version of this port did exactly that, and only the dry run disagreed.
 //
-// `EnableRule.ts` writes the bare severity spelling, so this IS how the rule is configured here.
+// `EnableRule.ts` writes the bare severity spelling, so this is how the rule is configured here.
 func TestInitDeclarationsIsInertWhenNamedWithoutAMode(test *testing.T) {
 	test.Parallel()
 

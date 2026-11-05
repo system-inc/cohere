@@ -130,7 +130,7 @@ func TestNoWrapperObjectTypesStaysSilent(test *testing.T) {
 		{"a shadowing type alias", "type Number = 0 | 1;\nexport let value: Number;\n"},
 		{"a shadowing interface", "interface Number {\n    tag: string;\n}\nexport let value: Number;\n"},
 		// An enum shadows too, and that was measured rather than assumed. An enum declares a value
-		// and a TYPE of the same name, so the annotation below resolves to the enum: asked through
+		// and a type of the same name, so the annotation below resolves to the enum: asked through
 		// the checker, `Number` here resolves to a declaration in this file, while without the enum
 		// it resolves into a library declaration file. The shadow walk counted only interface, type
 		// alias and class until it was lifted onto the shelf, so this was a false positive on a name

@@ -13,7 +13,8 @@ func takeVerdictFile() *os.File {
 	if value == "" {
 		return nil
 	}
-	os.Unsetenv(VerdictVariable)
+	// Ignored: Unsetenv fails only for a name holding "=" or a NUL, and VerdictVariable holds neither.
+	_ = os.Unsetenv(VerdictVariable)
 	descriptor, parseError := strconv.Atoi(value)
 	if parseError != nil || descriptor < 3 {
 		return nil

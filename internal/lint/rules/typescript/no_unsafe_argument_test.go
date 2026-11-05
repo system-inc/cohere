@@ -24,7 +24,7 @@ func noUnsafeArgumentCaseName(index int) string {
 // Several of them are the false positives a plausible port ships. A call to an undeclared function
 // and a call on a non-function are both silent because the callee cannot resolve, and reproducing
 // that costs nothing only because the signature lookup declines. Passing an `any` to a parameter
-// typed `any` or `unknown` is silent because assignment INTO those is not unsafe, which lives in
+// typed `any` or `unknown` is silent because assignment into those is not unsafe, which lives in
 // the shared assignment predicate rather than here. `acceptsMap(new Map())` is silent because of a
 // special case inside that predicate for Map's empty constructor, which is typed `Map<any, any>`.
 func TestNoUnsafeArgumentStaysSilent(test *testing.T) {
@@ -348,7 +348,7 @@ func TestNoUnsafeArgumentFires(test *testing.T) {
 
 		{
 			// The other half of the pair above, and the reason it is not enough to assert the three
-			// silences. A FIXED tuple carries no variable element, so nothing is consumed and the
+			// silences. A fixed tuple carries no variable element, so nothing is consumed and the
 			// trailing argument does get its parameter. A port that simply always consumed after a
 			// tuple spread would pass all three silent rows and fail this one.
 			sourceText: "declare function foo(a: number, b: string): void;\ndeclare const x: [number];\nfoo(...x, 1 as any);\n",

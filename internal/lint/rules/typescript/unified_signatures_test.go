@@ -13,7 +13,7 @@ import (
 // Every source body was byte-checked against that file, and the check was itself controlled by
 // corrupting one body and confirming it went red.
 //
-// Spans are asserted as the TEXT a finding covers rather than as line and column. The harness
+// Spans are asserted as the text a finding covers rather than as line and column. The harness
 // normalises a fixture to `strings.TrimSpace(contents)+"\n"` while the corpus writes its sources as
 // indented template literals starting with a newline, so every upstream line number is one greater
 // than ours. Text spans do not care: they are computed once from upstream's line/column against
@@ -63,7 +63,7 @@ func TestUnifiedSignaturesValid(test *testing.T) {
 	cases := []unifiedSignaturesCase{
 		{
 			// Scope containment. Both members are named `f` and neither reports on its own, so this
-			// only stays silent if the nested type literal's member is attributed to the LITERAL
+			// only stays silent if the nested type literal's member is attributed to the literal
 			// rather than to the enclosing interface. A walk that descended into nested scopes while
 			// collecting the outer one would group these two and report.
 			sourceText: "interface I {\n  f(x: number): void;\n  a: { f(x: string): void };\n}\n",
@@ -342,7 +342,7 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 
 	cases := []unifiedSignaturesCase{
 		{
-			// Two reporting GROUPS in one scope, which is the only shape that can observe the order
+			// Two reporting groups in one scope, which is the only shape that can observe the order
 			// findings come out in: every other fixture asserts a single finding. Groups are
 			// iterated in first-seen order rather than over the map, and this row asserts source
 			// order. It is worth knowing that this catches a map-order mutation only ~8% of the
@@ -360,7 +360,7 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 		},
 		{
 			// The control for the containment case in the valid table: the same two signatures
-			// INSIDE one type literal DO group, so the rule is not simply ignoring nested members.
+			// inside one type literal do group, so the rule is not simply ignoring nested members.
 			sourceText: "interface I {\n  a: { f(x: number): void; f(x: string): void };\n}\n",
 			options:    nil,
 			isJsx:      false,
@@ -369,7 +369,7 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			wantStarts: []string{"These overloads can be combined into one signature taking `number | string`."},
 		},
 		{
-			// The control for the row above: two computed members with the SAME key text do group,
+			// The control for the row above: two computed members with the same key text do group,
 			// so the digit is not simply suppressing every computed member.
 			sourceText: "interface I {\n  [`a`](x: number): void;\n  [`a`](x: string): void;\n}\n",
 			options:    nil,
@@ -377,6 +377,19 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string"},
 			wantStarts: []string{"These overloads can be combined into one signature taking `number | string`."},
+		},
+		{
+			// The control for the decoder test's same-line rows: a block comment after the last
+			// overload's semicolon precedes the implementation, not either overload, so both read as
+			// undocumented and the pair still reports. A lookup that reached past a signature's own
+			// end for its comment would go quiet here. The installed build reports this row.
+			sourceText: "function f(a: string): void;\nfunction f(a: number): void; /** documents the implementation */\n" +
+				"function f(a: unknown): void {}\n",
+			options:    &UnifiedSignaturesOptions{IgnoreOverloadsWithDifferentJsDoc: true},
+			isJsx:      false,
+			wantIds:    []string{"singleParameterDifference"},
+			wantSpans:  []string{"a: number"},
+			wantStarts: []string{"These overloads can be combined into one signature taking `string | number`."},
 		},
 		{
 			sourceText: "declare function f(a: number): void;\ndeclare function f(a: number): void;\n",
@@ -892,7 +905,7 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 				test.Errorf("finding %d points at %q, wanted %q, on %q",
 					findingIndex, gotSpan, wantSpan, testCase.sourceText)
 			}
-			// The WHOLE rendered message, not merely the id. Two halves carry real judgment: the
+			// The whole rendered message, not merely the id. Two halves carry real judgment: the
 			// opening says which other overload this one joins, and for a union it names the type
 			// the pair would become. Asserting only the prefix left the union text unchecked, which
 			// a mutation sweep caught by deleting the parenthesising branch without a fixture
@@ -947,6 +960,24 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 			name: "ignoreOverloadsWithDifferentJSDoc past a line comment",
 			sourceText: "/** @deprecated */ // kept for old callers\ndeclare function f(x: number): unknown;\n" +
 				"declare function f(x: boolean): unknown;\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// A JSDoc block on the first overload's line, after its semicolon, documents the second:
+			// upstream's `getCommentsBefore` is every comment after the previous token, the `;`. The
+			// scanner's leading ranges at that position start after the first newline, so they alone
+			// miss it and the second overload read as undocumented. The installed build is clean here.
+			name: "ignoreOverloadsWithDifferentJSDoc on the previous overload's line",
+			sourceText: "function f(a: string): void; /** doc for the next */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// Upstream finds any block comment, not only a JSDoc one (`comment.type === Block`), so a plain
+			// block in the same place documents the second overload too.
+			name: "ignoreOverloadsWithDifferentJSDoc plain block on the previous overload's line",
+			sourceText: "function f(a: string): void; /* plain */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
 			option: "ignoreOverloadsWithDifferentJSDoc",
 		},
 	}

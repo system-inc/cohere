@@ -20,7 +20,8 @@ func (fixture *landFixture) namedWorktree(directory string, arguments ...string)
 	fixture.t.Helper()
 	command := exec.Command(fixture.wrapper, append([]string{"worktree"}, arguments...)...)
 	command.Dir, command.Env = directory, fixture.environment
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	command.Stdout, command.Stderr = &standardOutput, &standardError
 	runError := command.Run()
 	var exited *exec.ExitError

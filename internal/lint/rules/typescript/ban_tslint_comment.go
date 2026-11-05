@@ -68,7 +68,7 @@ func messageBanTslintComment(text string) rule.Message {
 // installed build, `// tslint:disable` reports in `a.js`, `a.mjs`, `a.ts` and `a.tsx` alike. A
 // tslint directive is dead in every language it can appear in.
 //
-// # The subject is the comment's INTERIOR, and the span is the WHOLE comment
+// # The subject is the comment's interior, and the span is the whole comment
 //
 // The regex is tested against `c.value`, which is the text between the delimiters, so a JSDoc
 // comment's leading star defeats the anchor and `/** tslint:disable */` is silent while
@@ -103,7 +103,7 @@ func messageBanTslintComment(text string) rule.Message {
 // The second is refused by this project's parse guard. The first and third are not: both produce
 // source that parses, so the guard is structurally unable to see them, and the edit engine applies
 // a fix unattended. So this port narrows the range to the comment itself plus at most one character
-// on each side WHEN THAT CHARACTER IS WHITESPACE, which reproduces every corpus output while
+// on each side when that character is whitespace, which reproduces every corpus output while
 // declining to delete a character that is not blank. `banTslintCommentFixRange` holds the
 // measurement and the four cases where the two readings differ.
 //
@@ -213,9 +213,9 @@ func banTslintCommentFixRange(comment comments.Comment, sourceText string) core.
 	// Widen left onto a blank character, and only when the comment does not start its own line.
 	//
 	// Both halves of that condition are upstream's and both are load-bearing. The column test is
-	// upstream's `column > 0` and it is NOT subsumed by the blank test, which is what a reader will
+	// upstream's `column > 0` and it is not subsumed by the blank test, which is what a reader will
 	// assume and what an earlier draft of this comment asserted. The character before a
-	// column-zero comment is the newline that ENDED THE PREVIOUS LINE, which is blank, so a blank
+	// column-zero comment is the newline that ended the previous line, which is blank, so a blank
 	// test alone takes it. Measured on upstream's own eighth corpus case: with the column test the
 	// fix writes `\nconst woah = doSomeStuff();\nconsole.log(woah);\n      `, and without it the
 	// fix writes `\nconst woah = doSomeStuff();console.log(woah);\n      `, joining two statements

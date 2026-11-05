@@ -50,7 +50,7 @@ var messageUnexpectedThis = rule.Message{
 // every case forced to `module`, and the two runs agree on all 91. Two corpus cases carry
 // `ecmaFeatures: { globalReturn: true }`, which reads as though the feature is what makes them report;
 // it is not. Measured separately, they report under `sourceType: module` with no `globalReturn` at all
-// and stay silent under `script` WITH it, so the module-ness is doing the work and the parser feature
+// and stay silent under `script` with it, so the module-ness is doing the work and the parser feature
 // is doing none.
 //
 // So the strictness question has one answer here and the code path layer reduces to a stack of
@@ -76,7 +76,7 @@ var messageUnexpectedThis = rule.Message{
 //
 // # capIsConstructor is on by default, so the zero-value struct is the wrong configuration
 //
-// The option surface is one boolean and its default is TRUE, which means a decoder that fills a
+// The option surface is one boolean and its default is true, which means a decoder that fills a
 // zero-value struct inverts it and silently reports every `function Foo() { this.x = 1; }` in the
 // tree. The corpus tests the option on eight cases and the decoder below is hand written for exactly
 // this reason.
@@ -88,7 +88,7 @@ var NoInvalidThis = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// The walk is done here rather than through per-kind listeners because the rule
-				// needs to know what it is INSIDE when it meets a `this`, and the listener walk is
+				// needs to know what it is inside when it meets a `this`, and the listener walk is
 				// pre-order with no exit hook to pop a stack on.
 				walker := &noInvalidThisWalker{ctx: ruleContext, settings: settings}
 				walker.walk(node)
@@ -226,7 +226,7 @@ func (w *noInvalidThisWalker) currentlyValid() bool {
 // `param.type === Identifier && param.name === 'this'` over every parameter rather than only the
 // first, and that width is reproduced here: the grammar allows `this` only in first position, but the
 // parser recovers from `function f(x, this: T)` and hands back the illegal shape, which the corpus
-// exercises directly with `z(function (x, this: context) { console.log(x, this); });` as a PASSING
+// exercises directly with `z(function (x, this: context) { console.log(x, this); });` as a passing
 // case.
 func declaresThisParameter(node *ast.Node) bool {
 	parameters := node.Parameters()
@@ -242,11 +242,11 @@ func declaresThisParameter(node *ast.Node) bool {
 // thisIsDefaultBoundIn is ESLint's `astUtils.isDefaultThisBinding`, which is where the judgment lives.
 //
 // It answers "would calling this function leave `this` as the default binding", and the rule reports
-// exactly when it says yes. The traversal walks OUTWARD from the function looking for something that
+// exactly when it says yes. The traversal walks outward from the function looking for something that
 // binds a receiver, and every arm below is upstream's, in upstream's order.
 //
 // The direction is worth stating because it inverts twice on the way to the report site: this returns
-// true when `this` is UNBOUND, the stack stores whether `this` is VALID, and the report fires when
+// true when `this` is unbound, the stack stores whether `this` is valid, and the report fires when
 // the stack says invalid.
 func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
 	// A capitalized name is the convention for a constructor, and upstream trusts it. This is the
@@ -306,10 +306,10 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 
 		// If the enclosing function is immediately invoked, follow its return value out.
 		//
-		// The step out is to the CALL, not to the function's own parent, and the two differ here
+		// The step out is to the call, not to the function's own parent, and the two differ here
 		// where they do not upstream: `(function () { return function () {}; })()` gives the inner
 		// function a parenthesized parent, so `enclosing.Parent` is the parenthesis rather than the
-		// call. Upstream's `func.parent` IS the call because its parser drops the node. Stepping to
+		// call. Upstream's `func.parent` is the call because its parser drops the node. Stepping to
 		// the parenthesis instead leaves the loop reading the call as an ordinary CallExpression
 		// arm, which answers "nothing binds this" and reports, on three corpus cases that pass.
 		case ast.KindReturnStatement:
@@ -337,7 +337,7 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 
 		// A method or a property's value has a receiver; anything else in these nodes does not.
 		//
-		// The Initializer test is upstream's `parent.value !== currentNode` and is INERT for both
+		// The Initializer test is upstream's `parent.value !== currentNode` and is inert for both
 		// kinds here, kept for fidelity. A computed key is a ComputedPropertyName node in
 		// typescript-go rather than a direct child, for an object literal and a class field alike,
 		// so a function whose parent is either of these kinds is always its value. Measured twice:
@@ -345,7 +345,7 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 		// `class A { [function () { this.x; }]: number = 1; }` parses as
 		// ComputedPropertyName < PropertyDeclaration, so it reaches the default arm and reports
 		// without consulting this line. An earlier draft of this comment claimed the class field
-		// case DID reach here and that claim was wrong; the mutant survived the fixture written on
+		// case did reach here and that claim was wrong; the mutant survived the fixture written on
 		// the strength of it, which is how the error was caught.
 		case ast.KindPropertyAssignment, ast.KindPropertyDeclaration:
 			return parent.Initializer() != current
@@ -361,14 +361,14 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 
 		// `.bind(obj)`, `.call(obj)`, `.apply(obj, [])` all supply a receiver.
 		//
-		// The `Expression() == current` half is upstream's and is INERT here, kept for fidelity
+		// The `Expression() == current` half is upstream's and is inert here, kept for fidelity
 		// rather than because it decides anything. Upstream needs it because its MemberExpression
 		// carries both the object and the property as expression children; typescript-go puts the
 		// property in its own `name` slot, so a function reaching this arm is always the receiver.
 		// Measured rather than argued: a probe walked 14 shapes including computed access,
 		// string and numeric keys, spreads, accessors and `q['bind'](obj)`, asserting the function
 		// is always the Expression, and found no counterexample. The mutant dropping this test
-		// therefore survives the sweep as EQUIVALENT rather than as a fixture gap.
+		// therefore survives the sweep as equivalent rather than as a fixture gap.
 		case ast.KindPropertyAccessExpression:
 			if parent.Expression() == current && isBindCallOrApply(parent) {
 				return !(isCallee(parent) && callHasNonNullishArgument(parent.Parent, 0))
@@ -389,7 +389,7 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 // functionOwnName returns the name a function carries itself, or empty for an anonymous one.
 //
 // Upstream reads `node.id`, which exists only for a declaration or a named function expression. A
-// name inherited from a variable or a property is deliberately NOT this: upstream handles that
+// name inherited from a variable or a property is deliberately not this: upstream handles that
 // separately in the VariableDeclaration and AssignmentExpression arms, and only for anonymous
 // functions, so folding it in here would report differently on
 // `var Foo = function bar() { this.x; };`.
@@ -423,7 +423,7 @@ func startsWithUpperCase(name string) bool {
 // were measured to matter. This is the largest single piece of machinery behind a rule whose own
 // file is a hundred lines, and it is a good example of the rule file being a thin caller.
 //
-// The first question is `getJSDocComment`, which walks OUTWARD from the function to whatever node
+// The first question is `getJSDocComment`, which walks outward from the function to whatever node
 // the documentation would sit on, and then requires the token immediately before that node to be a
 // real JSDoc block. The walk is why the boundary is not a token gap, measured at 8.67.0:
 //
@@ -434,7 +434,7 @@ func startsWithUpperCase(name string) bool {
 //	function foo() { /** @this*/ q(function () { this.x; }); }            REPORTS
 //	function foo() { /** @this*/ const q = 1; return fn; }                REPORTS
 //
-// The fifth is the one that pins the shape: a function passed as a CALL ARGUMENT does not walk out
+// The fifth is the one that pins the shape: a function passed as a call argument does not walk out
 // at all, because upstream excludes a call or new parent before the loop starts. The sixth closes
 // the walk for a different reason: the ancestor it reaches is the return statement, and the token
 // before that is `;` rather than a comment.
@@ -450,7 +450,7 @@ func startsWithUpperCase(name string) bool {
 //	// @this Obj                                                 silent, a line comment counts here
 //
 // The pattern itself is `/^[\s*]*@this/mu`: anchored per line, allowing asterisks in the prefix, and
-// with NO closing word boundary. So `@thisx` satisfies it and `@nothis` does not, both measured.
+// with no closing word boundary. So `@thisx` satisfies it and `@nothis` does not, both measured.
 // That reads as a defect and is reproduced rather than corrected, because fidelity is the authority
 // where upstream gives no reasoning.
 func hasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
@@ -584,7 +584,7 @@ func commentTextHasThisTag(text string) bool {
 
 // isLogicalOperator answers whether a binary expression is `||`, `&&` or `??`.
 //
-// These are upstream's LogicalExpression, which it looks THROUGH rather than deciding on, because
+// These are upstream's LogicalExpression, which it looks through rather than deciding on, because
 // `obj.foo = cached || function () {}` still assigns the function to `obj.foo`. Every other binary
 // operator, assignment included, is a decision point.
 func isLogicalOperator(node *ast.Node) bool {
@@ -631,7 +631,7 @@ func enclosingFunctionOf(node *ast.Node) *ast.Node {
 
 // callInvoking returns the call expression that immediately invokes a node, or nil.
 //
-// The parenthesis walk is the same one isCallee does, but the CALL is what the caller needs rather
+// The parenthesis walk is the same one isCallee does, but the call is what the caller needs rather
 // than a yes or no, because stepping out of an immediately invoked function has to land on the call
 // and typescript-go puts a parenthesis in between. Sharing the walk keeps the two answers from
 // drifting: a shape isCallee accepts is a shape this returns a call for.
@@ -758,7 +758,7 @@ func isSpecificMemberAccess(callee *ast.Node, object string, property string) bo
 // second argument is a thisArg.
 //
 // A plain lookup rather than upstream's regular expression over the receiver, because upstream's
-// pattern also constrains the RECEIVER to an array-looking name and this does not need to: the
+// pattern also constrains the receiver to an array-looking name and this does not need to: the
 // method name alone is what its `isMethodWhichHasThisArg` tests, walking down a member chain to the
 // last property and matching the name against this set.
 var thisArgMethodNames = map[string]struct{}{

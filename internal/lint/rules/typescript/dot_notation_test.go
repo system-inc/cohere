@@ -26,13 +26,13 @@ func dotNotationTsconfig(test *testing.T, flag bool) string {
 		return dotNotationCorpusTsconfig
 	}
 	var configuration struct {
-		CompilerOptions map[string]any `json:"compilerOptions"`
-		Include         []string       `json:"include"`
+		CompilerOptions map[string]json.RawMessage `json:"compilerOptions"`
+		Include         []string                   `json:"include"`
 	}
 	if decodeError := json.Unmarshal([]byte(dotNotationCorpusTsconfig), &configuration); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	configuration.CompilerOptions["noPropertyAccessFromIndexSignature"] = true
+	configuration.CompilerOptions["noPropertyAccessFromIndexSignature"] = json.RawMessage("true")
 	encoded, encodeError := json.Marshal(configuration)
 	if encodeError != nil {
 		test.Fatal(encodeError)

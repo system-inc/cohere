@@ -17,7 +17,7 @@ func noUnsafeReturnCaseName(index int) string {
 // TestNoUnsafeReturnStaysSilent is upstream's thirty passing cases verbatim.
 //
 // Upstream runs this rule's whole corpus under `tsconfig.noImplicitThis.json` and our harness pins
-// `strict: true`, so every case was measured against the installed 8.67.0 build under BOTH settings
+// `strict: true`, so every case was measured against the installed 8.67.0 build under both settings
 // rather than assumed to transfer. All thirty are clean under both, so nothing in this list depends
 // on which one is in force. The single case whose verdict does move is in the firing test, at the id
 // our configuration produces.
@@ -65,7 +65,7 @@ func TestNoUnsafeReturnStaysSilent(test *testing.T) {
 		// Measured boundary cases upstream does not write, all driven through the installed 8.67.0
 		// build before being written here.
 
-		// `unknown` absorbing `any` where the function has NO return annotation of its own and gets
+		// `unknown` absorbing `any` where the function has no return annotation of its own and gets
 		// its return type contextually. These exist because a mutant removing that branch survived
 		// the whole imported corpus: every one of upstream's `unknown` cases writes an explicit
 		// annotation, and the annotation branch above keeps those clean on its own, so nothing
@@ -74,10 +74,10 @@ func TestNoUnsafeReturnStaysSilent(test *testing.T) {
 		"declare function wrap(f: () => unknown): void;\nwrap(() => 1 as any);\n",
 		"type F = () => unknown;\nconst f: F = () => JSON.parse('');\n",
 
-		// A UNION-typed receiver in the unsafe-assignment branch. Upstream uses two different
+		// A union-typed receiver in the unsafe-assignment branch. Upstream uses two different
 		// signature accessors in this rule, a union-flattening one for the excuse loops and the
 		// checker's own for this branch, and a port using the flattening one everywhere reports
-		// both of these. Measured clean upstream; the non-union control that DOES report is in the
+		// both of these. Measured clean upstream; the non-union control that does report is in the
 		// firing test.
 		"declare function foo(arg: null | (() => Set<string>)): void;\nfoo(() => new Set<any>());\n",
 		"const foo: (() => Set<string>) | null = () => new Set<any>();\n",
@@ -106,7 +106,7 @@ type noUnsafeReturnFinding struct {
 // TestNoUnsafeReturnFires is upstream's thirty-two reporting cases verbatim, at the verdicts this
 // harness can observe.
 //
-// Every row's id, rendered text, and span come from the installed 8.67.0 build run under OUR
+// Every row's id, rendered text, and span come from the installed 8.67.0 build run under our
 // compiler options rather than upstream's. Thirty-one are identical under both settings. The
 // thirty-second is the `return this` case, which reports twice either way while its id moves from
 // `unsafeReturnThis` to `unsafeReturn`; it is pinned at ours and the other is recorded in the rule's

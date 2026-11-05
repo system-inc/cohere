@@ -662,6 +662,13 @@ func TestBuildConcurrently(test *testing.T) {
 	}
 }
 
+var ruleOfMessageId = map[string]string{
+	MessageIdMissingReason: RuleRequireIgnoreReason,
+	MessageIdMalformed:     RuleRequireIgnoreReason,
+	MessageIdUnused:        RuleNoUnusedIgnore,
+	MessageIdUnknownRule:   RuleNoUnusedIgnore,
+}
+
 func checkOutcome(test *testing.T, label string, source []string, findingSpecs []string, wanted wantedOutcome) {
 	test.Helper()
 	index := Build("fixture.go", []byte(strings.Join(source, "\n")+"\n"))
@@ -698,13 +705,6 @@ func checkOutcome(test *testing.T, label string, source []string, findingSpecs [
 				renderDirectiveFindings([]DirectiveFinding{actual}), expected)
 		}
 	}
-}
-
-var ruleOfMessageId = map[string]string{
-	MessageIdMissingReason: RuleRequireIgnoreReason,
-	MessageIdMalformed:     RuleRequireIgnoreReason,
-	MessageIdUnused:        RuleNoUnusedIgnore,
-	MessageIdUnknownRule:   RuleNoUnusedIgnore,
 }
 
 func parseFindings(test *testing.T, file string, specs []string) []Finding {

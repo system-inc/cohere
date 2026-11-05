@@ -87,7 +87,7 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(test *testing.T) {
 	// A top-level `type` qualifier with an inline one nested inside it is illegal TypeScript, so the
 	// grammar says this shape cannot exist and upstream's `importKind!="type"` selector is written as
 	// though it cannot. The parser is not the grammar: it recovers from the illegal source and hands
-	// back a type-only clause whose specifiers are ALSO marked type-only, which satisfies the
+	// back a type-only clause whose specifiers are also marked type-only, which satisfies the
 	// universal below and reaches the report. Measured both ways by removing the guard: with it the
 	// input is silent, without it the rule reports and offers `import type type { A } from 'mod';`,
 	// which does not parse. Upstream is silent on it, measured at 8.67.0.

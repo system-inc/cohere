@@ -103,7 +103,7 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //   - A description's length is counted in characters as a reader sees them (getStringLength:
 //     `Intl.Segmenter` graphemes for anything not ASCII, here `text.GraphemeCount`). oxc counted
 //     bytes, so two accented letters passed a minimum of three.
-//   - The description is trimmed as JavaScript trims, which keeps U+0085 and strips U+FEFF; Go's
+//   - The description is trimmed as JavaScript trims, which keeps `U+0085` and strips `U+FEFF`; Go's
 //     `strings.TrimSpace` does the reverse for both.
 //   - A finding covers the whole comment, delimiters included, where oxc's covered its interior.
 //   - Replacing `@ts-ignore` is a suggestion, not a fix, and it rewrites the first occurrence only:
@@ -167,6 +167,33 @@ var BanTsComment = rule.Rule{
 		}
 	},
 }
+
+// The four directives, spelled once.
+const (
+	banTsCommentExpectError = "expect-error"
+	banTsCommentIgnore      = "ignore"
+	banTsCommentNoCheck     = "nocheck"
+	banTsCommentCheck       = "check"
+)
+
+// BanTsCommentSettingKind names which of the three shapes a directive's configuration took.
+//
+// A Go struct rather than an interface because the three carry different payloads and the rule
+// switches on all three, which is exactly what upstream's enum does.
+type BanTsCommentSettingKind string
+
+const (
+	// BanTsCommentBoolean is `true` or `false`: ban the directive outright, or allow it.
+	BanTsCommentBoolean BanTsCommentSettingKind = "Boolean"
+
+	// BanTsCommentRequireDescription is `"allow-with-description"`: allow it when it carries an
+	// explanation of at least the minimum length.
+	BanTsCommentRequireDescription BanTsCommentSettingKind = "RequireDescription"
+
+	// BanTsCommentDescriptionFormat is `{ "descriptionFormat": "<regex>" }`: allow it when the
+	// explanation both reaches the minimum length and matches the pattern.
+	BanTsCommentDescriptionFormat BanTsCommentSettingKind = "DescriptionFormat"
+)
 
 // reportBanTsComments is upstream's `Program` listener.
 func reportBanTsComments(ruleContext rule.Context, options BanTsCommentOptions) {
@@ -266,14 +293,6 @@ func banTsCommentValue(comment comments.Comment) (string, bool) {
 	return comment.Text[2 : len(comment.Text)-2], true
 }
 
-// The four directives, spelled once.
-const (
-	banTsCommentExpectError = "expect-error"
-	banTsCommentIgnore      = "ignore"
-	banTsCommentNoCheck     = "nocheck"
-	banTsCommentCheck       = "check"
-)
-
 // findBanTsCommentDirective is upstream's `findDirectiveInComment`, returning the directive and the
 // description after it. The three patterns it reads are set out on the rule.
 func findBanTsCommentDirective(value string, isBlock bool) (string, string, bool) {
@@ -326,25 +345,6 @@ func banTsCommentDirectiveAt(text string, first string, second string) (string, 
 	return "", "", false
 }
 
-// BanTsCommentSettingKind names which of the three shapes a directive's configuration took.
-//
-// A Go struct rather than an interface because the three carry different payloads and the rule
-// switches on all three, which is exactly what upstream's enum does.
-type BanTsCommentSettingKind string
-
-const (
-	// BanTsCommentBoolean is `true` or `false`: ban the directive outright, or allow it.
-	BanTsCommentBoolean BanTsCommentSettingKind = "Boolean"
-
-	// BanTsCommentRequireDescription is `"allow-with-description"`: allow it when it carries an
-	// explanation of at least the minimum length.
-	BanTsCommentRequireDescription BanTsCommentSettingKind = "RequireDescription"
-
-	// BanTsCommentDescriptionFormat is `{ "descriptionFormat": "<regex>" }`: allow it when the
-	// explanation both reaches the minimum length and matches the pattern.
-	BanTsCommentDescriptionFormat BanTsCommentSettingKind = "DescriptionFormat"
-)
-
 // BanTsCommentSetting is how one directive is configured.
 //
 // `RequireDescription` is not `DescriptionFormat` with a nil pattern: the first checks the length,
@@ -380,7 +380,7 @@ type BanTsCommentOptions struct {
 	// TsNoCheck defaults to banned.
 	TsNoCheck BanTsCommentSetting
 
-	// TsCheck defaults to ALLOWED. `@ts-check` turns checking on rather than off, so banning it by
+	// TsCheck defaults to allowed. `@ts-check` turns checking on rather than off, so banning it by
 	// default would be backwards, and this is the one default a reader is likely to guess wrong.
 	TsCheck BanTsCommentSetting
 

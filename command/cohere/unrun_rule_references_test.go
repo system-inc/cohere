@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"testing"
 )
@@ -10,7 +11,9 @@ import (
 func TestUnrunRuleReferencesAreOneNoteMostNamedFirst(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
-	writeUnrunRuleReferences(&out, map[string]int{"jsx-a11y/alt-text": 1, "import/no-cycle": 2, "@eslint-react/no-array-index-key": 1})
+	stream := bufio.NewWriter(&out)
+	writeUnrunRuleReferences(stream, map[string]int{"jsx-a11y/alt-text": 1, "import/no-cycle": 2, "@eslint-react/no-array-index-key": 1})
+	flushStream(test, stream)
 	want := "  directives: 4 disable comments name rules cohere doesn't run, which silences nothing here: " +
 		"import/no-cycle 2, @eslint-react/no-array-index-key 1, jsx-a11y/alt-text 1\n"
 	if out.String() != want {
@@ -18,13 +21,15 @@ func TestUnrunRuleReferencesAreOneNoteMostNamedFirst(test *testing.T) {
 	}
 
 	out.Reset()
-	writeUnrunRuleReferences(&out, map[string]int{"no-with": 1})
+	writeUnrunRuleReferences(stream, map[string]int{"no-with": 1})
+	flushStream(test, stream)
 	if want := "  directives: 1 disable comment names a rule cohere doesn't run, which silences nothing here: no-with 1\n"; out.String() != want {
 		test.Errorf("the singular note is %q, want %q", out.String(), want)
 	}
 
 	out.Reset()
-	writeUnrunRuleReferences(&out, nil)
+	writeUnrunRuleReferences(stream, nil)
+	flushStream(test, stream)
 	if out.Len() != 0 {
 		test.Errorf("no references printed %q, want nothing", out.String())
 	}

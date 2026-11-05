@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -42,14 +43,17 @@ func renderRecordsIn(
 ) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
-	run := newEngineRun(&out, mode, language, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, mode, language, "", time.Now())
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			run.writeUnfinished(language.theEngine() + " broke its contract")
+			flushStream(test, stream)
 			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited "+string(rune('0'+engineExit)))
+	flushStream(test, stream)
 	return out.String(), exitCode, finishError
 }
 
@@ -89,17 +93,17 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
 		requireLines(test, output,
-			"package described in 412ms — 3 Swift files in the package, 2 of them ours\n",
+			"package described in 412ms: 3 Swift files in the package, 2 of them ours\n",
 			"fix: 0 of 2 files rewritten, 0 fixes applied, 0 refused\n",
 			"format scope: changed files (working tree against HEAD): 0\n",
 			"types: 0 diagnostics over 2 files in 820ms\n",
-			"lint: 0 findings — 4 rules over 2 files, 512 nodes visited, walked by the fix phase (nothing was rewritten, so its findings still hold)\n",
+			"lint: 0 findings \u2014 4 rules over 2 files, 512 nodes visited, walked by the fix phase (nothing was rewritten, so its findings still hold)\n",
 			"coverage: 4 rules = 4 ran and found nothing\n",
 			"  0 files crashed · details: cohere --coverage\n",
 			"  config: no CohereSettings.json beside Package.swift, so every house rule ran at error",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
-			"— package 412ms",
+			": package 412ms",
 		)
 		forbidLines(test, output, "did not check everything", "modified tree", "in scope (")
 	})
@@ -127,13 +131,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("FindingsWithCoverage", func(test *testing.T) {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 		run.details = true
 		for _, line := range contractFixture(test, "Findings.jsonl") {
 			if acceptError := run.accept([]byte(line)); acceptError != nil {
 				test.Fatal(acceptError)
 			}
 		}
+		flushStream(test, stream)
 		output := out.String()
 		requireLines(test, output,
 			"  listened to no files (1): nothing gave it a file, or it declined every one",
@@ -156,8 +162,8 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		requireLines(test, output,
 			"/project/Sources/Example/Broken.swift:3:23 - error: cannot convert value of type 'String' to specified type 'Int'\n",
 			"fix skipped (--no-fix)",
-			"lint did not run (types bailed: 1 type errors — lint findings against wrong semantics are noise)",
-			"  this run did not check everything — the phases above say what was not checked\n",
+			"lint did not run (types bailed: 1 type errors \u2014 lint findings against wrong semantics are noise)",
+			"  this run did not check everything: the phases above say what was not checked\n",
 		)
 		// A compiler finding with no group has no bracket.
 		forbidLines(test, output, "Int' [#")
@@ -174,7 +180,7 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		requireLines(test, output,
 			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
-			"  this run did not check everything — the notes above name the files nothing checked\n",
+			"  this run did not check everything: the notes above name the files nothing checked\n",
 		)
 	})
 
@@ -186,21 +192,22 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
+		// The dashes are escaped, not changed: they are the report's bytes, in the TypeScript unused report's shape.
 		requireLines(test, output,
-			"\nunused: a report, not a gate — nothing here fails a build\n",
-			"\n  imports nothing uses — 3\n",
+			"\nunused: a report, not a gate \u2014 nothing here fails a build\n",
+			"\n  imports nothing uses \u2014 3\n",
 			// Two items on one line arrive out of column order and print in it.
-			"    /project/Sources/Example/Main.swift:1:1 — import Foundation\n    /project/Sources/Example/Main.swift:1:20 — import Darwin\n",
-			"    /project/Sources/Example/Tally.swift:2:1 — import Combine\n",
+			"    /project/Sources/Example/Main.swift:1:1 \u2014 import Foundation\n    /project/Sources/Example/Main.swift:1:20 \u2014 import Darwin\n",
+			"    /project/Sources/Example/Tally.swift:2:1 \u2014 import Combine\n",
 			"  looked at 2 files and 6 imports (cohere-swift/correctness-no-unused-import)\n",
 			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
 			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
 			// The second rule's section, from a real run on ahraos-presence: its own heading and count, its
 			// items, and its own coverage lines, every skip reason by name.
-			"\n  declarations nothing uses — 2\n",
-			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 — var deepestAt\n",
-			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 — func after(_:_:)\n",
+			"\n  declarations nothing uses \u2014 2\n",
+			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 \u2014 var deepestAt\n",
+			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 \u2014 func after(_:_:)\n",
 			"  looked at 1092 files and 4311 declarations (cohere-swift/correctness-no-unused-declaration)\n",
 			"  not checked for unused declarations: 156 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  never reported: 358 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
@@ -233,12 +240,13 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
+		// The dashes are escaped, not changed, as in Unused above.
 		requireLines(test, output,
-			"\n  cohere-swift/unused-parameter — 3\n",
+			"\n  cohere-swift/unused-parameter \u2014 3\n",
 			"  looked at 2 files and 6 items (cohere-swift/unused-parameter)\n",
 			"  not checked for unused items: 1 files (the build has not compiled it as it stands)\n",
 			// The known rule beside it keeps its own words.
-			"\n  declarations nothing uses — 2\n",
+			"\n  declarations nothing uses \u2014 2\n",
 		)
 		forbidLines(test, output, "imports nothing uses")
 	})
@@ -377,7 +385,7 @@ func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
 	if renderRecordsError != nil || exitCode != 1 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
-	requireLines(test, output, "  this run did not check everything — the Swift engine reported that it fell short without a record saying where\n")
+	requireLines(test, output, "  this run did not check everything: the Swift engine reported that it fell short without a record saying where\n")
 }
 
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
@@ -455,7 +463,11 @@ func TestSwiftEngineArguments(test *testing.T) {
 		test.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 
-	_, mode, _ = engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value, nil)
+	_, mode, rulesError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value,
+		nil)
+	if rulesError != nil {
+		test.Fatal(rulesError)
+	}
 	if mode != engineModeRules {
 		test.Errorf("--rules ran in mode %s", mode)
 	}
@@ -568,12 +580,14 @@ func TestEngineRunLabelsAGoCompilerFindingGo(test *testing.T) {
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
 	record := &engineFindingRecord{Source: "compiler", File: "internal/thing/thing.go", Line: 3, Column: 7,
 		Severity: "error", Message: "undefined: missing"}
 	if acceptFindingError := run.acceptFinding(record); acceptFindingError != nil {
 		test.Fatal(acceptFindingError)
 	}
+	flushStream(test, stream)
 	if want := "internal/thing/thing.go:3:7 error go undefined: missing\n"; out.String() != want {
 		test.Errorf("finding:\n got  %q\n want %q", out.String(), want)
 	}
@@ -588,7 +602,8 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 
 	render := func(provenanceLine string, sourceCommit string) string {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeVersion, goLanguage("module"), "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeVersion, goLanguage("module"), "", time.Now())
 		run.engineSourceCommit = sourceCommit
 		if acceptError := run.accept([]byte(provenanceLine)); acceptError != nil {
 			test.Fatal(acceptError)
@@ -596,6 +611,7 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 		if _, finishError := run.finish(0, "exited 0"); finishError != nil {
 			test.Fatal(finishError)
 		}
+		flushStream(test, stream)
 		return out.String()
 	}
 

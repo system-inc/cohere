@@ -17,6 +17,10 @@ const VerdictVariable = "COHERE_VERDICT_FD"
 // number that means something else in it.
 var verdictFile = takeVerdictFile()
 
+// verdictSent is whether the caller has already been answered, so whatever this process says afterward
+// must go to the next run instead of to a terminal it no longer owns.
+var verdictSent bool
+
 // sendVerdict tells the dispatcher this run's exit code, once, after everything the caller will read has
 // been written, so the dispatcher can return while this process finishes what nobody waits for: recording
 // the run, writing the cache table, and handing back a heap of several gigabytes (#zqsdzbq, early return).
@@ -30,7 +34,9 @@ func sendVerdict(exitCode int) bool {
 	file := verdictFile
 	verdictFile = nil
 	_, writeError := file.Write([]byte{byte(exitCode)})
-	file.Close()
+	// Ignored: a pipe's write is not buffered, so the byte arrived or the write's own error, checked below, says
+	// it did not, and the close can lose nothing.
+	_ = file.Close()
 	if writeError != nil {
 		return false
 	}
@@ -46,11 +52,9 @@ func sendVerdict(exitCode int) bool {
 // and exits with its status, as it would have under exec.
 func dropVerdict() {
 	if verdictFile != nil {
-		verdictFile.Close()
+		// Ignored: nothing was written, and the dispatcher reads the descriptor's end as the answer however the
+		// close goes, since this process's exit closes it too.
+		_ = verdictFile.Close()
 		verdictFile = nil
 	}
 }
-
-// verdictSent is whether the caller has already been answered, so whatever this process says afterward
-// must go to the next run instead of to a terminal it no longer owns.
-var verdictSent bool

@@ -38,11 +38,11 @@ type CheckedRequiresOnChangeOrReadOnlyOptions struct {
 
 // DecodeCheckedRequiresOnChangeOrReadOnlyOptions decodes the option object.
 //
-// Hand-written rather than `rule.DecodeOptionsInto` for one reason: the generic decoder ERRORS on
+// Hand-written rather than `rule.DecodeOptionsInto` for one reason: the generic decoder errors on
 // empty input, and a rule configured as a bare `"error"` is handed exactly that. Upstream accepts
 // it, since `Object.assign({}, defaultOptions, context.options[0])` with an undefined second source
 // is just the defaults, so the empty path has to answer both-false rather than fail. Every default
-// here IS the Go zero value, so nothing else needs translating.
+// here is the Go zero value, so nothing else needs translating.
 func DecodeCheckedRequiresOnChangeOrReadOnlyOptions(raw []byte) (any, error) {
 	var options CheckedRequiresOnChangeOrReadOnlyOptions
 	if len(raw) == 0 {
@@ -57,7 +57,7 @@ func DecodeCheckedRequiresOnChangeOrReadOnlyOptions(raw []byte) (any, error) {
 // checkedRequiresTargetProperties is the set upstream collects before deciding anything.
 //
 // Upstream builds a Set of the names present out of this fixed four and then asks the set three
-// questions. Reproduced as a set rather than as three independent scans because the SET is what
+// questions. Reproduced as a set rather than as three independent scans because the set is what
 // decides: a name written twice contributes once, which is why `<input checked defaultChecked
 // defaultChecked />` reports exactly one exclusive finding rather than two. Measured on the
 // installed build.
@@ -89,14 +89,14 @@ var checkedRequiresTargetProperties = map[string]bool{
 // `meta.messages` names two, and upstream asks them as two separate questions after one shared
 // gate. `checked` present is the gate; then `defaultChecked` alongside it is the exclusive finding,
 // and the absence of both `onChange` and `readOnly` is the missing finding. An element writing
-// `checked defaultChecked` and nothing else reports BOTH, exclusive first, which is the order the
+// `checked defaultChecked` and nothing else reports both, exclusive first, which is the order the
 // corpus asserts and the order this rule reports in.
 //
 // # Why the name comparison is exact and the value is never read
 //
 // Upstream collects `prop.name.name` for JSX and `prop.key.name` for a call, and compares against a
 // four-name set. `name` exists on an Identifier and on nothing else, so three shapes contribute
-// NOTHING and each is a real thing somebody writes:
+// nothing and each is a real thing somebody writes:
 //
 //	<input {...properties} checked />          a spread has no name
 //	React.createElement('input', {'checked': true})    a string-literal key has no `.name`
@@ -108,14 +108,14 @@ var checkedRequiresTargetProperties = map[string]bool{
 // the difference. Case is exact too, so `<input CHECKED />` and `{ readonly: true }` are both
 // silent, both measured.
 //
-// The VALUE is never consulted. `checked={false}` reports exactly like `checked`, which reads wrong
+// The value is never consulted. `checked={false}` reports exactly like `checked`, which reads wrong
 // until you see that an input pinned to false is as stuck as one pinned to true. Upstream's own
 // corpus asserts it twice.
 //
 // # `createElement` is resolved, not pattern-matched, and this is why the rule needs the checker
 //
 // Upstream's `isCreateElement` accepts two spellings and the second one needs scope analysis:
-// `<pragma>.createElement(...)`, where the object name must equal the pragma, and a BARE
+// `<pragma>.createElement(...)`, where the object name must equal the pragma, and a bare
 // `createElement(...)` only when that name is destructured from a pragma import. Measured against
 // the installed build, the difference is load-bearing in both directions:
 //
@@ -130,7 +130,7 @@ var checkedRequiresTargetProperties = map[string]bool{
 //	React['createElement']('input', {checked: 1})                    SILENT, no `property.name`
 //	document.createElement(...)                                      SILENT, object is not the pragma
 //
-// The shelf's `react.IsCreateElementCall` answers TRUE on four of those silent rows. It accepts any
+// The shelf's `react.IsCreateElementCall` answers `true` on four of those silent rows. It accepts any
 // object, accepts a bare call with no import at all, and accepts a computed member, so this rule
 // does not call it. That helper matches `no-children-prop`, whose upstream asks the question a
 // different way, and its own doc comment says a rule reading its callee inline upstream should read
@@ -138,7 +138,7 @@ var checkedRequiresTargetProperties = map[string]bool{
 //
 // The pragma is fixed at `React` here. Upstream reads it from a `@jsx` comment or from
 // `settings.react.pragma`, and cohere reads no React settings, so the second is unreachable by any
-// route. The first is reachable and is NOT implemented; see `pragmaFromJsxComment` below for the
+// route. The first is reachable and is not implemented; see `pragmaFromJsxComment` below for the
 // measurement and the reasoning.
 var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 	Name:             "react/checked-requires-onchange-or-readonly",
@@ -238,12 +238,25 @@ func propertyIdentifierName(property *ast.Node) string {
 	return name.Text()
 }
 
+// reactPragmaName is the object name the namespaced spelling is compared against.
+//
+// Fixed rather than configurable, because both of upstream's sources for it are out of reach or
+// deliberately declined. `settings.react.pragma` has no counterpart in `internal/config` at all. A
+// `/** @jsx Foo.bar */` comment is readable here through `comments.ForFile`, and is not read, which
+// is a stated divergence rather than an oversight: implementing it would mean scanning every
+// comment in every file to answer a question that changes the verdict only for a file that opts out
+// of the automatic runtime by hand, and the ahra tree contains no such comment. The cost is a false
+// negative on such a file, which is the safe direction, and the next reader adding it should add a
+// fixture for `/** @jsx Preact.h */ Preact.createElement('input', {checked: 1})`, which reports
+// upstream and is measured silent here.
+const reactPragmaName = "React"
+
 // isPragmaCreateElementCall reproduces upstream's `isCreateElement` for the fixed `React` pragma.
 //
 // Two accepting shapes, matching the reference implementation branch for branch.
 //
 // The namespaced one is purely syntactic: the callee is a property access whose property is the
-// IDENTIFIER `createElement` and whose object is the identifier `React`. Upstream reads
+// identifier `createElement` and whose object is the identifier `React`. Upstream reads
 // `callee.property.name`, so a computed member has no name and declines, and it reads
 // `callee.object.name`, so `Preact.` and `document.` and `a.b.createElement` all decline on the same
 // line. All four measured silent.
@@ -287,16 +300,3 @@ func isPragmaCreateElementCall(ruleContext rule.Context, node *ast.Node) bool {
 
 	return false
 }
-
-// reactPragmaName is the object name the namespaced spelling is compared against.
-//
-// Fixed rather than configurable, because both of upstream's sources for it are out of reach or
-// deliberately declined. `settings.react.pragma` has no counterpart in `internal/config` at all. A
-// `/** @jsx Foo.bar */` comment IS readable here through `comments.ForFile`, and is not read, which
-// is a stated divergence rather than an oversight: implementing it would mean scanning every
-// comment in every file to answer a question that changes the verdict only for a file that opts out
-// of the automatic runtime by hand, and the ahra tree contains no such comment. The cost is a false
-// NEGATIVE on such a file, which is the safe direction, and the next reader adding it should add a
-// fixture for `/** @jsx Preact.h */ Preact.createElement('input', {checked: 1})`, which reports
-// upstream and is measured silent here.
-const reactPragmaName = "React"

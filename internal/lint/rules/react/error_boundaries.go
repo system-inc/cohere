@@ -50,7 +50,7 @@ var messageJsxInTryStatement = rule.Message{
 // spelling only because upstream has no syntax tree left at that point.** The lowering has already
 // run; blocks are all it has. Because the handler is popped exactly when its own block begins, and
 // because the body's blocks are laid out between the `try` terminal and the handler, the stack is
-// non-empty across precisely the extent of some enclosing try *block* — never across that same
+// non-empty across precisely the extent of some enclosing try *block*, never across that same
 // try's catch clause, and never across its finally clause. A catch clause is covered only when an
 // *outer* try is still pending, which is the "unless that catch is itself nested inside an outer
 // try" sentence in React's own doc comment.
@@ -87,7 +87,7 @@ var messageJsxInTryStatement = rule.Message{
 // and both are reproduced here as silence, deliberately, with the command that established them
 // stated rather than asserted.
 //
-// **A try with no catch clause is silent, whatever is in it.** React's HIR builder does not support
+// **A try with no catch clause is silent, whatever is in it.** React's `HIR` builder does not support
 // `try`/`finally` without a handler at all: it aborts the whole function with a Todo diagnostic,
 // `(BuildHIR::lowerStatement) Handle TryStatement without a catch clause`, before any validation
 // pass runs. Upstream's own corpus records this and is the reason the two fixtures named
@@ -284,7 +284,7 @@ func isReactCompiledFunction(fn *ast.Node) bool {
 		return false
 	}
 
-	// A function declaration is NOT accepted on syntax alone here, even though upstream's
+	// A function declaration is not accepted on syntax alone here, even though upstream's
 	// `isComponentDeclaration` reads that way. Measured: `function Component(a, b, c)` is clean
 	// upstream, and so is `function Component(...props)`, so the parameter test is reached for a
 	// declaration too and an early accept would report on both.
