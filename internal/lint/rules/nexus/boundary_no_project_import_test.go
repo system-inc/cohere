@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -50,38 +51,58 @@ func TestBoundaryNoProjectImportStaysSilent(test *testing.T) {
 		name     string
 		fileName string
 		source   string
-		options  any
+		options  rule.Given[BoundaryNoProjectImportOptions]
 	}{
 		{
 			"whitelisted specifier",
 			baseLibraryFile,
 			"import { settings } from '@project/ProjectSettings';\n",
-			baseLibraryOptions,
+			rule.Configured(baseLibraryOptions),
 		},
-		{"relative import", baseLibraryFile, "import { Thing } from './Thing';\n", baseLibraryOptions},
-		{"sibling alias", baseLibraryFile, "import { Thing } from '@structure/source/Thing';\n", baseLibraryOptions},
-		{"unrelated package", baseLibraryFile, "import { Thing } from '@projector/Thing';\n", baseLibraryOptions},
+		{
+			"relative import",
+			baseLibraryFile,
+			"import { Thing } from './Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"sibling alias",
+			baseLibraryFile,
+			"import { Thing } from '@structure/source/Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"unrelated package",
+			baseLibraryFile,
+			"import { Thing } from '@projector/Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
 		{
 			"outside the guarded library",
 			"/repo/application/source/Thing.ts",
 			"import { helper } from '@project/source/Helper';\n",
-			baseLibraryOptions,
+			rule.Configured(baseLibraryOptions),
 		},
 		// A rule registered without its required option must guard nothing rather than guard
 		// everything. Failing open here would have been a silent tree-wide false positive; the
 		// liveness harness in ahra reports exactly this rule as its one dead fixture.
-		{"no options at all", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", nil},
+		{
+			"no options at all",
+			baseLibraryFile,
+			"import { helper } from '@project/source/Helper';\n",
+			rule.Given[BoundaryNoProjectImportOptions]{},
+		},
 		{
 			"empty library directory",
 			baseLibraryFile,
 			"import { helper } from '@project/source/Helper';\n",
-			BoundaryNoProjectImportOptions{},
+			rule.Configured(BoundaryNoProjectImportOptions{}),
 		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				BoundaryNoProjectImport,
 				testCase.fileName,

@@ -16,7 +16,7 @@ const securityRequireContextAccessFile = "/repository/source/SecurityRequireCont
 // Taken verbatim from `BaseLintConfiguration.ts`, because the oracle every expectation below was
 // measured against was driven with exactly this configuration. Inventing a simpler one would have
 // made the fixtures agree with a rule nobody runs.
-func securityRequireContextAccessLiveOptions() any {
+func securityRequireContextAccessLiveOptions() SecurityRequireContextAccessOptions {
 	return securityRequireContextAccessOptions(`[
 		{"contextKey":"AccountRequestContextKey",
 		 "requiresAny":["RequireSessionAccess","WithSessionAccess"]},
@@ -32,7 +32,7 @@ func securityRequireContextAccessLiveOptions() any {
 // Through the decoder rather than by building the struct, because the decoder is where the two
 // schema constraints live -- both fields required, and `requiresAny` non-empty -- and neither has
 // an upstream counterpart to inherit correctness from.
-func securityRequireContextAccessOptions(requirementsJson string) any {
+func securityRequireContextAccessOptions(requirementsJson string) SecurityRequireContextAccessOptions {
 	decoded, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
 		[]byte(`{"requirements":` + requirementsJson + `}`))
 	if decodeContextRequiresAccessOptionsError != nil {
@@ -45,7 +45,7 @@ func securityRequireContextAccessOptions(requirementsJson string) any {
 type securityRequireContextAccessCase struct {
 	name       string
 	sourceText string
-	options    any
+	options    SecurityRequireContextAccessOptions
 	// wantKeys is the context key each finding names, in order. nil means the case is clean.
 	wantKeys []string
 }
@@ -599,19 +599,19 @@ func TestContextRequiresAccessUnmeasurableShapes(test *testing.T) {
 func TestContextRequiresAccessRegistersNothingUnconfigured(test *testing.T) {
 	test.Parallel()
 
-	listenersFor := func(options any) rule.Listeners {
+	listenersFor := func(options rule.Given[SecurityRequireContextAccessOptions]) rule.Listeners {
 		return SecurityRequireContextAccess.Run(rule.Context{}, options)
 	}
 
-	if got := len(listenersFor(nil)); got != 0 {
+	if got := len(listenersFor(rule.Given[SecurityRequireContextAccessOptions]{})); got != 0 {
 		test.Errorf("nil options registered %d listeners, wanted none", got)
 	}
-	if got := len(listenersFor(SecurityRequireContextAccessOptions{})); got != 0 {
+	if got := len(listenersFor(rule.Configured(SecurityRequireContextAccessOptions{}))); got != 0 {
 		test.Errorf("an empty requirement list registered %d listeners, wanted none", got)
 	}
 	// The control: a configured requirement registers, so the zeros above are the guard rather
 	// than a rule that never registers at all.
-	if got := len(listenersFor(securityRequireContextAccessLiveOptions())); got == 0 {
+	if got := len(listenersFor(rule.Configured(securityRequireContextAccessLiveOptions()))); got == 0 {
 		test.Error("the live configuration registered no listeners")
 	}
 }

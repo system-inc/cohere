@@ -23,7 +23,9 @@ import (
 //
 // Driving real rules this way is what surfaced the trivia defect these tests now pin. Reasoning
 // about ranges would not have found it, because every range involved was individually defensible.
-func proposeFromRules(rules ...rule.Rule) Propose {
+//
+// The rules come bound, so one call can hand rules of different options types.
+func proposeFromRules(rules ...rule.Bound) Propose {
 	return func(fileName string, text string) ([]Proposal, error) {
 		rooted := fileName
 		if !tspath.IsRootedDiskPath(rooted) {
@@ -53,12 +55,17 @@ func proposeFromRules(rules ...rule.Rule) Propose {
 					diagnostics = append(diagnostics, diagnostic)
 				},
 			}
-			listeners := currentRule.Run(context, nil)
+			listeners := currentRule.Run(context)
 			walkForRules(sourceFile.AsNode(), listeners)
 		}
 
 		return ProposalsFrom(diagnostics), nil
 	}
+}
+
+// unconfigured is subject bound to the zero Given, as a bare severity runs it and as nil options used to.
+func unconfigured[Options any](subject rule.Rule[Options]) rule.Bound {
+	return rule.Bind(subject, rule.Given[Options]{})
 }
 
 func walkForRules(node *ast.Node, listeners rule.Listeners) {
@@ -90,7 +97,7 @@ func TestARealRuleFixLandsCorrectly(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	result, err := FixFile(fileName, proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)), DefaultMaxPasses)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +144,7 @@ func TestARealRuleConvergesInTwoPasses(test *testing.T) {
 	result, fixTextError := FixText(
 		"imports.ts",
 		source,
-		proposeFromRules(nexus.ImportRequireNodeNamespace),
+		proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)),
 		DefaultMaxPasses,
 	)
 	if fixTextError != nil {
@@ -201,7 +208,7 @@ func TestReplaceNodeMustNotEatLeadingTrivia(test *testing.T) {
 			result, fixTextError := FixText(
 				"imports.ts",
 				testCase.source,
-				proposeFromRules(nexus.ImportRequireNodeNamespace),
+				proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)),
 				DefaultMaxPasses,
 			)
 			if fixTextError != nil {
@@ -228,7 +235,7 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	result, err := FixFile(fileName, proposeFromRules(unconfigured(nexus.ImportRequireNodeNamespace)), DefaultMaxPasses)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -281,7 +288,7 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(breakingRule), DefaultMaxPasses)
+	result, err := FixFile(fileName, proposeFromRules(unconfigured(breakingRule)), DefaultMaxPasses)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -365,7 +372,7 @@ func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	result, err := FixFile(fileName, proposeFromRules(unconfigured(nonSilencingRule)), DefaultMaxPasses)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -399,7 +406,12 @@ func TestNonConvergenceNamesTheRule(test *testing.T) {
 	test.Parallel()
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
-	result, fixTextError := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	result, fixTextError := FixText(
+		"switch.ts",
+		source,
+		proposeFromRules(unconfigured(nonSilencingRule)),
+		DefaultMaxPasses,
+	)
 	if fixTextError != nil {
 		test.Fatalf("unexpected error: %v", fixTextError)
 	}
@@ -465,7 +477,12 @@ func TestSiblingFixesFromOneDiagnosticHalfApply(test *testing.T) {
 	test.Parallel()
 	source := "const a = \"xy\";\n"
 
-	result, fixTextError := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)
+	result, fixTextError := FixText(
+		"p.ts",
+		source,
+		proposeFromRules(unconfigured(siblingOverlapRule)),
+		DefaultMaxPasses,
+	)
 	if fixTextError != nil {
 		test.Fatalf("unexpected error: %v", fixTextError)
 	}

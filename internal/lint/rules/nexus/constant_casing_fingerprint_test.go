@@ -12,7 +12,12 @@ import (
 // walk hands the rule, viewed under its own reads.
 func constantCasingFingerprintOf(test *testing.T, files map[string]string, subject string) [sha256.Size]byte {
 	test.Helper()
-	return constantCasingFingerprintWithOptions(test, files, subject, nil)
+	return constantCasingFingerprintWithOptions(
+		test,
+		files,
+		subject,
+		rule.Given[ConsistencyRequireConstantCasingOptions]{},
+	)
 }
 
 // constantCasingFingerprintWithOptions is constantCasingFingerprintOf under the rule's options.
@@ -20,7 +25,7 @@ func constantCasingFingerprintWithOptions(
 	test *testing.T,
 	files map[string]string,
 	subject string,
-	options any,
+	options rule.Given[ConsistencyRequireConstantCasingOptions],
 ) [sha256.Size]byte {
 	test.Helper()
 	var fingerprint [sha256.Size]byte
@@ -127,8 +132,8 @@ func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(test *
 		test,
 		files,
 		source,
-		nil,
-	) != constantCasingFingerprintWithOptions(test, files, source, framework) {
+		rule.Given[ConsistencyRequireConstantCasingOptions]{},
+	) != constantCasingFingerprintWithOptions(test, files, source, rule.Configured(framework)) {
 		test.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
 	}
 
