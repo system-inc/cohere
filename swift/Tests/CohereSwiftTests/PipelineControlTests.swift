@@ -11,8 +11,12 @@ import Testing
  These are slow on purpose (each run is a `swift build`), and they are the only tests that would notice a
  phase quietly wired to nothing: the per-rule and per-phase tests each check a piece, not that the pieces
  are connected. Every run is `--no-fix`, so the fixture is read and never written.
+
+ Not serialized: each run writes its own UUID-named package, the build cache is keyed by the package's path,
+ and the process-wide state is two Mutex-guarded singletons that parallel callers queue on. In series this
+ suite was the whole test run's critical path, 62.6s; in parallel, 11s, green in every round measured (#7r8mct7).
  */
-@Suite(.serialized)
+@Suite
 struct PipelineControlTests {
     static let manifest = """
         // swift-tools-version:6.2
