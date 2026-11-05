@@ -2,7 +2,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point <theme.css> [-output <file.go>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_collapse \
+//	    -entry-point <theme.css> [-output <file.go>] [-check] \
 //	    [-resolve-root <dir>] [-verify-invariance-against <theme.css>[:<resolve-root>]]
 //
 // # The one invariance claim in this file, and how to re-measure it
@@ -670,15 +671,15 @@ type CollapseFamily struct {
 // CollapseFamilies is every family the installed Tailwind knows, sorted by input roots.
 //
 // Upstream ships shorthand data and it does not derive this. Two maps keyed on CSS property,
-// `+"`"+`padding-inline: [padding-left, padding-right]`+"`"+` and its kin, cover inset, margin, padding,
+// `+"`padding-inline: [padding-left, padding-right]`"+` and its kin, cover inset, margin, padding,
 // scroll-margin, scroll-padding, border width/style/colour, gap, overflow, overscroll-behavior and
-// ten logical block/inline pairs. This is keyed on utility roots, `+"`"+`pl + pr => px`+"`"+`, and bridging the
-// two key spaces is `+"`"+`canonicalizeCandidates`+"`"+`, the signature-equivalence search `+"`"+`enumerate.mjs`+"`"+`
+// ten logical block/inline pairs. This is keyed on utility roots, `+"`pl + pr => px`"+`, and bridging the
+// two key spaces is `+"`canonicalizeCandidates`, the signature-equivalence search `enumerate.mjs`"+`
 // prices at eight to ten thousand lines that changes every Tailwind minor.
 //
 // It also holds families no CSS shorthand covers, which is the half that makes the two genuinely
-// different questions rather than one restated: `+"`"+`h + w => size`+"`"+`, `+"`"+`skew`+"`"+`, `+"`"+`translate`+"`"+`, the `+"`"+`rounded-*`+"`"+`
-// corners, the `+"`"+`mask-*`+"`"+` edges and `+"`"+`border-spacing`+"`"+` collapse through a utility relationship rather
+// different questions rather than one restated: `+"`h + w => size`, `skew`, `translate`, the `rounded-*`"+`
+// corners, the `+"`mask-*` edges and `border-spacing`"+` collapse through a utility relationship rather
 // than a property one.
 var CollapseFamilies = []CollapseFamily{
 `,
@@ -772,7 +773,7 @@ var PropertyOrder = map[string]int{
 // SortOverrideProperties used to be printed here and is not any more.
 //
 // It held the twelve values a `+"`--tw-sort`"+` declaration can carry, and nothing read it. The latch it
-// describes is real and is implemented in walk.go: `+"`PropertySort`"+` reads a `+"`--tw-sort`"+` declaration's
+// describes is real and is implemented in walk.go: `+"`PropertySort` reads a `--tw-sort`"+` declaration's
 // value and looks it up in `+"`PropertyOrder`"+`, so a value that names a known property latches the order
 // there and a value that does not falls through. Neither branch consults a list of which values are
 // legal, because the lookup answers that by hitting or missing.

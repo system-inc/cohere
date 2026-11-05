@@ -4,7 +4,9 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_candidate -package-root <tailwindcss package> [-corpus-root <repo>] [-theme-entry <entry.css>] [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_candidate \
+//	    -package-root <tailwindcss package> [-corpus-root <repo>] [-theme-entry <entry.css>] [-output <file.json>] \
+//	    [-check]
 //
 // The distinction this tool enforces is order. `parseCandidate` is a generator, roughly a fifth of
 // the classes a real repository writes yield more than one candidate, and the first that compiles

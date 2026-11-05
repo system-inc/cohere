@@ -3,7 +3,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
+//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table \
+//	    -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
 //
 // The input is what `internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs --json` writes, which is the
 // uncompacted diagnostic shape: a full `{order, count}` per bucket per root across all three

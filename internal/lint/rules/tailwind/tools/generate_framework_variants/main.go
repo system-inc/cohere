@@ -2,7 +2,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package> [-output <file.go>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants \
+//	    -package-root <tailwindcss package> [-output <file.go>] [-check]
 //
 // The table it writes is what lets `LoadDesignSystem` build a registry that knows `hover`. Without
 // it a run-scoped design system registers only the repository's own `@custom-variant` names:
@@ -582,7 +583,7 @@ package tailwind
 // order is where a comparison function gets to speak, and comparison is how the five breakpoints
 // order by their resolved widths instead of alphabetically.
 type FrameworkVariantRegistration struct {
-	// Name is the registered root, as written before the colon: ` + "`hover`" + `, ` + "`group`" + `, ` + "`@max`" + `.
+	// Name is the registered root, as written before the colon: ` + "`hover`, `group`, `@max`" + `.
 	Name string
 	// Order is the registration number Variants.set assigned. Shared across every root registered
 	// inside one Variants.group.
@@ -596,7 +597,7 @@ type FrameworkVariantRegistration struct {
 //
 // The function itself cannot be generated: upstream's is a closure over the design system's theme,
 // and reading a hardcoded breakpoint scale here would be the per-repository bug this port exists to
-// remove. Measured on the engine, redefining ` + "`--breakpoint-sm`" + ` to ` + "`200rem`" + ` moves ` + "`sm`" + ` from dense
+// remove. Measured on the engine, redefining ` + "`--breakpoint-sm` to `200rem` moves `sm`" + ` from dense
 // index 0 to index 4. So what is generated is the order number and the direction, and
 // LoadDesignSystem attaches CompareBreakpoints over the live theme.
 //
@@ -639,7 +640,7 @@ var FrameworkVariantRegistrations = []FrameworkVariantRegistration{
 	builder.WriteString(`// FrameworkVariantComparisonGroups is every order number that carries a comparison function.
 //
 // All four are breakpoint comparisons in a default build. Without them the six roots sharing order
-// 64 fall through to a root-name comparison, and ` + "`2xl`" + ` sorts before ` + "`sm`" + ` alphabetically, which
+// 64 fall through to a root-name comparison, and ` + "`2xl` sorts before `sm`" + ` alphabetically, which
 // reorders every responsive class in the tree.
 var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 `)

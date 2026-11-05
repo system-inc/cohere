@@ -619,7 +619,7 @@ var FrameworkNamespaces = map[string]bool{
 	fmt.Fprintf(&body, `// baseStatics is every static utility whose reading is a fact about Tailwind.
 //
 // %d of them. A static one system registers and another does not is a repository `+"`@utility`"+`
-// block — ahra declares `+"`markdown-content`"+` and `+"`typing-dots`"+`, www-connected-app declares
+// block — ahra declares `+"`markdown-content` and `typing-dots`"+`, www-connected-app declares
 // neither — and NewTable adds those from the live evaluator rather than this file carrying one
 // repository's utilities as framework facts.
 var baseStatics = map[string]Reading{

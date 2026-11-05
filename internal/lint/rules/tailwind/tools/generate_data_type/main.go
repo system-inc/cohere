@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_data_type -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_data_type \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is that reading the source and asking the engine are
 // different claims, and they disagree. Read `infer-data-type.ts` and `serif` is a generic-name.

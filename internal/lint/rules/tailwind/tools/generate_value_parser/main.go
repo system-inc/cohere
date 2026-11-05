@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces:
 // reading the source and asking the engine are different claims. For this parser they disagree in
