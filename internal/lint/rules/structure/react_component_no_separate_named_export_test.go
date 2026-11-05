@@ -186,7 +186,7 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(test *testing.T) {
 // otherwise, on the first fixable rule I have written since it existed. An id-only fixture would
 // have agreed with me.
 //
-// This test used to assert the DEFECT. Its expected outputs were the source with the list deleted
+// This test used to assert the defect. Its expected outputs were the source with the list deleted
 // and no `export` anywhere, so every component the fixer touched was unexported and the suite
 // stayed green, because the fixture recorded what the fixer did rather than what the file needed.
 // The outputs below carry the export onto each declaration, which is the only rewrite that leaves
@@ -229,7 +229,7 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 			"const Button = () => <button />;\nexport { Button };\n",
 			"export const Button = () => <button />;\n\n",
 		},
-		// A list written ABOVE the declaration it names, which hoisting makes legal.
+		// A list written above the declaration it names, which hoisting makes legal.
 		{
 			"a list before its declaration",
 			"export { Button };\nfunction Button() {\n    return <button />;\n}\n",

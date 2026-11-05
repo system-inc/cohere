@@ -190,7 +190,7 @@ func TestNoDivRegexReportsTheWholeLiteral(test *testing.T) {
 // code. With one vector and one equals sign in the input, several wrong spans produce plausible
 // output; these separate them.
 //
-// The flags case is the sharpest: a repair anchored on the literal's END rather than its start
+// The flags case is the sharpest: a repair anchored on the literal's end rather than its start
 // would land in or past the flags. The `/=/` case pins that the repair does not eat the closing
 // slash. And the second and third cases have a second equals sign later in the pattern, which a
 // repair searching for an equals sign rather than taking index 1 would find instead.
@@ -261,7 +261,7 @@ func TestNoDivRegexMessage(test *testing.T) {
 // see because what it prevents is a panic rather than a wrong verdict.
 //
 // A mutation deleting the guard survived every other fixture in this file, which is the shape the
-// brief calls crash protection: the sweep reports SURVIVED identically whether the guard matters or
+// brief calls crash protection: the sweep reports `SURVIVED` identically whether the guard matters or
 // not, because a panic is not a finding.
 //
 // It matters. The grammar cannot produce a regular expression literal shorter than two characters,

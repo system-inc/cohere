@@ -52,7 +52,7 @@ func runNoRestrictedProperties(
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/no-restricted-properties.js` was loaded with its RuleTester stubbed so every case
-// came out as data with its restrictions attached, then replayed against the INSTALLED rule to
+// came out as data with its restrictions attached, then replayed against the installed rule to
 // record what it reports. All 89 reproduced.
 //
 // Upstream's options are a variadic list of restriction objects, one per element. The struct here
@@ -183,7 +183,7 @@ func TestNoRestrictedPropertiesStaysSilent(test *testing.T) {
 // With no restrictions configured, the rule registers nothing at all.
 //
 // This is the property that makes the rule's violation count on any codebase structurally zero
-// rather than evidence of a clean tree, and it is why this port ships REGISTERED BUT NOT ENABLED:
+// rather than evidence of a clean tree, and it is why this port ships registered but not enabled:
 // enabling it means choosing restrictions, which is a decision about this codebase rather than a
 // porting question.
 //
@@ -208,7 +208,7 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(test *testing.T) {
 		"restrictedObjectProperty", "restrictedObjectProperty")
 }
 
-// What the finding SAYS, asserted by equality on the whole rendered sentence.
+// What the finding says, asserted by equality on the whole rendered sentence.
 //
 // Every message on this rule is built by interpolation from up to four pieces: the object name, the
 // property name, an allowance list, and the project's own message. Nothing above can see any of
@@ -320,7 +320,7 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(test *testing.T) {
 
 // Where the finding points, which no message-id fixture can see.
 //
-// A member access reports on the WHOLE access rather than on the property, and a destructuring
+// A member access reports on the whole access rather than on the property, and a destructuring
 // pattern reports on the whole pattern rather than on the property being read -- which is why one
 // pattern restricting two properties reports twice on the same span. Both are upstream's `node`.
 func TestNoRestrictedPropertiesPointsAtTheAccess(test *testing.T) {
@@ -363,10 +363,10 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(test *testing.T) {
 	}
 }
 
-// Destructuring written as an ASSIGNMENT, which our parser gives a different node kind.
+// Destructuring written as an assignment, which our parser gives a different node kind.
 //
 // ESTree calls `var {bar} = foo` and `({bar} = foo)` the same `ObjectPattern`, so upstream needs one
-// listener. Ours parses the second as an object LITERAL whose members are property assignments, so
+// listener. Ours parses the second as an object literal whose members are property assignments, so
 // the same judgment needs a second entry point over a different shape entirely.
 //
 // Six of upstream's imported cases reported nothing until that arm existed, and a seventh -- the
@@ -390,7 +390,7 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(test *testing.T) {
 		{"[{ bad }] = foo;", restrictBad, []string{"restrictedProperty"}},
 		// An ordinary object literal in a call argument is not a pattern and must stay clean.
 		{"foo({ bad: 1 });", restrictBad, nil},
-		// Nor is one on the RIGHT of an assignment.
+		// Nor is one on the right of an assignment.
 		{"x = { bad: 1 };", restrictBad, nil},
 	}
 	for _, testCase := range cases {
@@ -406,7 +406,7 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(test *testing.T) {
 	}
 }
 
-// The property-name predicate, which is NOT the shelf's `property.AccessedName`.
+// The property-name predicate, which is not the shelf's `property.AccessedName`.
 //
 // The shelf helper is the closest thing on any shelf and disagrees with upstream on four of the
 // eight spellings this rule can meet. That was measured with a probe rather than read off its doc
@@ -538,7 +538,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 	})
 }
 
-// The empty-list guard registers NO listener, which is a cost property no findings test can see.
+// The empty-list guard registers no listener, which is a cost property no findings test can see.
 //
 // Written for a surviving mutant. Removing the guard changes no verdict -- an index built from an
 // empty list matches nothing, so both paths reach the same silence -- and `ExpectFindings` asserts
@@ -620,7 +620,7 @@ func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(test *testing.T) 
 			nil},
 		{"a rest element against an object restriction", "var {...rest} = foo;", restrictFoo, nil},
 		{"a rest element in an assignment pattern", "({...rest} = foo);", restrictRest, nil},
-		// The control: the same binding name written as an ordinary property DOES report.
+		// The control: the same binding name written as an ordinary property does report.
 		{"the same name as a real property", "var {rest} = foo;", restrictRest,
 			[]string{"restrictedProperty"}},
 	}

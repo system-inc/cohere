@@ -60,7 +60,7 @@ type RequireAtomicUpdatesOptions struct {
 //
 // `foo = foo + await bar` reports and `foo = await bar + foo` does not, and the two differ only in
 // which side of the suspension the read of `foo` sits on. Nothing about the assignment node, the
-// symbol, or the enclosing function separates them: the discrimination is the ORDER of a read, a
+// symbol, or the enclosing function separates them: the discrimination is the order of a read, a
 // suspension, and a write along a path, which is exactly what a control-flow graph carries and what
 // a syntactic walk cannot see. Upstream reaches this with ESLint's code path analysis, tracking two
 // per-segment sets and moving variables between them.
@@ -73,13 +73,13 @@ type RequireAtomicUpdatesOptions struct {
 // to be cleared by a later read, so its whole contribution is bookkeeping between two events inside
 // one block.
 //
-// That collapses. This runs a FORWARD dataflow over a single set, "variables read before a
+// That collapses. This runs a forward dataflow over a single set, "variables read before a
 // suspension that no later read has refreshed", met by union across predecessors. Inside a block the
 // transfer walks events in order: a read removes the variable from the outdated set and records it
 // as freshly read, a suspension moves every freshly read variable into the outdated set, and a write
 // is judged against the set as it stands. Union is upstream's own meet, reached in
 // `SegmentInfo#initialize` by folding every previous segment's two sets together, and `isOutdated`
-// answering true if ANY current segment holds the variable is the same disjunction on the other
+// answering true if any current segment holds the variable is the same disjunction on the other
 // side.
 //
 // The block-local fresh set is not part of the lattice value because it cannot survive a block
@@ -125,7 +125,7 @@ type RequireAtomicUpdatesOptions struct {
 //
 // The last two are the parameter special case and they are not symmetric, which reads as an
 // inconsistency and is deliberate upstream: `isMemberAccess && variable.defs.some(Parameter)`
-// returns false EARLY, before the escape scan runs. A parameter's object is reachable by the caller
+// returns false early, before the escape scan runs. A parameter's object is reachable by the caller
 // whatever this function does with the binding, so a property write on it is observable outside; the
 // binding itself is not, so a plain reassignment of it is local. Two questions, one predicate,
 // opposite answers, and the corpus pins both.
@@ -133,7 +133,7 @@ type RequireAtomicUpdatesOptions struct {
 // # Two divergences from ESLint, both measured on the whole tree and both kept
 //
 // Run end to end over `~/Projects/ahra` on 2026-08-26, cohere reports 39 and ESLint 31, and the
-// difference is entirely one-way: cohere is a strict SUPERSET, with 8 findings ESLint declines and
+// difference is entirely one-way: cohere is a strict superset, with 8 findings ESLint declines and
 // zero that ESLint reports and cohere misses. Both classes are recorded below with the reduction
 // that isolates them, because each is a place a later reader would otherwise "fix" cohere back to
 // ESLint's answer.
@@ -148,7 +148,7 @@ type RequireAtomicUpdatesOptions struct {
 // The two disagree in one direction, and upstream's own corpus contains the case. Case 26 assigns
 // `process.exitCode` and upstream ships it with `globals: { process: "readonly" }` in its language
 // options. Measured on the installed rule: with that global declared it reports twice, and with the
-// SAME source and no global declared it is completely silent. In this tree `process` resolves
+// same source and no global declared it is completely silent. In this tree `process` resolves
 // through the ambient node declarations, so we report where a bare ESLint run on an untyped file
 // would not.
 //
@@ -159,7 +159,7 @@ type RequireAtomicUpdatesOptions struct {
 //
 // The divergence is a strict superset in favour of reporting, and it is the right direction here:
 // the reason upstream skips an unresolved name is that it cannot tell a global from a typo, not that
-// a global cannot race. A global is in fact the MOST racy thing in the file. `TestRequireAtomicUpdatesResolutionDivergence`
+// a global cannot race. A global is in fact the most racy thing in the file. `TestRequireAtomicUpdatesResolutionDivergence`
 // pins it so the next reader sees a measurement rather than inherits an argument.
 //
 // On the real tree this accounts for 7 of the 8 extras, all of them the same shape: a handler saved
@@ -172,10 +172,10 @@ type RequireAtomicUpdatesOptions struct {
 //
 // `modules/art/ArtTerminal.ts:414-416` and `modules/phi/social/PhiSocialTerminal.ts:480-482` are
 // that pattern over `console.log`, `console.info` and `process.stdout.write`. Measured on the
-// installed rule, the SAME source reports when `console` is a declared global and is silent when it
+// installed rule, the same source reports when `console` is a declared global and is silent when it
 // is not.
 //
-// Why those two names are undeclared HERE is narrower than "the config has no globals", and the
+// Why those two names are undeclared here is narrower than "the config has no globals", and the
 // narrow version is the one that survives a grep. `StructureLintConfiguration.ts` declares globals
 // in two places and the two lists differ:
 //
@@ -206,7 +206,7 @@ type RequireAtomicUpdatesOptions struct {
 // # Divergence two, a refresh credited across a throwing edge: the 8th
 //
 // ESLint clears a variable's outdated mark at a read, and carries that clearing into the `catch` of
-// an enclosing `try`. So a read at the END of a try block silences a write in the catch, even though
+// an enclosing `try`. So a read at the end of a try block silences a write in the catch, even though
 // the catch is reached precisely on the paths where that read did not run.
 //
 // Reduced to the pair that isolates it, measured on eslint 10.8.1:
@@ -219,14 +219,14 @@ type RequireAtomicUpdatesOptions struct {
 //	    try { await a(); e.p = await b(); use(e.p); } catch (x) { e.err = 1; } }
 //	  -> ESLint reports only `e.p`, and goes silent on `e.err`
 //
-// The two differ by the single read `use(e.p)`. Reading an UNRELATED variable there does not change
+// The two differ by the single read `use(e.p)`. Reading an unrelated variable there does not change
 // the verdict, and adding a further await after the read restores it, which together show the
 // mechanism is the refresh rather than statement count or position.
 //
 // The catch runs when `await b()` rejects. On that path `use(e.p)` never executes, so the refresh
 // ESLint credits did not happen and `e` is still built from a pre-suspension read. Cohere reports
 // it; ESLint does not. This is `modules/kingdom/KingdomShadeController.ts:203`, and it is the only
-// one of the 8 where the two implementations disagree about a JUDGMENT rather than about what
+// one of the 8 where the two implementations disagree about a judgment rather than about what
 // resolves.
 //
 // Kept deliberately. A refresh that only happens on the non-throwing path cannot make the throwing
@@ -249,7 +249,7 @@ var RequireAtomicUpdates = rule.Rule{
 	// substitute: `let foo` inside the async function and `let foo` outside it produce identical
 	// identifier text and opposite verdicts.
 	//
-	// A mutant flipping this to false survives every fixture, and that is a property of the HARNESS
+	// A mutant flipping this to false survives every fixture, and that is a property of the harness
 	// rather than a gap in the fixtures: `rule_testing.RunTyped` supplies a checker whatever the rule
 	// declares, so no rule test can observe the declaration. What the field actually controls is
 	// whether a real run acquires the checker for this file at all, so under-declaring it makes the
@@ -329,7 +329,7 @@ func analyzeNonAtomicUpdates(ruleContext rule.Context, sourceFile *ast.Node, set
 //
 // # The gate is a cost filter, and that was measured rather than assumed
 //
-// A mutant widening this to every root SURVIVED the whole corpus, and the honest verdict is
+// A mutant widening this to every root survived the whole corpus, and the honest verdict is
 // equivalence rather than a fixture gap. A root that cannot suspend emits no suspension, so nothing
 // in it ever enters the outdated set and no write in it can be judged; admitting more such roots
 // cannot change a verdict. The inverse mutation, closing the gate on everything, fails 24 lines,
@@ -403,12 +403,12 @@ func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, setti
 		Read: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
 			// The Read hook fires for a plain assignment target too, which `no-useless-assignment`
 			// measured and documented: `patternReads` reads a `KindIdentifier` target before the
-			// assigned expression. So what the occurrence IS comes from the AST, and the hook only
+			// assigned expression. So what the occurrence is comes from the AST, and the hook only
 			// says where in the flow it sits.
 			//
 			// That distinction is load-bearing here and in the same direction as upstream's. Reading
-			// upstream: a reference is marked fresh when `reference.isRead()` AND it is not the
-			// target of a plain `=`. A compound target (`foo += x`) IS a read and does refresh; a
+			// upstream: a reference is marked fresh when `reference.isRead()` and it is not the
+			// target of a plain `=`. A compound target (`foo += x`) is a read and does refresh; a
 			// plain target (`foo = x`) is not. Reproducing that means asking the AST which kind of
 			// assignment target this is.
 			// A declarator's own name is a declaration rather than a reference, and upstream's
@@ -447,14 +447,14 @@ func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, setti
 			}
 		},
 		Expression: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
-			// A suspension is recorded as a marker HERE, before its operand, and moved to its real
+			// A suspension is recorded as a marker here, before its operand, and moved to its real
 			// position by `placeDeferredEvents`. The Expression hook is the only one the graph
 			// offers for an await or a yield, and it is pre-order, which is the wrong end.
 			//
 			// The distinction is not cosmetic and the corpus decides it in both directions.
-			// `foo = await foo` REPORTS upstream, because `makeOutdated` runs at the await's exit
+			// `foo = await foo` reports upstream, because `makeOutdated` runs at the await's exit
 			// and so the read inside its own operand is made stale by it. `foo = await bar + foo`
-			// is CLEAN, because the read to the right of the `+` happens after the whole await.
+			// is clean, because the read to the right of the `+` happens after the whole await.
 			// Recording the suspension before the operand gets the first wrong; recording it at the
 			// operand's end gets both right.
 			switch node.Kind {
@@ -483,7 +483,7 @@ func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, setti
 	// One assignment can be judged more than once, and reporting each judgment would double the
 	// finding.
 	//
-	// The graph lays a `finally` block out TWICE, once for normal completion and once for the path
+	// The graph lays a `finally` block out twice, once for normal completion and once for the path
 	// leaving the `try` through return, throw, or a suspended yield. Both copies carry the same
 	// source positions, so a write inside a `finally` is walked twice and both copies can find it
 	// stale. Measured on the shape that surfaced it, which came off the real tree rather than out of
@@ -492,12 +492,12 @@ func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, setti
 	//	function o() { let g = false; async function f() {
 	//	    if (g) return; g = true; try { await s(); } finally { g = false; } } }
 	//
-	// The installed rule reports `g = false` ONCE, at column 106. Before this, cohere reported the
+	// The installed rule reports `g = false` once, at column 106. Before this, cohere reported the
 	// identical span twice. No imported case could see it: upstream's corpus writes no assignment
 	// inside a `finally` at all, and its one try/catch case puts the writes in the arms.
 	//
 	// Deduplicating by the assignment's own position is the right key rather than by block, because
-	// the copies ARE one write in the source. `no-useless-assignment` hit the same duplicate layout
+	// the copies are one write in the source. `no-useless-assignment` hit the same duplicate layout
 	// and answered a different question about it, needing every copy to agree before reporting; here
 	// any copy finding it stale is a real race, so the first wins and the rest are the same finding.
 	reported := map[int]bool{}
@@ -530,7 +530,7 @@ func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, setti
 //
 // `isOutdated` reads only the outdated set, so a first version of this rule kept the fresh set
 // block-local and treated it as bookkeeping inside one block. That is wrong wherever a read and the
-// suspension that stales it land in DIFFERENT blocks, which is what any forked right-hand side
+// suspension that stales it land in different blocks, which is what any forked right-hand side
 // produces. Measured on upstream's own cases: `foo = foo + (bar ? baz : await amount)` lays the read
 // out in the entry block and the await in one arm of the fork, so at the await the block-local fresh
 // set is empty and nothing is ever marked outdated. Five corpus findings were silent that way, and
@@ -567,7 +567,7 @@ func (state atomicReadState) clone() atomicReadState {
 // # Union is the meet, and it is upstream's own
 //
 // `SegmentInfo#initialize` folds every previous segment's two sets together with
-// `Set.prototype.add`, and `isOutdated` returns true if ANY current segment holds the variable. Both
+// `Set.prototype.add`, and `isOutdated` returns true if any current segment holds the variable. Both
 // are disjunction, so a binding outdated on one incoming path is outdated at the join. That is the
 // conservative direction for a race warning: a write reachable by a path where the read was stale is
 // a write that can be stale.
@@ -745,7 +745,7 @@ func recordAtomicWrite(
 	if symbol == nil {
 		return
 	}
-	// The variable arm asks whether the BINDING escapes, so isMemberAccess is false here. The
+	// The variable arm asks whether the binding escapes, so isMemberAccess is false here. The
 	// property arm asks the same predicate with it true, which is what makes a parameter answer
 	// differently on the two sides. See the escape table in the rule's doc comment.
 	if !escapesEnclosingFunction(ruleContext, symbol, root, false, escapes) {
@@ -765,7 +765,7 @@ func recordAtomicWrite(
 //
 // A mutant disabling `binary.Left != identifier` survived the whole corpus, and the cause is the
 // caller rather than the fixtures. `recordAtomicWrite` is the single call site and it runs only from
-// the graph's Write hook, which fires where a binding is STORED into, so an identifier on the right
+// the graph's Write hook, which fires where a binding is stored into, so an identifier on the right
 // of an assignment never arrives here. Measured on four shapes chosen to separate them, including
 // `let foo; let bar; async function x() { foo; await q; bar = foo; }` where `foo` is read on the
 // right after a suspension: mutant and pristine produce identical findings on all four.
@@ -820,7 +820,7 @@ func isAssignmentOperatorToken(operator *ast.Node) bool {
 //
 // Upstream's condition is `reference.isRead() && !(writeExpr && writeExpr.parent.operator === "=")`,
 // where `getWriteExpr` walks up through enclosing member expressions. So the test is about the whole
-// member CHAIN the identifier heads, not only about the identifier being the target itself, and both
+// member chain the identifier heads, not only about the identifier being the target itself, and both
 // halves of that are pinned by the corpus:
 //
 //	foo = await bar             clean    a plain `=` target is not a read

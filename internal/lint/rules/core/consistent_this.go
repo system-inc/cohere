@@ -44,7 +44,7 @@ func DefaultConsistentThisSettings() ConsistentThisSettings {
 // Hand rolled rather than routed through the generic helper for two reasons. The default is
 // `["that"]` rather than the zero value, and a generic decoder would turn an absent option into an
 // empty list, which silently inverts the rule rather than disabling it. And upstream's option
-// surface is VARIADIC: each alias is its own option element, `["error", "self", "vm"]`, so the rule
+// surface is variadic: each alias is its own option element, `["error", "self", "vm"]`, so the rule
 // registers with `DecodeOptionList` and is handed that list, which is upstream's `context.options`
 // exactly.
 //
@@ -106,8 +106,8 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 //
 // `self += this` is a finding, because the alias ends up holding a concatenation rather than the
 // context. Upstream reads `node.operator !== "="` for this, and it is a real discrimination rather
-// than defensive coding: the assignment's value IS a `this` expression, so a port testing only the
-// value reports nothing. Measured on the installed rule, `self ||= this` reports TWICE, since the
+// than defensive coding: the assignment's value is a `this` expression, so a port testing only the
+// value reports nothing. Measured on the installed rule, `self ||= this` reports twice, since the
 // declaration also never received a plain assignment.
 //
 // # The declared-and-never-assigned half needs a scope model, and ours is measured rather than
@@ -120,8 +120,8 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 //
 // We have no scope table, so this asks the same question of the tree, and what `reference.from`
 // actually means here was measured against the installed rule rather than read off the source. It is
-// the innermost ESLINT scope, and eslint opens one for a block, a switch, a loop body, a catch and a
-// `with`, but NOT for an unbraced `if` consequent, a labeled statement, or any expression nesting.
+// the innermost ESLint scope, and eslint opens one for a block, a switch, a loop body, a catch and a
+// `with`, but not for an unbraced `if` consequent, a labeled statement, or any expression nesting.
 // So all of these report, with the alias `self`:
 //
 //	var self; { self = this; }                  a bare block
@@ -140,7 +140,7 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 //	var self; a, self = this;
 //	var self; a ? self = this : 0;
 //
-// Reproduced rather than corrected. In every reporting case above the write reaches the same VAR
+// Reproduced rather than corrected. In every reporting case above the write reaches the same `var`
 // declaration and the alias does end up holding `this`, so upstream is reporting correct code, and
 // the intuitive reading of the rule would call all of them clean. That intuition is the thing most
 // likely to be wrong here, so it is written down beside the measurement rather than acted on.
@@ -176,7 +176,7 @@ var ConsistentThis = rule.Rule{
 // is not an oversight on either side: an arrow has no `this` of its own, so a capture inside one
 // belongs to the enclosing scope.
 func checkConsistentThisScope(ruleContext rule.Context, scope *ast.Node, aliases []string) {
-	// Declarations of an alias in THIS scope, and whether a plain assignment of `this` rescued each.
+	// Declarations of an alias in this scope, and whether a plain assignment of `this` rescued each.
 	declaredAliases := []*ast.Node{}
 	rescuedAliases := map[string]bool{}
 	nestedScopes := []*ast.Node{}
@@ -188,7 +188,7 @@ func checkConsistentThisScope(ruleContext rule.Context, scope *ast.Node, aliases
 			nestedScopes = append(nestedScopes, current)
 			return false
 		}
-		// An arrow is NOT a scope this rule judges, and it is not transparent either.
+		// An arrow is not a scope this rule judges, and it is not transparent either.
 		//
 		// Upstream hooks only Program, FunctionExpression and FunctionDeclaration exits, so an
 		// arrow body's scope is never visited and the declared-and-never-assigned judgment simply
@@ -226,11 +226,11 @@ func checkConsistentThisScope(ruleContext rule.Context, scope *ast.Node, aliases
 			}
 			if isDesignatedAlias(name.Text(), aliases) {
 				declaredAliases = append(declaredAliases, current)
-				// ANY initializer settles this declaration, not only a `this` one.
+				// Any initializer settles this declaration, not only a `this` one.
 				//
 				// Upstream's checkWasAssigned returns as soon as a def is a declarator with a
 				// non-null init, without looking at what the init holds, so an initialized
-				// declaration is never judged a second time here. That matters because a WRONG
+				// declaration is never judged a second time here. That matters because a wrong
 				// initializer has already been reported by checkAssignment above: with the alias
 				// `self`, `var self = 42` is one finding upstream and two under the intuitive
 				// reading, which is what this port shipped until the corpus said otherwise.
@@ -305,7 +305,7 @@ func isConsistentThisScope(node *ast.Node) bool {
 //
 // This reproduces `reference.from === scope` and it is a measurement rather than a derivation: the
 // list below is exactly what eslint opens a scope for, established by driving the installed rule
-// over each construct with and without a block. A loop appears here through its BODY rather than
+// over each construct with and without a block. A loop appears here through its body rather than
 // through the loop itself, which is why `for(var i=0;;) self = this;` is clean and
 // `for(;;) { self = this; }` is not.
 //
@@ -315,7 +315,7 @@ func liesInsideANestedEslintScope(write *ast.Node, scope *ast.Node) bool {
 	for ancestor := write.Parent; ancestor != nil && ancestor != scope; ancestor = ancestor.Parent {
 		switch ancestor.Kind {
 		case ast.KindBlock:
-			// A function's OWN body block is that function's scope rather than a nested one, and
+			// A function's own body block is that function's scope rather than a nested one, and
 			// skipping this exemption costs a real finding: with the alias `self`,
 			// `var self; function f() { var self; self = this; }` reports the outer declaration
 			// upstream and reported both here, because the inner write never rescued the inner
@@ -389,7 +389,7 @@ func isAssignmentOperator(kind ast.Kind) bool {
 // This is what an arrow body gets. Upstream reaches every declarator and every assignment inside an
 // arrow through listeners that do not depend on a scope, while its scope-exit listeners never fire
 // for one, so the declared-and-never-assigned judgment is skipped there and only there. A nested
-// function INSIDE an arrow is a scope again, which is why the descent resumes at one.
+// function inside an arrow is a scope again, which is why the descent resumes at one.
 func checkConsistentThisAssignmentsOnly(ruleContext rule.Context, node *ast.Node, aliases []string) {
 	var visit func(*ast.Node) bool
 	visit = func(current *ast.Node) bool {

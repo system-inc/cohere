@@ -230,7 +230,7 @@ func TestNoAsyncClientComponentDeclinesNearMisses(test *testing.T) {
 	}
 }
 
-// Shapes the corpus never writes that DO report, so the silence above is a discrimination rather
+// Shapes the corpus never writes that do report, so the silence above is a discrimination rather
 // than a narrow rule.
 func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(test *testing.T) {
 	test.Parallel()
@@ -281,7 +281,7 @@ func TestNoAsyncClientComponentResolvesThroughShadowing(test *testing.T) {
 // written specifically to kill it.
 //
 // All four verdicts below are pinned on the release oxlint binary, and they split on which
-// declaration appears FIRST IN SOURCE. oxc reaches one node through `symbol_declaration(symbol_id)`
+// declaration appears first in source. oxc reaches one node through `symbol_declaration(symbol_id)`
 // and its binder records the first declaration it walks past, so a merged name whose first
 // declaration is a type or a namespace never reaches the async check at all. A loop reports all
 // four; an index-zero read reports three and is right twice by accident.
@@ -326,7 +326,7 @@ func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(test *tes
 	}
 }
 
-// A synchronous arrow with a CAPITALIZED name, which the corpus never writes.
+// A synchronous arrow with a capitalized name, which the corpus never writes.
 //
 // Upstream's only sync-arrow clean case is `pass[4]`, and its name is lowercase, so it exits on the
 // capitalization test and never votes on whether the initializer is async. A mutant forcing the
@@ -359,7 +359,7 @@ func TestNoAsyncClientComponentDeclinesABindingWithNoInitializer(test *testing.T
 		asyncClientComponentFile, "\"use client\"\nlet MyThing: unknown\nexport default MyThing\n"))
 }
 
-// A lowercase name on an ASYNC arrow, which the corpus does not write.
+// A lowercase name on an async arrow, which the corpus does not write.
 //
 // Upstream's `pass[4]` is the nearest case and it turns off two conditions at once, being both
 // lowercase and synchronous, so it exits on the async test and never votes on capitalization for

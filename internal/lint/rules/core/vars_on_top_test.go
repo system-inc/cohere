@@ -146,7 +146,7 @@ func TestVarsOnTopSpanAndMessage(test *testing.T) {
 	}
 }
 
-// The directive prologue is a PREFIX scan rather than a filter, and the two answers differ on an
+// The directive prologue is a prefix scan rather than a filter, and the two answers differ on an
 // input upstream writes in both lists.
 //
 // Upstream's own pair is `'use strict'; 'directive'; var x; var y; f();` clean against
@@ -171,7 +171,7 @@ func TestVarsOnTopDirectiveScanIsAPrefix(test *testing.T) {
 func TestVarsOnTopStaticBlockHasNoPrologue(test *testing.T) {
 	test.Parallel()
 
-	// The same shape that is CLEAN at the top of a program.
+	// The same shape that is clean at the top of a program.
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"class C { static { 'use strict'; var x; } }"), "top")
 	rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", "'use strict'; var x;"))
@@ -196,7 +196,7 @@ func TestVarsOnTopExportedDeclarations(test *testing.T) {
 		rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", source))
 	}
 
-	// An exported FUNCTION is not a declaration and closes the run, which is the discrimination
+	// An exported function is not a declaration and closes the run, which is the discrimination
 	// the three clean cases above cannot make on their own.
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"export function f() {}\nvar x;"), "top")

@@ -74,7 +74,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //
 // # Two judgments, and the second is why this needs a control-flow graph
 //
-// The first is syntactic: within one function, the FIRST `return` sets the expectation and every
+// The first is syntactic: within one function, the first `return` sets the expectation and every
 // later one that disagrees is reported, at that return statement. The second asks whether a
 // function that returns a value anywhere can also run off its end, which is not a syntactic
 // question at all. `function foo() { if (a) return true; }` reports and
@@ -99,7 +99,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // # Constructors are exempt, and only some of them
 //
 // A class constructor is skipped because `return` in one is a language feature rather than a value
-// channel. An object literal's method NAMED `constructor` is not a constructor and is not exempt:
+// channel. An object literal's method named `constructor` is not a constructor and is not exempt:
 // measured against the installed rule, `({ constructor() { if (a) return true; } })` reports as
 // "method 'constructor'" while `class A { constructor() { if (a) return true; } }` is silent. The
 // corpus asserts both.
@@ -107,10 +107,10 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // Upstream also exempts an ES5 constructor, which is `astUtils.isES5Constructor`: a function
 // declaration or expression whose name begins with a capital letter. The corpus's
 // `function Foo() { if (!(this instanceof Foo)) return new Foo(); }` is clean for that reason and
-// for no other, and `class A { CapitalizedFunction() {...} }` REPORTS, which is what shows the
+// for no other, and `class A { CapitalizedFunction() {...} }` reports, which is what shows the
 // exemption is about the function's own name rather than about capitalisation anywhere.
 //
-// # What this does NOT ask
+// # What this does not ask
 //
 // Upstream never consults a type annotation, so `function foo(): number | undefined { if (a)
 // return true; }` reports even though the annotation makes the mixed return correct TypeScript.

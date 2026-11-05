@@ -322,7 +322,7 @@ func TestNoDocumentImportInPagePointsAtTheWholeDeclaration(test *testing.T) {
 // The message the finding carries, asserted as a whole rather than by Contains, because a
 // predicate weaker than the property it guards is not a guard. This rule interpolates nothing into
 // its text, so there is no rendering step that could go wrong, and asserting the identity is what
-// there is to assert: it pins that the finding carries THIS message rather than a sibling rule's,
+// there is to assert: it pins that the finding carries this message rather than a sibling rule's,
 // which the id alone would also satisfy if two rules shared one.
 func TestNoDocumentImportInPageCarriesItsOwnMessage(test *testing.T) {
 	test.Parallel()
