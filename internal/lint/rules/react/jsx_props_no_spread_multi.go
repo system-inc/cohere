@@ -181,12 +181,12 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 // literal translation of oxc's node would make this rule silent on every fail fixture upstream
 // ships: all five are self-closing. Both kinds are listened on, which `jsx_no_duplicate_props.go`
 // established here first.
-var JsxPropsNoSpreadMulti = rule.Rule{
+var JsxPropsNoSpreadMulti = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/jsx-props-no-spread-multi` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-props-no-spread-multi`
 	// would match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-props-no-spread-multi",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
 			if attributes == nil {

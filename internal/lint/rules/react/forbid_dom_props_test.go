@@ -426,12 +426,8 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options, ok := decoded.(ForbidDomPropsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
-		}
-		if len(options.Forbid) != 0 {
-			test.Fatalf("forbid list is %v, want empty", options.Forbid)
+		if len(decoded.Forbid) != 0 {
+			test.Fatalf("forbid list is %v, want empty", decoded.Forbid)
 		}
 	})
 
@@ -443,14 +439,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding the string arm: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options, ok := decoded.(ForbidDomPropsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+		if len(decoded.Forbid) != 2 {
+			test.Fatalf("forbid list is %v, want two entries", decoded.Forbid)
 		}
-		if len(options.Forbid) != 2 {
-			test.Fatalf("forbid list is %v, want two entries", options.Forbid)
-		}
-		for _, entry := range options.Forbid {
+		for _, entry := range decoded.Forbid {
 			if entry.DisallowedForWasGiven {
 				test.Fatalf("entry %q recorded a tag restriction it was never given", entry.PropName)
 			}
@@ -465,14 +457,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an absent disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options, ok := decoded.(ForbidDomPropsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
-		}
-		if options.Forbid[0].DisallowedForWasGiven {
+		if decoded.Forbid[0].DisallowedForWasGiven {
 			test.Fatal("an absent disallowedFor was recorded as given")
 		}
-		if !forbidDomPropsIsForbidden(options.Forbid[0], "div") {
+		if !forbidDomPropsIsForbidden(decoded.Forbid[0], "div") {
 			test.Fatal("an absent disallowedFor declined a tag, want every tag forbidden")
 		}
 	})
@@ -485,14 +473,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an empty disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options, ok := decoded.(ForbidDomPropsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
-		}
-		if !options.Forbid[0].DisallowedForWasGiven {
+		if !decoded.Forbid[0].DisallowedForWasGiven {
 			test.Fatal("an empty disallowedFor was not recorded as given, so it reads as absent")
 		}
-		if forbidDomPropsIsForbidden(options.Forbid[0], "div") {
+		if forbidDomPropsIsForbidden(decoded.Forbid[0], "div") {
 			test.Fatal("an empty disallowedFor matched a tag, want none")
 		}
 	})
@@ -505,11 +489,7 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding a named disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options, ok := decoded.(ForbidDomPropsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
-		}
-		entry := options.Forbid[0]
+		entry := decoded.Forbid[0]
 		if !forbidDomPropsIsForbidden(entry, "div") || !forbidDomPropsIsForbidden(entry, "span") {
 			test.Fatal("a named tag was declined")
 		}

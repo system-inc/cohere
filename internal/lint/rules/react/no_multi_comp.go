@@ -38,7 +38,7 @@ func DefaultNoMultiCompOptions() NoMultiCompOptions {
 // is false, so the zero value happens to be right; the decoder is explicit anyway because a future
 // option defaulting to true would silently invert the rule through the generic helper, and this is
 // the line where that would have to be noticed.
-func DecodeNoMultiCompOptions(raw []byte) (any, error) {
+func DecodeNoMultiCompOptions(raw []byte) (NoMultiCompOptions, error) {
 	options := DefaultNoMultiCompOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -106,7 +106,7 @@ type detectedComponent struct {
 //
 // Moving a component to its own file means creating that file, naming it, moving the imports it
 // needs, and updating every reference. Upstream ships no fixer either.
-var NoMultiComp = rule.Rule{
+var NoMultiComp = rule.Rule[NoMultiCompOptions]{
 	Name: "react/no-multi-comp",
 
 	// The checker is reached through this package's `isPragmaCreateElementCall`, to answer whether a
@@ -117,13 +117,13 @@ var NoMultiComp = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMultiCompOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultNoMultiCompOptions()
-		if configured, isConfigured := rule.OptionsAs[NoMultiCompOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

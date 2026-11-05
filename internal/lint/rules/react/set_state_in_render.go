@@ -152,7 +152,7 @@ var setStateInUseMemoMessage = rule.Message{
 //     to React's parameter test, so nothing in it reports. Checked with a control in the same file:
 //     a second component beside it still reports, so this is a per-function decline rather than a
 //     whole-file bailout.
-var SetStateInRender = rule.Rule{
+var SetStateInRender = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/set-state-in-render",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -161,7 +161,7 @@ var SetStateInRender = rule.Rule{
 	// no alias and this rule declines the whole file in silence. `structure/react-hook-no-any-type`
 	// reads this flag to name that cost at the site where the types went bad.
 	ResolvesReactValueTypes: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
 			// descends into nested functions through the function arena, so listening per function

@@ -725,15 +725,11 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 			if decodeSelfClosingCompOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeSelfClosingCompOptionsError)
 			}
-			options, isOptions := decoded.(SelfClosingCompOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want SelfClosingCompOptions", decoded)
+			if decoded.Component != testCase.wantComponent {
+				test.Errorf("Component is %v, want %v", decoded.Component, testCase.wantComponent)
 			}
-			if options.Component != testCase.wantComponent {
-				test.Errorf("Component is %v, want %v", options.Component, testCase.wantComponent)
-			}
-			if options.Html != testCase.wantHtml {
-				test.Errorf("Html is %v, want %v", options.Html, testCase.wantHtml)
+			if decoded.Html != testCase.wantHtml {
+				test.Errorf("Html is %v, want %v", decoded.Html, testCase.wantHtml)
 			}
 		})
 	}

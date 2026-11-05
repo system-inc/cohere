@@ -26,7 +26,7 @@ func DefaultSortDefaultPropsOptions() SortDefaultPropsOptions {
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
+func DecodeSortDefaultPropsOptions(raw []byte) (SortDefaultPropsOptions, error) {
 	options := DefaultSortDefaultPropsOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -98,17 +98,17 @@ var messageDefaultPropsNotSorted = rule.Message{
 // `const o = {defaultProps: {b: 1, a: 2}}` is silent only because the member arm requires an
 // assignment, while any class field named `defaultProps` is judged regardless of what the class
 // extends. Reproduced.
-var SortDefaultProps = rule.Rule{
+var SortDefaultProps = rule.Rule[SortDefaultPropsOptions]{
 	Name:             "react/sort-default-props",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[SortDefaultPropsOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultSortDefaultPropsOptions()
-		if configured, isConfigured := rule.OptionsAs[SortDefaultPropsOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

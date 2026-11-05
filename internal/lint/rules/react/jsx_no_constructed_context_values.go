@@ -206,10 +206,10 @@ func jsxNoConstructedContextValuesMessage(
 // (`memoWithoutDependenciesMsg`). Kirk's ruling, 2026-10-01. The analysis and its one-sided
 // definition of "proven" live in jsx_no_constructed_context_values_stability.go, and the divergence
 // is recorded in jsx_no_constructed_context_values.md.
-var JsxNoConstructedContextValues = rule.Rule{
+var JsxNoConstructedContextValues = rule.Rule[rule.NoOptions]{
 	Name:             "react/jsx-no-constructed-context-values",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

@@ -314,14 +314,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
-		if len(options.Legacy) != 0 {
-			test.Fatalf("legacy list is %v, want empty", options.Legacy)
-		}
-		components := jsxNoScriptUrlLinkComponents(options)
+		components := jsxNoScriptUrlLinkComponents(decoded)
 		if got := strings.Join(components["a"], ","); got != "href" {
 			test.Fatalf("built-in pair is %q, want %q", got, "href")
 		}
@@ -335,14 +331,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the array arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Foo" {
+			test.Fatalf("legacy list is %v, want one entry named Foo", decoded.Legacy)
 		}
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Foo" {
-			test.Fatalf("legacy list is %v, want one entry named Foo", options.Legacy)
-		}
-		if got := strings.Join(options.Legacy[0].Props, ","); got != "to,href" {
+		if got := strings.Join(decoded.Legacy[0].Props, ","); got != "to,href" {
 			test.Fatalf("props are %q, want %q", got, "to,href")
 		}
 	})
@@ -355,12 +347,8 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the object arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
-		}
-		if len(options.Legacy) != 0 {
-			test.Fatalf("legacy list is %v, want empty", options.Legacy)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
 	})
 
@@ -372,12 +360,8 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding both arms: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
-		}
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Bar" {
-			test.Fatalf("legacy list is %v, want one entry named Bar", options.Legacy)
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Bar" {
+			test.Fatalf("legacy list is %v, want one entry named Bar", decoded.Legacy)
 		}
 	})
 

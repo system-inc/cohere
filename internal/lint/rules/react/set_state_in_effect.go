@@ -236,7 +236,7 @@ var messageSetStateInEffect = rule.Message{
 //
 // Recorded rather than smoothed over, and a differential run against a tool implementing upstream's
 // binding-kind switch or its control dominators will show differences here for those reasons.
-var SetStateInEffect = rule.Rule{
+var SetStateInEffect = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/set-state-in-effect",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -244,7 +244,7 @@ var SetStateInEffect = rule.Rule{
 	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
 	// return takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `static-components`. Lowering already descends into
 			// nested functions through the function arena, so listening per function kind would

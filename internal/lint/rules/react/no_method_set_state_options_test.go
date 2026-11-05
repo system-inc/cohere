@@ -40,12 +40,8 @@ func TestDecodeNoMethodSetStateOptions(test *testing.T) {
 			if decodeNoMethodSetStateOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeNoMethodSetStateOptionsError)
 			}
-			options, ok := decoded.(NoMethodSetStateOptions)
-			if !ok {
-				test.Fatalf("decoded to %T, want NoMethodSetStateOptions", decoded)
-			}
-			if options.DisallowInFunc != testCase.want {
-				test.Errorf("DisallowInFunc = %v, wanted %v", options.DisallowInFunc, testCase.want)
+			if decoded.DisallowInFunc != testCase.want {
+				test.Errorf("DisallowInFunc = %v, wanted %v", decoded.DisallowInFunc, testCase.want)
 			}
 		})
 	}

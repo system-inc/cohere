@@ -67,7 +67,7 @@ func DefaultJsxCurlyBracePresenceOptions() JsxCurlyBracePresenceOptions {
 // and it cannot express a wire shape that is sometimes a string and sometimes an object. The
 // defaults here are also not Go zero values, so a struct built by hand rather than routed through
 // this function would silently configure the rule as `ignore` on every axis and report nothing.
-func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
+func DecodeJsxCurlyBracePresenceOptions(raw []byte) (JsxCurlyBracePresenceOptions, error) {
 	settings := DefaultJsxCurlyBracePresenceOptions()
 	if len(raw) == 0 {
 		return settings, nil
@@ -193,10 +193,10 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 // findings, which is what I13 asserts, so I13 is the row that describes this tree and I12 is
 // recorded here rather than imported. This is the version-gate shape the port brief warns about,
 // and it was visible only because the extractor kept the `features` field beside each case.
-var JsxCurlyBracePresence = rule.Rule{
+var JsxCurlyBracePresence = rule.Rule[JsxCurlyBracePresenceOptions]{
 	Name: "react/jsx-curly-brace-presence",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[JsxCurlyBracePresenceOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxCurlyBracePresenceOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultJsxCurlyBracePresenceOptions()
 		}

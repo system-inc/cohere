@@ -145,12 +145,12 @@ var messageNoRenderReturn = rule.Message{
 // `node: findRenderMethod(component.node)`, and `findRenderMethod` returns the property rather than
 // the value, so a port anchoring on the function would carry the right message and the wrong span.
 // Every fixture below asserts the sliced text.
-var RequireRenderReturn = rule.Rule{
+var RequireRenderReturn = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/require-render-return` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-require-render-return` would match no
 	// inventory entry and lint no files while passing every fixture in this package.
 	Name: "react/require-render-return",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The judgment needs the whole file before it can be made: a return anywhere marks the
 		// component that encloses it, and only at the end is it known which components were never
 		// marked. There is no `rule.OnExit`, and the walk is pre-order, so `KindSourceFile` fires

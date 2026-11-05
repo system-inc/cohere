@@ -776,14 +776,10 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options, ok := decoded.(NoUnknownPropertyOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		if len(decoded.Ignore) != 0 {
+			test.Fatalf("ignore list is %v, want empty", decoded.Ignore)
 		}
-		if len(options.Ignore) != 0 {
-			test.Fatalf("ignore list is %v, want empty", options.Ignore)
-		}
-		if options.RequireDataLowercase {
+		if decoded.RequireDataLowercase {
 			test.Fatal("requireDataLowercase defaulted to true, want false")
 		}
 	})
@@ -796,14 +792,10 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options, ok := decoded.(NoUnknownPropertyOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		if strings.Join(decoded.Ignore, ",") != "a,b" {
+			test.Fatalf("ignore list is %v", decoded.Ignore)
 		}
-		if strings.Join(options.Ignore, ",") != "a,b" {
-			test.Fatalf("ignore list is %v", options.Ignore)
-		}
-		if !options.RequireDataLowercase {
+		if !decoded.RequireDataLowercase {
 			test.Fatal("requireDataLowercase is false, want true")
 		}
 	})

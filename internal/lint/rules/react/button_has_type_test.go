@@ -754,14 +754,10 @@ func TestButtonHasTypeDecodesItsOptions(test *testing.T) {
 			if decodeButtonHasTypeOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeButtonHasTypeOptionsError)
 			}
-			settings, ok := decoded.(ButtonHasTypeOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if settings.Button != testCase.button || settings.Submit != testCase.submit ||
-				settings.Reset != testCase.resetButton {
+			if decoded.Button != testCase.button || decoded.Submit != testCase.submit ||
+				decoded.Reset != testCase.resetButton {
 				test.Errorf("decoded to %+v, want button=%v submit=%v reset=%v",
-					settings, testCase.button, testCase.submit, testCase.resetButton)
+					decoded, testCase.button, testCase.submit, testCase.resetButton)
 			}
 		})
 	}

@@ -536,12 +536,8 @@ func TestDecodeSortDefaultPropsOptions(test *testing.T) {
 			if decodeSortDefaultPropertiesOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeSortDefaultPropertiesOptionsError)
 			}
-			options, isOptions := decoded.(SortDefaultPropsOptions)
-			if !isOptions {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if options.IgnoreCase != testCase.want {
-				test.Fatalf("ignoreCase is %v, wanted %v", options.IgnoreCase, testCase.want)
+			if decoded.IgnoreCase != testCase.want {
+				test.Fatalf("ignoreCase is %v, wanted %v", decoded.IgnoreCase, testCase.want)
 			}
 		})
 	}

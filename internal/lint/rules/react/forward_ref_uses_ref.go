@@ -135,9 +135,9 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // parent node is. Nothing asks what an identifier binds to, so nothing declares `NeedsTypeChecker`,
 // and declaring it would not let the rule answer the aliased-import case anyway, because upstream
 // does not ask that question either.
-var ForwardRefUsesRef = rule.Rule{
+var ForwardRefUsesRef = rule.Rule[rule.NoOptions]{
 	Name: "react/forward-ref-uses-ref",
-	Run: func(ruleContext rule.Context, _ any) rule.Listeners {
+	Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

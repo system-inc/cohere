@@ -361,7 +361,7 @@ var (
 // effect that sets state, removing a useEffectEvent function from the array, and wrapping a function
 // used outside the Hook in useCallback. That is the hazard "The repair" above describes, and it is the
 // author's explicit choice by an option named for it, so it is the one place this rule writes code.
-var ExhaustiveDeps = rule.Rule{
+var ExhaustiveDeps = rule.Rule[ExhaustiveDepsOptions]{
 	Name:             "react-hooks/exhaustive-deps",
 	NeedsTypeChecker: true,
 	Run:              runExhaustiveDeps,
@@ -439,8 +439,8 @@ var hooksUselessWithoutDependencies = map[string]bool{"useMemo": true, "useCallb
 // `useEffective` is not. oxc spells this as a plain substring test, which disagrees on the second.
 var effectHookNamePattern = regexp.MustCompile(`Effect($|[^a-z])`)
 
-func runExhaustiveDeps(ruleContext rule.Context, options any) rule.Listeners {
-	settings, _ := rule.OptionsAs[ExhaustiveDepsOptions](options)
+func runExhaustiveDeps(ruleContext rule.Context, options rule.Given[ExhaustiveDepsOptions]) rule.Listeners {
+	settings, _ := options.Read()
 	run := exhaustiveDepsRun{
 		autoDependenciesHooks:     map[string]bool{},
 		dangerousAutofix:          settings.EnableDangerousAutofixThisMayCauseInfiniteLoops,

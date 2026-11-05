@@ -530,12 +530,8 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 		if decodeForbidElementsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
-		options, ok := decoded.(ForbidElementsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T", decoded)
-		}
-		if len(options.Forbid) != 0 {
-			test.Errorf("want an empty list, got %d entries", len(options.Forbid))
+		if len(decoded.Forbid) != 0 {
+			test.Errorf("want an empty list, got %d entries", len(decoded.Forbid))
 		}
 	})
 
@@ -547,18 +543,14 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 		if decodeForbidElementsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
-		options, ok := decoded.(ForbidElementsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidElementsOptions", decoded)
+		if len(decoded.Forbid) != 2 {
+			test.Fatalf("want 2 entries, got %d", len(decoded.Forbid))
 		}
-		if len(options.Forbid) != 2 {
-			test.Fatalf("want 2 entries, got %d", len(options.Forbid))
+		if decoded.Forbid[0].Element != "a" || decoded.Forbid[0].Message != "" {
+			test.Errorf("string arm decoded to %+v", decoded.Forbid[0])
 		}
-		if options.Forbid[0].Element != "a" || options.Forbid[0].Message != "" {
-			test.Errorf("string arm decoded to %+v", options.Forbid[0])
-		}
-		if options.Forbid[1].Element != "b" || options.Forbid[1].Message != "m" {
-			test.Errorf("object arm decoded to %+v", options.Forbid[1])
+		if decoded.Forbid[1].Element != "b" || decoded.Forbid[1].Message != "m" {
+			test.Errorf("object arm decoded to %+v", decoded.Forbid[1])
 		}
 	})
 
@@ -568,11 +560,7 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 		if decodeForbidElementsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
-		options, ok := decoded.(ForbidElementsOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidElementsOptions", decoded)
-		}
-		got := []string{options.Forbid[0].Element, options.Forbid[1].Element, options.Forbid[2].Element}
+		got := []string{decoded.Forbid[0].Element, decoded.Forbid[1].Element, decoded.Forbid[2].Element}
 		if got[0] != "x" || got[1] != "y" || got[2] != "z" {
 			test.Errorf("order is %v", got)
 		}

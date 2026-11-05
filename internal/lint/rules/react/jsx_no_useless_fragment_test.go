@@ -566,12 +566,8 @@ func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
 			if decodeJsxNoUselessFragmentOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoUselessFragmentOptionsError)
 			}
-			settings, ok := decoded.(JsxNoUselessFragmentOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if settings.AllowExpressions != testCase.want {
-				test.Errorf("AllowExpressions is %v, want %v", settings.AllowExpressions, testCase.want)
+			if decoded.AllowExpressions != testCase.want {
+				test.Errorf("AllowExpressions is %v, want %v", decoded.AllowExpressions, testCase.want)
 			}
 		})
 	}

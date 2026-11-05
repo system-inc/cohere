@@ -58,7 +58,7 @@ func DefaultNoUnstableNestedComponentsOptions() NoUnstableNestedComponentsOption
 // and an empty pattern matches only the empty string, so every render prop would stop being
 // recognised and the rule would report where upstream is silent. That is the default-inversion trap
 // the brief names, arriving through a string rather than through a bool.
-func DecodeNoUnstableNestedComponentsOptions(raw []byte) (any, error) {
+func DecodeNoUnstableNestedComponentsOptions(raw []byte) (NoUnstableNestedComponentsOptions, error) {
 	options := DefaultNoUnstableNestedComponentsOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -133,7 +133,7 @@ const componentAsPropsInfo = " If you want to allow component creation in props,
 // Upstream ships none, and there is none available: moving the component out means choosing where
 // it goes and rewriting every value it closed over into a prop. That is a design decision rather
 // than a repair.
-var NoUnstableNestedComponents = rule.Rule{
+var NoUnstableNestedComponents = rule.Rule[NoUnstableNestedComponentsOptions]{
 	Name: "react/no-unstable-nested-components",
 
 	// Reached through this package's `isPragmaCreateElementCall`, which `returnsJsx` consults to
@@ -142,8 +142,8 @@ var NoUnstableNestedComponents = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoUnstableNestedComponentsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnstableNestedComponentsOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil options, which is not this type.
 			// Without this the zero value would apply and the empty pattern would match nothing.

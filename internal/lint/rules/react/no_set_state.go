@@ -49,9 +49,9 @@ var messageNoSetState = rule.Message{
 //
 // Removing a setState call means deciding where the state goes instead, which is a refactor.
 // Upstream ships no fixer either.
-var NoSetState = rule.Rule{
+var NoSetState = rule.Rule[rule.NoOptions]{
 	Name: "react/no-set-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

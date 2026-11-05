@@ -94,15 +94,15 @@ type NoChildrenPropOptions struct {
 // reports and `{[children]: 1}` does not, and the difference is that the first names the property
 // and the second names a variable holding some other name. `staticKeyName` below draws exactly
 // that line.
-var NoChildrenProp = rule.Rule{
+var NoChildrenProp = rule.Rule[NoChildrenPropOptions]{
 	// No namespace prefix. The config writes `react/no-children-prop` and the parity guard strips
 	// the namespace on a `/` boundary, so a rule named `react-no-children-prop` would match no
 	// inventory entry, lint no files, and still pass every fixture in this file. The first rule in
 	// `internal/rules/next/` shipped that way and was inert, which is why this comment is here.
 	Name: "react/no-children-prop",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoChildrenPropOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's `allowFunctions: false`.
-		settings, _ := rule.OptionsAs[NoChildrenPropOptions](options)
+		settings, _ := options.Read()
 		isFunction := func(node *ast.Node) bool {
 			return settings.AllowFunctions && noChildrenPropIsFunction(node)
 		}

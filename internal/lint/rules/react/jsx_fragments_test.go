@@ -343,12 +343,8 @@ func TestDecodeJsxFragmentsOptions(test *testing.T) {
 			if decodeJsxFragmentsOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeJsxFragmentsOptionsError)
 			}
-			options, isOptions := decoded.(JsxFragmentsOptions)
-			if !isOptions {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if options.Mode != testCase.want {
-				test.Fatalf("mode is %q, wanted %q", options.Mode, testCase.want)
+			if decoded.Mode != testCase.want {
+				test.Fatalf("mode is %q, wanted %q", decoded.Mode, testCase.want)
 			}
 		})
 	}
@@ -528,11 +524,7 @@ func TestJsxFragmentsVersionArmIsNotPorted(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decode returned %v", err)
 	}
-	options, ok := decoded.(JsxFragmentsOptions)
-	if !ok {
-		test.Fatalf("decoded to %T, want JsxFragmentsOptions", decoded)
-	}
-	if options.Mode != JsxFragmentsElement {
+	if decoded.Mode != JsxFragmentsElement {
 		test.Fatal("the bare enum did not decode")
 	}
 }
@@ -647,12 +639,7 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			test.Errorf("%s was refused: %v", accepted.wire, decodeJsxFragmentsOptionsError)
 			continue
 		}
-		options, ok := decoded.(JsxFragmentsOptions)
-		if !ok {
-			test.Errorf("%s decoded to %T, want JsxFragmentsOptions", accepted.wire, decoded)
-			continue
-		}
-		if got := options.Mode; got != accepted.want {
+		if got := decoded.Mode; got != accepted.want {
 			test.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
 		}
 	}

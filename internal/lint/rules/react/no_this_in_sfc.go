@@ -167,12 +167,12 @@ var messageNoThisInSfc = rule.Message{
 // oxc does, confirmed by dumping the ancestor chain for both forms, so a plain parent-kind check
 // with no `SkipParentheses` reproduces all seven rows. Adding the paren-skip that usually reads as
 // a free correctness improvement would report two cases oxlint is silent on. All are pinned below.
-var NoThisInSfc = rule.Rule{
+var NoThisInSfc = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-this-in-sfc` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-this-in-sfc` would match no inventory entry, lint
 	// no files, and still pass every fixture in this package.
 	Name: "react/no-this-in-sfc",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
 		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
 		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this

@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // empty body with an empty list rather than an error: upstream reads `configuration.forbid || []`,
 // so an unconfigured rule declines everything instead of failing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ForbidElementsOptions]{
 		Rule:   ForbidElements,
 		Decode: DecodeForbidElementsOptions,
 	})

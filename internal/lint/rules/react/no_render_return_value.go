@@ -107,12 +107,12 @@ var messageNoRenderReturnValue = rule.Message{
 // in its body, so it declines every input this rule exists to catch. Its parenthesis-skipping is
 // also a divergence here, since oxc matches `Expression::Identifier` against the object directly
 // and a parenthesized receiver is a different node there.
-var NoRenderReturnValue = rule.Rule{
+var NoRenderReturnValue = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-render-return-value` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-render-return-value` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-render-return-value",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callee := reactDOMRenderCallee(node.AsCallExpression().Expression)

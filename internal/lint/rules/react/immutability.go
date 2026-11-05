@@ -146,12 +146,12 @@ import (
 // Upstream's diagnostics carry a primary span plus a secondary label pointing at the value's
 // origin. Our `Diagnostic` carries a single `Range`, so the primary span is kept where upstream puts
 // it and the origin label is dropped rather than folded into the message.
-var Immutability = rule.Rule{
+var Immutability = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/immutability",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// Taken at the file level for the reason static_components.go and refs.go both give:
 			// lowering already descends into nested functions through the function arena, so

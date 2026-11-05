@@ -879,17 +879,13 @@ func TestDecodeStaticPropertyPlacementOptions(test *testing.T) {
 			if decodeStaticPropertyPlacementOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeStaticPropertyPlacementOptionsError)
 			}
-			options, isOptions := decoded.(StaticPropertyPlacementOptions)
-			if !isOptions {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if len(options.Positions) != len(staticPropertyPlacementProperties) {
+			if len(decoded.Positions) != len(staticPropertyPlacementProperties) {
 				test.Fatalf("decoded %d positions, wanted %d",
-					len(options.Positions), len(staticPropertyPlacementProperties))
+					len(decoded.Positions), len(staticPropertyPlacementProperties))
 			}
 			for property, want := range testCase.want {
-				if options.Positions[property] != want {
-					test.Fatalf("%s is %q, wanted %q", property, options.Positions[property], want)
+				if decoded.Positions[property] != want {
+					test.Fatalf("%s is %q, wanted %q", property, decoded.Positions[property], want)
 				}
 			}
 		})

@@ -200,7 +200,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // through 15 for `class Foo {}`. All three reproduce exactly through `ctx.ReportNode`, verified
 // against the source bytes before this rule was written, and asserted in the fixtures because a
 // message-id assertion cannot see a span.
-var UnsupportedSyntax = rule.Rule{
+var UnsupportedSyntax = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/unsupported-syntax`, and the parity guard
 	// strips the namespace on a `/` boundary, so `react-unsupported-syntax` would match no
 	// inventory entry while still passing every fixture in this package.
@@ -216,7 +216,7 @@ var UnsupportedSyntax = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

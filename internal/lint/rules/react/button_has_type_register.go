@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written rather than `rule.DecodeOptionsInto` because all three
 // options default to `true`, which is not Go's zero value; see DecodeButtonHasTypeOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: ButtonHasType, Decode: DecodeButtonHasTypeOptions})
+	rule.Register(rule.Registration[ButtonHasTypeOptions]{Rule: ButtonHasType, Decode: DecodeButtonHasTypeOptions})
 }

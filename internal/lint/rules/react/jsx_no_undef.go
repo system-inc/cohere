@@ -80,13 +80,13 @@ var messageJsxIdentifierNotDefined = rule.Message{
 // declarations is in this file; an import counts, because its symbol is the alias the import
 // declares here. Under `allowGlobals`, or in a `.cjs` file, any resolved symbol counts. Before
 // #d21war2 every resolved symbol counted, which was `allowGlobals` on in every file.
-var JsxNoUndef = rule.Rule{
+var JsxNoUndef = rule.Rule[JsxNoUndefOptions]{
 	Name:             "react/jsx-no-undef",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoUndefOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's `allowGlobals: false`.
-		settings, _ := rule.OptionsAs[JsxNoUndefOptions](options)
+		settings, _ := options.Read()
 		stopsAtModuleScope := !settings.AllowGlobals &&
 			!strings.HasSuffix(ruleContext.SourceFile.FileName().AsString(), ".cjs")
 

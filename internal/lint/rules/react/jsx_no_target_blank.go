@@ -101,7 +101,7 @@ type jsxNoTargetBlankWireOptions struct {
 // A rule configured as a bare `"error"` is handed nil options, and `configuration.OptionsRegistry.Decode`
 // turns an empty body into nil for a non-required rule, so the nil path has to produce upstream's
 // defaults rather than the zero struct. It does, and a fixture bypasses the decoder to pin it.
-func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
+func DecodeJsxNoTargetBlankOptions(raw []byte) (JsxNoTargetBlankOptions, error) {
 	options := JsxNoTargetBlankOptions{Links: true}
 	if len(raw) == 0 {
 		return options, nil
@@ -237,17 +237,17 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 // insertion arms, which write `relValue` and therefore write `noopener`. That asymmetry is
 // upstream's: `relValue` is computed from the flag and then only the two `insertText` calls use it,
 // while all three `replaceText` calls hardcode `noreferrer`. Measured both ways.
-var JsxNoTargetBlank = rule.Rule{
+var JsxNoTargetBlank = rule.Rule[JsxNoTargetBlankOptions]{
 	// No namespace prefix. The config writes `react/jsx-no-target-blank` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-target-blank` would
 	// match no inventory entry and lint no files while passing every fixture in this package.
 	Name: "react/jsx-no-target-blank",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoTargetBlankOptions]) rule.Listeners {
 		// An unconfigured rule reaches this with nil, and the comma-ok form yields the zero struct,
 		// whose `Links` is false rather than upstream's true. That difference decides nothing today
 		// because nothing reads `Links`, but relying on that would make a future wiring of `Links`
 		// silently wrong for every unconfigured file, so the default is restored explicitly.
-		settings, configured := rule.OptionsAs[JsxNoTargetBlankOptions](options)
+		settings, configured := options.Read()
 		if !configured {
 			settings = JsxNoTargetBlankOptions{Links: true}
 		}

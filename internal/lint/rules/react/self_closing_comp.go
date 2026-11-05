@@ -47,7 +47,7 @@ func DefaultSelfClosingCompOptions() SelfClosingCompOptions {
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeSelfClosingCompOptions(raw []byte) (any, error) {
+func DecodeSelfClosingCompOptions(raw []byte) (SelfClosingCompOptions, error) {
 	options := DefaultSelfClosingCompOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -106,15 +106,15 @@ var messageNotSelfClosing = rule.Message{
 // Upstream replaces from the opening tag's own `>` through the closing tag's `>` with ` />`, which
 // collapses the whole `></div>` tail in one edit and normalizes the spacing before the slash. The
 // corpus asserts the resulting text on all twelve reporting cases and every one is reproduced.
-var SelfClosingComp = rule.Rule{
+var SelfClosingComp = rule.Rule[SelfClosingCompOptions]{
 	Name: "react/self-closing-comp",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[SelfClosingCompOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultSelfClosingCompOptions()
-		if configured, isConfigured := rule.OptionsAs[SelfClosingCompOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

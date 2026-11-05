@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // one errors on empty input, which is what a bare `"error"` configuration hands it; see
 // DecodeCheckedRequiresOnChangeOrReadOnlyOptions.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[CheckedRequiresOnChangeOrReadOnlyOptions]{
 		Rule:   CheckedRequiresOnChangeOrReadOnly,
 		Decode: DecodeCheckedRequiresOnChangeOrReadOnlyOptions,
 	})

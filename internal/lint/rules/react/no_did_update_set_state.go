@@ -80,13 +80,13 @@ var messageNoSetStateInComponentDidUpdate = rule.Message{
 // `static_name()` and it resolves the same three shapes: an identifier, a string literal, and a
 // computed key holding one. All three measured reporting on the release binary, so a port matching
 // only the identifier spelling loses two real findings and crashes on a third input.
-var NoDidUpdateSetState = rule.Rule{
+var NoDidUpdateSetState = rule.Rule[NoMethodSetStateOptions]{
 	// No namespace prefix. The config writes `react/no-did-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
 	Name: "react/no-did-update-set-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMethodSetStateOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
-		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		settings, _ := options.Read()
 		reportInsideNestedFunctions := settings.DisallowInFunc
 
 		return rule.Listeners{

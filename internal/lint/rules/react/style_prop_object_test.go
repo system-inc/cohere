@@ -497,12 +497,8 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 		if decodeStylePropertyObjectOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options, ok := decoded.(StylePropObjectOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
-		}
-		if len(options.Allow) != 0 {
-			test.Fatalf("allow list is %v, want empty", options.Allow)
+		if len(decoded.Allow) != 0 {
+			test.Fatalf("allow list is %v, want empty", decoded.Allow)
 		}
 	})
 
@@ -514,12 +510,8 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 		if decodeStylePropertyObjectOptionsError != nil {
 			test.Fatalf("decoding a named allow list: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options, ok := decoded.(StylePropObjectOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
-		}
-		if len(options.Allow) != 2 || options.Allow[0] != "MyComponent" || options.Allow[1] != "Other" {
-			test.Fatalf("allow list is %v", options.Allow)
+		if len(decoded.Allow) != 2 || decoded.Allow[0] != "MyComponent" || decoded.Allow[1] != "Other" {
+			test.Fatalf("allow list is %v", decoded.Allow)
 		}
 	})
 }

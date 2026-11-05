@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // examines every element, which is the opposite of the two sibling forbid rules where an empty list
 // means the rule declines everything.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[StylePropObjectOptions]{
 		Rule:   StylePropObject,
 		Decode: DecodeStylePropObjectOptions,
 	})

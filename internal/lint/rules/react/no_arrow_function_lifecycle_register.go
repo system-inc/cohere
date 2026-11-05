@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No `Decode`, because upstream declares `schema: []` and the rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: NoArrowFunctionLifecycle})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoArrowFunctionLifecycle})
 }

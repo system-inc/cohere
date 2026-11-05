@@ -575,15 +575,11 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 			if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 			}
-			settings, ok := decoded.(CheckedRequiresOnChangeOrReadOnlyOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
+			if decoded.IgnoreMissingProperties != testCase.wantMissingIgnored {
+				test.Errorf("IgnoreMissingProperties is %v", decoded.IgnoreMissingProperties)
 			}
-			if settings.IgnoreMissingProperties != testCase.wantMissingIgnored {
-				test.Errorf("IgnoreMissingProperties is %v", settings.IgnoreMissingProperties)
-			}
-			if settings.IgnoreExclusiveCheckedAttribute != testCase.wantExclusiveIgnore {
-				test.Errorf("IgnoreExclusiveCheckedAttribute is %v", settings.IgnoreExclusiveCheckedAttribute)
+			if decoded.IgnoreExclusiveCheckedAttribute != testCase.wantExclusiveIgnore {
+				test.Errorf("IgnoreExclusiveCheckedAttribute is %v", decoded.IgnoreExclusiveCheckedAttribute)
 			}
 		})
 	}

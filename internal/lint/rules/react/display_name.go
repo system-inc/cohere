@@ -32,7 +32,7 @@ func DefaultDisplayNameOptions() DisplayNameOptions {
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeDisplayNameOptions(raw []byte) (any, error) {
+func DecodeDisplayNameOptions(raw []byte) (DisplayNameOptions, error) {
 	options := DefaultDisplayNameOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -85,7 +85,7 @@ var messageNoContextDisplayName = rule.Message{
 // # No fix
 //
 // The repair is to name a thing, which means choosing the name. Upstream ships no fixer either.
-var DisplayName = rule.Rule{
+var DisplayName = rule.Rule[DisplayNameOptions]{
 	Name: "react/display-name",
 
 	// The checker resolves the object of a `C.displayName` write back to its declaration, which is
@@ -94,13 +94,13 @@ var DisplayName = rule.Rule{
 	// and not the other, so a name comparison would be wrong.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DisplayNameOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultDisplayNameOptions()
-		if configured, isConfigured := rule.OptionsAs[DisplayNameOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

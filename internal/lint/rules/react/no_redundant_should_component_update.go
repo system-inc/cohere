@@ -96,9 +96,9 @@ const messageIdNoRedundantShouldComponentUpdate = "noShouldCompUpdate"
 //
 // Reproduced exactly, empty string included. A port that helpfully fell back to the property name
 // would report text upstream never produces, and no fixture asserting a message id could see it.
-var NoRedundantShouldComponentUpdate = rule.Rule{
+var NoRedundantShouldComponentUpdate = rule.Rule[rule.NoOptions]{
 	Name: "react/no-redundant-should-component-update",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			if !extendsPureComponent(node) {
 				return

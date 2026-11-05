@@ -907,12 +907,8 @@ func TestDecodeNoMultiCompOptions(test *testing.T) {
 			if decodeNoMultiCompOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeNoMultiCompOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiCompOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want NoMultiCompOptions", decoded)
-			}
-			if options.IgnoreStateless != testCase.want {
-				test.Errorf("IgnoreStateless is %v, want %v", options.IgnoreStateless, testCase.want)
+			if decoded.IgnoreStateless != testCase.want {
+				test.Errorf("IgnoreStateless is %v, want %v", decoded.IgnoreStateless, testCase.want)
 			}
 		})
 	}

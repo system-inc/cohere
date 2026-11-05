@@ -1572,10 +1572,10 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(test *testing.T) {
   }
 }`
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "react/no-unstable-nested-components",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(sourceFile *ast.Node) {
 					validated := 0
@@ -1622,13 +1622,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
-	decoded, err := DecodeNoUnstableNestedComponentsOptions(nil)
+	options, err := DecodeNoUnstableNestedComponentsOptions(nil)
 	if err != nil {
 		test.Fatalf("decoding empty input: %v", err)
-	}
-	options, ok := decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
@@ -1638,13 +1634,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	}
 
 	// An explicit pattern replaces the default.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
+	options, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
 	if err != nil {
 		test.Fatalf("decoding a pattern: %v", err)
-	}
-	options, ok = decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "*Renderer" {
 		test.Errorf("pattern %q, want *Renderer", options.PropNamePattern)
@@ -1652,13 +1644,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
+	options, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
 	if err != nil {
 		test.Fatalf("decoding an empty pattern: %v", err)
-	}
-	options, ok = decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty pattern gave %q, want render*", options.PropNamePattern)

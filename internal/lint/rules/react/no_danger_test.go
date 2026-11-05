@@ -365,12 +365,8 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding nil: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T", decoded)
-		}
-		if len(settings.CustomComponentNames) != 0 {
-			test.Fatalf("default custom names were %v, wanted none", settings.CustomComponentNames)
+		if len(decoded.CustomComponentNames) != 0 {
+			test.Fatalf("default custom names were %v, wanted none", decoded.CustomComponentNames)
 		}
 	})
 
@@ -382,14 +378,10 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
-		}
-		if len(settings.CustomComponentNames) != 2 ||
-			settings.CustomComponentNames[0] != "A" ||
-			settings.CustomComponentNames[1] != "B*" {
-			test.Fatalf("decoded to %v", settings.CustomComponentNames)
+		if len(decoded.CustomComponentNames) != 2 ||
+			decoded.CustomComponentNames[0] != "A" ||
+			decoded.CustomComponentNames[1] != "B*" {
+			test.Fatalf("decoded to %v", decoded.CustomComponentNames)
 		}
 	})
 
@@ -401,11 +393,7 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
-		}
-		if len(settings.CustomComponentNames) != 0 {
+		if len(decoded.CustomComponentNames) != 0 {
 			test.Fatal("unknown key changed the options")
 		}
 	})

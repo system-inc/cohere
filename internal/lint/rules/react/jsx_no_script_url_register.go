@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // has to answer an empty list with the built-in `a` to `href` pair rather than an error, since an
 // unconfigured rule still checks anchors.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[JsxNoScriptUrlOptions]{
 		Rule:             JsxNoScriptUrl,
 		DecodeOptionList: DecodeJsxNoScriptUrlOptions,
 	})

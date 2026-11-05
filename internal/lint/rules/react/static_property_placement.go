@@ -71,7 +71,7 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 // instead, which is a configured value read and then ignored. Each is refused now, as is a third
 // element. The bare-string spelling this decoder accepted while the config layer delivered one
 // element is refused too: it was never upstream's.
-func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
+func DecodeStaticPropertyPlacementOptions(list []byte) (StaticPropertyPlacementOptions, error) {
 	options := DefaultStaticPropertyPlacementOptions()
 	slots, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(slots) == 0 {
@@ -212,17 +212,17 @@ func messageStaticPropertyPlacement(
 // spelling: a class field and a getter differ in when the value is evaluated, and an assignment
 // after the class is a different statement entirely. None of the three rewrites is behaviour
 // preserving in general, so none is offered here either.
-var StaticPropertyPlacement = rule.Rule{
+var StaticPropertyPlacement = rule.Rule[StaticPropertyPlacementOptions]{
 	Name:             "react/static-property-placement",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[StaticPropertyPlacementOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultStaticPropertyPlacementOptions()
-		if configured, isConfigured := rule.OptionsAs[StaticPropertyPlacementOptions](options); isConfigured &&
+		if configured, isConfigured := options.Read(); isConfigured &&
 			configured.Positions != nil {
 			settings = configured
 		}

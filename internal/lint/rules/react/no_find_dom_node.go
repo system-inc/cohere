@@ -102,12 +102,12 @@ const findDOMNodeName = "findDOMNode"
 // different node. That is upstream being narrow rather than upstream being right, and it is
 // reproduced rather than improved on, because a differential run against oxlint is what this port
 // has to survive.
-var NoFindDOMNode = rule.Rule{
+var NoFindDOMNode = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-find-dom-node` and the parity guard strips
 	// the namespace on a `/` boundary, so `react-no-find-dom-node` would match no inventory entry,
 	// lint no files, and still pass every fixture in this package.
 	Name: "react/no-find-dom-node",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				name := findDOMNodeCalleeName(node.AsCallExpression().Expression)

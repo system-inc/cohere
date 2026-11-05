@@ -227,7 +227,7 @@ var (
 // missing branch of this one. The **inline**-escape arm is ported, because it needs only the call's
 // own parent. Stated rather than silently missing: a `useEffectEvent` result assigned to a variable
 // and then passed to a child is a finding this port gives up.
-var RulesOfHooks = rule.Rule{
+var RulesOfHooks = rule.Rule[RulesOfHooksOptions]{
 	Name: "react-hooks/rules-of-hooks",
 	Run:  runRulesOfHooks,
 }
@@ -245,7 +245,7 @@ type RulesOfHooksOptions struct {
 	AdditionalHooks string `json:"additionalHooks"`
 }
 
-func runRulesOfHooks(ruleContext rule.Context, options any) rule.Listeners {
+func runRulesOfHooks(ruleContext rule.Context, options rule.Given[RulesOfHooksOptions]) rule.Listeners {
 	// One graph per code path root per file, built lazily and only for roots that actually contain a
 	// Hook call. Most functions contain none, and building a graph for them would make this rule pay
 	// per function rather than per Hook.

@@ -141,7 +141,7 @@ var messageNoAdjacentInlineElements = rule.Message{
 // `validate` returns as soon as it reports, so a run of three inline elements produces one finding
 // and a container holding two separated pairs also produces one. Both measured. A loop that kept
 // going would report twice on inputs upstream reports once.
-var NoAdjacentInlineElements = rule.Rule{
+var NoAdjacentInlineElements = rule.Rule[rule.NoOptions]{
 	Name: "react/no-adjacent-inline-elements",
 
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
@@ -149,7 +149,7 @@ var NoAdjacentInlineElements = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// isInlineJsxChild answers upstream's `isInline` for a node in a JSX child list.
 		//
 		// Only a JSX element counts. Text, an expression container and a fragment all fall through

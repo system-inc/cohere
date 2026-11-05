@@ -609,16 +609,12 @@ func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
 			if decodeRequireOptimizationOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeRequireOptimizationOptionsError)
 			}
-			settings, ok := decoded.(RequireOptimizationOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if len(settings.AllowDecorators) != len(testCase.want) {
-				test.Fatalf("decoded %d decorators, want %d", len(settings.AllowDecorators), len(testCase.want))
+			if len(decoded.AllowDecorators) != len(testCase.want) {
+				test.Fatalf("decoded %d decorators, want %d", len(decoded.AllowDecorators), len(testCase.want))
 			}
 			for index, name := range testCase.want {
-				if settings.AllowDecorators[index] != name {
-					test.Errorf("decorator %d is %q, want %q", index, settings.AllowDecorators[index], name)
+				if decoded.AllowDecorators[index] != name {
+					test.Errorf("decorator %d is %q, want %q", index, decoded.AllowDecorators[index], name)
 				}
 			}
 		})

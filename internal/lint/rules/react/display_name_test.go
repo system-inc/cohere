@@ -1137,17 +1137,13 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 			if decodeDisplayNameOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeDisplayNameOptionsError)
 			}
-			options, isOptions := decoded.(DisplayNameOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want DisplayNameOptions", decoded)
-			}
-			if options.IgnoreTranspilerName != testCase.wantIgnore {
+			if decoded.IgnoreTranspilerName != testCase.wantIgnore {
 				test.Errorf("IgnoreTranspilerName is %v, want %v",
-					options.IgnoreTranspilerName, testCase.wantIgnore)
+					decoded.IgnoreTranspilerName, testCase.wantIgnore)
 			}
-			if options.CheckContextObjects != testCase.wantCheckContext {
+			if decoded.CheckContextObjects != testCase.wantCheckContext {
 				test.Errorf("CheckContextObjects is %v, want %v",
-					options.CheckContextObjects, testCase.wantCheckContext)
+					decoded.CheckContextObjects, testCase.wantCheckContext)
 			}
 		})
 	}

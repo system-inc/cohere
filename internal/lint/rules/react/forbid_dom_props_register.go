@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // has to answer an empty body with an empty list rather than an error: an unconfigured rule
 // declines everything, which is what the installed build does.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ForbidDomPropsOptions]{
 		Rule:   ForbidDomProps,
 		Decode: DecodeForbidDomPropsOptions,
 	})

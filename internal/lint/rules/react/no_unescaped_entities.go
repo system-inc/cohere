@@ -174,9 +174,9 @@ var messageReplaceWithAlt = rule.Message{
 // An object entry with no `alternatives` key is dropped here, which makes it silent rather than
 // fatal. `{char: "&", alternatives: []}` is a different configuration and does report, with an
 // empty alternatives list, and that one is reproduced exactly.
-var NoUnescapedEntities = rule.Rule{
+var NoUnescapedEntities = rule.Rule[NoUnescapedEntitiesOptions]{
 	Name: "react/no-unescaped-entities",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnescapedEntitiesOptions]) rule.Listeners {
 		entities := configuredEntities(options)
 		// An empty forbid list makes every input clean, and returning no listeners is how this rule
 		// says that. **This branch is a cost optimization and nothing else**, measured rather than
@@ -307,8 +307,8 @@ func quotedAlternatives(alternatives []string) string {
 // the path the real tree takes for every file, so it is handled first and pinned by its own fixture.
 // A rule reaching the scan with an empty list here would register on every file and find nothing,
 // which is the failure that looks exactly like success.
-func configuredEntities(options any) []forbiddenEntity {
-	decoded, isOurs := rule.OptionsAs[NoUnescapedEntitiesOptions](options)
+func configuredEntities(options rule.Given[NoUnescapedEntitiesOptions]) []forbiddenEntity {
+	decoded, isOurs := options.Read()
 	if !isOurs || decoded.Forbid == nil {
 		return defaultForbiddenEntities
 	}
@@ -342,7 +342,7 @@ type noUnescapedEntitiesWireOptions struct {
 //
 // An object entry with no `alternatives` is also dropped, and that one is a deliberate divergence:
 // upstream crashes on it. See the rule doc.
-func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
+func DecodeNoUnescapedEntitiesOptions(raw []byte) (NoUnescapedEntitiesOptions, error) {
 	if len(raw) == 0 {
 		return NoUnescapedEntitiesOptions{}, nil
 	}

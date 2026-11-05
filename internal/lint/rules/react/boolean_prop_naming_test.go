@@ -1302,26 +1302,22 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 			if decodeBooleanPropertyNamingOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeBooleanPropertyNamingOptionsError)
 			}
-			options, isOptions := decoded.(BooleanPropNamingOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want BooleanPropNamingOptions", decoded)
+			if decoded.Rule != testCase.wantRule {
+				test.Errorf("Rule is %q, want %q", decoded.Rule, testCase.wantRule)
 			}
-			if options.Rule != testCase.wantRule {
-				test.Errorf("Rule is %q, want %q", options.Rule, testCase.wantRule)
-			}
-			if len(options.PropTypeNames) != len(testCase.wantPropTypeNames) {
-				test.Fatalf("PropTypeNames is %v, want %v", options.PropTypeNames, testCase.wantPropTypeNames)
+			if len(decoded.PropTypeNames) != len(testCase.wantPropTypeNames) {
+				test.Fatalf("PropTypeNames is %v, want %v", decoded.PropTypeNames, testCase.wantPropTypeNames)
 			}
 			for index, wanted := range testCase.wantPropTypeNames {
-				if options.PropTypeNames[index] != wanted {
-					test.Errorf("PropTypeNames[%d] is %q, want %q", index, options.PropTypeNames[index], wanted)
+				if decoded.PropTypeNames[index] != wanted {
+					test.Errorf("PropTypeNames[%d] is %q, want %q", index, decoded.PropTypeNames[index], wanted)
 				}
 			}
-			if options.ValidateNested != testCase.wantNested {
-				test.Errorf("ValidateNested is %v, want %v", options.ValidateNested, testCase.wantNested)
+			if decoded.ValidateNested != testCase.wantNested {
+				test.Errorf("ValidateNested is %v, want %v", decoded.ValidateNested, testCase.wantNested)
 			}
-			if options.Message != testCase.wantMessage {
-				test.Errorf("Message is %q, want %q", options.Message, testCase.wantMessage)
+			if decoded.Message != testCase.wantMessage {
+				test.Errorf("Message is %q, want %q", decoded.Message, testCase.wantMessage)
 			}
 		})
 	}

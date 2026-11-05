@@ -121,15 +121,15 @@ const (
 // there. Stated rather than silent, because it is the one place this port is knowingly wider than
 // oxc, and the only inputs it can differ on are ones oxc declines to look at rather than ones it
 // judges differently.
-var NoWillUpdateSetState = rule.Rule{
+var NoWillUpdateSetState = rule.Rule[NoMethodSetStateOptions]{
 	// No namespace prefix. The config writes `react/no-will-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
 	Name: "react/no-will-update-set-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMethodSetStateOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
-		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		settings, _ := options.Read()
 		reportInsideNestedFunctions := settings.DisallowInFunc
 
 		return rule.Listeners{

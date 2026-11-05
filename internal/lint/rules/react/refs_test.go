@@ -852,10 +852,10 @@ export function Component({label}: {label: string}) {
 
 	declined := map[ast.Kind]int{}
 	asked := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "refs-cannot-have-ref-type-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(root *ast.Node) {
 					var visit func(node *ast.Node) bool

@@ -225,12 +225,12 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 // unconditional and reads no pragma. Recorded because it is a real divergence from oxc and the
 // differential will show it: any file calling `Date.now()` in a component reports here and does not
 // under oxlint. The corpus is unaffected, since its two files set the pragma either way.
-var Purity = rule.Rule{
+var Purity = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/purity",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
 			// descends into nested functions through the function arena, so listening per function

@@ -230,7 +230,7 @@ func iframeMissingSandboxInvalidValue(value string) rule.Message {
 // wins over `src`, are same-origin. A plain `string`, a template whose head stops before the host is
 // complete, a bare `src` and a spread after the last `src` are unknown. Both report. The
 // invalid-token and missing-attribute reports are untouched and remain exactly upstream's.
-var IframeMissingSandbox = rule.Rule{
+var IframeMissingSandbox = rule.Rule[rule.NoOptions]{
 	Name: "react/iframe-missing-sandbox",
 
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
@@ -239,7 +239,7 @@ var IframeMissingSandbox = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// validateSandboxValue splits a sandbox attribute's text and reports each rejected token,
 		// then the invalid pairing. Upstream reports every unknown token separately and the
 		// combination once, in that order, which is what the two-finding corpus case pins.

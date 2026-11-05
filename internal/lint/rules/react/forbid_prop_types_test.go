@@ -1591,14 +1591,10 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options, ok := decoded.(ForbidPropTypesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		if decoded.Forbid != nil {
+			test.Errorf("Forbid = %v, wanted nil so the defaults apply", decoded.Forbid)
 		}
-		if options.Forbid != nil {
-			test.Errorf("Forbid = %v, wanted nil so the defaults apply", options.Forbid)
-		}
-		if got := options.forbiddenTypes(); len(got) != 3 {
+		if got := decoded.forbiddenTypes(); len(got) != 3 {
 			test.Errorf("effective list = %v, wanted the three defaults", got)
 		}
 	})
@@ -1609,11 +1605,7 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options, ok := decoded.(ForbidPropTypesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
-		}
-		if got := options.forbiddenTypes(); len(got) != 3 {
+		if got := decoded.forbiddenTypes(); len(got) != 3 {
 			test.Errorf("effective list = %v, wanted the three defaults", got)
 		}
 	})
@@ -1624,14 +1616,10 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options, ok := decoded.(ForbidPropTypesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
-		}
-		if options.Forbid == nil {
+		if decoded.Forbid == nil {
 			test.Fatal("Forbid is nil, so an explicit empty list was indistinguishable from absent")
 		}
-		if got := options.forbiddenTypes(); len(got) != 0 {
+		if got := decoded.forbiddenTypes(); len(got) != 0 {
 			test.Errorf("effective list = %v, wanted empty", got)
 		}
 	})
@@ -1642,11 +1630,7 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options, ok := decoded.(ForbidPropTypesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
-		}
-		got := options.forbiddenTypes()
+		got := decoded.forbiddenTypes()
 		if len(got) != 1 || got[0] != "string" {
 			test.Errorf("effective list = %v, wanted exactly [string]", got)
 		}
@@ -1660,12 +1644,8 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options, ok := decoded.(ForbidPropTypesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
-		}
-		if !options.CheckContextTypes || !options.CheckChildContextTypes {
-			test.Errorf("flags = %v/%v, wanted both true", options.CheckContextTypes, options.CheckChildContextTypes)
+		if !decoded.CheckContextTypes || !decoded.CheckChildContextTypes {
+			test.Errorf("flags = %v/%v, wanted both true", decoded.CheckContextTypes, decoded.CheckChildContextTypes)
 		}
 	})
 }

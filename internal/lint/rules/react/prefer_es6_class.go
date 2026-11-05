@@ -45,7 +45,7 @@ func DefaultPreferEs6ClassOptions() PreferEs6ClassOptions {
 // into a struct, cannot read it. Upstream's schema is `[{ enum: ["always", "never"] }]`, so anything
 // else is refused, naming the value: the two modes report on disjoint inputs, and a value read as
 // neither would silently select a third behaviour of reporting nothing at all.
-func DecodePreferEs6ClassOptions(raw []byte) (any, error) {
+func DecodePreferEs6ClassOptions(raw []byte) (PreferEs6ClassOptions, error) {
 	options := DefaultPreferEs6ClassOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -181,12 +181,12 @@ var messagePreferEs6ClassShouldUseCreateClass = rule.Message{
 // the object expression, so the span starts at the brace and excludes `createReactClass(`. The
 // Never arm reports the whole class declaration. Measured by reading the reported columns, and
 // asserted by the span fixtures rather than left to a message id.
-var PreferEs6Class = rule.Rule{
+var PreferEs6Class = rule.Rule[PreferEs6ClassOptions]{
 	// No namespace prefix beyond the plugin's own. The config writes `react/prefer-es6-class` and
 	// the parity guard strips the namespace on a `/` boundary.
 	Name: "react/prefer-es6-class",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferEs6ClassOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferEs6ClassOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
 			// to the zero value whose Mode matches neither arm. Falling back to the default is what

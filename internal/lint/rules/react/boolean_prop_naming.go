@@ -72,7 +72,7 @@ var errBooleanPropNamingNeedsOptions = errors.New(
 // the generic helper would leave empty: an absent `rule` has to become the documented pattern
 // rather than the empty string, and an absent `propTypeNames` has to become `["bool"]` rather than
 // an empty list. Both zero values silence the rule rather than merely narrowing it.
-func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
+func DecodeBooleanPropNamingOptions(raw []byte) (BooleanPropNamingOptions, error) {
 	options := DefaultBooleanPropNamingOptions()
 	if len(raw) == 0 {
 		// Refusing empty input is what makes `RequiresOptions` mean anything. That field only
@@ -155,7 +155,7 @@ func messageBooleanPropNaming(propertyName string, pattern string, override stri
 //
 // Registered with `RequiresOptions` because upstream is inert without an options object; see
 // BooleanPropNamingOptions. A bare `"error"` here would be a rule that lints nothing.
-var BooleanPropNaming = rule.Rule{
+var BooleanPropNaming = rule.Rule[BooleanPropNamingOptions]{
 	Name: "react/boolean-prop-naming",
 
 	// The TypeScript half resolves a props type reference to its declaration, which is what lets
@@ -163,7 +163,7 @@ var BooleanPropNaming = rule.Rule{
 	// resolution answers the same question without being fooled by a shadowing declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[BooleanPropNamingOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -174,7 +174,7 @@ var BooleanPropNaming = rule.Rule{
 			return nil
 		}
 
-		settings, hasSettings := rule.OptionsAs[BooleanPropNamingOptions](options)
+		settings, hasSettings := options.Read()
 		if !hasSettings {
 			// RequiresOptions means the config layer declines the file before this, so reaching
 			// here without options is a harness path. Declining matches upstream's own behaviour

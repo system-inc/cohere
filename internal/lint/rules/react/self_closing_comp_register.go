@@ -7,5 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-written rather than `rule.DecodeOptionsInto` because both options default to
 // `true`; see DecodeSelfClosingCompOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: SelfClosingComp, Decode: DecodeSelfClosingCompOptions})
+	rule.Register(
+		rule.Registration[SelfClosingCompOptions]{Rule: SelfClosingComp, Decode: DecodeSelfClosingCompOptions},
+	)
 }

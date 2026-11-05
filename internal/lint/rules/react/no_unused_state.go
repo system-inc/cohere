@@ -93,9 +93,9 @@ func messageUnusedStateField(name string) rule.Message {
 // `meta.fixable` is unset upstream. Deleting a state field is not a spelling change: the write that
 // set it may have a side effect, and the right repair is usually to delete the code that computes
 // the value too, which only the author can decide.
-var NoUnusedState = rule.Rule{
+var NoUnusedState = rule.Rule[rule.NoOptions]{
 	Name: "react/no-unused-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
