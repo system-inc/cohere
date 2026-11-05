@@ -552,7 +552,7 @@ func TestApplyCoversOnlyItsOwnFile(test *testing.T) {
 		{Rule: "cohere-go/printf", File: "c.go", Line: 3},
 	}
 
-	outcome := Apply(knownRules, indexes, findings)
+	outcome := Apply(knownRules, knownRules, indexes, findings)
 
 	if !slices.Equal(outcome.Kept, findings[1:]) {
 		test.Fatalf("kept %v, want the findings in b.go and c.go", outcome.Kept)
@@ -569,11 +569,54 @@ func TestApplyLeavesTheIndexUnchanged(test *testing.T) {
 	source := "package fixture\n//cohere:ignore printf the format is built at run time\nvar first = risky()\n"
 	indexes := []*Index{Build("a.go", []byte(source))}
 
-	Apply(knownRules, indexes, []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}})
-	outcome := Apply(knownRules, indexes, nil)
+	Apply(knownRules, knownRules, indexes, []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}})
+	outcome := Apply(knownRules, knownRules, indexes, nil)
 
 	if len(outcome.DirectiveFindings) != 1 || outcome.DirectiveFindings[0].MessageId != MessageIdUnused {
 		test.Fatalf("directive findings %v, want the one unused directive", outcome.DirectiveFindings)
+	}
+}
+
+// TestApplyLeavesARuleThatDidNotRunAlone runs one directive naming two rules, one with a finding to withhold and
+// one without, twice: once with both rules run, where the second is reported unused, and once with the second
+// turned off by the settings, where it is neither used nor unused and nothing is reported.
+func TestApplyLeavesARuleThatDidNotRunAlone(test *testing.T) {
+	test.Parallel()
+	source := "package fixture\n//cohere:ignore printf,correctness-no-machine-path built at run time\nvar first = risky()\n"
+	findings := []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}}
+
+	bothRan := Apply(knownRules, knownRules, []*Index{Build("a.go", []byte(source))}, findings)
+	if len(bothRan.DirectiveFindings) != 1 || bothRan.DirectiveFindings[0].MessageId != MessageIdUnused ||
+		!strings.Contains(bothRan.DirectiveFindings[0].Message, "correctness-no-machine-path") {
+		test.Fatalf("with both rules run, directive findings %s, want correctness-no-machine-path unused",
+			renderDirectiveFindings(bothRan.DirectiveFindings))
+	}
+
+	onlyPrintf := Apply(knownRules, []string{"cohere-go/printf"}, []*Index{Build("a.go", []byte(source))}, findings)
+	if len(onlyPrintf.DirectiveFindings) != 0 {
+		test.Fatalf("with correctness-no-machine-path off, directive findings %s, want none",
+			renderDirectiveFindings(onlyPrintf.DirectiveFindings))
+	}
+	if len(onlyPrintf.Kept) != 0 || onlyPrintf.WithheldByRule["cohere-go/printf"] != 1 {
+		test.Fatalf("with correctness-no-machine-path off, kept %v and withheld %v, want printf withheld",
+			onlyPrintf.Kept, onlyPrintf.WithheldByRule)
+	}
+}
+
+// TestApplyStillReportsAnUnknownRuleAndAMissingReason keeps the rules that ran from excusing what is wrong with a
+// directive itself: a name no rule has, and a directive with no reason, are findings whatever ran.
+func TestApplyStillReportsAnUnknownRuleAndAMissingReason(test *testing.T) {
+	test.Parallel()
+	source := "package fixture\n//cohere:ignore no-such-rule built at run time\n//cohere:ignore printf\nvar first = 1\n"
+	outcome := Apply(knownRules, nil, []*Index{Build("a.go", []byte(source))}, nil)
+
+	var messageIds []string
+	for _, directiveFinding := range outcome.DirectiveFindings {
+		messageIds = append(messageIds, directiveFinding.MessageId)
+	}
+	if !slices.Equal(messageIds, []string{MessageIdUnknownRule, MessageIdMissingReason}) {
+		test.Fatalf("with no rule run, directive findings %s, want an unknown rule then a missing reason",
+			renderDirectiveFindings(outcome.DirectiveFindings))
 	}
 }
 
@@ -587,7 +630,7 @@ func TestBuildConcurrently(test *testing.T) {
 		group.Go(func() {
 			file := fmt.Sprintf("file%d.go", slot)
 			findings := []Finding{{Rule: "cohere-go/printf", File: file, Line: 3}}
-			outcomes[slot] = Apply(knownRules, []*Index{Build(file, source)}, findings)
+			outcomes[slot] = Apply(knownRules, knownRules, []*Index{Build(file, source)}, findings)
 		})
 	}
 	group.Wait()
@@ -603,7 +646,7 @@ func TestBuildConcurrently(test *testing.T) {
 func checkOutcome(test *testing.T, label string, source []string, findingSpecs []string, wanted wantedOutcome) {
 	test.Helper()
 	index := Build("fixture.go", []byte(strings.Join(source, "\n")+"\n"))
-	outcome := Apply(knownRules, []*Index{index}, parseFindings(test, "fixture.go", findingSpecs))
+	outcome := Apply(knownRules, knownRules, []*Index{index}, parseFindings(test, "fixture.go", findingSpecs))
 
 	var kept []string
 	for _, finding := range outcome.Kept {

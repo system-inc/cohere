@@ -88,15 +88,23 @@ type directiveState struct {
 }
 
 // Apply withholds every finding a well-formed directive covers, and reports what is wrong with the
-// directives. knownRules are the full names a directive may name; this package's own two rules are known
-// without being listed. A finding in a file with no Index is kept.
+// directives. knownRules are the full names a directive may name, and rulesRan are the ones this run ran; this
+// package's own two rules are known and ran without being listed. A finding in a file with no Index is kept.
 //
-// The unused findings mean what they say only when findings holds every rule's results for the files indexed:
-// a run filtered to one rule would call every other rule's directives dead.
-func Apply(knownRules []string, indexes []*Index, findings []Finding) Outcome {
+// A directive naming a known rule that did not run, because the settings turned it off, is neither used nor
+// unused for that rule: nothing was there to withhold, and calling it dead would push its author to delete an
+// exemption the next run with the rule on still needs.
+//
+// The unused findings mean what they say only when findings holds every ran rule's results for the files
+// indexed: a run filtered to one rule would call every other rule's directives dead.
+func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []Finding) Outcome {
 	known := map[string]bool{RuleRequireIgnoreReason: true, RuleNoUnusedIgnore: true}
 	for _, ruleName := range knownRules {
 		known[ruleName] = true
+	}
+	ran := map[string]bool{RuleRequireIgnoreReason: true, RuleNoUnusedIgnore: true}
+	for _, ruleName := range rulesRan {
+		ran[ruleName] = true
 	}
 
 	statesByFile := map[string][]*directiveState{}
@@ -119,7 +127,7 @@ func Apply(knownRules []string, indexes []*Index, findings []Finding) Outcome {
 
 	for _, index := range indexes {
 		for _, state := range statesByFile[index.File] {
-			outcome.DirectiveFindings = append(outcome.DirectiveFindings, directiveFindings(state)...)
+			outcome.DirectiveFindings = append(outcome.DirectiveFindings, directiveFindings(state, ran)...)
 		}
 		// Two indexes for one file would otherwise report its directives twice.
 		delete(statesByFile, index.File)
@@ -179,7 +187,7 @@ func withholdingDirective(states []*directiveState, finding Finding) *directiveS
 	return nil
 }
 
-func directiveFindings(state *directiveState) []DirectiveFinding {
+func directiveFindings(state *directiveState, ran map[string]bool) []DirectiveFinding {
 	report := func(ruleName string, messageId string, message string) DirectiveFinding {
 		return DirectiveFinding{
 			File:      state.file,
@@ -208,7 +216,7 @@ func directiveFindings(state *directiveState) []DirectiveFinding {
 		return found
 	}
 	for _, ruleName := range state.resolved {
-		if state.withheld[ruleName] {
+		if state.withheld[ruleName] || !ran[ruleName] {
 			continue
 		}
 		message := strings.ReplaceAll(unusedMessage, "{{rule}}", ruleName)
