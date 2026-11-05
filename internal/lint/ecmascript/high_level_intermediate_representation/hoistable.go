@@ -194,6 +194,8 @@ func (registry *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
 // That argument is implicit in upstream's construction rather than stated by it, which is why it is
 // pinned by `TestOptionalChainReductionTerminates` on the shape that would spin if the flip were
 // ever reversible.
+//
+// Mutates: nodes each reducible path is replaced in place by its non-optional form, the set the caller merged
 func reduceOptionalChains(nodes map[int]bool, registry *pathRegistry) {
 	hasOptional := false
 	for index := range nodes {
@@ -700,6 +702,9 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 // here only if it was non-null on EVERY path that reaches here. An empty neighbour list therefore
 // contributes the empty set rather than everything, which is why `doneSets` being empty short
 // circuits to no contribution rather than to a universal one.
+//
+// Mutates: state each block is marked active on entry and done on exit, threaded through the whole walk
+// Mutates: working each block's merged set is stored, so one map holds every block's answer
 func recursivelyPropagateNonNull(
 	id static_single_assignment.BlockId,
 	direction propagationDirection,

@@ -591,9 +591,9 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(test *testing.
 		"a promise's value": `const done: Promise<{ result: string }> = Promise.resolve({ result: 'ok' as const });`,
 		// A default takes what the wider type's `?` passes (OrmDatabase's increment on api).
 		"a defaulted parameter": `interface Counter { add(value?: number): void } class Tally { add(value = 1): void { value; } } const counter: Counter = new Tally();`,
-		// #y0ejf6a's near-misses, return-probe.tgz's n1 to n4: a read-only return, a method building what it returns, and
-		// the library's iterator, whose next() hands back a new result each call (276 findings on the consumers when a
-		// method's return was first paired).
+		// #y0ejf6a's near-misses, return-probe.tgz's n1 to n4: a read-only return, a method building what it returns,
+		// and the library's iterator, whose next() hands back a new result each call (276 findings on the consumers
+		// when a method's return was first paired).
 		"a readonly return": animals +
 			`interface Pound { all(): readonly Animal[] } class Kennel { dogs: Dog[] = [rex]; all(): Dog[] { return this.dogs; } } const pound: Pound = new Kennel();`,
 		"a copy returned": animals +

@@ -281,6 +281,9 @@ func dropSplicedFunctionExpressions(function *Function, spliced map[static_singl
 // It declines rather than half-applying: a copy that cannot complete leaves the caller's block
 // untouched, because a block cut at the call with no body spliced in is a function with a dangling
 // terminal, which is worse than an uninlined IIFE.
+//
+// Mutates: block it is cut at the call and its terminal enters the spliced body
+// Mutates: queue the continuation is appended, since a later IIFE in the same statement now lives there
 func spliceInlinedCall(function *Function, block *BasicBlock, index int,
 	instruction *Instruction, expression *FunctionExpression, nested *Function,
 	queue *[]*BasicBlock) bool {
@@ -465,6 +468,8 @@ func nestedFunctionOf(function *Function, expression *FunctionExpression) *Funct
 // of one -- passed as an argument, stored into an object, returned -- means the value escapes, and
 // a splice would then leave the escaped reference pointing at a function whose body also runs
 // inline. Upstream deletes on every operand of every non-call instruction for this reason.
+//
+// Mutates: functions every operand the value reads is deleted, so one set narrows across a whole function
 func forgetFunctionOperands(
 	value InstructionValue,
 	functions map[static_single_assignment.IdentifierId]*FunctionExpression,

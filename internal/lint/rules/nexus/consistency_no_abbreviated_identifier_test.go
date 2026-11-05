@@ -1024,7 +1024,8 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 // inheritance and CSSProperties -> csstype.Properties inheritance, including the relevant fields.
 func abbreviatedReactDependencyFiles(source string) map[string]string {
 	return map[string]string{
-		"subject.tsx": "import * as React from 'react';\ninterface SVGSVGElement {}\ndeclare const condition: boolean;\ndeclare const previous: { height?: number } | undefined;\n" +
+		"subject.tsx": "import * as React from 'react';\ninterface SVGSVGElement {}\n" +
+			"declare const condition: boolean;\ndeclare const previous: { height?: number } | undefined;\n" +
 			source,
 		"node_modules/react/index.d.ts": `
 			import * as CSS from 'csstype';
@@ -1192,7 +1193,8 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(test *test
 				{"dependency context", "const style: React.CSSProperties = { ...(" + expression.source + ") };", 0},
 				{
 					"JSX style context",
-					"declare function Icon(properties: React.SVGProps<SVGSVGElement>): any; const icon = <Icon style={{ ...(" +
+					"declare function Icon(properties: React.SVGProps<SVGSVGElement>): any; " +
+						"const icon = <Icon style={{ ...(" +
 						expression.source +
 						") }} />;",
 					0,

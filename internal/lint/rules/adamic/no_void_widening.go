@@ -87,7 +87,8 @@ func readsVoidValue(tc *checker.Checker, target *checker.Type) bool {
 		return false
 	}
 	for _, member := range target.Types() {
-		if member.Flags()&(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike|checker.TypeFlagsESSymbolLike|checker.TypeFlagsNonPrimitive) != 0 {
+		if member.Flags()&(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|
+			checker.TypeFlagsBigIntLike|checker.TypeFlagsESSymbolLike|checker.TypeFlagsNonPrimitive) != 0 {
 			return true
 		}
 		if member.Flags()&checker.TypeFlagsObject != 0 &&

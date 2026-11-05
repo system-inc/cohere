@@ -403,11 +403,13 @@ func TestReactComponentRequirePropertiesTypeSuffixNeverRenamesADependencysType(t
 
 	result := runWithDependencies(test, "app/x/page.tsx",
 		"function Card(properties: CardProps) {\n    return <p>{properties.label}</p>;\n}\n"+
-			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
+			"export default function Page(properties: PageProps<'/x'>) {\n"+
+			"    return <Card label={String(properties)} />;\n}\n"+
 			"interface CardProps { label: string }\n")
 	rule_testing.ExpectFixedSource(test, result,
 		"function Card(properties: CardProperties) {\n    return <p>{properties.label}</p>;\n}\n"+
-			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
+			"export default function Page(properties: PageProps<'/x'>) {\n"+
+			"    return <Card label={String(properties)} />;\n}\n"+
 			"interface CardProperties { label: string }\n")
 	if len(result.Diagnostics) != 2 {
 		test.Fatalf("wanted the two findings for CardProps and none for PageProps, got %d", len(result.Diagnostics))

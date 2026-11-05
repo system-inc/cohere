@@ -143,6 +143,9 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
+// maximumReactiveRounds bounds the fixpoint. See the reason at the loop.
+const maximumReactiveRounds = 10000
+
 // ReactiveGap names a reactivity source this pass cannot compute, for a caller that needs to know.
 //
 // It exists so that "we do not do this" is answerable through the API rather than only by reading
@@ -290,9 +293,6 @@ func (r *reactivity) run() {
 
 	r.applyToPlaces(r.function, true)
 }
-
-// maximumReactiveRounds bounds the fixpoint. See the reason at the loop.
-const maximumReactiveRounds = 10000
 
 // visitBlock runs one block's phis and instructions against the current reactive set.
 func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_assignment.BlockId]bool) {
@@ -632,12 +632,13 @@ func useRefResultValues(function *Function) map[static_single_assignment.Identif
 				if instruction == nil {
 					continue
 				}
-				var from, into static_single_assignment.IdentifierId
-				switch value := instruction.Value.(type) {
+				var from static_single_assignment.IdentifierId
+				var into static_single_assignment.IdentifierId
+				switch shape := instruction.Value.(type) {
 				case *StoreLocal:
-					from, into = value.Value.Identifier, value.LValue.Identifier
+					from, into = shape.Value.Identifier, shape.LValue.Identifier
 				case *LoadLocal:
-					from, into = value.Place.Identifier, instruction.LValue.Identifier
+					from, into = shape.Place.Identifier, instruction.LValue.Identifier
 				default:
 					continue
 				}
@@ -830,6 +831,8 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 // grows, so the frontier is cached and the test is re-asked each round. Caching the whole answer
 // would freeze the first round's reactive set into the control decision and silently lose sources.
 // refreshControlled recomputes which blocks are reactive-controlled from the current reactive set.
+//
+// Mutates: controlled the fixpoint keeps one set of controlled blocks across its rounds, and each round widens it
 func (r *reactivity) refreshControlled(
 	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
 	controlled map[static_single_assignment.BlockId]bool,
@@ -911,7 +914,8 @@ func (r *reactivity) postDominatorFrontiers() map[static_single_assignment.Block
 
 	inSubtree := make([]bool, len(blocks))
 	seen := make([]bool, len(blocks))
-	var marked, stack []static_single_assignment.BlockId
+	var marked []static_single_assignment.BlockId
+	var stack []static_single_assignment.BlockId
 	for _, block := range blocks {
 		// The target's subtree, the target included. Bounded by the tree's size for the reason the
 		// chain walk was: this reads data a caller could have restructured into a cycle, and a linter
@@ -1062,6 +1066,8 @@ func (r *reactivity) propagateToNested(nested *Function, captures []Place) {
 }
 
 // setPlace writes the settled flag onto one place.
+//
+// Mutates: place the settled flag belongs on the caller's place, which is the one the function itself holds
 func (r *reactivity) setPlace(place *Place) {
 	if place == nil {
 		return

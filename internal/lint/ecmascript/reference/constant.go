@@ -97,21 +97,23 @@ func isWrittenAfterDeclaration(ruleContext rule.Context, symbol *ast.Symbol, dec
 // apart from a string constant.
 func IsConstantRegExpIn(ruleContext rule.Context, expression *ast.Node) bool {
 	following := map[*ast.Symbol]bool{}
-	for expression != nil {
-		expression = ast.SkipParentheses(expression)
-		switch expression.Kind {
+	// The walk follows the expression through each name's initializer, one binding at a time.
+	current := expression
+	for current != nil {
+		current = ast.SkipParentheses(current)
+		switch current.Kind {
 		case ast.KindRegularExpressionLiteral:
 			return true
 		case ast.KindIdentifier:
 			if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 				return false
 			}
-			initializer, symbol := constantInitializer(ruleContext, expression)
+			initializer, symbol := constantInitializer(ruleContext, current)
 			if initializer == nil || following[symbol] {
 				return false
 			}
 			following[symbol] = true
-			expression = initializer
+			current = initializer
 		default:
 			return false
 		}

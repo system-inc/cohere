@@ -178,7 +178,8 @@ var UnionWrite = rule.Rule{
 				// A logical assignment writes only its RHS. The expression's type also
 				// contains the old value, which need not fit another member's slot.
 				switch operator {
-				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken,
+					ast.KindAmpersandAmpersandEqualsToken:
 				default:
 					value = node // arithmetic compound assignment writes the operation's result
 				}

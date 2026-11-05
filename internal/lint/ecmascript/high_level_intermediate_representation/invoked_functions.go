@@ -89,6 +89,8 @@ func CollectAssumedInvokedFunctions(function *Function) AssumedInvokedFunctions 
 // Upstream's step 1, and its comment gives the reason it only matches `FunctionExpression`:
 // "conservatively only match function expressions which can have guaranteed ssa. ObjectMethods and
 // ObjectProperties do not". A value whose definition is not unique cannot be traced to one function.
+//
+// Mutates: candidates each value that holds a nested function is recorded, so one map gathers a whole function
 func collectInvokedCandidates(
 	function *Function,
 	candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
@@ -102,18 +104,18 @@ func collectInvokedCandidates(
 			if instruction == nil {
 				continue
 			}
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *FunctionExpression:
 				candidates[instruction.LValue.Identifier] = &invokedCandidate{
-					function:  value.Function,
+					function:  instructionValue.Function,
 					mayInvoke: map[FunctionId]bool{},
 				}
 			case *StoreLocal:
-				if held, ok := candidates[value.Value.Identifier]; ok {
-					candidates[value.LValue.Identifier] = held
+				if held, ok := candidates[instructionValue.Value.Identifier]; ok {
+					candidates[instructionValue.LValue.Identifier] = held
 				}
 			case *LoadLocal:
-				if held, ok := candidates[value.Place.Identifier]; ok {
+				if held, ok := candidates[instructionValue.Place.Identifier]; ok {
 					candidates[instruction.LValue.Identifier] = held
 				}
 			}
@@ -122,6 +124,8 @@ func collectInvokedCandidates(
 }
 
 // collectInvocations reads the call sites, upstream's step 2.
+//
+// Mutates: invoked each function a call site, a JSX prop or a return proves or assumes invoked is marked
 func collectInvocations(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
 	invoked AssumedInvokedFunctions) {
 	for _, block := range function.Blocks {

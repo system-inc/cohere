@@ -169,7 +169,8 @@ func TestNextRequirePageDefaultExportStaysSilent(test *testing.T) {
 		{
 			"another page's default re-exported (www-phi-health app/(main-layout)/research/page.tsx)",
 			pageFile,
-			"// Next.js Metadata\nexport function generateMetadata() {\n    return {\n        title: 'Research',\n    };\n}\n\n" +
+			"// Next.js Metadata\nexport function generateMetadata() {\n" +
+				"    return {\n        title: 'Research',\n    };\n}\n\n" +
 				"export { default } from './subscribe/page';\n",
 		},
 		// An imported binding exported as default. Its declaration is in another module, so it cannot
