@@ -79,6 +79,15 @@ func rebuilds(readError error, problem *parseError) []error {
 	}
 }
 
+// The messages promise only what %w does, since %q, %x and width flags print differently: the cause stays reachable to
+// errors.Is and errors.As, and it prints as %v does.
+func promised(readError error) []error {
+	return []error{
+		fmt.Errorf("%q", readError),   // want `keeps the error reachable.*prints it as .%v. does\.$`
+		errors.New(readError.Error()), // want `keeps it reachable.*prints it as .%v. does\.$`
+	}
+}
+
 // A closure is no shelter.
 func enclosed(readError error) func() error {
 	return func() error {
