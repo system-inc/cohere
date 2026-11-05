@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/goengine/check/checker"
 	"github.com/system-inc/cohere/internal/goengine/rule"
 )
 
