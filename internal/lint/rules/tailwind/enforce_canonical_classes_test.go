@@ -40,7 +40,7 @@ func runCanonicalFixtureWithOptions(
 	test *testing.T,
 	fileName string,
 	source string,
-	options any,
+	options *EnforceCanonicalClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 	return runCanonicalFixtureWithStylesheet(test, fileName, source, `@import "tailwindcss";`, options)
@@ -53,7 +53,7 @@ func runCanonicalFixtureWithStylesheet(
 	fileName string,
 	source string,
 	stylesheet string,
-	options any,
+	options *EnforceCanonicalClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 
@@ -81,7 +81,7 @@ func runCanonicalFixtureWithStylesheet(
 		return rule_testing.RunTypedFilesWithSetup(test, EnforceCanonicalClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		test, EnforceCanonicalClasses, files, fileName, options, plantPackage)
+		test, EnforceCanonicalClasses, files, fileName, *options, plantPackage)
 }
 
 func TestEnforceCanonicalClassesReportsCollapses(test *testing.T) {
@@ -529,7 +529,7 @@ func TestCanonicalFixturesActuallyRan(test *testing.T) {
 // options", which failed as a silent zero-finding run rather than a crash.
 func TestIgnoredClassesAreExempt(test *testing.T) {
 	test.Parallel()
-	options := EnforceCanonicalClassesOptions{Ignore: []string{`^px-4$`}}
+	options := &EnforceCanonicalClassesOptions{Ignore: []string{`^px-4$`}}
 
 	result := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`, options)
@@ -558,7 +558,7 @@ func TestIgnorePatternsReadAsJavaScript(test *testing.T) {
 	for _, pattern := range []string{`^px-(?=4$)`, `(?<=^p)x-4$`} {
 		result := runCanonicalFixtureWithOptions(test, "Component.tsx",
 			`const element = <div className="px-4 py-4" />;`,
-			EnforceCanonicalClassesOptions{Ignore: []string{pattern}})
+			&EnforceCanonicalClassesOptions{Ignore: []string{pattern}})
 		if len(result.Diagnostics) != 0 {
 			test.Errorf("ignore %q should exempt px-4, got %d findings", pattern, len(result.Diagnostics))
 		}
@@ -569,7 +569,7 @@ func TestIgnorePatternsReadAsJavaScript(test *testing.T) {
 	// above could pass because the pattern excused everything.
 	control := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="px-2 py-2" />;`,
-		EnforceCanonicalClassesOptions{Ignore: []string{`^px-(?=4$)`}})
+		&EnforceCanonicalClassesOptions{Ignore: []string{`^px-(?=4$)`}})
 	if len(control.Diagnostics) != 1 {
 		test.Errorf("a lookahead that matches neither class should exempt neither, got %d findings",
 			len(control.Diagnostics))
@@ -587,11 +587,11 @@ func TestCanonicalCollapseOption(test *testing.T) {
 		test.Fatalf("by default the pair should collapse, got %d findings", len(result.Diagnostics))
 	}
 	if result := runCanonicalFixtureWithOptions(test, "Component.tsx", source,
-		EnforceCanonicalClassesOptions{Collapse: &on}); len(result.Diagnostics) != 1 {
+		&EnforceCanonicalClassesOptions{Collapse: &on}); len(result.Diagnostics) != 1 {
 		test.Fatalf("collapse: true is the default and should collapse too, got %d findings", len(result.Diagnostics))
 	}
 	if result := runCanonicalFixtureWithOptions(test, "Component.tsx", source,
-		EnforceCanonicalClassesOptions{Collapse: &off}); len(result.Diagnostics) != 0 {
+		&EnforceCanonicalClassesOptions{Collapse: &off}); len(result.Diagnostics) != 0 {
 		test.Fatalf("collapse: false should report no collapse, got %d findings", len(result.Diagnostics))
 	}
 }
@@ -612,11 +612,11 @@ func TestCanonicalLogicalOption(test *testing.T) {
 		test.Fatalf("by default mr-2 ml-2 should collapse to mx-2, got %d findings", len(result.Diagnostics))
 	}
 	if result := runCanonicalFixtureWithOptions(test, "Component.tsx", logicalPair,
-		EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 0 {
+		&EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 0 {
 		test.Fatalf("logical: false should leave mr-2 ml-2 alone, got %d findings", len(result.Diagnostics))
 	}
 	if result := runCanonicalFixtureWithOptions(test, "Component.tsx", physicalPair,
-		EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 1 {
+		&EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 1 {
 		test.Fatalf("logical: false should still collapse w-8 h-8, got %d findings", len(result.Diagnostics))
 	}
 }

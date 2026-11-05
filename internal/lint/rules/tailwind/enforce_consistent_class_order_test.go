@@ -237,8 +237,9 @@ func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
 			// pointed at the table it reads.
 			name:     "ring-offset resolves to its own root, not to ring",
 			fileName: "Component.tsx",
-			source: `const element = <div className="focus-visible:ring-1 focus-visible:ring-(--color-content-informative) ` +
-				`focus-visible:ring-offset-1 focus-visible:outline-none" />;`,
+			source: `const element = <div className="focus-visible:ring-1 ` +
+				`focus-visible:ring-(--color-content-informative) focus-visible:ring-offset-1 ` +
+				`focus-visible:outline-none" />;`,
 		},
 		{
 			// Both spellings are accepted, which is what pins the tiebreak to source order rather
