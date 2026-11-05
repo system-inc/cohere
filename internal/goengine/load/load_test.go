@@ -15,8 +15,10 @@ import (
 // behind `//go:build ignore`; it requires outside, a module beside it that a pattern names, with an ignored file
 // of its own. clean also has directories go list matches as no package: a windows-only package, a directory of
 // `//go:build ignore` scripts, and _tools, which ./... skips by its name though go would build its file. Its
-// tagged package builds only under the `-tags=special` the load's `GOFLAGS` sets. broken has one package for
-// each way a load fails.
+// tagged package builds only under the `-tags=special` the load's `GOFLAGS` sets. Two files import "C", which
+// cgo being off leaves out though no build line does: one beside plain.go, which go list reports as ignored,
+// and one alone in native, which go list matches as no package. broken has one package for each way a load
+// fails.
 var fixtureFiles = map[string]string{
 	"clean/go.mod": "module example.com/clean\n\ngo 1.21\n\nrequire example.com/outside v0.0.0\n\n" +
 		"replace example.com/outside => ../outside\n",
@@ -29,6 +31,8 @@ var fixtureFiles = map[string]string{
 		"func Quadruple(value int) int { return p.Double(p.Double(value)) }\n",
 	"clean/plain/plain.go":              "package plain\n\nconst Name = \"plain\"\n",
 	"clean/windowsonly/only_windows.go": "package windowsonly\n",
+	"clean/plain/native.go":             "package plain\n\nimport \"C\"\n",
+	"clean/native/native.go":            "package native\n\nimport \"C\"\n",
 	"clean/scripts/first.go":            "//go:build ignore\n\npackage main\n\nfunc main() {}\n",
 	"clean/scripts/second.go":           "//go:build ignore\n\npackage main\n\nfunc main() {}\n",
 	"clean/_tools/tool.go":              "package tools\n",
@@ -51,8 +55,8 @@ var fixtureFiles = map[string]string{
 }
 
 // cleanEnvironment is what clean is loaded under: linux/amd64, so a target that is not the host's shows the
-// load's environment reaches every go command it runs, and a tag only `GOFLAGS` sets.
-var cleanEnvironment = []string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64", "GOFLAGS=-tags=special"}
+// load's environment reaches every go command it runs, cgo off, and a tag only `GOFLAGS` sets.
+var cleanEnvironment = []string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0", "GOFLAGS=-tags=special"}
 
 // fixtures is the modules written and loaded once per test binary: each load type-checks the standard
 // library from source, seconds of work every test only reads. census is clean's .go files, as the project's
@@ -236,15 +240,24 @@ func TestEveryWronglySignedTestFunctionIsOneTypeDiagnostic(test *testing.T) {
 }
 
 // excludedInClean is every file of clean the build constraints leave out under cleanEnvironment, as both the
-// load and ExcludedByConstraints must name it: p's ignored file, which go list reports, and the windows-only
-// package and the ignore scripts, which go list matches as no package at all.
+// load and ExcludedByConstraints must name it, with the same reason: p's ignored file, which go list reports,
+// the windows-only package and the ignore scripts, which go list matches as no package at all, and the two
+// files that import "C", one of each kind, left out because cgo is off.
 func excludedInClean(root string) []Excluded {
+	constraints := "excluded by build constraints on linux/amd64"
+	cgoOff := `imports "C", and cgo is off for linux/amd64`
 	var excluded []Excluded
-	excludedFiles := []string{"p/ignored.go", "scripts/first.go", "scripts/second.go", "windowsonly/only_windows.go"}
-	for _, relative := range excludedFiles {
+	for _, each := range []struct{ relative, reason string }{
+		{"native/native.go", cgoOff},
+		{"p/ignored.go", constraints},
+		{"plain/native.go", cgoOff},
+		{"scripts/first.go", constraints},
+		{"scripts/second.go", constraints},
+		{"windowsonly/only_windows.go", constraints},
+	} {
 		excluded = append(excluded, Excluded{
-			File:   filepath.Join(root, "clean", filepath.FromSlash(relative)),
-			Reason: "excluded by build constraints on linux/amd64",
+			File:   filepath.Join(root, "clean", filepath.FromSlash(each.relative)),
+			Reason: each.reason,
 		})
 	}
 	return excluded
