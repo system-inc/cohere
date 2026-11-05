@@ -42,14 +42,14 @@ var messageNoWith = rule.Message{
 // `.js` files in the tree where no such check runs.
 var NoWith = rule.Rule{
 	Name: "no-with",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindWithStatement: func(node *ast.Node) {
 				// The first token of the statement, which is the `with` keyword. Built from the
 				// scanner rather than from `node.Pos()` directly, because `Pos()` sits before the
 				// node's leading comments and whitespace and would underline those instead.
-				ctx.ReportRange(
-					scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()),
+				ruleContext.ReportRange(
+					scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos()),
 					messageNoWith)
 			},
 		}

@@ -114,7 +114,7 @@ var NoDuplicateEnumValues = rule.Rule{
 	// No namespace prefix. The config writes `typescript/no-duplicate-enum-values` and the parity
 	// guard strips the namespace on a `/` boundary.
 	Name: "@typescript-eslint/no-duplicate-enum-values",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				declaration := node.AsEnumDeclaration()
@@ -147,7 +147,7 @@ var NoDuplicateEnumValues = rule.Rule{
 					case ast.KindNumericLiteral:
 						text := initializer.AsNumericLiteral().Text
 						if earlier, duplicated := seenNumbers[text]; duplicated {
-							ctx.ReportNode(earlier, messageNoDuplicateEnumValues)
+							ruleContext.ReportNode(earlier, messageNoDuplicateEnumValues)
 							// Deliberately not rewritten. Upstream's number table is a vector it
 							// appends to only when the value is new, so a third copy reports
 							// against the first rather than the second.
@@ -158,7 +158,7 @@ var NoDuplicateEnumValues = rule.Rule{
 					case ast.KindStringLiteral:
 						text := initializer.AsStringLiteral().Text
 						if earlier, duplicated := seenStrings[text]; duplicated {
-							ctx.ReportNode(earlier, messageNoDuplicateEnumValues)
+							ruleContext.ReportNode(earlier, messageNoDuplicateEnumValues)
 						}
 						// Written on every hit, duplicate or not, which is what makes a third copy
 						// report against the second. Upstream's `insert` returns the displaced

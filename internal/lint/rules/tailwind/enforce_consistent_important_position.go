@@ -75,8 +75,8 @@ type EnforceConsistentImportantPositionOptions struct {
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
 var EnforceConsistentImportantPosition = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-important-position",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -89,7 +89,7 @@ var EnforceConsistentImportantPosition = rule.Rule{
 			}
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
@@ -98,7 +98,7 @@ var EnforceConsistentImportantPosition = rule.Rule{
 					if !isMisplaced {
 						continue
 					}
-					ctx.ReportRange(literal.Range, messageImportantPosition(className, corrected))
+					ruleContext.ReportRange(literal.Range, messageImportantPosition(className, corrected))
 				}
 			}
 		}

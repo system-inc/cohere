@@ -67,8 +67,8 @@ var NoUnknownClasses = rule.Rule{
 	Name: "better-tailwindcss/no-unknown-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -83,17 +83,17 @@ var NoUnknownClasses = rule.Rule{
 		// CSS will not parse is reported once per file. This rule needs that distinction more than
 		// the others do, because a design system that failed to load would otherwise make every
 		// class in the tree read as unknown.
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Err != nil {
-			if ctx.Program == nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Err) {
 				return nil
 			}
-			return declineListeners(ctx, "no-unknown-classes", designSystem)
+			return declineListeners(ruleContext, "no-unknown-classes", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -103,7 +103,7 @@ var NoUnknownClasses = rule.Rule{
 			ignore = configured.Ignore
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 		ignored := compileIgnorePatterns(ignore)
 
 		report := func(node *ast.Node) {
@@ -112,7 +112,7 @@ var NoUnknownClasses = rule.Rule{
 					if isIgnored(className, ignored) || classExistsIn(className, designSystem.System) {
 						continue
 					}
-					ctx.ReportRange(literal.Range, messageUnknownClass(className))
+					ruleContext.ReportRange(literal.Range, messageUnknownClass(className))
 				}
 			}
 		}

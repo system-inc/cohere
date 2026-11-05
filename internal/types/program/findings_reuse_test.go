@@ -72,23 +72,23 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 	}
 	files := graph.ProjectFiles()
 	rules := findingsReuseRules(test)
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 
-	plain, err := graph.Walk(ctx, files, rules)
+	plain, err := graph.Walk(backgroundContext, files, rules)
 	if err != nil {
 		test.Fatalf("plain walk: %v", err)
 	}
 
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	if _, walkError := graph.Walk(ctx, files, rules); walkError != nil {
+	if _, walkError := graph.Walk(backgroundContext, files, rules); walkError != nil {
 		test.Fatalf("recording walk: %v", walkError)
 	}
 	recorded := recording.Recorded()
 
 	graph.FindingsReuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
-	replayed, err := graph.Walk(ctx, files, rules)
+	replayed, err := graph.Walk(backgroundContext, files, rules)
 	if err != nil {
 		test.Fatalf("replaying walk: %v", err)
 	}
@@ -144,13 +144,13 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 		return graph
 	}
 	rules := findingsReuseRules(test)
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 
 	first := build()
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	first.FindingsReuse = recording
-	before, err := first.Walk(ctx, first.ProjectFiles(), rules)
+	before, err := first.Walk(backgroundContext, first.ProjectFiles(), rules)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	}
 	second := build()
 	second.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	after, err := second.Walk(ctx, second.ProjectFiles(), rules)
+	after, err := second.Walk(backgroundContext, second.ProjectFiles(), rules)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -233,21 +233,21 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 			pure = append(pure, subject)
 		}
 	}
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 	files := graph.ProjectFiles()
 
-	plain, err := graph.Walk(ctx, files, pure)
+	plain, err := graph.Walk(backgroundContext, files, pure)
 	if err != nil {
 		test.Fatal(err)
 	}
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	if _, walkError := graph.Walk(ctx, files, pure); walkError != nil {
+	if _, walkError := graph.Walk(backgroundContext, files, pure); walkError != nil {
 		test.Fatal(walkError)
 	}
 	graph.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	replayed, err := graph.Walk(ctx, files, pure)
+	replayed, err := graph.Walk(backgroundContext, files, pure)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 	})
 	panicking := rule.Rule{
 		Name: "test-panics-on-every-declaration",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { panic("simulated") }}
 		},
 	}
@@ -494,15 +494,15 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 // the old pure notes and no typed ones, and the run after that replays the refreshed entry.
 func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	test.Parallel()
-	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ctx rule.Context, declaration *ast.Node) string) rule.Rule {
+	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ruleContext rule.Context, declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name:             name,
 			NeedsTypeChecker: needsTypeChecker,
 			ProgramReads:     reads,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-					if noted := key(ctx, node); noted != "" {
-						ctx.Note(noted)
+					if noted := key(ruleContext, node); noted != "" {
+						ruleContext.Note(noted)
 					}
 				}}
 			},
@@ -511,14 +511,14 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	// The type-aware rule notes only strings, so after lib.ts turns its value into a number it notes nothing
 	// in consumer.ts, and a refresh that kept its old notes would show.
 	rules := []rule.Rule{
-		noting("test-notes-pure", false, 0, func(ctx rule.Context, declaration *ast.Node) string { return "declared" }),
-		noting("test-notes-typed", true, 0, func(ctx rule.Context, declaration *ast.Node) string {
-			if rendered := ctx.TypeChecker.TypeToString(ctx.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
+		noting("test-notes-pure", false, 0, func(ruleContext rule.Context, declaration *ast.Node) string { return "declared" }),
+		noting("test-notes-typed", true, 0, func(ruleContext rule.Context, declaration *ast.Node) string {
+			if rendered := ruleContext.TypeChecker.TypeToString(ruleContext.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
 				return "a string"
 			}
 			return ""
 		}),
-		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ctx rule.Context, declaration *ast.Node) string { return "walked" }),
+		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ruleContext rule.Context, declaration *ast.Node) string { return "walked" }),
 	}
 	if pure, typeAware, _, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
 		test.Fatalf("the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",

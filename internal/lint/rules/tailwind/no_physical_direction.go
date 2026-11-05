@@ -129,19 +129,19 @@ var physicalToLogical = []directionMapping{
 // for it, and the symptom is extra findings rather than an error.
 var NoPhysicalDirection = rule.Rule{
 	Name: "structure/tailwind-no-physical-direction",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// An Adamic `.a` file is checked as the `.ts` it is (#kwt1htp).
-		fileName := ctx.SourceFile.FileName()
+		fileName := ruleContext.SourceFile.FileName()
 		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") && !strings.HasSuffix(fileName.AsString(), ".tsx") {
 			return nil
 		}
 
 		report := func(node *ast.Node, text string) {
 			for _, violation := range physicalDirectionViolationsIn(text) {
-				ctx.ReportNode(node, messagePhysicalDirection(violation.original, violation.replacement))
+				ruleContext.ReportNode(node, messagePhysicalDirection(violation.original, violation.replacement))
 			}
 		}
 

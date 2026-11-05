@@ -142,8 +142,8 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -164,7 +164,7 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 				if reportedStrictNullChecks {
 					return
 				}
-				if noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx) {
+				if noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ruleContext) {
 					return
 				}
 				if parsed.AllowRuleToRunWithoutStrictNullChecks {
@@ -174,14 +174,14 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 				// Upstream reports at line zero, column zero, which is a location rather than a
 				// node. The file's first token is the nearest thing this tree has to that and it
 				// puts the finding where a reader will look.
-				ctx.ReportRange(ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos()),
+				ruleContext.ReportRange(ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos()),
 					messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck())
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportNoUnnecessaryBooleanLiteralCompare(ctx, node, parsed)
+				reportNoUnnecessaryBooleanLiteralCompare(ruleContext, node, parsed)
 			},
 		}
 	},
@@ -205,11 +205,11 @@ type noUnnecessaryBooleanLiteralCompareComparison struct {
 
 // reportNoUnnecessaryBooleanLiteralCompare is upstream's `BinaryExpression` visitor.
 func reportNoUnnecessaryBooleanLiteralCompare(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	options NoUnnecessaryBooleanLiteralCompareOptions,
 ) {
-	comparison, found := noUnnecessaryBooleanLiteralCompareDeconstruct(ctx, node)
+	comparison, found := noUnnecessaryBooleanLiteralCompareDeconstruct(ruleContext, node)
 	if !found {
 		return
 	}
@@ -225,14 +225,14 @@ func reportNoUnnecessaryBooleanLiteralCompare(
 
 	message := noUnnecessaryBooleanLiteralCompareMessageFor(comparison)
 
-	replacement, mutated, buildable := noUnnecessaryBooleanLiteralCompareReplacement(ctx, node, comparison)
+	replacement, mutated, buildable := noUnnecessaryBooleanLiteralCompareReplacement(ruleContext, node, comparison)
 	if !buildable {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
 
-	ctx.ReportNodeWithFixes(node, message,
-		rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, mutated), replacement))
+	ruleContext.ReportNodeWithFixes(node, message,
+		rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, mutated), replacement))
 }
 
 // noUnnecessaryBooleanLiteralCompareMessageFor is upstream's nested conditional over the ids.
@@ -257,7 +257,7 @@ func noUnnecessaryBooleanLiteralCompareMessageFor(
 // noUnnecessaryBooleanLiteralCompareDeconstruct is upstream's `getBooleanComparison`, which folds
 // `deconstructComparison` and the type test together.
 func noUnnecessaryBooleanLiteralCompareDeconstruct(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 ) (noUnnecessaryBooleanLiteralCompareComparison, bool) {
 	var empty noUnnecessaryBooleanLiteralCompareComparison
@@ -302,7 +302,7 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 			negated:       !positive,
 		}
 
-		expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+		expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 		if expressionType == nil {
 			return empty, false
 		}
@@ -319,7 +319,7 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 		// not because any input can see it.
 		constraint := expressionType
 		if type_checking.IsTypeFlagSet(expressionType, shimchecker.TypeFlagsTypeParameter) {
-			constraint = shimchecker.Checker_getBaseConstraintOfType(ctx.TypeChecker, expressionType)
+			constraint = shimchecker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, expressionType)
 			if constraint == nil {
 				return empty, false
 			}
@@ -429,7 +429,7 @@ func noUnnecessaryBooleanLiteralCompareIsNullableBoolean(expressionType *shimche
 // thing this function decides is punctuation. Returning the node to replace as well as the text,
 // because a comparison wrapped in `!` is replaced together with its wrapper.
 func noUnnecessaryBooleanLiteralCompareReplacement(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	comparison noUnnecessaryBooleanLiteralCompareComparison,
 ) (replacement string, mutated *ast.Node, buildable bool) {
@@ -464,7 +464,7 @@ func noUnnecessaryBooleanLiteralCompareReplacement(
 	}
 	overallNegated := inversions%2 == 1
 
-	text, readable := noUnnecessaryBooleanLiteralCompareNodeText(ctx, comparison.expression)
+	text, readable := noUnnecessaryBooleanLiteralCompareNodeText(ruleContext, comparison.expression)
 	if !readable {
 		return "", nil, false
 	}
@@ -638,11 +638,11 @@ func noUnnecessaryBooleanLiteralCompareIsWeakPrecedenceParent(node *ast.Node) bo
 // `GetStrictOptionValue` is the same resolution: an explicit value wins, and an unset one falls back
 // to `strict` unless `strict` is explicitly false. Reading it through the program handle is why this
 // rule declares that it reads the program.
-func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx rule.Context) bool {
-	if ctx.Program == nil {
+func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ruleContext rule.Context) bool {
+	if ruleContext.Program == nil {
 		return true
 	}
-	compilerOptions := ctx.Program.Options()
+	compilerOptions := ruleContext.Program.Options()
 	if compilerOptions == nil {
 		return true
 	}
@@ -650,12 +650,12 @@ func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx rule.Context)
 }
 
 // noUnnecessaryBooleanLiteralCompareNodeText slices a node's own source text, trivia excluded.
-func noUnnecessaryBooleanLiteralCompareNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
+func noUnnecessaryBooleanLiteralCompareNodeText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	sourceText := ctx.SourceFile.Text()
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	sourceText := ruleContext.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
 	}

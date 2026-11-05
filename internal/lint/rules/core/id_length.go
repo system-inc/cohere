@@ -182,11 +182,11 @@ var messageIdLengthTooLongPrivate = rule.Message{
 var IdLength = rule.Rule{
 	Name: "id-length",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := idLengthSettingsFrom(options)
 
 		check := func(node *ast.Node) {
-			checkIdLengthName(ctx, node, settings)
+			checkIdLengthName(ruleContext, node, settings)
 		}
 		return rule.Listeners{
 			ast.KindIdentifier:        check,
@@ -196,7 +196,7 @@ var IdLength = rule.Rule{
 }
 
 // checkIdLengthName judges one identifier.
-func checkIdLengthName(ctx rule.Context, node *ast.Node, settings IdLengthSettings) {
+func checkIdLengthName(ruleContext rule.Context, node *ast.Node, settings IdLengthSettings) {
 	parent := node.Parent
 	if parent == nil {
 		return
@@ -261,7 +261,7 @@ func checkIdLengthName(ctx rule.Context, node *ast.Node, settings IdLengthSettin
 		}
 	}
 
-	ctx.ReportNode(node, rule.Message{Id: message.Id, Description: rendered})
+	ruleContext.ReportNode(node, rule.Message{Id: message.Id, Description: rendered})
 }
 
 // idLengthIsNamingSite is upstream's `SUPPORTED_EXPRESSIONS` lookup: does this identifier NAME

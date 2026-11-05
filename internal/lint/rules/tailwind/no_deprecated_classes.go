@@ -121,8 +121,8 @@ var deprecations = []deprecation{
 // name would miss every prefixed use, which is most of them in real markup.
 var NoDeprecatedClasses = rule.Rule{
 	Name: "better-tailwindcss/no-deprecated-classes",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -131,11 +131,11 @@ var NoDeprecatedClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportDeprecations(ctx, literal)
+				reportDeprecations(ruleContext, literal)
 			}
 		}
 
@@ -157,7 +157,7 @@ var NoDeprecatedClasses = rule.Rule{
 // A repeat of an earlier class is reported and not renamed: `no-duplicate-classes` deletes it, and
 // a rename of the same bytes would be refused as an overlap. Once it is gone there is nothing left
 // to rename.
-func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
+func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) == 0 {
 		return
@@ -166,8 +166,8 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 	// The class tokens line up with `classes` one for one, or there is no fix to offer.
 	var tokens []classToken
 	tokenized := false
-	if ctx.SourceFile != nil {
-		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	if ruleContext.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ruleContext.SourceFile.Text(), literal.Range, literal.Text)
 	}
 	classTokens := classesOf(tokens)
 	if tokenized && len(classTokens) == len(classes) {
@@ -205,13 +205,13 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 		if found.replacement == "" {
 			// Removed outright: reported and left as written, because this rule has no rewrite to offer
 			// and dropping the class would change what renders.
-			ctx.ReportRange(literal.Range, messageDeprecatedClassIrreplaceable(found.className))
+			ruleContext.ReportRange(literal.Range, messageDeprecatedClassIrreplaceable(found.className))
 			continue
 		}
 
 		message := messageDeprecatedClassReplaceable(found.className, found.replacement)
 		if !canFix {
-			ctx.ReportRange(literal.Range, message)
+			ruleContext.ReportRange(literal.Range, message)
 			continue
 		}
 
@@ -222,10 +222,10 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 			fixes = []rule.Fix{rule.ReplaceRange(classTokens[found.index].Range, found.replacement)}
 		}
 
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}

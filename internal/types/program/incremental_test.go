@@ -198,11 +198,11 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 		return graph
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	// Leg one: cold. No build info yet, so this is the full pass.
 	cold := build()
-	if findings := messagesOf(cold.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+	if findings := messagesOf(cold.IncrementalDiagnostics(backgroundContext)); len(findings) != 0 {
 		test.Fatalf("the clean fixture produced %d findings, so no later leg can distinguish a "+
 			"planted error from existing noise: %v", len(findings), findings)
 	}
@@ -213,8 +213,8 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	if coldSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on an incremental config")
 	}
-	coldSession.Diagnostics(ctx)
-	if diagnostics := coldSession.Write(ctx); len(diagnostics) != 0 {
+	coldSession.Diagnostics(backgroundContext)
+	if diagnostics := coldSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("writing the build info reported %d diagnostics: %v",
 			len(diagnostics), messagesOf(diagnostics))
 	}
@@ -238,7 +238,7 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	}
 
 	warmDirty := build()
-	dirtyFindings := messagesOf(warmDirty.IncrementalDiagnostics(ctx))
+	dirtyFindings := messagesOf(warmDirty.IncrementalDiagnostics(backgroundContext))
 	if len(dirtyFindings) == 0 {
 		test.Fatal("a violation planted after the build info was written was NOT found on a warm " +
 			"run. That is a stale cache reporting a clean tree, which is the exact failure this " +
@@ -254,13 +254,13 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	if rewriteSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on the rewrite")
 	}
-	rewriteSession.Diagnostics(ctx)
-	if diagnostics := rewriteSession.Write(ctx); len(diagnostics) != 0 {
+	rewriteSession.Diagnostics(backgroundContext)
+	if diagnostics := rewriteSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("rewriting the build info reported diagnostics: %v", messagesOf(diagnostics))
 	}
 
 	warmClean := build()
-	if findings := messagesOf(warmClean.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+	if findings := messagesOf(warmClean.IncrementalDiagnostics(backgroundContext)); len(findings) != 0 {
 		test.Fatalf("after removing the planted error the warm run still reports findings, which "+
 			"is a stale result rather than a clean tree: %v", findings)
 	}
@@ -289,10 +289,10 @@ func TestIncrementalMatchesFullPass(test *testing.T) {
 		return graph
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	first := build()
-	full := messagesOf(first.AllDiagnostics(ctx))
+	full := messagesOf(first.AllDiagnostics(backgroundContext))
 	if len(full) < 2 {
 		test.Fatalf("the fixture was meant to produce at least two findings and produced %d; "+
 			"an equivalence test over an empty set proves nothing: %v", len(full), full)
@@ -301,13 +301,13 @@ func TestIncrementalMatchesFullPass(test *testing.T) {
 	if firstSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on an incremental config")
 	}
-	firstSession.Diagnostics(ctx)
-	if diagnostics := firstSession.Write(ctx); len(diagnostics) != 0 {
+	firstSession.Diagnostics(backgroundContext)
+	if diagnostics := firstSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("writing the build info reported diagnostics: %v", messagesOf(diagnostics))
 	}
 
 	second := build()
-	warm := messagesOf(second.IncrementalDiagnostics(ctx))
+	warm := messagesOf(second.IncrementalDiagnostics(backgroundContext))
 
 	slices.Sort(full)
 	slices.Sort(warm)

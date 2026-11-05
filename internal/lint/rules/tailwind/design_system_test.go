@@ -141,8 +141,8 @@ func (probe *designSystemProbe) rule() rule.Rule {
 		Name: "tailwind-design-system-probe",
 		// What DesignSystemForProgram reads. ctx.Program refuses anything undeclared.
 		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-		Run: func(ctx rule.Context, _ any) rule.Listeners {
-			result := DesignSystemForProgram(ctx.Program)
+		Run: func(ruleContext rule.Context, _ any) rule.Listeners {
+			result := DesignSystemForProgram(ruleContext.Program)
 			probe.mutex.Lock()
 			probe.results = append(probe.results, result)
 			probe.files++

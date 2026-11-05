@@ -373,7 +373,7 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 // in this rule's tests came out of upstream's corpus and was replayed against the installed build.
 var NoRestrictedImports = rule.Rule{
 	Name: "no-restricted-imports",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, configured := rule.OptionsAs[NoRestrictedImportsOptions](options)
 		if !configured || (len(settings.Paths) == 0 && len(settings.Patterns) == 0) {
 			// Upstream's `if (Object.keys(restrictedPaths).length === 0 &&
@@ -381,7 +381,7 @@ var NoRestrictedImports = rule.Rule{
 			return rule.Listeners{}
 		}
 
-		checker, ok := newNoRestrictedImportsChecker(ctx, settings)
+		checker, ok := newNoRestrictedImportsChecker(ruleContext, settings)
 		if !ok {
 			// A configuration that reached the rule without passing the decoder. Reporting nothing
 			// is the only honest answer, and it cannot happen through the config layer.
@@ -421,10 +421,10 @@ type noRestrictedImportsChecker struct {
 
 // newNoRestrictedImportsChecker compiles the configuration once per file.
 func newNoRestrictedImportsChecker(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings NoRestrictedImportsOptions,
 ) (*noRestrictedImportsChecker, bool) {
-	checker := &noRestrictedImportsChecker{ctx: ctx, paths: map[string][]NoRestrictedImportsPath{}}
+	checker := &noRestrictedImportsChecker{ctx: ruleContext, paths: map[string][]NoRestrictedImportsPath{}}
 
 	for _, path := range settings.Paths {
 		checker.paths[path.Name] = append(checker.paths[path.Name], path)
@@ -868,12 +868,12 @@ func noRestrictedImportsExportIsTypeOnly(node *ast.Node) bool {
 // token list here, so the `*` is found by scanning the statement's own source text from its start,
 // which cannot run past the specifier because a `*` is the only thing that can follow `export` in
 // these two forms.
-func noRestrictedImportsStarToken(ctx rule.Context, node *ast.Node) *core.TextRange {
-	if ctx.SourceFile == nil {
+func noRestrictedImportsStarToken(ruleContext rule.Context, node *ast.Node) *core.TextRange {
+	if ruleContext.SourceFile == nil {
 		return nil
 	}
-	statement := rule.TokenRange(ctx.SourceFile, node)
-	text := ctx.SourceFile.Text()
+	statement := rule.TokenRange(ruleContext.SourceFile, node)
+	text := ruleContext.SourceFile.Text()
 	if statement.Pos() < 0 || statement.End() > len(text) {
 		return nil
 	}

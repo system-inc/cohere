@@ -292,17 +292,17 @@ var UseMemo = rule.Rule{
 	// reassignment check asks the same kind of question about the assignment target.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
 				if call == nil {
 					return
 				}
-				kind, isManualMemo := manualMemoKind(ctx, call.Expression)
+				kind, isManualMemo := manualMemoKind(ruleContext, call.Expression)
 				if !isManualMemo {
 					return
 				}
@@ -314,7 +314,7 @@ var UseMemo = rule.Rule{
 				if len(arguments) == 0 {
 					// Upstream reports the whole call here, not the callee, because
 					// `extractManualMemoizationArgs` uses `instr.value.loc`.
-					ctx.ReportNode(node, messageUseMemoMissingCallback)
+					ruleContext.ReportNode(node, messageUseMemoMissingCallback)
 					return
 				}
 
@@ -328,19 +328,19 @@ var UseMemo = rule.Rule{
 					if callback.Kind == ast.KindSpreadElement {
 						return
 					}
-					ctx.ReportNode(callback, messageUseMemoCallbackNotInline)
+					ruleContext.ReportNode(callback, messageUseMemoCallbackNotInline)
 				}
 
 				// The dependency check runs whether or not the callback was inline, which was
 				// measured rather than assumed: `useMemo(props.fn, [f()])` reports twice.
 				if len(arguments) >= 2 {
-					checkDependencyList(ctx, kind, arguments[1])
+					checkDependencyList(ruleContext, kind, arguments[1])
 				}
 
 				if inlineCallback == nil {
 					return
 				}
-				checkInlineCallback(ctx, kind, inlineCallback)
+				checkInlineCallback(ruleContext, kind, inlineCallback)
 			},
 		}
 	},
@@ -362,13 +362,13 @@ const (
 // Two shapes, both resolving the binding rather than matching text. See the matrix at `UseMemo` for
 // the thirteen inputs that pin this, and note that the two import forms are keyed differently: a
 // named import on the name it was exported under, a default or namespace import on the local name.
-func manualMemoKind(ctx rule.Context, callee *ast.Node) (manualMemoKindValue, bool) {
+func manualMemoKind(ruleContext rule.Context, callee *ast.Node) (manualMemoKindValue, bool) {
 	if callee == nil {
 		return 0, false
 	}
 	switch callee.Kind {
 	case ast.KindIdentifier:
-		name, resolved := reactModuleBindingName(ctx, callee)
+		name, resolved := reactModuleBindingName(ruleContext, callee)
 		if !resolved {
 			return 0, false
 		}
@@ -393,7 +393,7 @@ func manualMemoKind(ctx rule.Context, callee *ast.Node) (manualMemoKindValue, bo
 		// The receiver is keyed on the LOCAL name being `React`, for a global and for a default or
 		// namespace import alike. Measured: `import Rct from 'react'` then `Rct.useMemo(...)` is
 		// silent, because upstream's `ImportDefault` arm looks up `binding.name`.
-		name, resolved := reactModuleLocalName(ctx, object)
+		name, resolved := reactModuleLocalName(ruleContext, object)
 		return kind, resolved && name == "React"
 	}
 	return 0, false
@@ -422,8 +422,8 @@ func manualMemoKindForName(name string) (manualMemoKindValue, bool) {
 // exported under, which is what makes `import {useMemo as um}` report on `um(...)` and
 // `import {somethingElse as useMemo}` stay silent. Anything else declared in source is a local
 // binding that shadows, and answers nothing.
-func reactModuleBindingName(ctx rule.Context, identifier *ast.Node) (string, bool) {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func reactModuleBindingName(ruleContext rule.Context, identifier *ast.Node) (string, bool) {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		// Nothing resolved, so the name is a true global. This is the common case in the fixtures
 		// and in real source that relies on the automatic React runtime.
@@ -482,8 +482,8 @@ func reactModuleBindingName(ctx rule.Context, identifier *ast.Node) (string, boo
 // This is the port brief's first survivor category arriving live: the mutant was right and the
 // original was wrong, and no imported fixture could have said so, because upstream's corpus writes
 // no non-React module at all.
-func reactModuleLocalName(ctx rule.Context, identifier *ast.Node) (string, bool) {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func reactModuleLocalName(ruleContext rule.Context, identifier *ast.Node) (string, bool) {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return identifier.Text(), true
 	}
@@ -611,12 +611,12 @@ func inlineFunctionArgument(argument *ast.Node) *ast.Node {
 // literal** rather than complaining about the element. Measured both ways: `[...props.a]` and
 // `[, props.a]` report "not an array literal", while `[f()]` reports "not a simple expression".
 // Reading the source alone would have put both in the second bucket.
-func checkDependencyList(ctx rule.Context, kind manualMemoKindValue, argument *ast.Node) {
+func checkDependencyList(ruleContext rule.Context, kind manualMemoKindValue, argument *ast.Node) {
 	if argument == nil {
 		return
 	}
 	if argument.Kind != ast.KindArrayLiteralExpression {
-		ctx.ReportNode(argument, messageUseMemoDependencyListNotArrayLiteral)
+		ruleContext.ReportNode(argument, messageUseMemoDependencyListNotArrayLiteral)
 		return
 	}
 	elements := argument.AsArrayLiteralExpression().Elements
@@ -630,14 +630,14 @@ func checkDependencyList(ctx rule.Context, kind manualMemoKindValue, argument *a
 		if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
 			// One finding for the whole list, not one per offending element, because the list
 			// never became a list.
-			ctx.ReportNode(argument, messageUseMemoDependencyListNotArrayLiteral)
+			ruleContext.ReportNode(argument, messageUseMemoDependencyListNotArrayLiteral)
 			return
 		}
 	}
 	for _, element := range elements.Nodes {
 		if element != nil && !isSimpleDependencyExpression(element) {
 			// One finding per bad element, measured: `[f(), g()]` reports twice.
-			ctx.ReportNode(element, messageUseMemoDependencyNotSimple)
+			ruleContext.ReportNode(element, messageUseMemoDependencyNotSimple)
 		}
 	}
 }
@@ -700,7 +700,7 @@ func isSimpleDependencyExpression(node *ast.Node) bool {
 // Gated on `useMemo` rather than running for both hooks, which is upstream's asymmetry:
 // `validateUseMemo` builds its `useMemos` set from the `useMemo` name alone, so a `useCallback`
 // callback may take parameters and may be async. Measured on all three.
-func checkInlineCallback(ctx rule.Context, kind manualMemoKindValue, callback *ast.Node) {
+func checkInlineCallback(ruleContext rule.Context, kind manualMemoKindValue, callback *ast.Node) {
 	if kind != manualMemoKindUseMemo {
 		return
 	}
@@ -709,15 +709,15 @@ func checkInlineCallback(ctx rule.Context, kind manualMemoKindValue, callback *a
 	if len(parameters) > 0 {
 		// Points at the first parameter, whatever its shape. Measured over an identifier, an object
 		// pattern and a default: the span is the whole parameter node in each case.
-		ctx.ReportNode(parameters[0], messageUseMemoCallbackHasParameters)
+		ruleContext.ReportNode(parameters[0], messageUseMemoCallbackHasParameters)
 	}
 
 	if isAsyncOrGeneratorFunction(callback) {
 		// Points at the whole callback, not at the `async` keyword. Measured.
-		ctx.ReportNode(callback, messageUseMemoCallbackAsyncOrGenerator)
+		ruleContext.ReportNode(callback, messageUseMemoCallbackAsyncOrGenerator)
 	}
 
-	reportOuterReassignments(ctx, callback)
+	reportOuterReassignments(ruleContext, callback)
 }
 
 // isAsyncOrGeneratorFunction reports whether a function-like node is async or a generator.
@@ -772,7 +772,7 @@ func hasModifierKind(node *ast.Node, kind ast.Kind) bool {
 // Nested functions inside the callback are not descended into, measured: a write to an outer
 // variable from a function declared inside the callback is silent, because that write closes over
 // the callback's scope rather than the component's from the callback's own point of view.
-func reportOuterReassignments(ctx rule.Context, callback *ast.Node) {
+func reportOuterReassignments(ruleContext rule.Context, callback *ast.Node) {
 	body := utilsreact.FunctionBody(callback)
 	if body == nil {
 		return
@@ -790,7 +790,7 @@ func reportOuterReassignments(ctx rule.Context, callback *ast.Node) {
 			binary := current.AsBinaryExpression()
 			if binary != nil && binary.OperatorToken != nil &&
 				ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
-				reportIfOuterBinding(ctx, callback, binary.Left)
+				reportIfOuterBinding(ruleContext, callback, binary.Left)
 			}
 		}
 		current.ForEachChild(func(child *ast.Node) bool {
@@ -810,7 +810,7 @@ func reportOuterReassignments(ctx rule.Context, callback *ast.Node) {
 // A target that is not a plain identifier is declined, which covers the property-write and
 // element-write cases measured silent. A target resolving to no symbol is a true global, also
 // measured silent. A target whose declarations all sit inside the callback is a local and is fine.
-func reportIfOuterBinding(ctx rule.Context, callback *ast.Node, target *ast.Node) {
+func reportIfOuterBinding(ruleContext rule.Context, callback *ast.Node, target *ast.Node) {
 	// The identifier test is SUBSUMED by the symbol lookup below, established rather than assumed.
 	// Measured: a mutation dropping it to `target == nil` survives the whole fixture set, and a
 	// hunt over nine assignment-target shapes chosen to reach it produced an identical verdict on
@@ -828,7 +828,7 @@ func reportIfOuterBinding(ctx rule.Context, callback *ast.Node, target *ast.Node
 	if target == nil || target.Kind != ast.KindIdentifier {
 		return
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(target)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(target)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return
 	}
@@ -840,7 +840,7 @@ func reportIfOuterBinding(ctx rule.Context, callback *ast.Node, target *ast.Node
 			return
 		}
 	}
-	ctx.ReportNode(target, messageUseMemoCallbackReassignsOuterVariable)
+	ruleContext.ReportNode(target, messageUseMemoCallbackReassignsOuterVariable)
 }
 
 // isNodeWithin reports whether a node sits inside another, by walking parents.

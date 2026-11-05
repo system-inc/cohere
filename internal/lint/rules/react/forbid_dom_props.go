@@ -222,7 +222,7 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 var ForbidDomProps = rule.Rule{
 	Name: "react/forbid-dom-props",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[ForbidDomPropsOptions](options)
 
 		// Assignment in list order reproduces upstream's map construction, so a repeated prop name
@@ -266,7 +266,7 @@ var ForbidDomProps = rule.Rule{
 
 				// Upstream reports on the whole attribute, so the span covers the name and any
 				// value together.
-				ctx.ReportNode(node, forbidDomPropsMessage(attributeName, entry.Message))
+				ruleContext.ReportNode(node, forbidDomPropsMessage(attributeName, entry.Message))
 			},
 		}
 	},

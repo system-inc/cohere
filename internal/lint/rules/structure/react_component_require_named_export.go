@@ -57,12 +57,12 @@ func messageComponentRequiresNamedExport() rule.Message {
 var ReactComponentRequireNamedExport = rule.Rule{
 	Name:       "structure/react-component-require-named-export",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || fileContext.IsSpecialNextJsFile {
 			return nil
 		}
@@ -70,7 +70,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 		// The decision is about the file rather than about any node in it, so it is made once here
 		// rather than in a listener. Returning nil listeners means the walk never enters this file
 		// on this rule's behalf, which is the cheapest a rule can be.
-		components := componentsDeclaredInFile(ctx.SourceFile.AsNode())
+		components := componentsDeclaredInFile(ruleContext.SourceFile.AsNode())
 		if len(components) == 0 {
 			return nil
 		}
@@ -83,7 +83,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 		// The first component declared, matching the original. A file with several components and no
 		// named export reports once, naming the first, because the fix is to export the one the file
 		// is about and the rest are its helpers.
-		ctx.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport())
+		ruleContext.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport())
 		return nil
 	},
 }

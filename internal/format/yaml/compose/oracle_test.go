@@ -176,9 +176,9 @@ func runOracle(test *testing.T, script string, texts []string) []string {
 	if err != nil {
 		test.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", script)
+	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
 	output, err := command.Output()
 	if err != nil {

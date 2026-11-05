@@ -197,8 +197,8 @@ var ImportRequirePathAlias = rule.Rule{
 	// The tsconfig's `paths` and the directory they resolve against, read only when
 	// aliasesFromTsconfigPaths asks for them.
 	ProgramReads: rule.ReadsCompilerOptions,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -213,9 +213,9 @@ var ImportRequirePathAlias = rule.Rule{
 		// Written first, so a written alias wins a tie with a derived one on the same directory: the
 		// sort below is stable.
 		configured := append([]PathAlias{}, settings.Aliases...)
-		if settings.AliasesFromTsconfigPaths && ctx.Program != nil {
+		if settings.AliasesFromTsconfigPaths && ruleContext.Program != nil {
 			configured = append(configured,
-				aliasesFromCompilerPaths(ctx.Program.Options(), ctx.Program.GetCurrentDirectory(), repositoryRoot)...)
+				aliasesFromCompilerPaths(ruleContext.Program.Options(), ruleContext.Program.GetCurrentDirectory(), repositoryRoot)...)
 		}
 		if len(configured) == 0 {
 			// Nothing to suggest, so nothing to report.
@@ -239,7 +239,7 @@ var ImportRequirePathAlias = rule.Rule{
 			strictRoots = append(strictRoots, normalizeConfiguredDirectory(root))
 		}
 
-		importingFile := imports.NormalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ruleContext.SourceFile)
 		importingRelative, isInsideRepository := repositoryRelative(repositoryRoot, importingFile)
 		if !isInsideRepository {
 			return nil
@@ -267,13 +267,13 @@ var ImportRequirePathAlias = rule.Rule{
 				return
 			}
 
-			specifierRange := rule.TokenRange(ctx.SourceFile, specifierNode)
-			specifierText := ctx.SourceFile.Text()[specifierRange.Pos():specifierRange.End()]
-			fix := ctx.ReplaceNode(specifierNode, quotedLike(specifierText, suggestion))
+			specifierRange := rule.TokenRange(ruleContext.SourceFile, specifierNode)
+			specifierText := ruleContext.SourceFile.Text()[specifierRange.Pos():specifierRange.End()]
+			fix := ruleContext.ReplaceNode(specifierNode, quotedLike(specifierText, suggestion))
 
 			for _, root := range strictRoots {
 				if directoryContains(root, importingRelative) {
-					ctx.ReportNodeWithFixes(specifierNode,
+					ruleContext.ReportNodeWithFixes(specifierNode,
 						messageUseAliasInStrictRoot(importPath, root, suggestion), fix)
 					return
 				}
@@ -281,7 +281,7 @@ var ImportRequirePathAlias = rule.Rule{
 
 			levels := strings.Count(importPath, "../")
 			if levels >= 2 {
-				ctx.ReportNodeWithFixes(specifierNode, messageUseAlias(importPath, levels, suggestion), fix)
+				ruleContext.ReportNodeWithFixes(specifierNode, messageUseAlias(importPath, levels, suggestion), fix)
 			}
 		}
 

@@ -53,11 +53,11 @@ var PreferPromiseRejectErrors = rule.Rule{
 	Name:             "prefer-promise-reject-errors",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declining the file once rather than once per node. `NeedsTypeChecker` governs the
 		// registration path only, and the harness builds a context by hand, so this is the guard
 		// that actually runs.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -65,12 +65,12 @@ var PreferPromiseRejectErrors = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if preferPromiseRejectErrorsIsGlobalPromiseReject(ctx, node) {
-					preferPromiseRejectErrorsCheckCall(ctx, node, settings)
+				if preferPromiseRejectErrorsIsGlobalPromiseReject(ruleContext, node) {
+					preferPromiseRejectErrorsCheckCall(ruleContext, node, settings)
 				}
 			},
 			ast.KindNewExpression: func(node *ast.Node) {
-				preferPromiseRejectErrorsCheckExecutor(ctx, node, settings)
+				preferPromiseRejectErrorsCheckExecutor(ruleContext, node, settings)
 			},
 		}
 	},
@@ -82,7 +82,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 // no-argument case, so `Promise.reject(undefined)` still reports under it. The corpus pins that
 // with a case carrying `allowEmptyReject: true` in the INVALID list.
 func preferPromiseRejectErrorsCheckCall(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	settings PreferPromiseRejectErrorsOptions,
 ) {
@@ -92,14 +92,14 @@ func preferPromiseRejectErrorsCheckCall(
 		if settings.AllowEmptyReject {
 			return
 		}
-		ctx.ReportNode(call, messagePreferPromiseRejectErrors)
+		ruleContext.ReportNode(call, messagePreferPromiseRejectErrors)
 		return
 	}
 
 	reason := arguments[0]
 	if !preferPromiseRejectErrorsCouldBeError(reason) ||
-		preferPromiseRejectErrorsIsGlobalUndefined(ctx, reason) {
-		ctx.ReportNode(call, messagePreferPromiseRejectErrors)
+		preferPromiseRejectErrorsIsGlobalUndefined(ruleContext, reason) {
+		ruleContext.ReportNode(call, messagePreferPromiseRejectErrors)
 	}
 }
 
@@ -110,13 +110,13 @@ func preferPromiseRejectErrorsCheckCall(
 // tree does not have. The checker answers the same question one identifier at a time, so the walk
 // asks `GetSymbolAtLocation` at each identifier in callee position inside the executor.
 func preferPromiseRejectErrorsCheckExecutor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings PreferPromiseRejectErrorsOptions,
 ) {
 	callee := node.Expression()
 	if callee == nil || callee.Kind != ast.KindIdentifier || callee.Text() != "Promise" ||
-		!preferPromiseRejectErrorsResolvesToTheGlobalPromise(ctx, callee) {
+		!preferPromiseRejectErrorsResolvesToTheGlobalPromise(ruleContext, callee) {
 		return
 	}
 
@@ -144,13 +144,13 @@ func preferPromiseRejectErrorsCheckExecutor(
 		return
 	}
 
-	targets := preferPromiseRejectErrorsRejectSymbols(ctx, parameters, secondName.Text())
+	targets := preferPromiseRejectErrorsRejectSymbols(ruleContext, parameters, secondName.Text())
 	if len(targets) == 0 {
 		return
 	}
 
-	preferPromiseRejectErrorsForEachCallOfSymbols(ctx, executor, targets, func(call *ast.Node) {
-		preferPromiseRejectErrorsCheckCall(ctx, call, settings)
+	preferPromiseRejectErrorsForEachCallOfSymbols(ruleContext, executor, targets, func(call *ast.Node) {
+		preferPromiseRejectErrorsCheckCall(ruleContext, call, settings)
 	})
 }
 
@@ -170,7 +170,7 @@ func preferPromiseRejectErrorsCheckExecutor(
 // This widens nothing in the ordinary case: with distinct parameter names exactly one parameter
 // matches, so the set has one element and the behavior is identical.
 func preferPromiseRejectErrorsRejectSymbols(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	parameters []*ast.Node,
 	rejectName string,
 ) map[*ast.Symbol]bool {
@@ -180,7 +180,7 @@ func preferPromiseRejectErrorsRejectSymbols(
 		if name == nil || name.Kind != ast.KindIdentifier || name.Text() != rejectName {
 			continue
 		}
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
 			targets[symbol] = true
 		}
 	}
@@ -200,7 +200,7 @@ func preferPromiseRejectErrorsRejectSymbols(
 // where an inner function parameter or an inner `const` is spelled `reject` and calling it rejects
 // nothing.
 func preferPromiseRejectErrorsForEachCallOfSymbols(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	executor *ast.Node,
 	targets map[*ast.Symbol]bool,
 	visit func(call *ast.Node),
@@ -213,7 +213,7 @@ func preferPromiseRejectErrorsForEachCallOfSymbols(
 		if ast.IsCallExpression(node) {
 			callee := preferPromiseRejectErrorsUnwrap(node.Expression())
 			if callee != nil && callee.Kind == ast.KindIdentifier &&
-				targets[ctx.TypeChecker.GetSymbolAtLocation(callee)] {
+				targets[ruleContext.TypeChecker.GetSymbolAtLocation(callee)] {
 				visit(node)
 			}
 		}
@@ -234,7 +234,7 @@ func preferPromiseRejectErrorsForEachCallOfSymbols(
 // receiver, and it accepts every spelling whose property name the syntax settles. The corpus
 // reports `Promise['reject'](5)` shapes through optional chaining and parentheses, so the property
 // name is read through the shelf rather than by matching a property access alone.
-func preferPromiseRejectErrorsIsGlobalPromiseReject(ctx rule.Context, call *ast.Node) bool {
+func preferPromiseRejectErrorsIsGlobalPromiseReject(ruleContext rule.Context, call *ast.Node) bool {
 	callee := preferPromiseRejectErrorsUnwrap(call.Expression())
 	if callee == nil {
 		return false
@@ -264,7 +264,7 @@ func preferPromiseRejectErrorsIsGlobalPromiseReject(ctx rule.Context, call *ast.
 	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "Promise" {
 		return false
 	}
-	return preferPromiseRejectErrorsResolvesToTheGlobalPromise(ctx, receiver)
+	return preferPromiseRejectErrorsResolvesToTheGlobalPromise(ruleContext, receiver)
 }
 
 // preferPromiseRejectErrorsResolvesToTheGlobalPromise asks upstream's `isGlobalReference` question
@@ -275,8 +275,8 @@ func preferPromiseRejectErrorsIsGlobalPromiseReject(ctx rule.Context, call *ast.
 // `let`, a hoisted `var`, a parameter and a block-scoped class each answer exactly one
 // non-ambient declaration. Every declaration must be ambient rather than just the first, which is
 // the index-zero trap this tree has been bitten by before.
-func preferPromiseRejectErrorsResolvesToTheGlobalPromise(ctx rule.Context, identifier *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+func preferPromiseRejectErrorsResolvesToTheGlobalPromise(ruleContext rule.Context, identifier *ast.Node) bool {
+	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferPromiseRejectErrorsIsGlobalUndefined answers whether an expression is the global
@@ -290,12 +290,12 @@ func preferPromiseRejectErrorsResolvesToTheGlobalPromise(ctx rule.Context, ident
 // `Promise.reject(undefined)`, which is upstream's own reported case.
 //
 // The corpus pins both directions: the bare form is invalid and the shadowed form is valid.
-func preferPromiseRejectErrorsIsGlobalUndefined(ctx rule.Context, expression *ast.Node) bool {
+func preferPromiseRejectErrorsIsGlobalUndefined(ruleContext rule.Context, expression *ast.Node) bool {
 	if expression == nil || expression.Kind != ast.KindIdentifier ||
 		expression.Text() != "undefined" {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
 	// No symbol, or a symbol declared nowhere in source, is the global. A shadowing binding always
 	// carries its own declaration.
 	if symbol == nil {

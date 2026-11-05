@@ -13,8 +13,8 @@ import (
 //
 // Here rather than in control_flow_graph, whose only import is the shim, so a rule can adopt the
 // graph without dragging the rule package behind it.
-func codePathRoots(ctx rule.Context, sourceFile *ast.Node) []control_flow_graph.RootSummary {
-	return rule.Cached(ctx.FileCache, "control_flow_graph.Roots", func() []control_flow_graph.RootSummary {
+func codePathRoots(ruleContext rule.Context, sourceFile *ast.Node) []control_flow_graph.RootSummary {
+	return rule.Cached(ruleContext.FileCache, "control_flow_graph.Roots", func() []control_flow_graph.RootSummary {
 		return control_flow_graph.IndexRoots(sourceFile)
 	})
 }

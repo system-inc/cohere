@@ -74,20 +74,20 @@ func reactivityByName(test *testing.T, source string) map[string]bool {
 	probe := rule.Rule{
 		Name:             "stable-hook-positions",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"type lookup below would answer empty and the test would pass vacuously")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						for _, block := range function.Blocks {
 							if block == nil {
 								continue

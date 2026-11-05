@@ -100,14 +100,14 @@ var NoUnassignedVars = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one. Reporting on a nil checker would be
 				// the worst available behavior here, since it would mean reporting every readable
 				// declaration in the file as never-assigned.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -165,7 +165,7 @@ var NoUnassignedVars = rule.Rule{
 					return
 				}
 
-				anchor := declarationAnchoredAt(ctx, name)
+				anchor := declarationAnchoredAt(ruleContext, name)
 				if anchor == nil {
 					return
 				}
@@ -194,7 +194,7 @@ var NoUnassignedVars = rule.Rule{
 					// resolve to this declaration. It is here because it is far cheaper than a
 					// checker call and this walk visits every identifier in the file.
 					if current.Kind == ast.KindIdentifier && current.Text() == name.Text() &&
-						current != name && resolvesToDeclaration(ctx, current, anchor) {
+						current != name && resolvesToDeclaration(ruleContext, current, anchor) {
 						if reference.WritesToBinding(current) {
 							// One write is enough to settle the question, and finding it stops the
 							// walk. Upstream returns on its first `is_write()` for the same reason.
@@ -215,7 +215,7 @@ var NoUnassignedVars = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, messageNoUnassignedVars)
+				ruleContext.ReportNode(name, messageNoUnassignedVars)
 			},
 		}
 	},

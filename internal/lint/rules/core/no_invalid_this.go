@@ -212,7 +212,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // for exactly this reason.
 var NoInvalidThis = rule.Rule{
 	Name: "no-invalid-this",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := noInvalidThisSettingsFrom(options)
 
 		return rule.Listeners{
@@ -220,7 +220,7 @@ var NoInvalidThis = rule.Rule{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs to know what it is INSIDE when it meets a `this`, and the listener walk is
 				// pre-order with no exit hook to pop a stack on.
-				walker := &noInvalidThisWalker{ctx: ctx, settings: settings}
+				walker := &noInvalidThisWalker{ctx: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}
@@ -376,7 +376,7 @@ func (w *noInvalidThisWalker) currentlyValid() bool {
 // The direction is worth stating because it inverts twice on the way to the report site: this returns
 // true when `this` is UNBOUND, the stack stores whether `this` is VALID, and the report fires when
 // the stack says invalid.
-func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
+func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
 	// A declared `this` parameter binds `this` by contract, and the checker enforces it at every
 	// call site. This lives in CORE, not only in the typescript-eslint extension: ESLint 10.8.1's
 	// own `isDefaultThisBinding` opens with it, and four corpus cases in upstream's TypeScript
@@ -394,7 +394,7 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 	if settings.CapIsConstructor && noInvalidThisStartsWithUpperCase(noInvalidThisFunctionOwnName(node)) {
 		return false
 	}
-	if noInvalidThisHasJSDocThisTag(ctx, node) {
+	if noInvalidThisHasJSDocThisTag(ruleContext, node) {
 		return false
 	}
 
@@ -596,14 +596,14 @@ func noInvalidThisStartsWithUpperCase(name string) bool {
 // prefix, and with NO closing word boundary, so `@thisx` satisfies it and `@nothis` does not. That
 // reads as a defect and is reproduced rather than corrected, because fidelity is to the authority
 // where upstream gives no reasoning.
-func noInvalidThisHasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
-	if ctx.SourceFile == nil {
+func noInvalidThisHasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	if noInvalidThisCommentTextHasThisTag(noInvalidThisJSDocCommentFor(ctx, node)) {
+	if noInvalidThisCommentTextHasThisTag(noInvalidThisJSDocCommentFor(ruleContext, node)) {
 		return true
 	}
-	for _, comment := range noInvalidThisCommentsImmediatelyBefore(ctx, node) {
+	for _, comment := range noInvalidThisCommentsImmediatelyBefore(ruleContext, node) {
 		if noInvalidThisCommentTextHasThisTag(comment.Text) {
 			return true
 		}
@@ -614,23 +614,23 @@ func noInvalidThisHasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
 // noInvalidThisJSDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule
 // reaches, which are a declaration and an expression. It returns the documenting comment's text, or
 // empty.
-func noInvalidThisJSDocCommentFor(ctx rule.Context, node *ast.Node) string {
+func noInvalidThisJSDocCommentFor(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindFunctionDeclaration {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJSDocBlockBefore(ruleContext, node)
 	}
 
 	parent := node.Parent
 	if parent == nil {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJSDocBlockBefore(ruleContext, node)
 	}
 	// A function handed straight to a call does not walk out. This is what separates
 	// `q(function () {...})` from `var q = function () {...}` and it is upstream's own guard.
 	if parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJSDocBlockBefore(ruleContext, node)
 	}
 
 	for parent != nil {
-		if len(noInvalidThisCommentsImmediatelyBefore(ctx, parent)) > 0 ||
+		if len(noInvalidThisCommentsImmediatelyBefore(ruleContext, parent)) > 0 ||
 			noInvalidThisIsFunctionLike(parent) ||
 			parent.Kind == ast.KindMethodDeclaration || parent.Kind == ast.KindPropertyAssignment {
 			break
@@ -638,16 +638,16 @@ func noInvalidThisJSDocCommentFor(ctx rule.Context, node *ast.Node) string {
 		parent = parent.Parent
 	}
 	if parent != nil && parent.Kind != ast.KindFunctionDeclaration && parent.Kind != ast.KindSourceFile {
-		return noInvalidThisJSDocBlockBefore(ctx, parent)
+		return noInvalidThisJSDocBlockBefore(ruleContext, parent)
 	}
-	return noInvalidThisJSDocBlockBefore(ctx, node)
+	return noInvalidThisJSDocBlockBefore(ruleContext, node)
 }
 
 // noInvalidThisJSDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the
 // node has to be a block comment whose text opens with an asterisk, and it has to end no more than
 // one line above.
-func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
-	preceding := noInvalidThisCommentsImmediatelyBefore(ctx, node)
+func noInvalidThisJSDocBlockBefore(ruleContext rule.Context, node *ast.Node) string {
+	preceding := noInvalidThisCommentsImmediatelyBefore(ruleContext, node)
 	if len(preceding) == 0 {
 		return ""
 	}
@@ -655,9 +655,9 @@ func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 	if !last.IsBlock || !strings.HasPrefix(strings.TrimPrefix(last.Text, "/*"), "*") {
 		return ""
 	}
-	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-		rule.TokenRange(ctx.SourceFile, node).Pos())
-	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, last.Range.End())
+	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+		rule.TokenRange(ruleContext.SourceFile, node).Pos())
+	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, last.Range.End())
 	if nodeLine-commentLine > 1 {
 		return ""
 	}
@@ -670,16 +670,16 @@ func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 // Other comments in the gap do not close it, which is why the span is scanned for comments rather
 // than merely tested for whitespace. Any non-comment text does close it, and that is what makes the
 // gap belong to `1` rather than to the callback in `z(/* @this */ 1, function () {})`.
-func noInvalidThisCommentsImmediatelyBefore(ctx rule.Context, node *ast.Node) []comments.Comment {
-	tokenStart := rule.TokenRange(ctx.SourceFile, node).Pos()
-	sourceText := ctx.SourceFile.Text()
+func noInvalidThisCommentsImmediatelyBefore(ruleContext rule.Context, node *ast.Node) []comments.Comment {
+	tokenStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	sourceText := ruleContext.SourceFile.Text()
 	if tokenStart > len(sourceText) {
 		return nil
 	}
 
 	found := []comments.Comment{}
 	cursor := tokenStart
-	all := comments.ForFile(ctx)
+	all := comments.ForFile(ruleContext)
 	for index := len(all) - 1; index >= 0; index-- {
 		comment := all[index]
 		if comment.Range.End() > cursor {

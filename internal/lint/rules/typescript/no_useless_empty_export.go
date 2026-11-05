@@ -89,8 +89,8 @@ var messageUselessEmptyExport = rule.Message{
 // once per extension.
 var NoUselessEmptyExport = rule.Rule{
 	Name: "@typescript-eslint/no-useless-empty-export",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -116,8 +116,8 @@ var NoUselessEmptyExport = rule.Rule{
 					return
 				}
 				for _, emptyExport := range emptyExports {
-					ctx.ReportNodeWithFixes(emptyExport, messageUselessEmptyExport,
-						ctx.RemoveNode(emptyExport))
+					ruleContext.ReportNodeWithFixes(emptyExport, messageUselessEmptyExport,
+						ruleContext.RemoveNode(emptyExport))
 				}
 			},
 		}

@@ -43,7 +43,7 @@ func messageNoInvalidateCacheInOnSuccess() rule.Message {
 // anything else in the handler depended on running at that moment.
 var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
 	Name: "structure/network-no-invalidate-cache-in-on-success",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		reportInvalidations := func(body *ast.Node) {
 			if body == nil {
 				return
@@ -54,7 +54,7 @@ var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
 					return
 				}
 				if current.Kind == ast.KindCallExpression && isServiceCacheInvalidate(current) {
-					ctx.ReportNode(current, messageNoInvalidateCacheInOnSuccess())
+					ruleContext.ReportNode(current, messageNoInvalidateCacheInOnSuccess())
 				}
 				current.ForEachChild(func(child *ast.Node) bool {
 					visit(child)

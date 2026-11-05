@@ -32,15 +32,15 @@ func lowerTypedForSSA(test *testing.T, code string) *Function {
 	probe := rule.Rule{
 		Name:             "ssa-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
 						if lowered == nil {
-							lowered = Lower(function, ctx.TypeChecker)
+							lowered = Lower(function, ruleContext.TypeChecker)
 						}
 					})
 				},

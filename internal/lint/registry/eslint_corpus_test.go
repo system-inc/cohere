@@ -352,7 +352,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 	probe := func(occurrence int) rule.Registration {
 		return rule.Registration{Rule: rule.Rule{
 			Name: "corpus-place-probe",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				seen := 0
 				return rule.Listeners{
 					ast.KindIdentifier: func(node *ast.Node) {
@@ -361,7 +361,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 						}
 						seen++
 						if seen == occurrence {
-							ctx.ReportNode(node, rule.Message{Id: "probe", Description: "One x."})
+							ruleContext.ReportNode(node, rule.Message{Id: "probe", Description: "One x."})
 						}
 					},
 				}

@@ -144,17 +144,17 @@ var NoBaseToString = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoBaseToStringOptions](options)
 		if !isSettings {
 			settings = DefaultNoBaseToStringSettings()
 		}
-		state := &noBaseToStringState{ctx: ctx, settings: settings}
+		state := &noBaseToStringState{ctx: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			// `a + b` and `a += b`, which our parser files under one kind rather than upstream's two.
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				binary := node.AsBinaryExpression()
@@ -166,28 +166,28 @@ var NoBaseToString = rule.Rule{
 					return
 				}
 
-				leftType := ctx.TypeChecker.GetTypeAtLocation(binary.Left)
-				rightType := ctx.TypeChecker.GetTypeAtLocation(binary.Right)
+				leftType := ruleContext.TypeChecker.GetTypeAtLocation(binary.Left)
+				rightType := ruleContext.TypeChecker.GetTypeAtLocation(binary.Right)
 				if leftType == nil || rightType == nil {
 					return
 				}
 
 				// Only a concatenation WITH a string coerces the other side, and upstream checks the
 				// left first, so `'' + {}` reports the right and `{} + ''` reports the left.
-				if type_checking.GetTypeName(ctx.TypeChecker, leftType) == "string" {
+				if type_checking.GetTypeName(ruleContext.TypeChecker, leftType) == "string" {
 					state.checkExpression(binary.Right, rightType)
 					return
 				}
 				if binary.Left.Kind == ast.KindPrivateIdentifier {
 					return
 				}
-				if type_checking.GetTypeName(ctx.TypeChecker, rightType) == "string" {
+				if type_checking.GetTypeName(ruleContext.TypeChecker, rightType) == "string" {
 					state.checkExpression(binary.Left, leftType)
 				}
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
@@ -222,7 +222,7 @@ var NoBaseToString = rule.Rule{
 				case "join":
 					// The constrained type, because a type parameter's constraint is what says
 					// whether the elements stringify.
-					receiverType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)
+					receiverType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)
 					if receiverType == nil {
 						return
 					}
@@ -235,7 +235,7 @@ var NoBaseToString = rule.Rule{
 			// A template literal coerces every interpolation, unless the whole thing is a tag's
 			// argument, where the tag decides what to do with the raw parts.
 			ast.KindTemplateExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression {

@@ -89,17 +89,17 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 // when there are several, and the rule cannot tell which query it is looking at.
 var ConsistencyRequirePaginationArgumentName = rule.Rule{
 	Name: "base/consistency-require-pagination-argument-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				checkPaginationDecorator(ctx, node)
+				checkPaginationDecorator(ruleContext, node)
 			},
 		}
 	},
 }
 
 // checkPaginationDecorator judges one decorator.
-func checkPaginationDecorator(ctx rule.Context, node *ast.Node) {
+func checkPaginationDecorator(ruleContext rule.Context, node *ast.Node) {
 	decorator := node.AsDecorator()
 	if decorator == nil || decorator.Expression == nil ||
 		decorator.Expression.Kind != ast.KindCallExpression {
@@ -150,7 +150,7 @@ func checkPaginationDecorator(ctx rule.Context, node *ast.Node) {
 	if name == "pagination" || paginationArgumentName.MatchString(name) {
 		return
 	}
-	ctx.ReportNode(reported, messagePaginationDecoratorInvalidName())
+	ruleContext.ReportNode(reported, messagePaginationDecoratorInvalidName())
 }
 
 // isAPaginationArgument says whether a decorated parameter is a paginator.

@@ -41,7 +41,7 @@ func messageLoadTimeImportMetaPath(name string) rule.Message {
 // constant, which is a judgment one expression cannot make.
 var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 	Name: "nexus/correctness-no-load-time-import-meta-path",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindMetaProperty: func(node *ast.Node) {
 				// The cheap structural gate first: `import.meta`, read for one of the two names.
@@ -62,7 +62,7 @@ var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 				if !correctnessNoLoadTimeImportMetaPathRunsAtLoad(access) {
 					return
 				}
-				ctx.ReportNode(access, messageLoadTimeImportMetaPath(name))
+				ruleContext.ReportNode(access, messageLoadTimeImportMetaPath(name))
 			},
 		}
 	},

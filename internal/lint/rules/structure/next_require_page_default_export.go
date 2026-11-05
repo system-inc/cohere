@@ -58,13 +58,13 @@ func messagePageDefaultExportNameSuffix() rule.Message {
 var NextRequirePageDefaultExport = rule.Rule{
 	Name:       "structure/next-require-page-default-export",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || !fileContext.IsPageFile {
 			return nil
 		}
 
-		sourceFile := ctx.SourceFile.AsNode()
+		sourceFile := ruleContext.SourceFile.AsNode()
 		hasDefaultExport := false
 
 		// Imports bind at module scope wherever they are written, so they are gathered before any
@@ -82,16 +82,16 @@ var NextRequirePageDefaultExport = rule.Rule{
 			hasDefaultExport = true
 
 			if defaultExport.separate {
-				ctx.ReportNode(statement, messagePageDefaultExportInline())
+				ruleContext.ReportNode(statement, messagePageDefaultExportInline())
 			}
 			if defaultExport.name != "" && !strings.HasSuffix(defaultExport.name, "PageRoute") {
-				ctx.ReportNode(statement, messagePageDefaultExportNameSuffix())
+				ruleContext.ReportNode(statement, messagePageDefaultExportNameSuffix())
 			}
 			return false
 		})
 
 		if !hasDefaultExport {
-			ctx.ReportNode(sourceFile, messagePageRequireDefaultExport())
+			ruleContext.ReportNode(sourceFile, messagePageRequireDefaultExport())
 		}
 
 		return nil

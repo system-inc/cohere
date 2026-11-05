@@ -88,7 +88,7 @@ var NoScriptComponentInHead = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The clause each `next/head` default import declares. A file can write more than one such
 		// import, so this is a set rather than a single anchor.
 		headImportClauses := map[*ast.Node]bool{}
@@ -111,7 +111,7 @@ var NoScriptComponentInHead = rule.Rule{
 					return
 				}
 				tagName, _ := jsx.ElementParts(element.OpeningElement)
-				if !bindsToOneOf(ctx, tagName, headImportClauses) {
+				if !bindsToOneOf(ruleContext, tagName, headImportClauses) {
 					return
 				}
 				if element.Children == nil {
@@ -120,7 +120,7 @@ var NoScriptComponentInHead = rule.Rule{
 
 				for _, child := range element.Children.Nodes {
 					if isScriptComponent(child) {
-						ctx.ReportNode(tagName, messageNoScriptComponentInHead)
+						ruleContext.ReportNode(tagName, messageNoScriptComponentInHead)
 					}
 				}
 			},
@@ -141,7 +141,7 @@ var NoScriptComponentInHead = rule.Rule{
 // so the map lookup already declines them. It is kept because the exhaustion is a property of the
 // parser rather than of this rule, and because `Text()` is reached below on the child tag where the
 // same guard is genuinely load bearing. Do not read the surviving mutant as a fixture gap.
-func bindsToOneOf(ctx rule.Context, tagName *ast.Node, clauses map[*ast.Node]bool) bool {
+func bindsToOneOf(ruleContext rule.Context, tagName *ast.Node, clauses map[*ast.Node]bool) bool {
 	if tagName == nil || tagName.Kind != ast.KindIdentifier || len(clauses) == 0 {
 		return false
 	}
@@ -150,10 +150,10 @@ func bindsToOneOf(ctx rule.Context, tagName *ast.Node, clauses map[*ast.Node]boo
 	// test harness never has one at all. Dereferencing it panicked outright rather than going
 	// silent, which takes the whole run down instead of dropping one rule's findings. Found by the
 	// fixture written to assert the silence.
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	return rule.FirstDeclarationInSet(ctx.TypeChecker.GetSymbolAtLocation(tagName), clauses)
+	return rule.FirstDeclarationInSet(ruleContext.TypeChecker.GetSymbolAtLocation(tagName), clauses)
 }
 
 // isScriptComponent reports whether a JSX child is an element whose tag is literally `Script`.

@@ -39,8 +39,8 @@ var consistencyNoLongLineCommentText = policy.MessageOf("nexus/consistency-no-lo
 // that would close the block early and change what the rest of the run means.
 var ConsistencyNoLongLineComment = rule.Rule{
 	Name: "nexus/consistency-no-long-line-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -51,15 +51,15 @@ var ConsistencyNoLongLineComment = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				sourceLines := strings.Split(ctx.SourceFile.Text(), "\n")
+				sourceLines := strings.Split(ruleContext.SourceFile.Text(), "\n")
 
 				var run []comments.Comment
 				flush := func() {
-					reportLineCommentRun(ctx, run, maximumLineCount)
+					reportLineCommentRun(ruleContext, run, maximumLineCount)
 					run = nil
 				}
 
-				for _, comment := range comments.ForFile(ctx) {
+				for _, comment := range comments.ForFile(ruleContext) {
 					if !isFoldableLineComment(comment, sourceLines) {
 						flush()
 						continue
@@ -124,7 +124,7 @@ func isConsecutiveComment(previous comments.Comment, current comments.Comment) b
 }
 
 // reportLineCommentRun reports a run that is too long, with a fix when one is safe.
-func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineCount int) {
+func reportLineCommentRun(ruleContext rule.Context, run []comments.Comment, maximumLineCount int) {
 	if len(run) <= maximumLineCount {
 		return
 	}
@@ -141,15 +141,15 @@ func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineC
 	// let a human decide how to phrase it.
 	for _, comment := range run {
 		if strings.Contains(comment.Text, "*/") {
-			ctx.ReportRange(runRange, message)
+			ruleContext.ReportRange(runRange, message)
 			return
 		}
 	}
 
-	ctx.Report(rule.Diagnostic{
+	ruleContext.Report(rule.Diagnostic{
 		Range:      runRange,
 		Message:    message,
-		SourceFile: ctx.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes:      []rule.Fix{rule.ReplaceRange(runRange, blockCommentFromRun(run))},
 	})
 }

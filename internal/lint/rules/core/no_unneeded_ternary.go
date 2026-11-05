@@ -101,21 +101,21 @@ var messageNoUnneededTernaryConditionalAssignment = rule.Message{
 // `(a || b) as any` and asserts the type of the wrong thing.
 var NoUnneededTernary = rule.Rule{
 	Name: "no-unneeded-ternary",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowDefaultAssignment := noUnneededTernaryDefaultAssignment
 		if decoded, configured := rule.OptionsAs[NoUnneededTernaryOptions](options); configured {
 			allowDefaultAssignment = decoded.resolve()
 		}
 		return rule.Listeners{
 			ast.KindConditionalExpression: func(node *ast.Node) {
-				checkNoUnneededTernary(ctx, node, allowDefaultAssignment)
+				checkNoUnneededTernary(ruleContext, node, allowDefaultAssignment)
 			},
 		}
 	},
 }
 
 // checkNoUnneededTernary judges one conditional expression.
-func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssignment bool) {
+func checkNoUnneededTernary(ruleContext rule.Context, node *ast.Node, allowDefaultAssignment bool) {
 	conditional := node.AsConditionalExpression()
 	if conditional.Condition == nil || conditional.WhenTrue == nil || conditional.WhenFalse == nil {
 		return
@@ -125,12 +125,12 @@ func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssign
 	alternate, alternateIsBoolean := noUnneededTernaryBooleanLiteralValue(conditional.WhenFalse)
 
 	if consequentIsBoolean && alternateIsBoolean {
-		reportNoUnneededTernaryBooleanBranches(ctx, node, conditional, consequent, alternate)
+		reportNoUnneededTernaryBooleanBranches(ruleContext, node, conditional, consequent, alternate)
 		return
 	}
 
 	if !allowDefaultAssignment && noUnneededTernaryMatchesDefaultAssignment(conditional) {
-		reportNoUnneededTernaryDefaultAssignment(ctx, node, conditional)
+		reportNoUnneededTernaryDefaultAssignment(ruleContext, node, conditional)
 	}
 }
 
@@ -145,35 +145,35 @@ func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssign
 //	true then false   the ternary is the test coerced to boolean, so it becomes the test itself
 //	                  when the test already produces a boolean, and `!!test` when it does not
 func reportNoUnneededTernaryBooleanBranches(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	conditional *ast.ConditionalExpression,
 	consequent bool,
 	alternate bool,
 ) {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	if consequent == alternate {
 		// `f() ? true : true` is left unrepaired: collapsing it would drop the call, and whether
 		// that call mattered is not something the rule can know. Upstream returns null here, which
 		// its corpus records as the single `output: null` case.
 		if ast.SkipParentheses(conditional.Condition).Kind != ast.KindIdentifier {
-			ctx.ReportRange(nodeRange, messageNoUnneededTernaryConditionalExpression)
+			ruleContext.ReportRange(nodeRange, messageNoUnneededTernaryConditionalExpression)
 			return
 		}
 		literal := "false"
 		if consequent {
 			literal = "true"
 		}
-		ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+		ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
 			rule.ReplaceRange(nodeRange, literal))
 		return
 	}
 
 	if alternate {
 		// `test ? false : true` is the negation of the test.
-		ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
-			rule.ReplaceRange(nodeRange, noUnneededTernaryInvert(ctx, conditional.Condition)))
+		ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+			rule.ReplaceRange(nodeRange, noUnneededTernaryInvert(ruleContext, conditional.Condition)))
 		return
 	}
 
@@ -181,22 +181,22 @@ func reportNoUnneededTernaryBooleanBranches(
 	// negation is written as a negation OF THE INVERSION rather than as `!!` plus the test, which
 	// is upstream's `!${invertExpression(node.test)}` and is what makes `!(a + b)` come out as
 	// `!!(a + b)` with the parentheses in the right place.
-	replacement := "!" + noUnneededTernaryInvert(ctx, conditional.Condition)
+	replacement := "!" + noUnneededTernaryInvert(ruleContext, conditional.Condition)
 	if noUnneededTernaryAlwaysBoolean(conditional.Condition) {
-		replacement = noUnneededTernaryParenthesizedText(ctx, conditional.Condition)
+		replacement = noUnneededTernaryParenthesizedText(ruleContext, conditional.Condition)
 	}
-	ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+	ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
 		rule.ReplaceRange(nodeRange, replacement))
 }
 
 // reportNoUnneededTernaryDefaultAssignment reports `a ? a : b` and repairs it to `a || b`.
 func reportNoUnneededTernaryDefaultAssignment(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	conditional *ast.ConditionalExpression,
 ) {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	alternateText := noUnneededTernaryParenthesizedText(ctx, conditional.WhenFalse)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	alternateText := noUnneededTernaryParenthesizedText(ruleContext, conditional.WhenFalse)
 
 	// The alternate is wrapped when it binds looser than `||`, and separately when it is a `??`,
 	// which cannot sit beside `||` without parentheses at all. Already-parenthesized alternates are
@@ -207,9 +207,9 @@ func reportNoUnneededTernaryDefaultAssignment(
 		alternateText = "(" + alternateText + ")"
 	}
 
-	replacement := noUnneededTernaryParenthesizedText(ctx, conditional.Condition) + " || " +
+	replacement := noUnneededTernaryParenthesizedText(ruleContext, conditional.Condition) + " || " +
 		alternateText
-	ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalAssignment,
+	ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalAssignment,
 		rule.ReplaceRange(nodeRange, replacement))
 }
 
@@ -312,21 +312,21 @@ func noUnneededTernaryIsCoalesce(expression *ast.Node) bool {
 // are taken by RANGE out of the file rather than rebuilt from node fields. That is what makes the
 // repair safe on TypeScript: `foo as any`, `foo!`, `f<number>()` and `<boolean>a` all survive
 // verbatim because nothing here ever looks at what they are made of.
-func noUnneededTernaryInvert(ctx rule.Context, expression *ast.Node) string {
-	text := ctx.SourceFile.Text()
+func noUnneededTernaryInvert(ruleContext rule.Context, expression *ast.Node) string {
+	text := ruleContext.SourceFile.Text()
 
 	if expression.Kind == ast.KindBinaryExpression {
 		if operator := expression.AsBinaryExpression().OperatorToken; operator != nil {
 			if inverse := noUnneededTernaryInverseOperator(operator.Kind); inverse != "" {
-				expressionRange := rule.TokenRange(ctx.SourceFile, expression)
-				operatorRange := rule.TokenRange(ctx.SourceFile, operator)
+				expressionRange := rule.TokenRange(ruleContext.SourceFile, expression)
+				operatorRange := rule.TokenRange(ruleContext.SourceFile, operator)
 				return text[expressionRange.Pos():operatorRange.Pos()] + inverse +
 					text[operatorRange.End():expressionRange.End()]
 			}
 		}
 	}
 
-	inner := noUnneededTernaryParenthesizedText(ctx, expression)
+	inner := noUnneededTernaryParenthesizedText(ruleContext, expression)
 	if noUnneededTernaryPrecedence(expression) < noUnneededTernaryUnaryPrecedence {
 		return "!(" + inner + ")"
 	}
@@ -409,7 +409,7 @@ func noUnneededTernaryInverseOperator(kind ast.Kind) string {
 //
 // Taken by range rather than reconstructed, which is the whole reason this fixer does not lose type
 // syntax.
-func noUnneededTernaryParenthesizedText(ctx rule.Context, expression *ast.Node) string {
-	expressionRange := rule.TokenRange(ctx.SourceFile, expression)
-	return ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+func noUnneededTernaryParenthesizedText(ruleContext rule.Context, expression *ast.Node) string {
+	expressionRange := rule.TokenRange(ruleContext.SourceFile, expression)
+	return ruleContext.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
 }

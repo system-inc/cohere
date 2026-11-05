@@ -32,16 +32,16 @@ func messageForbiddenOutsideImport() rule.Message {
 // nexus or to invert the dependency, and neither is a text edit.
 var BoundaryNoNexusOutsideImport = rule.Rule{
 	Name: "nexus/boundary-no-nexus-outside-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The whole rule is a question about where the file lives, so a file outside nexus declines
 		// before a single node is visited. This is the cheapest a rule gets.
-		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), "/libraries/nexus/") {
+		if !strings.Contains(imports.NormalizedFileName(ruleContext.SourceFile), "/libraries/nexus/") {
 			return nil
 		}
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isOutsideNexusAlias(source) {
-				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport())
+				ruleContext.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport())
 			}
 		})
 	},

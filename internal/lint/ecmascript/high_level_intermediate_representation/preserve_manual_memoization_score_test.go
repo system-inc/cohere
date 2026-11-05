@@ -542,20 +542,20 @@ func findingsForSource(test *testing.T, source string) ([]PreserveManualMemoizat
 	probe := rule.Rule{
 		Name:             "preserve-manual-memoization-score",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						lowered = true
-						all = append(all, pipelineFindings(function, ctx.TypeChecker)...)
+						all = append(all, pipelineFindings(function, ruleContext.TypeChecker)...)
 					})
 				},
 			}

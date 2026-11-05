@@ -60,12 +60,12 @@ var NominalClass = rule.Rule{
 	Name:             "adamic/nominal-class",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
-		walker := flow.WalkerFor(ctx)
+		typeChecker := ruleContext.TypeChecker
+		walker := flow.WalkerFor(ruleContext)
 		// The judge and the message it picks are made once per file and set at each site, not a closure per
 		// site (#m6tyg79).
 		var handle policy.MessageHandle
@@ -102,10 +102,10 @@ var NominalClass = rule.Rule{
 			if !wrong {
 				return
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: handle.Id,
 				Description: handle.Render(map[string]string{
-					"slot":   slotText(ctx.SourceFile, site.Node, found.Path),
+					"slot":   slotText(ruleContext.SourceFile, site.Node, found.Path),
 					"source": typeChecker.TypeToString(found.Source),
 					"target": typeChecker.TypeToString(found.Target),
 				}),

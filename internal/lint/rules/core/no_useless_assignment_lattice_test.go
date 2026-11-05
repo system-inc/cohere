@@ -109,14 +109,14 @@ func TestDeadStoreBitsetSolvesAsTheMapDid(test *testing.T) {
 		"  return later() + total;\n" +
 		"}\n"
 	solved := 0
-	probe := rule.Rule{Name: "dead-store-bitset", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "dead-store-bitset", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			symbols, occupied := collectSymbolFacts(ctx, node)
-			for _, root := range codePathRoots(ctx, node) {
+			symbols, occupied := collectSymbolFacts(ruleContext, node)
+			for _, root := range codePathRoots(ruleContext, node) {
 				if !occupied[root.Node] {
 					continue
 				}
-				graph := deadStoreGraph(ctx, root.Node, symbols)
+				graph := deadStoreGraph(ruleContext, root.Node, symbols)
 				numbers := map[*ast.Symbol]int{}
 				for _, block := range graph.Blocks {
 					for index := range block.Events {

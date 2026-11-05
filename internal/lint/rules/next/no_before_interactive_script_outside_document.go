@@ -151,8 +151,8 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 	// on no files while its own tests stay green.
 	Name: "@next/next/no-before-interactive-script-outside-document",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileName := ctx.SourceFile.FileName()
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		fileName := ruleContext.SourceFile.FileName()
 
 		// Hoisted, unlike upstream, which asks this at every opening element. Same answer, asked
 		// once. Returning no listeners is this tree's spelling of upstream's `should_run`.
@@ -160,7 +160,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 			return nil
 		}
 
-		scriptLocalName, imported := localNameOfFirstNextScriptImport(ctx.SourceFile)
+		scriptLocalName, imported := localNameOfFirstNextScriptImport(ruleContext.SourceFile)
 		if !imported {
 			// Nothing in this file can be the framework's script component, so nothing can report.
 			// Upstream reaches the same conclusion later, after the strategy match, because its
@@ -182,7 +182,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 			if nextjs.IsDocumentPage(fileName.AsString()) {
 				return
 			}
-			ctx.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)
+			ruleContext.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)
 		}
 
 		return rule.Listeners{

@@ -82,9 +82,9 @@ var NoUnnecessaryQualifier = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		walkOutermost := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
@@ -120,7 +120,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 					// (`A.(B)` is not a type), so there is nothing to unwrap on the left. The
 					// parenthesized TYPE case `const x: (A.T) = 3` puts the parens around the
 					// whole type reference, above this node, and reaches here unwrapped.
-					if unnecessaryQualifierReport(ctx, namespacesInScope,
+					if unnecessaryQualifierReport(ruleContext, namespacesInScope,
 						qualifiedName.Left, qualifiedName.Right) {
 						// Reported: upstream suppresses everything inside this node, and so
 						// does declining to recurse. See the doc comment.
@@ -153,7 +153,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 					if name == nil {
 						break
 					}
-					if unnecessaryQualifierReport(ctx, namespacesInScope, qualifier, name) {
+					if unnecessaryQualifierReport(ruleContext, namespacesInScope, qualifier, name) {
 						return
 					}
 				}
@@ -177,17 +177,17 @@ var NoUnnecessaryQualifier = rule.Rule{
 //
 // Returns whether it reported, which is what drives the subtree suppression at the call site.
 func unnecessaryQualifierReport(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	namespacesInScope []*ast.Node,
 	qualifier *ast.Node,
 	name *ast.Node,
 ) bool {
-	namespaceSymbol := ctx.TypeChecker.GetSymbolAtLocation(qualifier)
-	if namespaceSymbol == nil || !qualifierSymbolIsNamespaceInScope(ctx, namespacesInScope, namespaceSymbol) {
+	namespaceSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(qualifier)
+	if namespaceSymbol == nil || !qualifierSymbolIsNamespaceInScope(ruleContext, namespacesInScope, namespaceSymbol) {
 		return false
 	}
 
-	accessedSymbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	accessedSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if accessedSymbol == nil {
 		return false
 	}
@@ -195,7 +195,7 @@ func unnecessaryQualifierReport(
 	// The scope lookup is anchored at the QUALIFIER rather than at the name, which is upstream's
 	// choice and is load-bearing: asking at the name would ask what is visible after the dot, which
 	// is the namespace's own member table and would answer yes for every qualifier.
-	scopeSymbols := ctx.TypeChecker.GetSymbolsInScope(qualifier, accessedSymbol.Flags)
+	scopeSymbols := ruleContext.TypeChecker.GetSymbolsInScope(qualifier, accessedSymbol.Flags)
 	var fromScope *ast.Symbol
 	for _, scopeSymbol := range scopeSymbols {
 		if scopeSymbol.Name == name.Text() {
@@ -211,7 +211,7 @@ func unnecessaryQualifierReport(
 	// with the local one while the access resolves to the exported one. Comparing them directly
 	// would answer false on every real finding. Comparing without this normalization also loses the
 	// shadowing case in the other direction, so the call is doing two jobs.
-	if ctx.TypeChecker.GetExportSymbolOfSymbol(fromScope) != accessedSymbol {
+	if ruleContext.TypeChecker.GetExportSymbolOfSymbol(fromScope) != accessedSymbol {
 		return false
 	}
 
@@ -239,15 +239,15 @@ func unnecessaryQualifierReport(
 	// for it is positional rather than a paren count: if an open parenthesis lies between the
 	// qualifier's start and the enclosing expression's start, its partner is outside the removal.
 	removal := core.NewTextRange(
-		rule.TokenRange(ctx.SourceFile, qualifier).Pos(),
-		rule.TokenRange(ctx.SourceFile, name).Pos(),
+		rule.TokenRange(ruleContext.SourceFile, qualifier).Pos(),
+		rule.TokenRange(ruleContext.SourceFile, name).Pos(),
 	)
 	if qualifierRemovalWouldStrandAParenthesis(qualifier) {
-		ctx.ReportNode(qualifier, message)
+		ruleContext.ReportNode(qualifier, message)
 		return true
 	}
 
-	ctx.ReportNodeWithFixes(qualifier, message, rule.RemoveRange(removal))
+	ruleContext.ReportNodeWithFixes(qualifier, message, rule.RemoveRange(removal))
 	return true
 }
 
@@ -261,7 +261,7 @@ func unnecessaryQualifierReport(
 // The recursion is upstream's and terminates because an alias chain is finite and the checker
 // resolves it to a non-alias.
 func qualifierSymbolIsNamespaceInScope(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	namespacesInScope []*ast.Node,
 	symbol *ast.Symbol,
 ) bool {
@@ -274,11 +274,11 @@ func qualifierSymbolIsNamespaceInScope(
 	if symbol.Flags&ast.SymbolFlagsAlias == 0 {
 		return false
 	}
-	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
+	aliased := ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 	if aliased == nil || aliased == symbol {
 		return false
 	}
-	return qualifierSymbolIsNamespaceInScope(ctx, namespacesInScope, aliased)
+	return qualifierSymbolIsNamespaceInScope(ruleContext, namespacesInScope, aliased)
 }
 
 // isEntityNameExpressionForQualifier is upstream's `isEntityNameExpression`: an identifier, or a

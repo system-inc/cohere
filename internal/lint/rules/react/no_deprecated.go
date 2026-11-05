@@ -126,11 +126,11 @@ var NoDeprecated = rule.Rule{
 	// namespace on a `/` boundary, so `react-no-deprecated` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
 	Name: "react/no-deprecated",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The pragma is read once per file rather than per node, because it is a property of the
 		// file's comments and cannot change between two nodes in it. It also has to be read before
 		// the first node is judged, which is why the table is built here and not lazily.
-		pragma := reactPragmaFor(ctx)
+		pragma := reactPragmaFor(ruleContext)
 		deprecations := defaultPragmaDeprecations
 		if pragma != defaultPragma {
 			deprecations = deprecationsForPragma(pragma)
@@ -141,10 +141,10 @@ var NoDeprecated = rule.Rule{
 			if !deprecated {
 				return
 			}
-			ctx.Report(rule.Diagnostic{
-				Range:      rule.TokenRange(ctx.SourceFile, node),
+			ruleContext.Report(rule.Diagnostic{
+				Range:      rule.TokenRange(ruleContext.SourceFile, node),
 				Message:    rule.Message{Id: noDeprecatedMessageId, Description: entry.describe(name)},
-				SourceFile: ctx.SourceFile,
+				SourceFile: ruleContext.SourceFile,
 			})
 		}
 
@@ -152,7 +152,7 @@ var NoDeprecated = rule.Rule{
 			// Every property access, not only the outermost. `React.PropTypes.component` reports
 			// twice upstream and the inner finding is only reachable by visiting the inner node.
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				report(node, sourceSliceOf(ctx, node))
+				report(node, sourceSliceOf(ruleContext, node))
 			},
 
 			ast.KindImportDeclaration: func(node *ast.Node) {
@@ -359,8 +359,8 @@ var moduleNamesByIdentifier = map[string]string{
 // `comments.ForFile` is the shelf's cached per-file scan. Reaching for the scanner directly would
 // duplicate a derivation three other rules already share, which is the cost this shelf exists to
 // avoid.
-func reactPragmaFor(ctx rule.Context) string {
-	for _, comment := range comments.ForFile(ctx) {
+func reactPragmaFor(ruleContext rule.Context) string {
+	for _, comment := range comments.ForFile(ruleContext) {
 		candidate, found := jsxAnnotationIn(commentValueOf(comment))
 		if !found {
 			continue
@@ -462,9 +462,9 @@ func isJavaScriptIdentifier(name string) bool {
 // anchored rather than at the node's leading trivia. That matters for a member expression whose
 // receiver carries a comment: the trivia belongs to the receiver rather than to the member, and
 // including it would make the key unmatchable for a reason upstream does not have.
-func sourceSliceOf(ctx rule.Context, node *ast.Node) string {
-	textRange := rule.TokenRange(ctx.SourceFile, node)
-	text := ctx.SourceFile.Text()
+func sourceSliceOf(ruleContext rule.Context, node *ast.Node) string {
+	textRange := rule.TokenRange(ruleContext.SourceFile, node)
+	text := ruleContext.SourceFile.Text()
 	start, end := textRange.Pos(), textRange.End()
 	if start < 0 || end > len(text) || start > end {
 		return ""

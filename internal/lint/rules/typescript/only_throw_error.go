@@ -191,7 +191,7 @@ var OnlyThrowError = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
@@ -203,7 +203,7 @@ var OnlyThrowError = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -253,16 +253,16 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if allowRethrowing && onlyThrowErrorIsRethrown(ctx, subject) {
+				if allowRethrowing && onlyThrowErrorIsRethrown(ruleContext, subject) {
 					return
 				}
 
-				argumentType := ctx.TypeChecker.GetTypeAtLocation(subject)
+				argumentType := ruleContext.TypeChecker.GetTypeAtLocation(subject)
 				if argumentType == nil {
 					return
 				}
 
-				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ruleContext.Program) {
 					return
 				}
 
@@ -270,7 +270,7 @@ var OnlyThrowError = rule.Rule{
 				// sits above the any/unknown escapes on purpose: `throw undefined` reports even
 				// with every default still permissive.
 				if type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsUndefined) {
-					ctx.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
+					ruleContext.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
 					return
 				}
 
@@ -282,11 +282,11 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+				if type_checking.IsErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 					return
 				}
 
-				ctx.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
+				ruleContext.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
 			},
 		}
 	},
@@ -297,12 +297,12 @@ var OnlyThrowError = rule.Rule{
 // Two shapes count, and they are the two upstream names: a catch clause binding, and the rejection
 // handler parameter of a `.catch`/`.then` on something thenable. Anything that is not a bare
 // identifier is not a rethrow, which is what keeps `throw 'literal'` reportable.
-func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
+func onlyThrowErrorIsRethrown(ruleContext rule.Context, node *ast.Node) bool {
 	if !ast.IsIdentifier(node) {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return false
 	}
@@ -357,7 +357,7 @@ func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
 
 	// The name alone is not enough: any object can have a method called `catch`. Upstream tests the
 	// receiver's type, and a plain `{ catch(cb) {} }` object reports.
-	return type_checking.IsThenableType(ctx.TypeChecker, receiver, nil)
+	return type_checking.IsThenableType(ruleContext.TypeChecker, receiver, nil)
 }
 
 // onlyThrowErrorParsePromiseHandlingCall reads a syntactically possible `.catch`/`.then` call,

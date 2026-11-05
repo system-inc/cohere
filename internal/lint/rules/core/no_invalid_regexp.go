@@ -129,7 +129,7 @@ var NoInvalidRegexp = rule.Rule{
 	// Whether `RegExp` is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowedFlags := allowedConstructorFlags(options)
 
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
@@ -140,7 +140,7 @@ var NoInvalidRegexp = rule.Rule{
 			if callee.AsIdentifier().Text != "RegExp" {
 				return
 			}
-			if ctx.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(callee)) {
+			if ruleContext.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(callee)) {
 				return
 			}
 			// `RegExp()` with no arguments produces the empty pattern and cannot fail.
@@ -164,7 +164,7 @@ var NoInvalidRegexp = rule.Rule{
 
 			if flags != nil {
 				if message := invalidFlagsMessage(*flags, allowedFlags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 					return
 				}
 			}
@@ -181,7 +181,7 @@ var NoInvalidRegexp = rule.Rule{
 					return
 				}
 				if message := invalidPatternMessage(pattern, *flags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 				}
 				return
 			}
@@ -192,7 +192,7 @@ var NoInvalidRegexp = rule.Rule{
 			withUnicode := invalidPatternMessage(pattern, "u")
 			withNeither := invalidPatternMessage(pattern, "")
 			if withUnicode != "" && withNeither != "" {
-				ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
+				ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
 			}
 		}
 

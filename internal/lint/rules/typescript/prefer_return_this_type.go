@@ -143,7 +143,7 @@ var PreferReturnThisType = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// checkFunction is upstream's `checkFunction`: the class must have a name, the function must
 		// carry a return type, that return type must mention the class name, and the function must
 		// really return only `this`.
@@ -166,12 +166,12 @@ var PreferReturnThisType = rule.Rule{
 				return
 			}
 
-			if !functionReturnsOnlyThis(ctx, function, class) {
+			if !functionReturnsOnlyThis(ruleContext, function, class) {
 				return
 			}
 
-			ctx.ReportNodeWithFixes(matched, buildUseThisTypeMessage(),
-				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, matched), "this"))
+			ruleContext.ReportNodeWithFixes(matched, buildUseThisTypeMessage(),
+				rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, matched), "this"))
 		}
 
 		// checkProperty is upstream's `checkProperty`: a class property whose initializer is a
@@ -200,7 +200,7 @@ var PreferReturnThisType = rule.Rule{
 		// that containment without asking each member who its parent is, and it means an object
 		// literal method, which is a different node kind anyway, can never arrive here.
 		visitClass := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -231,7 +231,7 @@ var PreferReturnThisType = rule.Rule{
 // Three gates in upstream's order: an explicit `this` parameter disqualifies outright, a function
 // with no body cannot be judged, and then the body is read either as a single expression or as a
 // set of return statements.
-func functionReturnsOnlyThis(ctx rule.Context, function *ast.Node, class *ast.Node) bool {
+func functionReturnsOnlyThis(ruleContext rule.Context, function *ast.Node, class *ast.Node) bool {
 	// `f(this: Foo): Foo` pins the receiver type explicitly, so the author has already said what
 	// they mean and the rule declines. Upstream tests only the FIRST parameter, because that is the
 	// only position the grammar allows a `this` parameter in.
@@ -250,7 +250,7 @@ func functionReturnsOnlyThis(ctx rule.Context, function *ast.Node, class *ast.No
 
 	// The class's own type, and the `this` type that belongs to it. `GetTypeAtLocation` on a class
 	// declaration answers the instance type, which is the InterfaceType carrying `thisType`.
-	classType := ctx.TypeChecker.GetTypeAtLocation(class)
+	classType := ruleContext.TypeChecker.GetTypeAtLocation(class)
 	if classType == nil {
 		return false
 	}
@@ -262,7 +262,7 @@ func functionReturnsOnlyThis(ctx rule.Context, function *ast.Node, class *ast.No
 	// The parentheses unwrap belongs here rather than at the report site: `(): Foo => (this)` gives
 	// us a parenthesized expression where upstream's parser gives the `this` keyword.
 	if body.Kind != ast.KindBlock {
-		bodyType := ctx.TypeChecker.GetTypeAtLocation(skipParenthesesSafely(body))
+		bodyType := ruleContext.TypeChecker.GetTypeAtLocation(skipParenthesesSafely(body))
 		return bodyType != nil && classThisType != nil && classThisType == bodyType
 	}
 
@@ -299,7 +299,7 @@ func functionReturnsOnlyThis(ctx rule.Context, function *ast.Node, class *ast.No
 			return false
 		}
 
-		expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+		expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 		if expressionType == nil {
 			return false
 		}

@@ -60,7 +60,7 @@ func messageNoArrayWithStringLiteralInvalidateCache() rule.Message {
 // means creating a binding in another file.
 var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
 	Name: "structure/network-no-invalidate-cache-literal-key",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -78,10 +78,10 @@ var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
 
 				switch firstArgument.Kind {
 				case ast.KindStringLiteral:
-					ctx.ReportNode(firstArgument, messageNoStringLiteralInvalidateCache())
+					ruleContext.ReportNode(firstArgument, messageNoStringLiteralInvalidateCache())
 
 				case ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
-					ctx.ReportNode(firstArgument, messageNoTemplateLiteralInvalidateCache())
+					ruleContext.ReportNode(firstArgument, messageNoTemplateLiteralInvalidateCache())
 
 				case ast.KindArrayLiteralExpression:
 					// Reported per element, so an array of five keys with one literal among them
@@ -89,9 +89,9 @@ var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
 					for _, element := range firstArgument.AsArrayLiteralExpression().Elements.Nodes {
 						switch ast.SkipParentheses(element).Kind {
 						case ast.KindStringLiteral:
-							ctx.ReportNode(element, messageNoArrayWithStringLiteralInvalidateCache())
+							ruleContext.ReportNode(element, messageNoArrayWithStringLiteralInvalidateCache())
 						case ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
-							ctx.ReportNode(element, messageNoTemplateLiteralInvalidateCache())
+							ruleContext.ReportNode(element, messageNoTemplateLiteralInvalidateCache())
 						}
 					}
 				}

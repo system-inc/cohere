@@ -102,8 +102,8 @@ func messageDefaultHasNoType(name string) rule.Message {
 // this tree the annotation arm is the piece to add.
 var DefaultPropsMatchPropTypes = rule.Rule{
 	Name: "react/default-props-match-prop-types",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -114,7 +114,7 @@ var DefaultPropsMatchPropTypes = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkDefaultPropsAgainstPropTypes(ctx, node, settings)
+				checkDefaultPropsAgainstPropTypes(ruleContext, node, settings)
 			},
 		}
 	},
@@ -161,7 +161,7 @@ type componentPropDeclarations struct {
 // component's propTypes from satisfying the first component's defaults, and it costs nothing that a
 // detected-component walk would have bought.
 func checkDefaultPropsAgainstPropTypes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	settings DefaultPropsMatchPropTypesOptions,
 ) {
@@ -263,7 +263,7 @@ func checkDefaultPropsAgainstPropTypes(
 	// Reported in declaration order rather than map order, so two components in one file report
 	// deterministically. A map walk here would make the finding order depend on Go's randomisation.
 	for _, owner := range order {
-		reportMismatchedDefaults(ctx, byOwner[owner], settings)
+		reportMismatchedDefaults(ruleContext, byOwner[owner], settings)
 	}
 }
 
@@ -399,7 +399,7 @@ func readDefaultPropsObject(declarations *componentPropDeclarations, value *ast.
 
 // reportMismatchedDefaults applies the two arms to one component.
 func reportMismatchedDefaults(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	declarations *componentPropDeclarations,
 	settings DefaultPropsMatchPropTypesOptions,
 ) {
@@ -423,10 +423,10 @@ func reportMismatchedDefaults(
 			continue
 		}
 		if isDeclared {
-			ctx.ReportNode(defaultProp.node, messageRequiredHasDefault(defaultProp.name))
+			ruleContext.ReportNode(defaultProp.node, messageRequiredHasDefault(defaultProp.name))
 			continue
 		}
-		ctx.ReportNode(defaultProp.node, messageDefaultHasNoType(defaultProp.name))
+		ruleContext.ReportNode(defaultProp.node, messageDefaultHasNoType(defaultProp.name))
 	}
 }
 

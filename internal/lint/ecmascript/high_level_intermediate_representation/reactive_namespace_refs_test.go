@@ -110,20 +110,20 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 			probe := rule.Rule{
 				Name:             "namespace-ref-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ctx rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
-							if ctx.TypeChecker == nil {
+							if ruleContext.TypeChecker == nil {
 								test.Fatal("the fixture requires a type checker")
 							}
 							forEachFunctionLike(node, func(functionNode *ast.Node) {
-								function := Lower(functionNode, ctx.TypeChecker)
+								function := Lower(functionNode, ruleContext.TypeChecker)
 								if function == nil {
 									test.Fatal("the fixture did not lower")
 								}
 								visited++
 								Construct(function)
-								findings += len(AnalyzePreservedManualMemoization(function, ctx.TypeChecker))
+								findings += len(AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker))
 								for _, instruction := range function.Instructions {
 									if _, isMarker := instruction.Value.(*StartMemoize); isMarker {
 										markers++

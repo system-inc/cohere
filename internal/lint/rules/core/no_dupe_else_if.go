@@ -39,7 +39,7 @@ var messageUnexpectedDuplicateElseIf = rule.Message{
 // if-else-if chain long enough to matter is a defect this rule is not the one to report.
 var NoDupeElseIf = rule.Rule{
 	Name: "no-dupe-else-if",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				test := node.AsIfStatement().Expression
@@ -92,7 +92,7 @@ var NoDupeElseIf = rule.Rule{
 					for conditionIndex, groups := range remaining {
 						kept := groups[:0]
 						for _, group := range groups {
-							if !anyGroupIsSubsetOf(ctx.SourceFile, earlierGroups, group) {
+							if !anyGroupIsSubsetOf(ruleContext.SourceFile, earlierGroups, group) {
 								kept = append(kept, group)
 							}
 						}
@@ -102,7 +102,7 @@ var NoDupeElseIf = rule.Rule{
 					// A condition with nothing left is fully covered, so this branch is dead.
 					for _, groups := range remaining {
 						if len(groups) == 0 {
-							ctx.ReportNode(test, messageUnexpectedDuplicateElseIf)
+							ruleContext.ReportNode(test, messageUnexpectedDuplicateElseIf)
 							return
 						}
 					}

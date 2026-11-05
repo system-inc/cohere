@@ -168,7 +168,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
@@ -183,19 +183,19 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if settings.AllowEmptyReject {
 					return
 				}
-				ctx.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
+				ruleContext.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
 				return
 			}
 
 			// Upstream reads `arguments.at(0)` with no kind test, so a SPREAD element is type-checked
 			// like any other argument. Measured: `Promise.reject(...args)` reports.
 			argument := arguments[0]
-			argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+			argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 			if argumentType == nil {
 				return
 			}
 
-			if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+			if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ruleContext.Program) {
 				return
 			}
 			if settings.AllowThrowingAny && type_checking.IsTypeAnyType(argumentType) {
@@ -204,22 +204,22 @@ var PreferPromiseRejectErrors = rule.Rule{
 			if settings.AllowThrowingUnknown && type_checking.IsTypeUnknownType(argumentType) {
 				return
 			}
-			if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 				return
 			}
 			// A readonly Error-like is a separate predicate upstream and not subsumed by the one
 			// above: `Readonly<Error>` is not assignable through the same path.
-			if type_checking.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsReadonlyErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 				return
 			}
 
-			ctx.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
+			ruleContext.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
 		}
 
 		return rule.Listeners{
 			// The static form: Promise.reject(x)
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -235,12 +235,12 @@ var PreferPromiseRejectErrors = rule.Rule{
 
 				// The NAME alone is not enough: any object can have a `reject` method. Measured, a
 				// plain object literal with one is clean upstream.
-				receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
+				receiverType := ruleContext.TypeChecker.GetTypeAtLocation(receiver)
 				if receiverType == nil {
 					return
 				}
-				if !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, receiverType) &&
-					!type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, receiverType) {
+				if !type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, receiverType) &&
+					!type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, receiverType) {
 					return
 				}
 
@@ -249,7 +249,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 
 			// The executor form: new Promise((resolve, reject) => reject(x))
 			ast.KindNewExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -257,8 +257,8 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if callee == nil {
 					return
 				}
-				calleeType := ctx.TypeChecker.GetTypeAtLocation(callee)
-				if calleeType == nil || !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, calleeType) {
+				calleeType := ruleContext.TypeChecker.GetTypeAtLocation(callee)
+				if calleeType == nil || !type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, calleeType) {
 					return
 				}
 
@@ -328,14 +328,14 @@ var PreferPromiseRejectErrors = rule.Rule{
 				// So: this input is silent here and reports upstream, deliberately. The test file
 				// pins it as silent with the reasoning at the line, so it fails loudly if the
 				// checker ever starts merging.
-				rejectSymbol := ctx.TypeChecker.GetSymbolAtLocation(rejectName)
+				rejectSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(rejectName)
 				if rejectSymbol == nil {
 					return
 				}
 
 				// The scan reaches into nested functions, because a reject called from a closure
 				// inside the executor still rejects this promise. Measured reporting upstream.
-				preferPromiseRejectErrorsForEachCallOfSymbol(ctx, executor, rejectSymbol, checkRejectCall)
+				preferPromiseRejectErrorsForEachCallOfSymbol(ruleContext, executor, rejectSymbol, checkRejectCall)
 			},
 		}
 	},
@@ -397,7 +397,7 @@ func preferPromiseRejectErrorsIsFunction(node *ast.Node) bool {
 //   - It only considers an identifier in CALLEE position. Passing reject somewhere as a value is not
 //     a rejection, and upstream is silent on it.
 func preferPromiseRejectErrorsForEachCallOfSymbol(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	root *ast.Node,
 	target *ast.Symbol,
 	visit func(call *ast.Node),
@@ -427,7 +427,7 @@ func preferPromiseRejectErrorsForEachCallOfSymbol(
 			if callee != nil && ast.IsIdentifier(callee) {
 				// Symbol identity rather than name equality: this is what declines a shadowing
 				// inner parameter that happens to be spelled the same.
-				if ctx.TypeChecker.GetSymbolAtLocation(callee) == target {
+				if ruleContext.TypeChecker.GetSymbolAtLocation(callee) == target {
 					visit(node)
 				}
 			}

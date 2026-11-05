@@ -151,27 +151,27 @@ var Immutability = rule.Rule{
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Taken at the file level for the reason static_components.go and refs.go both give:
 			// lowering already descends into nested functions through the function arena, so
 			// listening per function kind would lower every inner function twice, once as a child
 			// and once standalone with no enclosing context.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				immutabilityForEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					immutabilityAnalyzeCompilationUnit(ctx, lowered, functionNode)
+					immutabilityAnalyzeCompilationUnit(ruleContext, lowered, functionNode)
 				})
 			},
 		}
@@ -204,23 +204,23 @@ func immutabilityForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) 
 //
 // A function that is not a compilation unit is walked past into the functions it contains, because
 // one of those may be a unit even when its wrapper is not.
-func immutabilityAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermediate_representation.Function, node *ast.Node) {
+func immutabilityAnalyzeCompilationUnit(ruleContext rule.Context, function *high_level_intermediate_representation.Function, node *ast.Node) {
 	if function == nil {
 		return
 	}
 	if !immutabilityIsCompilationUnit(function, node) {
 		for index, nested := range function.Functions {
 			_ = index
-			immutabilityAnalyzeCompilationUnit(ctx, nested, nested.Node)
+			immutabilityAnalyzeCompilationUnit(ruleContext, nested, nested.Node)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	for _, finding := range immutabilitySweepFunction(ctx, function) {
-		immutabilityReport(ctx, function, finding)
+	for _, finding := range immutabilitySweepFunction(ruleContext, function) {
+		immutabilityReport(ruleContext, function, finding)
 	}
 }
 
@@ -723,7 +723,7 @@ func (state *immutabilityState) nameOf(function *high_level_intermediate_represe
 // early return, which is sound there because its diagnostics are per-function. Here upstream keeps
 // analysing and reports every distinct mutation, and the imported corpus contains functions with
 // two and three findings, so returning early would drop them.
-func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) []immutabilityFinding {
+func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_intermediate_representation.Function) []immutabilityFinding {
 	state := newImmutabilityState()
 	immutabilityCollectAliases(function, state)
 
@@ -764,7 +764,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermedia
 			state.values[id] = value
 		}
 		state.changed = false
-		findings = immutabilityRunOneRound(ctx, function, state)
+		findings = immutabilityRunOneRound(ruleContext, function, state)
 		// Accumulate into the entry state ONLY what was frozen at a point that can reach the back
 		// edge, which is what `state.frozenInsideLoop` records.
 		//
@@ -877,7 +877,7 @@ func immutabilityCollectAliases(function *high_level_intermediate_representation
 // control that reports. A hook building a value and returning it is what hooks are for; the freeze
 // that matters is the one the CALLER applies when it receives the value, and that is already
 // modelled at the call site by `immutabilityHookResultKind`.
-func immutabilityRunOneRound(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState) []immutabilityFinding {
+func immutabilityRunOneRound(ruleContext rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState) []immutabilityFinding {
 	var findings []immutabilityFinding
 	order := 0
 
@@ -947,7 +947,7 @@ func immutabilityRunOneRound(ctx rule.Context, function *high_level_intermediate
 				state.setKind(phi.Place.Identifier, merged)
 			}
 		}
-		findings = immutabilityTransfer(ctx, function, state, instruction, findings, &order)
+		findings = immutabilityTransfer(ruleContext, function, state, instruction, findings, &order)
 	}
 
 	return findings
@@ -999,7 +999,7 @@ func immutabilityDeduplicate(findings []immutabilityFinding) []immutabilityFindi
 // silence is the safe direction for a mutation rule and toward reporting is the safe direction for
 // an access rule, which is why the two neighbours differ.
 func immutabilityTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1041,16 +1041,16 @@ func immutabilityTransfer(
 	// --- Writing ----------------------------------------------------------
 
 	case *high_level_intermediate_representation.PropertyStore:
-		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
+		findings = immutabilityCheckWrite(ruleContext, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
 	case *high_level_intermediate_representation.ComputedStore:
-		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
+		findings = immutabilityCheckWrite(ruleContext, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
 	case *high_level_intermediate_representation.PropertyDelete:
-		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
+		findings = immutabilityCheckWrite(ruleContext, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
 	case *high_level_intermediate_representation.ComputedDelete:
-		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
+		findings = immutabilityCheckWrite(ruleContext, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
 	// `props.count++` and `props.count += 1` are deliberately NOT handled here, and the reason is a
 	// property of the lowering rather than of React. Dumping the representation for `props.count++`
@@ -1120,13 +1120,13 @@ func immutabilityTransfer(
 	// the VALUE, so the finding lands where the function is handed to React rather than at the
 	// reassignment. That is what makes the two reassignment diagnostics point where they do.
 	case *high_level_intermediate_representation.FunctionExpression:
-		findings = immutabilityNestedFunctionTransfer(ctx, function, state, value, target, findings, order)
+		findings = immutabilityNestedFunctionTransfer(ruleContext, function, state, value, target, findings, order)
 
 	case *high_level_intermediate_representation.CallExpression:
-		findings = immutabilityCallTransfer(ctx, function, state, instruction, value.Callee.Identifier, value.Args, target, findings, order)
+		findings = immutabilityCallTransfer(ruleContext, function, state, instruction, value.Callee.Identifier, value.Args, target, findings, order)
 
 	case *high_level_intermediate_representation.MethodCall:
-		findings = immutabilityMethodCallTransfer(ctx, function, state, instruction, value, target, findings, order)
+		findings = immutabilityMethodCallTransfer(ruleContext, function, state, instruction, value, target, findings, order)
 
 	default:
 		// Deliberately silent. See the doc comment: an unmodelled instruction must not invent a
@@ -1154,7 +1154,7 @@ func immutabilityPropagate(state *immutabilityState, object static_single_assign
 
 // immutabilityCheckWrite asks the lattice what writing to a value does and reports when it must.
 func immutabilityCheckWrite(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	object static_single_assignment.IdentifierId,
@@ -1180,7 +1180,7 @@ func immutabilityCheckWrite(
 	// `refs.go` OWNS the render-time half of this question and reports a ref access during render
 	// under its own rule, so the exemption here loses no coverage; it routes the finding to the rule
 	// whose name matches it.
-	if immutabilityIsRefValue(ctx, function, state, object) || immutabilityWriteTargetIsRef(ctx, node) {
+	if immutabilityIsRefValue(ruleContext, function, state, object) || immutabilityWriteTargetIsRef(ruleContext, node) {
 		return findings
 	}
 	current := state.kindOf(object)
@@ -1252,7 +1252,7 @@ func immutabilityMutatedObjectNode(node *ast.Node, object static_single_assignme
 // `const o = {}; doThing(o); o.a = 1;` is CLEAN while the same code with `useThing` reports. React
 // only freezes at boundaries it controls.
 func immutabilityCallTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1389,7 +1389,7 @@ func immutabilityHookResultKind(name string) immutabilityAbstractValue {
 // fine. Reproduced as silence deliberately; a rule that helpfully reported `props.list.push(1)`
 // would disagree with React on ordinary code.
 func immutabilityMethodCallTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1450,7 +1450,7 @@ func immutabilityMethodName(instruction *high_level_intermediate_representation.
 // and they overlap, which refs.go measured as a wrong-finding rather than a missing one, so the
 // inner walk here reads only names and syntax and never indexes the outer state by an inner id.
 func immutabilityNestedFunctionTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
 	value *high_level_intermediate_representation.FunctionExpression,
@@ -1468,7 +1468,7 @@ func immutabilityNestedFunctionTransfer(
 	// Measured: `const cb = () => { props.a = 1; };` reports on line 2, inside the callback, while
 	// `const cb = () => { local = 1; };` reports on the line that hands `cb` to JSX. The two look
 	// alike in source and are opposite in where they point.
-	findings = immutabilityCapturedWrites(ctx, state, inner, value, findings, order)
+	findings = immutabilityCapturedWrites(ruleContext, state, inner, value, findings, order)
 	// A reassignment only matters when the binding belongs to THIS function, which is the render
 	// whose end outlives it. `Function.Context` names what the closure captured from here, so a
 	// write to anything else is a write to a binding some intermediate scope owns and the render has
@@ -1539,8 +1539,8 @@ func immutabilityNestedFunctionTransfer(
 // the real tree rather than in a fixture: `rule_testing`'s tsconfig sets `types: []` and resolves no
 // `node_modules`, so `@types/react` never resolves there and every symbol is nil. The fixtures
 // therefore cannot see this exemption at all, and the two ref fixtures below pin the NAME half only.
-func immutabilityWriteTargetIsRef(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil || node == nil {
+func immutabilityWriteTargetIsRef(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || node == nil {
 		return false
 	}
 	target := node
@@ -1569,7 +1569,7 @@ func immutabilityWriteTargetIsRef(ctx rule.Context, node *ast.Node) bool {
 	// hang a linter on a pathological input.
 	expression := target.Expression()
 	for depth := 0; expression != nil && depth < 16; depth++ {
-		valueType := ctx.TypeChecker.GetTypeAtLocation(expression)
+		valueType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 		if valueType != nil {
 			// Compared positively rather than checked for non-nil: the shim is a hand-mirrored
 			// struct read through `unsafe.Pointer` and has returned a silently wrong type before,
@@ -1604,7 +1604,7 @@ func immutabilityWriteTargetIsRef(ctx rule.Context, node *ast.Node) bool {
 // Recurses one level only. A closure inside a closure writing through a doubly-captured value is a
 // real shape and it is NOT covered here; see the report for what that costs.
 func immutabilityCapturedWrites(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	state *immutabilityState,
 	inner *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
@@ -1652,13 +1652,13 @@ func immutabilityCapturedWrites(
 					innerKinds[instruction.LValue.Identifier] = carried
 				}
 			case *high_level_intermediate_representation.PropertyStore:
-				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
+				findings = immutabilityCapturedWriteFinding(ruleContext, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
 			case *high_level_intermediate_representation.ComputedStore:
-				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
+				findings = immutabilityCapturedWriteFinding(ruleContext, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
 			case *high_level_intermediate_representation.PropertyDelete:
-				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
+				findings = immutabilityCapturedWriteFinding(ruleContext, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
 			case *high_level_intermediate_representation.ComputedDelete:
-				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
+				findings = immutabilityCapturedWriteFinding(ruleContext, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
 			}
 		}
 	}
@@ -1667,7 +1667,7 @@ func immutabilityCapturedWrites(
 
 // immutabilityCapturedWriteFinding reports one write through a captured value when it is frozen.
 func immutabilityCapturedWriteFinding(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	inner *high_level_intermediate_representation.Function,
 	kinds map[static_single_assignment.IdentifierId]immutabilityAbstractValue,
 	names map[static_single_assignment.IdentifierId]string,
@@ -1686,7 +1686,7 @@ func immutabilityCapturedWriteFinding(
 	if names[object] != "" && refsIsRefLikeName(names[object]) {
 		return findings
 	}
-	if immutabilityWriteTargetIsRef(ctx, instruction.Node) {
+	if immutabilityWriteTargetIsRef(ruleContext, instruction.Node) {
 		return findings
 	}
 	switch immutabilityMutate(current.Kind) {
@@ -1918,14 +1918,14 @@ func immutabilityMessageFor(finding immutabilityFinding) rule.Message {
 // Through `ctx.ReportNode` rather than a Place's range, because a Place's range is the range of the
 // node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness.
-func immutabilityReport(ctx rule.Context, function *high_level_intermediate_representation.Function, finding immutabilityFinding) {
+func immutabilityReport(ruleContext rule.Context, function *high_level_intermediate_representation.Function, finding immutabilityFinding) {
 	message := immutabilityMessageFor(finding)
 	if finding.Node != nil {
-		ctx.ReportNode(finding.Node, message)
+		ruleContext.ReportNode(finding.Node, message)
 		return
 	}
 	if function.Node != nil {
-		ctx.ReportNode(function.Node, message)
+		ruleContext.ReportNode(function.Node, message)
 	}
 }
 
@@ -1966,8 +1966,8 @@ func immutabilityHasBackEdge(function *high_level_intermediate_representation.Fu
 //
 // The property name is checked too, because the exemption is for writing a ref's `current` and not
 // for writing arbitrary properties onto a ref object.
-func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState, id static_single_assignment.IdentifierId) bool {
-	if ctx.TypeChecker == nil || function == nil {
+func immutabilityIsRefValue(ruleContext rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState, id static_single_assignment.IdentifierId) bool {
+	if ruleContext.TypeChecker == nil || function == nil {
 		return false
 	}
 	for _, candidate := range [2]static_single_assignment.IdentifierId{id, state.resolve(id)} {
@@ -1975,7 +1975,7 @@ func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_
 		if node == nil {
 			continue
 		}
-		valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+		valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 		if valueType == nil {
 			continue
 		}

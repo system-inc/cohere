@@ -51,8 +51,8 @@ var messageNoSetState = rule.Message{
 // Upstream ships no fixer either.
 var NoSetState = rule.Rule{
 	Name: "react/no-set-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -67,7 +67,7 @@ var NoSetState = rule.Rule{
 				}
 				// Upstream reports on the callee, `this.setState`, rather than on the whole call,
 				// so the finding stops at the member access and excludes the argument list.
-				ctx.ReportNode(callee, messageNoSetState)
+				ruleContext.ReportNode(callee, messageNoSetState)
 			},
 		}
 	},

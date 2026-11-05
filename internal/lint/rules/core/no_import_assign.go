@@ -107,7 +107,7 @@ var NoImportAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Each import declaration on the shared walk, including one inside a `declare module` block,
 		// which can hold its own. The writes to its names are read from the file's identifier index.
 		//
@@ -127,19 +127,19 @@ var NoImportAssign = rule.Rule{
 				// fixtures, because typescript-go tolerates a nil receiver on this path and returns no
 				// symbol; that is an implementation detail of a vendored compiler rather than a
 				// promise, so the guard stays and the rule does not depend on it.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				bindings := imports.BindingsOf(node)
-				reportWritesToImport(ctx, bindings.Default, false, judged)
+				reportWritesToImport(ruleContext, bindings.Default, false, judged)
 				// `import { a as b }` binds `b`, and `Name()` on the specifier is the local name rather
 				// than the imported one. Upstream's `named12 as foo` case proves it matters: `foo = 0`
 				// reports and `named12 = 0` does not, because `named12` binds nothing.
 				for _, specifier := range bindings.Named {
-					reportWritesToImport(ctx, specifier.Name(), false, judged)
+					reportWritesToImport(ruleContext, specifier.Name(), false, judged)
 				}
 				if bindings.Namespace != nil {
-					reportWritesToImport(ctx, bindings.Namespace.Name(), true, judged)
+					reportWritesToImport(ruleContext, bindings.Namespace.Name(), true, judged)
 				}
 			},
 		}
@@ -152,20 +152,20 @@ var NoImportAssign = rule.Rule{
 //
 // The member and mutation-function shapes apply only to `import * as`. A default or named import is
 // an ordinary value and mutating it is upstream's first ten clean cases.
-func reportWritesToImport(ctx rule.Context, name *ast.Node, isNamespace bool, judged map[*ast.Node]bool) {
+func reportWritesToImport(ruleContext rule.Context, name *ast.Node, isNamespace bool, judged map[*ast.Node]bool) {
 	if name == nil {
 		return
 	}
 	// Anchored on the declaration its own symbol reports, so both sides of the comparison are answers
 	// to the same question. Asking the AST for one side and the checker for the other would compare
 	// two things that happen to agree today.
-	declaration := declarationAnchoredAt(ctx, name)
+	declaration := declarationAnchoredAt(ruleContext, name)
 	if declaration == nil || judged[declaration] {
 		return
 	}
 	judged[declaration] = true
 
-	for _, occurrence := range reference.IdentifiersNamed(ctx, name.Text()) {
+	for _, occurrence := range reference.IdentifiersNamed(ruleContext, name.Text()) {
 		// The structural question first, and the checker only for an identifier that already sits
 		// somewhere a write happens. Both orders report the same findings, and the order matters for
 		// what the rule costs: this rule anchors on import declarations, so it runs in nearly every
@@ -185,12 +185,12 @@ func reportWritesToImport(ctx rule.Context, name *ast.Node, isNamespace bool, ju
 		default:
 			if member := writesThroughMemberExpression(occurrence); member != nil {
 				blame = member
-			} else if isArgumentOfWellKnownMutationFunction(ctx, occurrence) {
+			} else if isArgumentOfWellKnownMutationFunction(ruleContext, occurrence) {
 				blame = occurrence
 			}
 		}
-		if blame != nil && resolvedDeclarationOf(ctx, occurrence) == declaration {
-			ctx.ReportNode(blame, messageNoImportAssign)
+		if blame != nil && resolvedDeclarationOf(ruleContext, occurrence) == declaration {
+			ruleContext.ReportNode(blame, messageNoImportAssign)
 		}
 	}
 }
@@ -201,13 +201,13 @@ func reportWritesToImport(ctx rule.Context, name *ast.Node, isNamespace bool, ju
 // property's own symbol rather than to the value being written, which reads exactly like a correctly
 // declined shadow. `({named} = obj)` on an imported `named` is a real failing shape, so that case is
 // asked through the accessor built for it.
-func resolvedDeclarationOf(ctx rule.Context, identifier *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func resolvedDeclarationOf(ruleContext rule.Context, identifier *ast.Node) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+		symbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
 	// An import binding is declared in this file, so only this file's declarations can be one.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if len(declarations) == 0 {
 		return nil
 	}
@@ -373,7 +373,7 @@ var reflectMutationMethods = map[string]bool{
 //
 // Only the first argument. `Object.assign(obj, mod, other)` reads `mod` into `obj` and is clean
 // upstream, with a fixture.
-func isArgumentOfWellKnownMutationFunction(ctx rule.Context, identifier *ast.Node) bool {
+func isArgumentOfWellKnownMutationFunction(ruleContext rule.Context, identifier *ast.Node) bool {
 	call := identifier.Parent
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
@@ -413,7 +413,7 @@ func isArgumentOfWellKnownMutationFunction(ctx rule.Context, identifier *ast.Nod
 		return false
 	}
 
-	return resolvesToAGlobalObject(ctx, object)
+	return resolvesToAGlobalObject(ruleContext, object)
 }
 
 // resolvesToAGlobalObject reports whether an identifier names the real global rather than a local of
@@ -428,10 +428,10 @@ func isArgumentOfWellKnownMutationFunction(ctx rule.Context, identifier *ast.Nod
 // An identifier the checker cannot resolve answers false. Nothing in this tree reaches that, since a
 // `lib.d.ts` is always present, and answering false there is the direction that costs a missed
 // finding rather than a false positive.
-func resolvesToAGlobalObject(ctx rule.Context, identifier *ast.Node) bool {
+func resolvesToAGlobalObject(ruleContext rule.Context, identifier *ast.Node) bool {
 	// A shadowing `var Object` declares in the file under lint. Any declaration there disproves the
 	// global, so this refuses on the first one rather than requiring all of them to be local: the real
 	// `Object` is declared several times across the lib files and a shadow adds one more, so "every
 	// declaration is local" would answer wrongly.
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }

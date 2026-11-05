@@ -405,21 +405,21 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 		probe := rule.Rule{
 			Name:             "hoistable-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
+						if ruleContext.TypeChecker == nil {
 							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
 							Construct(function)
 							OutlineFunctions(function)
-							InferReactive(function, ctx.TypeChecker)
+							InferReactive(function, ruleContext.TypeChecker)
 							DropManualMemoization(function)
 							if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
 								MergeConsecutiveBlocks(function)

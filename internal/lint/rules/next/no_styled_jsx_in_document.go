@@ -78,10 +78,10 @@ var NoStyledJsxInDocument = rule.Rule{
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:       "@next/next/no-styled-jsx-in-document",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Asked once rather than per element, because it is a property of the file. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString()) {
+		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -95,7 +95,7 @@ var NoStyledJsxInDocument = rule.Rule{
 			if !jsx.HasAttributeNamed(attributes, "jsx", jsx.MatchExactly) {
 				return
 			}
-			ctx.ReportNode(node, messageNoStyledJsxInDocument)
+			ruleContext.ReportNode(node, messageNoStyledJsxInDocument)
 		}
 
 		// Two kinds where oxc registers one. A self-closing element still produces a

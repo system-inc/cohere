@@ -176,7 +176,7 @@ var (
 // Nothing else in this rule is about parsing rather than style.
 var ArrowBodyStyle = rule.Rule{
 	Name: "arrow-body-style",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
 		if decoded, configured := rule.OptionsAs[ArrowBodyStyleOptions](options); configured {
 			settings = decoded
@@ -189,21 +189,21 @@ var ArrowBodyStyle = rule.Rule{
 		}
 		return rule.Listeners{
 			ast.KindArrowFunction: func(node *ast.Node) {
-				checkArrowBodyStyle(ctx, node, settings)
+				checkArrowBodyStyle(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkArrowBodyStyle judges one arrow function's body.
-func checkArrowBodyStyle(ctx rule.Context, node *ast.Node, settings ArrowBodyStyleOptions) {
+func checkArrowBodyStyle(ruleContext rule.Context, node *ast.Node, settings ArrowBodyStyleOptions) {
 	body := node.AsArrowFunction().Body
 	if body == nil {
 		return
 	}
 
 	if body.Kind == ast.KindBlock {
-		checkArrowBodyStyleBracedBody(ctx, node, body, settings)
+		checkArrowBodyStyleBracedBody(ruleContext, node, body, settings)
 		return
 	}
 
@@ -215,12 +215,12 @@ func checkArrowBodyStyle(ctx rule.Context, node *ast.Node, settings ArrowBodySty
 	if !wantsBraces {
 		return
 	}
-	reportArrowBodyStyleWantingBraces(ctx, node, body)
+	reportArrowBodyStyleWantingBraces(ruleContext, node, body)
 }
 
 // checkArrowBodyStyleBracedBody judges a `{ ... }` body.
 func checkArrowBodyStyleBracedBody(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	body *ast.Node,
 	settings ArrowBodyStyleOptions,
@@ -255,7 +255,7 @@ func checkArrowBodyStyleBracedBody(
 		return
 	}
 
-	reportArrowBodyStyleWantingNoBraces(ctx, node, body, blockBody)
+	reportArrowBodyStyleWantingNoBraces(ruleContext, node, body, blockBody)
 }
 
 // reportArrowBodyStyleWantingNoBraces reports a braced body, with the repair when one is possible.
@@ -265,7 +265,7 @@ func checkArrowBodyStyleBracedBody(
 // equivalent, which is a single return carrying a value; every other shape reports with no repair,
 // reproducing upstream's `output: null`.
 func reportArrowBodyStyleWantingNoBraces(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	body *ast.Node,
 	blockBody []*ast.Node,
@@ -278,21 +278,21 @@ func reportArrowBodyStyleWantingNoBraces(
 		message = messageArrowBodyStyleUnexpectedOtherBlock
 	case blockBody[0].AsReturnStatement().Expression == nil:
 		message = messageArrowBodyStyleUnexpectedSingleBlock
-	case arrowBodyStyleStartsWithBrace(ctx, blockBody[0].AsReturnStatement().Expression):
+	case arrowBodyStyleStartsWithBrace(ruleContext, blockBody[0].AsReturnStatement().Expression):
 		message = messageArrowBodyStyleUnexpectedObjectBlock
 	default:
 		message = messageArrowBodyStyleUnexpectedSingleBlock
 	}
 
-	fixes := arrowBodyStyleRemoveBracesFixes(ctx, node, body, blockBody)
+	fixes := arrowBodyStyleRemoveBracesFixes(ruleContext, node, body, blockBody)
 	if len(fixes) == 0 {
 		// Upstream's fixer returns an empty edit list rather than declining, which the engine
 		// treats as no fix. Reproduced as reporting with no repair, which is what its corpus
 		// records as `output: null`.
-		ctx.ReportRange(rule.TokenRange(ctx.SourceFile, body), message)
+		ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, body), message)
 		return
 	}
-	ctx.ReportRangeWithFixes(rule.TokenRange(ctx.SourceFile, body), message, fixes...)
+	ruleContext.ReportRangeWithFixes(rule.TokenRange(ruleContext.SourceFile, body), message, fixes...)
 }
 
 // arrowBodyStyleRemoveBracesFixes builds the edits that turn `{ return v; }` into `v`.
@@ -303,7 +303,7 @@ func reportArrowBodyStyleWantingNoBraces(
 // once the block's closing brace stops separating them, so the repair is declined and the finding
 // stands alone.
 func arrowBodyStyleRemoveBracesFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	body *ast.Node,
 	blockBody []*ast.Node,
@@ -315,31 +315,31 @@ func arrowBodyStyleRemoveBracesFixes(
 	if returned == nil {
 		return nil
 	}
-	if arrowBodyStyleHasInsertionHazardAfter(ctx, body) {
+	if arrowBodyStyleHasInsertionHazardAfter(ruleContext, body) {
 		return nil
 	}
 
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	openingBrace := core.NewTextRange(body.Pos(), body.Pos())
 	if index := strings.Index(text[body.Pos():body.End()], "{"); index >= 0 {
 		openingBrace = core.NewTextRange(body.Pos()+index, body.Pos()+index+1)
 	}
 	closingBrace := core.NewTextRange(body.End()-1, body.End())
 
-	valueStart := rule.TokenRange(ctx.SourceFile, returned).Pos()
+	valueStart := rule.TokenRange(ruleContext.SourceFile, returned).Pos()
 	// Upstream anchors on the return statement's LAST TOKEN, which is the semicolon when one is
 	// written. So `{ return a ; }` shortens to `a ` with the space kept and the semicolon dropped,
 	// rather than to `a`. Ending the span at the expression instead swallows that whitespace, which
 	// is a one-character difference on three of upstream's own cases and invisible to every
 	// message-id fixture.
 	valueEnd := returned.End()
-	semicolon := arrowBodyStyleTrailingSemicolonOf(ctx, blockBody[0])
+	semicolon := arrowBodyStyleTrailingSemicolonOf(ruleContext, blockBody[0])
 
 	// Parenthesize when the concise form would otherwise be misread. A leading brace would start a
 	// block, a comma expression would be read as the arrow's parameter list continuing, and an `in`
 	// inside a for statement's initializer belongs to the `for...in` grammar.
 	unwrapped := arrowBodyStyleUnwrapParentheses(returned)
-	needsParentheses := arrowBodyStyleStartsWithBrace(ctx, returned) ||
+	needsParentheses := arrowBodyStyleStartsWithBrace(ruleContext, returned) ||
 		(unwrapped.Kind == ast.KindBinaryExpression &&
 			unwrapped.AsBinaryExpression().OperatorToken != nil &&
 			unwrapped.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken) ||
@@ -379,9 +379,9 @@ func arrowBodyStyleRemoveBracesFixes(
 	// A comment anywhere in the ceremony has to survive, so only the tokens themselves are removed
 	// and the whitespace around them is left in place. Without a comment the whitespace goes too,
 	// which is what makes the common case read as one clean line.
-	if arrowBodyStyleCommentsBetween(ctx, openingBrace.End(), valueStart) ||
-		arrowBodyStyleCommentsBetween(ctx, trailingFrom, closingBrace.Pos()) {
-		returnKeyword := rule.TokenRange(ctx.SourceFile, blockBody[0])
+	if arrowBodyStyleCommentsBetween(ruleContext, openingBrace.End(), valueStart) ||
+		arrowBodyStyleCommentsBetween(ruleContext, trailingFrom, closingBrace.Pos()) {
+		returnKeyword := rule.TokenRange(ruleContext.SourceFile, blockBody[0])
 		returnRange := core.NewTextRange(returnKeyword.Pos(), returnKeyword.Pos()+len("return"))
 		fixes = append(fixes,
 			rule.RemoveRange(openingBrace),
@@ -425,11 +425,11 @@ func arrowBodyStyleRemoveBracesFixes(
 // are consumed rather than left behind: the opening one becomes `{return ` and the closing one is
 // deleted wherever it sits, which is not always the last token -- `() => ({}).foo()` closes it in
 // the middle.
-func reportArrowBodyStyleWantingBraces(ctx rule.Context, node *ast.Node, body *ast.Node) {
+func reportArrowBodyStyleWantingBraces(ruleContext rule.Context, node *ast.Node, body *ast.Node) {
 	message := messageArrowBodyStyleExpectedBlock
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 
-	bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
+	bodyStart := rule.TokenRange(ruleContext.SourceFile, body).Pos()
 	lastToken := node.End()
 
 	// A parenthesized object literal, whose parentheses the concise form REQUIRED and the block
@@ -440,9 +440,9 @@ func reportArrowBodyStyleWantingBraces(ctx rule.Context, node *ast.Node, body *a
 	// matching the opening one rather than by taking the last token. Upstream walks up from the
 	// object to the nearest parenthesized ancestor and takes the token after it; this matches
 	// forward from the opening paren, which is the same span reached without a parent walk.
-	if object := arrowBodyStyleForcedParenthesizedObject(ctx, body); object != nil {
+	if object := arrowBodyStyleForcedParenthesizedObject(ruleContext, body); object != nil {
 		openingParen := core.NewTextRange(bodyStart, bodyStart+1)
-		objectStart := rule.TokenRange(ctx.SourceFile, object).Pos()
+		objectStart := rule.TokenRange(ruleContext.SourceFile, object).Pos()
 		closingParen := arrowBodyStyleMatchingCloseParen(text, bodyStart)
 
 		var fixes []rule.Fix
@@ -475,11 +475,11 @@ func reportArrowBodyStyleWantingBraces(ctx rule.Context, node *ast.Node, body *a
 				rule.RemoveRange(core.NewTextRange(closingParen, closingParen+1)),
 				rule.ReplaceRange(core.NewTextRange(lastToken, lastToken), "}"))
 		}
-		ctx.ReportRangeWithFixes(rule.TokenRange(ctx.SourceFile, body), message, fixes...)
+		ruleContext.ReportRangeWithFixes(rule.TokenRange(ruleContext.SourceFile, body), message, fixes...)
 		return
 	}
 
-	ctx.ReportRangeWithFixes(rule.TokenRange(ctx.SourceFile, body), message,
+	ruleContext.ReportRangeWithFixes(rule.TokenRange(ruleContext.SourceFile, body), message,
 		rule.ReplaceRange(core.NewTextRange(bodyStart, bodyStart), "{return "),
 		rule.ReplaceRange(core.NewTextRange(lastToken, lastToken), "}"))
 }
@@ -498,8 +498,8 @@ func reportArrowBodyStyleWantingBraces(ctx rule.Context, node *ast.Node, body *a
 // comment -- including upstream's own case that threads nine comments through one arrow, which it
 // does repair. Measured across six spellings against the installed rule: a comment never decides
 // this, and the token after it always does, so `/* c */ ;` is fixed and `/* c */ + 1` is not.
-func arrowBodyStyleHasInsertionHazardAfter(ctx rule.Context, body *ast.Node) bool {
-	text := ctx.SourceFile.Text()
+func arrowBodyStyleHasInsertionHazardAfter(ruleContext rule.Context, body *ast.Node) bool {
+	text := ruleContext.SourceFile.Text()
 	for position := body.End(); position < len(text); position++ {
 		character := text[position]
 		if character == ' ' || character == '\t' || character == '\n' || character == '\r' {
@@ -545,8 +545,8 @@ func arrowBodyStyleEndOfComment(text string, start int) int {
 // `comments.ForFile` caches one scan per file, so this is a scan of an already-built list rather
 // than a re-scan of the text. Reaching for `GetLeadingCommentRanges` here would have been the third
 // time somebody reimplemented that shelf.
-func arrowBodyStyleCommentsBetween(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func arrowBodyStyleCommentsBetween(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.End() <= to {
 			return true
 		}
@@ -561,12 +561,12 @@ func arrowBodyStyleCommentsBetween(ctx rule.Context, from int, to int) bool {
 // kind, because upstream asks it of the token: an object literal starts with a brace, and so does
 // nothing else that can be returned, but reading the first byte is the same question upstream asks
 // and cannot drift from it.
-func arrowBodyStyleStartsWithBrace(ctx rule.Context, expression *ast.Node) bool {
+func arrowBodyStyleStartsWithBrace(ruleContext rule.Context, expression *ast.Node) bool {
 	if expression == nil {
 		return false
 	}
-	start := rule.TokenRange(ctx.SourceFile, expression).Pos()
-	text := ctx.SourceFile.Text()
+	start := rule.TokenRange(ruleContext.SourceFile, expression).Pos()
+	text := ruleContext.SourceFile.Text()
 	return start < len(text) && text[start] == '{'
 }
 
@@ -648,8 +648,8 @@ func arrowBodyStyleInsideForInitializer(node *ast.Node) bool {
 //
 // A concise arrow body is an expression rather than a statement, so the semicolon that ended the
 // return has no place in the shortened form and upstream removes it as its own edit.
-func arrowBodyStyleTrailingSemicolonOf(ctx rule.Context, statement *ast.Node) int {
-	text := ctx.SourceFile.Text()
+func arrowBodyStyleTrailingSemicolonOf(ruleContext rule.Context, statement *ast.Node) int {
+	text := ruleContext.SourceFile.Text()
 	for position := statement.End() - 1; position >= statement.Pos(); position-- {
 		switch text[position] {
 		case ' ', '\t', '\n', '\r':
@@ -674,8 +674,8 @@ func arrowBodyStyleTrailingSemicolonOf(ctx rule.Context, statement *ast.Node) in
 // both open with the forced parentheses and both are repaired by consuming them, so this looks past
 // a member access or a call to the leftmost thing the body starts with rather than testing the
 // body's own kind.
-func arrowBodyStyleForcedParenthesizedObject(ctx rule.Context, body *ast.Node) *ast.Node {
-	if !arrowBodyStyleStartsWithOpenParen(ctx, body) {
+func arrowBodyStyleForcedParenthesizedObject(ruleContext rule.Context, body *ast.Node) *ast.Node {
+	if !arrowBodyStyleStartsWithOpenParen(ruleContext, body) {
 		return nil
 	}
 	// Descend the leftmost spine: whatever the body evaluates to, the token after the arrow's
@@ -713,12 +713,12 @@ func arrowBodyStyleLeftmostOperand(node *ast.Node) *ast.Node {
 }
 
 // arrowBodyStyleStartsWithOpenParen reports whether a node's first token is `(`.
-func arrowBodyStyleStartsWithOpenParen(ctx rule.Context, node *ast.Node) bool {
+func arrowBodyStyleStartsWithOpenParen(ruleContext rule.Context, node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
-	text := ctx.SourceFile.Text()
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	text := ruleContext.SourceFile.Text()
 	return start < len(text) && text[start] == '('
 }
 

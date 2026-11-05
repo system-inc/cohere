@@ -95,19 +95,19 @@ var ConsistencyNoIsoStringDateCut = rule.Rule{
 	// it is declared on, which no function body holds, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				consistencyNoIsoStringDateCutCheckRange(ctx, node)
+				consistencyNoIsoStringDateCutCheckRange(ruleContext, node)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				consistencyNoIsoStringDateCutCheckSplitIndex(ctx, node)
+				consistencyNoIsoStringDateCutCheckSplitIndex(ruleContext, node)
 			},
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				consistencyNoIsoStringDateCutCheckDestructuredSplit(ctx, node)
+				consistencyNoIsoStringDateCutCheckDestructuredSplit(ruleContext, node)
 			},
 		}
 	},
@@ -119,7 +119,7 @@ const consistencyNoIsoStringDateCutDatePartEnd = 10
 
 // consistencyNoIsoStringDateCutCheckRange reports `<iso>.slice|substring|substr(a, b)` whose range lies
 // inside the date part.
-func consistencyNoIsoStringDateCutCheckRange(ctx rule.Context, call *ast.Node) {
+func consistencyNoIsoStringDateCutCheckRange(ruleContext rule.Context, call *ast.Node) {
 	method, receiver, arguments := consistencyNoIsoStringDateCutMethodCall(call)
 	if receiver == nil || len(arguments) != 2 {
 		return
@@ -143,25 +143,25 @@ func consistencyNoIsoStringDateCutCheckRange(ctx rule.Context, call *ast.Node) {
 	if start >= end || end > consistencyNoIsoStringDateCutDatePartEnd {
 		return
 	}
-	if consistencyNoIsoStringDateCutIsIsoString(ctx, receiver) {
-		ctx.ReportNode(call, consistencyNoIsoStringDateCutMessage())
+	if consistencyNoIsoStringDateCutIsIsoString(ruleContext, receiver) {
+		ruleContext.ReportNode(call, consistencyNoIsoStringDateCutMessage())
 	}
 }
 
 // consistencyNoIsoStringDateCutCheckSplitIndex reports `<iso>.split('T')[0]`.
-func consistencyNoIsoStringDateCutCheckSplitIndex(ctx rule.Context, node *ast.Node) {
+func consistencyNoIsoStringDateCutCheckSplitIndex(ruleContext rule.Context, node *ast.Node) {
 	access := node.AsElementAccessExpression()
 	if index, ok := consistencyNoIsoStringDateCutIndex(access.ArgumentExpression); !ok || index != 0 {
 		return
 	}
-	if consistencyNoIsoStringDateCutIsSplitOnT(ctx, ast.SkipParentheses(access.Expression)) {
-		ctx.ReportNode(node, consistencyNoIsoStringDateCutMessage())
+	if consistencyNoIsoStringDateCutIsSplitOnT(ruleContext, ast.SkipParentheses(access.Expression)) {
+		ruleContext.ReportNode(node, consistencyNoIsoStringDateCutMessage())
 	}
 }
 
 // consistencyNoIsoStringDateCutCheckDestructuredSplit reports `const [day] = <iso>.split('T')`, at the
 // split.
-func consistencyNoIsoStringDateCutCheckDestructuredSplit(ctx rule.Context, node *ast.Node) {
+func consistencyNoIsoStringDateCutCheckDestructuredSplit(ruleContext rule.Context, node *ast.Node) {
 	name := node.Name()
 	initializer := node.AsVariableDeclaration().Initializer
 	if name == nil || name.Kind != ast.KindArrayBindingPattern || initializer == nil {
@@ -174,8 +174,8 @@ func consistencyNoIsoStringDateCutCheckDestructuredSplit(ctx rule.Context, node 
 		return
 	}
 	split := ast.SkipParentheses(initializer)
-	if consistencyNoIsoStringDateCutIsSplitOnT(ctx, split) {
-		ctx.ReportNode(split, consistencyNoIsoStringDateCutMessage())
+	if consistencyNoIsoStringDateCutIsSplitOnT(ruleContext, split) {
+		ruleContext.ReportNode(split, consistencyNoIsoStringDateCutMessage())
 	}
 }
 
@@ -198,7 +198,7 @@ func consistencyNoIsoStringDateCutMethodCall(call *ast.Node) (string, *ast.Node,
 
 // consistencyNoIsoStringDateCutIsSplitOnT says whether a node is `<iso>.split('T')`, with exactly that
 // one argument. A limit changes what index 0 can be (`split('T', 0)` is empty), so it is left alone.
-func consistencyNoIsoStringDateCutIsSplitOnT(ctx rule.Context, node *ast.Node) bool {
+func consistencyNoIsoStringDateCutIsSplitOnT(ruleContext rule.Context, node *ast.Node) bool {
 	method, receiver, arguments := consistencyNoIsoStringDateCutMethodCall(node)
 	if method != "split" || receiver == nil || len(arguments) != 1 {
 		return false
@@ -207,7 +207,7 @@ func consistencyNoIsoStringDateCutIsSplitOnT(ctx rule.Context, node *ast.Node) b
 	if (separator.Kind != ast.KindStringLiteral && separator.Kind != ast.KindNoSubstitutionTemplateLiteral) || separator.Text() != "T" {
 		return false
 	}
-	return consistencyNoIsoStringDateCutIsIsoString(ctx, receiver)
+	return consistencyNoIsoStringDateCutIsIsoString(ruleContext, receiver)
 }
 
 // consistencyNoIsoStringDateCutIndex reads a non-negative integer literal.
@@ -225,9 +225,9 @@ func consistencyNoIsoStringDateCutIndex(node *ast.Node) (int, bool) {
 
 // consistencyNoIsoStringDateCutIsIsoString says whether an expression is the default library's
 // `<date>.toISOString()`, called directly or held in a `const` of this file.
-func consistencyNoIsoStringDateCutIsIsoString(ctx rule.Context, expression *ast.Node) bool {
+func consistencyNoIsoStringDateCutIsIsoString(ruleContext rule.Context, expression *ast.Node) bool {
 	if expression.Kind == ast.KindIdentifier {
-		initializer := consistencyNoIsoStringDateCutConstInitializer(ctx, expression)
+		initializer := consistencyNoIsoStringDateCutConstInitializer(ruleContext, expression)
 		if initializer == nil {
 			return false
 		}
@@ -238,18 +238,18 @@ func consistencyNoIsoStringDateCutIsIsoString(ctx rule.Context, expression *ast.
 		return false
 	}
 	name := ast.SkipParentheses(expression.AsCallExpression().Expression).AsPropertyAccessExpression().Name()
-	return consistencyNoIsoStringDateCutIsDateMember(ctx, name)
+	return consistencyNoIsoStringDateCutIsDateMember(ruleContext, name)
 }
 
 // consistencyNoIsoStringDateCutConstInitializer is the initializer of the `const` an identifier names,
 // when that `const` is the symbol's only declaration, binds a plain identifier, and is in this file.
-func consistencyNoIsoStringDateCutConstInitializer(ctx rule.Context, identifier *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func consistencyNoIsoStringDateCutConstInitializer(ruleContext rule.Context, identifier *ast.Node) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return nil
 	}
 	declaration := symbol.Declarations[0]
-	if ast.GetSourceFileOfNode(declaration) != ctx.SourceFile || declaration.Kind != ast.KindVariableDeclaration ||
+	if ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile || declaration.Kind != ast.KindVariableDeclaration ||
 		declaration.Name() == nil || declaration.Name().Kind != ast.KindIdentifier {
 		return nil
 	}
@@ -262,9 +262,9 @@ func consistencyNoIsoStringDateCutConstInitializer(ctx rule.Context, identifier 
 
 // consistencyNoIsoStringDateCutIsDateMember says whether a member name resolves to a method the
 // default library declares on `Date`.
-func consistencyNoIsoStringDateCutIsDateMember(ctx rule.Context, name *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
-	if symbol == nil || !rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+func consistencyNoIsoStringDateCutIsDateMember(ruleContext rule.Context, name *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
+	if symbol == nil || !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, symbol) {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {

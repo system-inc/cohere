@@ -107,14 +107,14 @@ var GetterReturn = rule.Rule{
 	// Whether the `Object` or `Reflect` of a descriptor call is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowImplicit := false
 		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {
 			allowImplicit = parsed.AllowImplicit
 		}
 
 		isGlobal := func(identifier *ast.Node) bool {
-			return ctx.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 
 		check := func(node *ast.Node, body *ast.Node) {
@@ -130,14 +130,14 @@ var GetterReturn = rule.Rule{
 			// ESLint's two ids: `expected` for a getter that never returns, `expectedAlways` for one
 			// that returns on some paths and falls off the end on another
 			if returnsAnywhere(body) {
-				ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
+				ruleContext.ReportRange(getterHeadRange(ruleContext.SourceFile, node), rule.Message{
 					Id: "expectedAlways",
 					Description: "This getter returns a value on some paths and falls off the end on " +
 						"another, where reading the property yields undefined. Return a value from every path.",
 				})
 				return
 			}
-			ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
+			ruleContext.ReportRange(getterHeadRange(ruleContext.SourceFile, node), rule.Message{
 				Id: "expected",
 				Description: "This getter never returns a value, so reading the property yields " +
 					"undefined. Return the value it stands for.",
@@ -154,7 +154,7 @@ var GetterReturn = rule.Rule{
 				if function == nil || function.Body() == nil || function.Body().Kind != ast.KindBlock || !isGetterFunction(function, isGlobal) {
 					return
 				}
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "expected",
 					Description: "This bare return leaves the getter with undefined, so reading the " +
 						"property yields nothing. Return the value it stands for.",

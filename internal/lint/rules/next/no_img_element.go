@@ -45,7 +45,7 @@ var NoImgElement = rule.Rule{
 	// and passes every one of its own tests. That is not hypothetical: the first rule in this
 	// package shipped that way and was inert.
 	Name: "@next/next/no-img-element",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, name *ast.Node) {
 			// An intrinsic element is a lowercase, unqualified identifier. A member-expression name
 			// (`<Foo.img />`) or a namespaced one is a component reference that never emits an
@@ -56,7 +56,7 @@ var NoImgElement = rule.Rule{
 			if enclosedByPictureElement(node) {
 				return
 			}
-			ctx.ReportNode(node, messageNoImgElement)
+			ruleContext.ReportNode(node, messageNoImgElement)
 		}
 
 		// Both opening forms are listened to. `<img />` parses as a JsxSelfClosingElement and never

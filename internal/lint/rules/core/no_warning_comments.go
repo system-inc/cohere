@@ -146,7 +146,7 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 // because the quoted text is the part of the message a reader scans.
 var NoWarningComments = rule.Rule{
 	Name: "no-warning-comments",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := NoWarningCommentsOptions{}
 		if decoded, configured := rule.OptionsAs[NoWarningCommentsOptions](options); configured {
 			settings = decoded
@@ -170,7 +170,7 @@ var NoWarningComments = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				checkNoWarningComments(ctx, compiled)
+				checkNoWarningComments(ruleContext, compiled)
 			},
 		}
 	},
@@ -324,8 +324,8 @@ func noWarningCommentsFoldEqual(first rune, second rune) bool {
 // One listener on the source file rather than a per-node one, because a comment is trivia and has
 // no node kind to anchor on. `comments.ForFile` caches one scan per file, so this is a read of an
 // already-built list.
-func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled) {
-	for _, comment := range comments.ForFile(ctx) {
+func checkNoWarningComments(ruleContext rule.Context, compiled noWarningCommentsCompiled) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		value := noWarningCommentsValueOf(comment)
 		first, hasFirst := noWarningCommentsFirstUnskipped(value, compiled.skip)
 
@@ -350,7 +350,7 @@ func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled
 				}
 				selfDirectiveChecked = true
 			}
-			ctx.ReportRange(comment.Range, rule.Message{
+			ruleContext.ReportRange(comment.Range, rule.Message{
 				Id: "unexpectedComment",
 				Description: fmt.Sprintf(
 					"This comment opens with `%s`, which marks the code as knowingly "+

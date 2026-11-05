@@ -106,9 +106,9 @@ func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 		Name:         "probe/design-system-per-location",
 		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 		NoListener:   rule.NoListenerAnswersInRun,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			for _, location := range []DesignSystemLocation{{}, {ConfigPath: "packages/web/design/brand.css"}, {}} {
-				entryPoints = append(entryPoints, filepath.Base(DesignSystemForProgramAt(ctx.Program, location).EntryPoint))
+				entryPoints = append(entryPoints, filepath.Base(DesignSystemForProgramAt(ruleContext.Program, location).EntryPoint))
 			}
 			return nil
 		},

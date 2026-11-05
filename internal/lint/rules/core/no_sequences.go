@@ -115,8 +115,8 @@ func (options NoSequencesOptions) allowInParentheses() bool {
 // alternative repair of adding parentheses silences the finding without addressing it.
 var NoSequences = rule.Rule{
 	Name: "no-sequences",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -171,11 +171,11 @@ var NoSequences = rule.Rule{
 					return
 				}
 
-				comma := leftmostCommaOf(ctx, node)
+				comma := leftmostCommaOf(ruleContext, node)
 				if comma == nil {
 					return
 				}
-				ctx.ReportRange(*comma, messageUnexpectedCommaExpression)
+				ruleContext.ReportRange(*comma, messageUnexpectedCommaExpression)
 			},
 		}
 	},
@@ -272,7 +272,7 @@ func isArrowBody(node *ast.Node) bool {
 // starting at the space rather than at the comma. `rule.TokenRange` scans past it, which is the same
 // correction `ctx.ReportNode` applies and the reason this does not build the range from `Pos()`
 // directly.
-func leftmostCommaOf(ctx rule.Context, node *ast.Node) *core.TextRange {
+func leftmostCommaOf(ruleContext rule.Context, node *ast.Node) *core.TextRange {
 	current := node
 	for isCommaExpression(current.AsBinaryExpression().Left) {
 		current = current.AsBinaryExpression().Left
@@ -281,7 +281,7 @@ func leftmostCommaOf(ctx rule.Context, node *ast.Node) *core.TextRange {
 	if operator == nil {
 		return nil
 	}
-	commaRange := rule.TokenRange(ctx.SourceFile, operator)
+	commaRange := rule.TokenRange(ruleContext.SourceFile, operator)
 	return &commaRange
 }
 

@@ -46,13 +46,13 @@ func TestStateEffectsFollowImportOrigin(test *testing.T) {
 			}
 			source := testCase.prefix + ` function Component(` + parameters + `) { return ` + testCase.callee + `({value: 0}); }`
 			visited := 0
-			probe := rule.Rule{Name: "state-effects-origin", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+			probe := rule.Rule{Name: "state-effects-origin", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(node *ast.Node) {
 						if node.Name() == nil || node.Name().Text() != "Component" {
 							return
 						}
-						function := Lower(node, ctx.TypeChecker)
+						function := Lower(node, ruleContext.TypeChecker)
 						Construct(function)
 						effects := InferAliasingEffects(function)
 						for _, instruction := range function.Instructions {
@@ -129,12 +129,12 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			var findings, markers int
-			probe := rule.Rule{Name: "state-method-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+			probe := rule.Rule{Name: "state-method-memoization", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(node *ast.Node) {
-						function := Lower(node, ctx.TypeChecker)
+						function := Lower(node, ruleContext.TypeChecker)
 						Construct(function)
-						findings += len(AnalyzePreservedManualMemoization(function, ctx.TypeChecker))
+						findings += len(AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker))
 						for _, instruction := range function.Instructions {
 							if _, found := instruction.Value.(*StartMemoize); found {
 								markers++
@@ -170,13 +170,13 @@ useEffect(() => { setState(someGlobal.value); }, [someGlobal]);
 return <div>{String(state)}</div>;
 }`
 	visited := 0
-	probe := rule.Rule{Name: "state-setter-dependency-pruning", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "state-setter-dependency-pruning", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			forEachFunctionLike(node, func(node *ast.Node) {
-				function := Lower(node, ctx.TypeChecker)
+				function := Lower(node, ruleContext.TypeChecker)
 				Construct(function)
 				OutlineFunctions(function)
-				InferReactive(function, ctx.TypeChecker)
+				InferReactive(function, ruleContext.TypeChecker)
 				DropManualMemoization(function)
 				if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
 					MergeConsecutiveBlocks(function)
@@ -205,8 +205,8 @@ return <div>{String(state)}</div>;
 					test.Errorf("raw setter dependencies=%d, want one outside the state scope", count)
 				}
 				tree, _ := BuildReactiveFunctionWithFlattenedScopes(function, flattened)
-				MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, ctx.TypeChecker)
-				PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, ctx.TypeChecker)
+				MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, ruleContext.TypeChecker)
+				PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, ruleContext.TypeChecker)
 				PruneUnusedScopes(tree, dependencies)
 				PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 				PruneNonReactiveDependencies(tree, function, dependencies)

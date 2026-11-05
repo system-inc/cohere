@@ -91,7 +91,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// report is shared by the two assertion spellings, which differ only in where the expression
 		// and the type node live. `x as T` and `<T>x` are the same judgment and upstream registers
 		// one visitor over both.
@@ -99,7 +99,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 			// Without this the rule is not merely wrong, it is silently wrong: the shim answers nil
 			// from GetSymbolAtLocation and friends rather than panicking, so a missing guard buys a
 			// vacuous green rather than an obvious crash.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			if expression == nil || typeNode == nil {
@@ -110,16 +110,16 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 				return
 			}
 
-			originalTypes, isUsable := unionConstituentsIfNotLoose(ctx.TypeChecker, expression)
+			originalTypes, isUsable := unionConstituentsIfNotLoose(ruleContext.TypeChecker, expression)
 			if !isUsable {
 				return
 			}
-			assertedTypes, isUsable := unionConstituentsIfNotLoose(ctx.TypeChecker, typeNode)
+			assertedTypes, isUsable := unionConstituentsIfNotLoose(ruleContext.TypeChecker, typeNode)
 			if !isUsable {
 				return
 			}
 
-			if !isSameTypeWithoutNullish(ctx.TypeChecker, assertedTypes, originalTypes) {
+			if !isSameTypeWithoutNullish(ruleContext.TypeChecker, assertedTypes, originalTypes) {
 				return
 			}
 
@@ -156,8 +156,8 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 
 			// `rule.TokenRange` supplies the text rather than `Pos()`, which includes leading trivia
 			// and would pull the preceding whitespace into the replacement as well as into the span.
-			expressionRange := rule.TokenRange(ctx.SourceFile, assertedExpression)
-			expressionText := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+			expressionRange := rule.TokenRange(ruleContext.SourceFile, assertedExpression)
+			expressionText := ruleContext.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
 
 			precedence := ast.GetOperatorPrecedence(assertedExpression.Kind, ast.KindUnknown,
 				ast.OperatorPrecedenceFlagsNone)
@@ -166,8 +166,8 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 				replacement = "(" + expressionText + ")!"
 			}
 
-			ctx.ReportNodeWithFixes(node, preferNonNullAssertionMessage,
-				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement))
+			ruleContext.ReportNodeWithFixes(node, preferNonNullAssertionMessage,
+				rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement))
 		}
 
 		return rule.Listeners{

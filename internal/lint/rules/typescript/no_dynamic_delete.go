@@ -97,7 +97,7 @@ import (
 var NoDynamicDelete = rule.Rule{
 	Name: "@typescript-eslint/no-dynamic-delete",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				// SkipParentheses dereferences its argument, so the operand is read from the node
@@ -122,7 +122,7 @@ var NoDynamicDelete = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(key, buildDynamicDeleteMessage())
+				ruleContext.ReportNode(key, buildDynamicDeleteMessage())
 			},
 		}
 	},

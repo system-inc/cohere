@@ -105,14 +105,14 @@ var noTyposPropTypeNames = []string{
 // three-line predicate.
 var NoTypos = rule.Rule{
 	Name: "react/no-typos",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The two import bindings, tracked across the whole file. Upstream keeps them as closure
 		// state and its listeners run in source order, so an import below a usage does not name the
 		// package for that usage. Reproduced by walking the file once from the source node, in
 		// order, rather than by registering per-kind listeners whose relative order is not stated.
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				state := &noTyposState{ctx: ctx}
+				state := &noTyposState{ctx: ruleContext}
 				state.walk(sourceFile)
 			},
 		}

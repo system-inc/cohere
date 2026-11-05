@@ -134,7 +134,7 @@ var NoConstAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Each constant declaration on the shared walk, reading the writes to its names from the
 		// file's identifier index.
 		//
@@ -152,7 +152,7 @@ var NoConstAssign = rule.Rule{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// The flags live on the declaration list rather than on the individual declarator,
@@ -167,7 +167,7 @@ var NoConstAssign = rule.Rule{
 					// elements down, and upstream fails on exactly that.
 					forEachBoundName(declaration.AsVariableDeclaration().Name(), func(boundName *ast.Node) {
 						if boundName != nil && boundName.Kind == ast.KindIdentifier {
-							reportConstWrites(ctx, boundName, judged)
+							reportConstWrites(ruleContext, boundName, judged)
 						}
 					})
 				}
@@ -183,11 +183,11 @@ var NoConstAssign = rule.Rule{
 // a failing case for the write coming first (`x = 123; const x = 1;`) and notes that reporting it
 // aligns with ESLint. Anchoring the search on the file and the match on symbol identity is what
 // makes the position of the write irrelevant.
-func reportConstWrites(ctx rule.Context, boundName *ast.Node, judged map[*ast.Node]bool) {
+func reportConstWrites(ruleContext rule.Context, boundName *ast.Node, judged map[*ast.Node]bool) {
 	// Resolved through the checker rather than taken as the declarator node directly, so that both
 	// sides of the comparison are answers to the same question: asking the AST for one side and the
 	// checker for the other compares two things that happen to agree today.
-	anchor := declarationAnchoredAt(ctx, boundName)
+	anchor := declarationAnchoredAt(ruleContext, boundName)
 	if anchor == nil || judged[anchor] {
 		return
 	}
@@ -197,9 +197,9 @@ func reportConstWrites(ctx rule.Context, boundName *ast.Node, judged map[*ast.No
 	// resolves to this very declaration, and `WritesToBinding` declines it: a declaration name's
 	// parent is the declarator, which is not an assignment. The structural test runs first because it
 	// is far cheaper than a checker call.
-	for _, occurrence := range reference.IdentifiersNamed(ctx, boundName.Text()) {
-		if reference.WritesToBinding(occurrence) && resolvesToDeclaration(ctx, occurrence, anchor) {
-			ctx.ReportNode(occurrence, messageNoConstAssign)
+	for _, occurrence := range reference.IdentifiersNamed(ruleContext, boundName.Text()) {
+		if reference.WritesToBinding(occurrence) && resolvesToDeclaration(ruleContext, occurrence, anchor) {
+			ruleContext.ReportNode(occurrence, messageNoConstAssign)
 		}
 	}
 }

@@ -127,10 +127,10 @@ var CorrectnessRequireVerifyArrayParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				checkVerifyArrayParity(ctx, node, node.Name())
+				checkVerifyArrayParity(ruleContext, node, node.Name())
 			},
 			// A constructor parameter property. See isBaseParameterProperty for why the parameter
 			// kind carries both forms here where the original has a node kind of its own.
@@ -138,15 +138,15 @@ var CorrectnessRequireVerifyArrayParity = rule.Rule{
 				if !isBaseParameterProperty(node) {
 					return
 				}
-				checkVerifyArrayParity(ctx, node, node.Name())
+				checkVerifyArrayParity(ruleContext, node, node.Name())
 			},
 		}
 	},
 }
 
 // checkVerifyArrayParity judges one property or parameter property.
-func checkVerifyArrayParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
-	if ctx.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
+func checkVerifyArrayParity(ruleContext rule.Context, node *ast.Node, key *ast.Node) {
+	if ruleContext.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
 		return
 	}
 
@@ -175,11 +175,11 @@ func checkVerifyArrayParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
 		return
 	}
 
-	if !verifyTypeIsArray(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(key)) {
+	if !verifyTypeIsArray(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(key)) {
 		return
 	}
 
-	ctx.ReportNode(key, rule.Message{
+	ruleContext.ReportNode(key, rule.Message{
 		Id:          correctnessRequireVerifyArrayParityText.Id,
 		Description: correctnessRequireVerifyArrayParityText.Render(map[string]string{"propertyName": key.Text()}),
 	})

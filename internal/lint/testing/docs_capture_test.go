@@ -17,11 +17,11 @@ import (
 // the docs capture rather than to ship.
 var captureProbe = rule.Rule{
 	Name: "probe-docs-capture",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
-				ctx.ReportNodeWithFixes(node, rule.Message{Id: "debugger", Description: "A debugger statement."},
-					rule.Fix{Range: rule.TokenRange(ctx.SourceFile, node)})
+				ruleContext.ReportNodeWithFixes(node, rule.Message{Id: "debugger", Description: "A debugger statement."},
+					rule.Fix{Range: rule.TokenRange(ruleContext.SourceFile, node)})
 			},
 		}
 	},

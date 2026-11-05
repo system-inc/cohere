@@ -124,8 +124,8 @@ var messageUnexpectedMultilineDivision = rule.Message{
 // of two different routes rather than a shared implementation.
 var NoUnexpectedMultiline = rule.Rule{
 	Name: "no-unexpected-multiline",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		text := ctx.SourceFile.Text()
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		text := ruleContext.SourceFile.Text()
 
 		// reportIfLineBreaks is upstream's checkForBreakAfter. The token that opens what follows
 		// `expression` is the first non-trivia character after it, and the finding is anchored on
@@ -149,11 +149,11 @@ var NoUnexpectedMultiline = rule.Rule{
 			// Probed over six shapes including calls and accesses whose callee itself ends in `)`
 			// or `]`, and the two positions reported the same line every time. The subtraction is
 			// kept because it is what the sentence above means, not because it changes an answer.
-			if scanner.GetECMALineOfPosition(ctx.SourceFile, expression.End()-1) ==
-				scanner.GetECMALineOfPosition(ctx.SourceFile, openToken) {
+			if scanner.GetECMALineOfPosition(ruleContext.SourceFile, expression.End()-1) ==
+				scanner.GetECMALineOfPosition(ruleContext.SourceFile, openToken) {
 				return
 			}
-			ctx.ReportRange(core.NewTextRange(openToken, openToken+1), message)
+			ruleContext.ReportRange(core.NewTextRange(openToken, openToken+1), message)
 		}
 
 		return rule.Listeners{
@@ -188,7 +188,7 @@ var NoUnexpectedMultiline = rule.Rule{
 				// what this arm is measuring across: `aaaa<test>/* comment */`+"`foo`" reports at
 				// the backtick, four lines below the comment's start. GetRangeOfTokenAtPosition is
 				// what moves the position past the trivia to the backtick itself.
-				templateToken := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, tagged.Template.Pos()).Pos()
+				templateToken := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, tagged.Template.Pos()).Pos()
 				if templateToken >= len(text) {
 					return
 				}
@@ -213,11 +213,11 @@ var NoUnexpectedMultiline = rule.Rule{
 				if lastTokenEnd <= 0 {
 					return
 				}
-				if scanner.GetECMALineOfPosition(ctx.SourceFile, lastTokenEnd-1) ==
-					scanner.GetECMALineOfPosition(ctx.SourceFile, templateToken) {
+				if scanner.GetECMALineOfPosition(ruleContext.SourceFile, lastTokenEnd-1) ==
+					scanner.GetECMALineOfPosition(ruleContext.SourceFile, templateToken) {
 					return
 				}
-				ctx.ReportRange(core.NewTextRange(templateToken, templateToken+1),
+				ruleContext.ReportRange(core.NewTextRange(templateToken, templateToken+1),
 					messageUnexpectedMultilineTaggedTemplate)
 			},
 

@@ -136,7 +136,7 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 // offered the rewrite; kept as upstream's, and measured.
 var NoEmptyObjectType = rule.Rule{
 	Name: "@typescript-eslint/no-empty-object-type",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoEmptyObjectTypeOptions](options)
 		if !ok {
 			settings = DefaultNoEmptyObjectTypeOptions()
@@ -145,12 +145,12 @@ var NoEmptyObjectType = rule.Rule{
 		listeners := rule.Listeners{}
 		if settings.AllowInterfaces != "always" {
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
-				checkEmptyInterface(ctx, settings, node)
+				checkEmptyInterface(ruleContext, settings, node)
 			}
 		}
 		if settings.AllowObjectTypes != "always" {
 			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
-				checkEmptyTypeLiteral(ctx, settings, node)
+				checkEmptyTypeLiteral(ruleContext, settings, node)
 			}
 		}
 		return listeners
@@ -159,7 +159,7 @@ var NoEmptyObjectType = rule.Rule{
 
 // checkEmptyInterface reports an interface with no members, unless its extends clause or its name
 // exempts it.
-func checkEmptyInterface(ctx rule.Context, settings NoEmptyObjectTypeOptions, node *ast.Node) {
+func checkEmptyInterface(ruleContext rule.Context, settings NoEmptyObjectTypeOptions, node *ast.Node) {
 	declaration := node.AsInterfaceDeclaration()
 	name := declaration.Name()
 	if name == nil {
@@ -180,15 +180,15 @@ func checkEmptyInterface(ctx rule.Context, settings NoEmptyObjectTypeOptions, no
 
 	if len(extended) == 0 {
 		if !shouldSuggest {
-			ctx.ReportNode(name, messageEmptyInterface)
+			ruleContext.ReportNode(name, messageEmptyInterface)
 			return
 		}
-		ctx.ReportNodeWithSuggestions(name, messageEmptyInterface,
-			emptyInterfaceRewrite(ctx, node, "object", rule.Message{
+		ruleContext.ReportNodeWithSuggestions(name, messageEmptyInterface,
+			emptyInterfaceRewrite(ruleContext, node, "object", rule.Message{
 				Id:          "replaceEmptyInterface",
 				Description: "Replace the empty interface with `object`, which means any non-primitive.",
 			}),
-			emptyInterfaceRewrite(ctx, node, "unknown", rule.Message{
+			emptyInterfaceRewrite(ruleContext, node, "unknown", rule.Message{
 				Id:          "replaceEmptyInterface",
 				Description: "Replace the empty interface with `unknown`, which means any value at all.",
 			}),
@@ -197,12 +197,12 @@ func checkEmptyInterface(ctx rule.Context, settings NoEmptyObjectTypeOptions, no
 	}
 
 	if !shouldSuggest {
-		ctx.ReportNode(name, messageEmptyInterfaceWithSuper)
+		ruleContext.ReportNode(name, messageEmptyInterfaceWithSuper)
 		return
 	}
-	supertype := rule.TokenRange(ctx.SourceFile, extended[0])
-	ctx.ReportNodeWithSuggestions(name, messageEmptyInterfaceWithSuper,
-		emptyInterfaceRewrite(ctx, node, ctx.SourceFile.Text()[supertype.Pos():supertype.End()], rule.Message{
+	supertype := rule.TokenRange(ruleContext.SourceFile, extended[0])
+	ruleContext.ReportNodeWithSuggestions(name, messageEmptyInterfaceWithSuper,
+		emptyInterfaceRewrite(ruleContext, node, ruleContext.SourceFile.Text()[supertype.Pos():supertype.End()], rule.Message{
 			Id:          "replaceEmptyInterfaceWithSuper",
 			Description: "Replace the empty interface with a type alias of the type it extends.",
 		}),
@@ -214,8 +214,8 @@ func checkEmptyInterface(ctx rule.Context, settings NoEmptyObjectTypeOptions, no
 // Upstream replaces its TSInterfaceDeclaration node, which an `export` wraps rather than starts, so an
 // `export` stays in front of the alias. A `declare` is part of the node and goes with it: `export declare
 // interface X {}` becomes `export type X = object`. Measured on the installed rule.
-func emptyInterfaceRewrite(ctx rule.Context, node *ast.Node, target string, message rule.Message) rule.Suggestion {
-	text := ctx.SourceFile.Text()
+func emptyInterfaceRewrite(ruleContext rule.Context, node *ast.Node, target string, message rule.Message) rule.Suggestion {
+	text := ruleContext.SourceFile.Text()
 	declaration := node.AsInterfaceDeclaration()
 	name := declaration.Name()
 	typeParameters := ""
@@ -225,7 +225,7 @@ func emptyInterfaceRewrite(ctx rule.Context, node *ast.Node, target string, mess
 		closing := scanner.SkipTrivia(text, declaration.TypeParameters.End())
 		typeParameters = text[opening : closing+1]
 	}
-	replacement := core.NewTextRange(emptyInterfaceRewriteStart(ctx, node), node.End())
+	replacement := core.NewTextRange(emptyInterfaceRewriteStart(ruleContext, node), node.End())
 	return rule.Suggestion{
 		Message: message,
 		Fixes: []rule.Fix{rule.ReplaceRange(replacement,
@@ -235,17 +235,17 @@ func emptyInterfaceRewrite(ctx rule.Context, node *ast.Node, target string, mess
 
 // emptyInterfaceRewriteStart is where upstream's interface node begins: its first modifier that is not
 // `export` or `default`, else the `interface` keyword.
-func emptyInterfaceRewriteStart(ctx rule.Context, node *ast.Node) int {
+func emptyInterfaceRewriteStart(ruleContext rule.Context, node *ast.Node) int {
 	modifiers := node.Modifiers()
 	if modifiers == nil || len(modifiers.Nodes) == 0 {
-		return rule.TokenRange(ctx.SourceFile, node).Pos()
+		return rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	}
 	for _, modifier := range modifiers.Nodes {
 		if modifier.Kind != ast.KindExportKeyword && modifier.Kind != ast.KindDefaultKeyword {
-			return rule.TokenRange(ctx.SourceFile, modifier).Pos()
+			return rule.TokenRange(ruleContext.SourceFile, modifier).Pos()
 		}
 	}
-	return scanner.SkipTrivia(ctx.SourceFile.Text(), modifiers.Nodes[len(modifiers.Nodes)-1].End())
+	return scanner.SkipTrivia(ruleContext.SourceFile.Text(), modifiers.Nodes[len(modifiers.Nodes)-1].End())
 }
 
 // emptyInterfaceMergesInItsScope answers upstream's mergedWithOtherDeclaration: whether a class or
@@ -304,7 +304,7 @@ func scopeStatementsOf(statement *ast.Node) []*ast.Node {
 //
 // Our parser keeps a parenthesized type, which upstream's folds away, so `T & ({})` is still in an
 // intersection and `type BaseProps = ({})` still names the alias; the parentheses are looked through.
-func checkEmptyTypeLiteral(ctx rule.Context, settings NoEmptyObjectTypeOptions, node *ast.Node) {
+func checkEmptyTypeLiteral(ruleContext rule.Context, settings NoEmptyObjectTypeOptions, node *ast.Node) {
 	typeLiteral := node.AsTypeLiteralNode()
 	if typeLiteral.Members != nil && len(typeLiteral.Members.Nodes) != 0 {
 		return
@@ -321,20 +321,20 @@ func checkEmptyTypeLiteral(ctx rule.Context, settings NoEmptyObjectTypeOptions, 
 		return
 	}
 
-	ctx.ReportNodeWithSuggestions(node, messageEmptyObject,
+	ruleContext.ReportNodeWithSuggestions(node, messageEmptyObject,
 		rule.Suggestion{
 			Message: rule.Message{
 				Id:          "replaceEmptyObjectType",
 				Description: "Replace `{}` with `object`, which means any non-primitive.",
 			},
-			Fixes: []rule.Fix{ctx.ReplaceNode(node, "object")},
+			Fixes: []rule.Fix{ruleContext.ReplaceNode(node, "object")},
 		},
 		rule.Suggestion{
 			Message: rule.Message{
 				Id:          "replaceEmptyObjectType",
 				Description: "Replace `{}` with `unknown`, which means any value at all.",
 			},
-			Fixes: []rule.Fix{ctx.ReplaceNode(node, "unknown")},
+			Fixes: []rule.Fix{ruleContext.ReplaceNode(node, "unknown")},
 		},
 	)
 }

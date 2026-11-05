@@ -64,8 +64,8 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -82,12 +82,12 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 				if decoratorExpression == nil {
 					return
 				}
-				decoratorType := ctx.TypeChecker.GetTypeAtLocation(decoratorExpression)
+				decoratorType := ruleContext.TypeChecker.GetTypeAtLocation(decoratorExpression)
 				if decoratorType == nil {
 					return
 				}
 
-				resolvedType := readInjectResolvedTypeBrand(ctx, decoratorType)
+				resolvedType := readInjectResolvedTypeBrand(ruleContext, decoratorType)
 				if resolvedType == nil {
 					// Not a branded decorator, so there is no contract to check.
 					return
@@ -99,11 +99,11 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 					return
 				}
 
-				parameterType := ctx.TypeChecker.GetTypeAtLocation(parameterNode)
+				parameterType := ruleContext.TypeChecker.GetTypeAtLocation(parameterNode)
 				if parameterType == nil {
 					return
 				}
-				if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, resolvedType, parameterType) {
+				if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, resolvedType, parameterType) {
 					return
 				}
 
@@ -117,15 +117,15 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 				// are `wrong: Other`, `s: SubService`, `d: Other = new Other()`, `plain: Other` and
 				// `n: Other`, so the span runs from the name through the end of the declaration and
 				// a defaulted parameter keeps its default.
-				ctx.ReportRange(core.NewTextRange(
-					rule.TokenRange(ctx.SourceFile, parameterNode.Name()).Pos(),
+				ruleContext.ReportRange(core.NewTextRange(
+					rule.TokenRange(ruleContext.SourceFile, parameterNode.Name()).Pos(),
 					parameterNode.End(),
 				), rule.Message{
 					Id: correctnessRequireMatchingInjectTypeText.Id,
 					Description: correctnessRequireMatchingInjectTypeText.Render(map[string]string{
 						"decoratorName": injectDecoratorName(node),
-						"resolvedType":  ctx.TypeChecker.TypeToString(resolvedType),
-						"parameterType": ctx.TypeChecker.TypeToString(parameterType),
+						"resolvedType":  ruleContext.TypeChecker.TypeToString(resolvedType),
+						"parameterType": ruleContext.TypeChecker.TypeToString(parameterType),
 					}),
 				})
 			},
@@ -143,12 +143,12 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 // optional, so its type is `T | undefined`, and comparing that against a parameter typed `T` answers
 // NOT assignable. Without the strip the rule reports every correct site and is silent on none of
 // them, which is the exact inversion of its purpose.
-func readInjectResolvedTypeBrand(ctx rule.Context, decoratorType *checker.Type) *checker.Type {
-	symbol := ctx.TypeChecker.GetPropertyOfType(decoratorType, "__resolvedType")
+func readInjectResolvedTypeBrand(ruleContext rule.Context, decoratorType *checker.Type) *checker.Type {
+	symbol := ruleContext.TypeChecker.GetPropertyOfType(decoratorType, "__resolvedType")
 	if symbol == nil {
 		return nil
 	}
-	brandType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+	brandType := ruleContext.TypeChecker.GetTypeOfSymbol(symbol)
 	if brandType == nil || !type_checking.IsUnionType(brandType) {
 		return brandType
 	}

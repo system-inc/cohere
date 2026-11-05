@@ -128,15 +128,15 @@ type noThisAliasRawOptions struct {
 // upstream declines it. Measured on the release binary in both shapes.
 var NoThisAlias = rule.Rule{
 	Name: "@typescript-eslint/no-this-alias",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// Declining the file rather than the node, matching upstream's `should_run`, which reads
 		// `ctx.source_type().is_typescript()`. Measured: the same `const self = this;` reports in a
 		// `.ts` file and is silent in a `.js` one.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -151,7 +151,7 @@ var NoThisAlias = rule.Rule{
 			if allowed[identifier.Text()] {
 				return
 			}
-			ctx.ReportNode(identifier, messageNoThisAlias)
+			ruleContext.ReportNode(identifier, messageNoThisAlias)
 		}
 
 		return rule.Listeners{
@@ -178,7 +178,7 @@ var NoThisAlias = rule.Rule{
 				if !parsed.ReportDestructuring {
 					return
 				}
-				ctx.ReportNode(name, messageNoThisDestructure)
+				ruleContext.ReportNode(name, messageNoThisDestructure)
 			},
 
 			ast.KindBinaryExpression: func(node *ast.Node) {
@@ -204,7 +204,7 @@ var NoThisAlias = rule.Rule{
 					if !parsed.ReportDestructuring {
 						return
 					}
-					ctx.ReportNode(expression.Left, messageNoThisDestructure)
+					ruleContext.ReportNode(expression.Left, messageNoThisDestructure)
 
 				default:
 					// Everything else is upstream's identifier arm and its simple-target arm, which

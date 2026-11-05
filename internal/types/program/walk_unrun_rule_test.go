@@ -45,7 +45,7 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 	graph.RegisteredRuleNames = []string{"no-console", "react/no-array-index-key", "nexus/consistency-no-enum"}
 	listening := rule.Rule{
 		Name: "no-console",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {}}
 		},
 	}

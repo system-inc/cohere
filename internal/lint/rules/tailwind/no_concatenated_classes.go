@@ -61,8 +61,8 @@ type NoConcatenatedClassesOptions struct {
 // produce a class list the author never intended.
 var NoConcatenatedClasses = rule.Rule{
 	Name: "better-tailwindcss/no-concatenated-classes",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -71,12 +71,12 @@ var NoConcatenatedClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, template := range reader.ClassTemplatesIn(node) {
 				for _, boundary := range template.Boundaries {
-					ctx.ReportRange(boundary.Range, messageConcatenatedClass(boundary.Fragment))
+					ruleContext.ReportRange(boundary.Range, messageConcatenatedClass(boundary.Fragment))
 				}
 			}
 		}

@@ -224,7 +224,7 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 // factory-component arm reaches them too.
 var SortComp = rule.Rule{
 	Name: "react/sort-comp",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		resolved, isSortCompOptions := rule.OptionsAs[SortCompOptions](options)
 		if !isSortCompOptions {
 			// A rule configured as a bare `"error"` is handed nil options rather than the decoded
@@ -241,7 +241,7 @@ var SortComp = rule.Rule{
 			// a `Program:exit` handler over the component list it accumulated. `KindSourceFile`
 			// fires before its children here, so the walk is done by hand inside it.
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, component := range collectDetectedComponents(ctx, node) {
+				for _, component := range collectDetectedComponents(ruleContext, node) {
 					members := sortCompComponentMembers(component.node)
 					if len(members) < 2 {
 						// Fewer than two members cannot form a pair, so no vote can be cast. Not a
@@ -250,7 +250,7 @@ var SortComp = rule.Rule{
 						// the allocation below is not worth paying for it.
 						continue
 					}
-					sortCompCheckOrder(ctx, methodsOrder, members)
+					sortCompCheckOrder(ruleContext, methodsOrder, members)
 				}
 			},
 		}
@@ -649,7 +649,7 @@ type sortCompError struct {
 }
 
 // sortCompCheckOrder runs the pairwise vote over one component's members and reports what survives.
-func sortCompCheckOrder(ctx rule.Context, methodsOrder []string, members []sortCompMember) {
+func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members []sortCompMember) {
 	errors := map[int]*sortCompError{}
 
 	storeError := func(memberA sortCompMember, indexA int, memberB sortCompMember, indexB int) {
@@ -745,7 +745,7 @@ func sortCompCheckOrder(ctx rule.Context, methodsOrder []string, members []sortC
 		if index < reported.closestIndex {
 			position = "before"
 		}
-		ctx.ReportNode(
+		ruleContext.ReportNode(
 			reported.member.node,
 			sortCompUnsortedProps(reported.member.name, position, reported.closestMember.name),
 		)

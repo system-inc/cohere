@@ -50,7 +50,7 @@ func messageNoStringLiteralGraphQlQuery() rule.Message {
 // mistake that arrives with other errors.
 var NetworkNoStringLiteralQuery = rule.Rule{
 	Name: "structure/network-no-string-literal-query",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -63,7 +63,7 @@ var NetworkNoStringLiteralQuery = rule.Rule{
 
 				firstArgument := call.Arguments.Nodes[0]
 				if resolvesToStringLiteral(firstArgument, map[*ast.Node]bool{}) {
-					ctx.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery())
+					ruleContext.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery())
 				}
 			},
 		}

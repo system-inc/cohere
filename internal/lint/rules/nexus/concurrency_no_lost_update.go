@@ -133,8 +133,8 @@ var ConcurrencyNoLostUpdate = rule.Rule{
 	// variable from a shadowing local of the same spelling.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
@@ -142,7 +142,7 @@ var ConcurrencyNoLostUpdate = rule.Rule{
 				var visit func(node *ast.Node) bool
 				visit = func(node *ast.Node) bool {
 					if control_flow_graph.IsRoot(node) && concurrencyNoLostUpdateCanSuspend(node) {
-						analyzeConcurrencyNoLostUpdateRoot(ctx, node)
+						analyzeConcurrencyNoLostUpdateRoot(ruleContext, node)
 					}
 					node.ForEachChild(visit)
 					return false
@@ -314,9 +314,9 @@ type concurrencyNoLostUpdateRoot struct {
 	stableBindings   map[*ast.Symbol]bool
 }
 
-func analyzeConcurrencyNoLostUpdateRoot(ctx rule.Context, root *ast.Node) {
+func analyzeConcurrencyNoLostUpdateRoot(ruleContext rule.Context, root *ast.Node) {
 	analysis := &concurrencyNoLostUpdateRoot{
-		ctx:              ctx,
+		ctx:              ruleContext,
 		root:             root,
 		locals:           map[*ast.Symbol]*concurrencyNoLostUpdateLocal{},
 		between:          map[concurrencyNoLostUpdateBetweenKey]bool{},
@@ -370,9 +370,9 @@ func analyzeConcurrencyNoLostUpdateRoot(ctx rule.Context, root *ast.Node) {
 			continue
 		}
 		if analysis.losesUpdate(assignment, target) {
-			targetRange := rule.TokenRange(ctx.SourceFile, binary.Left)
-			targetText := ctx.SourceFile.Text()[targetRange.Pos():targetRange.End()]
-			ctx.ReportNode(assignment, concurrencyNoLostUpdateMessage(targetText))
+			targetRange := rule.TokenRange(ruleContext.SourceFile, binary.Left)
+			targetText := ruleContext.SourceFile.Text()[targetRange.Pos():targetRange.End()]
+			ruleContext.ReportNode(assignment, concurrencyNoLostUpdateMessage(targetText))
 		}
 	}
 
@@ -386,7 +386,7 @@ func analyzeConcurrencyNoLostUpdateRoot(ctx rule.Context, root *ast.Node) {
 		evaluator := concurrencyNoLostUpdateEvaluator{analysis: analysis, target: access.target, anchor: call}
 		for _, outcome := range evaluator.evaluate(access.value, false) {
 			if outcome.dependencies&concurrencyNoLostUpdateStaleModified != 0 {
-				ctx.ReportNode(call, concurrencyNoLostUpdateStoreMessage(analysis.storeReadText(access.target, call)))
+				ruleContext.ReportNode(call, concurrencyNoLostUpdateStoreMessage(analysis.storeReadText(access.target, call)))
 				break
 			}
 		}

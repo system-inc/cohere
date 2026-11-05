@@ -12,8 +12,8 @@ import (
 // at the syntax: `await value` is identical either way, and only the checker knows which it is.
 var awaitedTypeIsThenable = rule.Rule{
 	Name: "probe-await-thenable",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// A type-aware rule handed no checker must decline rather than guess. This is exactly
 			// the path that made a fixture pass vacuously under the syntax-only harness.
 			return nil
@@ -21,15 +21,15 @@ var awaitedTypeIsThenable = rule.Rule{
 		return rule.Listeners{
 			ast.KindAwaitExpression: func(node *ast.Node) {
 				operand := node.AsAwaitExpression().Expression
-				operandType := ctx.TypeChecker.GetTypeAtLocation(operand)
+				operandType := ruleContext.TypeChecker.GetTypeAtLocation(operand)
 				if operandType == nil {
 					return
 				}
 				// The checker narrows `const value = 3` to the literal type `3`, not to `number`.
 				// That narrowing is itself evidence the checker is live rather than stubbed, and a
 				// syntactic walk could not produce it.
-				if isNumeric(ctx.TypeChecker.TypeToString(operandType)) {
-					ctx.ReportNode(node, rule.Message{
+				if isNumeric(ruleContext.TypeChecker.TypeToString(operandType)) {
+					ruleContext.ReportNode(node, rule.Message{
 						Id:          "awaitNonThenable",
 						Description: "Awaiting a number does nothing.",
 					})
@@ -142,14 +142,14 @@ func TestNarrowedLiteralTypesReachTheRule(test *testing.T) {
 	reported := []string{}
 	recorder := rule.Rule{
 		Name: "probe-type-names",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if ctx.TypeChecker == nil {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if ruleContext.TypeChecker == nil {
 				return nil
 			}
 			return rule.Listeners{
 				ast.KindAwaitExpression: func(node *ast.Node) {
-					operandType := ctx.TypeChecker.GetTypeAtLocation(node.AsAwaitExpression().Expression)
-					reported = append(reported, ctx.TypeChecker.TypeToString(operandType))
+					operandType := ruleContext.TypeChecker.GetTypeAtLocation(node.AsAwaitExpression().Expression)
+					reported = append(reported, ruleContext.TypeChecker.TypeToString(operandType))
 				},
 			}
 		},

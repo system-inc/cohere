@@ -92,10 +92,10 @@ var PreferNumericLiterals = rule.Rule{
 	Name:             "prefer-numeric-literals",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
@@ -115,20 +115,20 @@ var PreferNumericLiterals = rule.Rule{
 				if !isSpellable {
 					return
 				}
-				if !preferNumericLiteralsIsParseInt(ctx, call.Expression) {
+				if !preferNumericLiteralsIsParseInt(ruleContext, call.Expression) {
 					return
 				}
 
-				calleeRange := rule.TokenRange(ctx.SourceFile, call.Expression)
-				functionName := ctx.SourceFile.Text()[calleeRange.Pos():calleeRange.End()]
+				calleeRange := rule.TokenRange(ruleContext.SourceFile, call.Expression)
+				functionName := ruleContext.SourceFile.Text()[calleeRange.Pos():calleeRange.End()]
 				message := preferNumericLiteralsMessage(spelling.system, functionName)
 
-				if fix, canFix := preferNumericLiteralsFix(ctx, node, spelling.prefix, stringValue,
+				if fix, canFix := preferNumericLiteralsFix(ruleContext, node, spelling.prefix, stringValue,
 					radix); canFix {
-					ctx.ReportNodeWithFixes(node, message, fix)
+					ruleContext.ReportNodeWithFixes(node, message, fix)
 					return
 				}
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			},
 		}
 	},
@@ -174,14 +174,14 @@ func preferNumericLiteralsRadixValue(node *ast.Node) (int, bool) {
 
 // preferNumericLiteralsIsParseInt answers upstream's `isParseInt`, which accepts two callee shapes
 // and requires the name at the root of each to be the global.
-func preferNumericLiteralsIsParseInt(ctx rule.Context, callee *ast.Node) bool {
+func preferNumericLiteralsIsParseInt(ruleContext rule.Context, callee *ast.Node) bool {
 	unwrapped := preferNumericLiteralsUnwrap(callee)
 	if unwrapped == nil {
 		return false
 	}
 
 	if unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == "parseInt" {
-		return preferNumericLiteralsResolvesToAGlobal(ctx, unwrapped)
+		return preferNumericLiteralsResolvesToAGlobal(ruleContext, unwrapped)
 	}
 
 	// `Number.parseInt`, in either spelling and with optional chaining anywhere in it.
@@ -205,7 +205,7 @@ func preferNumericLiteralsIsParseInt(ctx rule.Context, callee *ast.Node) bool {
 		accessedObject.Text() != "Number" {
 		return false
 	}
-	return preferNumericLiteralsResolvesToAGlobal(ctx, accessedObject)
+	return preferNumericLiteralsResolvesToAGlobal(ruleContext, accessedObject)
 }
 
 // preferNumericLiteralsUnwrap strips parentheses in a loop.
@@ -225,18 +225,18 @@ func preferNumericLiteralsUnwrap(node *ast.Node) *ast.Node {
 // A declaration in a declaration file is the global. Five of upstream's passing cases are shadows,
 // covering a parameter and a local for each of the two names, and nothing about the syntax
 // separates them from the real thing.
-func preferNumericLiteralsResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+func preferNumericLiteralsResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node) bool {
+	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferNumericLiteralsFix builds the repair, or declines.
-func preferNumericLiteralsFix(ctx rule.Context, node *ast.Node, prefix string, stringValue string,
+func preferNumericLiteralsFix(ruleContext rule.Context, node *ast.Node, prefix string, stringValue string,
 	radix int) (rule.Fix, bool) {
-	callRange := rule.TokenRange(ctx.SourceFile, node)
+	callRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	// Any comment inside the call would be deleted by a whole-call replacement. Twelve of
 	// upstream's declines are this and nothing else.
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= callRange.Pos() && comment.Range.End() <= callRange.End() {
 			return rule.Fix{}, false
 		}
@@ -251,7 +251,7 @@ func preferNumericLiteralsFix(ctx rule.Context, node *ast.Node, prefix string, s
 		return rule.Fix{}, false
 	}
 
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	if callRange.Pos() > 0 && scanner.IsIdentifierPart(rune(text[callRange.Pos()-1])) {
 		// `yield` beside `0b11` would read as one identifier.
 		replacement = " " + replacement

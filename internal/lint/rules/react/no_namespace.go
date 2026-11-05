@@ -113,7 +113,7 @@ var NoNamespace = rule.Rule{
 	// which binding `createElement` resolves to. The JSX arm needs nothing from it.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		reportElement := func(node *ast.Node) {
 			// `jsx.ElementParts` rather than a switch over the two kinds. A first draft wrote the
 			// switch by hand and `TestRulePackagesDoNotReachPastWrappedAccessors` refused it,
@@ -127,7 +127,7 @@ var NoNamespace = rule.Rule{
 			if tagName == nil || tagName.Kind != ast.KindJsxNamespacedName {
 				return
 			}
-			ctx.ReportNode(node, messageNoNamespace)
+			ruleContext.ReportNode(node, messageNoNamespace)
 		}
 
 		return rule.Listeners{
@@ -138,11 +138,11 @@ var NoNamespace = rule.Rule{
 				// crashing on `GetSymbolAtLocation`, and a vacuous green is the more dangerous of
 				// the two failures. The JSX arm above needs no checker and deliberately sits
 				// outside this guard, so a nil checker costs only the bare-call spelling.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
@@ -158,7 +158,7 @@ var NoNamespace = rule.Rule{
 				if !strings.Contains(first.Text(), ":") {
 					return
 				}
-				ctx.ReportNode(node, messageNoNamespace)
+				ruleContext.ReportNode(node, messageNoNamespace)
 			},
 		}
 	},

@@ -136,9 +136,9 @@ var PreferArrowCallback = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := preferArrowCallbackSettingsFrom(options)
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -147,7 +147,7 @@ var PreferArrowCallback = rule.Rule{
 				// One walk rather than per-kind listeners, because the rule needs to know which
 				// enclosing function each `this`, `super`, `new.target` and `arguments` belongs to,
 				// and the listener walk is pre-order with no exit hook.
-				walker := &preferArrowCallbackWalker{ctx: ctx, settings: settings}
+				walker := &preferArrowCallbackWalker{ctx: ruleContext, settings: settings}
 				walker.walk(node, nil)
 			},
 		}
@@ -238,11 +238,11 @@ func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallb
 // `foo(function(arguments) { arguments; })` REPORTS: the parameter shadows the implicit binding,
 // the function does not depend on it, and converting to an arrow is safe. Measured against the
 // installed rule, which reports it.
-func preferArrowCallbackResolvesToADeclaration(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func preferArrowCallbackResolvesToADeclaration(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	return rule.HasDeclarations(symbol)
 }
 
@@ -322,14 +322,14 @@ func (w *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCall
 //
 // Resolution rather than text: see the rule's doc comment for the three measured shapes, two of
 // which a text comparison gets wrong.
-func preferArrowCallbackReferencesOwnName(ctx rule.Context, node *ast.Node,
+func preferArrowCallbackReferencesOwnName(ruleContext rule.Context, node *ast.Node,
 	expression *ast.FunctionExpression) bool {
 
 	name := expression.Name()
 	if name == nil {
 		return false
 	}
-	declared := ctx.TypeChecker.GetSymbolAtLocation(name)
+	declared := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if declared == nil {
 		return false
 	}
@@ -341,7 +341,7 @@ func preferArrowCallbackReferencesOwnName(ctx rule.Context, node *ast.Node,
 			return
 		}
 		if inner.Kind == ast.KindIdentifier && inner != name && inner.Text() == name.Text() {
-			if ctx.TypeChecker.GetSymbolAtLocation(inner) == declared {
+			if ruleContext.TypeChecker.GetSymbolAtLocation(inner) == declared {
 				found = true
 				return
 			}
@@ -466,7 +466,7 @@ func preferArrowCallbackIsLogicalOperator(kind ast.Kind) bool {
 // nothing in two more inside the `.bind(this)` branch, and every one of them is a case where the
 // rewritten source would be valid and mean something else, or would delete a comment. All seven are
 // asserted by an `output: null` in the corpus.
-func preferArrowCallbackFix(ctx rule.Context, node *ast.Node, expression *ast.FunctionExpression,
+func preferArrowCallbackFix(ruleContext rule.Context, node *ast.Node, expression *ast.FunctionExpression,
 	frame *preferArrowCallbackFrame, callback preferArrowCallbackInfo) ([]rule.Fix, bool) {
 
 	// Decline 1: a callback that uses `this` without being bound to it. An arrow would take `this`
@@ -487,12 +487,12 @@ func preferArrowCallbackFix(ctx rule.Context, node *ast.Node, expression *ast.Fu
 		}
 	}
 
-	text := ctx.SourceFile.Text()
-	functionKeyword := preferArrowCallbackFunctionKeywordRange(ctx, node)
+	text := ruleContext.SourceFile.Text()
+	functionKeyword := preferArrowCallbackFunctionKeywordRange(ruleContext, node)
 	if functionKeyword.Pos() < 0 {
 		return nil, false
 	}
-	parameterListStart := preferArrowCallbackParameterListStart(ctx, node)
+	parameterListStart := preferArrowCallbackParameterListStart(ruleContext, node)
 	if parameterListStart < 0 || parameterListStart < functionKeyword.End() {
 		return nil, false
 	}
@@ -558,7 +558,7 @@ func preferArrowCallbackFix(ctx rule.Context, node *ast.Node, expression *ast.Fu
 		// Upstream removes only the tokens rather than the span, so the comment survives.
 		fixes = append(fixes, rule.RemoveRange(functionKeyword))
 		if expression.Name() != nil {
-			fixes = append(fixes, ctx.RemoveNode(expression.Name()))
+			fixes = append(fixes, ruleContext.RemoveNode(expression.Name()))
 		}
 	} else {
 		fixes = append(fixes, rule.RemoveRange(
@@ -592,7 +592,7 @@ func preferArrowCallbackFix(ctx rule.Context, node *ast.Node, expression *ast.Fu
 		// The TOKEN start, not `Pos()`: `Pos()` begins at the previous token's end and so includes
 		// the leading whitespace, which would place the `(` before the space and produce
 		// `nativeCb ||( () => {})`. Same trap sort-vars has for its declarator spans.
-		open := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, replaced.Pos()).Pos()
+		open := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, replaced.Pos()).Pos()
 		fixes = append(fixes,
 			rule.ReplaceRange(core.NewTextRange(open, open), "("),
 			rule.ReplaceRange(core.NewTextRange(replaced.End(), replaced.End()), ")"))
@@ -676,8 +676,8 @@ func preferArrowCallbackIsAsync(node *ast.Node) bool {
 
 // preferArrowCallbackFunctionKeywordRange finds the `function` keyword, which is upstream's
 // `getFirstToken(node, node.async ? 1 : 0)`.
-func preferArrowCallbackFunctionKeywordRange(ctx rule.Context, node *ast.Node) core.TextRange {
-	text := ctx.SourceFile.Text()
+func preferArrowCallbackFunctionKeywordRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+	text := ruleContext.SourceFile.Text()
 	limit := node.End()
 	for index := node.Pos(); index+8 <= limit && index+8 <= len(text); index++ {
 		if text[index:index+8] == "function" {
@@ -689,8 +689,8 @@ func preferArrowCallbackFunctionKeywordRange(ctx rule.Context, node *ast.Node) c
 
 // preferArrowCallbackParameterListStart finds the `(` that opens the parameter list, which is
 // upstream's `getTokenAfter(functionToken, isOpeningParenToken)`.
-func preferArrowCallbackParameterListStart(ctx rule.Context, node *ast.Node) int {
-	text := ctx.SourceFile.Text()
+func preferArrowCallbackParameterListStart(ruleContext rule.Context, node *ast.Node) int {
+	text := ruleContext.SourceFile.Text()
 	body := node.Body()
 	limit := node.End()
 	if body != nil {

@@ -204,7 +204,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 var InitDeclarations = rule.Rule{
 	Name: "@typescript-eslint/init-declarations",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[InitDeclarationsOptions](options)
 		if !isSettings {
 			settings = DefaultInitDeclarationsSettings()
@@ -252,7 +252,7 @@ var InitDeclarations = rule.Rule{
 							continue
 						}
 						// The narrowed span: the identifier alone, excluding any type annotation.
-						ctx.ReportNode(name, buildInitDeclarationsMessage(
+						ruleContext.ReportNode(name, buildInitDeclarationsMessage(
 							"initialized", name.AsIdentifier().Text))
 						continue
 					}
@@ -275,7 +275,7 @@ var InitDeclarations = rule.Rule{
 						continue
 					}
 					// The core rule's own span, kept: the whole declarator.
-					ctx.ReportNode(declarator, buildInitDeclarationsMessage(
+					ruleContext.ReportNode(declarator, buildInitDeclarationsMessage(
 						"notInitialized", name.AsIdentifier().Text))
 				}
 			},

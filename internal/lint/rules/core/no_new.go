@@ -60,7 +60,7 @@ var messageNoNewStatement = rule.Message{
 // `new` is the statement's expression and the inner one is its callee.
 var NoNew = rule.Rule{
 	Name: "no-new",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				// See the doc above: our tree keeps parentheses that ESTree discards, so the
@@ -69,7 +69,7 @@ var NoNew = rule.Rule{
 				if expression == nil || expression.Kind != ast.KindNewExpression {
 					return
 				}
-				ctx.ReportNode(node, messageNoNewStatement)
+				ruleContext.ReportNode(node, messageNoNewStatement)
 			},
 		}
 	},

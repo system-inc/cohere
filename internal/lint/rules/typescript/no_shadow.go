@@ -210,11 +210,11 @@ var NoShadow = rule.Rule{
 	// builtinGlobals asks whether a global's declarations live in a lib file.
 	ProgramReads: rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declined once per file rather than once per node. NeedsTypeChecker governs the
 		// registration path only; a Context built by hand still arrives with a nil checker, and
 		// `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds exactly that.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		settings, ok := rule.OptionsAs[NoShadowOptions](options)
@@ -226,7 +226,7 @@ var NoShadow = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkFileForShadowing(ctx, node, settings)
+				checkFileForShadowing(ruleContext, node, settings)
 			},
 		}
 	},
@@ -277,7 +277,7 @@ type shadowScope struct {
 // because a shadowing judgment needs the ENCLOSING scopes and there is no rule.OnExit and no
 // upward walk from a listener. KindSourceFile fires before its children, so the tree is walked
 // here directly and the answer is computed in one pass.
-func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoShadowOptions) {
+func checkFileForShadowing(ruleContext rule.Context, sourceFile *ast.Node, settings NoShadowOptions) {
 	var scopes []shadowScope
 
 	// The chain of containers currently open, outermost first. A binding's enclosing scopes are
@@ -337,7 +337,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 							identifier:   identifier,
 							declaration:  typeParameter,
 							declarations: []*ast.Node{typeParameter},
-							symbol:       ctx.TypeChecker.GetSymbolAtLocation(identifier),
+							symbol:       ruleContext.TypeChecker.GetSymbolAtLocation(identifier),
 						})
 					}
 				}
@@ -396,7 +396,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 						identifier:   identifier,
 						declaration:  typeParameter,
 						declarations: []*ast.Node{typeParameter},
-						symbol:       ctx.TypeChecker.GetSymbolAtLocation(identifier),
+						symbol:       ruleContext.TypeChecker.GetSymbolAtLocation(identifier),
 					})
 				}
 			}
@@ -407,7 +407,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 
 		if node.Kind == ast.KindEnumDeclaration {
 			enumScope := shadowScope{container: node}
-			collectEnumMembers(ctx, node, &enumScope)
+			collectEnumMembers(ruleContext, node, &enumScope)
 			if len(enumScope.bindings) > 0 {
 				scopes = append(scopes, enumScope)
 			}
@@ -433,13 +433,13 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 			continue
 		}
 		for _, binding := range scope.bindings {
-			reportIfShadowing(ctx, settings, scopes, scopeIndex, binding)
+			reportIfShadowing(ruleContext, settings, scopes, scopeIndex, binding)
 		}
 	}
 }
 
 // reportIfShadowing finds the nearest enclosing binding of the same name and reports if one exists.
-func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shadowScope, scopeIndex int, binding shadowBinding) {
+func reportIfShadowing(ruleContext rule.Context, settings NoShadowOptions, scopes []shadowScope, scopeIndex int, binding shadowBinding) {
 	// A `this` parameter is a pseudo-parameter that cannot be shadowed. Upstream skips it by name
 	// and definition type; here the parameter's name node is the `this` keyword.
 	if binding.name == "this" {
@@ -450,7 +450,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	if bindingIsDeclaredInADefinitionFile(ctx, binding) {
+	if bindingIsDeclaredInADefinitionFile(ruleContext, binding) {
 		return
 	}
 
@@ -474,7 +474,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 			!ast.IsExternalModule(container.AsSourceFile()) && binding.symbol != nil {
 			return
 		}
-		if !isBuiltinGlobal(ctx.TypeChecker, ctx.Program, binding.name) {
+		if !isBuiltinGlobal(ruleContext.TypeChecker, ruleContext.Program, binding.name) {
 			return
 		}
 		shadowed = shadowBinding{name: binding.name, global: true}
@@ -505,7 +505,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 	// ignoreFunctionTypeParameterNameValueShadow, default true: a parameter NAME inside a function
 	// TYPE is documentation rather than a binding. Nothing can read it, so it shadows nothing.
 	if settings.IgnoreFunctionTypeParameterNameValueShadow &&
-		bindingIsAFunctionTypeParameterName(ctx, binding, shadowed) {
+		bindingIsAFunctionTypeParameterName(ruleContext, binding, shadowed) {
 		return
 	}
 
@@ -518,7 +518,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 	// A type-only import of a name, augmented inside `declare module` naming that same module, is
 	// declaration merging rather than shadowing: the interface being declared is the very thing the
 	// import refers to.
-	if bindingIsExternalDeclarationMerging(ctx, scopes[scopeIndex].container, binding, shadowed) {
+	if bindingIsExternalDeclarationMerging(ruleContext, scopes[scopeIndex].container, binding, shadowed) {
 		return
 	}
 
@@ -533,7 +533,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	if settings.IgnoreOnInitialization && bindingIsInitializedThrough(ctx, binding, shadowed, shadowedContainer) {
+	if settings.IgnoreOnInitialization && bindingIsInitializedThrough(ruleContext, binding, shadowed, shadowedContainer) {
 		return
 	}
 
@@ -542,10 +542,10 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	reportRange := noShadowReportRange(ctx, binding.identifier)
+	reportRange := noShadowReportRange(ruleContext, binding.identifier)
 
 	if shadowed.global {
-		ctx.ReportRange(reportRange, rule.Message{
+		ruleContext.ReportRange(reportRange, rule.Message{
 			Id: messageNoShadowGlobal.Id,
 			Description: fmt.Sprintf("%s The name '%s' is already a global variable.",
 				messageNoShadowGlobal.Description, binding.name),
@@ -553,13 +553,13 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	shadowedLine, shadowedColumn := noShadowLineAndColumnOf(ctx, shadowed.identifier)
+	shadowedLine, shadowedColumn := noShadowLineAndColumnOf(ruleContext, shadowed.identifier)
 
 	// An enum member shadowing gets its own message, because the consequence is different: the
 	// member is added to the enum's scope, so a LATER member initializer naming it resolves to the
 	// member rather than to the outer binding.
 	if bindingIsAnEnumName(shadowed) {
-		ctx.ReportRange(reportRange, rule.Message{
+		ruleContext.ReportRange(reportRange, rule.Message{
 			Id: messageNoEnumShadow.Id,
 			Description: fmt.Sprintf("%s The name '%s' is already declared in the upper scope on "+
 				"line %d column %d.", messageNoEnumShadow.Description, binding.name,
@@ -568,7 +568,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	ctx.ReportRange(reportRange, rule.Message{
+	ruleContext.ReportRange(reportRange, rule.Message{
 		Id: messageNoShadow.Id,
 		Description: fmt.Sprintf("%s The name '%s' is already declared in the upper scope on "+
 			"line %d column %d.", messageNoShadow.Description, binding.name,
@@ -583,8 +583,8 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 // upstream reports covers `a?: number` and `a!: number`. A rest parameter's annotation hangs on the
 // RestElement instead and a destructured name has none, so both report the name alone. Measured on the
 // installed rule; the edge rows named "span:" record each shape.
-func noShadowReportRange(ctx rule.Context, identifier *ast.Node) core.TextRange {
-	nameRange := rule.TokenRange(ctx.SourceFile, identifier)
+func noShadowReportRange(ruleContext rule.Context, identifier *ast.Node) core.TextRange {
+	nameRange := rule.TokenRange(ruleContext.SourceFile, identifier)
 	end := identifier.End()
 	switch declaration := identifier.Parent; declaration.Kind {
 	case ast.KindVariableDeclaration:
@@ -706,12 +706,12 @@ func expressionSelfName(node *ast.Node) *ast.Node {
 // Through the enum symbol's Exports table rather than through Locals, because an enum declaration
 // is not a locals container and `ast.GetLocals` would panic on it. Measured: for `enum E { A }` the
 // symbol carries `exports=[A]` and `members=[]`.
-func collectEnumMembers(ctx rule.Context, enumDeclaration *ast.Node, scope *shadowScope) {
+func collectEnumMembers(ruleContext rule.Context, enumDeclaration *ast.Node, scope *shadowScope) {
 	name := enumDeclaration.Name()
 	if name == nil {
 		return
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return
 	}
@@ -1050,9 +1050,9 @@ func bindingIsTypeOnlyImport(binding shadowBinding) bool {
 // function's NAME has that same function as its definition node, so a name declared only by
 // signatures counts too, while an overload set with its implementation does not: measured on the
 // installed rule.
-func bindingIsAFunctionTypeParameterName(ctx rule.Context, binding shadowBinding, shadowed shadowBinding) bool {
+func bindingIsAFunctionTypeParameterName(ruleContext rule.Context, binding shadowBinding, shadowed shadowBinding) bool {
 	if shadowed.global {
-		if !builtinGlobalIsValue(ctx.TypeChecker, ctx.Program, shadowed.name) {
+		if !builtinGlobalIsValue(ruleContext.TypeChecker, ruleContext.Program, shadowed.name) {
 			return false
 		}
 	} else if shadowedIsValue, _ := bindingDeclarationSpaces(shadowed); !shadowedIsValue {
@@ -1110,8 +1110,8 @@ func bindingIsAnIndexSignatureParameter(declaration *ast.Node) bool {
 // The four definition types upstream reads are a variable (the `declare` is on its statement), a
 // class, an enum and a namespace. A declaration inside a `declare namespace` without its own `declare`
 // is not one, and still reports; measured on the installed rule.
-func bindingIsDeclaredInADefinitionFile(ctx rule.Context, binding shadowBinding) bool {
-	fileName := strings.ToLower(ctx.SourceFile.FileName().AsString())
+func bindingIsDeclaredInADefinitionFile(ruleContext rule.Context, binding shadowBinding) bool {
+	fileName := strings.ToLower(ruleContext.SourceFile.FileName().AsString())
 	if !strings.HasSuffix(fileName, ".d.ts") && !strings.HasSuffix(fileName, ".d.cts") &&
 		!strings.HasSuffix(fileName, ".d.mts") {
 		return false
@@ -1171,7 +1171,7 @@ func bindingIsAStaticMethodGenericOverAClassGeneric(binding shadowBinding, shado
 //	const a = wrap(class { m() { let a; } });   reports, the method's outer scope is the class
 //
 // A method is a function expression to upstream, which nests it under a MethodDefinition.
-func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadowed shadowBinding, shadowedContainer *ast.Node) bool {
+func bindingIsInitializedThrough(ruleContext rule.Context, binding shadowBinding, shadowed shadowBinding, shadowedContainer *ast.Node) bool {
 	if shadowed.global || shadowed.symbol == nil || shadowed.identifier == nil || shadowedContainer == nil {
 		return false
 	}
@@ -1192,7 +1192,7 @@ func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadow
 	}
 	location := call.End()
 	spans := func(node *ast.Node) bool {
-		return node != nil && rule.TokenRange(ctx.SourceFile, node).Pos() <= location && location <= node.End()
+		return node != nil && rule.TokenRange(ruleContext.SourceFile, node).Pos() <= location && location <= node.End()
 	}
 
 	for current := shadowed.identifier; current != nil; current = current.Parent {
@@ -1332,7 +1332,7 @@ func bindingIsAnInferredTypeParameter(binding shadowBinding) bool {
 // The module name is what separates the first two, and the outer being an import is what separates
 // the first from the third. Both are checked, because dropping either one silently converts one of
 // upstream's own reporting cases into silence.
-func bindingIsExternalDeclarationMerging(ctx rule.Context, container *ast.Node,
+func bindingIsExternalDeclarationMerging(ruleContext rule.Context, container *ast.Node,
 	inner shadowBinding, outer shadowBinding) bool {
 	if container == nil || container.Kind != ast.KindModuleDeclaration {
 		return false
@@ -1387,8 +1387,8 @@ func moduleSpecifierTextOf(declaration *ast.Node) string {
 }
 
 // noShadowLineAndColumnOf renders a node's one-based line and column, which the message quotes.
-func noShadowLineAndColumnOf(ctx rule.Context, node *ast.Node) (int, int) {
-	line, column := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-		rule.TokenRange(ctx.SourceFile, node).Pos())
+func noShadowLineAndColumnOf(ruleContext rule.Context, node *ast.Node) (int, int) {
+	line, column := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+		rule.TokenRange(ruleContext.SourceFile, node).Pos())
 	return line + 1, column + 1
 }

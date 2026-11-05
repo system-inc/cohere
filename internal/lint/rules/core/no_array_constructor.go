@@ -137,7 +137,7 @@ var NoArrayConstructor = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			callee, arguments, typeArguments, isOptionalCall := arrayConstructorCallParts(node)
 
@@ -202,14 +202,14 @@ var NoArrayConstructor = rule.Rule{
 			// guard reads each rule file for a `.TypeChecker` selector, and this rule's only read
 			// would otherwise sit in `resolvesToAGlobal` one file over, so the rule would declare a
 			// need the guard could not confirm.
-			if ctx.TypeChecker == nil || !resolvesToAGlobal(ctx, callee) {
+			if ruleContext.TypeChecker == nil || !resolvesToAGlobal(ruleContext, callee) {
 				return
 			}
 
-			ctx.ReportNodeWithSuggestions(node, messageNoArrayConstructor, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(node, messageNoArrayConstructor, rule.Suggestion{
 				Message: messageUseAnArrayLiteral,
 				Fixes: []rule.Fix{
-					ctx.ReplaceNode(node, arrayLiteralReplacing(ctx, node, arguments)),
+					ruleContext.ReplaceNode(node, arrayLiteralReplacing(ruleContext, node, arguments)),
 				},
 			})
 		}
@@ -252,9 +252,9 @@ func arrayConstructorCallParts(node *ast.Node) (
 // `new Array` with no parentheses parses with a nil argument list rather than an empty one, which is
 // a distinct shape from `new Array()` and reaches the same empty answer here. A port reading the
 // list without that guard panics on the shortest input in the corpus.
-func arrayLiteralReplacing(ctx rule.Context, node *ast.Node, arguments *ast.NodeList) string {
+func arrayLiteralReplacing(ruleContext rule.Context, node *ast.Node, arguments *ast.NodeList) string {
 	if arguments == nil || len(arguments.Nodes) == 0 {
 		return "[]"
 	}
-	return "[" + ctx.SourceFile.Text()[arguments.Nodes[0].Pos():node.End()-1] + "]"
+	return "[" + ruleContext.SourceFile.Text()[arguments.Nodes[0].Pos():node.End()-1] + "]"
 }

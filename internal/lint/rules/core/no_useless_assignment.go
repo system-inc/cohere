@@ -123,13 +123,13 @@ var NoUselessAssignment = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				analyzeDeadStoresByLiveness(ctx, sourceFile)
+				analyzeDeadStoresByLiveness(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -258,13 +258,13 @@ func isInsideTryBlock(node *ast.Node) bool {
 // reported 50 findings in one file, and every one of them traced to
 // `let newStartTime: Date; switch (...) { ... newStartTime = ...; } return { newStartTime, ... }`.
 // Reading those findings is what surfaced it; the imported corpus was green throughout.
-func resolveOccurrence(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+func resolveOccurrence(ruleContext rule.Context, identifier *ast.Node) *ast.Symbol {
 	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-		if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 			return symbol
 		}
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	return ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 }
 
 // isNonReferenceIdentifier reports whether an identifier occurrence cannot be a reference to a local

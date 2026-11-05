@@ -122,7 +122,7 @@ var NoUnreachableLoop = rule.Rule{
 	// upstream asks its scope analysis nothing here either.
 	NeedsTypeChecker: false,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which `options.(T)` turns into the
 		// zero value. Upstream's default is `{ ignore: [] }`, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
@@ -149,7 +149,7 @@ var NoUnreachableLoop = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportUnreachableLoops(ctx, node, settings)
+				reportUnreachableLoops(ruleContext, node, settings)
 			},
 		}
 	},
@@ -182,7 +182,7 @@ func unreachableLoopIgnoresEverything(ignore []string) bool {
 }
 
 // reportUnreachableLoops judges every loop in the file, one code-path root at a time.
-func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoUnreachableLoopOptions) {
+func reportUnreachableLoops(ruleContext rule.Context, sourceFile *ast.Node, settings NoUnreachableLoopOptions) {
 	// Recorded per loop node: whether the loop statement was reached at a reachable position, and
 	// whether any reachable event flowed back into it.
 	type loopState struct {
@@ -204,7 +204,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	// Only a root whose own code holds a loop this rule judges can report, so only those are built.
 	// On a cold ahra run that is 7.6% of roots and 30% of the blocks every root used to cost
 	// (#tmn9n27).
-	for _, summary := range codePathRoots(ctx, sourceFile) {
+	for _, summary := range codePathRoots(ruleContext, sourceFile) {
 		root := summary.Node
 		if !unreachableLoopRootHoldsJudgedLoop(summary, settings.Ignore) {
 			if CheckCodePathGates {
@@ -281,7 +281,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	})
 
 	for _, loop := range invalid {
-		ctx.ReportNode(loop, messageUnreachableLoop)
+		ruleContext.ReportNode(loop, messageUnreachableLoop)
 	}
 }
 

@@ -1436,7 +1436,7 @@ func oneVarLastCommentRunStart(text string, from int) int {
 // carries the measured flag table.
 var OneVar = rule.Rule{
 	Name: "one-var",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[OneVarSettings](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and `options.(T)` on nil yields
@@ -1447,10 +1447,10 @@ var OneVar = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.SourceFile == nil {
+				if ruleContext.SourceFile == nil {
 					return
 				}
-				checker := &oneVarChecker{context: ctx, settings: settings}
+				checker := &oneVarChecker{context: ruleContext, settings: settings}
 
 				var walk func(*ast.Node)
 				walk = func(current *ast.Node) {

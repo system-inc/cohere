@@ -79,7 +79,7 @@ func consistencyNoHandRolledDelayMessage() rule.Message {
 var ConsistencyNoHandRolledDelay = rule.Rule{
 	Name: "nexus/consistency-no-hand-rolled-delay",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				duration := consistencyNoHandRolledDelayDuration(node)
@@ -89,7 +89,7 @@ var ConsistencyNoHandRolledDelay = rule.Rule{
 				if consistencyNoHandRolledDelayIsDefinition(node, duration) {
 					return
 				}
-				ctx.ReportNode(node, consistencyNoHandRolledDelayMessage())
+				ruleContext.ReportNode(node, consistencyNoHandRolledDelayMessage())
 			},
 		}
 	},

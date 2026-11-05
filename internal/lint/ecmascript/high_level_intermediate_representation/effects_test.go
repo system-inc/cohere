@@ -26,10 +26,10 @@ func effectsFor(test *testing.T, source string) (*Function, *AliasingEffects) {
 	probe := rule.Rule{
 		Name:             "effects-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"assertion below would pass vacuously")
 					}
@@ -37,7 +37,7 @@ func effectsFor(test *testing.T, source string) (*Function, *AliasingEffects) {
 						if function != nil {
 							return
 						}
-						lowered := Lower(functionNode, ctx.TypeChecker)
+						lowered := Lower(functionNode, ruleContext.TypeChecker)
 						if lowered == nil {
 							return
 						}

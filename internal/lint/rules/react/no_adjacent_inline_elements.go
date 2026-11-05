@@ -149,7 +149,7 @@ var NoAdjacentInlineElements = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// isInlineJsxChild answers upstream's `isInline` for a node in a JSX child list.
 		//
 		// Only a JSX element counts. Text, an expression container and a fragment all fall through
@@ -214,7 +214,7 @@ var NoAdjacentInlineElements = rule.Rule{
 			for _, child := range children {
 				currentIsInline := isInline(child)
 				if previousIsInline && currentIsInline {
-					ctx.ReportNode(reported, messageNoAdjacentInlineElements)
+					ruleContext.ReportNode(reported, messageNoAdjacentInlineElements)
 					return
 				}
 				previousIsInline = currentIsInline
@@ -231,10 +231,10 @@ var NoAdjacentInlineElements = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments

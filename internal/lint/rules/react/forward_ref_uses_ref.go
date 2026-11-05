@@ -137,7 +137,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // does not ask that question either.
 var ForwardRefUsesRef = rule.Rule{
 	Name: "react/forward-ref-uses-ref",
-	Run: func(ctx rule.Context, _ any) rule.Listeners {
+	Run: func(ruleContext rule.Context, _ any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -170,8 +170,8 @@ var ForwardRefUsesRef = rule.Rule{
 					return
 				}
 
-				ctx.ReportNodeWithSuggestions(first, messageForwardRefUsesRef,
-					suggestionsFor(ctx, node, first, parameters)...)
+				ruleContext.ReportNodeWithSuggestions(first, messageForwardRefUsesRef,
+					suggestionsFor(ruleContext, node, first, parameters)...)
 			},
 		}
 	},
@@ -259,14 +259,14 @@ func hasExactlyOneCountedParameter(parameters []*ast.Node) bool {
 // choosing takes the first, and upstream's is the removal, so reversing them would silently change
 // what an unattended run writes.
 func suggestionsFor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	function *ast.Node,
 	parameters []*ast.Node,
 ) []rule.Suggestion {
 	addRef := rule.Suggestion{
 		Message: messageForwardRefAddRefParameter,
-		Fixes:   []rule.Fix{addRefParameterFix(ctx, function, parameters)},
+		Fixes:   []rule.Fix{addRefParameterFix(ruleContext, function, parameters)},
 	}
 	if !canRemoveForwardRef(function, call) {
 		return []rule.Suggestion{addRef}
@@ -282,7 +282,7 @@ func suggestionsFor(
 				// trims it. The replacement text is sliced the same way for the same reason:
 				// the function's `Pos()` is just inside the call's `(`, so any space there
 				// would be carried into the unwrapped result.
-				ctx.ReplaceNode(call, functionSourceText(ctx, function)),
+				ruleContext.ReplaceNode(call, functionSourceText(ruleContext, function)),
 			},
 		},
 		addRef,
@@ -323,9 +323,9 @@ func isInExpressionStatement(node *ast.Node) bool {
 // trailing comma with any whitespace after it, and a missing opening paren. `forwardRef(a => {})`
 // becoming `forwardRef((a, ref) => {})` needs all three, and `function(a, ) {}` needs the middle
 // one, which is why upstream ships fixture pairs for both.
-func addRefParameterFix(ctx rule.Context, function *ast.Node, parameters []*ast.Node) rule.Fix {
-	span := parameterListRange(ctx, function, parameters)
-	text := ctx.SourceFile.Text()[span.Pos():span.End()]
+func addRefParameterFix(ruleContext rule.Context, function *ast.Node, parameters []*ast.Node) rule.Fix {
+	span := parameterListRange(ruleContext, function, parameters)
+	text := ruleContext.SourceFile.Text()[span.Pos():span.End()]
 	text = strings.TrimSuffix(text, ")")
 	text = strings.TrimRight(text, " \t\r\n")
 	text = strings.TrimSuffix(text, ",")
@@ -343,8 +343,8 @@ func addRefParameterFix(ctx rule.Context, function *ast.Node, parameters []*ast.
 // from the function keeps `function Component(a)` from finding the paren-free stretch before the
 // name, and scanning forward from the last parameter to the next `)` is safe because a default
 // value or a type annotation is inside the last parameter's own range.
-func parameterListRange(ctx rule.Context, function *ast.Node, parameters []*ast.Node) core.TextRange {
-	text := ctx.SourceFile.Text()
+func parameterListRange(ruleContext rule.Context, function *ast.Node, parameters []*ast.Node) core.TextRange {
+	text := ruleContext.SourceFile.Text()
 
 	// `Pos()` on the first parameter starts at its leading trivia rather than at the parameter, so
 	// both branches below have to step over that whitespace rather than trusting it. Getting this
@@ -388,7 +388,7 @@ func isSpaceByte(b byte) bool {
 //
 // Split out rather than inlined because the trivia trim has to match the one on the span being
 // replaced: a slice from `Pos()` would carry whatever whitespace sits after the call's `(`.
-func functionSourceText(ctx rule.Context, function *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, function)
-	return ctx.SourceFile.Text()[span.Pos():span.End()]
+func functionSourceText(ruleContext rule.Context, function *ast.Node) string {
+	span := rule.TokenRange(ruleContext.SourceFile, function)
+	return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 }

@@ -186,7 +186,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-props-no-spread-multi`
 	// would match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-props-no-spread-multi",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
 			if attributes == nil {
@@ -237,7 +237,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 						// `<div {...props} {...props} {...props} />` a single finding.
 						if !reportedIdentifiers[name] {
 							reportedIdentifiers[name] = true
-							ctx.ReportNode(earlier, messageJsxPropsNoSpreadMultiIdentifier)
+							ruleContext.ReportNode(earlier, messageJsxPropsNoSpreadMultiIdentifier)
 						}
 						continue
 					}
@@ -258,7 +258,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 			for leftIndex := 0; leftIndex < len(memberExpressions); leftIndex++ {
 				for rightIndex := leftIndex + 1; rightIndex < len(memberExpressions); rightIndex++ {
 					if isSameMemberExpression(memberExpressions[leftIndex], memberExpressions[rightIndex]) {
-						ctx.ReportNode(memberSpreads[leftIndex], messageJsxPropsNoSpreadMultiMemberExpression)
+						ruleContext.ReportNode(memberSpreads[leftIndex], messageJsxPropsNoSpreadMultiMemberExpression)
 					}
 				}
 			}

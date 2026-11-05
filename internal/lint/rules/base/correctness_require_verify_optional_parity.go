@@ -73,10 +73,10 @@ var CorrectnessRequireVerifyOptionalParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				checkVerifyOptionalParity(ctx, node, node.Name())
+				checkVerifyOptionalParity(ruleContext, node, node.Name())
 			},
 			// A constructor parameter property, `constructor(@VerifyIsString() public name: string)`.
 			// The original hooks `TSParameterProperty`, which our parser does not have: it gives a
@@ -86,15 +86,15 @@ var CorrectnessRequireVerifyOptionalParity = rule.Rule{
 				if !isBaseParameterProperty(node) {
 					return
 				}
-				checkVerifyOptionalParity(ctx, node, node.Name())
+				checkVerifyOptionalParity(ruleContext, node, node.Name())
 			},
 		}
 	},
 }
 
 // checkVerifyOptionalParity judges one property or parameter property.
-func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
-	if ctx.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
+func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *ast.Node) {
+	if ruleContext.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
 		return
 	}
 
@@ -117,12 +117,12 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 		return
 	}
 
-	keyType := ctx.TypeChecker.GetTypeAtLocation(key)
+	keyType := ruleContext.TypeChecker.GetTypeAtLocation(key)
 	typeIsNullable := decorators.IsNullableType(keyType)
-	typeText := ctx.TypeChecker.TypeToString(keyType)
+	typeText := ruleContext.TypeChecker.TypeToString(keyType)
 
 	if hasOptionalSentinel && !typeIsNullable {
-		ctx.ReportNode(key, rule.Message{
+		ruleContext.ReportNode(key, rule.Message{
 			Id:          correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
 			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
 		})
@@ -144,7 +144,7 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 	// reporting. That was wrong -- such a property cannot reach this line at all -- and the sweep
 	// is what caught it.
 	if typeIsNullable && !hasOptionalSentinel && hasOtherVerifyRule {
-		ctx.ReportNode(key, rule.Message{
+		ruleContext.ReportNode(key, rule.Message{
 			Id:          correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
 			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(map[string]string{"typeText": typeText}),
 		})

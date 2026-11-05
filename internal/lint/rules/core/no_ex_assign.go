@@ -37,7 +37,7 @@ var messageUnexpectedExceptionAssignment = rule.Message{
 // later use, and the rule cannot know which later uses meant the original error.
 var NoExAssign = rule.Rule{
 	Name: "no-ex-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCatchClause: func(node *ast.Node) {
 				clause := node.AsCatchClause()
@@ -52,7 +52,7 @@ var NoExAssign = rule.Rule{
 					return
 				}
 
-				reportAssignmentsTo(ctx, clause.Block, name.Text(), messageUnexpectedExceptionAssignment)
+				reportAssignmentsTo(ruleContext, clause.Block, name.Text(), messageUnexpectedExceptionAssignment)
 			},
 		}
 	},
@@ -62,7 +62,7 @@ var NoExAssign = rule.Rule{
 //
 // Compound assignments are included, since `name += x` and `name ??= x` write to the binding exactly
 // as `name = x` does, and the compound forms are the ones that read as harmless.
-func reportAssignmentsTo(ctx rule.Context, root *ast.Node, targetName string, message rule.Message) {
+func reportAssignmentsTo(ruleContext rule.Context, root *ast.Node, targetName string, message rule.Message) {
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
@@ -74,7 +74,7 @@ func reportAssignmentsTo(ctx rule.Context, root *ast.Node, targetName string, me
 			if binary.OperatorToken != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 				if left := ast.SkipParentheses(binary.Left); left != nil &&
 					left.Kind == ast.KindIdentifier && left.Text() == targetName {
-					ctx.ReportNode(left, message)
+					ruleContext.ReportNode(left, message)
 				}
 			}
 		}
@@ -88,7 +88,7 @@ func reportAssignmentsTo(ctx rule.Context, root *ast.Node, targetName string, me
 		if current.Kind == ast.KindPrefixUnaryExpression || current.Kind == ast.KindPostfixUnaryExpression {
 			if operand, operator := updateOperandAndOperator(current); reference.IsUpdateOperator(operator) {
 				if operand != nil && operand.Kind == ast.KindIdentifier && operand.Text() == targetName {
-					ctx.ReportNode(operand, message)
+					ruleContext.ReportNode(operand, message)
 				}
 			}
 		}

@@ -153,7 +153,7 @@ func messageRequireCorrectAlias(expected string, actual string, bare string) rul
 // rather than with one that breaks the build. Reporting honestly beats fixing wrongly.
 var ImportRequireNodeNamespace = rule.Rule{
 	Name: "nexus/import-require-node-namespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
@@ -171,7 +171,7 @@ var ImportRequireNodeNamespace = rule.Rule{
 
 				namespaceImport, hasNamespaceImport := namespaceImportOf(declaration)
 				if !hasNamespaceImport {
-					ctx.ReportNode(node, messageRequireNamespaceImport(source, expected, bare))
+					ruleContext.ReportNode(node, messageRequireNamespaceImport(source, expected, bare))
 					return
 				}
 
@@ -184,17 +184,17 @@ var ImportRequireNodeNamespace = rule.Rule{
 				// alias at the `* as alias` specifier (its `namespaceSpecifier`) rather than at the
 				// name alone.
 				if !strings.HasPrefix(source, "node:") {
-					ctx.ReportNodeWithFixes(
+					ruleContext.ReportNodeWithFixes(
 						node,
 						messageRequireNodePrefix(source, expected, bare),
-						ctx.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
+						ruleContext.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
 					)
 				}
 
 				if alias := namespaceImport.Name(); alias != nil && alias.Text() != expected {
 					// No fix: renaming the alias without renaming its references through scope
 					// would leave the file uncompilable, the same trap as the namespace case above.
-					ctx.ReportNode(namespaceImport, messageRequireCorrectAlias(expected, alias.Text(), bare))
+					ruleContext.ReportNode(namespaceImport, messageRequireCorrectAlias(expected, alias.Text(), bare))
 				}
 			},
 		}

@@ -92,19 +92,19 @@ var CorrectnessNoTestOnGlobalRegex = rule.Rule{
 	// Whether `test` and `RegExp` are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				correctnessNoTestOnGlobalRegexCheck(ctx, node)
+				correctnessNoTestOnGlobalRegexCheck(ruleContext, node)
 			},
 		}
 	},
 }
 
-func correctnessNoTestOnGlobalRegexCheck(ctx rule.Context, node *ast.Node) {
+func correctnessNoTestOnGlobalRegexCheck(ruleContext rule.Context, node *ast.Node) {
 	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return
@@ -114,11 +114,11 @@ func correctnessNoTestOnGlobalRegexCheck(ctx rule.Context, node *ast.Node) {
 	if name.Kind != ast.KindIdentifier || name.Text() != "test" {
 		return
 	}
-	if !correctnessNoTestOnGlobalRegexIsRegExpMember(ctx, ctx.TypeChecker.GetSymbolAtLocation(name)) {
+	if !correctnessNoTestOnGlobalRegexIsRegExpMember(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(name)) {
 		return
 	}
 	receiver := ast.SkipParentheses(access.Expression)
-	symbol, creation := correctnessNoTestOnGlobalRegexRegex(ctx, receiver)
+	symbol, creation := correctnessNoTestOnGlobalRegexRegex(ruleContext, receiver)
 	if creation == nil {
 		return
 	}
@@ -128,15 +128,15 @@ func correctnessNoTestOnGlobalRegexCheck(ctx rule.Context, node *ast.Node) {
 	if !correctnessNoTestOnGlobalRegexRepeats(node, creation) {
 		return
 	}
-	if correctnessNoTestOnGlobalRegexIsPositioned(ctx, symbol) {
+	if correctnessNoTestOnGlobalRegexIsPositioned(ruleContext, symbol) {
 		return
 	}
-	ctx.ReportNode(node, correctnessNoTestOnGlobalRegexMessage())
+	ruleContext.ReportNode(node, correctnessNoTestOnGlobalRegexMessage())
 }
 
 // correctnessNoTestOnGlobalRegexIsRegExpMember says whether a symbol is a member of the default
 // library's RegExp interface, with every declaration there.
-func correctnessNoTestOnGlobalRegexIsRegExpMember(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoTestOnGlobalRegexIsRegExpMember(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -146,7 +146,7 @@ func correctnessNoTestOnGlobalRegexIsRegExpMember(ctx rule.Context, symbol *ast.
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ruleContext.Program, file) {
 			return false
 		}
 	}
@@ -156,7 +156,7 @@ func correctnessNoTestOnGlobalRegexIsRegExpMember(ctx rule.Context, symbol *ast.
 // correctnessNoTestOnGlobalRegexRegex resolves a `.test()` receiver to the symbol it names and the
 // expression that created its regex, when that is a `g` regex held by a `const` or a `readonly`
 // property declared in this file. The creation is nil otherwise.
-func correctnessNoTestOnGlobalRegexRegex(ctx rule.Context, receiver *ast.Node) (*ast.Symbol, *ast.Node) {
+func correctnessNoTestOnGlobalRegexRegex(ruleContext rule.Context, receiver *ast.Node) (*ast.Symbol, *ast.Node) {
 	var name *ast.Node
 	switch receiver.Kind {
 	case ast.KindIdentifier:
@@ -166,12 +166,12 @@ func correctnessNoTestOnGlobalRegexRegex(ctx rule.Context, receiver *ast.Node) (
 	default:
 		return nil, nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return nil, nil
 	}
 	declaration := symbol.Declarations[0]
-	if ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+	if ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
 		return nil, nil
 	}
 	var initializer *ast.Node
@@ -195,7 +195,7 @@ func correctnessNoTestOnGlobalRegexRegex(ctx rule.Context, receiver *ast.Node) (
 		return nil, nil
 	}
 	creation := ast.SkipParentheses(initializer)
-	flags, known := correctnessNoTestOnGlobalRegexFlags(ctx, creation)
+	flags, known := correctnessNoTestOnGlobalRegexFlags(ruleContext, creation)
 	if !known || !strings.Contains(flags, "g") {
 		return nil, nil
 	}
@@ -204,7 +204,7 @@ func correctnessNoTestOnGlobalRegexRegex(ctx rule.Context, receiver *ast.Node) (
 
 // correctnessNoTestOnGlobalRegexFlags reads the flags of a regex literal, or of `new RegExp(source,
 // flags)` with the default library's RegExp and a literal flags argument.
-func correctnessNoTestOnGlobalRegexFlags(ctx rule.Context, creation *ast.Node) (string, bool) {
+func correctnessNoTestOnGlobalRegexFlags(ruleContext rule.Context, creation *ast.Node) (string, bool) {
 	switch creation.Kind {
 	case ast.KindRegularExpressionLiteral:
 		_, flags := regexsyntax.PatternAndFlags(creation.Text())
@@ -213,7 +213,7 @@ func correctnessNoTestOnGlobalRegexFlags(ctx rule.Context, creation *ast.Node) (
 		newExpression := creation.AsNewExpression()
 		constructor := ast.SkipParentheses(newExpression.Expression)
 		if constructor.Kind != ast.KindIdentifier || constructor.Text() != "RegExp" ||
-			!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+			!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
 			return "", false
 		}
 		if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) != 2 {
@@ -296,7 +296,7 @@ func correctnessNoTestOnGlobalRegexRepeatsInLoop(loop *ast.Node, child *ast.Node
 
 // correctnessNoTestOnGlobalRegexIsPositioned says whether anything in the file sets the regex's
 // `lastIndex` to a value other than the literal `0`, which is the one use `g` has for `.test()`.
-func correctnessNoTestOnGlobalRegexIsPositioned(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoTestOnGlobalRegexIsPositioned(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	positioned := false
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -318,7 +318,7 @@ func correctnessNoTestOnGlobalRegexIsPositioned(ctx rule.Context, symbol *ast.Sy
 				}
 				value := ast.SkipParentheses(binary.Right)
 				isZero := binary.OperatorToken.Kind == ast.KindEqualsToken && value.Kind == ast.KindNumericLiteral && value.Text() == "0"
-				if name != nil && !isZero && ctx.TypeChecker.GetSymbolAtLocation(name) == symbol {
+				if name != nil && !isZero && ruleContext.TypeChecker.GetSymbolAtLocation(name) == symbol {
 					positioned = true
 					return true
 				}
@@ -327,6 +327,6 @@ func correctnessNoTestOnGlobalRegexIsPositioned(ctx rule.Context, symbol *ast.Sy
 		node.ForEachChild(visit)
 		return false
 	}
-	ctx.SourceFile.AsNode().ForEachChild(visit)
+	ruleContext.SourceFile.AsNode().ForEachChild(visit)
 	return positioned
 }

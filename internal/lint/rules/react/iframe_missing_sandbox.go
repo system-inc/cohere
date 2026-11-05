@@ -239,7 +239,7 @@ var IframeMissingSandbox = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// validateSandboxValue splits a sandbox attribute's text and reports each rejected token,
 		// then the invalid pairing. Upstream reports every unknown token separately and the
 		// combination once, in that order, which is what the two-finding corpus case pins.
@@ -255,7 +255,7 @@ var IframeMissingSandbox = rule.Rule{
 			for _, token := range strings.Split(value, " ") {
 				token = text.TrimWhitespace(token)
 				if !iframeMissingSandboxAllowedValues[token] {
-					ctx.ReportNode(reported, iframeMissingSandboxInvalidValue(token))
+					ruleContext.ReportNode(reported, iframeMissingSandboxInvalidValue(token))
 				}
 				if token == "allow-scripts" {
 					allowScripts = true
@@ -265,7 +265,7 @@ var IframeMissingSandbox = rule.Rule{
 				}
 			}
 			if allowScripts && allowSameOrigin && reportsPair() {
-				ctx.ReportNode(reported, messageIframeMissingSandboxInvalidCombination)
+				ruleContext.ReportNode(reported, messageIframeMissingSandboxInvalidCombination)
 			}
 		}
 
@@ -300,7 +300,7 @@ var IframeMissingSandbox = rule.Rule{
 								frame.sourceDocument = true
 							}
 						}
-						return !frame.provablyCrossOrigin(ctx)
+						return !frame.provablyCrossOrigin(ruleContext)
 					}
 					for _, property := range properties.Nodes {
 						attributeName, named := jsx.AttributeName(property)
@@ -321,7 +321,7 @@ var IframeMissingSandbox = rule.Rule{
 			}
 
 			if !sandboxFound {
-				ctx.ReportNode(node, messageIframeMissingSandboxAttributeMissing)
+				ruleContext.ReportNode(node, messageIframeMissingSandboxAttributeMissing)
 			}
 		}
 
@@ -335,10 +335,10 @@ var IframeMissingSandbox = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJsxElement,
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments
@@ -384,7 +384,7 @@ var IframeMissingSandbox = rule.Rule{
 									}
 								}
 							}
-							return !frame.provablyCrossOrigin(ctx)
+							return !frame.provablyCrossOrigin(ruleContext)
 						}
 						for _, property := range properties.Nodes {
 							// Upstream requires `x.type === 'Property'` and reads `x.key.name`,
@@ -413,7 +413,7 @@ var IframeMissingSandbox = rule.Rule{
 				}
 
 				if !sandboxFound {
-					ctx.ReportNode(node, messageIframeMissingSandboxAttributeMissing)
+					ruleContext.ReportNode(node, messageIframeMissingSandboxAttributeMissing)
 				}
 			},
 		}
@@ -456,11 +456,11 @@ func (frame *iframeMissingSandboxFrame) opaque() {
 // framing page's. Only a yes keeps the pair silent, so every shape this cannot read reports: a
 // `srcDoc` and an absent `src` (`about:blank`) are the page's own origin, and a bare `src` or a
 // spread after the last one leaves the rendered `src` unknown.
-func (frame *iframeMissingSandboxFrame) provablyCrossOrigin(ctx rule.Context) bool {
+func (frame *iframeMissingSandboxFrame) provablyCrossOrigin(ruleContext rule.Context) bool {
 	if frame.sourceDocument || frame.opaqueAfterSource || !frame.sourceSeen {
 		return false
 	}
-	return iframeMissingSandboxValueIsCrossOrigin(ctx, frame.sourceValue, true)
+	return iframeMissingSandboxValueIsCrossOrigin(ruleContext, frame.sourceValue, true)
 }
 
 // iframeMissingSandboxJsxValue unwraps a JSX attribute's initializer to the expression it holds, or
@@ -484,7 +484,7 @@ func iframeMissingSandboxJsxValue(initializer *ast.Node) *ast.Node {
 // initializer is read once, never a chain of them. Anything else asks the checker, and every string
 // literal or template literal constituent must be cross-origin; a plain `string` proves nothing, and
 // one constituent that is not provably cross-origin is enough to report, since the value can be it.
-func iframeMissingSandboxValueIsCrossOrigin(ctx rule.Context, value *ast.Node, followConst bool) bool {
+func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast.Node, followConst bool) bool {
 	if value == nil {
 		return false
 	}
@@ -495,20 +495,20 @@ func iframeMissingSandboxValueIsCrossOrigin(ctx rule.Context, value *ast.Node, f
 	case ast.KindTemplateExpression:
 		return iframeMissingSandboxClassifyUrl(value.AsTemplateExpression().Head.Text(), false) == iframeMissingSandboxOriginCross
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	if followConst && ast.IsIdentifier(value) {
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(value); symbol != nil && symbol.ValueDeclaration != nil &&
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(value); symbol != nil && symbol.ValueDeclaration != nil &&
 			ast.IsVariableDeclaration(symbol.ValueDeclaration) &&
 			ast.GetCombinedNodeFlags(symbol.ValueDeclaration)&ast.NodeFlagsConst != 0 {
 			if initializer := symbol.ValueDeclaration.Initializer(); initializer != nil &&
-				iframeMissingSandboxValueIsCrossOrigin(ctx, initializer, false) {
+				iframeMissingSandboxValueIsCrossOrigin(ruleContext, initializer, false) {
 				return true
 			}
 		}
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(value)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(value)
 	if valueType == nil {
 		return false
 	}
