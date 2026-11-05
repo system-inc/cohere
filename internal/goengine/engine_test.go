@@ -301,7 +301,7 @@ func copyFixture(test *testing.T, fixture string) string {
 		if relativeError != nil {
 			return relativeError
 		}
-		target := filepath.Join(root, relative)
+		target := filepath.Join(root, projectName(relative))
 		if entry.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
@@ -338,11 +338,33 @@ func runGit(test *testing.T, directory string, arguments ...string) {
 	}
 }
 
+// unformattedFixtureSuffix ends the name of a fixture that must stay unformatted to test the fix phase. Such a
+// file lives on disk as `<name>.go.fixture` and becomes `<name>.go` only in a case's temporary copy, because
+// internal/guard's TestEveryGoFileCohereOwnsIsGofmtClean holds every .go file cohere owns to gofmt, testdata
+// included, as the release's own `gofmt -l ./command ./internal` does.
+const unformattedFixtureSuffix = ".go.fixture"
+
+// projectName is the name a fixture file takes in a case's copy: a `.go.fixture` becomes the `.go` it stands for,
+// and every other file keeps its name.
+func projectName(relative string) string {
+	if stem, isFixture := strings.CutSuffix(relative, unformattedFixtureSuffix); isFixture {
+		return stem + ".go"
+	}
+	return relative
+}
+
 // unchanged is a verify that a file of the copy reads as it does in its fixture: the run wrote nothing to it.
+// relative names the file as the copy has it, so a `.go.fixture` on disk is read under its own name.
 func unchanged(relative string, fixture string) func(test *testing.T, root string) {
 	return func(test *testing.T, root string) {
 		test.Helper()
-		original, originalError := os.ReadFile(filepath.Join("testdata", fixture, filepath.FromSlash(relative)))
+		source := filepath.Join("testdata", fixture, filepath.FromSlash(relative))
+		if stem, isGo := strings.CutSuffix(source, ".go"); isGo {
+			if _, statError := os.Stat(stem + unformattedFixtureSuffix); statError == nil {
+				source = stem + unformattedFixtureSuffix
+			}
+		}
+		original, originalError := os.ReadFile(source)
 		after, afterError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 		if originalError != nil || afterError != nil {
 			test.Fatalf("reading %s: %v, %v", relative, originalError, afterError)
