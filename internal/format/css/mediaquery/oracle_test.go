@@ -311,8 +311,11 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		}
 	}
 	for _, want := range records {
-		name := want["name"].(string)
-		params := want["params"].(string)
+		name, nameIsString := want["name"].(string)
+		params, paramsIsString := want["params"].(string)
+		if !nameIsString || !paramsIsString {
+			test.Fatalf("the oracle printed a record without a name and params: %v", want)
+		}
 		wantError, oracleRefused := want["error"].(string)
 		expectThrow, isFixture := throws[name]
 		if isFixture {
