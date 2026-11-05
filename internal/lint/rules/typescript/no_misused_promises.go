@@ -290,7 +290,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // The direction matters more than usual. Under a checker-less Context this rule does not panic: our
 // shim's `GetTypeAtLocation` and `GetSymbolAtLocation` return nil rather than crashing, so the rule
 // would go silent, and silence makes every clean fixture pass having proven nothing — which for this
-// rule is one hundred and twenty-THREE of its two hundred and thirteen cases. The guard sits at the
+// rule is one hundred and twenty-three of its two hundred and thirteen cases. The guard sits at the
 // top of `Run` rather than inside each of the fourteen listeners, which is strictly stronger: no
 // listener is even registered, so no arm can be added later that forgets it.
 // `TestNoMisusedPromisesRequiresTheTypedHarness` pins the declaration and the guard together so a

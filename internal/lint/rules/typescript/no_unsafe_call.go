@@ -57,7 +57,7 @@ import (
 //
 // When `noImplicitThis` is off, an unannotated `this` is implicitly `any`, and upstream swaps the
 // message for one that says so and suggests turning the compiler option on. That branch is ported
-// below and it is unreachable through this package'S TESTS, because the harness writes its own
+// below and it is unreachable through this package'S tests, because the harness writes its own
 // tsconfig with `strict: true` and no override, and it writes it after the setup hook runs, so
 // nothing a fixture can do changes the option. Probed rather than assumed, with a control: a rule
 // reading `ctx.Program.Options()` under both `RunTyped` and `RunTypedFilesWithSetup` reports

@@ -1,6 +1,6 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-empty-object-type.test.ts and edge rows. Do not edit by HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-empty-object-type.test.ts and edge rows. Do not edit by hand.
 //
 // The 42 upstream rows are every row in the test file, 14 valid and 28 invalid, extracted by loading it with
 // RuleTester stubbed. 18 edge rows were added for what they leave open. Before recording, every upstream row

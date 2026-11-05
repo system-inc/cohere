@@ -1,6 +1,6 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-redeclare.test.ts and edge rows. Do not edit by HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-redeclare.test.ts and edge rows. Do not edit by hand.
 //
 // The 21 valid and 31 invalid rows were extracted by loading upstream's test file with its RuleTester stubbed,
 // and 34 edge rows were added for what that corpus leaves open. Before recording, every upstream row

@@ -73,7 +73,7 @@ import (
 // enough to be sure, and over-counting is the safe direction (it produces silence rather than a
 // false report).
 //
-// Mapped types are the GAP, and it is a substrate limit rather than a judgment. Upstream reads four
+// Mapped types are the gap, and it is a substrate limit rather than a judgment. Upstream reads four
 // fields off a mapped type (its type parameter, constraint, name type and template type) to count
 // uses inside `{ [K in keyof T]: ... }`. In this tree those four fields are unexported on
 // `checker.MappedType` with no accessor method and no entry in `shim/checker/extra-shim.json`, so
@@ -504,7 +504,7 @@ func countsAsRelatingUse(
 	// overlap of ranges rather than an ancestor walk, and reproducing the range test rather than
 	// the intent keeps a default (`<T = T[]>`) covered by the same two comparisons a constraint is.
 	//
-	// Subsumed by the type PHASE, measured rather than assumed, and kept anyway. A mutation
+	// Subsumed by the type phase, measured rather than assumed, and kept anyway. A mutation
 	// narrowing this overlap so an in-constraint mention counts survives every fixture, and four
 	// rounds of hunting a distinguishing input found none. The reason is not that the branch is
 	// unreachable: a probe confirmed the two versions disagree about real identifiers, in
@@ -569,7 +569,7 @@ func countsAsRelatingUse(
 // makes `const func = <T,>(param: T[]) => null` report: `T[]` is genuinely one use, and the type
 // phase counts it as one. Upstream's comment says the same thing in one line, and the corpus pins
 // both directions, with `Partial<T>` clean and `T[]` reporting.
-// Subsumed by the type PHASE for the whole-branch case, measured. Forcing this function's caller
+// Subsumed by the type phase for the whole-branch case, measured. Forcing this function's caller
 // to ignore it entirely survives every fixture, because the type phase independently declines the
 // same shapes: `Partial<T>` resolves to a type whose alias arguments are visited with
 // assumeMultipleUses, giving a count above the threshold either way. The carve-out inside it is a
@@ -804,7 +804,7 @@ func (walk *typeUsageWalk) visitType(subject *checker.Type, assumeMultipleUses b
 	// the type's reference data (TypeScript/tsc/internal/checker/checker.go:22011) and takes the
 	// process down on a type that is not a reference. Measured with a probe that called it
 	// unguarded on the mapped type reached by upstream's `<T extends string>(t: T) => t as
-	// { [K in 'a' as T]: 0 }`: immediate nil dereference. Since the walk recovers per FILE rather
+	// { [K in 'a' as T]: 0 }`: immediate nil dereference. Since the walk recovers per file rather
 	// than per rule, that would cost every rule its verdict on any file containing such a shape.
 	if isTypeReferenceType(subject) {
 		walk.visitTypeReference(subject, assumeMultipleUses, isReturnType)

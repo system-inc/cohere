@@ -1,6 +1,6 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/ban-ts-comment.test.ts and edge rows. Do not edit by HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/ban-ts-comment.test.ts and edge rows. Do not edit by hand.
 //
 // The 52 valid and 62 invalid rows, from all four of the test file's ruleTester.run blocks, were extracted by
 // loading it with RuleTester stubbed, and 40 edge rows were added for what that corpus leaves open: grapheme

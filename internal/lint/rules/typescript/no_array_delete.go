@@ -97,12 +97,12 @@ import (
 // ` arr.splice(...)` rather than `arr.splice(...)`, and a repair that also ate the space would
 // satisfy every message id while failing every output.
 //
-// Comments stay where they WERE. Upstream's comment-heavy case keeps `/** multi line */` sitting
+// Comments stay where they were. Upstream's comment-heavy case keeps `/** multi line */` sitting
 // between the removed keyword and the receiver, and keeps `/* inline */` inside the index
 // expression, because those bytes were never in an edited range. The `@typescript-eslint` fixer
 // would have collected them and stacked them above the call.
 //
-// A sequence expression keeps its OWN PARENTHESES rather than being given new ones.
+// A sequence expression keeps its own parentheses rather than being given new ones.
 // `delete arr[(doWork(), 1)]` becomes ` arr.splice((doWork(), 1), 1)` because the parentheses are
 // part of the untouched argument text, so tsgolint needs no special case where the other upstream
 // has one. The two agree on the output for this input and reach it by different routes.

@@ -53,7 +53,7 @@ import (
 //
 // All four report upstream and all four report here, and none of them appears in the corpus.
 //
-// Parentheses are invisible in ESTREE and are real nodes here, which is the divergence that would
+// Parentheses are invisible in estree and are real nodes here, which is the divergence that would
 // have shipped silently. estree has no parenthesized-expression node at all, so upstream's `Literal`
 // test sees straight through `delete c[(7)]` and stays clean. A port testing our kinds without
 // skipping parentheses would report it. Measured against the installed build, and the corpus writes
@@ -67,7 +67,7 @@ import (
 // So parentheses are skipped in three places: the delete operand, the key, and the minus operand.
 // The last of those is the one no reading of the rule file suggests.
 //
-// An optional chain is EXCLUDED, and not through the key test. estree wraps `c?.[x]` in a
+// An optional chain is excluded, and not through the key test. estree wraps `c?.[x]` in a
 // `ChainExpression`, so `node.argument.type !== MemberExpression` is already false and the rule
 // returns before it ever looks at the key. Both spellings are clean upstream regardless of what the
 // key is, which is what proves the exclusion is structural rather than a consequence of the index:

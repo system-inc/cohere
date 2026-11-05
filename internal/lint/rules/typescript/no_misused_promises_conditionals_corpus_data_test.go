@@ -1,6 +1,6 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-misused-promises.test.ts and edge rows. Do not edit by HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-misused-promises.test.ts and edge rows. Do not edit by hand.
 //
 // The 34 upstream rows are every row in the test file whose options set checksConditionals, 22 valid and 12 invalid, extracted by loading it with
 // RuleTester stubbed. 17 edge rows were added for what they leave open. Before recording, every upstream row

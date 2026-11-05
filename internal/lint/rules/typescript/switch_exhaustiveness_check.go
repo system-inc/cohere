@@ -59,7 +59,7 @@ import (
 // `Literal | Undefined | Null | UniqueESSymbol`, which is why `case undefined` and `case null` are
 // real branches here and why an enum member is one too.
 //
-// Contains A non-literal type. True when SOME union member has EVERY intersection member
+// Contains A non-literal type. True when some union member has every intersection member
 // non-literal-like. The nesting is the part a reader gets wrong: it is some-over-union of
 // every-over-intersection, so `'foo' & { bar: 1 }` contains a non-literal type because the
 // intersection is not wholly literal, while `'foo' | number` contains one because of the `number`

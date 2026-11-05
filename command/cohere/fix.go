@@ -623,7 +623,7 @@ func proposalsForText(
 	 *
 	 * `internal/types/program/walk.go:500` filters a diagnostic through `directives.Suppresses`
 	 * before reporting it. This path did not, so a rule's finding was correctly withheld and its
-	 * FIX was applied anyway: both linters reported nothing on a disabled line and both fixers
+	 * fix was applied anyway: both linters reported nothing on a disabled line and both fixers
 	 * rewrote it. That is worse than either half alone, because the file changes with no diagnostic
 	 * explaining why and the only evidence is in `git diff`.
 	 *

@@ -103,7 +103,7 @@ func messageBanTslintComment(text string) rule.Message {
 // The second is refused by this project's parse guard. The first and third are not: both produce
 // source that parses, so the guard is structurally unable to see them, and the edit engine applies
 // a fix unattended. So this port narrows the range to the comment itself plus at most one character
-// on each side when that character is WHITESPACE, which reproduces every corpus output while
+// on each side when that character is whitespace, which reproduces every corpus output while
 // declining to delete a character that is not blank. `banTslintCommentFixRange` holds the
 // measurement and the four cases where the two readings differ.
 //

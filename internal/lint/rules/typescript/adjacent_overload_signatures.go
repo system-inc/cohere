@@ -42,7 +42,7 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // # The algorithm, which is not "compare adjacent pairs"
 //
 // The name suggests a pairwise walk and the implementation is not one. Each container keeps a list
-// of every member name seen so far and the name of the immediately PRECEDING member. A member
+// of every member name seen so far and the name of the immediately preceding member. A member
 // reports when its name is already in the seen list and it does not match the preceding member,
 // which is exactly "this set was closed and has been reopened". A name is appended to the seen list
 // only the first time it appears.

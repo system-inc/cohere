@@ -700,7 +700,7 @@ func TestRestrictTemplateExpressionsRequiresTheTypedHarness(test *testing.T) {
 // with upstream's default list, which is a real decision and not a detail.
 //
 // Upstream's defaultOptions carries `allow: [{ name: ['Error', 'URL', 'URLSearchParams'], from:
-// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` REPLACES that list rather
+// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` replaces that list rather
 // than adding to it while supplying any other key leaves it alone. Measured on the installed build,
 // all three rows below, because the merge semantics are the sort of thing a port gets subtly wrong
 // in a way no imported case catches: every one of upstream's allow cases supplies a list, so the

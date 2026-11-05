@@ -78,7 +78,7 @@ import (
 // number-like.
 //
 // Both halves are load-bearing and the corpus pins each one from the other side. `{ [key: number]:
-// number }` has the index signature and no length, and it is a PASSING case; adding `length: 1` to
+// number }` has the index signature and no length, and it is a passing case; adding `length: 1` to
 // that same object is a failing case. And because the recursion is a `some` rather than an `every`,
 // a union reports when any part is array-like, which is why `string[] | null` and `boolean[] | { a:
 // 1 }` both fire.

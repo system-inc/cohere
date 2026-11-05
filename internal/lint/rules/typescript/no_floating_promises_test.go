@@ -433,7 +433,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 // here: `@typescript-eslint` is silent on it too, so this is shared behavior rather than a choice.
 //
 // The third row is a real divergence and it is recorded in the rule's doc comment: `@typescript-
-// eslint` is SILENT on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
+// eslint` is silent on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
 // and tsgolint reports because typescript-go keeps one. tsgolint wins, so the report is deliberate.
 func TestNoFloatingPromisesMeasuredParentheses(test *testing.T) {
 	test.Parallel()

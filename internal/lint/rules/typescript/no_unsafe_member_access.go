@@ -59,7 +59,7 @@ import (
 // # The `this` branch, and why no fixture in this package can reach it
 //
 // Upstream runs this corpus under `tsconfig.noImplicitThis.json` and our harness pins `strict:
-// true`. Measured against the installed 8.67.0 build under BOTH settings: thirty-five of
+// true`. Measured against the installed 8.67.0 build under both settings: thirty-five of
 // thirty-six cases are identical, and the object-literal `this` case reports three
 // `unsafeThisMemberExpression` findings under upstream's configuration and is completely silent
 // under ours, because `this` in an object literal is typed as the literal rather than `any` when

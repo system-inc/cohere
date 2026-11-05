@@ -60,7 +60,7 @@ import (
 //   - `window.a.setTimeout('x')` is silent: the receiver of the matched access must be the
 //     identifier itself, so one more level of nesting declines.
 //   - `window['setTimeout']('x')` reports, but only for a string literal key. A `const k =
-//     'setTimeout'` variable key and a TEMPLATE-literal key are both silent, because the check is
+//     'setTimeout'` variable key and a template-literal key are both silent, because the check is
 //     `ast.IsStringLiteral` on the argument expression and neither is one.
 //   - `const st = setTimeout; st('x', 0)` is silent. The alias carries the function's type, not
 //     its name, and names are all this rule reads.

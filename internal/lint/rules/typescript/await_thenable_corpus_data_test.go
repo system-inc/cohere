@@ -1,6 +1,6 @@
 package typescript
 
-// Code generated from typescript-eslint v8.67.0's tests/rules/await-thenable.test.ts. Do not edit by HAND.
+// Code generated from typescript-eslint v8.67.0's tests/rules/await-thenable.test.ts. Do not edit by hand.
 //
 // Every case was extracted by loading upstream's test file with its RuleTester stubbed, then replayed
 // against the installed rule (@typescript-eslint/eslint-plugin 8.67.0, one program per case, the
