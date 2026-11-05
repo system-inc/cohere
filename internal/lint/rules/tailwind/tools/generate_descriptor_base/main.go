@@ -542,7 +542,7 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 // This is the half of the descriptor table that is a fact about Tailwind rather than about any one
 // repository, and it is checked in because it was measured to be invariant rather than assumed to
 // be. The other half `+"\u2014"+` which theme namespaces exist, which keys are in them, and the repository's
-// own `+"`@utility`"+` blocks `+"\u2014"+` is read off the live design system by NewTable in descriptor_live.go.
+// own `+"`@utility` blocks \u2014"+` is read off the live design system by NewTable in descriptor_live.go.
 //
 // The seam is measured, and the measurement is the reason the split is exactly here:
 //

@@ -27,7 +27,7 @@ func TestParsesRealVerifyOutput(test *testing.T) {
 	test.Parallel()
 	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims. Its dashes are
 	// spelled as escapes between the raw pieces, since a raw string cannot hold one, so the bytes stay verbatim.
-	output := `graph built in 1.752s ` + "\u2014" + ` 9973 files in the program, 3407 of them ours
+	output := "graph built in 1.752s \u2014" + ` 9973 files in the program, 3407 of them ours
 /Users/kirkouimet/Projects/ahra/modules/mcp/McpApi.ts:240:16 - Identifier "params" should not be abbreviated. Use "parameters" or a more descriptive name. [consistency-no-abbreviated-identifier/noParams]
 lint: 1 findings ` + "\u2014" + ` 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
   note: rule consistency-no-utils-folder listened to no files ` + "\u2014" + ` it ran, but it never looked
