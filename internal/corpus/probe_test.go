@@ -1,6 +1,7 @@
 package corpus
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"testing"
@@ -16,6 +17,12 @@ func runProbe(test *testing.T, name, probe, value string) string {
 	}
 	command := exec.Command(executable, "-test.run", "^"+name+"$", "-test.v")
 	command.Env = append(os.Environ(), "COHERE_CORPUS_PROBE="+probe, Ahra.Variable+"="+value)
-	output, _ := command.CombinedOutput()
+	output, runError := command.CombinedOutput()
+	// A child that ran and failed is a verdict the caller reads from the output, since a probe that expects
+	// `--- FAIL` exits nonzero. A child that never ran has no verdict to read.
+	var exitError *exec.ExitError
+	if runError != nil && !errors.As(runError, &exitError) {
+		test.Fatalf("running the probe %s: %v", name, runError)
+	}
 	return string(output)
 }

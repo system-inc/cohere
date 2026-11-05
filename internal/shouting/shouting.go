@@ -482,6 +482,9 @@ func TokensInMasked(masked string) []string {
 // would miss `git\tstatus`. A bare word over-admits slightly, which is the safe direction.
 var commandStarters = []string{"$", "ahra", "git", "pnpm", "npm", "sqlite3", "curl"}
 
+// structureCommandStarter is the `s\s+c` arm, which no literal can express.
+var structureCommandStarter = regexp.MustCompile(`s\s+c`)
+
 // containsAnyCommandStarter reports whether any command prefix appears anywhere in the text.
 //
 // A superset of what `commandLine` can match, never a subset, for the same reason the abbreviation
@@ -500,9 +503,6 @@ func containsAnyCommandStarter(text string) bool {
 	}
 	return structureCommandStarter.MatchString(text)
 }
-
-// structureCommandStarter is the `s\s+c` arm, which no literal can express.
-var structureCommandStarter = regexp.MustCompile(`s\s+c`)
 
 // HasAdjacentUppercaseLetters reports whether two uppercase letters appear in a row.
 //

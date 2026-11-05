@@ -68,7 +68,10 @@ func TestNoCohereTestNamesAHomeDirectory(test *testing.T) {
 	})
 	lines := map[string][]string{}
 	for _, homePath := range found {
-		relative, _ := filepath.Rel(root, homePath.Position.Filename)
+		relative, relativeError := filepath.Rel(root, homePath.Position.Filename)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		relative = filepath.ToSlash(relative)
 		lines[relative] = append(
 			lines[relative],

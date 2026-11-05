@@ -318,6 +318,8 @@ func fileDeclarations(file *ast.SourceFile, text string) []declarationRecord {
 // the single most load-bearing input to the closure: on this tree 1,228 files are spared, and
 // omitting their declarations would darken most of the application in one stroke while looking like
 // a discovery.
+//
+// Mutates: into the caller's root set gathers every spared file's declarations, one call per file
 func collectRootSymbols(file *ast.SourceFile, into map[*ast.Symbol]bool) {
 	for _, statement := range file.Statements.Nodes {
 		switch statement.Kind {

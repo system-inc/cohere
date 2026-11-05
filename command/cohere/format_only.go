@@ -39,7 +39,7 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 		)
 	}
 	for _, file := range summary.NotTransformed {
-		if file.Failed || file.Reason == unparseableSkipReason {
+		if file.Outcome == edit.NotTransformedFailed || file.Reason == unparseableSkipReason {
 			unchecked = append(unchecked, uncheckedFile{FileName: file.FileName, Reason: file.Reason})
 		}
 	}

@@ -187,16 +187,16 @@ func (matcher *Matcher) Excluded() (bool, Source) {
 // symbolic link, which git does not follow in a tree; one too large; one unreadable) is an error naming
 // it, never skipped.
 func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
-	relativeDirectory = cleanRelative(relativeDirectory)
-	if relativeDirectory == matcher.directory {
+	cleanedDirectory := cleanRelative(relativeDirectory)
+	if cleanedDirectory == matcher.directory {
 		return matcher, nil
 	}
-	remainder, below := strings.CutPrefix(relativeDirectory, matcher.directory)
+	remainder, below := strings.CutPrefix(cleanedDirectory, matcher.directory)
 	if matcher.directory != "" {
 		remainder, below = strings.CutPrefix(remainder, "/")
 	}
 	if !below || remainder == "" {
-		return nil, fmt.Errorf("gitignore: %s is not below %s", relativeDirectory, displayDirectory(matcher.directory))
+		return nil, fmt.Errorf("gitignore: %s is not below %s", cleanedDirectory, displayDirectory(matcher.directory))
 	}
 
 	entered := *matcher
@@ -244,19 +244,21 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 // directory is a programming error and panics, because the answer would silently leave out the ignore
 // files between the two.
 func (matcher *Matcher) Ignored(relativePath string, isDirectory bool) (bool, Source) {
-	relativePath = cleanRelative(relativePath)
-	parent := path.Dir(relativePath)
+	cleanedPath := cleanRelative(relativePath)
+	parent := path.Dir(cleanedPath)
 	if parent == "." {
 		parent = ""
 	}
 	if parent != matcher.directory {
+		// Invariant: a caller enters the path's directory before asking, as IgnoredPath and every walk do, so a
+		// mismatch is a caller's bug, and answering anyway would leave out the ignore files between the two.
 		panic(fmt.Sprintf("gitignore: asked about %s through the matcher for %s; Enter its directory first",
-			relativePath, displayDirectory(matcher.directory)))
+			cleanedPath, displayDirectory(matcher.directory)))
 	}
 	if matcher.excludedBy != nil {
 		return true, matcher.excludedBy.source
 	}
-	decided := matcher.decide(relativePath, path.Base(relativePath), isDirectory, len(matcher.files))
+	decided := matcher.decide(cleanedPath, path.Base(cleanedPath), isDirectory, len(matcher.files))
 	if decided == nil {
 		return false, Source{}
 	}
@@ -268,8 +270,8 @@ func (matcher *Matcher) Ignored(relativePath string, isDirectory bool) (bool, So
 // It is for a question about one path, such as explaining why a file was left out; a walk enters each
 // directory itself and asks Ignored, which reads every ignore file once.
 func (matcher *Matcher) IgnoredPath(relativePath string, isDirectory bool) (bool, Source, error) {
-	relativePath = cleanRelative(relativePath)
-	parent := path.Dir(relativePath)
+	cleanedPath := cleanRelative(relativePath)
+	parent := path.Dir(cleanedPath)
 	if parent == "." {
 		parent = ""
 	}
@@ -277,7 +279,7 @@ func (matcher *Matcher) IgnoredPath(relativePath string, isDirectory bool) (bool
 	if enterError != nil {
 		return false, Source{}, enterError
 	}
-	ignored, source := scope.Ignored(relativePath, isDirectory)
+	ignored, source := scope.Ignored(cleanedPath, isDirectory)
 	return ignored, source, nil
 }
 
@@ -314,8 +316,8 @@ func CompilePatterns(lines []string, name string) (*Patterns, error) {
 // the line that decided. Unlike a Matcher it knows nothing of directories above the path: a walk applying
 // it prunes each directory it excludes, so a path below one is never asked about.
 func (patterns *Patterns) Ignored(relativePath string, isDirectory bool) (bool, Source) {
-	relativePath = cleanRelative(relativePath)
-	decided := lastMatching(patterns.rules, relativePath, path.Base(relativePath), isDirectory)
+	cleanedPath := cleanRelative(relativePath)
+	decided := lastMatching(patterns.rules, cleanedPath, path.Base(cleanedPath), isDirectory)
 	if decided == nil {
 		return false, Source{}
 	}
@@ -417,9 +419,9 @@ var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}
 // parseRules compiles an ignore file's lines. file names it in every Source, and base is the directory its
 // anchored patterns are relative to.
 func parseRules(contents []byte, file string, base string) ([]rule, error) {
-	contents = bytes.TrimPrefix(contents, byteOrderMark)
+	text := bytes.TrimPrefix(contents, byteOrderMark)
 	var rules []rule
-	for index, line := range strings.Split(string(contents), "\n") {
+	for index, line := range strings.Split(string(text), "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if line == "" || line[0] == '#' {
 			continue
@@ -494,11 +496,11 @@ func cleanRelative(relative string) string {
 	if isCleanRelative(relative) {
 		return relative
 	}
-	relative = path.Clean(filepath.ToSlash(relative))
-	if relative == "." || relative == "/" {
+	cleaned := path.Clean(filepath.ToSlash(relative))
+	if cleaned == "." || cleaned == "/" {
 		return ""
 	}
-	return strings.TrimPrefix(relative, "/")
+	return strings.TrimPrefix(cleaned, "/")
 }
 
 // isCleanRelative reports whether a path is already what cleanRelative would make it: slash separated, with

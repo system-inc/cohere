@@ -1,6 +1,7 @@
 package rename
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -131,37 +132,41 @@ func Apply(plan *Plan) (int, error) {
 //
 // Printed before anything is applied, and printed identically whether or not it will be applied.
 // The dry run is the same computation as the real run, so a preview cannot drift from what lands.
-func Write(out io.Writer, plan *Plan, applied bool) {
+//
+// A bufio.Writer keeps the first failed write's error and hands it back from Flush, so the one check at the end
+// catches a plan that never reached out, whichever line failed.
+func Write(out io.Writer, plan *Plan, applied bool) error {
+	writer := bufio.NewWriter(out)
 	if len(plan.Refusals) > 0 {
-		fmt.Fprintf(out, "rename refused: %s\n", plan.OldName)
+		fmt.Fprintf(writer, "rename refused: %s\n", plan.OldName)
 		for _, refusal := range plan.Refusals {
-			fmt.Fprintf(out, "  %s\n", refusal)
+			fmt.Fprintf(writer, "  %s\n", refusal)
 		}
-		fmt.Fprintf(out, "\nNothing was written.\n")
-		return
+		fmt.Fprintf(writer, "\nNothing was written.\n")
+		return flushed(writer, "the refused rename")
 	}
 
 	verb := "would rename"
 	if applied {
 		verb = "renamed"
 	}
-	fmt.Fprintf(out, "%s %s to %s — %d sites in %d files\n",
+	fmt.Fprintf(writer, "%s %s to %s — %d sites in %d files\n",
 		verb, plan.OldName, plan.NewName, len(plan.Edits), plan.FilesTouched)
 	if plan.DeclarationFile != "" {
-		fmt.Fprintf(out, "declared at %s:%d\n", plan.DeclarationFile, plan.DeclarationLine)
+		fmt.Fprintf(writer, "declared at %s:%d\n", plan.DeclarationFile, plan.DeclarationLine)
 	}
 
 	currentFile := ""
 	for _, edit := range plan.Edits {
 		if edit.FileName != currentFile {
 			currentFile = edit.FileName
-			fmt.Fprintf(out, "\n  %s\n", currentFile)
+			fmt.Fprintf(writer, "\n  %s\n", currentFile)
 		}
 		detail := plan.NewName
 		if edit.Kind == EditShorthandExpansion {
 			detail = edit.Text
 		}
-		fmt.Fprintf(out, "    %d:%d  %s  [%d,%d) -> %s\n",
+		fmt.Fprintf(writer, "    %d:%d  %s  [%d,%d) -> %s\n",
 			edit.Line, edit.Column, edit.Kind, edit.Range.Pos(), edit.Range.End(), detail)
 	}
 
@@ -169,42 +174,56 @@ func Write(out io.Writer, plan *Plan, applied bool) {
 	// appears only when there is something to say cannot be distinguished from a tool that forgot to
 	// look, and the whole point of this section is that the reader must never be handed a count that
 	// implies a completeness the checker cannot deliver.
-	fmt.Fprintf(out, "\nwhat this could not see: ")
+	fmt.Fprintf(writer, "\nwhat this could not see: ")
 	if len(plan.Blind) == 0 {
-		fmt.Fprintf(out, "no string literal in the program spells %q.\n", plan.OldName)
+		fmt.Fprintf(writer, "no string literal in the program spells %q.\n", plan.OldName)
 	} else {
 		fmt.Fprintf(
-			out,
+			writer,
 			"%d string literals spell %q, and a string-keyed use is invisible to the\n",
 			len(plan.Blind),
 			plan.OldName,
 		)
-		fmt.Fprintf(out, "type checker. If any of these is a property key or a dynamic lookup, this rename did NOT\n")
-		fmt.Fprintf(out, "touch it and the result compiles while being wrong at runtime. Read them:\n")
+		fmt.Fprintf(
+			writer,
+			"type checker. If any of these is a property key or a dynamic lookup, this rename did NOT\n",
+		)
+		fmt.Fprintf(writer, "touch it and the result compiles while being wrong at runtime. Read them:\n")
 		for _, blind := range plan.Blind {
-			fmt.Fprintf(out, "    %s:%d:%d  %q\n", blind.FileName, blind.Line, blind.Column, blind.Text)
+			fmt.Fprintf(writer, "    %s:%d:%d  %q\n", blind.FileName, blind.Line, blind.Column, blind.Text)
 		}
 	}
 
 	if !applied {
-		fmt.Fprintf(out, "\nNothing was written. Pass --write to apply.\n")
+		fmt.Fprintf(writer, "\nNothing was written. Pass --write to apply.\n")
 	}
+	return flushed(writer, "the rename plan")
 }
 
-// WriteCandidates prints the symbols a bare name resolved to, when it resolved to more than one.
-func WriteCandidates(out io.Writer, name string, candidates []Candidate) {
+// WriteCandidates prints the symbols a bare name resolved to, when it resolved to more than one, buffered as Write is.
+func WriteCandidates(out io.Writer, name string, candidates []Candidate) error {
+	writer := bufio.NewWriter(out)
 	fmt.Fprintf(
-		out,
+		writer,
 		"%q names %d different symbols, so this rename is ambiguous and was refused.\n\n",
 		name,
 		len(candidates),
 	)
 	for _, candidate := range candidates {
-		fmt.Fprintf(out, "  %s:%d:%d  %s\n", candidate.FileName, candidate.Line, candidate.Column, candidate.Kind)
+		fmt.Fprintf(writer, "  %s:%d:%d  %s\n", candidate.FileName, candidate.Line, candidate.Column, candidate.Kind)
 	}
-	fmt.Fprintf(out, "\nName one of them by position:\n")
+	fmt.Fprintf(writer, "\nName one of them by position:\n")
 	if len(candidates) > 0 {
-		fmt.Fprintf(out, "  cohere rename %s:%d:%d <newName>\n",
+		fmt.Fprintf(writer, "  cohere rename %s:%d:%d <newName>\n",
 			candidates[0].FileName, candidates[0].Line, candidates[0].Column)
 	}
+	return flushed(writer, "the rename's candidates")
+}
+
+// flushed flushes writer, naming what was being written when it or any write before it failed.
+func flushed(writer *bufio.Writer, what string) error {
+	if flushError := writer.Flush(); flushError != nil {
+		return fmt.Errorf("writing %s: %w", what, flushError)
+	}
+	return nil
 }
