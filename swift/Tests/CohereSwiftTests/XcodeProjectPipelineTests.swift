@@ -18,7 +18,21 @@ import Testing
  */
 @Suite(.serialized)
 struct XcodeProjectPipelineTests {
-    static let specification = """
+    /* The App target's settings with every toolchain setting the rules require on, so a fixture is clean of them unless it says otherwise. */
+    static let toolchainOn = """
+              base:
+                SWIFT_VERSION: "6.0"
+                SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+                SWIFT_STRICT_MEMORY_SAFETY: YES
+
+        """
+
+    static let specification = specification(appSettings: toolchainOn)
+
+    /* The fixture's spec with `appSettings` as the App target's `settings:` map, the target's line being line 5. */
+    static func specification(appSettings: String) -> String {
+        """
         name: Fixture
         options:
           bundleIdPrefix: com.cohere
@@ -34,10 +48,9 @@ struct XcodeProjectPipelineTests {
               properties:
                 CFBundleDisplayName: Fixture
             settings:
-              base:
-                SWIFT_VERSION: "6.0"
 
-        """
+        """ + appSettings
+    }
 
     static let cleanSource = """
         struct Greeter {
@@ -170,7 +183,76 @@ struct XcodeProjectPipelineTests {
                 "\(URL(fileURLWithPath: $0["file"] as? String ?? "").lastPathComponent): \($0["error"] as? String ?? "")"
             }
         }
+
+        /* The toolchain rules' findings as `<rule, its prefix off>@<file name>:<line>`, in the order written. */
+        var toolchainFindings: [String] {
+            toolchainFindingRecords.map {
+                let rule = ($0["rule"] as? String ?? "").replacingOccurrences(of: "cohere-swift/", with: "")
+                let file = URL(fileURLWithPath: $0["file"] as? String ?? "").lastPathComponent
+                return "\(rule)@\(file):\($0["line"] as? Int ?? 0)"
+            }
+        }
+
+        var toolchainFindingRecords: [[String: Any]] {
+            of("finding").filter { ($0["rule"] as? String ?? "").hasPrefix("cohere-swift/toolchain-") }
+        }
+
+        /* The message of the one toolchain finding from `rule`, its prefix off. */
+        func toolchainMessage(_ rule: String) -> String {
+            toolchainFindingRecords.first { $0["rule"] as? String == "cohere-swift/\(rule)" }?["message"] as? String
+                ?? ""
+        }
+
+        /* The rules the lint record says were offered nothing, which a clean twin must not list: silent is not judged. */
+        var rulesSilent: [String] {
+            of("lint").first?["rulesSilent"] as? [String] ?? []
+        }
+
+        var fixRecord: [String: Any] {
+            of("fix").first ?? [:]
+        }
     }
+
+    static let toolchainRules = RuleRegistry.packageRules.map(\.name)
+
+    /* Every toolchain setting off: Swift 5, no upcoming feature, no strict memory safety. */
+    static let toolchainOff = """
+              base:
+                SWIFT_VERSION: "5.0"
+
+        """
+
+    /* The same settings as `toolchainOn`, the features and memory safety spelled as flags in `OTHER_SWIFT_FLAGS`. */
+    static let toolchainOnInFlags = """
+              base:
+                SWIFT_VERSION: "6.0"
+                OTHER_SWIFT_FLAGS: "-enable-upcoming-feature ExistentialAny -enable-upcoming-feature MemberImportVisibility -strict-memory-safety"
+
+        """
+
+    /* MemberImportVisibility and strict memory safety in Debug alone, which Release ships without. */
+    static let toolchainOnInDebugOnly = """
+              base:
+                SWIFT_VERSION: "6.0"
+                SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+              configs:
+                Debug:
+                  SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+                  SWIFT_STRICT_MEMORY_SAFETY: YES
+
+        """
+
+    /* Strict memory safety turned off by Release's own settings, which a key in base cannot override. */
+    static let strictMemorySafetyOffInRelease = """
+              base:
+                SWIFT_VERSION: "6.0"
+                SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+              configs:
+                Release:
+                  SWIFT_STRICT_MEMORY_SAFETY: NO
+
+        """
 
     /* An entry point that uses both of the fixture's types, so nothing the unused report judges is unused by default. */
     static let usingEntrySource = """
@@ -231,6 +313,9 @@ struct XcodeProjectPipelineTests {
             settings:
               base:
                 SWIFT_VERSION: "6.0"
+                SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+                SWIFT_STRICT_MEMORY_SAFETY: YES
                 GENERATE_INFOPLIST_FILE: YES
 
         """
@@ -651,7 +736,11 @@ struct XcodeProjectPipelineTests {
         #expect(run.complete == false)
     }
 
-    /* A target whose SDKROOT names no platform this engine builds for is not built, and its files are a named gap. */
+    /*
+     A target whose SDKROOT names no platform this engine builds for is not built, and its files are a named gap. Its
+     build settings are not asked for either, so the toolchain rules leave it unchecked, named at the spec with why,
+     rather than judging it on or off.
+     */
     @Test func aTargetWithNoKnownPlatformIsANamedGap() async throws {
         try Self.requireXcodegen()
         let fixture = try Self.fixture(
@@ -668,6 +757,13 @@ struct XcodeProjectPipelineTests {
                 "; App was not built, because its SDKROOT auto names no platform this engine builds for"
             ),
             "\(run.typesBuild)",
+        )
+        #expect(run.toolchainFindings.isEmpty, "\(run.toolchainFindingRecords)")
+        #expect(
+            run.lintCrashes.contains(
+                "project.yml: the build settings of App could not be read: its SDKROOT auto names no platform this engine builds for; so the rules that judge them did not (\(Self.toolchainRules.sorted().joined(separator: ", ")))"
+            ),
+            "\(run.lintCrashes)",
         )
         #expect(run.complete == false)
     }
@@ -968,5 +1064,209 @@ struct XcodeProjectPipelineTests {
         let covered = try #require(run.of("coveredPackages").first)
         #expect(covered["checked"] as? [String] == [fixture.root.standardizedFileURL.path])
         #expect(covered["vendored"] as? [String] == [])
+    }
+
+    /*
+     Block D (#6vjs9n7): an Xcode target with every toolchain setting off is flagged by each of the three rules, at the
+     target's line in project.yml, with the build setting to set. Under `--no-fix` the tree is byte for byte as it was.
+     */
+    @Test func anXcodeTargetWithItsToolchainSettingsOffIsFlaggedAtItsLineInTheSpec() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.toolchainOff),
+        )
+        defer { Self.remove(fixture.repository) }
+        let before = try Self.snapshot(of: fixture.repository)
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(
+            run.toolchainFindings == [
+                "toolchain-require-swift-6-language-mode@project.yml:5",
+                "toolchain-require-upcoming-features@project.yml:5",
+                "toolchain-require-strict-memory-safety@project.yml:5",
+            ],
+            "\(run.records)",
+        )
+        #expect(
+            run.toolchainMessage("toolchain-require-swift-6-language-mode").hasPrefix(
+                "App compiles in Swift 5 language mode. Swift 6 is required"
+            )
+        )
+        #expect(
+            run.toolchainMessage("toolchain-require-upcoming-features").hasPrefix(
+                "App does not enable ExistentialAny and MemberImportVisibility. Set SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY and SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY to YES in the target's build settings, in every configuration."
+            ),
+            "\(run.toolchainMessage("toolchain-require-upcoming-features"))",
+        )
+        #expect(
+            run.toolchainMessage("toolchain-require-strict-memory-safety").hasPrefix(
+                "App does not compile under strict memory safety. Set the target's SWIFT_STRICT_MEMORY_SAFETY build setting to YES"
+            )
+        )
+        #expect(run.lintCrashes.isEmpty)
+        let after = try Self.snapshot(of: fixture.repository)
+        #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+    }
+
+    /*
+     The clean twins: every setting on by its build setting, and the features and memory safety on by flags in
+     `OTHER_SWIFT_FLAGS` instead. Each rule judged the target (it is not silent) and found nothing.
+     */
+    @Test(arguments: ["build settings", "flags"])
+    func anXcodeTargetWithItsToolchainSettingsOnIsClean(spelling: String) async throws {
+        try Self.requireXcodegen()
+        let settings = spelling == "flags" ? Self.toolchainOnInFlags : Self.toolchainOn
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: settings),
+        )
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.toolchainFindings.isEmpty, "\(run.toolchainFindingRecords)")
+        #expect(Set(run.rulesSilent).isDisjoint(with: Self.toolchainRules), "\(run.rulesSilent)")
+        #expect(run.lintCrashes.isEmpty)
+        #expect(run.complete == true)
+    }
+
+    /* A setting on in Debug alone is not the target's setting: each is flagged, and the words name the configuration it is missing from. */
+    @Test func aToolchainSettingOnInDebugOnlyIsFlagged() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.toolchainOnInDebugOnly),
+        )
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(
+            run.toolchainFindings == [
+                "toolchain-require-upcoming-features@project.yml:5",
+                "toolchain-require-strict-memory-safety@project.yml:5",
+            ],
+            "\(run.records)",
+        )
+        #expect(
+            run.toolchainMessage("toolchain-require-upcoming-features").hasPrefix(
+                "App does not enable MemberImportVisibility in Release. Set SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY to YES"
+            ),
+            "\(run.toolchainMessage("toolchain-require-upcoming-features"))",
+        )
+        #expect(
+            run.toolchainMessage("toolchain-require-strict-memory-safety").hasPrefix(
+                "App does not compile under strict memory safety in Release."
+            )
+        )
+    }
+
+    /*
+     A plain run writes the missing settings into the target's base settings in project.yml, keeps them because the
+     project generated from it again reads them as on, and reports the fix; the next run finds nothing to say.
+     */
+    @Test func aPlainRunFixesTheSpecAndTheNextRunIsClean() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.toolchainOff),
+        )
+        defer { Self.remove(fixture.repository) }
+        let spec = fixture.root.appendingPathComponent("project.yml")
+
+        let fixed = try await Self.run(root: fixture.root, arguments: [])
+
+        #expect(fixed.toolchainFindings.isEmpty, "\(fixed.toolchainFindingRecords) \(fixed.fixRecord)")
+        let changed = fixed.fixRecord["changedFiles"] as? [[String: Any]] ?? []
+        let specChange = changed.first { ($0["file"] as? String ?? "").hasSuffix("/project.yml") }
+        #expect(
+            specChange?["fixedBy"] as? [String: Int]
+                == Dictionary(uniqueKeysWithValues: Self.toolchainRules.map { ($0, 1) }),
+            "\(fixed.fixRecord)",
+        )
+        #expect(
+            try String(contentsOf: spec, encoding: .utf8)
+                == Self.specification(
+                    appSettings: """
+                              base:
+                                SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+                                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+                                SWIFT_STRICT_MEMORY_SAFETY: YES
+                                SWIFT_VERSION: "6.0"
+
+                        """
+                )
+        )
+
+        let next = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        #expect(next.toolchainFindings.isEmpty, "\(next.toolchainFindingRecords)")
+        #expect(Set(next.rulesSilent).isDisjoint(with: Self.toolchainRules))
+        #expect(next.complete == true, "\(next.records)")
+    }
+
+    /*
+     A fix that would not take: Release turns strict memory safety off in its own settings, which a key in base cannot
+     override. The project generated from the edited spec still reads it as off, so project.yml is put back byte for
+     byte, the refusal is counted, and the finding stands.
+     */
+    @Test func aFixThatWouldNotTakeIsPutBack() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.strictMemorySafetyOffInRelease),
+        )
+        defer { Self.remove(fixture.repository) }
+        let spec = fixture.root.appendingPathComponent("project.yml")
+        let before = try Data(contentsOf: spec)
+
+        let run = try await Self.run(root: fixture.root, arguments: [])
+
+        #expect(try Data(contentsOf: spec) == before)
+        #expect(run.toolchainFindings == ["toolchain-require-strict-memory-safety@project.yml:5"], "\(run.records)")
+        let refusals = run.fixRecord["refusalsByReason"] as? [String: Int] ?? [:]
+        #expect(refusals[XcodeSpecificationFix.notRegenerated] == 1, "\(run.fixRecord)")
+        let changed = run.fixRecord["changedFiles"] as? [[String: Any]] ?? []
+        #expect(!changed.contains { ($0["file"] as? String ?? "").hasSuffix("/project.yml") })
+    }
+
+    /*
+     A committed project's findings point at the target's line in project.pbxproj, and no run writes that file: a plain
+     run leaves it byte for byte as it was, and the findings stand.
+     */
+    @Test func aCommittedProjectsFindingsPointAtItsTargetAndAreNeverFixed() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.toolchainOff),
+        )
+        defer { Self.remove(fixture.repository) }
+        try Self.commitProject(at: fixture.root)
+        let projectFile = fixture.root.appendingPathComponent("Fixture.xcodeproj/project.pbxproj")
+        let before = try Data(contentsOf: projectFile)
+        let lines = String(decoding: before, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: false)
+        let targetLine =
+            try #require(
+                lines.indices.first { index in
+                    lines[index].hasSuffix("/* App */ = {")
+                        && lines.indices.contains(index + 1) && lines[index + 1].contains("isa = PBXNativeTarget;")
+                }
+            ) + 1
+
+        let checked = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+        #expect(
+            checked.toolchainFindings == [
+                "toolchain-require-swift-6-language-mode@project.pbxproj:\(targetLine)",
+                "toolchain-require-upcoming-features@project.pbxproj:\(targetLine)",
+                "toolchain-require-strict-memory-safety@project.pbxproj:\(targetLine)",
+            ],
+            "\(checked.records)",
+        )
+        #expect(!checked.toolchainMessage("toolchain-require-swift-6-language-mode").contains("first line"))
+
+        let plain = try await Self.run(root: fixture.root, arguments: ["--no-cache"])
+        #expect(try Data(contentsOf: projectFile) == before)
+        #expect(plain.toolchainFindings.count == 3, "\(plain.toolchainFindingRecords)")
     }
 }

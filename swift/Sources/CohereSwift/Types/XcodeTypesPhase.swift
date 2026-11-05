@@ -172,15 +172,24 @@ struct XcodeTypesPhase {
     }
 
     func arguments(for build: Build) -> [String] {
+        invocation(of: build, configuration: "Debug") + [build.action]
+    }
+
+    /*
+     One xcodebuild of a target's scheme in one configuration, everything but what it is asked to do: the build's
+     action, or `-showBuildSettings` when `XcodeBuildSettings` asks what the build would compile with, which this
+     shares so the settings read goes through the same project or workspace, scratch and resolution as the build.
+     */
+    func invocation(of build: Build, configuration: String) -> [String] {
         var arguments = buildsThroughWorkspace ? ["-workspace", workspace.path] : ["-project", project.bundle.path]
         arguments += [
             "-scheme", build.target, "-destination", "generic/platform=\(build.platform)", "-derivedDataPath",
-            derivedData.path, "-clonedSourcePackagesDirPath", clonedPackages.path, "-configuration", "Debug",
+            derivedData.path, "-clonedSourcePackagesDirPath", clonedPackages.path, "-configuration", configuration,
         ]
         if !resolutionAllowed && committedResolved != nil {
             arguments.append("-disableAutomaticPackageResolution")
         }
-        return arguments + ["CODE_SIGNING_ALLOWED=NO", "ENABLE_USER_SCRIPT_SANDBOXING=YES", build.action]
+        return arguments + ["CODE_SIGNING_ALLOWED=NO", "ENABLE_USER_SCRIPT_SANDBOXING=YES"]
     }
 
     /*

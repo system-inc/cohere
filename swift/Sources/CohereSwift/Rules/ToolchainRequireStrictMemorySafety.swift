@@ -14,17 +14,37 @@ import SwiftSyntax
 
  Read from SwiftPM's own answer (`dump-package`), as `toolchain-require-upcoming-features` reads its features. Plugin
  and macro targets, and targets with no Swift sources, are skipped for that rule's reasons.
+
+ At an Xcode root it is on when every configuration turns it on, by `SWIFT_STRICT_MEMORY_SAFETY` or by
+ `-strict-memory-safety` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting.
  */
-public struct ToolchainRequireStrictMemorySafety: PackageRule {
+public struct ToolchainRequireStrictMemorySafety: XcodeSettingRule {
     public let name = "cohere-swift/toolchain-require-strict-memory-safety"
     public let origin = RuleOrigin.house
     public let upstreamName: String? = nil
 
     public init() {}
 
+    func xcodeSettingsMissing(for target: PackageModel.Target) -> [XcodeGenSpecification.Setting] {
+        guard ToolchainRequireUpcomingFeatures.judges(target), !target.strictMemorySafety else { return [] }
+        return [XcodeGenSpecification.Setting(key: "SWIFT_STRICT_MEMORY_SAFETY", value: "YES")]
+    }
+
     public func findings(in package: PackageModel, manifest: ParsedFile?) -> [FindingRecord] {
-        package.targets
-            .filter { $0.kind != "plugin" && $0.kind != "macro" && !$0.sources.isEmpty && !$0.strictMemorySafety }
+        if let settings = package.xcodeBuildSettings {
+            return package.toolchainTargets.filter { !xcodeSettingsMissing(for: $0).isEmpty }.map { target in
+                let off = settings.configurations(of: target.name, where: { !$0.strictMemorySafety })
+                return settings.finding(rule: name, target: target.name) { lineFound in
+                    RuleMessages.ToolchainRequireStrictMemorySafety.strictMemorySafetyMissingInXcode(
+                        target: target.name,
+                        configurations: off.map { .some(configurations: XcodeBuildSettings.listed($0)) } ?? .every,
+                        located: lineFound ? .found : .notFound(definition: settings.definitionName),
+                    )
+                }
+            }
+        }
+        return package.targets
+            .filter { ToolchainRequireUpcomingFeatures.judges($0) && !$0.strictMemorySafety }
             .map { target in
                 let message = RuleMessages.ToolchainRequireStrictMemorySafety.strictMemorySafetyMissing(
                     target: target.name
