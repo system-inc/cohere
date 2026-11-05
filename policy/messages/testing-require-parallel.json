@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/testing-require-parallel"
+  },
+  "messages": {
+    "notParallel": {
+      "text": "This test runs alone while its siblings wait, because its first statement is not Parallel on its own *testing.T. Make that call its first statement, or, if it touches state no other test may share at the same time, say which in a `// Not parallel: <reason>` comment directly above it, so the next reader knows before changing it."
+    },
+    "notParallelWithoutReason": {
+      "text": "This test says it is not parallel and gives no reason. Name what it shares after `Not parallel:`, such as the environment, the working directory or a package variable, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    }
+  }
+}
