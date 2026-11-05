@@ -21,6 +21,14 @@ type fixture struct {
 
 	// lone is a go.mod with no go.work around it, outside the repository.
 	lone string
+
+	// outside is a go.work of two modules in no repository, as a fresh `go work init` in a temporary
+	// directory is.
+	outside string
+
+	// broken is a go.work whose `.git` is a file pointing at a git directory that is not there, so it is in a
+	// repository git cannot read.
+	broken string
 }
 
 // fixtureBase is the temporary directory the fixture is built in, removed once every test is done.
@@ -56,7 +64,12 @@ func readFixture(test *testing.T) fixture {
 }
 
 func buildFixture(base string) (fixture, error) {
-	built := fixture{repository: filepath.Join(base, "repository"), lone: filepath.Join(base, "lone")}
+	built := fixture{
+		repository: filepath.Join(base, "repository"),
+		lone:       filepath.Join(base, "lone"),
+		outside:    filepath.Join(base, "outside"),
+		broken:     filepath.Join(base, "broken"),
+	}
 	library := filepath.Join(base, "library")
 	libraryFiles := map[string]string{
 		"mod/go.mod":     "module example.com/library/mod\n\ngo 1.21\n",
@@ -79,6 +92,10 @@ func buildFixture(base string) (fixture, error) {
 			"ignore (\n\t./generated\n\ttools/scripts\n\t./deep/inside\n)\n",
 		".gitignore":                       "scratch.go\nbuild/\n",
 		"main.go":                          "package root\n",
+		"_draft.go":                        "package root\n",
+		".draft.go":                        "package root\n",
+		"drafts/_only.go":                  "package drafts\n",
+		"drafts/.only.go":                  "package drafts\n",
 		"notes.txt":                        "not go\n",
 		"scratch.go":                       "package root\n",
 		"build/generated.go":               "package build\n",
@@ -122,6 +139,22 @@ func buildFixture(base string) (fixture, error) {
 
 	loneFiles := map[string]string{"go.mod": "module example.com/lone\n\ngo 1.21\n", "lone.go": "package lone\n"}
 	if writeError := writeFiles(built.lone, loneFiles); writeError != nil {
+		return fixture{}, writeError
+	}
+	outsideFiles := map[string]string{
+		"go.work":     "go 1.25\n\nuse (\n\t.\n\t./tool\n)\n",
+		"go.mod":      "module example.com/outside\n\ngo 1.25\n",
+		"tool/go.mod": "module example.com/outside/tool\n\ngo 1.25\n",
+	}
+	if writeError := writeFiles(built.outside, outsideFiles); writeError != nil {
+		return fixture{}, writeError
+	}
+	brokenFiles := map[string]string{
+		"go.work": "go 1.25\n\nuse .\n",
+		"go.mod":  "module example.com/broken\n\ngo 1.25\n",
+		".git":    "gitdir: " + filepath.Join(base, "missing-git-directory") + "\n",
+	}
+	if writeError := writeFiles(built.broken, brokenFiles); writeError != nil {
 		return fixture{}, writeError
 	}
 	return built, nil

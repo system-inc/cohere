@@ -27,8 +27,14 @@ type Loaded struct {
 	// would refuse, each once, sorted by file and position.
 	Diagnostics []Diagnostic
 
-	// Excluded are the workspace files the build constraints left out, each once, sorted by file.
+	// Excluded are the workspace files the build constraints left out, each once, sorted by file: those a
+	// loaded package lists as ignored, and those of the census no package holds, as in a directory whose every
+	// file is left out, which go list matches as no package at all.
 	Excluded []Excluded
+
+	// Unseen are the files of the census no package holds that the build constraints would build, sorted: a
+	// gap, since nothing type-checked them.
+	Unseen []string
 
 	// PackagesLoaded counts every package in the graph, dependencies and test variants included.
 	PackagesLoaded int
@@ -44,9 +50,10 @@ type Loaded struct {
 }
 
 // Packages loads the packages the patterns name from directory, with the current environment plus
-// environment (such as `GOWORK=off`). It returns an error only when nothing could be loaded at all; what the
-// packages themselves get wrong is Loaded.Diagnostics.
-func Packages(directory string, patterns []string, environment []string) (*Loaded, error) {
+// environment (such as `GOWORK=off`), and accounts for census, the project's own absolute list of its .go
+// files: each comes back held by a package, in Excluded, or in Unseen. It returns an error only when
+// nothing could be loaded at all; what the packages themselves get wrong is Loaded.Diagnostics.
+func Packages(directory string, patterns []string, environment []string, census []string) (*Loaded, error) {
 	started := time.Now()
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
@@ -71,11 +78,11 @@ func Packages(directory string, patterns []string, environment []string) (*Loade
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })
 	loaded.FilesTypeChecked = filesTypeChecked(workspace, loaded.Packages)
-	excluded, excludedError := excludedFiles(workspace, fullEnvironment, roots)
+	excluded, unseen, excludedError := excludedAndUnseen(workspace, fullEnvironment, roots, census)
 	if excludedError != nil {
 		return nil, excludedError
 	}
-	loaded.Excluded = excluded
+	loaded.Excluded, loaded.Unseen = excluded, unseen
 	loaded.Elapsed = time.Since(started)
 	return loaded, nil
 }

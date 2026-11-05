@@ -16,6 +16,19 @@ var plantedAnalyzer = &analysis.Analyzer{
 	},
 }
 
+// optionedAnalyzer finds nothing and has one option, readsFile, for the rules that are configured by one.
+var optionedAnalyzer = func() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "optioned",
+		Doc:  "optioned finds nothing; it exists so a rule under test has an analyzer with an option",
+		Run: func(pass *analysis.Pass) (any, error) {
+			return nil, nil
+		},
+	}
+	analyzer.Flags.String("readsFile", "", "the file a rule under test would read")
+	return analyzer
+}()
+
 // TestValidateAcceptsAWellFormedRule is the control for the refusals below: a house rule and each kind of
 // ported rule, written the way the registry will hold them.
 func TestValidateAcceptsAWellFormedRule(test *testing.T) {
@@ -41,6 +54,12 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			UpstreamName: "nilness",
 			TypeAware:    true,
 			Analyzer:     plantedAnalyzer,
+		},
+		{
+			Name:         "cohere-go/correctness-require-declared-walk",
+			Origin:       OriginHouse,
+			Analyzer:     optionedAnalyzer,
+			ConfiguredBy: []string{"readsFile"},
 		},
 	}
 	for _, testCase := range cases {
@@ -122,6 +141,16 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			name:   "a tools rule with no upstream name",
 			rule:   Rule{Name: "cohere-go/nilness", Origin: OriginTools, Analyzer: plantedAnalyzer},
 			saying: "names no upstream rule",
+		},
+		{
+			name: "an option its analyzer has no flag for",
+			rule: Rule{
+				Name:         "cohere-go/correctness-require-declared-walk",
+				Origin:       OriginHouse,
+				Analyzer:     optionedAnalyzer,
+				ConfiguredBy: []string{"readsFiles"},
+			},
+			saying: "has no flag for",
 		},
 	}
 	for _, testCase := range cases {

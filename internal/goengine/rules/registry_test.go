@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -161,7 +162,8 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 		TypeAware:    true,
 		Analyzer:     unusedReport,
 	}
-	if last := registry[len(registry)-1]; last != expectedUnused {
+	// reflect.DeepEqual because ConfiguredBy is a slice, which leaves rule.Rule without ==.
+	if last := registry[len(registry)-1]; !reflect.DeepEqual(last, expectedUnused) {
 		test.Errorf("the last rule is %+v, expected %+v", last, expectedUnused)
 	}
 	for _, registeredRule := range registry {

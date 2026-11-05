@@ -35,7 +35,8 @@ type Workspace struct {
 	Modules     []Module
 	InSubmodule []string
 
-	// Submodules are the gitlinks of the index, relative to Root. Only a go.work root reads them.
+	// Submodules are the gitlinks of the index, relative to Root. Only a go.work root in a repository reads
+	// them.
 	Submodules []string
 
 	// FromWorkspace is whether Root holds a go.work. Without one Root is a single module.
@@ -61,9 +62,16 @@ func ReadWorkspace(root string) (Workspace, error) {
 	if parseError != nil {
 		return Workspace{}, parseError
 	}
-	links, linksError := gitlinks(absoluteRoot)
-	if linksError != nil {
-		return Workspace{}, linksError
+	// A root in no repository has no index, so no gitlinks, as it has no ignore files for TakeCensus. Whether
+	// there is one is decided by a `.git` at or above the root, never by reading git's error, so a repository
+	// git cannot read still fails here.
+	var links []string
+	if nearestRepository(absoluteRoot) != "" {
+		indexLinks, linksError := gitlinks(absoluteRoot)
+		if linksError != nil {
+			return Workspace{}, linksError
+		}
+		links = indexLinks
 	}
 
 	covered := Workspace{Root: absoluteRoot, Submodules: links, FromWorkspace: true}

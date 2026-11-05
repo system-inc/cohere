@@ -77,6 +77,9 @@ func TestTakeCensusDoesNotEnterWhatGoDoesNot(test *testing.T) {
 		"an ignore directive deeper":    "deep/tools/scripts/script.go",
 		"a nested ignore directive":     "deep/inside/inside.go",
 		"below a nested ignore":         "deep/inside/below/below.go",
+		"an underscore file":            "_draft.go",
+		"a dot file":                    ".draft.go",
+		"a directory of only those":     "drafts/_only.go",
 	}
 	for name, file := range skipped {
 		test.Run(name, func(test *testing.T) {
@@ -106,8 +109,9 @@ func TestTakeCensusDoesNotEnterWhatGoDoesNot(test *testing.T) {
 }
 
 // The census's directories in the root module are the ones `go list ./...` lists there, so what go leaves
-// out of ./... by testdata, `.` and `_`, vendor, `ignore` directives and module boundaries, the census leaves
-// out the same way, checked against go rather than against this package's reading of it. The submodule is
+// out of ./... by testdata, `.` and `_` (directories, and files: drafts holds only such files, so it is no
+// package), vendor, `ignore` directives and module boundaries, the census leaves out the same way, checked
+// against go rather than against this package's reading of it. The submodule is
 // a module of its own, so go never counts it in the root module either.
 func TestTakeCensusSeesTheRootModulesPackagesGoListSees(test *testing.T) {
 	test.Parallel()
