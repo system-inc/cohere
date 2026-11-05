@@ -45,8 +45,8 @@ func DefaultComplexitySettings() ComplexitySettings {
 // # The same JavaScript quirk max-depth has, and the same two opposite zero spellings
 //
 // Upstream's threshold handling is `hasOwn(option,"maximum") || hasOwn(option,"max")` gating
-// `threshold = option.maximum || option.max`. The guard tests PRESENCE and the `||` tests
-// TRUTHINESS, and they disagree exactly when a zero is written. See `DecodeMaxDepthOptions`, which
+// `threshold = option.maximum || option.max`. The guard tests presence and the `||` tests
+// truthiness, and they disagree exactly when a zero is written. See `DecodeMaxDepthOptions`, which
 // carries the measured table for the identical expression; the outcome here is the same, and the
 // `{"maximum": 0}` shape leaves the threshold `undefined` so every comparison against it is false
 // and the rule goes silent.
@@ -129,7 +129,7 @@ var messageComplexityComplex = rule.Message{
 //
 // The audit rates it No at 326 violations. The standard also quotes the Tricorder paper naming
 // cyclomatic complexity as failing the bar for a useful diagnostic, and that judgment is about
-// ENABLING rather than about porting: a metric that fires on 326 sites with no fixer is a cleanup
+// enabling rather than about porting: a metric that fires on 326 sites with no fixer is a cleanup
 // nobody has agreed to, and a number that correlates poorly with what makes code hard to read is a
 // poor thing to gate a build on. The port exists so the decision can be revisited without redoing
 // the work, and the rule is registered unenabled.
@@ -142,7 +142,7 @@ var messageComplexityComplex = rule.Message{
 // it: cyclomatic complexity counts decision points syntactically, so a walk is the right tool.
 //
 // `onCodePathStart` and `onCodePathEnd` sound like they need ESLint's code path analysis and do
-// not. The rule uses a code path only as a STACK of function-like scopes, and reads `codePath.origin`
+// not. The rule uses a code path only as a stack of function-like scopes, and reads `codePath.origin`
 // to filter to three of the four kinds ESLint produces -- `function`, `class-field-initializer` and
 // `class-static-block`, excluding `program`. That is the same frame stack `max-depth` maintains, and
 // it is maintained the same way here: one `KindSourceFile` listener recursing itself, since this
@@ -160,7 +160,7 @@ var messageComplexityComplex = rule.Message{
 // `case` that carries a test, so `default` never counts; modified counts the switch itself as one
 // regardless of how many cases it has. Both are in the corpus.
 //
-// # The message interpolates a NAME, and the name is most of the port
+// # The message interpolates a name, and the name is most of the port
 //
 // Upstream builds it with `getFunctionNameWithKind` -- 77 lines assembling `static`, `private`,
 // `async`, `generator`, a kind word, and a quoted name -- then upper-cases the first letter. The
@@ -168,13 +168,13 @@ var messageComplexityComplex = rule.Message{
 // `Static method 'static'` and `Class field initializer`, so the name is what a message fixture
 // actually tests rather than an incidental detail.
 //
-// It is SIMPLER here than upstream, because of a parser difference worth stating: in ESTree a
+// It is simpler here than upstream, because of a parser difference worth stating: in ESTree a
 // method is a `MethodDefinition` wrapping a `FunctionExpression`, so upstream has to read modifiers
 // off the parent and the kind word off `parent.kind`. Measured, our parser has no wrapper at all --
 // `KindMethodDeclaration` is both the member and the function -- so the whole parent dispatch
 // collapses into the node's own kind and its modifier list.
 //
-// # The span is the function HEAD, not the function
+// # The span is the function head, not the function
 //
 // Upstream reports `loc: getFunctionHeadLoc(node, sourceCode)`: from the declaration's start to the
 // opening parenthesis of its parameters, or the `=>` token for an arrow, or the `static` keyword for
@@ -225,7 +225,7 @@ func (w *complexityWalker) walk(node *ast.Node) {
 		return
 	}
 
-	// A class field's code path covers its INITIALIZER only, not the whole member, and the
+	// A class field's code path covers its initializer only, not the whole member, and the
 	// difference is visible: a computed key is evaluated where the class is defined, so its
 	// branches belong to the enclosing function rather than to the field. Measured against the
 	// installed rule at max 1, `function foo() { class C { [x || y] = a; } }` reports on `foo`
@@ -354,10 +354,10 @@ func (w *complexityWalker) reportIfOverThreshold(frame complexityFrame) {
 //
 // Upstream's `onCodePathEnd` filters `codePath.origin` to `function`,
 // `class-field-initializer` and `class-static-block`, excluding `program`. So the file itself is
-// deliberately NOT a frame here: a top-level `if` belongs to the program's path, which is never
+// deliberately not a frame here: a top-level `if` belongs to the program's path, which is never
 // reported, and giving the file a frame would report the whole module as one function.
 //
-// A property declaration is a frame only when it HAS an initializer, because that is what makes it
+// A property declaration is a frame only when it has an initializer, because that is what makes it
 // a class field initializer rather than a bare declaration.
 func complexityStartsAFrame(node *ast.Node) bool {
 	switch node.Kind {
@@ -418,7 +418,7 @@ func complexityNameOf(ruleContext rule.Context, node *ast.Node) string {
 		tokens = append(tokens, "generator")
 	}
 
-	// The kind word. Upstream reads it off the PARENT when the function is a property's value or a
+	// The kind word. Upstream reads it off the parent when the function is a property's value or a
 	// class field's value, so what the function is assigned to wins over what it is syntactically:
 	// measured, `class C { x = () => a||b||c; }` renders "Method 'x'" rather than "Arrow function",
 	// and `{ b: (a) => ... }` renders "Method 'b'". A count-only fixture cannot see either, because
@@ -445,7 +445,7 @@ func complexityNameOf(ruleContext rule.Context, node *ast.Node) string {
 		}
 	}
 
-	// A private name is pushed UNQUOTED, where every other name is quoted. Upstream does this by
+	// A private name is pushed unquoted, where every other name is quoted. Upstream does this by
 	// pushing `` `#${key.name}` `` directly rather than going through its quoted-name branch, so
 	// `class C { #p() {} }` renders `Private method #p` and not `Private method '#p'`. Measured
 	// against the installed rule; no corpus case reaches it, because upstream never writes a
@@ -469,7 +469,7 @@ func complexityNameOf(ruleContext rule.Context, node *ast.Node) string {
 // `getStaticPropertyName` on the parent for a property and the variable's own name otherwise. The
 // corpus exercises the property form: `var o = { c: function() {} }` renders `Method 'c'`.
 func complexityReadableNameOf(node *ast.Node) string {
-	// The OWNER's name wins when there is one, which is upstream's ordering: it reads
+	// The owner's name wins when there is one, which is upstream's ordering: it reads
 	// `getStaticPropertyName(parent)` first and consults `node.id` only as a fallback.
 	if owner := complexityNamingOwnerOf(node); owner != nil && owner.Name() != nil {
 		if owner.Name().Kind == ast.KindPrivateIdentifier {
@@ -501,15 +501,15 @@ func complexityReadableNameOf(node *ast.Node) string {
 //
 // Upstream's `getFunctionNameWithKind` reads `parent.type === "Property"` and
 // `"PropertyDefinition"` for both the kind word and the name, which is how an arrow assigned to a
-// field becomes "Method 'x'". A function that has its OWN name, such as a method declaration or a
+// field becomes "Method 'x'". A function that has its own name, such as a method declaration or a
 // named function expression, is not borrowing and returns nil here.
 func complexityNamingOwnerOf(node *ast.Node) *ast.Node {
 	if node.Kind != ast.KindArrowFunction && node.Kind != ast.KindFunctionExpression {
 		return nil
 	}
-	// Deliberately NOT gated on the function being anonymous. Upstream tries the property name
-	// FIRST and falls back to the function's own `id` only when the property name is not static, so
-	// a named function expression in a property position is named for the PROPERTY:
+	// Deliberately not gated on the function being anonymous. Upstream tries the property name
+	// first and falls back to the function's own `id` only when the property name is not static, so
+	// a named function expression in a property position is named for the property:
 	// `{ d: function named() {} }` renders `Method 'd'`, measured against the installed rule. An
 	// earlier draft read the function's own name first and rendered `Method 'named'`.
 	parent := node.Parent
@@ -561,7 +561,7 @@ func complexityIsGenerator(node *ast.Node) bool {
 // complexityHeadRange is upstream's `getFunctionHeadLoc`.
 //
 // From the declaration's start to the opening parenthesis of its parameters, so the reported span
-// is the function's HEAD rather than its body. Two shapes differ: an arrow reports on its `=>`
+// is the function's head rather than its body. Two shapes differ: an arrow reports on its `=>`
 // token, and a class field initializer reports on the initializer expression.
 func complexityHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	switch node.Kind {
@@ -580,7 +580,7 @@ func complexityHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRang
 	case ast.KindArrowFunction:
 		// An arrow that borrows a property's name also borrows its span, so this arm is only
 		// reached by a free-standing arrow. Upstream's ordering is the same: its Property and
-		// PropertyDefinition branch is tested BEFORE its ArrowFunctionExpression branch, so an
+		// PropertyDefinition branch is tested before its ArrowFunctionExpression branch, so an
 		// arrow in a property position never reaches the arrow arm at all.
 		if complexityNamingOwnerOf(node) == nil {
 			if arrow := node.AsArrowFunction(); arrow != nil && arrow.EqualsGreaterThanToken != nil {
@@ -593,7 +593,7 @@ func complexityHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRang
 
 	// Everything else: start of the declaration through to the opening paren of the parameters.
 	//
-	// The start is the OWNER's when the function borrows a name, which is upstream's
+	// The start is the owner's when the function borrows a name, which is upstream's
 	// `start = parent.loc.start` for its Property and PropertyDefinition branch. Measured, that is
 	// what makes `{ c: function (a) {...} }` span `c: function ` rather than `function ` -- the
 	// property name is part of the head.

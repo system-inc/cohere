@@ -33,7 +33,7 @@ func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
 		// still bare in the test position, so the except-parens escape does not apply.
 		{"parenthesized operands", "var x; if ((x) = (0));"},
 		{"ternary test", "var x; var b = (x = 0) ? 1 : 0;"},
-		// Reported under the default even though the assignment IS wrapped in parentheses. See the
+		// Reported under the default even though the assignment is wrapped in parentheses. See the
 		// asymmetry note on the rule: upstream strips parentheses for a ternary test regardless of
 		// mode, and only for a ternary test.
 		{"parenthesized ternary test", "(((3496.29)).bkufyydt = 2e308) ? foo : bar;"},
@@ -50,7 +50,7 @@ func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
 
 // Fires, always mode. Upstream's `fail` entries carrying `["always"]`.
 //
-// Nine of these report TWICE upstream, at a byte-identical span, because its statement branch and
+// Nine of these report twice upstream, at a byte-identical span, because its statement branch and
 // its assignment branch both fire on a bare assignment in a test position. This asserts one finding
 // each. The divergence is deliberate and is argued at the rule.
 func TestNoCondAssignFiresUnderAlways(test *testing.T) {
@@ -130,7 +130,7 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 		{"switch case label", "switch (foo) { case a = b: bar(); }", exceptParensOptions},
 		{"switch case label, always", "switch (foo) { case a = b: bar(); }", alwaysOptions},
 		{"switch case label expression, always", "switch (foo) { case baz + (a = b): bar(); }", alwaysOptions},
-		// Assignments in the BODY of a conditional, which is where assignments belong. These are
+		// Assignments in the body of a conditional, which is where assignments belong. These are
 		// the cases the span containment check exists for.
 		{"assignment in an if body", "if (obj.key) { (obj.key=false) }", alwaysOptions},
 		{"assignment in a for body", "for (;;) { (obj.key=false) }", alwaysOptions},
@@ -147,7 +147,7 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 		{"for updater", "for (x = 0;x<10;(x = x + 1)) { x = 0 }", exceptParensOptions},
 		{"for updater compound", "const nums = [1,2,3]; for(let i = 0; i < nums.length; i += 1) { dosomething(); }", exceptParensOptions},
 		{"for updater compound, always", "for (let i = 0; i < nums.length; i += 1) { dosomething();}", alwaysOptions},
-		// The assignment is in a ternary BRANCH, not its test.
+		// The assignment is in a ternary branch, not its test.
 		{"assignment in a ternary branch", "let a = 1; a = a ? (a += 5) : 1;", alwaysOptions},
 	}
 
@@ -208,12 +208,12 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("a for initializer is not the test, even when the test also assigns", func(test *testing.T) {
 		test.Parallel()
 		// Found by a surviving mutant. Dropping the start bound of the containment check turns the
-		// `for` initializer into a second finding, because the initializer ENDS before the test
+		// `for` initializer into a second finding, because the initializer ends before the test
 		// ends and so satisfies the end bound on its own.
 		//
 		// Upstream's corpus cannot see this. Its `for (x = 0;x<10;x++)` case has an assignment in
 		// the initializer and a comparison in the test, so the initializer stays silent whether or
-		// not the start bound is checked. It takes an assignment in BOTH positions to separate them,
+		// not the start bound is checked. It takes an assignment in both positions to separate them,
 		// and the finding must land on the test's assignment rather than the initializer's.
 		const source = "for (x = 0; y = 1; z++) { }"
 		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, alwaysOptions)
@@ -226,7 +226,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 
 	test.Run("a for initializer assigning into a parenthesized value", func(test *testing.T) {
 		test.Parallel()
-		// The same bound, reached a different way: here the initializer NESTS an assignment, so a
+		// The same bound, reached a different way: here the initializer nests an assignment, so a
 		// rule missing the start bound reports two findings on a loop whose test assigns nothing.
 		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"for (a = (b = 1); c; d) { }", alwaysOptions)

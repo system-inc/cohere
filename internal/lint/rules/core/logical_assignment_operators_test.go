@@ -1539,7 +1539,7 @@ func runLogicalAssignment(test *testing.T, testCase struct {
 // is a fact about the harness rather than about the rule.
 //
 // `rule_testing`'s tsconfig pins `moduleDetection: "force"` (internal/rule_testing/program.go:27),
-// which makes EVERY typed fixture an external module no matter what it contains. A module is strict
+// which makes every typed fixture an external module no matter what it contains. A module is strict
 // by specification, and `with` is illegal in strict code, so under RunTyped the rule's `isStrict`
 // is unconditionally true and the non-strict `with` branch is unreachable through that harness.
 // Upstream runs its whole corpus at `sourceType: "script"`, where those seven cases are the only
@@ -2045,7 +2045,7 @@ func TestLogicalAssignmentOperatorsHandlesNilOptions(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "assignment")
 	rule_testing.ExpectFixedSource(test, result, logicalAssignmentAsWritten("a = a || b", "a ||= b"))
 
-	// The control: the if-statement arm must stay OFF under the default, or the fallback would be
+	// The control: the if-statement arm must stay off under the default, or the fallback would be
 	// enforcing something nobody configured.
 	silent := rule_testing.RunTyped(test, LogicalAssignmentOperators, "logical.ts", "if (a) a = b")
 	rule_testing.ExpectClean(test, silent)
@@ -2107,7 +2107,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 			wantFixed: "a ||= b as number",
 		},
 		{
-			// A non-null assertion is not a valid assignment TARGET, so the shape this was first
+			// A non-null assertion is not a valid assignment target, so the shape this was first
 			// written as (`a! = a! || b`) does not parse as an assignment at all. It survives on
 			// the right instead, which is where the repair copies text.
 			name:      "a non-null assertion on the right survives the assignment repair",
@@ -2271,7 +2271,7 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(test *testing.T) 
 			len(typed.Diagnostics[0].Fixes))
 	}
 
-	// The control on the OTHER limitation: a shadowed `undefined` needs the checker, and the
+	// The control on the other limitation: a shadowed `undefined` needs the checker, and the
 	// untyped harness cannot see it. This case is clean upstream and reports here, which is what
 	// makes the split above load bearing rather than arbitrary. No `with` case shadows anything,
 	// so the two limitations never overlap.
@@ -2295,7 +2295,7 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(test *testing.T) 
 // shapes upstream's corpus never writes.
 //
 // The corpus contains exactly one case in this family, `fn(a || (a = 0))`, and it is the one shape
-// that does NOT gain parentheses. A port reading that single case as evidence about call arguments
+// that does not gain parentheses. A port reading that single case as evidence about call arguments
 // generally, or about delimited positions generally, gets every other shape here wrong and stays
 // green through the whole imported corpus. That is what happened: the first version of this rule
 // carried a semantic helper about argument and element positions, all four rows below came out
@@ -2325,7 +2325,7 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(test *testing.T) {
 		{"a sole argument to new borrows its parentheses too", "new Thing(a || (a = 0))",
 			"new Thing(a ||= 0)"},
 		// The two halves of the token test are separable, and this row is the only thing that
-		// reaches the closing half. A FIRST argument of several is preceded by the call's `(` and
+		// reaches the closing half. A first argument of several is preceded by the call's `(` and
 		// followed by a comma, so the opening half accepts and the closing half must refuse. With
 		// the closing half neutralized this row comes out bare, and every other row in this test
 		// still passes, which is exactly how it read as a surviving mutant.

@@ -72,7 +72,7 @@ func TestNoUnmodifiedLoopConditionStaysSilent(test *testing.T) {
 // oracle verdict to import. This rule ports the installed build and takes no options.
 //
 // The test asserts only that the three cases still parse and run without crashing, which is the
-// most that can honestly be claimed about them. It deliberately does NOT assert a finding count:
+// most that can honestly be claimed about them. It deliberately does not assert a finding count:
 // under 10.8.1 semantics a ConditionalExpression is always a group, and what the option would
 // change is exactly the thing nothing here can measure.
 //
@@ -95,7 +95,7 @@ func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(test *te
 
 // TestNoUnmodifiedLoopConditionSpans asserts where the finding points.
 //
-// Upstream reports on the IDENTIFIER inside the condition, not on the loop and not on the
+// Upstream reports on the identifier inside the condition, not on the loop and not on the
 // condition, so the span is one name. The two-finding case pins both spans and their order.
 func TestNoUnmodifiedLoopConditionSpans(test *testing.T) {
 	test.Parallel()
@@ -279,7 +279,7 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(tes
 // TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration covers where the search
 // for a caller stops.
 //
-// `getEncloseFunctionDeclaration` climbs to the FIRST function declaration and stops there, rather
+// `getEncloseFunctionDeclaration` climbs to the first function declaration and stops there, rather
 // than continuing outward to one that happens to be referenced from the loop. The corpus never
 // nests, so a mutant that skipped past a declaration survived all 37 imported cases and the
 // unnamed-function fixtures too.
@@ -335,7 +335,7 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(test
 //
 // The dynamic-expression check abandons a group holding a call, a member access, a `new`, a tagged
 // template or a `yield`, because any of those may be changing what the rule is about to call
-// unchanging. It deliberately does NOT look inside a nested function, since a function that is
+// unchanging. It deliberately does not look inside a nested function, since a function that is
 // merely written is not called.
 //
 // Every dynamic case in the corpus writes the call at the top level of the condition, so a mutant
@@ -389,12 +389,12 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(test *
 
 // TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite covers upstream's initializer exception.
 //
-// `isWriteReference` declines a reference marked as an initializer UNLESS the binding is a `var`.
+// `isWriteReference` declines a reference marked as an initializer unless the binding is a `var`.
 // The corpus exercises that only through `for (var foo = 0; foo < 10; ) { } foo = 1;`, where the
 // exception makes the head's `foo = 0` a write that then fails the in-the-loop test anyway, so the
 // case reports either way and a mutant removing the exception survives it.
 //
-// The shape that separates them is a `var` declaration with an initializer INSIDE the loop body,
+// The shape that separates them is a `var` declaration with an initializer inside the loop body,
 // where the write does count as in the loop. The `let` row is the pure contrast: same source except
 // for the keyword, and the `let` shadows rather than writing the outer binding.
 //
@@ -492,7 +492,7 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(test *testing.T) {
 // TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended is where cohere is
 // deliberately quieter than ESLint.
 //
-// Upstream credits a write only when it sits in the loop, or in a function DECLARATION whose name is
+// Upstream credits a write only when it sits in the loop, or in a function declaration whose name is
 // referenced from the loop. It cannot see the most common modern cancellation shape: a flag set by a
 // signal handler or an abort callback while the loop is suspended at an `await`. A suspended loop
 // hands the thread to whatever else is queued, so a write in another function activation, registered
@@ -500,7 +500,7 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(test *testing.T) {
 // such loops in ahra, and all three are false.
 //
 // The first three silent rows are those sites, cut to the lines that decide them:
-// `modules/tasks/TasksWatchCommandLineInterface.ts:305` (a hoisted SIGINT handler),
+// `modules/tasks/TasksWatchCommandLineInterface.ts:305` (a hoisted `SIGINT` handler),
 // `modules/os/sensation/AhraOsMonitors.ts:548` (an `abort` closure in the enclosing function of an async
 // IIFE), and `modules/os/boot-screens/RainbowMatrix.ts:689` (`teardown`, reached through `onSignal`).
 //

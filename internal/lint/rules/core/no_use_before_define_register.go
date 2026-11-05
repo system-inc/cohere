@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // at once touch nothing in common.
 //
 // The decoder is hand-rolled rather than `rule.DecodeOptionsInto`, for two reasons that compound.
-// Six of this rule's seven options default to TRUE, and the generic helper errors on empty input,
+// Six of this rule's seven options default to true, and the generic helper errors on empty input,
 // which the config layer turns into nil for a non-required rule, which a struct assertion turns into
 // the zero value: false for all of them. That path leaves a rule that registers on every file and
 // judges almost nothing. And upstream's schema is a `oneOf`, so the option can arrive as the bare

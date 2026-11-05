@@ -73,10 +73,10 @@ type NoReturnAssignOptions = NoReturnAssignMode
 //
 // # The parenthesis test is positional and blind to nesting, which is a real divergence source
 //
-// Upstream asks `astUtils.isParenthesised`, which reads the token immediately BEFORE the assignment
-// and the token immediately AFTER it and answers true when they are `(` and `)`. It does not ask
+// Upstream asks `astUtils.isParenthesised`, which reads the token immediately before the assignment
+// and the token immediately after it and answers true when they are `(` and `)`. It does not ask
 // whether those two parentheses are each other's match, and it does not ask whether they belong to
-// the assignment at all. So `return foo(a = b)` is SILENT under the default, because the call's own
+// the assignment at all. So `return foo(a = b)` is silent under the default, because the call's own
 // open paren sits immediately before the assignment and its close paren immediately after, and the
 // rule reads that as the author's deliberate wrapping. Measured against the installed build.
 //
@@ -92,7 +92,7 @@ type NoReturnAssignOptions = NoReturnAssignMode
 // From the assignment, upstream climbs until it reaches a node whose ESTree type matches
 // `/^(?:[a-zA-Z]+?Statement|ArrowFunctionExpression|FunctionExpression|ClassExpression)$/`, then
 // asks what it landed on. A `ReturnStatement` reports; an `ArrowFunctionExpression` reports only
-// when the child it came up through IS the arrow's body, which is what separates `() => a = b` from
+// when the child it came up through is the arrow's body, which is what separates `() => a = b` from
 // `(a = b) => c`, where the assignment is a parameter default. Anything else is silent.
 //
 // The sentinel set is what makes `return class extends (a = b) {}` and `switch (a = b)` silent:
@@ -128,7 +128,7 @@ var NoReturnAssign = rule.Rule{
 				case ast.KindReturnStatement:
 					ruleContext.ReportNode(sentinel, messageReturnAssignment)
 				case ast.KindArrowFunction:
-					// Only when the walk came up through the arrow's BODY. An assignment in a
+					// Only when the walk came up through the arrow's body. An assignment in a
 					// parameter default reaches the same arrow through a different child, and
 					// `(a = b) => c` is a default rather than a returned write.
 					if sentinel.AsArrowFunction().Body == child {
@@ -170,10 +170,10 @@ func climbToTheEnclosingSentinel(assignment *ast.Node) (child *ast.Node, sentine
 // from the ESTree type names it matches rather than derived from what a statement is. Two members
 // of that set are surprising enough to be worth naming:
 //
-//   - `FunctionDeclaration` is NOT a sentinel, because the name ends in `Declaration`. It does not
+//   - `FunctionDeclaration` is not a sentinel, because the name ends in `Declaration`. It does not
 //     have to be: an assignment written inside its body is an `ExpressionStatement`, which is, so
 //     the walk stops well below the declaration and no assignment escapes a function body.
-//   - `SwitchCase` and `CatchClause` are NOT sentinels, for the same naming reason, and unlike the
+//   - `SwitchCase` and `CatchClause` are not sentinels, for the same naming reason, and unlike the
 //     function case there is no block below them in the `case` position. That is why
 //     `switch (a = b) {}` is silent through `SwitchStatement` rather than through anything nearer.
 //
@@ -197,16 +197,16 @@ func isReturnAssignSentinel(node *ast.Node) bool {
 	// and `function f(){ return () => { var z = a = b; }; }` from silent to reporting, and both are
 	// silent against the installed build.
 	//
-	// `KindBlock` is deliberately ABSENT, and it is the one member of upstream's set that is not
+	// `KindBlock` is deliberately absent, and it is the one member of upstream's set that is not
 	// here. Upstream's regex matches `BlockStatement`, and it is what stops the declarator shape
-	// above in ESTree. In our tree it is SUBSUMED everywhere it could apply: a walk starting at an
+	// above in ESTree. In our tree it is subsumed everywhere it could apply: a walk starting at an
 	// assignment cannot reach a Block without passing a nearer sentinel, because a bare assignment
 	// inside a block is wrapped in an ExpressionStatement and a declared one in a VariableStatement.
 	// So the two differences cancel, and the position upstream covers with Block is covered here by
 	// VariableStatement.
 	//
 	// Measured rather than argued. A probe walking from every assignment to the first sentinel, with
-	// a Block case that reports instead of stopping, reached a Block ZERO times across 21 shapes:
+	// a Block case that reports instead of stopping, reached a Block zero times across 21 shapes:
 	// bare blocks, function and generator and async bodies, if, try, catch, finally, switch clauses,
 	// every loop form, a labeled block, a class static block, a namespace, and three malformed
 	// inputs whose error recovery synthesizes nodes well-formed source never produces. The same
@@ -227,14 +227,14 @@ func isReturnAssignSentinel(node *ast.Node) bool {
 	// function declaration, and two malformed inputs, found none of the five ever reached as the
 	// first sentinel, and the control with ExpressionStatement removed reached Labeled immediately.
 	//
-	// They stay because this set is a TRANSCRIPTION of an enumerated upstream regex rather than a
+	// They stay because this set is a transcription of an enumerated upstream regex rather than a
 	// set of independent decisions, and the next reader's job is to check it against that regex. A
 	// set missing five members it should have looks like a porting gap, and proving each absence
 	// inert costs the same probe again. Block is deleted rather than kept for the opposite reason:
-	// it is inert AND its role is taken by a different node, so listing it would misdescribe how
+	// it is inert and its role is taken by a different node, so listing it would misdescribe how
 	// this works.
 	//
-	// The three that ARE load-bearing and least obvious, each pinned by a fixture: With, through its
+	// The three that are load-bearing and least obvious, each pinned by a fixture: With, through its
 	// subject expression; Try, through a catch binding's destructuring default, which is the only
 	// position under a `try` that is not already a statement; and VariableStatement, above.
 	case ast.KindBreakStatement,
@@ -296,7 +296,7 @@ func isReturnAssignSentinel(node *ast.Node) bool {
 //
 // # Finding the two adjacent tokens without a token stream
 //
-// The previous token needs no scan at all. A node's `Pos()` is the position BEFORE its leading
+// The previous token needs no scan at all. A node's `Pos()` is the position before its leading
 // trivia, which is exactly where the previous token ended, so `text[node.Pos()-1]` is that token's
 // last byte. That is the same property `rule.TokenRange` exists to work around, used in the other
 // direction. Measured on the trivia shapes: `return foo(/*c*/ a = b /*d*/)` and
@@ -311,12 +311,12 @@ func isReturnAssignSentinel(node *ast.Node) bool {
 //
 // Upstream compares a token's whole value; this compares one byte. They agree because `(` and `)`
 // are single-byte punctuators that no other token can start or end with: the grammar has no longer
-// token beginning with `(` or ending with `)`, so a byte found at a token boundary IS that token.
+// token beginning with `(` or ending with `)`, so a byte found at a token boundary is that token.
 //
 // A `(` inside a string, a template, or a regular expression is never at that boundary, because
 // something always separates it from the assignment. Both `return "(" , a = b;` and a template
 // literal holding an open paren followed by `, a = b;` answer `,` here and report, matching
-// upstream. A `(` inside a COMMENT is skipped, which is also what upstream does, since its token
+// upstream. A `(` inside a comment is skipped, which is also what upstream does, since its token
 // reader skips comments: `return foo /*(*/ (a = b);` is silent both ways because the real `(`
 // follows the comment.
 func isPositionallyParenthesized(sourceFile *ast.SourceFile, node *ast.Node) bool {

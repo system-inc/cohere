@@ -240,12 +240,12 @@ var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
 // Upstream declares environment globals through a config knob. We have no such knob: our program is
 // built from a tsconfig, and the fixture harness pins `lib: ["ES2022"]`, so `window`, `self` and
 // `event` resolve to no symbol at all. Rather than weaken the rule to make those cases green, each
-// case carries what upstream configured and the runner writes an equivalent AMBIENT DECLARATION
-// FILE beside the fixture. That is how a real tree declares these names, so the rule takes the same
+// case carries what upstream configured and the runner writes an equivalent ambient declaration
+// file beside the fixture. That is how a real tree declares these names, so the rule takes the same
 // path it takes on a repository rather than one arranged for the test.
 //
 // The distinction is load bearing rather than cosmetic, and the corpus is what proves it. Under
-// `checkGlobalObject`, `window.foo()` REPORTS when the browser set is declared and is CLEAN when it
+// `checkGlobalObject`, `window.foo()` reports when the browser set is declared and is clean when it
 // is not, while `globalThis.foo()` reports either way. Measured, our checker draws that same
 // three-way line by itself: `globalThis` resolves to a symbol carrying zero declarations, `window`
 // resolves to nothing without a declaration and to a declaration-file symbol with one. So the
@@ -257,8 +257,8 @@ var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
 func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCase) {
 	test.Helper()
 
-	// A case whose verdict is decided ABOVE the rule, by the language version rather than by the
-	// rule's own judgment. `globalThis.foo()` appears in upstream's valid AND invalid lists with
+	// A case whose verdict is decided above the rule, by the language version rather than by the
+	// rule's own judgment. `globalThis.foo()` appears in upstream's valid and invalid lists with
 	// byte-identical options, separated only by `ecmaVersion`: the name did not exist before
 	// ES2020, so eslint's scope does not know it under ecmaVersion 6 and the input is clean there.
 	//
@@ -305,7 +305,7 @@ func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCas
 // The field holds the names upstream declared, comma separated. Upstream's browser set is 1164
 // names of which these cases only ever read `window`, `self` and `event`, so the extractor records
 // those three rather than the whole list, plus any name added on top of the set. That last part is
-// load bearing: one case configures the browser set AND `myGlobal`, and recording it as a bare
+// load bearing: one case configures the browser set and `myGlobal`, and recording it as a bare
 // "browser" flag dropped the extra and made the case report once where upstream reports twice.
 //
 // `globalThis` is deliberately never emitted. The checker knows it without a declaration, which is
@@ -444,7 +444,7 @@ func TestNoRestrictedGlobalsSpan(test *testing.T) {
 // nil options rather than a struct, so this asserts the path no case in the corpus takes and the
 // one the live config will take if the rule is enabled without a list.
 //
-// The early return itself is an OPTIMISATION rather than a discrimination, and the mutation
+// The early return itself is an optimisation rather than a discrimination, and the mutation
 // neutralising it survives for that reason: with an empty map the identifier listener looks every
 // name up, finds nothing restricted, and reports nothing anyway. No input can distinguish the two,
 // because distinguishing them would need a name that is restricted while the map is empty. Kept
