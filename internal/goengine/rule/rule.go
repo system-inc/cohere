@@ -55,7 +55,9 @@ func (rule Rule) Validate() error {
 		return fmt.Errorf("a rule has no name")
 	}
 	if !strings.HasPrefix(rule.Name, Namespace) {
-		return fmt.Errorf("rule %q does not start with %q, the namespace every Go rule's name opens with", rule.Name, Namespace)
+		return fmt.Errorf(
+			"rule %q does not start with %q, the namespace every Go rule's name opens with", rule.Name, Namespace,
+		)
 	}
 	if rule.Name == Namespace {
 		return fmt.Errorf("rule %q is the namespace alone, with no name after it", rule.Name)
@@ -66,11 +68,17 @@ func (rule Rule) Validate() error {
 	switch rule.Origin {
 	case OriginHouse:
 		if rule.UpstreamName != "" {
-			return fmt.Errorf("rule %q is a house rule and names upstream %q; a house rule has no upstream", rule.Name, rule.UpstreamName)
+			return fmt.Errorf(
+				"rule %q is a house rule and names upstream %q; a house rule has no upstream",
+				rule.Name, rule.UpstreamName,
+			)
 		}
 	case OriginVet, OriginStaticcheck, OriginTools:
 		if rule.UpstreamName == "" {
-			return fmt.Errorf("rule %q is ported from %s and names no upstream rule, so nobody can find what it ports", rule.Name, rule.Origin)
+			return fmt.Errorf(
+				"rule %q is ported from %s and names no upstream rule, so nobody can find what it ports",
+				rule.Name, rule.Origin,
+			)
 		}
 	default:
 		return fmt.Errorf(
