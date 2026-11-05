@@ -27,13 +27,14 @@ func NewAstPath[N Node[N]](root N) *AstPath[N] {
 
 // at is JavaScript's Array.prototype.at, with a missing element as nil.
 func (path *AstPath[N]) at(index int) any {
-	if index < 0 {
-		index += len(path.stack)
+	stackIndex := index
+	if stackIndex < 0 {
+		stackIndex += len(path.stack)
 	}
-	if index < 0 || index >= len(path.stack) {
+	if stackIndex < 0 || stackIndex >= len(path.stack) {
 		return nil
 	}
-	return path.stack[index]
+	return path.stack[stackIndex]
 }
 
 // asNode reports whether a stack value is a node.
@@ -191,10 +192,11 @@ func (path *AstPath[N]) GetParentNode(count int) (N, bool) { return path.GetNode
 
 // nodeStackIndex is upstream's #getNodeStackIndex: walk value positions, skipping slices.
 func (path *AstPath[N]) nodeStackIndex(count int) int {
+	remaining := count
 	for index := len(path.stack) - 1; index >= 0; index -= 2 {
 		if !isSlice(path.stack[index]) {
-			count--
-			if count < 0 {
+			remaining--
+			if remaining < 0 {
 				return index
 			}
 		}
@@ -217,6 +219,8 @@ func field[N Node[N]](value any, name any) any {
 		}
 		return nil
 	default:
+		// Invariant: every printer names a property with a string and a slice element with an int, as Prettier's
+		// path.call is only ever given, and PrintAstToDoc's print unpacks a selector slice into those names.
 		panic(fmt.Sprintf("printing: a path name must be a string or an int, got %T", name))
 	}
 }
@@ -225,6 +229,8 @@ func field[N Node[N]](value any, name any) any {
 //
 // Names are property names or slice indexes, in upstream's order. The stack is restored even if the
 // callback panics, as upstream's finally restores it.
+//
+// Mutates: path the callback runs with the path descended through names, and its stack is back on return
 func Call[N Node[N], R any](path *AstPath[N], callback func(*AstPath[N]) R, names ...any) R {
 	length := len(path.stack)
 	value := path.at(-1)
@@ -237,6 +243,8 @@ func Call[N Node[N], R any](path *AstPath[N], callback func(*AstPath[N]) R, name
 }
 
 // CallParent is upstream's path.callParent(callback, count): run callback with the path at an ancestor.
+//
+// Mutates: path the callback runs with the path cut back to the ancestor, and its stack is back on return
 func CallParent[N Node[N], R any](path *AstPath[N], callback func(*AstPath[N]) R, count int) R {
 	stackIndex := path.nodeStackIndex(count + 1)
 	parentValues := append([]any(nil), path.stack[stackIndex+1:]...)
