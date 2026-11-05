@@ -314,13 +314,5 @@
         "kind": "span",
         "task": "v1hnsz8",
         "reason": "reports at the base name's start with no end"
-    },
-    {
-        "engine": "swift",
-        "family": "utils-folder",
-        "case": "uf02",
-        "kind": "verdict",
-        "task": "4spf9wc",
-        "reason": "silent, since it bans `utils` and `_utils` and not `util`"
     }
 ]
