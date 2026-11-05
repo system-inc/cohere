@@ -165,12 +165,15 @@ func (found discovery) notes() []string {
 
 // projectRun is one project's run, as its child reported it.
 type projectRun struct {
-	open     *openReport
-	project  discoveredProject
-	output   []byte
-	exitCode int
-	err      error
-	elapsed  time.Duration
+	open    *openReport
+	project discoveredProject
+	output  []byte
+	// standardError is the child's stderr when it is kept apart from output, under `--json`, and empty
+	// otherwise, when the two share output in the order they were written.
+	standardError []byte
+	exitCode      int
+	err           error
+	elapsed       time.Duration
 }
 
 // runProjects checks every discovered project, each in its own run of this binary, all at once, and
@@ -187,15 +190,21 @@ type projectRun struct {
 // TanStack Query's 95 projects started at once were 95 graphs in memory, and more children than that buys no
 // time the cores do not already give one.
 func runProjects(found discovery, arguments []string, out io.Writer) int {
+	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
+	// under `--json`, whose stdout is records only.
+	failures := out
+	if activeOutput.Mode == outputJSON {
+		failures = os.Stderr
+	}
 	executable, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(out, "cohere: %s\n",
+		fmt.Fprintf(failures, "cohere: %s\n",
 			sentence.FromError(fmt.Errorf("finding this binary to run each project: %w", err)))
 		return 1
 	}
 	yieldDirectory, err := os.MkdirTemp("", "cohere-yield-")
 	if err != nil {
-		fmt.Fprintf(out, "cohere: %s\n",
+		fmt.Fprintf(failures, "cohere: %s\n",
 			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", err)))
 		return 1
 	}
@@ -229,7 +238,8 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
-			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children)
+			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children,
+				activeOutput.Mode == outputJSON)
 		}()
 	}
 	group.Wait()
@@ -258,8 +268,11 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		if len(checked.output) > 0 && checked.output[len(checked.output)-1] != '\n' {
 			fmt.Fprintln(out)
 		}
+		// Under `--json` stdout is records only, so what a child wrote to stderr, an engine's note or a
+		// file it could not format, goes to stderr, where a single project's run puts it too.
+		os.Stderr.Write(checked.standardError)
 		if checked.err != nil {
-			fmt.Fprintf(out, "cohere: %s\n",
+			fmt.Fprintf(failures, "cohere: %s\n",
 				sentence.FromError(fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)))
 		}
 		fmt.Fprintln(account)
@@ -320,7 +333,19 @@ func projectRunsAtOnce() int {
 // runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
 // names what it yields to nearer projects (see ownership.go). The child is held in children while it runs,
 // so a signal to this run reaches it.
-func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string, openPath string, children *projectChildren) projectRun {
+//
+// separateStandardError keeps the child's stderr apart from its stdout, for `--json`, whose stdout a program
+// reads one record per line. The human views keep the two together, in the order the child wrote them.
+func runProject(
+	executable string,
+	root string,
+	project discoveredProject,
+	arguments []string,
+	yieldFile string,
+	openPath string,
+	children *projectChildren,
+	separateStandardError bool,
+) projectRun {
 	directory := filepath.Join(root, filepath.FromSlash(project.Directory))
 	prefix := []string{"--directory", directory}
 	if project.ConfigFile != "" {
@@ -340,13 +365,21 @@ func runProject(executable string, root string, project discoveredProject, argum
 	if openPath != "" {
 		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
 	}
-	var output bytes.Buffer
+	var output, standardError bytes.Buffer
 	child.Stdout = &output
 	child.Stderr = &output
+	if separateStandardError {
+		child.Stderr = &standardError
+	}
 
 	started := time.Now()
 	err := children.run(child)
-	run := projectRun{project: project, output: output.Bytes(), elapsed: time.Since(started)}
+	run := projectRun{
+		project:       project,
+		output:        output.Bytes(),
+		standardError: standardError.Bytes(),
+		elapsed:       time.Since(started),
+	}
 	if openPath != "" {
 		run.open = readOpenReport(openPath)
 	}
