@@ -573,6 +573,8 @@ func abbreviatedOwnsProperty(ruleContext rule.Context, name *ast.Node) bool {
 
 // A local override can still carry a dependency's contract through another local override.
 // Follow the declarations behind inherited properties, with a cycle guard for erroneous heritage.
+//
+// Mutates: seen the walk marks every owner it visits, so one guard spans the whole recursion
 func abbreviatedInheritedExternal(ruleContext rule.Context, owner *ast.Node, name string, static bool, seen map[*ast.Node]bool) bool {
 	if seen[owner] {
 		return false

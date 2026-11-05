@@ -138,13 +138,14 @@ func (index *fileUsageIndex) collect(node *ast.Node) {
 // recordJsxTag records a tag written in element position. A qualified tag like `<Menu.Item />` is
 // rooted at the binding, so the root is what gets recorded.
 func (index *fileUsageIndex) recordJsxTag(tagName *ast.Node) {
-	for tagName != nil {
-		switch tagName.Kind {
+	current := tagName
+	for current != nil {
+		switch current.Kind {
 		case ast.KindIdentifier:
-			index.usedAsJsxElementName[tagName.Text()] = true
+			index.usedAsJsxElementName[current.Text()] = true
 			return
 		case ast.KindPropertyAccessExpression:
-			tagName = tagName.AsPropertyAccessExpression().Expression
+			current = current.AsPropertyAccessExpression().Expression
 		default:
 			return
 		}

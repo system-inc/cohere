@@ -519,7 +519,7 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 	type builder = control_flow_graph.Builder[correctnessRequireResponseStatusCheckEvent]
 	walked := map[*ast.Node]bool{}
 	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[correctnessRequireResponseStatusCheckEvent]{
-		Read: func(b *builder, node *ast.Node) {
+		Read: func(graphBuilder *builder, node *ast.Node) {
 			binding := resolve(node)
 			if binding == nil || binding.dropped || correctnessRequireResponseStatusCheckInType(node, root) {
 				return
@@ -527,12 +527,14 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 			walked[node] = true
 			use, report := correctnessRequireResponseStatusCheckClassify(node)
 			if use != correctnessRequireResponseStatusCheckNeutral {
-				b.Emit(correctnessRequireResponseStatusCheckEvent{binding: binding, use: use, report: report})
+				graphBuilder.Emit(correctnessRequireResponseStatusCheckEvent{
+					binding: binding, use: use, report: report,
+				})
 			}
 		},
-		Write: func(b *builder, node *ast.Node) {
+		Write: func(graphBuilder *builder, node *ast.Node) {
 			if binding := byName[node]; binding != nil && !binding.dropped {
-				b.Emit(correctnessRequireResponseStatusCheckEvent{binding: binding, declare: true})
+				graphBuilder.Emit(correctnessRequireResponseStatusCheckEvent{binding: binding, declare: true})
 			}
 		},
 	})

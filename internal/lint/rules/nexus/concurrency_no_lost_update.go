@@ -482,13 +482,13 @@ func (analysis *concurrencyNoLostUpdateRoot) resolve(identifier *ast.Node) *ast.
 // pathOf reads an expression as a variable or a static member path, through parentheses and type
 // assertions.
 func (analysis *concurrencyNoLostUpdateRoot) pathOf(node *ast.Node) (concurrencyNoLostUpdatePath, bool) {
-	node = concurrencyNoLostUpdateSkipTransparent(node)
-	if node == nil {
+	unwrapped := concurrencyNoLostUpdateSkipTransparent(node)
+	if unwrapped == nil {
 		return concurrencyNoLostUpdatePath{}, false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		symbol := analysis.resolve(node)
+		symbol := analysis.resolve(unwrapped)
 		if symbol == nil {
 			return concurrencyNoLostUpdatePath{}, false
 		}
@@ -496,16 +496,16 @@ func (analysis *concurrencyNoLostUpdateRoot) pathOf(node *ast.Node) (concurrency
 	case ast.KindThisKeyword:
 		return concurrencyNoLostUpdatePath{isThis: true}, true
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		name, isStatic := property.AccessedName(node,
+		name, isStatic := property.AccessedName(unwrapped,
 			property.Named|property.Quoted|property.Templated|property.Numeric|property.Private)
 		if !isStatic {
 			return concurrencyNoLostUpdatePath{}, false
 		}
 		var object *ast.Node
-		if node.Kind == ast.KindPropertyAccessExpression {
-			object = node.AsPropertyAccessExpression().Expression
+		if unwrapped.Kind == ast.KindPropertyAccessExpression {
+			object = unwrapped.AsPropertyAccessExpression().Expression
 		} else {
-			object = node.AsElementAccessExpression().Expression
+			object = unwrapped.AsElementAccessExpression().Expression
 		}
 		objectPath, isPath := analysis.pathOf(object)
 		if !isPath {
@@ -555,20 +555,21 @@ func (analysis *concurrencyNoLostUpdateRoot) compoundTargetOf(node *ast.Node) (c
 // concurrencyNoLostUpdateSkipTransparent sees through the wrappers that change neither a value nor
 // which reference it is.
 func concurrencyNoLostUpdateSkipTransparent(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			current = current.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			current = current.AsSatisfiesExpression().Expression
 		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
+			current = current.AsTypeAssertion().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -624,17 +625,16 @@ func (analysis *concurrencyNoLostUpdateRoot) nestedUsage(symbol *ast.Symbol) con
 	usage := concurrencyNoLostUpdateNestedUsage{}
 	var visit func(node *ast.Node, nested bool) bool
 	visit = func(node *ast.Node, nested bool) bool {
-		if control_flow_graph.IsRoot(node) {
-			nested = true
-		}
-		if nested && node.Kind == ast.KindIdentifier && analysis.resolve(node) == symbol {
+		// Once the walk enters a nested function, everything below it is nested too.
+		withinNested := nested || control_flow_graph.IsRoot(node)
+		if withinNested && node.Kind == ast.KindIdentifier && analysis.resolve(node) == symbol {
 			usage.referenced = true
 			if reference.WritesToBinding(node) {
 				usage.written = true
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
-			return visit(child, nested)
+			return visit(child, withinNested)
 		})
 		return false
 	}
@@ -1036,9 +1036,9 @@ func (analysis *concurrencyNoLostUpdateRoot) suspensionBetween(
 		}
 	}
 
+	// Finding the anchor reached after a suspension settles the answer and ends the whole search.
 	answer := false
-search:
-	for len(queue) > 0 {
+	for len(queue) > 0 && !answer {
 		current := queue[0]
 		queue = queue[1:]
 		suspended := current.suspended
@@ -1063,23 +1063,21 @@ search:
 				// is the evaluator's to judge, path by path, because the initializer can fork.
 				if event.node == anchor && suspended {
 					answer = true
-					break search
 				}
 			case concurrencyNoLostUpdateAnchor:
 				if event.node == anchor {
 					if suspended {
 						answer = true
-						break search
 					}
 				} else if analysis.writesTarget(event.node, target) {
 					stopped = true
 				}
 			}
-			if stopped {
+			if stopped || answer {
 				break
 			}
 		}
-		if stopped {
+		if stopped || answer {
 			continue
 		}
 		for _, successor := range current.block.Successors {
@@ -1163,21 +1161,21 @@ func (analysis *concurrencyNoLostUpdateRoot) controlFlowGraph() *control_flow_gr
 		return node.Kind == ast.KindForOfStatement && node.AsForInOrOfStatement().AwaitModifier != nil
 	}
 	analysis.graph = control_flow_graph.Build(analysis.root, control_flow_graph.Hooks[concurrencyNoLostUpdateEvent]{
-		Expression: func(b *builder, node *ast.Node) {
+		Expression: func(graphBuilder *builder, node *ast.Node) {
 			switch node.Kind {
 			case ast.KindAwaitExpression, ast.KindYieldExpression:
-				b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateSuspend, node: node})
+				graphBuilder.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateSuspend, node: node})
 			case ast.KindBinaryExpression:
 				if ast.IsAssignmentOperator(node.AsBinaryExpression().OperatorToken.Kind) {
-					b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateAnchor, node: node})
+					graphBuilder.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateAnchor, node: node})
 				}
 			case ast.KindCallExpression:
 				if access := analysis.storeAccessOf(node); access != nil && access.isWrite {
-					b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateAnchor, node: node})
+					graphBuilder.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateAnchor, node: node})
 				}
 			}
 		},
-		Statement: func(b *builder, node *ast.Node) {
+		Statement: func(graphBuilder *builder, node *ast.Node) {
 			// The first step of a `for await` suspends before the body runs. Recorded with no node, so
 			// no anchor is exempted for being inside it.
 			//
@@ -1187,17 +1185,21 @@ func (analysis *concurrencyNoLostUpdateRoot) controlFlowGraph() *control_flow_gr
 			// the body already crosses this first step. A const declared in the body is declared again
 			// before anything in the next iteration can read it.
 			if isForAwait(node) {
-				b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateSuspend})
+				graphBuilder.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateSuspend})
 			}
 		},
-		Read: func(b *builder, node *ast.Node) {
+		Read: func(graphBuilder *builder, node *ast.Node) {
 			if symbol := declarationSymbol(node); symbol != nil {
-				b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateDeclarationStart, node: node, symbol: symbol})
+				graphBuilder.Emit(concurrencyNoLostUpdateEvent{
+					kind: concurrencyNoLostUpdateDeclarationStart, node: node, symbol: symbol,
+				})
 			}
 		},
-		Write: func(b *builder, node *ast.Node) {
+		Write: func(graphBuilder *builder, node *ast.Node) {
 			if symbol := declarationSymbol(node); symbol != nil {
-				b.Emit(concurrencyNoLostUpdateEvent{kind: concurrencyNoLostUpdateDeclarationEnd, node: node, symbol: symbol})
+				graphBuilder.Emit(concurrencyNoLostUpdateEvent{
+					kind: concurrencyNoLostUpdateDeclarationEnd, node: node, symbol: symbol,
+				})
 			}
 		},
 	})
@@ -1356,17 +1358,17 @@ func (analysis *concurrencyNoLostUpdateRoot) computeStoreAccess(call *ast.Node) 
 // storeKeyOf canonicalizes one key argument: a literal by its text, a binding that holds still by its
 // symbol.
 func (analysis *concurrencyNoLostUpdateRoot) storeKeyOf(argument *ast.Node) (string, bool) {
-	argument = concurrencyNoLostUpdateSkipTransparent(argument)
-	if argument == nil {
+	unwrapped := concurrencyNoLostUpdateSkipTransparent(argument)
+	if unwrapped == nil {
 		return "", false
 	}
 	switch {
-	case ast.IsStringLiteralLike(argument):
-		return "string\x00" + argument.Text(), true
-	case ast.IsNumericLiteral(argument):
-		return "number\x00" + argument.Text(), true
-	case argument.Kind == ast.KindIdentifier:
-		symbol := analysis.resolve(argument)
+	case ast.IsStringLiteralLike(unwrapped):
+		return "string\x00" + unwrapped.Text(), true
+	case ast.IsNumericLiteral(unwrapped):
+		return "number\x00" + unwrapped.Text(), true
+	case unwrapped.Kind == ast.KindIdentifier:
+		symbol := analysis.resolve(unwrapped)
 		if symbol == nil || !analysis.bindingHoldsStill(symbol) {
 			return "", false
 		}
