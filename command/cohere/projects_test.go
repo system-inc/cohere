@@ -780,21 +780,28 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(t *testing
 	if exitCode != 0 {
 		t.Errorf("under --json the run exited %d, want 0:\n%s", exitCode, output)
 	}
-	gaps := map[string]float64{}
+	// Each label's gap, the files named with their reasons. The TypeScript summary in the root's directory
+	// shares the label and lists none, so appending keeps the Swift one whichever prints first.
+	gaps := map[string][]map[string]string{}
 	for _, line := range strings.Split(output, "\n") {
 		var summary struct {
-			Kind  string         `json:"kind"`
-			Label string         `json:"label"`
-			Gaps  map[string]any `json:"gaps"`
+			Kind  string `json:"kind"`
+			Label string `json:"label"`
+			Gaps  struct {
+				UncheckedSwift []map[string]string `json:"uncheckedSwift"`
+			} `json:"gaps"`
 		}
 		if json.Unmarshal([]byte(line), &summary) != nil || summary.Kind != "summary" {
 			continue
 		}
-		count, _ := summary.Gaps["uncheckedSwift"].(float64)
-		gaps[summary.Label] += count
+		gaps[summary.Label] = append(gaps[summary.Label], summary.Gaps.UncheckedSwift...)
 	}
-	if gaps["."] != 2 || gaps["CapturePhone"] != 0 || gaps["Tools/Sim"] != 0 {
-		t.Errorf("under --json the gaps are %v, want 2 for . and none for the others:\n%s", gaps, output)
+	wantGaps := []map[string]string{
+		{"file": alias + "/Scripts/build.swift", "reason": "no target of this package compiles it"},
+		{"file": alias + "/Scripts/odd.swift", "reason": "a reason no engine has given yet"},
+	}
+	if !reflect.DeepEqual(gaps["."], wantGaps) || len(gaps["CapturePhone"]) != 0 || len(gaps["Tools/Sim"]) != 0 {
+		t.Errorf("under --json the gaps are %v, want build.swift and odd.swift for . and none for the others:\n%s", gaps, output)
 	}
 }
 

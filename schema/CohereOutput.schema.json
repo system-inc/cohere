@@ -127,7 +127,19 @@
                             },
                             "description": "Directories of .swift files beside the project that no Swift package holds, so nothing checked them, found by a run from the repository that discovered this one project. They fail nothing. Absent when there are none."
                         },
-                        "uncheckedSwift": { "type": "integer", "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. They fail nothing. Absent when there are none." }
+                        "uncheckedSwift": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["file", "reason"],
+                                "properties": {
+                                    "file": { "type": "string", "description": "The file, as the Swift engine names it." },
+                                    "reason": { "type": "string", "description": "Why the engine left it out, in the engine's words, such as \"no target of this package compiles it\"." }
+                                }
+                            },
+                            "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
+                        }
                     }
                 },
                 "adamic": {
