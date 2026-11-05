@@ -8,6 +8,11 @@ package checker
 // calls: readfile.go (Copyright 2020), url.go (Copyright 2023) and validatefix.go (Copyright 2025), each
 // The Go Authors, under the same BSD-style license. An internal package of x/tools cannot be imported from
 // this module, so the copy of checker.go carries its own. The code is unchanged.
+//
+// ValidateFixes is the largest of them and is kept whole because it guards our byte offsets: check turns each
+// suggested fix's edits into 0-based offsets into a file, and an edit that runs backwards, spans two files or
+// ends past the end of its file would become offsets that cut the wrong bytes. Upstream panics on such a fix, the
+// recover in check turns that into a crash naming the analyzer, and no wrong offset reaches a finding.
 
 import (
 	"cmp"

@@ -34,14 +34,18 @@
 // file against that upstream path to bump it; every change is marked
 // "cohere:".
 //
-// The one change is the release. Upstream's Analyze keeps every
-// action's Result until the whole graph finishes, under its own
+// The changes are two. The first is the release. Upstream's Analyze
+// keeps every action's Result until the whole graph finishes, under its own
 // "TODO(adonovan): opt: clear them earlier, so we can release large data
 // structures like SSA sooner" (checker.go:210-219 at v0.50.0, :213 at
 // v0.49.0). On cohere's own tree that holds staticcheck's IR of every
 // package in the graph at once. Here an action's Result is released
-// when the last action that reads it has finished (releaseInputs). When
-// x/tools resolves that TODO, this copy goes away and check imports
+// when the last action that reads it has finished (releaseInputs). The
+// second is the order that lets the release free anything in time: an
+// action finishes its vertical work, facts from the packages below,
+// before its horizontal dependencies are built (prepare), which is what
+// keeps the engine under its memory cap. When x/tools resolves that
+// TODO, this copy goes away and check imports
 // golang.org/x/tools/go/analysis/checker again.
 //
 // What else differs, because this module cannot import x/tools'
@@ -116,6 +120,9 @@ type Action struct {
 	// this action's Result, its horizontal dependents. The last of them
 	// releases a non-root Result (see releaseInputs).
 	resultReaders atomic.Int32
+
+	// cohere: prepared guards prepare, which like exec runs once.
+	prepared sync.Once
 }
 
 func (act *Action) String() string {
@@ -249,9 +256,57 @@ func execAll(actions []*Action) {
 
 func (act *Action) exec() { act.once.Do(act.execOnce) }
 
+// cohere: prepare runs everything act and its horizontal dependencies
+// wait on across packages: each vertical dependency in full, and each
+// horizontal dependency's own prepare. Only then does execOnce run the
+// horizontal dependencies themselves.
+//
+// It is what lets the engine's memory cap hold. An analyzer with a
+// large Result and no facts, such as staticcheck's buildir, has no
+// vertical dependencies, so upstream's execAll(act.Deps) starts it on
+// every package at once, while the actions that read it still wait on
+// facts from the packages below, and the release cannot free what no
+// reader has finished with. Preparing first builds a package's IR only
+// once a reader of it has its facts in hand. Measured on cohere's own
+// root under the engine's 5 GiB cap, three runs each, the same 335
+// findings in every run: with prepare, 5.57 to 5.65 GB peak at 49 to
+// 51s user; without it, 6.05 to 6.67 GB at 84 to 102s user, the
+// collector working at the cap to hold what is alive at once.
+func (act *Action) prepare() {
+	act.prepared.Do(func() {
+		var wg sync.WaitGroup
+		for _, dep := range act.Deps {
+			step := dep.exec
+			if dep.Package == act.Package {
+				step = dep.prepare
+			}
+			wg.Add(1)
+			work := func() {
+				step()
+				wg.Done()
+			}
+			if act.opts.Sequential {
+				work()
+			} else {
+				go work()
+			}
+		}
+		wg.Wait()
+	})
+}
+
 func (act *Action) execOnce() {
 	// Analyze dependencies.
-	execAll(act.Deps)
+	// cohere: in two steps, the vertical work first (see prepare), then
+	// the horizontal dependencies, all of whose vertical work is done.
+	act.prepare()
+	var horizontal []*Action
+	for _, dep := range act.Deps {
+		if dep.Package == act.Package {
+			horizontal = append(horizontal, dep)
+		}
+	}
+	execAll(horizontal)
 
 	// cohere: however this action ends, a failed prerequisite or an
 	// error from Run included, it has read all it will of its inputs.
