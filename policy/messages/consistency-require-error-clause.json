@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-require-error-clause"
+  },
+  "messages": {
+    "capitalizedOpening": {
+      "text": "This error opens with `{{word}}`, and an error's text is a clause that reads right after a caller wraps it, `open config: permission denied`, so the capital lands in the middle of the line. Open on a lowercase word, or, if `{{word}}` is a proper name, spell it as one: a name declared where the error is made, an initialism such as `JSON`, or a word with a capital inside such as `TypeScript`."
+    },
+    "trailingPunctuation": {
+      "text": "This error ends with `{{punctuation}}`, and an error's text is a clause a caller wraps and goes on from, `open config: permission denied`, so the mark lands in the middle of the line once it is wrapped. End on the last word, and leave the end of the sentence to whoever prints it."
+    },
+    "failurePrefix": {
+      "text": "This error opens with `{{prefix}}`, which says only that something went wrong, and every error already says that. Each caller that wraps it adds another, until the line reads `failed to load: failed to open: ...`. Say what was being done, as a clause such as `opening config`, or what is wrong, such as `permission denied`, so every wrapped layer adds a fact."
+    }
+  }
+}
