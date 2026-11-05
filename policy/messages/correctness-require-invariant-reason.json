@@ -10,7 +10,7 @@
       "text": "This panic is marked as an invariant and gives no reason. Say what holds after `Invariant:`, such as the table built from constants or the caller that already checked, because a marker with nothing after it tells the next reader nothing and excuses nothing."
     },
     "mustOutsideInitialization": {
-      "text": "`{{name}}` panics on a bad input, and called here it turns that input into a crash at the moment of use. Call it only in the initializer of a package-level `var`, where a bad constant stops the program the moment it starts, or call the form that returns an error and handle it."
+      "text": "`{{name}}` panics on a bad input, and here it runs inside a function that may be called long after the program starts, so a bad input stops the process in the middle of its work. Call it only while the package initializes, in a package-level `var` initializer or `func init()`, where a bad constant stops the program the moment it starts, or call the form that returns an error and handle it."
     }
   }
 }
