@@ -96,9 +96,9 @@ func readReference(gitDirectory string, commonDirectory string, reference string
 
 	packed, openError := os.Open(filepath.Join(commonDirectory, "packed-refs"))
 	if openError != nil {
-		return "", fmt.Errorf("%s is neither a loose ref nor packed (%v)", reference, openError)
+		return "", fmt.Errorf("%s is neither a loose ref nor packed (%w)", reference, openError)
 	}
-	defer packed.Close()
+	defer packed.Close() // Ignored: the file was only read, so a failed close loses nothing.
 	lines := bufio.NewScanner(packed)
 	for lines.Scan() {
 		// `<object> <ref>`, with `#` headers and `^<object>` peel lines that name no ref.

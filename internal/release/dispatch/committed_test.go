@@ -95,11 +95,19 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 	}
 
 	// Nothing is left behind but the binaries and the shared compiler.
-	if entries, _ := os.ReadDir(fixture.paths.SnapshotDirectory()); len(entries) != 0 {
-		test.Fatalf("%d snapshot(s) left in %s after building", len(entries), fixture.paths.SnapshotDirectory())
+	snapshots, readSnapshotsError := os.ReadDir(fixture.paths.SnapshotDirectory())
+	if readSnapshotsError != nil {
+		test.Fatalf("reading the snapshot directory: %v", readSnapshotsError)
 	}
-	if entries, _ := os.ReadDir(fixture.paths.CompilerDirectory()); len(entries) != 1 {
-		test.Fatalf("two commits pinning one compiler left %d compiler extractions, expected 1", len(entries))
+	if len(snapshots) != 0 {
+		test.Fatalf("%d snapshot(s) left in %s after building", len(snapshots), fixture.paths.SnapshotDirectory())
+	}
+	compilers, readCompilersError := os.ReadDir(fixture.paths.CompilerDirectory())
+	if readCompilersError != nil {
+		test.Fatalf("reading the compiler directory: %v", readCompilersError)
+	}
+	if len(compilers) != 1 {
+		test.Fatalf("two commits pinning one compiler left %d compiler extractions, expected 1", len(compilers))
 	}
 }
 

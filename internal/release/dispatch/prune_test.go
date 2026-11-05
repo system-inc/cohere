@@ -246,6 +246,9 @@ func TestEnsureCompilerMarksAReusedExtractionInUse(test *testing.T) {
 		test.Fatal(changeTimesError)
 	}
 
+	// Read before the reuse, so a mark the call made cannot be earlier, with a second's slack for a filesystem that
+	// keeps times to the second. However slow the call, the mark only lands later.
+	started := time.Now()
 	got, err := ensureCompiler(paths, commit)
 	if err != nil {
 		test.Fatal(err)
@@ -257,7 +260,7 @@ func TestEnsureCompilerMarksAReusedExtractionInUse(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if time.Since(information.ModTime()) > time.Minute {
+	if information.ModTime().Before(started.Add(-time.Second)) {
 		test.Fatalf(
 			"a reused extraction still reads as last used at %s, so a prune would take it mid-build",
 			information.ModTime(),

@@ -48,14 +48,6 @@ func (paths Paths) BinaryDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "bin")
 }
 
-// BinaryPath is where the committed-tree binary with this hash lives.
-//
-// The name carries the platform as well as the hash. A cache directory can outlive a change of
-// machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
-func (paths Paths) BinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash+executableSuffix)
-}
-
 // executableSuffix ends every binary the launcher builds, `.exe` on Windows and nothing elsewhere.
 // Windows runs a file by its extension, and Go's exec there will not run a path that has none.
 var executableSuffix = func() string {
@@ -64,6 +56,14 @@ var executableSuffix = func() string {
 	}
 	return ""
 }()
+
+// BinaryPath is where the committed-tree binary with this hash lives.
+//
+// The name carries the platform as well as the hash. A cache directory can outlive a change of
+// machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
+func (paths Paths) BinaryPath(hash string) string {
+	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash+executableSuffix)
+}
 
 // developmentBinaryName is the `--dev` binary's file name.
 var developmentBinaryName = "cohere-dev" + executableSuffix

@@ -36,7 +36,7 @@ func FindModuleDirectory() (string, error) {
 	}
 
 	return "", errors.New(
-		"could not find the cohere module: no go.mod declaring github.com/system-inc/cohere in any parent of this binary or the working directory",
+		"finding the cohere module: no go.mod declaring github.com/system-inc/cohere in any parent of this binary or the working directory",
 	)
 }
 
