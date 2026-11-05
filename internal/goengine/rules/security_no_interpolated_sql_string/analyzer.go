@@ -28,13 +28,15 @@
 //
 // A hole outside any string that is not right after a comparison builds SQL from code (a table or column name,
 // an `IN (?, ?, ?)` list, a condition, `LIMIT %d`, `CREATE DATABASE %s`), where no placeholder can go, so it is
-// never a finding. A hole inside double quotes or backquotes is a name. A value whose type cannot hold a quote is
-// never a finding: a number, a boolean, a constant whose text holds no `'` or `\`, a value formatted with `%x`,
-// and a struct, pointer, slice or map, whose printed form is the fmt package's and calling it quote-capable
-// would be a guess. A string, an interface (any or error) and a type parameter whose type set allows a string
-// can hold one. The reading gives up on the whole query, rather than guess, wherever package sqltext does: a
-// backslash inside quoted text, `#` outside a string, `--` not followed by whitespace, a dollar quote, and a
-// query ending inside a string, a name or a block comment.
+// never a finding, and neither is one right after a comparison that the next text continues with `.`, since
+// `= %s.id` qualifies a column with a table's name. A hole inside double quotes or backquotes is a name. A value
+// that cannot hold a quote is never a finding: a number, a boolean and the text strconv formats one as (package
+// inertvalue's judgment, which the shell rule shares), a constant whose text holds no `'` or `\`, a value
+// formatted with `%x`, and a struct, pointer, slice or map, whose printed form is the fmt package's and calling it
+// quote-capable would be a guess. A string, an interface (any or error) and a type parameter whose type set is not
+// only numbers and booleans can hold one. The reading gives up on the whole query, rather than guess, wherever
+// package sqltext does: a backslash inside quoted text, `#` outside a string, `--` not followed by whitespace, a
+// dollar quote, and a query ending inside a string, a name or a block comment.
 //
 // One escape is accepted as making a value safe, the one the TypeScript rule accepts, written where the reader
 // can see it: strings.ReplaceAll (or strings.Replace with -1) doubling every backslash and every single quote, as
@@ -60,6 +62,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/inertvalue"
 	"github.com/system-inc/cohere/internal/sqltext"
 	"github.com/system-inc/cohere/policy"
 )
@@ -377,7 +380,7 @@ func (reader queryReader) canHoldQuote(found hole) bool {
 		// A constant is fixed text, and only one that itself holds a quote or a backslash breaks the string.
 		return value.Kind() == constant.String && strings.ContainsAny(constant.StringVal(value), `'\`)
 	}
-	return canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
+	return !reader.isInert(found.expression) && canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
 }
 
 // canHoldText is whether found can print any text at all, rather than digits, a boolean or a fixed constant.
@@ -385,18 +388,35 @@ func (reader queryReader) canHoldText(found hole) bool {
 	if found.printsHex || reader.pass.TypesInfo.Types[found.expression].Value != nil {
 		return false
 	}
-	return canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
+	return !reader.isInert(found.expression) && canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
 }
 
-// canHoldText is whether a value of candidate's type can print arbitrary text: a string, an interface, whose
-// dynamic value is unknown, or a type parameter whose type set is not only numbers and booleans.
+// isInert is whether expression, or the initializer of the local it names, prints only as a number or a boolean:
+// package inertvalue's judgment, which the shell rule shares, so `id = " + strconv.Itoa(id)` is as quiet as the
+// `%d` of the same id.
+func (reader queryReader) isInert(expression ast.Expr) bool {
+	if inertvalue.Is(reader.pass.TypesInfo, expression) {
+		return true
+	}
+	identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
+	if !isIdentifier {
+		return false
+	}
+	initializer := reader.localInitializer(identifier)
+	return initializer != nil && inertvalue.Is(reader.pass.TypesInfo, initializer)
+}
+
+// canHoldText is whether a value of candidate's type, once isInert has ruled out a number or a boolean, can print
+// arbitrary text: a string, an interface, whose dynamic value is unknown, or a type parameter whose type set is not
+// only numbers and booleans. A struct, pointer, slice or map prints in the fmt package's form, and calling it
+// quote-capable would be a guess, as the TypeScript twin declines to for an object.
 func canHoldText(candidate types.Type) bool {
 	if candidate == nil {
 		return false
 	}
-	// A type parameter's Underlying is its constraint, an interface, so it is asked about its type set first.
-	if parameter, isParameter := types.Unalias(candidate).(*types.TypeParam); isParameter {
-		return !onlyFixedText(parameter.Constraint(), 0)
+	// A type parameter's Underlying is its constraint, an interface, so it is asked about before the switch.
+	if _, isParameter := types.Unalias(candidate).(*types.TypeParam); isParameter {
+		return true
 	}
 	switch underlying := candidate.Underlying().(type) {
 	case *types.Basic:
@@ -405,38 +425,6 @@ func canHoldText(candidate types.Type) bool {
 		return true
 	}
 	return false
-}
-
-// onlyFixedText is whether constraint limits a type set to numbers and booleans: some element of it, a union or
-// a single type, has nothing else in it. An embedded interface narrows the set too, so it is asked the same.
-func onlyFixedText(constraint types.Type, depth int) bool {
-	bounds, isInterface := constraint.Underlying().(*types.Interface)
-	if !isInterface || depth > readingDepth {
-		return false
-	}
-	for index := range bounds.NumEmbeddeds() {
-		switch element := bounds.EmbeddedType(index).(type) {
-		case *types.Union:
-			fixed := true
-			for termIndex := range element.Len() {
-				fixed = fixed && isFixedTextType(element.Term(termIndex).Type())
-			}
-			if fixed {
-				return true
-			}
-		default:
-			if isFixedTextType(element) || onlyFixedText(element, depth+1) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// isFixedTextType is whether candidate is a number or a boolean, a named one included.
-func isFixedTextType(candidate types.Type) bool {
-	basic, isBasic := candidate.Underlying().(*types.Basic)
-	return isBasic && basic.Info()&(types.IsNumeric|types.IsBoolean) != 0
 }
 
 // isEscaped is whether expression, or the initializer of the local it names, ends in the one escape the package

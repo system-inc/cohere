@@ -17,4 +17,16 @@ var rawWithHyphen = `a raw string with a self-evident hyphen-minus`
 
 var escapedHyphen = "an escape spells a hyphen-minus: \x2d"
 
-func use() []any { return []any{flags, negative, rawWithHyphen, escapedHyphen} }
+// A dash spelled with an escape is data, such as a test's input, and the escape says it is meant, in every form an
+// interpreted string can spell it.
+var (
+	escapedEmDash     = "an escape \u2014 spells it"
+	escapedLongEnDash = "a long escape \U00002013 spells it"
+	escapedHexEmDash  = "three hex escapes \xe2\x80\x94 spell it"
+	escapedOctalDash  = "three octal escapes \342\200\223 spell it"
+)
+
+func use() []any {
+	return []any{flags, negative, rawWithHyphen, escapedHyphen, escapedEmDash, escapedLongEnDash, escapedHexEmDash,
+		escapedOctalDash}
+}

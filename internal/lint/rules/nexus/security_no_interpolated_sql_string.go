@@ -102,7 +102,8 @@ var (
 //
 // Only comparisons, on purpose. After `(`, `,`, `AND`, `FROM` or `ORDER BY`, an unquoted interpolation
 // builds SQL from code (an `IN (${placeholders})` list, an `AND ${condition}` fragment, a table or a
-// column), and reading those would be false findings.
+// column), and reading those would be false findings. For the same reason an interpolation the next text continues
+// with `.` (`= ${table}.id`) is a table qualifying a column, not a value, and is not reported.
 //
 // Where it came from: `#3ng4vkk`. On ahra in 2026-10 it found 25 sites. 23 were GAQL ids typed `string`
 // from the command line across `modules/google/ads` (fixed in `#kx29bm3` by typing them as numbers),

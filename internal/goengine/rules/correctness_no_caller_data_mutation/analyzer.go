@@ -3,9 +3,10 @@
 //
 // A slice, a map and a pointer share what they reach with the caller, so a write at one lands in the caller's data.
 // The call reads like it hands data over, and the caller's data comes back different with nothing at the call site to
-// say so. Go does fill a caller's buffer on purpose, as Read(p []byte) and json.Unmarshal do, and a function whose
-// contract is that says so once on its own doc comment, with `// Mutates: <parameter> <why>`, which exempts that
-// parameter's writes and no other's.
+// say so. Go does fill a caller's buffer on purpose, as Read(p []byte) and json.Unmarshal do. A method that implements
+// io.Reader's Read has that contract from the interface, so its buffer is exempt with nothing written, and any other
+// function whose contract is to fill a parameter says so once on its own doc comment, with
+// `// Mutates: <parameter> <why>`, which exempts that parameter's writes and no other's.
 //
 // This is the twin of nexus/correctness-no-caller-data-mutation, read for Go: a method writing its own receiver is the
 // type's API and is never judged, and only a direct write at the parameter is, since that is the write a reader can
@@ -34,8 +35,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a direct write at a declared function's slice, map or pointer parameter (parameter[index] =, " +
 		"parameter[key] =, parameter.Field = through a pointer, *parameter =, ++, --, op=, delete and clear), which " +
 		"lands in the caller's data with nothing at the call site to say so, unless the function's doc comment says " +
-		"// Mutates: <parameter> <why>. Receivers, function literals' parameters and a parameter the function " +
-		"reassigns or takes the address of are not judged.",
+		"// Mutates: <parameter> <why>. Receivers, the buffer of a Read that implements io.Reader, function " +
+		"literals' parameters and a parameter the function reassigns or takes the address of are not judged.",
 	Run: run,
 }
 
@@ -53,6 +54,7 @@ var mutatesUnknownParameterMessage = policy.MessageOf(Name, "mutatesUnknownParam
 const mutatesMarker = "Mutates:"
 
 func run(pass *analysis.Pass) (any, error) {
+	reader := &ioReader{pass: pass}
 	for _, file := range pass.Files {
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
@@ -64,6 +66,11 @@ func run(pass *analysis.Pass) (any, error) {
 			if function.Body == nil {
 				continue
 			}
+			// io.Reader's contract is that Read fills its buffer, so a Read that implements it fills the caller's
+			// buffer by contract, as a Mutates tag would say.
+			if buffer := reader.bufferOf(function); buffer != nil {
+				outParameters[buffer] = true
+			}
 			parameters := judgedParameters(pass, function, outParameters)
 			if len(parameters) == 0 {
 				continue
@@ -72,6 +79,75 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	return nil, nil
+}
+
+// ioReader finds io.Reader in the package's import graph the first time a method named Read asks, since most
+// packages declare none.
+type ioReader struct {
+	pass   *analysis.Pass
+	looked bool
+	// reader is io.Reader's interface, or nil when no package in the import graph is io. A type can then still have
+	// the method by shape, and its Read is judged like any other function, a missed exemption rather than a guess.
+	reader *types.Interface
+}
+
+// bufferOf is the buffer parameter of function when function is a Read method whose receiver type, or a pointer to
+// it, implements io.Reader, which makes its signature Read([]byte) (int, error), or nil. A function merely named Read
+// implements nothing and has no buffer here.
+func (lookup *ioReader) bufferOf(function *ast.FuncDecl) *types.Var {
+	if function.Recv == nil || function.Name.Name != "Read" {
+		return nil
+	}
+	method, isFunc := lookup.pass.TypesInfo.Defs[function.Name].(*types.Func)
+	if !isFunc || method.Signature().Recv() == nil || method.Signature().Params().Len() != 1 {
+		return nil
+	}
+	if !lookup.looked {
+		lookup.looked = true
+		lookup.reader = findIoReader(lookup.pass.Pkg)
+	}
+	if lookup.reader == nil {
+		return nil
+	}
+	// A pointer to the receiver's type holds both its value and its pointer methods in its method set.
+	receiverType := method.Signature().Recv().Type()
+	if pointer, isPointer := types.Unalias(receiverType).(*types.Pointer); isPointer {
+		receiverType = pointer.Elem()
+	}
+	if !types.Implements(types.NewPointer(receiverType), lookup.reader) {
+		return nil
+	}
+	return method.Signature().Params().At(0)
+}
+
+// findIoReader is io.Reader's interface, found by walking the imports of analyzed and of each package they reach to
+// the package whose path is io, or nil when none of them is.
+func findIoReader(analyzed *types.Package) *types.Interface {
+	visited := map[*types.Package]bool{analyzed: true}
+	pending := []*types.Package{analyzed}
+	for len(pending) > 0 {
+		current := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		for _, imported := range current.Imports() {
+			if visited[imported] {
+				continue
+			}
+			visited[imported] = true
+			if imported.Path() == "io" {
+				typeName, isTypeName := imported.Scope().Lookup("Reader").(*types.TypeName)
+				if !isTypeName {
+					return nil
+				}
+				reader, isInterface := typeName.Type().Underlying().(*types.Interface)
+				if !isInterface {
+					return nil
+				}
+				return reader
+			}
+			pending = append(pending, imported)
+		}
+	}
+	return nil
 }
 
 // judgedParameters is every named parameter of function the rule judges: not the receiver, which is the type's API,

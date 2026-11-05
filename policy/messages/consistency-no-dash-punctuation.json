@@ -9,8 +9,11 @@
     "dashPunctuation": {
       "text": "This is {{dash}}. <<cure>>"
     },
-    "escapedDashPunctuation": {
-      "text": "This string spells {{dash}} with an escape, and it reaches the reader as the dash itself. <<cure>>"
+    "dashPunctuationInString": {
+      "text": "This string holds {{dash}} written as itself. <<cure>> If the dash is data, such as a test's input, write it as `{{escape}}`: the value stays the same, and the escape tells the next reader the dash is meant."
+    },
+    "dashPunctuationInRawString": {
+      "text": "This raw string holds {{dash}}. <<cure>> If the dash is data, such as a test's input, move the text to an interpreted string and write it as `{{escape}}`, since a raw string cannot hold an escape and the escape tells the next reader the dash is meant."
     }
   }
 }

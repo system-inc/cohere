@@ -39,6 +39,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/inertvalue"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -71,12 +72,6 @@ var longOptions = map[string]bool{
 
 // longOptionsWithArgument take the next argument as their value.
 var longOptionsWithArgument = map[string]bool{"--rcfile": true, "--init-file": true}
-
-// strconvFormatters return the text of a number or a boolean, which holds no shell syntax. Go adds no number to a
-// string, so "kill " + strconv.Itoa(pid) is how a pid reaches a script, and it is as safe as the pid.
-var strconvFormatters = map[string]bool{
-	"Itoa": true, "FormatInt": true, "FormatUint": true, "FormatFloat": true, "FormatBool": true,
-}
 
 // depthLimit bounds the walk through Sprintf calls, concatenations and locals. A chain this long is never written by
 // hand; past it the script is not judged, a finding missed and never one invented.
@@ -346,18 +341,15 @@ func flatten(pass *analysis.Pass, expression ast.Expr, depth int, pieces []piece
 	return append(pieces, piece{value: expression}), true
 }
 
-// judge is what a value spliced into a script holds. A boolean, integer or float prints digits, a sign, a point and
-// letters, none of them shell syntax, unless its type prints through a String, Error or Format method of its own,
-// whose text this rule cannot see. Text strconv formats from a number or a boolean is the same. Everything else is
-// text the shell parses: a string, a named string type, an error, an interface that may hold a string, a slice, a
-// struct or a pointer, which print their contents.
+// judge is what a value spliced into a script holds. A boolean, integer or float, and the text strconv formats one
+// as, prints digits, a sign, a point and letters, none of them shell syntax: package inertvalue's judgment, which the
+// SQL rule shares. A number or boolean whose type prints through a String, Error or Format method of its own is not
+// inert, and its text this rule cannot see, so it is not judged, nor is a type parameter. Everything else is text
+// the shell parses: a string, a named string type, an error, an interface that may hold a string, a slice, a struct
+// or a pointer, which print their contents.
 func judge(pass *analysis.Pass, value ast.Expr) verdict {
-	if call, isCall := ast.Unparen(value).(*ast.CallExpr); isCall {
-		function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-		if isFunc && function.Pkg() != nil && function.Pkg().Path() == "strconv" &&
-			function.Signature().Recv() == nil && strconvFormatters[function.Name()] {
-			return safe
-		}
+	if inertvalue.Is(pass.TypesInfo, value) {
+		return safe
 	}
 	valueType := pass.TypesInfo.TypeOf(value)
 	if valueType == nil {
@@ -366,28 +358,12 @@ func judge(pass *analysis.Pass, value ast.Expr) verdict {
 	if _, isTypeParameter := types.Unalias(valueType).(*types.TypeParam); isTypeParameter {
 		return unknown
 	}
+	// Past inertvalue, a number or a boolean is one that prints through a method of its own.
 	basic, isBasic := valueType.Underlying().(*types.Basic)
-	if !isBasic || basic.Info()&(types.IsBoolean|types.IsNumeric) == 0 {
-		return unsafe
-	}
-	if printsThroughMethod(valueType) {
+	if isBasic && basic.Info()&(types.IsBoolean|types.IsNumeric) != 0 {
 		return unknown
 	}
-	return safe
-}
-
-// printsThroughMethod is whether fmt prints a value of this type through a method of its own, String, Error, Format
-// or GoString, rather than as the number or boolean it holds. fmt asks the value itself, so only the type's own
-// method set counts, not its pointer's.
-func printsThroughMethod(valueType types.Type) bool {
-	methods := types.NewMethodSet(valueType)
-	for index := range methods.Len() {
-		switch methods.At(index).Obj().Name() {
-		case "String", "Error", "Format", "GoString":
-			return true
-		}
-	}
-	return false
+	return unsafe
 }
 
 // isString is whether a type is a string or a type whose underlying type is one.
