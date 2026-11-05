@@ -209,8 +209,8 @@ func notConfigured(enabled []rule.Rule) []string {
 // named silent, off by the config for every file the rules walked; so are the ones not configured that wrote
 // nothing, since a rule missing its options cannot report and is not quiet but unconfigured. The ones that ran
 // and wrote no finding, whether they had nothing to say or everything they said was outside the scope or
-// withheld, are watched and quiet; the rest found something. A rule that crashed on a package is counted by what
-// it wrote on the others, and the crash itself is in crashes, which makes the run incomplete.
+// withheld, are watched and quiet, unless they crashed on a package; the rest found something. A crash is in
+// crashes, which makes the run incomplete.
 func (engine *pipeline) lintCoverage(
 	result *check.Result, written []contract.FindingRecord, turnedOff []string, unconfigured []string,
 ) contract.LintRecord {
@@ -248,8 +248,9 @@ func (engine *pipeline) lintCoverage(
 		RulesNotConfigured: unconfigured,
 		ConfigNote:         engine.settings.Note,
 	}
+	// A rule that crashed on a package did not watch all of it, so its silence there is not quiet.
 	for _, name := range ranNames {
-		if writtenByRule[name] == 0 {
+		if writtenByRule[name] == 0 && !slices.Contains(result.CrashedRules, name) {
 			record.RulesWatchedAndQuiet++
 		}
 	}
