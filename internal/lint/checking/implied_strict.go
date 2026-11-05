@@ -26,5 +26,6 @@ func CompilerImpliesStrict(ruleContext rule.Context, source *ast.SourceFile) boo
 	if ruleContext.Program != nil {
 		options = ruleContext.Program.Options()
 	}
+	//cohere:ignore SA1019 mirrors the tsconfig's option as written; tsgo has no getter for it that is not deprecated
 	return IsStrictCompilerOptionEnabled(options, options.AlwaysStrict)
 }

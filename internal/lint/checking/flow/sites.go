@@ -56,52 +56,6 @@ type Site struct {
 	Spread bool
 }
 
-// Listeners returns the listeners that find every site in the walker's file and hand each to visit.
-//
-// The sites:
-//
-//	const x: T = e            the annotation
-//	x = e                     the assigned-to expression's type
-//	[a, { b }] = e            each target of the pattern, with the part of e it receives
-//	class { p: T = e }        the annotation
-//	f(x: T = e)               the annotation, and a defaulted binding element likewise
-//	f(e), new C(e)            the argument's contextual type: the resolved parameter, instantiated
-//	return e, (): T => e      the function's annotated return type; an unannotated, async or
-//	                          generator function has no slot to compare against
-//	{ p: e }, { p }, [e]      the contextual type of the property or element
-//	{ ...e }, [...e]          the literal's contextual type, as a new container: the literal's own slots are
-//	                          new, and what they hold is e's
-//	e as T, <T>e              an upcast: e's type is assignable to T and not T itself
-//
-// A site whose source and target are the same type is never handed over: nothing below can differ, and
-// it is the overwhelmingly common case. JSX attributes are not sites yet, since JSX is no part of Adamic
-// 0.1; their contextual type is the same question and the obvious next listener.
-//
-// Every rule listening shares the file's walker (WalkerFor), and every listener reaching a node is called
-// before the walk moves on, so the first rule there finds the node's sites and the others read them. Each
-// rule finding them again asked the checker for every source three times, and an object literal's type is
-// built anew on every ask (#m6tyg79). One listener serves every kind, so a rule costs a file one closure.
-func (walker *Walker) Listeners(visit func(Site)) rule.Listeners {
-	if walker.typeChecker == nil {
-		return nil
-	}
-	listener := func(node *ast.Node) {
-		if walker.sitesNode != node {
-			walker.sites = walker.sites[:0]
-			siteFinders[node.Kind](walker, node)
-			walker.sitesNode = node
-		}
-		for _, site := range walker.sites {
-			visit(site)
-		}
-	}
-	listeners := make(rule.Listeners, len(siteFinders))
-	for kind := range siteFinders {
-		listeners[kind] = listener
-	}
-	return listeners
-}
-
 // siteFinders is, by node kind, what offers the sites at a node of that kind into the walker's sites.
 var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 	ast.KindVariableDeclaration: func(w *Walker, node *ast.Node) {
@@ -187,6 +141,52 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 	ast.KindTypeAssertionExpression: (*Walker).offerUpcast,
 }
 
+// Listeners returns the listeners that find every site in the walker's file and hand each to visit.
+//
+// The sites:
+//
+//	const x: T = e            the annotation
+//	x = e                     the assigned-to expression's type
+//	[a, { b }] = e            each target of the pattern, with the part of e it receives
+//	class { p: T = e }        the annotation
+//	f(x: T = e)               the annotation, and a defaulted binding element likewise
+//	f(e), new C(e)            the argument's contextual type: the resolved parameter, instantiated
+//	return e, (): T => e      the function's annotated return type; an unannotated, async or
+//	                          generator function has no slot to compare against
+//	{ p: e }, { p }, [e]      the contextual type of the property or element
+//	{ ...e }, [...e]          the literal's contextual type, as a new container: the literal's own slots are
+//	                          new, and what they hold is e's
+//	e as T, <T>e              an upcast: e's type is assignable to T and not T itself
+//
+// A site whose source and target are the same type is never handed over: nothing below can differ, and
+// it is the overwhelmingly common case. JSX attributes are not sites yet, since JSX is no part of Adamic
+// 0.1; their contextual type is the same question and the obvious next listener.
+//
+// Every rule listening shares the file's walker (WalkerFor), and every listener reaching a node is called
+// before the walk moves on, so the first rule there finds the node's sites and the others read them. Each
+// rule finding them again asked the checker for every source three times, and an object literal's type is
+// built anew on every ask (#m6tyg79). One listener serves every kind, so a rule costs a file one closure.
+func (walker *Walker) Listeners(visit func(Site)) rule.Listeners {
+	if walker.typeChecker == nil {
+		return nil
+	}
+	listener := func(node *ast.Node) {
+		if walker.sitesNode != node {
+			walker.sites = walker.sites[:0]
+			siteFinders[node.Kind](walker, node)
+			walker.sitesNode = node
+		}
+		for _, site := range walker.sites {
+			visit(site)
+		}
+	}
+	listeners := make(rule.Listeners, len(siteFinders))
+	for kind := range siteFinders {
+		listeners[kind] = listener
+	}
+	return listeners
+}
+
 // offer adds the site of expression flowing into target, unless the two are one type or the target has no
 // object part or generic indexed access, where no judge can rule (see Judge). The target is read first so such a site
 // never asks the checker for its source.
@@ -237,10 +237,10 @@ func (walker *Walker) destructured(pattern *ast.Node, value *ast.Node, valueType
 
 // destructuredParts offers the targets of pattern with the parts of valueType, reported at value.
 func (walker *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
-	pattern = ast.SkipParentheses(pattern)
-	switch pattern.Kind {
+	unwrapped := ast.SkipParentheses(pattern)
+	switch unwrapped.Kind {
 	case ast.KindArrayLiteralExpression:
-		for index, element := range pattern.AsArrayLiteralExpression().Elements.Nodes {
+		for index, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if element.Kind == ast.KindSpreadElement {
 				return
 			}
@@ -249,8 +249,9 @@ func (walker *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valu
 			}
 		}
 	case ast.KindObjectLiteralExpression:
-		for _, property := range pattern.AsObjectLiteralExpression().Properties.Nodes {
-			var name, target *ast.Node
+		for _, property := range unwrapped.AsObjectLiteralExpression().Properties.Nodes {
+			var name *ast.Node
+			var target *ast.Node
 			switch property.Kind {
 			case ast.KindPropertyAssignment:
 				name, target = property.Name(), property.AsPropertyAssignment().Initializer
@@ -271,16 +272,17 @@ func (walker *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valu
 // destructuredTarget offers one target of a pattern: a nested pattern is destructured again with its part's
 // type, and anything else is a slot the part is put into.
 func (walker *Walker) destructuredTarget(target *ast.Node, value *ast.Node, partType *checker.Type) {
-	target = ast.SkipParentheses(target)
-	if target.Kind == ast.KindBinaryExpression &&
-		target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
-		target = ast.SkipParentheses(target.AsBinaryExpression().Left)
+	// The target without its parentheses or its default.
+	unwrapped := ast.SkipParentheses(target)
+	if unwrapped.Kind == ast.KindBinaryExpression &&
+		unwrapped.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
+		unwrapped = ast.SkipParentheses(unwrapped.AsBinaryExpression().Left)
 	}
-	if target.Kind == ast.KindArrayLiteralExpression || target.Kind == ast.KindObjectLiteralExpression {
-		walker.destructuredParts(target, value, partType)
+	if unwrapped.Kind == ast.KindArrayLiteralExpression || unwrapped.Kind == ast.KindObjectLiteralExpression {
+		walker.destructuredParts(unwrapped, value, partType)
 		return
 	}
-	walker.offerPart(value, partType, walker.typeChecker.GetTypeAtLocation(target))
+	walker.offerPart(value, partType, walker.typeChecker.GetTypeAtLocation(unwrapped))
 }
 
 // destructuredElement is the element at index of an array or tuple value's type.
@@ -429,15 +431,15 @@ func mapsToFresh(expression *ast.Node) bool {
 // mapReturns is what a `.map` call's inline callback returns, each return's expression, or nil when expression is no
 // such call or a return has none. A callback with no return returns nothing it could share, but builds no element.
 func mapReturns(expression *ast.Node) []*ast.Node {
-	expression = ast.SkipParentheses(expression)
-	if expression.Kind != ast.KindCallExpression {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped.Kind != ast.KindCallExpression {
 		return nil
 	}
-	callee := ast.SkipParentheses(expression.Expression())
+	callee := ast.SkipParentheses(unwrapped.Expression())
 	if callee.Kind != ast.KindPropertyAccessExpression || callee.AsPropertyAccessExpression().Name().Text() != "map" {
 		return nil
 	}
-	arguments := expression.Arguments()
+	arguments := unwrapped.Arguments()
 	if len(arguments) == 0 {
 		return nil
 	}
@@ -543,26 +545,26 @@ func (walker *Walker) hasObjectPart(t *checker.Type) bool {
 // isFresh is an expression whose value is made right here: an object or array literal, parenthesized or
 // not, or a conditional whose branches each are one or are nothing (`undefined`, `null`).
 func isFresh(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 		return true
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return isFreshOrNothing(conditional.WhenTrue) && isFreshOrNothing(conditional.WhenFalse)
 	}
 	return false
 }
 
 func isFreshOrNothing(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
+	unwrapped := ast.SkipParentheses(expression)
 	switch {
-	case expression.Kind == ast.KindNullKeyword:
+	case unwrapped.Kind == ast.KindNullKeyword:
 		return true
-	case expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
+	case unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == "undefined":
 		return true
 	}
-	return isFresh(expression)
+	return isFresh(unwrapped)
 }
 
 // newArrayMethods are the library methods that return an array they just built, never the receiver or
@@ -583,12 +585,12 @@ var newArrayFunctions = map[string]map[string]bool{
 // `map` that returns something it holds would read as new; the names are the library's, and a project
 // that reuses them for a shared value is the rare case this accepts.
 func isNewContainer(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindNewExpression:
 		return true
 	case ast.KindCallExpression:
-		callee := ast.SkipParentheses(expression.Expression())
+		callee := ast.SkipParentheses(unwrapped.Expression())
 		if callee.Kind != ast.KindPropertyAccessExpression {
 			return false
 		}

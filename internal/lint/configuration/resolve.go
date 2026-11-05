@@ -37,10 +37,7 @@ type resolutionIdentity struct {
 // so a caller can derive what depends only on the resolution once per resolution rather than once per
 // file: which rules apply, and their decoded options. Nil for a resolution with no identity, an ignored
 // file or one built by hand, which a caller treats as unique.
-func (resolved Resolved) Identity() any {
-	if resolved.identity == nil {
-		return nil
-	}
+func (resolved Resolved) Identity() *resolutionIdentity {
 	return resolved.identity
 }
 
@@ -98,12 +95,6 @@ func (c *Config) resolutions() *resolutionMemo {
 	return c.resolutionMemo.Load()
 }
 
-// Enabled reports whether a rule runs on this file.
-func (resolved Resolved) Enabled(ruleName string) bool {
-	status, _ := resolved.StatusOf(ruleName)
-	return status == StatusEnabled
-}
-
 // Status is why a rule did or did not run on a file.
 type Status int
 
@@ -126,6 +117,12 @@ const (
 	// StatusFileIgnored means no rule runs on this file.
 	StatusFileIgnored
 )
+
+// Enabled reports whether a rule runs on this file.
+func (resolved Resolved) Enabled(ruleName string) bool {
+	status, _ := resolved.StatusOf(ruleName)
+	return status == StatusEnabled
+}
 
 // StatusOf reports why a rule runs or does not, and its setting when it has one.
 func (resolved Resolved) StatusOf(ruleName string) (Status, RuleSetting) {

@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
@@ -95,6 +96,7 @@ func run() error {
 		ConfiguredRules:         configuredRuleNames(lintConfiguration),
 		Controls:                options.controls,
 		ExtraCohereRuleSettings: cohereOnlyRuleSettings(options.root),
+		Diagnostics:             os.Stderr,
 	})
 	if err != nil {
 		return err
@@ -357,7 +359,7 @@ export function PlantedEffect(properties: { label: string }) {
 // the shared config, because configuring it differently per side manufactures differences that say
 // nothing about either implementation. `Run` refuses a rule the tree's config already configures,
 // which is the mechanical version of that boundary rather than a comment asking for care.
-func cohereOnlyRuleSettings(root string) map[string]any {
+func cohereOnlyRuleSettings(root string) map[string]json.RawMessage {
 	// The alias is scoped to the control's own directory rather than to a real source root.
 	//
 	// A first version aliased `modules`, which is a real directory, and the rule fired 95 times
@@ -368,20 +370,23 @@ func cohereOnlyRuleSettings(root string) map[string]any {
 	//
 	// Aliasing the control directory means the only relative import that can climb into an aliased
 	// directory is the one in the planted file.
-	return map[string]any{
-		"nexus/import-require-path-alias": []any{
-			"error",
-			map[string]any{
-				"repositoryRoot": root,
-				"aliases": []any{
-					map[string]any{
-						"directory": filepath.Join("code-quality", "differential-control"),
-						"alias":     "@differential-control",
-					},
+	pathAliasSetting, encodeError := json.Marshal([]any{
+		"error",
+		map[string]any{
+			"repositoryRoot": root,
+			"aliases": []any{
+				map[string]any{
+					"directory": filepath.Join("code-quality", "differential-control"),
+					"alias":     "@differential-control",
 				},
 			},
 		},
+	})
+	// Invariant: the setting holds only strings, and slices and maps of them, which always encode.
+	if encodeError != nil {
+		panic(encodeError)
 	}
+	return map[string]json.RawMessage{"nexus/import-require-path-alias": pathAliasSetting}
 }
 
 // checkControlsAreLintable refuses to run when a control was placed where its rule cannot fire.

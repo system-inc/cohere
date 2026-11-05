@@ -2,6 +2,7 @@ package differential
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,6 +106,84 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 			filesWalked,
 			rulesRun,
 		)
+	}
+}
+
+// A coverage count past an int's range reads as no coverage line, so the vacuity guard refuses the run
+// rather than believing the largest int as a file count.
+func TestAnUnreadableCoverageCountReadsAsZero(test *testing.T) {
+	test.Parallel()
+	filesWalked, rulesRun := cohereCoverageFrom([]string{
+		"lint: 1 findings — 23 rules over 99999999999999999999 files, 2098302 nodes visited, in 813ms",
+	})
+	if filesWalked != 0 || rulesRun != 0 {
+		test.Fatalf(
+			"a coverage line whose count cannot be read must read as 0/0, got %d files and %d rules",
+			filesWalked,
+			rulesRun,
+		)
+	}
+}
+
+// The extended config keeps every key and setting the tree's config had, adds the extra rule as given,
+// and is removed by its cleanup.
+func TestTheExtendedConfigCarriesTheTreesConfigThrough(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	original := `{"plugins": ["nexus"], "rules": {"nexus/consistency-no-enum": ["error", {"limit": 3}]}}`
+	configurationPath := filepath.Join(root, ".oxlintrc.json")
+	if writeError := os.WriteFile(configurationPath, []byte(original), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+
+	command, cleanup, extendError := cohereCommandWithExtraRules(RunOptions{
+		Root:                    root,
+		Cohere:                  GateCommand{Program: "cohere"},
+		ExtraCohereRuleSettings: map[string]json.RawMessage{"nexus/only-cohere": json.RawMessage(`"error"`)},
+	})
+	if extendError != nil {
+		test.Fatal(extendError)
+	}
+	extendedPath := filepath.Join(root, ".oxlintrc.differential.json")
+	extended, readError := os.ReadFile(extendedPath)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	want := `{"plugins":["nexus"],` +
+		`"rules":{"nexus/consistency-no-enum":["error",{"limit":3}],"nexus/only-cohere":"error"}}`
+	if string(extended) != want {
+		test.Fatalf("the extended config is\n%s\nwant\n%s", extended, want)
+	}
+	if !strings.HasSuffix(command.String(), "-lint-config .oxlintrc.differential.json") {
+		test.Fatalf("cohere is not pointed at the extended config: %s", command)
+	}
+
+	cleanup()
+	if _, statError := os.Stat(extendedPath); !os.IsNotExist(statError) {
+		test.Fatal("the extended config was left behind")
+	}
+}
+
+// A rules key that is not an object is refused, rather than replaced by the extra rules alone, which
+// would hand cohere a config that enables only them.
+func TestAConfigWhoseRulesAreNotAnObjectIsRefused(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	configurationPath := filepath.Join(root, ".oxlintrc.json")
+	if writeError := os.WriteFile(configurationPath, []byte(`{"rules": "error"}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+
+	_, cleanup, extendError := cohereCommandWithExtraRules(RunOptions{
+		Root:                    root,
+		ExtraCohereRuleSettings: map[string]json.RawMessage{"nexus/only-cohere": json.RawMessage(`"error"`)},
+	})
+	cleanup()
+	if extendError == nil || !strings.Contains(extendError.Error(), "parsing the lint config's rules") {
+		test.Fatalf("a rules key holding a string must be refused, got %v", extendError)
+	}
+	if _, statError := os.Stat(filepath.Join(root, ".oxlintrc.differential.json")); !os.IsNotExist(statError) {
+		test.Fatal("a refused config must write no extended config")
 	}
 }
 
@@ -338,7 +417,12 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(test *testing.T) {
 		Contents:     "export enum Planted { A = 'A' }\n",
 		Rule:         "consistency-no-enum",
 	}
-	_, cleanup, plantControlsError := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	diagnostics := &strings.Builder{}
+	_, cleanup, plantControlsError := plantControls(RunOptions{
+		Root:        root,
+		Controls:    []Control{control},
+		Diagnostics: diagnostics,
+	})
 	if plantControlsError != nil {
 		test.Fatal(plantControlsError)
 	}
@@ -356,6 +440,10 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(test *testing.T) {
 	}
 	if _, statError := os.Stat(preexisting); statError != nil {
 		test.Fatalf("a directory that existed before the plant must survive cleanup: %v", statError)
+	}
+	// The directory left in place is said where the caller asked, so nobody finds it unexplained.
+	if !strings.Contains(diagnostics.String(), "left the directory") {
+		test.Fatalf("cleanup did not say which directory it left, wrote %q", diagnostics.String())
 	}
 }
 

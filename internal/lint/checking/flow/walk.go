@@ -157,7 +157,9 @@ func (walker *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pai
 		return top, wrong
 	}
 	walker.judge, walker.newContainer, walker.freshElements = judge, site.NewContainer, site.FreshElements
-	walker.objectIntersections, walker.methods, walker.overridden = options.ObjectIntersections, options.Methods, site.Overridden
+	walker.objectIntersections = options.ObjectIntersections
+	walker.methods = options.Methods
+	walker.overridden = site.Overridden
 	walker.visited, walker.path = walker.visited[:0], walker.path[:0]
 	if len(walker.visitedSet) > 0 {
 		clear(walker.visitedSet)
@@ -820,9 +822,15 @@ func (walker *Walker) inContextOf(
 	if len(source.TypeParameters()) == 0 || slices.Equal(source.TypeParameters(), target.TypeParameters()) {
 		return source, target
 	}
-	target = checker.Checker_getCanonicalSignature(walker.typeChecker, target)
+	canonicalTarget := checker.Checker_getCanonicalSignature(walker.typeChecker, target)
 	// No inference context and no comparer, as tsc's relater passes: the comparer is then assignability.
-	return checker.Checker_instantiateSignatureInContextOf(walker.typeChecker, source, target, nil, nil), target
+	return checker.Checker_instantiateSignatureInContextOf(
+		walker.typeChecker,
+		source,
+		canonicalTarget,
+		nil,
+		nil,
+	), canonicalTarget
 }
 
 func (walker *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
@@ -1050,11 +1058,11 @@ const maximumTraceDepth = 4
  * which leaves the value held.
  */
 func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
-	expression = ast.SkipParentheses(expression)
-	if expression.Kind != ast.KindIdentifier || depth >= maximumTraceDepth {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped.Kind != ast.KindIdentifier || depth >= maximumTraceDepth {
 		return nil
 	}
-	symbol := walker.valueSymbol(expression)
+	symbol := walker.valueSymbol(unwrapped)
 	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
@@ -1067,7 +1075,7 @@ func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 		list.Flags&ast.NodeFlagsConst == 0 {
 		return nil
 	}
-	function := ast.GetContainingFunction(expression)
+	function := ast.GetContainingFunction(unwrapped)
 	if function == nil || ast.GetContainingFunction(declaration) != function || function.Body() == nil {
 		return nil
 	}
@@ -1076,11 +1084,11 @@ func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if node.Kind == ast.KindIdentifier &&
-			node.Text() == expression.Text() &&
+			node.Text() == unwrapped.Text() &&
 			node != declaration.Name() &&
 			walker.valueSymbol(node) == symbol {
 			references++
-			if node != expression {
+			if node != unwrapped {
 				only = false
 			}
 		}
@@ -1194,14 +1202,16 @@ func IsTypeParameterIndexedAccess(t *checker.Type) bool {
 	if t == nil || t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
 		return false
 	}
+	// The access reached so far, walking in through each one's object type.
+	current := t
 	for depth := 0; depth <= maximumDepth; depth++ {
-		if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
+		if current.Flags()&checker.TypeFlagsTypeParameter != 0 {
 			return true
 		}
-		if t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
+		if current.Flags()&checker.TypeFlagsIndexedAccess == 0 {
 			return false
 		}
-		t = t.AsIndexedAccessType().ObjectType()
+		current = current.AsIndexedAccessType().ObjectType()
 	}
 	return false
 }
