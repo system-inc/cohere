@@ -48,7 +48,7 @@ var messageSetStateInEffect = rule.Message{
 //	oxc           crates/oxc_react_compiler/src/react_compiler_validation/validate_no_set_state_in_effects.rs
 //
 // React is the authority here per the port brief's table. Every behavioural claim in this comment
-// was established by RUNNING React 7.1.1 through the ESLint Linter API on the exact input named,
+// was established by running React 7.1.1 through the ESLint Linter API on the exact input named,
 // not by reading, and reading gave the wrong answer twice: on which names count as effects, and on
 // a function defined inside the effect body.
 //
@@ -59,7 +59,7 @@ var messageSetStateInEffect = rule.Message{
 // `isUseLayoutEffectHookType` and `isUseInsertionEffectHookType`, each comparing the callee's
 // inferred type against a `shapeId` from React's builtin registry. A name reaches that registry
 // through `Environment.getGlobalDeclaration`, which keys the lookup on the name a binding was
-// DECLARED as: `binding.imported` for a named import, `binding.name` for a global or a namespace
+// declared as: `binding.imported` for a named import, `binding.name` for a global or a namespace
 // member. So the decision is: does this callee resolve to a declaration named exactly `useEffect`,
 // `useLayoutEffect`, or `useInsertionEffect`.
 //
@@ -67,27 +67,27 @@ var messageSetStateInEffect = rule.Message{
 //
 //   - **A local rename still reports.** `import {useEffect as useFx} from 'react'; useFx(...)`
 //     reports, because `binding.imported` is `useEffect`. The local spelling is not consulted.
-//   - **The reverse does not.** `import {somethingElse as useEffect} from 'react'` is SILENT,
+//   - **The reverse does not.** `import {somethingElse as useEffect} from 'react'` is silent,
 //     which is the same rule read the other way and is the case that proves the local name is not
 //     what is being asked.
 //   - **A namespace member is the same question.** `React.useEffect(...)` reports, and needs no
 //     syntactic special case here, because the checker resolves the property access to the same
 //     `useEffect` declaration a named import resolves to.
-//   - **A custom hook is NOT an effect, however it is spelled.** `useMyEffect2` does not report and
+//   - **A custom hook is not an effect, however it is spelled.** `useMyEffect2` does not report and
 //     neither does `useEffective`. Both were run. This matters because a related rule,
 //     `exhaustive-deps`, computes `isEffect` as the regex `/Effect($|[^a-z])/` at bundle line 940,
-//     under which `useMyEffect2` WOULD be an effect and `useEffective` would not. That regex
+//     under which `useMyEffect2` would be an effect and `useEffective` would not. That regex
 //     belongs to that rule and is not consulted by this one; porting it here would report a class
 //     of custom hooks upstream is silent on, and no fixture in either corpus contains either name.
 //
 // A locally declared `function useEffect` is silent, and an import of `useEffect` from a non-React
-// module is silent too, both measured. Those two are NOT reproduced here and the divergence is
+// module is silent too, both measured. Those two are not reproduced here and the divergence is
 // deliberate; see "Where this diverges" below.
 //
 // # How a setter is identified, and why no React seed data is needed
 //
 // `@types/react` declares `useState<S>(): [S, Dispatch<SetStateAction<S>>]`, so the setter element
-// of the returned tuple carries the type ALIAS `Dispatch` while the value element does not. That is
+// of the returned tuple carries the type alias `Dispatch` while the value element does not. That is
 // the whole predicate. The checker is asked for the callee's type and the alias symbol's name is
 // compared against `Dispatch`.
 //
@@ -95,7 +95,7 @@ var messageSetStateInEffect = rule.Message{
 // for the symbol is the natural first move and it fails silently. Probed on a real program: a
 // setter's `Type_symbol` is the anonymous type literal behind the alias, so keying on it reports a
 // genuine setter as not-a-setter. The mirror-image trap belongs to the sibling rule `refs`, where
-// `RefObject` is an interface and therefore lives in the SYMBOL with a correctly nil alias. One
+// `RefObject` is an interface and therefore lives in the symbol with a correctly nil alias. One
 // predicate cannot serve both, and an agent that wrote one for both reported a genuine `useRef` as
 // neither.
 //
@@ -113,7 +113,7 @@ var messageSetStateInEffect = rule.Message{
 // # Why this needs the intermediate representation
 //
 // The transitive case is the reason, and it is upstream's own shape. `const f = () => setS(1);`
-// declared beside the effect and called as `f()` inside it REPORTS, at two levels of indirection as
+// declared beside the effect and called as `f()` inside it reports, at two levels of indirection as
 // well. Answering that from syntax means tracking which locals hold a setter, following them
 // through assignments, and then asking whether a value flowing into `useEffect`'s first argument
 // transitively reaches one. That is `setStateFunctions`, upstream's map, and it is a dataflow
@@ -123,7 +123,7 @@ var messageSetStateInEffect = rule.Message{
 //
 // # The ref exemption, and the one place this deliberately stops short
 //
-// `enableAllowSetStateFromRefsInEffects` defaults to TRUE in the shipped rule (bundle line 31649),
+// `enableAllowSetStateFromRefsInEffects` defaults to `true` in the shipped rule (bundle line 31649),
 // so the exemption is live rather than experimental, and it decides six of the twelve imported
 // cases. It has two halves and both are reachable on their own, measured with the other held out:
 //
@@ -152,12 +152,12 @@ var messageSetStateInEffect = rule.Message{
 //
 // # Behaviours that look like defects and are upstream's
 //
-//   - **A function defined INSIDE the effect is never followed.** `useEffect(() => { const f = ()
-//     => setS(1); f(); })` is SILENT, while moving that same declaration one line up, outside the
-//     effect, REPORTS. Measured on both inputs. The mechanism is visible in the algorithm:
+//   - **A function defined inside the effect is never followed.** `useEffect(() => { const f = ()
+//     => setS(1); f(); })` is silent, while moving that same declaration one line up, outside the
+//     effect, reports. Measured on both inputs. The mechanism is visible in the algorithm:
 //     `getSetStateCall` walks the effect function's own blocks, and a function declared inside it
 //     is a nested `FunctionExpression` whose body those blocks do not contain. The map it consults
-//     was populated in the ENCLOSING function, so only setters that crossed the boundary from
+//     was populated in the enclosing function, so only setters that crossed the boundary from
 //     outside are known. This is a real hole rather than an exemption, and it is reproduced.
 //   - **A `useCallback` or `useMemo` wrapper is invisible to both sides**, because upstream deletes
 //     it before this validator runs and this rule now reads a graph prepared the same way: the
@@ -168,11 +168,11 @@ var messageSetStateInEffect = rule.Message{
 //   - **A setter reached through a callback is silent, by the same mechanism running the other
 //     way.** `setTimeout(setS, 10)` and `subscribe(() => setS(1))` are both clean, which is the
 //     rule's actual purpose: the setter is not called during the effect body.
-//   - **One finding per effect, not per call.** Three `setS` calls in one effect report ONCE,
-//     because `getSetStateCall` returns the FIRST setter it finds and stops. Two separate effects
+//   - **One finding per effect, not per call.** Three `setS` calls in one effect report once,
+//     because `getSetStateCall` returns the first setter it finds and stops. Two separate effects
 //     report twice. Both measured.
 //   - **The dependency array is not consulted at all.** `useEffect(cb)` and `useEffect(cb, [])`
-//     behave identically, and a setter passed as the SECOND argument is silent.
+//     behave identically, and a setter passed as the second argument is silent.
 //
 // # Where this diverges, and why
 //
@@ -183,10 +183,10 @@ var messageSetStateInEffect = rule.Message{
 // or `Imported`, documented at `internal/utilities/hir/lower.go:58` and confirmed still true here.
 //
 // The divergence is therefore that a function named exactly `useEffect`, `useLayoutEffect` or
-// `useInsertionEffect` that is NOT React's would be treated as an effect. Its practical reach is
+// `useInsertionEffect` that is not React's would be treated as an effect. Its practical reach is
 // bounded by the other half of the rule: a finding still requires a genuine `Dispatch`-typed setter
 // from a real `useState`, so the false-positive surface is a file that declares its own `useEffect`
-// AND calls a real React setter synchronously inside it. No instance appeared in the dry run
+// and calls a real React setter synchronously inside it. No instance appeared in the dry run
 // described below, which is a weaker statement than "none exists" and is deliberately left weaker.
 //
 // # What the dry run actually found, which is the honest summary of this port
@@ -335,10 +335,10 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 			// Same capture path as in `findSetStateCall`, for an effect written inside a nested
 			// function that closes over a setter from further out.
 			//
-			// Only the MAP branch is here. A type check was written beside it and removed: the
+			// Only the map branch is here. A type check was written beside it and removed: the
 			// mutation deleting it survived the whole suite, and the reason is subsumption rather
 			// than a fixture gap. Every value this arm could newly identify by type is a value that
-			// gets asked the same type question again at the point it is CALLED, by
+			// gets asked the same type question again at the point it is called, by
 			// `isSetterPlace`, whose own type branch is caught by 22 lines. A captured setter that
 			// is never called cannot produce a finding by any route, so no input can distinguish
 			// the two versions.
@@ -352,12 +352,12 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 					setStateFunctions[target] = origin
 				}
 
-			// A function closing over a setter may itself BE a setter call, which is the transitive
+			// A function closing over a setter may itself be a setter call, which is the transitive
 			// case: `const f = () => setS(1)` makes `f` behave as a setter for this rule's purpose.
 			// Upstream gates the descent on an operand already being a setter, so a function that
 			// closes over nothing relevant is never scanned.
 			//
-			// # The gate is a COST guard, not a behavioural one, and its mutant survives
+			// # The gate is a cost guard, not a behavioural one, and its mutant survives
 			//
 			// Deleting it survives the whole suite, and the reason is the brief's "both branches
 			// reach the same verdict by different routes" rather than a fixture gap. Without the
@@ -378,9 +378,9 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 				if nested == nil {
 					continue
 				}
-				// The Place stored is the one found INSIDE the nested function, and it is what
+				// The Place stored is the one found inside the nested function, and it is what
 				// upstream stores too. It is only ever reported when this value is itself the
-				// callback handed to an effect; when this value is instead CALLED from a later
+				// callback handed to an effect; when this value is instead called from a later
 				// effect body, that body's own call site supplies the span. See the note on where
 				// findings point in `findSetStateCall`.
 				if callee, found := findSetStateCall(ruleContext, nested, translateAcrossCaptures(value, nested, setStateFunctions)); found {
@@ -406,14 +406,25 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 	}
 }
 
+// effectHookKindOf classifies a callee as an effect hook, `useEffectEvent`, or neither.
+type effectHookKindOf int
+
+const (
+	effectHookNone effectHookKindOf = iota
+	effectHookEffect
+	effectHookUseEffectEvent
+)
+
 // handleEffectCall is the CallExpression and MethodCall arm of upstream's switch.
 //
-// Two hooks are recognized and they do opposite things. `useEffectEvent` PROPAGATES setter-ness to
+// Two hooks are recognized and they do opposite things. `useEffectEvent` propagates setter-ness to
 // its result, so a setter reached through one is still reported when that result is called inside
-// an effect. The three effect hooks REPORT. Both read only the first argument, and upstream reads
+// an effect. The three effect hooks report. Both read only the first argument, and upstream reads
 // it only when it is a plain identifier rather than an inline function, which is what makes
 // `useEffect(() => {...})` reach the report through the FunctionExpression arm above rather than
 // here.
+//
+// Mutates: setStateFunctions records a `useEffectEvent` result as the setter it wraps, so a later call of it reports.
 func handleEffectCall(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
@@ -441,7 +452,7 @@ func handleEffectCall(
 
 // findSetStateCall is upstream's `getSetStateCall`, minus the control-dominance half.
 //
-// It scans one function's own blocks for a call whose callee is a setter, and returns the FIRST
+// It scans one function's own blocks for a call whose callee is a setter, and returns the first
 // one. Returning the first rather than collecting all of them is why three setter calls in one
 // effect produce one finding, which was measured rather than inferred.
 //
@@ -472,7 +483,7 @@ func findSetStateCall(
 	// Built here rather than per call so its per-block cache is shared, and built over a closure
 	// that reads `refDerived` live: the taint map is still filling as the blocks below are walked,
 	// and a branch on `reference.current` taints through the same loop that later reaches the
-	// setter. The predicate is only ever CALLED at a setter, by which point every instruction above
+	// setter. The predicate is only ever called at a setter, by which point every instruction above
 	// it in the walk has been seen.
 	isRefControlledBlock := high_level_intermediate_representation.ControlDominators(function, isDerivedFromRef)
 
@@ -508,7 +519,7 @@ func findSetStateCall(
 			if instructionReadsRefDerived(instruction, isDerivedFromRef) {
 				refDerived[target] = true
 
-				// A store binds through its OWN lvalue as well as the instruction's, and both have
+				// A store binds through its own lvalue as well as the instruction's, and both have
 				// to be tainted. Upstream reaches them together through `eachInstructionLValue`,
 				// which yields `instr.lvalue` and then the value's own lvalue; marking only the
 				// first loses the binding a reader actually named.
@@ -525,7 +536,7 @@ func findSetStateCall(
 					refDerived[store.LValue.Identifier] = true
 				}
 
-				// A destructure binds through a PATTERN rather than through the instruction's
+				// A destructure binds through a pattern rather than through the instruction's
 				// LValue, so tainting only the LValue loses every binding it introduced. That gap
 				// was not hypothetical: `const {height} = ref.current.getBoundingClientRect()` is
 				// upstream's own `valid-set-state-in-useEffect-from-ref` fixture, and it was the
@@ -537,7 +548,7 @@ func findSetStateCall(
 				// two different patterns.
 				//
 				// It is not. All four sites that construct a `Destructure` in lowering assign the
-				// SAME `pattern` local to both fields (`lower.go:498,640,897` and
+				// same `pattern` local to both fields (`lower.go:498,640,897` and
 				// `lower_expression.go:432`), so the second walk can never mark anything the first
 				// did not. A mutation deleting either call survived the whole suite while deleting
 				// both was caught by six lines, which is the signature of a subsumed branch rather
@@ -557,19 +568,19 @@ func findSetStateCall(
 					local[target] = origin
 				}
 
-			// A setter reaches a nested function as a CAPTURE, so inside that function it is read
+			// A setter reaches a nested function as a capture, so inside that function it is read
 			// with LoadContext rather than LoadLocal, and the value it produces is a fresh
 			// temporary with no syntax node of its own.
 			//
 			// This arm is the reason three fixtures failed at once on the first run, including two
 			// transcribed verbatim from upstream, and the failure did not look like one cause. The
 			// captured place keeps the identifier the enclosing function knew it by, so the type
-			// question can be asked of that place while the CALL is attributed to the temporary.
+			// question can be asked of that place while the call is attributed to the temporary.
 			// Upstream has no equivalent arm because its `setStateFunctions` map is threaded into
 			// the nested scan by the caller rather than rebuilt from the graph.
 			case *high_level_intermediate_representation.LoadContext:
-				// Keyed by the temporary this defines, VALUED by the captured place, because that
-				// place carries the span of the name as written at THIS call site. Upstream returns
+				// Keyed by the temporary this defines, valued by the captured place, because that
+				// place carries the span of the name as written at this call site. Upstream returns
 				// `callee`, the Place inside the function doing the calling, and reporting the
 				// original setter instead points the finding at the `useState` line rather than at
 				// the line the reader has to change.
@@ -582,8 +593,8 @@ func findSetStateCall(
 				// subsumed by `isSetterPlace` at the call site: deleting it survived every fixture
 				// while deleting `isSetterPlace`'s own type branch was caught by 22 lines.
 				//
-				// What remains is load-bearing for a different reason, and its mutant IS caught by
-				// eight lines: the entry it writes is keyed by the temporary but VALUED by the
+				// What remains is load-bearing for a different reason, and its mutant is caught by
+				// eight lines: the entry it writes is keyed by the temporary but valued by the
 				// captured place, which is what puts the finding on the name as written here rather
 				// than on the `useState` line.
 				if _, ok := local[value.Place.Identifier]; ok {
@@ -695,7 +706,7 @@ func translateAcrossCaptures(
 	limit := min(len(value.Captures), len(nested.Context))
 	for i := range limit {
 		if origin, known := outer[value.Captures[i].Identifier]; known {
-			// Keyed by the INNER identifier, valued by the OUTER place, so the finding still points
+			// Keyed by the inner identifier, valued by the outer place, so the finding still points
 			// at a span in a file rather than at a value in a closure's private table.
 			inner[nested.Context[i].Identifier] = origin
 		}
@@ -709,6 +720,8 @@ func translateAcrossCaptures(
 // included: `const {height = fallback} = ref.current...` binds `height` from a ref on the path where
 // the property exists, and a pass that skipped the default would exempt the one path and not the
 // other, which is a distinction upstream does not draw either.
+//
+// Mutates: refDerived marks every binding the pattern introduces as derived from a ref.
 func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, refDerived map[static_single_assignment.IdentifierId]bool) {
 	switch shape := pattern.(type) {
 	case *high_level_intermediate_representation.PlacePattern:
@@ -747,19 +760,19 @@ func markPatternRefDerived(pattern high_level_intermediate_representation.Patter
 // spread. A spread is excluded here for the same reason and it is not an approximation: `useEffect(
 // ...rest)` cannot be attributed to a known value.
 //
-// # The spread half of this condition is EQUIVALENT, and it is kept anyway
+// # The spread half of this condition is equivalent, and it is kept anyway
 //
 // A mutation deleting `|| args[0].Spread` survives every fixture, and it survives because no input
 // can distinguish the two versions rather than because the corpus is thin. The one-sentence reason:
-// a spread's operand is the ITERABLE being spread, never the callback itself, so it can never be a
+// a spread's operand is the iterable being spread, never the callback itself, so it can never be a
 // value `setStateFunctions` holds, and consulting that map is the only thing the guard's absence
 // would newly do.
 //
 // That was probed rather than argued, because the brief is right that a confident equivalence
 // argument reads exactly like a correct one. Two fixtures were written for it first and both
 // stayed green under the mutant, which is the signal that the hypothesis rather than the coverage
-// was wrong. The strongest candidate inputs — `useEffect(...[f])` and `useEffect(...f)` where `f`
-// IS registered in the map — were then run against the pristine and mutated rule side by side and
+// was wrong. The strongest candidate inputs, `useEffect(...[f])` and `useEffect(...f)` where `f`
+// is registered in the map, were then run against the pristine and mutated rule side by side and
 // produced byte-identical output, zero findings from both.
 //
 // It is kept because it is upstream's condition and this is a port: fidelity to the decision is the
@@ -834,7 +847,7 @@ const setStateTypeAliasName = "Dispatch"
 
 // refTypeSymbolName is the type `@types/react` puts on a ref.
 //
-// This reads the SYMBOL where the setter reads the ALIAS, and the asymmetry is real rather than an
+// This reads the symbol where the setter reads the alias, and the asymmetry is real rather than an
 // inconsistency to tidy up. `RefObject` is an interface, so it has no alias and its name lives in
 // the symbol; `Dispatch` is a type alias, so its name lives in the alias and its symbol is the
 // anonymous literal behind it. Using one field for both reports a genuine ref as not-a-ref, which
@@ -881,16 +894,7 @@ func typeAliasNameOf(ruleContext rule.Context, function *high_level_intermediate
 	return symbol.Name
 }
 
-// effectHookKindOf classifies a callee as an effect hook, `useEffectEvent`, or neither.
-type effectHookKindOf int
-
-const (
-	effectHookNone effectHookKindOf = iota
-	effectHookEffect
-	effectHookUseEffectEvent
-)
-
-// effectHookKind resolves a callee to the name it was DECLARED as and classifies it.
+// effectHookKind resolves a callee to the name it was declared as and classifies it.
 //
 // Resolving through the checker rather than reading the written spelling is what makes
 // `import {useEffect as useFx}` report and `import {somethingElse as useEffect}` stay silent, which
@@ -902,10 +906,10 @@ func effectHookKind(ruleContext rule.Context, function *high_level_intermediate_
 		return effectHookNone
 	}
 
-	// The TYPE's symbol, not `GetSymbolAtLocation`'s. The distinction is the whole point of this
+	// The type's symbol, not `GetSymbolAtLocation`'s. The distinction is the whole point of this
 	// function and it is easy to get backwards: for `import {useEffect as useFx}`,
-	// `GetSymbolAtLocation` returns the LOCAL name `useFx`, while the type's symbol returns the
-	// DECLARED name `useEffect`. React asks `binding.imported`, which is the declared one, so
+	// `GetSymbolAtLocation` returns the local name `useFx`, while the type's symbol returns the
+	// declared name `useEffect`. React asks `binding.imported`, which is the declared one, so
 	// reading the local name silently declines every renamed import.
 	//
 	// This rule ran once with the wrong accessor and the failure was instructive: the renamed
@@ -990,8 +994,8 @@ func reportSetter(ruleContext rule.Context, function *high_level_intermediate_re
 	// `Place.Range` rather than `Identifier.Node`, and the distinction is the whole correctness of
 	// this function.
 	//
-	// A Place is a REFERENCE to a value at one point in the program and carries the span of that
-	// reference. `Identifier.Node` is the node that INTRODUCED the value, which for a setter is its
+	// A Place is a reference to a value at one point in the program and carries the span of that
+	// reference. `Identifier.Node` is the node that introduced the value, which for a setter is its
 	// binding in the `useState` destructure. Reporting through the node therefore points every
 	// finding at the declaration line no matter which call produced it, so
 	// `const aliased = setState` reported at `setState` where React reports at `aliased`, and the

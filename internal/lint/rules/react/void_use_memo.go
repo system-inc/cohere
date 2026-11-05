@@ -109,7 +109,7 @@ var messageUseMemoResultUnused = rule.Message{
 //
 // # Where reading was wrong, both times
 //
-// **A bare `return;` is CLEAN.** React's `ReturnStatement` lowering hardcodes `returnVariant:
+// **A bare `return;` is clean.** React's `ReturnStatement` lowering hardcodes `returnVariant:
 // 'Explicit'` whether or not an argument is present, minting `undefined` as the value, so a
 // callback whose only return is `return;` satisfies `hasNonVoidReturn` and does not report. This
 // contradicts React's own pass documentation, which states at
@@ -276,7 +276,7 @@ func isUseMemoCallee(callee *ast.Node, enclosing *ast.Node) bool {
 // A binding in a scope the call site is not inside is never consulted, which is what makes the
 // sibling block and the nested function report.
 //
-// The outer boundary is the counterintuitive half and it is measured: a binding at MODULE scope
+// The outer boundary is the counterintuitive half and it is measured: a binding at module scope
 // does not shadow, because the compiled unit is the function rather than the file. The loop
 // therefore stops at `enclosing` rather than walking to the source file.
 func isShadowedWithin(name string, callee *ast.Node, enclosing *ast.Node) bool {
@@ -290,7 +290,7 @@ func isShadowedWithin(name string, callee *ast.Node, enclosing *ast.Node) bool {
 			// The compiled function is the last scope consulted. Anything above it, module scope
 			// included, is a global as far as this rule is concerned.
 			//
-			// This `break` is REDUNDANT and is kept because it states the boundary where a reader
+			// This `break` is redundant and is kept because it states the boundary where a reader
 			// looks for it. Measured by mutation: removing it alone changes nothing, because the
 			// kind gate above declines a source file (it is neither a block nor function-like) and
 			// `scopeStatements` declines it a second time. Three guards defend the module-scope
@@ -430,7 +430,7 @@ func inlineUseMemoCallback(call *ast.CallExpression) *ast.Node {
 		return nil
 	}
 	first := call.Arguments.Nodes[0]
-	// The spread decline is upstream's own branch, transcribed, and it is INERT here. Measured by
+	// The spread decline is upstream's own branch, transcribed, and it is inert here. Measured by
 	// mutation three ways: replacing the kind, deleting the guard, and even adding
 	// `KindSpreadElement` to the accepting switch below all leave every fixture green. The cause is
 	// a parse shape rather than another branch: a spread argument is `KindSpreadElement`, which is

@@ -65,19 +65,19 @@ var messageNoRenderReturn = rule.Message{
 //	createReactClass({ render: fn() {} })  upstream depth 1, our walk 1   (the expression is real)
 //
 // So only the class-method row is short and it is short by exactly one, matching what
-// `no-did-mount-set-state` documents for the same reason. The correction IS needed, and reasoning
+// `no-did-mount-set-state` documents for the same reason. The correction is needed, and reasoning
 // that it was not is how the first draft of this rule shipped three false negatives.
 //
 // The argument that failed is worth recording because it is the plausible one: the threshold is
-// `depth <= 1` and a DIRECT return in a class method counts 0 here against upstream's 1, which is
+// `depth <= 1` and a direct return in a class method counts 0 here against upstream's 1, which is
 // on the same side of the boundary, so the fusion looks harmless. It is not, because the boundary
-// is crossed by returns that are NESTED. A return inside a callback in a class method counts 2
+// is crossed by returns that are nested. A return inside a callback in a class method counts 2
 // upstream and 1 here, which is the difference between silent and marked, and it silently satisfies
 // a `render` that upstream leaves unsatisfied. Three fixtures caught it, including upstream's own
 // third failing case.
 //
 // The correction is applied at the property node rather than in the scope test, because that is
-// the only place the missing node's identity is known: an object property's function IS a real
+// the only place the missing node's identity is known: an object property's function is a real
 // separate node the walk has already counted, and only a class method or accessor is short.
 //
 // # The flag is per component, not per render method
@@ -229,11 +229,11 @@ func (collector *renderReturnCollector) walk(node *ast.Node) {
 	// body and that its parent property is named `render`, then marks unconditionally, without
 	// consulting the scope count at all. This arm needs no separate flag to reproduce that: the
 	// climb starts at the arrow's own parent, which `isRenderReturnImplicitReturnArrow` has
-	// already established IS the `render` property, so the shared count is zero when the property
+	// already established is the `render` property, so the shared count is zero when the property
 	// test runs and the walk satisfies it on the first step every time.
 	//
 	// That was measured rather than argued. Seeding the flag true for this arm was in the first
-	// draft, and a mutation forcing the seed false was a SURVIVOR: the seed is subsumed by the
+	// draft, and a mutation forcing the seed false was a survivor: the seed is subsumed by the
 	// property check and no input can separate the two, because the arm's own precondition is what
 	// guarantees the property is the first node the climb sees. Removed rather than kept with a
 	// fixture, since no fixture could have covered it.
@@ -250,7 +250,7 @@ func (collector *renderReturnCollector) walk(node *ast.Node) {
 // markEnclosingComponent reproduces upstream's `components.set`, which is the whole subtlety.
 //
 // The walk climbs to the nearest registered component and marks it, so a return inside a nested
-// class that is NOT a component marks the outer one. See the rule doc: that is a measured false
+// class that is not a component marks the outer one. See the rule doc: that is a measured false
 // negative in upstream and it is reproduced here rather than corrected.
 //
 // The scope count is applied on the way up. A return only counts if the property named `render` is
@@ -267,7 +267,7 @@ func (collector *renderReturnCollector) markEnclosingComponent(from *ast.Node) {
 			functionScopeDepth++
 		}
 		if isRenderNamedProperty(current) {
-			// A class method or accessor is ONE node here and TWO upstream, so the function scope
+			// A class method or accessor is one node here and two upstream, so the function scope
 			// it owns is counted at the property rather than by the walk. See the rule doc: this
 			// is the same correction the sibling rules make and it does move the verdict here.
 			depthAtProperty := functionScopeDepth
@@ -302,7 +302,7 @@ func isRenderReturnComponent(node *ast.Node) bool {
 	if isRenderReturnEs6ComponentClass(node) {
 		return true
 	}
-	// The ES5 component IS the object literal, and the factory call is its parent. Upstream keys
+	// The ES5 component is the object literal, and the factory call is its parent. Upstream keys
 	// the component list on the object for the same reason: `getComponentProperties` reads
 	// `node.properties`, which only an object literal has.
 	if node.Kind == ast.KindObjectLiteralExpression {
@@ -315,8 +315,8 @@ func isRenderReturnComponent(node *ast.Node) bool {
 // stripped from the whole heritage expression first.
 //
 // The shelf helper is correct for the rules that call it and wrong for this one, in a way neither
-// its doc comment nor any corpus can show. It skips parentheses on the RECEIVER, so
-// `extends (React).Component` answers true, and it does not skip them around the WHOLE expression,
+// its doc comment nor any corpus can show. It skips parentheses on the receiver, so
+// `extends (React).Component` answers true, and it does not skip them around the whole expression,
 // so `extends (React.Component)` answers false. Measured by walking the parse: the outer form
 // produces a `KindParenthesizedExpression` between the `KindExpressionWithTypeArguments` and the
 // property access, and the helper's kind switch declines it.
@@ -330,7 +330,7 @@ func isRenderReturnComponent(node *ast.Node) bool {
 // So this is fidelity to a parser difference, in the direction the brief warns about: the shelf
 // doing something sensible that upstream does not do is still a defect in a port, and here the
 // shelf is narrower than upstream rather than wider. Narrowed locally rather than changed on the
-// shelf, because the three rules that call it were ported against oxc, whose tree DOES carry a
+// shelf, because the three rules that call it were ported against oxc, whose tree does carry a
 // parenthesized node, and the shelf's doc records that measurement correctly for them.
 func isRenderReturnEs6ComponentClass(node *ast.Node) bool {
 	if node == nil {
@@ -408,7 +408,7 @@ func isRenderReturnComponentBaseName(name string) bool {
 //
 // Upstream's `findRenderMethod` filters the component's properties down to those whose name is
 // `render` and whose `value` is a `FunctionExpression` or an `ArrowFunctionExpression`, then takes
-// the FIRST such property. Two parts of that are load-bearing and each is measured:
+// the first such property. Two parts of that are load-bearing and each is measured:
 //
 // The value must be function-like. `render = 5`, `render = someFn`, a bare `render` class field
 // with no initializer, and the shorthand `{ render }` are all clean upstream, and the last two are
@@ -475,9 +475,9 @@ func membersOfRenderReturnComponent(component *ast.Node, visit func(member *ast.
 // The name is read by kind rather than through `Text()`, which panics outright on a computed
 // property name. That matters for fidelity as well as for safety: upstream's `getPropertyName`
 // returns `nameNode.name`, which is `undefined` for both a string-literal key and a computed one,
-// so `'render'() {}` and `['render']() {}` are BOTH clean upstream. Measured on all four spellings
+// so `'render'() {}` and `['render']() {}` are both clean upstream. Measured on all four spellings
 // across the class and object forms, and all four are clean. So this compares only the identifier
-// spelling, and `ast.TryGetTextOfPropertyName` is deliberately NOT used here even though it is what
+// spelling, and `ast.TryGetTextOfPropertyName` is deliberately not used here even though it is what
 // the sibling rules reach for: it resolves the string-literal and computed-holding-a-literal forms,
 // which would report on four inputs upstream is silent on.
 func isRenderNamedProperty(node *ast.Node) bool {
@@ -510,7 +510,7 @@ func isRenderNamedProperty(node *ast.Node) bool {
 //
 // Upstream's test is `astUtil.isFunctionLikeExpression(property.value)`, which accepts exactly
 // `FunctionExpression` and `ArrowFunctionExpression`. A `MethodDefinition` passes because its
-// `value` IS a `FunctionExpression`; our `KindMethodDeclaration` fuses the two and so answers true
+// `value` is a `FunctionExpression`; our `KindMethodDeclaration` fuses the two and so answers true
 // on its own, and the accessors do the same for the same reason.
 //
 // A property whose initializer is missing, a number, or an identifier is rejected, which is two of
@@ -518,7 +518,7 @@ func isRenderNamedProperty(node *ast.Node) bool {
 func hasFunctionLikeRenderValue(property *ast.Node) bool {
 	switch property.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		// The method IS the function here. Upstream reaches through `value` to a separate node.
+		// The method is the function here. Upstream reaches through `value` to a separate node.
 		return true
 	case ast.KindPropertyDeclaration:
 		return isRenderReturnFunctionLikeExpression(property.AsPropertyDeclaration().Initializer)
@@ -536,7 +536,7 @@ func hasFunctionLikeRenderValue(property *ast.Node) bool {
 // isRenderReturnFunctionLikeExpression is upstream's `isFunctionLikeExpression`, exactly.
 //
 // Two kinds and no more. A `FunctionDeclaration` is absent because it cannot be a property value,
-// and parentheses are NOT skipped, matching upstream, whose test is a bare `node.type` comparison
+// and parentheses are not skipped, matching upstream, whose test is a bare `node.type` comparison
 // on the value as written.
 func isRenderReturnFunctionLikeExpression(value *ast.Node) bool {
 	if value == nil {
@@ -551,13 +551,13 @@ func isRenderReturnFunctionLikeExpression(value *ast.Node) bool {
 // This is upstream's whole second listener: `if (node.expression === false ||
 // astUtil.getPropertyName(node.parent) !== 'render') return;`. Both halves matter.
 //
-// `node.expression === false` means the arrow has a BLOCK body, and those are handled by the return
+// `node.expression === false` means the arrow has a block body, and those are handled by the return
 // walk instead. Our tree spells the same distinction as the body's kind: a block body is
 // `KindBlock` and anything else is the expression. So `render = () => {}` falls through to the walk
 // and reports, while `render = () => <div/>` is caught here and is clean, both measured.
 //
 // The parent test is `getPropertyName`, which is the same identifier-only comparison
-// `isRenderNamedProperty` makes, so it is reused rather than restated. Note what upstream does NOT
+// `isRenderNamedProperty` makes, so it is reused rather than restated. Note what upstream does not
 // test here: it never asks whether the property is inside a component. A `render` arrow on a plain
 // object literal marks whatever component encloses that object, which is measured and is the same
 // looseness the nested-class case shows.
@@ -576,7 +576,7 @@ func isRenderReturnImplicitReturnArrow(node *ast.Node) bool {
 // isRenderReturnFunctionScope reports whether an ancestor costs a scope on upstream's count.
 //
 // Upstream tests `/Function(Expression|Declaration)$/` against the node type, and the pattern is
-// unanchored at the front, so it matches `FunctionExpression`, `FunctionDeclaration` AND
+// unanchored at the front, so it matches `FunctionExpression`, `FunctionDeclaration` and
 // `ArrowFunctionExpression`. That last one is the trap: an arrow reads as transparent and is not.
 // Measured, `render() { var f = () => { return 1; }; }` reports.
 //
