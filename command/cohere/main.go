@@ -48,6 +48,7 @@ func main() {
 			activeOpen.Checked = false
 		}
 		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
+		writeFailedRunSummary(os.Stdout, err)
 		exitProcess(1)
 	}
 	finishRunCache(0)
