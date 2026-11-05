@@ -30,8 +30,8 @@ class Pen<Member> extends Box<Member[]> {}
 `
 
 // TestNominalClassFiresOnEveryProvenHole: each case is accepted by tsc 6.0.3 and fails on Node.
-func TestNominalClassFiresOnEveryProvenHole(t *testing.T) {
-	t.Parallel()
+func TestNominalClassFiresOnEveryProvenHole(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		id     string
@@ -120,19 +120,19 @@ const maybe: A | undefined = { value: () => 2 };`, "notAnInstance", "{ value: ()
 		// api's drizzle adapters: an intersection whose member is the subclass says the arguments differ.
 		"a subclass in an intersection": {heritage + `declare const tagged: DogBox & { readonly tag: string }; const animalBox: Box<Animal> = tagged;`, "typeArgumentsDiffer", "tagged"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, NominalClass, fixture.source)
-			rule_testing.ExpectFindings(t, result, fixture.id)
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, NominalClass, fixture.source)
+			rule_testing.ExpectFindings(test, result, fixture.id)
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestNominalClassStaysCleanOnInstancesAndInterfaces: the class's own instances, its subclasses, and an
 // instance passed as an interface it satisfies.
-func TestNominalClassStaysCleanOnInstancesAndInterfaces(t *testing.T) {
-	t.Parallel()
+func TestNominalClassStaysCleanOnInstancesAndInterfaces(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		"its own instance":       shelters + `const shelter: AnimalShelter = new AnimalShelter();`,
 		"the same type argument": shelters + `const dogBox = new Box<Dog>(rex); const same: Box<Dog> = dogBox;`,
@@ -161,15 +161,15 @@ func TestNominalClassStaysCleanOnInstancesAndInterfaces(t *testing.T) {
 		// class is a hole is native dispatch's question, filed against relate's union rule, not widened here.
 		"a literal a class and an interface both take": `class A { readonly tag: string = 'a'; bark(): string { return 'woof'; } } interface Named { bark(): string } const either: A | Named = { tag: 'literal', bark: () => 'literal' };`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, NominalClass, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, NominalClass, source))
 		})
 	}
 }
 
 // TestNominalClassStaysCleanOnAdamicsPrograms: Adamic 0.1 compiles all ten, the generic Stack among them.
-func TestNominalClassStaysCleanOnAdamicsPrograms(t *testing.T) {
-	t.Parallel()
-	expectProgramsClean(t, NominalClass)
+func TestNominalClassStaysCleanOnAdamicsPrograms(test *testing.T) {
+	test.Parallel()
+	expectProgramsClean(test, NominalClass)
 }

@@ -15,8 +15,8 @@ const preferAsConstFile = "/repository/source/Thing.ts"
 // where `<'bar'>'bar'` is a JSX fragment opening rather than a type assertion. That is the whole
 // of the extractor's DISCREPANCY warning, 17 diagnostics against 20 inputs, and it resolves to
 // exactly one finding per reporting input with nothing left to recover.
-func TestPreferAsConstFires(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -41,10 +41,10 @@ func TestPreferAsConstFires(t *testing.T) {
 		{"upstream fail 17", "\n            class foo {\n              foo = 5 as 5;\n            }\n                  "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 		})
 	}
 }
@@ -56,8 +56,8 @@ func TestPreferAsConstFires(t *testing.T) {
 // rule ships: the annotation arm writes two edits at two separated offsets, and a finding carrying
 // a repair that deleted the wrong range satisfies every assertion in TestPreferAsConstFires,
 // because the finding is byte-identical either way.
-func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstFixesWriteWhatTheyClaim(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -90,10 +90,10 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 		{"the insert precedes trailing trivia", "let a: 'bar' = 'bar' /*t*/;\n", "let a = 'bar' as const /*t*/;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -109,8 +109,8 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 //
 // ExpectFixedSource returns the source unchanged when a diagnostic carries no fix, so asserting
 // the input back is the assertion that no repair was offered.
-func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -122,15 +122,15 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 		{"an object binding pattern", "let {}: 'bar' = 'bar';"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
 			}
 			if len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatalf("expected no suggestion on a binding pattern, got %d", len(result.Diagnostics[0].Suggestions))
+				test.Fatalf("expected no suggestion on a binding pattern, got %d", len(result.Diagnostics[0].Suggestions))
 			}
 		})
 	}
@@ -145,8 +145,8 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 //
 // The expected text is a literal typed here rather than a reference to the rule's own message or
 // span helper, so that a mutation moving the report site cannot move the assertion with it.
-func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstPointsAtTheLiteralType(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -163,23 +163,23 @@ func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
 		{"a binding pattern", "let []: 'bar' = 'bar';", "'bar'"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 			finding := result.Diagnostics[0]
 			if got := testCase.sourceText[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Fatalf("finding points at %q, want %q", got, testCase.wantText)
+				test.Fatalf("finding points at %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != "preferAsConst" {
-				t.Fatalf("message id %q, want %q", finding.Message.Id, "preferAsConst")
+				test.Fatalf("message id %q, want %q", finding.Message.Id, "preferAsConst")
 			}
 		})
 	}
 }
 
-func TestPreferAsConstStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -253,9 +253,9 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 		{"a string type against a numeric value", "let a: '2' = 2;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText))
 		})
 	}
 }
@@ -269,8 +269,8 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 //
 // Our NumericLiteral.Text already holds the canonical rendering of the double, so string equality
 // on it reproduces the float comparison without parsing anything.
-func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstMatchesNumericValuesNotSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -282,10 +282,10 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 		{"exponent notation", "let a: 1e2 = 100;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				"preferAsConst")
 		})
 	}
@@ -303,17 +303,17 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 // This matters beyond the count. The two arms being mutually exclusive on one declarator is what
 // makes the annotation arm's two-part edit safe to ship as a plain fix: the pair can never
 // compete with this rule's own other repair for the same bytes.
-func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "let foo: 'bar' = 'bar' as 'bar';"
-	result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "preferAsConst")
+	result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "preferAsConst")
 	finding := result.Diagnostics[0]
 	if got := sourceText[finding.Range.Pos():finding.Range.End()]; got != "'bar'" {
-		t.Fatalf("finding points at %q, want the assertion type", got)
+		test.Fatalf("finding points at %q, want the assertion type", got)
 	}
 	if finding.Range.Pos() != 26 {
-		t.Fatalf("finding starts at %d, want 26, the assertion type rather than the annotation", finding.Range.Pos())
+		test.Fatalf("finding starts at %d, want 26, the assertion type rather than the annotation", finding.Range.Pos())
 	}
 }

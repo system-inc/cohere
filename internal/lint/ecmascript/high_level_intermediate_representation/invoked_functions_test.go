@@ -9,8 +9,8 @@ import (
 )
 
 // invokedFor lowers a source and returns which nested functions are assumed invoked.
-func invokedFor(t *testing.T, source string) (*Function, AssumedInvokedFunctions) {
-	t.Helper()
+func invokedFor(test *testing.T, source string) (*Function, AssumedInvokedFunctions) {
+	test.Helper()
 	var outer *Function
 	var invoked AssumedInvokedFunctions
 	probe := rule.Rule{
@@ -38,12 +38,12 @@ func invokedFor(t *testing.T, source string) (*Function, AssumedInvokedFunctions
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if outer == nil {
-		t.Fatal("nothing lowered, so this test measured nothing")
+		test.Fatal("nothing lowered, so this test measured nothing")
 	}
 	return outer, invoked
 }
@@ -67,8 +67,8 @@ func invokedFor(t *testing.T, source string) (*Function, AssumedInvokedFunctions
 // lets the hoistable analysis descend into a callback that may never run, and a read hoisted out of
 // an uncalled function moves a load to somewhere it can throw. So a fixture that declares a callback
 // and never calls it must report nothing, and it is asserted rather than assumed.
-func TestAssumedInvokedFunctionsRecognisesEachCallShape(t *testing.T) {
-	t.Parallel()
+func TestAssumedInvokedFunctionsRecognisesEachCallShape(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -135,14 +135,14 @@ func TestAssumedInvokedFunctionsRecognisesEachCallShape(t *testing.T) {
 			want: 0,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, invoked := invokedFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, invoked := invokedFor(test, testCase.source)
 			if len(function.Functions) == 0 {
-				t.Fatal("the fixture lowered no nested function, so nothing here could be invoked")
+				test.Fatal("the fixture lowered no nested function, so nothing here could be invoked")
 			}
 			if len(invoked) != testCase.want {
-				t.Errorf("assumed %d of %d nested functions invoked, want %d",
+				test.Errorf("assumed %d of %d nested functions invoked, want %d",
 					len(invoked), len(function.Functions), testCase.want)
 			}
 		})

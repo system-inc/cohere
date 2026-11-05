@@ -73,14 +73,14 @@ var performanceNoIndependentAwaitInLoopAhraShapes = map[string]int{
 	"silent/AhraOsReportPdf.ts":           0,
 }
 
-func TestPerformanceNoIndependentAwaitInLoopAhraShapes(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopAhraShapes(test *testing.T) {
+	test.Parallel()
 
 	var onDisk []string
 	for _, directory := range []string{"fires", "silent"} {
 		entries, err := os.ReadDir(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, directory))
 		if err != nil {
-			t.Fatalf("reading %s: %v", directory, err)
+			test.Fatalf("reading %s: %v", directory, err)
 		}
 		for _, entry := range entries {
 			onDisk = append(onDisk, directory+"/"+entry.Name())
@@ -93,38 +93,38 @@ func TestPerformanceNoIndependentAwaitInLoopAhraShapes(t *testing.T) {
 	sort.Strings(onDisk)
 	sort.Strings(inTable)
 	if strings.Join(onDisk, ",") != strings.Join(inTable, ",") {
-		t.Fatalf("testdata and verdict table disagree:\n  on disk:  %v\n  in table: %v", onDisk, inTable)
+		test.Fatalf("testdata and verdict table disagree:\n  on disk:  %v\n  in table: %v", onDisk, inTable)
 	}
 
 	for name, wantCount := range performanceNoIndependentAwaitInLoopAhraShapes {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			source, err := os.ReadFile(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, name))
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
-			result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, "/repository/source/"+filepath.Base(name), string(source))
+			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, "/repository/source/"+filepath.Base(name), string(source))
 			if wantCount == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			want := make([]string, wantCount)
 			for index := range want {
 				want[index] = "independentAwaitInLoop"
 			}
-			rule_testing.ExpectFindings(t, result, want...)
+			rule_testing.ExpectFindings(test, result, want...)
 			for _, diagnostic := range result.Diagnostics {
 				reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if !strings.HasPrefix(reported, "for(const ") || !strings.HasSuffix(reported, ")") {
-					t.Errorf("finding should span the loop header, got %q", reported)
+					test.Errorf("finding should span the loop header, got %q", reported)
 				}
 			}
 		})
 	}
 }
 
-func TestPerformanceNoIndependentAwaitInLoopFires(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -240,17 +240,17 @@ func TestPerformanceNoIndependentAwaitInLoopFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
 				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
-			rule_testing.ExpectFindings(t, result, "independentAwaitInLoop")
+			rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 		})
 	}
 }
 
-func TestPerformanceNoIndependentAwaitInLoopStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -482,24 +482,24 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
 				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // A yield hands results out in order, and it needs a generator rather than the shared wrapper.
-func TestPerformanceNoIndependentAwaitInLoopStaysSilentOnYield(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopStaysSilentOnYield(test *testing.T) {
+	test.Parallel()
 
 	source := performanceNoIndependentAwaitInLoopPrelude +
 		"export async function* subject(): AsyncGenerator<number> {\n" +
 		"    for (const item of items) { yield await fetchItem(item); }\n" +
 		"}\n"
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
 
 	// Control: the same loop collecting rather than yielding reports, so the silence above is the yield.
 	control := performanceNoIndependentAwaitInLoopPrelude +
@@ -508,15 +508,15 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilentOnYield(t *testing.T) {
 		"    for (const item of items) { results.push(await fetchItem(item)); }\n" +
 		"    yield* results;\n" +
 		"}\n"
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, control),
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, control),
 		"independentAwaitInLoop")
 }
 
 // The callee scan follows an import to the function's source through the checker's alias
 // resolution. The control imports a function from the same module that does not print, so the
 // silence is the printing rather than the import.
-func TestPerformanceNoIndependentAwaitInLoopFollowsAnImportedCallee(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopFollowsAnImportedCallee(test *testing.T) {
+	test.Parallel()
 
 	printer := strings.Join([]string{
 		"declare const console: { log(...values: unknown[]): void };",
@@ -535,29 +535,29 @@ func TestPerformanceNoIndependentAwaitInLoopFollowsAnImportedCallee(t *testing.T
 		}, "\n")
 	}
 
-	silent := rule_testing.RunTypedFiles(t, PerformanceNoIndependentAwaitInLoop, map[string]string{
+	silent := rule_testing.RunTypedFiles(test, PerformanceNoIndependentAwaitInLoop, map[string]string{
 		"/repository/source/Printer.ts": printer,
 		"/repository/source/Subject.ts": subject("renderRow"),
 	}, "/repository/source/Subject.ts")
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 
-	control := rule_testing.RunTypedFiles(t, PerformanceNoIndependentAwaitInLoop, map[string]string{
+	control := rule_testing.RunTypedFiles(test, PerformanceNoIndependentAwaitInLoop, map[string]string{
 		"/repository/source/Printer.ts": printer,
 		"/repository/source/Subject.ts": subject("storeRow"),
 	}, "/repository/source/Subject.ts")
-	rule_testing.ExpectFindings(t, control, "independentAwaitInLoop")
+	rule_testing.ExpectFindings(test, control, "independentAwaitInLoop")
 }
 
 // One finding per loop however many awaits it holds, and an await in a nested loop is reported at
 // the nested loop rather than at the one around it.
-func TestPerformanceNoIndependentAwaitInLoopReportsTheInnermostLoopOnce(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopReportsTheInnermostLoopOnce(test *testing.T) {
+	test.Parallel()
 
 	twoAwaits := performanceNoIndependentAwaitInLoopSource(
 		"    const results: number[] = [];",
 		"    for (const item of items) { results.push(await fetchItem(item)); results.push(await fetchItem(item + item)); }",
 	)
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, twoAwaits),
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, twoAwaits),
 		"independentAwaitInLoop")
 
 	nested := performanceNoIndependentAwaitInLoopSource(
@@ -566,17 +566,17 @@ func TestPerformanceNoIndependentAwaitInLoopReportsTheInnermostLoopOnce(t *testi
 		"        for (const item of group) { results.push(await fetchItem(item)); }",
 		"    }",
 	)
-	result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, nested)
-	rule_testing.ExpectFindings(t, result, "independentAwaitInLoop")
+	result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, nested)
+	rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 	reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "for (const item of group)" {
-		t.Fatalf("expected the inner loop's header, got %q", reported)
+		test.Fatalf("expected the inner loop's header, got %q", reported)
 	}
 }
 
 // The span is the header, so a suppression goes above the loop, and the message is asserted whole.
-func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	source := performanceNoIndependentAwaitInLoopSource(
 		"    for (let index = 0; index < items.length; index++)",
@@ -584,39 +584,39 @@ func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(t *testing.T) {
 		"        await fetchItem(items[index]);",
 		"    }",
 	)
-	result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source)
-	rule_testing.ExpectFindings(t, result, "independentAwaitInLoop")
+	result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source)
+	rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 	diagnostic := result.Diagnostics[0]
 	reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "for (let index = 0; index < items.length; index++)" {
-		t.Fatalf("span: got %q", reported)
+		test.Fatalf("span: got %q", reported)
 	}
 	if diagnostic.Message.Description != messagePerformanceNoIndependentAwaitInLoop().Description {
-		t.Fatalf("message: got %q", diagnostic.Message.Description)
+		test.Fatalf("message: got %q", diagnostic.Message.Description)
 	}
 	for _, phrase := range []string{"Promise.all", "bounded", "cohere-disable-next-line nexus/performance-no-independent-await-in-loop -- "} {
 		if !strings.Contains(diagnostic.Message.Description, phrase) {
-			t.Errorf("message should mention %q", phrase)
+			test.Errorf("message should mention %q", phrase)
 		}
 	}
 	if strings.ContainsRune(diagnostic.Message.Description, '\u2014') {
-		t.Errorf("message carries an em-dash")
+		test.Errorf("message carries an em-dash")
 	}
 }
 
 // The rule declares the checker and declines a file without one, rather than reporting from an
 // unbound tree. Pinned so a later revert of the guard fails loudly rather than going vacuously
 // green; the control is the same source reporting under the typed harness.
-func TestPerformanceNoIndependentAwaitInLoopDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestPerformanceNoIndependentAwaitInLoopDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 
 	if !PerformanceNoIndependentAwaitInLoop.NeedsTypeChecker {
-		t.Fatal("the rule resolves bindings through the checker and must declare it")
+		test.Fatal("the rule resolves bindings through the checker and must declare it")
 	}
 	source := performanceNoIndependentAwaitInLoopSource(
 		"    for (const item of items) { await fetchItem(item); }",
 	)
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source),
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source),
 		"independentAwaitInLoop")
 }

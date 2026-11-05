@@ -46,25 +46,25 @@ export function run(): Shelter {
 // finds a node's sites once for all of them and remembers the checker's answers (#m6tyg79). Run together
 // through the walk a real run uses, one file cache and one dispatch, they report exactly what each reports
 // walked alone, so the sharing changes what is asked, never what is found.
-func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
-	writeAdamicSupport(t)(directory)
+func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeAdamicSupport(test)(directory)
 	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(sharedWalkerFixture), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	walk := func(rules ...rule.Rule) []string {
-		t.Helper()
+		test.Helper()
 		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
 		if err != nil {
-			t.Fatalf("building: %v", err)
+			test.Fatalf("building: %v", err)
 		}
 		if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), nil); len(diagnostics) > 0 {
-			t.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
+			test.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
 		}
 		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 		if err != nil {
-			t.Fatalf("walking: %v", err)
+			test.Fatalf("walking: %v", err)
 		}
 		findings := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -79,13 +79,13 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(t *testing.T) {
 	for _, subject := range []rule.Rule{InvariantMutable, NominalClass, NoOptionalWidening} {
 		found := walk(subject)
 		if len(found) == 0 {
-			t.Fatalf("%s found nothing walked alone, so sharing is untested for it", subject.Name)
+			test.Fatalf("%s found nothing walked alone, so sharing is untested for it", subject.Name)
 		}
 		alone = append(alone, found...)
 	}
 	sort.Strings(alone)
 	together := walk(InvariantMutable, NominalClass, NoOptionalWidening)
 	if !reflect.DeepEqual(together, alone) {
-		t.Errorf("walked together the rules report\n  %q\nand walked alone\n  %q", together, alone)
+		test.Errorf("walked together the rules report\n  %q\nand walked alone\n  %q", together, alone)
 	}
 }

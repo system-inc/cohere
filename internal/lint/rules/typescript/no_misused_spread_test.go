@@ -29,8 +29,8 @@ const (
 )
 
 // TestNoMisusedSpreadStaysSilent is upstream's valid list, each under its own options.
-func TestNoMisusedSpreadStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -79,10 +79,10 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 		{"upstream valid 38", "file.ts", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}},
 		{"upstream valid 39", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -98,8 +98,8 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 // The ordering of the object cascade is what most of these rows really pin. A Map is iterable, an
 // array is iterable, and a class instance can be, so several of these inputs satisfy two arms at
 // once and the id recorded is the one the earlier arm produces.
-func TestNoMisusedSpreadFires(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -176,10 +176,10 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", nil, []string{"noMapSpreadInObject"}},
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, []string{"noPromiseSpreadInObject"}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -199,8 +199,8 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 // (Countries.ts, PngTextMetadata.ts, two in PensieveDailies.ts), then the constructor shape the old
 // arm deliberately skipped. The last group is the control: the object cascade in the same harness
 // still reports, so silence above is the dropped branch and not a rule that stopped running.
-func TestNoMisusedSpreadLeavesStringSpreadAlone(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadLeavesStringSpreadAlone(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -227,15 +227,15 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(t *testing.T) {
 		{"a string spread into a constructor", "class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
 		})
 	}
 
-	t.Run("control: an array spread into an object in the same harness still reports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+	test.Run("control: an array spread into an object in the same harness still reports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile,
 			"declare const s: string;\nconst x = [...s];\nconst o = { ...[...s] };", nil), "noArraySpreadInObject")
 	})
 }
@@ -252,8 +252,8 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(t *testing.T) {
 // rows split on whether the spread is the object's only property, and two of them turn on
 // parentheses in opposite directions, since `{ ...(map) }` must lose them and `{ ...(map, map) }`
 // must keep them.
-func TestNoMisusedSpreadSuggestions(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -285,11 +285,11 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...Object.fromEntries(map)} />;\n      "},
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, "addAwait", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      "}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("want at least one finding, got none")
+				test.Fatal("want at least one finding, got none")
 			}
 			// The harness trims the fixture before building the program, so the offsets a fix
 			// carries are against the trimmed text rather than against the literal written above.
@@ -303,15 +303,15 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 						continue
 					}
 					matchedTheId = true
-					if applySuggestion(t, source, candidate) == want {
+					if applySuggestion(test, source, candidate) == want {
 						return
 					}
 				}
 			}
 			if !matchedTheId {
-				t.Fatalf("no suggestion with id %q among the findings", testCase.wantId)
+				test.Fatalf("no suggestion with id %q among the findings", testCase.wantId)
 			}
-			t.Errorf("no suggestion with id %q produced\n%q", testCase.wantId, want)
+			test.Errorf("no suggestion with id %q produced\n%q", testCase.wantId, want)
 		})
 	}
 }
@@ -324,8 +324,8 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 // routed through the object-literal shape it otherwise behaves like.
 //
 // One row per message id, plus every JSX shape, all taken from upstream's recorded columns.
-func TestNoMisusedSpreadSpans(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -348,18 +348,18 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", []string{"{...map}"}},
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", []string{"{...promise}"}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			// The harness trims the fixture, so slice the text it actually wrote.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			for index, want := range testCase.wantSpans {
 				reported := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != want {
-					t.Errorf("finding %d points at %q, want %q", index, reported, want)
+					test.Errorf("finding %d points at %q, want %q", index, reported, want)
 				}
 			}
 		})
@@ -389,26 +389,26 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 // half of it that CAN be expressed is pinned below: the same iterable shape without the ambient
 // module reports, which is the control saying the arm works and only the module resolution is
 // missing.
-func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the same iterable shape without an ambient module reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+	test.Run("the same iterable shape without an ambient module reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };", nil)
-		rule_testing.ExpectFindings(t, result, "noIterableSpreadInObject")
+		rule_testing.ExpectFindings(test, result, "noIterableSpreadInObject")
 	})
 
-	t.Run("an allow specifier naming that type silences it", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an allow specifier naming that type silences it", func(test *testing.T) {
+		test.Parallel()
 		// The other half of what case 61 was testing, expressed with a `from: file` specifier, which
 		// needs no package resolution.
-		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };",
 			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}},
 			}})
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -420,8 +420,8 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
 // iterable and a class instance. Reversing any adjacent pair changes a real input's message while
 // leaving the finding count alone, which every id fixture above would still accept for the wrong
 // reason if it were checking only that something reported.
-func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadCascadeOrdering(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -460,27 +460,27 @@ func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
 // TestNoMisusedSpreadRequiresTheTypedHarness asserts the rule declares the checker and that the
 // plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
-func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoMisusedSpread.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 
 	const source = "const o = { ...[1, 2, 3] };"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoMisusedSpread, noMisusedSpreadFile, source), "noArraySpreadInObject")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedSpread, noMisusedSpreadFile, source))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, source), "noArraySpreadInObject")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoMisusedSpread, noMisusedSpreadFile, source))
 }
 
 // TestNoMisusedSpreadSurvivesMalformedSpreads runs the rule over spread shapes where a node it
@@ -489,8 +489,8 @@ func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
 // A panic costs every rule its verdict on the whole file. This rule reaches for a spread's
 // expression, its parent, and an object literal's property list, and reads the source text between
 // two computed offsets when building the Map suggestion, so a malformed parse has several ways in.
-func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadSurvivesMalformedSpreads(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"const a = [...];\n",
@@ -514,10 +514,10 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
 	}
 
 	for index, source := range sources {
-		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(fmt.Sprintf("shape-%d", index), func(test *testing.T) {
+			test.Parallel()
 			// A panic fails the test. Findings are deliberately unasserted.
-			rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source, nil)
+			rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source, nil)
 		})
 	}
 }
@@ -528,58 +528,58 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
 // both the default and the zero value. What the decoder still owns is the wire format: `allow` mixes
 // bare strings with specifier objects, and `name` is itself either a string or an array of them, so
 // a fixture built from the struct directly leaves all of that untested.
-func TestNoMisusedSpreadDecoder(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadDecoder(test *testing.T) {
+	test.Parallel()
 
-	decode := func(t *testing.T, raw string) NoMisusedSpreadOptions {
-		t.Helper()
+	decode := func(test *testing.T, raw string) NoMisusedSpreadOptions {
+		test.Helper()
 		decoded, err := DecodeNoMisusedSpreadOptions([]byte(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		options, _ := decoded.(NoMisusedSpreadOptions)
 		return options
 	}
 
-	t.Run("an empty object allows nothing", func(t *testing.T) {
-		t.Parallel()
-		got := decode(t, `{}`)
+	test.Run("an empty object allows nothing", func(test *testing.T) {
+		test.Parallel()
+		got := decode(test, `{}`)
 		if len(got.Allow) != 0 || len(got.AllowInline) != 0 {
-			t.Errorf("got %+v, want an empty allow list", got)
+			test.Errorf("got %+v, want an empty allow list", got)
 		}
 	})
 
-	t.Run("a bare string becomes an inline specifier", func(t *testing.T) {
-		t.Parallel()
-		got := decode(t, `{"allow": ["Map"]}`)
+	test.Run("a bare string becomes an inline specifier", func(test *testing.T) {
+		test.Parallel()
+		got := decode(test, `{"allow": ["Map"]}`)
 		if len(got.AllowInline) != 1 || got.AllowInline[0] != "Map" {
-			t.Errorf("got %+v, want one inline specifier naming Map", got)
+			test.Errorf("got %+v, want one inline specifier naming Map", got)
 		}
 	})
 
-	t.Run("a specifier object with a string name becomes a one-element name list", func(t *testing.T) {
-		t.Parallel()
-		got := decode(t, `{"allow": [{"from": "lib", "name": "Map"}]}`)
+	test.Run("a specifier object with a string name becomes a one-element name list", func(test *testing.T) {
+		test.Parallel()
+		got := decode(test, `{"allow": [{"from": "lib", "name": "Map"}]}`)
 		if len(got.Allow) != 1 || len(got.Allow[0].Name) != 1 || got.Allow[0].Name[0] != "Map" {
-			t.Fatalf("got %+v, want one specifier naming Map", got)
+			test.Fatalf("got %+v, want one specifier naming Map", got)
 		}
 		if got.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
-			t.Errorf("the from field decoded as %v, want lib", got.Allow[0].From)
+			test.Errorf("the from field decoded as %v, want lib", got.Allow[0].From)
 		}
 	})
 
-	t.Run("the decoded allow list reaches the rule and changes its verdict", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the decoded allow list reaches the rule and changes its verdict", func(test *testing.T) {
+		test.Parallel()
 		// Byte-identical source, opposite verdicts, separated only by what came off the wire. The
 		// subject is upstream valid 38's class instance, which an inline specifier names by type, with
 		// a method added: a fields-only class is exempt without any allow list, so it could not show
 		// the list changing anything (see TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete).
 		const source = "class A {\n  a = 1;\n  m() {}\n}\nconst a = new A();\nconst o = { ...a };"
 
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(t, `{}`)), "noClassInstanceSpreadInObject")
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(t, `{"allow": ["A"]}`)))
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
+			decode(test, `{}`)), "noClassInstanceSpreadInObject")
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
+			decode(test, `{"allow": ["A"]}`)))
 	})
 }
 
@@ -600,8 +600,8 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 // The last row is the control that keeps the two decisions apart: a comma expression is weak
 // precedence, so it gets parentheses ADDED by this rule regardless, and it would still pass if the
 // keep-existing-parentheses behaviour were lost.
-func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -630,15 +630,15 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "noMapSpreadInObject")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, "noMapSpreadInObject")
 
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			want := strings.TrimSpace(testCase.wantOutput) + "\n"
-			if got := applySuggestion(t, source, result.Diagnostics[0].Suggestions[0]); got != want {
-				t.Errorf("the repair produced\n%q\nwant\n%q", got, want)
+			if got := applySuggestion(test, source, result.Diagnostics[0].Suggestions[0]); got != want {
+				test.Errorf("the repair produced\n%q\nwant\n%q", got, want)
 			}
 		})
 	}
@@ -651,8 +651,8 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
 // declarations, which is inert here for reasons recorded at the line, than for the guard above it:
 // a merged symbol is exactly the shape where a rule asking the wrong declaration goes silent, and
 // these pin that it does not.
-func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadMergedClassDeclarations(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -672,10 +672,10 @@ func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "noClassInstanceSpreadInObject")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, "noClassInstanceSpreadInObject")
 		})
 	}
 }
@@ -689,8 +689,8 @@ func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
 // The first group is upstream's invalid 69 through 76 and 83 verbatim, every one a fields-only class,
 // which upstream reports and cohere does not. The rest are the clauses, each with the case it exempts
 // and the case it must still report, so a mutant dropping any one clause fails here.
-func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -712,9 +712,9 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 		{"every class in a union is exempt", "class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n}\ndeclare const value: A | B;\nconst o = { ...value };"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
 		})
 	}
 
@@ -739,10 +739,10 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 		{"the class itself still reports as a declaration", "class A {\n  static a = 1;\n}\nconst o = { ...A };", "noClassDeclarationSpreadInObject"},
 	}
 	for _, testCase := range reported {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 
@@ -767,15 +767,15 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 		}, 1},
 	}
 	for _, testCase := range files {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sources := map[string]string{"Subject.ts": subject}
 			for name, text := range testCase.decorator {
 				sources[name] = text
 			}
-			result := rule_testing.RunTypedFiles(t, NoMisusedSpread, sources, "Subject.ts")
+			result := rule_testing.RunTypedFiles(test, NoMisusedSpread, sources, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
-				t.Errorf("got %d findings, want %d: %+v", len(result.Diagnostics), testCase.findings, result.Diagnostics)
+				test.Errorf("got %d findings, want %d: %+v", len(result.Diagnostics), testCase.findings, result.Diagnostics)
 			}
 		})
 	}

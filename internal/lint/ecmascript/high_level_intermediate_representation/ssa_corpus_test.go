@@ -29,10 +29,10 @@ import (
 )
 
 // Run SSA over a real tree with a real checker and cohere every function.
-func TestSSAOverRealCodebase(t *testing.T) {
-	t.Parallel()
+func TestSSAOverRealCodebase(test *testing.T) {
+	test.Parallel()
 
-	root := corpusRoot(t)
+	root := corpusRoot(test)
 	var files []string
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
@@ -83,7 +83,7 @@ func TestSSAOverRealCodebase(t *testing.T) {
 								for _, v := range VerifySSA(f) {
 									violations++
 									if violations <= 8 {
-										t.Errorf("%s: %s", filepath.Base(path), v.Detail)
+										test.Errorf("%s: %s", filepath.Base(path), v.Detail)
 									}
 									switch v.Kind {
 									case static_single_assignment.SSAViolationMultipleDefinitions:
@@ -134,18 +134,18 @@ func TestSSAOverRealCodebase(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTyped(t, probe, filepath.Base(path), string(contents))
+		rule_testing.RunTyped(test, probe, filepath.Base(path), string(contents))
 	}
 
-	t.Logf("files=%d functions=%d", len(files), totalFns)
-	t.Logf("phis=%d functionsWithPhis=%d namedValues=%d uses=%d", totalPhis, withPhis, totalNamed, totalUses)
-	t.Logf("violations=%d %v", violations, kinds)
+	test.Logf("files=%d functions=%d", len(files), totalFns)
+	test.Logf("phis=%d functionsWithPhis=%d namedValues=%d uses=%d", totalPhis, withPhis, totalNamed, totalUses)
+	test.Logf("violations=%d %v", violations, kinds)
 	keys := make([]string, 0, len(terminals))
 	for k := range terminals {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		t.Logf("  terminal %-8s %d", k, terminals[k])
+		test.Logf("  terminal %-8s %d", k, terminals[k])
 	}
 }

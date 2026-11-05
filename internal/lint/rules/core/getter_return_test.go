@@ -23,8 +23,8 @@ const getterReturnFile = "Getter.ts"
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write. Two of these earned that outright: the
 // try/catch pair and the loop pair, both of which a plausible first implementation gets backwards.
-func TestGetterReturnFires(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnFires(test *testing.T) {
+	test.Parallel()
 
 	// ESLint's id: `expected` for a getter with no return of its own, or at a bare `return;`, and
 	// `expectedAlways` at the head of one that returns on some paths and falls off the end on another
@@ -121,10 +121,10 @@ func TestGetterReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText), testCase.id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, GetterReturn, getterReturnFile, testCase.sourceText), testCase.id)
 		})
 	}
 }
@@ -135,8 +135,8 @@ func TestGetterReturnFires(t *testing.T) {
 // getter with no return at all still fires, and so does one whose only return sits behind an if.
 // A port that read the option as a global mute would pass every fixture in the block above and
 // fail every one of these.
-func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnFiresWithAllowImplicit(test *testing.T) {
+	test.Parallel()
 
 	// ESLint's id: `expected` for a getter with no return of its own, or at a bare `return;`, and
 	// `expectedAlways` at the head of one that returns on some paths and falls off the end on another
@@ -161,10 +161,10 @@ func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedWithOptions(test, GetterReturn, getterReturnFile, testCase.sourceText,
 					GetterReturnOptions{AllowImplicit: true}), testCase.id)
 		})
 	}
@@ -177,8 +177,8 @@ func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
 // `foo.defineProperty(...)` family says the right method name on the wrong object is not the
 // builtin. And the control-flow group at the end is the reason this rule needed an analysis at all
 // rather than a search for the token `return`.
-func TestGetterReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -272,9 +272,9 @@ func TestGetterReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, GetterReturn, getterReturnFile, testCase.sourceText))
 		})
 	}
 }
@@ -283,8 +283,8 @@ func TestGetterReturnStaysSilent(t *testing.T) {
 //
 // The option's actual job: a bare `return;` now satisfies the rule, including one behind an if that
 // is followed by a real return.
-func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnStaysSilentWithAllowImplicit(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -303,10 +303,10 @@ func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedWithOptions(test, GetterReturn, getterReturnFile, testCase.sourceText,
 					GetterReturnOptions{AllowImplicit: true}))
 		})
 	}
@@ -316,22 +316,22 @@ func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
 // files (#mnmx9s4). oxc's second Tester block pinned the opposite, a getter annotated
 // `boolean | undefined` with a path that returns nothing as clean, by declining every TypeScript file.
 // ESLint reports it, since the rule reads no types, and ESLint is the authority here (#jjfa7qb).
-func TestGetterReturnChecksTypeScript(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnChecksTypeScript(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, GetterReturn, getterReturnFile,
 		"var foo = {\n            get bar(): boolean | undefined {\n                if (Math.random() > 0.5) {\n                    return true;\n                }\n            }\n        };"),
 		"expectedAlways")
 }
 
 // A descriptor call whose `Object` is a local is not the platform method, so its `get` is not a
 // getter, as no-setter-return reads it.
-func TestGetterReturnAsksWhetherObjectIsTheGlobal(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnAsksWhetherObjectIsTheGlobal(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, GetterReturn, getterReturnFile,
 		"declare let Object: { defineProperty(target: object, key: string, value: object): void };\nObject.defineProperty({}, 'bar', { get: function () {} });"))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, GetterReturn, getterReturnFile,
 		"Object.defineProperty({}, 'bar', { get: function () {} });"), "expected")
 }
 
@@ -351,8 +351,8 @@ func TestGetterReturnAsksWhetherObjectIsTheGlobal(t *testing.T) {
 // The port this rule followed ran the head to the body's start, `get bar()` and `function ()`, so
 // every one of ESLint's 35 corpus rows read as a different span until the head followed ESLint's
 // (#jjfa7qb). The newline cases keep the whitespace before the paren, as ESLint's range does.
-func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
-	t.Parallel()
+func TestGetterReturnPointsAtTheGetterHead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -397,15 +397,15 @@ func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, GetterReturn, getterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("the finding points at %q, wanted %q", reported, testCase.want)
+				test.Errorf("the finding points at %q, wanted %q", reported, testCase.want)
 			}
 		})
 	}

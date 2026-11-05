@@ -22,8 +22,8 @@ const unsafeNegationFile = "/repository/source/UnsafeNegation.ts"
 // on both sides of the corpus, differing only in whether the option is set: `if (! a < b) {}` is
 // clean by default and reports with the option on. That pairing is the whole reason the option
 // cases have to carry their options.
-func TestNoUnsafeNegationFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -47,10 +47,10 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options), "unexpected")
 		})
 	}
@@ -69,8 +69,8 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 //
 // The second is the option gate. The four ordering operators are silent by default, including under
 // an explicitly empty options object, and including under an explicit false.
-func TestNoUnsafeNegationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -100,10 +100,10 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -122,8 +122,8 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 //
 // `typeof a === "x"` is the shape a reader worries about most when they hear "negation before a
 // relational operator", and `typeof` is a prefix unary too. It is exempt for both reasons at once.
-func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -147,10 +147,10 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -163,11 +163,11 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 // expression reports once by construction. Pinned because a port that listened on the unary instead
 // and walked up to its parent would report twice here, and the message-id fixtures above use inputs
 // where the two designs agree.
-func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationReportsADoubleNegationOnce(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
 }
 
 // Where the finding points, which the message-id fixtures above cannot see.
@@ -180,8 +180,8 @@ func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
 //
 // `! a <= b` is the case that catches an anchor on the `!` token alone: the operand is a space away,
 // so the correct span is three characters and a token-only span is one.
-func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationPointsAtTheNegatedOperand(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -199,16 +199,16 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("the finding points at %q, wanted %q", reported, testCase.want)
+				test.Fatalf("the finding points at %q, wanted %q", reported, testCase.want)
 			}
 		})
 	}
@@ -224,8 +224,8 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 // string over the wrong span passes a text comparison. `(!a in b)` is the case that needs it: the
 // correct rewrite touches only the inner binary and leaves the outer parentheses alone, and a repair
 // that replaced one character too many either way would still carry the text `!(a in b)`.
-func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationSuggestsBothRewrites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -266,30 +266,30 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("wanted no unattended fixes, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("wanted no unattended fixes, got %d", len(result.Diagnostics[0].Fixes))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 2 {
-				t.Fatalf("wanted two suggestions, got %d", len(suggestions))
+				test.Fatalf("wanted two suggestions, got %d", len(suggestions))
 			}
 
 			for index, want := range []string{testCase.wantNegated, testCase.wantExplicit} {
 				if len(suggestions[index].Fixes) != 1 {
-					t.Fatalf("suggestion %d carries %d fixes, wanted one", index, len(suggestions[index].Fixes))
+					test.Fatalf("suggestion %d carries %d fixes, wanted one", index, len(suggestions[index].Fixes))
 				}
 				fix := suggestions[index].Fixes[0]
 				rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 					testCase.sourceText[fix.Range.End():]
 				if rewritten != want {
-					t.Fatalf("suggestion %d rewrites to %q, wanted %q", index, rewritten, want)
+					test.Fatalf("suggestion %d rewrites to %q, wanted %q", index, rewritten, want)
 				}
 			}
 		})
@@ -302,20 +302,20 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 // source: one rewrite changes what the code does and the other pins what it already does. A port
 // that emitted the same message for both, or that built the second from the first, would leave a
 // human choosing between two identical-looking options.
-func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!a in b")
+	result := rule_testing.Run(test, NoUnsafeNegation, unsafeNegationFile, "!a in b")
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 2 {
-		t.Fatalf("wanted one diagnostic carrying two suggestions")
+		test.Fatalf("wanted one diagnostic carrying two suggestions")
 	}
 	first := result.Diagnostics[0].Suggestions[0].Message
 	second := result.Diagnostics[0].Suggestions[1].Message
 	if first.Id == second.Id {
-		t.Fatalf("both suggestions carry the message id %q", first.Id)
+		test.Fatalf("both suggestions carry the message id %q", first.Id)
 	}
 	if first.Description == second.Description {
-		t.Fatalf("both suggestions carry the description %q", first.Description)
+		test.Fatalf("both suggestions carry the description %q", first.Description)
 	}
 }
 
@@ -323,8 +323,8 @@ func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
 //
 // Two operators rather than one, because a rule quoting a constant string passes a single-operator
 // assertion.
-func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationNamesTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -337,16 +337,16 @@ func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.want, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.want, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, "`"+testCase.want+"`") {
-				t.Fatalf("the description %q does not name the operator %q", description, testCase.want)
+				test.Fatalf("the description %q does not name the operator %q", description, testCase.want)
 			}
 		})
 	}

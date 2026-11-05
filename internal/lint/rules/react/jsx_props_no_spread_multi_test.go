@@ -24,8 +24,8 @@ const jsxPropsNoSpreadMultiFile = "/repository/source/Spread.tsx"
 // upstream's clean cases that catch a wrong belief. Two of the four do real work here: the third
 // separates two different properties of one receiver, and the fourth is the only parenthesized
 // input in either corpus and is what pins that the receivers are compared rather than the text.
-func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
-	t.Parallel()
+func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -185,10 +185,10 @@ func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -196,8 +196,8 @@ func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
 
 // The clean cases are the whole discrimination, and the imported four are joined by the shapes our
 // tree can produce that oxc's cannot.
-func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -290,10 +290,10 @@ func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText))
 		})
 	}
 }
@@ -311,8 +311,8 @@ func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
 // the inner member expression, whose range does not cover the parentheses the reader wrote. A rule
 // reporting the peeled expression would point at `props.foo` inside `{...(props.foo).baz}`, which
 // is not what upstream underlines.
-func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
-	t.Parallel()
+func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -347,17 +347,17 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			for index, want := range testCase.want {
 				diagnostic := result.Diagnostics[index]
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Fatalf("finding %d: want reported text %q, got %q", index, want, got)
+					test.Fatalf("finding %d: want reported text %q, got %q", index, want, got)
 				}
 			}
 		})
@@ -370,13 +370,13 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 // The pairs are (1,2), (1,3) and (2,3), and each reports its left member, so the offsets are those
 // of the first, first and second spreads. A rule reporting the right count from the wrong pairing,
 // or reporting the same node three times, passes every other assertion in this file.
-func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
-	t.Parallel()
+func TestJsxPropsNoSpreadMultiPairsByPosition(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const a = <App {...props.a} {...props.a} {...props.a} />;\n"
-	result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, sourceText)
+	result := rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, sourceText)
 	if len(result.Diagnostics) != 3 {
-		t.Fatalf("want 3 findings, got %d", len(result.Diagnostics))
+		test.Fatalf("want 3 findings, got %d", len(result.Diagnostics))
 	}
 
 	first := strings.Index(sourceText, "{...props.a}")
@@ -385,7 +385,7 @@ func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
 	wantPositions := []int{first, first, second}
 	for index, want := range wantPositions {
 		if got := result.Diagnostics[index].Range.Pos(); got != want {
-			t.Fatalf("finding %d: want position %d, got %d", index, want, got)
+			test.Fatalf("finding %d: want position %d, got %d", index, want, got)
 		}
 	}
 }
@@ -395,27 +395,27 @@ func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
 // A fixture whose predicate is weaker than the property it guards is not a guard, and the two
 // messages here are near-identical prose differing only in their opening noun, so a containment
 // check would pass against either one. Equality is what separates them.
-func TestJsxPropsNoSpreadMultiRendersBothMessages(t *testing.T) {
-	t.Parallel()
+func TestJsxPropsNoSpreadMultiRendersBothMessages(test *testing.T) {
+	test.Parallel()
 
-	identifierResult := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
+	identifierResult := rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
 		"const a = <App {...props} {...props} />;\n")
 	if len(identifierResult.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(identifierResult.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(identifierResult.Diagnostics))
 	}
 	if got := identifierResult.Diagnostics[0].Message.Description; got != messageJsxPropsNoSpreadMultiIdentifier.Description {
-		t.Fatalf("want the identifier message, got %q", got)
+		test.Fatalf("want the identifier message, got %q", got)
 	}
 
-	memberResult := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
+	memberResult := rule_testing.Run(test, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
 		"const a = <App {...props.foo} {...props.foo} />;\n")
 	if len(memberResult.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(memberResult.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(memberResult.Diagnostics))
 	}
 	if got := memberResult.Diagnostics[0].Message.Description; got != messageJsxPropsNoSpreadMultiMemberExpression.Description {
-		t.Fatalf("want the member message, got %q", got)
+		test.Fatalf("want the member message, got %q", got)
 	}
 	if messageJsxPropsNoSpreadMultiIdentifier.Description == messageJsxPropsNoSpreadMultiMemberExpression.Description {
-		t.Fatal("the two messages must differ, or the assertions above cannot separate them")
+		test.Fatal("the two messages must differ, or the assertions above cannot separate them")
 	}
 }

@@ -60,26 +60,26 @@ type Golden struct {
 
 // Open reads the golden at testdata/oracle/<name>.json.gz for the bundles this build embeds. When recording,
 // it starts empty and writes what the test asked for when the test ends.
-func Open(t testing.TB, name string) *Golden {
-	t.Helper()
+func Open(test testing.TB, name string) *Golden {
+	test.Helper()
 	digest, err := BundlesDigest()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	golden := &Golden{
-		t:       t,
+		t:       test,
 		path:    filepath.Join("testdata", "oracle", name+".json.gz"),
 		digest:  digest,
 		update:  os.Getenv(UpdateVariable) != "",
 		answers: map[string]Answer{},
 	}
 	if golden.update {
-		t.Cleanup(golden.write)
+		test.Cleanup(golden.write)
 		return golden
 	}
 	answers, err := read(golden.path, digest)
 	if err != nil {
-		t.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", err, UpdateVariable, t.Name())
+		test.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", err, UpdateVariable, test.Name())
 	}
 	golden.answers = answers
 	return golden

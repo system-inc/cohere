@@ -14,8 +14,8 @@ import (
 // its default parser cannot read generic type arguments on a tag. Ours parses them natively, so
 // they are ordinary rows here and are marked at the line.
 
-func TestNoUnexpectedMultilineStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnexpectedMultilineStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -65,15 +65,15 @@ func TestNoUnexpectedMultilineStaysSilent(t *testing.T) {
 		{name: "valid38", source: "class C { field1 = () => {}\n*gen() {} }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source))
 		})
 	}
 }
 
-func TestNoUnexpectedMultilineFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnexpectedMultilineFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -100,10 +100,10 @@ func TestNoUnexpectedMultilineFires(t *testing.T) {
 		{name: "invalid16", source: "class C { field1 = function() {}\n[field2]; }", wantIds: []string{"property"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -117,8 +117,8 @@ func TestNoUnexpectedMultilineFires(t *testing.T) {
 //
 // rule_testing.Run does not trim its input the way RunTyped does, so these offsets index the
 // fixture literal directly.
-func TestNoUnexpectedMultilineSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestNoUnexpectedMultilineSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -147,22 +147,22 @@ func TestNoUnexpectedMultilineSpansAndMessages(t *testing.T) {
 		{name: "invalid16", source: "class C { field1 = function() {}\n[field2]; }", wantPos: 33, wantEnd: 34, wantText: "[", wantId: "property"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			if finding.Range.Pos() != testCase.wantPos || finding.Range.End() != testCase.wantEnd {
-				t.Errorf("span: got [%d,%d), want [%d,%d)",
+				test.Errorf("span: got [%d,%d), want [%d,%d)",
 					finding.Range.Pos(), finding.Range.End(), testCase.wantPos, testCase.wantEnd)
 			}
 			if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != testCase.wantId {
-				t.Errorf("message id: got %q, want %q", finding.Message.Id, testCase.wantId)
+				test.Errorf("message id: got %q, want %q", finding.Message.Id, testCase.wantId)
 			}
 		})
 	}
@@ -171,8 +171,8 @@ func TestNoUnexpectedMultilineSpansAndMessages(t *testing.T) {
 // The four descriptions are asserted against literal strings typed here rather than against the
 // rule's own constants, because comparing a diagnostic to the constant it was built from is an
 // equality that moves in both directions under mutation and guards nothing.
-func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
-	t.Parallel()
+func TestNoUnexpectedMultilineDescriptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source  string
@@ -201,14 +201,14 @@ func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.wantId, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source)
+		test.Run(testCase.wantId, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly 1 finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantOne {
-				t.Errorf("description:\n got %q\nwant %q", got, testCase.wantOne)
+				test.Errorf("description:\n got %q\nwant %q", got, testCase.wantOne)
 			}
 		})
 	}
@@ -223,8 +223,8 @@ func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
 //	node -e 'const {Linter}=require("eslint");console.log(JSON.stringify(
 //	  new Linter().cohere(CODE,{rules:{"no-unexpected-multiline":"error"},
 //	  languageOptions:{ecmaVersion:2022,sourceType:"script"}})))'
-func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(t *testing.T) {
-	t.Parallel()
+func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name   string
@@ -256,9 +256,9 @@ func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(t *testing.T) {
 				"upstream gives under the TypeScript parser, measured"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source))
 		})
 	}
 
@@ -276,10 +276,10 @@ func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(t *testing.T) {
 		{"accessThenCall", "var a = b\n[c]\n(d)", []string{"function", "property"}},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnexpectedMultiline, "file.ts", testCase.source), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnexpectedMultiline, "file.ts", testCase.source), testCase.wantIds...)
 		})
 	}
 }

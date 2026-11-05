@@ -50,12 +50,12 @@ const anotherExample = <Tab.List deprecatedProp="oh no" />;
 `
 
 // installFixtureReact writes the synthetic package into a fixture's node_modules/@types.
-func installFixtureReact(t *testing.T, types string) func(string) {
-	t.Helper()
+func installFixtureReact(test *testing.T, types string) func(string) {
+	test.Helper()
 	return func(directory string) {
 		packageDirectory := filepath.Join(directory, "node_modules", "@types", "fixture-react")
 		if err := os.MkdirAll(packageDirectory, 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		files := map[string]string{
 			"package.json": `{"name": "@types/fixture-react", "version": "0.0.0", "types": "index.d.ts"}`,
@@ -63,7 +63,7 @@ func installFixtureReact(t *testing.T, types string) func(string) {
 		}
 		for name, contents := range files {
 			if err := os.WriteFile(filepath.Join(packageDirectory, name), []byte(contents), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 	}
@@ -71,28 +71,28 @@ func installFixtureReact(t *testing.T, types string) func(string) {
 
 // A prop marked @deprecated, reached through a generic component alias an installed package declares,
 // is reported, on any machine.
-func TestNoDeprecatedReadsAPropThroughAnInstalledComponentAlias(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedReadsAPropThroughAnInstalledComponentAlias(test *testing.T) {
+	test.Parallel()
 	subject := "/repository/source/Subject.tsx"
-	result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoDeprecated,
-		map[string]string{subject: fixtureReactSource}, subject, nil, installFixtureReact(t, fixtureReactTypes))
+	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoDeprecated,
+		map[string]string{subject: fixtureReactSource}, subject, nil, installFixtureReact(test, fixtureReactTypes))
 	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Message.Description != "`deprecatedProp` is deprecated." {
-		t.Fatalf("want the one deprecatedProp finding, got %s", describeNoDeprecated(result))
+		test.Fatalf("want the one deprecatedProp finding, got %s", describeNoDeprecated(result))
 	}
 }
 
 // The control: the same source with the @deprecated tag removed reports nothing, so the finding above is
 // the tag's, read through the package, and not something else about the fixture.
-func TestNoDeprecatedReportsNothingWithoutTheTag(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedReportsNothingWithoutTheTag(test *testing.T) {
+	test.Parallel()
 	subject := "/repository/source/Subject.tsx"
 	untagged := strings.Replace(fixtureReactSource, "   * @deprecated\n", "", 1)
 	if untagged == fixtureReactSource {
-		t.Fatal("the source no longer carries the @deprecated tag this control removes")
+		test.Fatal("the source no longer carries the @deprecated tag this control removes")
 	}
-	result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoDeprecated,
-		map[string]string{subject: untagged}, subject, nil, installFixtureReact(t, fixtureReactTypes))
+	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoDeprecated,
+		map[string]string{subject: untagged}, subject, nil, installFixtureReact(test, fixtureReactTypes))
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("want no findings without the tag, got %s", describeNoDeprecated(result))
+		test.Fatalf("want no findings without the tag, got %s", describeNoDeprecated(result))
 	}
 }

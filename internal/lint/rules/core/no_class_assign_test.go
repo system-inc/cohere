@@ -19,8 +19,8 @@ const classAssignFile = "/repository/source/ClassAssign.ts"
 // one Tester block, 17 pass and 8 fail. The snapshot records 9 diagnostics from those 8 inputs, so
 // one finding per input is wrong here, and the extractor said so before any code was written. The
 // extra diagnostic belongs to `class A { } A = 0; A = 1;`, which writes twice and reports twice.
-func TestNoClassAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -47,10 +47,10 @@ func TestNoClassAssignFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoClassAssign, classAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoClassAssign, classAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -66,8 +66,8 @@ func TestNoClassAssignFires(t *testing.T) {
 // The if/else pair is the sharpest. Two sibling classes named `A` in disjoint blocks, and an `A = 1`
 // after both that binds to neither, so a rule matching on name reports twice on code upstream leaves
 // alone.
-func TestNoClassAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -98,10 +98,10 @@ func TestNoClassAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoClassAssign, classAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoClassAssign, classAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -115,8 +115,8 @@ func TestNoClassAssignStaysSilent(t *testing.T) {
 //
 // Sliced out of the source with the finding's own range rather than compared against an offset,
 // since an offset computed by the test is wrong in the same direction as the code that produced it.
-func TestNoClassAssignPointsAtTheWrite(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignPointsAtTheWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -137,18 +137,18 @@ func TestNoClassAssignPointsAtTheWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoClassAssign, classAssignFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoClassAssign, classAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			// The harness trims and appends a newline, so read positions against that same text.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			for i, want := range testCase.want {
 				reported := source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
 				if reported != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
 				}
 			}
 		})
@@ -159,15 +159,15 @@ func TestNoClassAssignPointsAtTheWrite(t *testing.T) {
 //
 // `[]string{"A", "A"}` is satisfied by a rule reporting the same identifier twice, and a rule
 // looping over the wrong collection does exactly that. This pins that they are distinct offsets.
-func TestNoClassAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignReportsEachWriteAtItsOwnOffset(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoClassAssign, classAssignFile, "class A { } A = 0; A = 1;")
+	result := rule_testing.RunTyped(test, NoClassAssign, classAssignFile, "class A { } A = 0; A = 1;")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-		t.Fatalf("both findings pointed at offset %d, so one write went unreported",
+		test.Fatalf("both findings pointed at offset %d, so one write went unreported",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -179,13 +179,13 @@ func TestNoClassAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
 // Fires cases would fail in a way that reads as a rule bug rather than as a harness mistake. This
 // asserts the silence directly, so the vacuous configuration is a named, tested state rather than
 // something a later edit can drift into unnoticed.
-func TestNoClassAssignNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoClassAssign.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoClassAssign, classAssignFile, "class A { } A = 0;"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoClassAssign, classAssignFile, "class A { } A = 0;"))
 }
 
 // Cases written from reading our code rather than upstream's, each covering a write shape the
@@ -200,8 +200,8 @@ func TestNoClassAssignNeedsTheTypedHarness(t *testing.T) {
 // class and leaves the binding alone, and it resolves to the class symbol exactly as a real
 // reassignment does, so symbol identity alone reports it. That one is the reason this rule needs
 // structural write detection as well as the checker.
-func TestNoClassAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
-	t.Parallel()
+func TestNoClassAssignCoversWriteShapesUpstreamNeverExercises(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -247,10 +247,10 @@ func TestNoClassAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoClassAssign, classAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoClassAssign, classAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -281,10 +281,10 @@ func TestNoClassAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoClassAssign, classAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoClassAssign, classAssignFile, testCase.sourceText))
 		})
 	}
 }

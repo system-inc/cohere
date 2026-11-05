@@ -21,8 +21,8 @@ const noUnsafeUnaryMinusFile = "/repository/source/Negate.ts"
 // numeric ones, which is not obvious from the rule's name. `(a: number | bigint) => -a` is the case
 // that proves the union walk: the union's own flags carry `Union` and nothing else, so a version
 // asking the whole type rather than its parts would report this valid input.
-func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -44,9 +44,9 @@ func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
 		{"negating a type parameter constrained to number", "<T extends number>(t: T) => -t;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeUnaryMinus,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeUnaryMinus,
 				noUnsafeUnaryMinusFile, testCase.sourceText))
 		})
 	}
@@ -56,8 +56,8 @@ func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
 //
 // Upstream records exactly one diagnostic per input and the rule `break`s at the first offending
 // union part, so no input here can report twice. `@typescript-eslint` agreed on all nine.
-func TestNoUnsafeUnaryMinusFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,9 +74,9 @@ func TestNoUnsafeUnaryMinusFires(t *testing.T) {
 		{"negating an unconstrained type parameter", "<T,>(t: T) => -t;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeUnaryMinus,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeUnaryMinus,
 				noUnsafeUnaryMinusFile, testCase.sourceText), "unaryMinus")
 		})
 	}
@@ -95,8 +95,8 @@ func TestNoUnsafeUnaryMinusFires(t *testing.T) {
 //	`unknown` REPORTS while `any` does not, because Unknown is a separate flag and only Any is exempt
 //	`T extends any` REPORTS, because the constraint resolves to `unknown` rather than staying `any`
 //	a whole numeric enum is SILENT, because it splits into members that are each NumberLike
-func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusTypeBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -136,14 +136,14 @@ func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
 		{"a doubled negation reports only on the inner one", "(a: string) => - -a;", []string{"unaryMinus"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -160,24 +160,24 @@ func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
 // all, and the rule cannot tell them apart from a genuinely safe `any`. Upstream's own corpus names
 // no such type, so no imported case needed a second file, but the next person adding one to this
 // table needs to know why their new clean case might be hollow.
-func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"declare const x: Disposable;\n-x;",
 		"declare const x: NotDefinedAnywhere;\n-x;",
 	} {
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, sourceText)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, sourceText)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("the error type stopped resolving to Any for %q, which changes what a hollow fixture looks like", sourceText)
+			test.Errorf("the error type stopped resolving to Any for %q, which changes what a hollow fixture looks like", sourceText)
 		}
 	}
 
 	// The control: a type the lib DOES carry, negated, still reports. Without this the assertions
 	// above would pass just as well if the rule had stopped running altogether.
-	control := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, "declare const x: string;\n-x;")
+	control := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, "declare const x: string;\n-x;")
 	if len(control.Diagnostics) != 1 {
-		t.Fatalf("the control found %d findings, want one, so the assertions above proved nothing", len(control.Diagnostics))
+		test.Fatalf("the control found %d findings, want one, so the assertions above proved nothing", len(control.Diagnostics))
 	}
 }
 
@@ -191,108 +191,108 @@ func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(t *testing.T) {
 // rule's own message constant, because a constant compared to itself moves under mutation and stays
 // green. It matters more than usual for this rule: the type name is interpolated per finding, and
 // it is exactly the half where the two upstream references disagree.
-func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the finding spans the whole unary expression, not the operand", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the finding spans the whole unary expression, not the operand", func(test *testing.T) {
+		test.Parallel()
 		source := "declare const a: string;\nconst negated = -a;"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		finding := result.Diagnostics[0]
 		reported := source[finding.Range.Pos():finding.Range.End()]
 		if reported != "-a" {
-			t.Errorf("the finding points at %q, want the whole unary expression", reported)
+			test.Errorf("the finding points at %q, want the whole unary expression", reported)
 		}
 		if finding.Message.Id != "unaryMinus" {
-			t.Errorf("message id is %q", finding.Message.Id)
+			test.Errorf("message id is %q", finding.Message.Id)
 		}
 		if finding.Message.Description != "Argument of unary negation should be assignable to number | bigint but is string instead." {
-			t.Errorf("message text is %q", finding.Message.Description)
+			test.Errorf("message text is %q", finding.Message.Description)
 		}
 	})
 
-	t.Run("the span includes parentheses around the operand", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the span includes parentheses around the operand", func(test *testing.T) {
+		test.Parallel()
 		// Our parser keeps the parenthesized expression as a real node and upstream's does too, so
 		// the operand is the ParenthesizedExpression and the report covers it. Measured against
 		// `@typescript-eslint`, which spans `-(a)` here as well. This is written down because the
 		// corpus contains no parenthesized form at all and a port could fall either way unnoticed.
 		source := "declare const a: string;\nconst negated = -(a);"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "-(a)" {
-			t.Errorf("the finding points at %q, want the parentheses included", reported)
+			test.Errorf("the finding points at %q, want the parentheses included", reported)
 		}
 	})
 
-	t.Run("a parenthesized whole expression reports the inner span", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a parenthesized whole expression reports the inner span", func(test *testing.T) {
+		test.Parallel()
 		source := "declare const a: string;\nconst negated = (-a);"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "-a" {
-			t.Errorf("the finding points at %q, want the unary expression without the outer parens", reported)
+			test.Errorf("the finding points at %q, want the unary expression without the outer parens", reported)
 		}
 	})
 
-	t.Run("the message names the offending union part rather than the whole type", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the message names the offending union part rather than the whole type", func(test *testing.T) {
+		test.Parallel()
 		// This is the measured divergence from `@typescript-eslint`, which renders
 		// "is string | number instead" for the same input because it passes the WHOLE argument type
 		// to typeToString while tsgolint passes the loop's current part. tsgolint wins because
 		// oxlint runs tsgolint, so this assertion is what records which reference was ported.
 		source := "declare const a: number | string;\nconst negated = -a;"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to number | bigint but is string instead." {
-			t.Errorf("message text is %q, want the union PART named", result.Diagnostics[0].Message.Description)
+			test.Errorf("message text is %q, want the union PART named", result.Diagnostics[0].Message.Description)
 		}
 	})
 
-	t.Run("a boolean renders as false because boolean is the union false or true", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a boolean renders as false because boolean is the union false or true", func(test *testing.T) {
+		test.Parallel()
 		// Nothing about this input looks like a union, and this row was not predicted from reading
 		// either implementation. `@typescript-eslint` renders "is boolean instead" here. It is the
 		// clearest evidence that the union walk is what produces the text, and no fixture asserting
 		// an id or a count could see it.
 		source := "declare const b: boolean;\nconst negated = -b;"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to number | bigint but is false instead." {
-			t.Errorf("message text is %q, want the first union part named", result.Diagnostics[0].Message.Description)
+			test.Errorf("message text is %q, want the first union part named", result.Diagnostics[0].Message.Description)
 		}
 	})
 
-	t.Run("each unsafe expression reports separately", func(t *testing.T) {
-		t.Parallel()
+	test.Run("each unsafe expression reports separately", func(test *testing.T) {
+		test.Parallel()
 		// The rule `break`s within one expression's union walk, so at most one finding per
 		// expression, but two expressions produce two findings at two different offsets. Without
 		// the offset comparison a rule reporting the same node twice would pass this.
 		source := "declare const a: string;\ndeclare const b: {};\nconst x = -a;\nconst y = -b;"
-		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 2 {
-			t.Fatalf("want two findings, got %d", len(result.Diagnostics))
+			test.Fatalf("want two findings, got %d", len(result.Diagnostics))
 		}
 		if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-			t.Fatal("both findings point at the same offset")
+			test.Fatal("both findings point at the same offset")
 		}
 		first := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		second := source[result.Diagnostics[1].Range.Pos():result.Diagnostics[1].Range.End()]
 		if first != "-a" || second != "-b" {
-			t.Errorf("findings point at %q and %q", first, second)
+			test.Errorf("findings point at %q and %q", first, second)
 		}
 	})
 }
@@ -305,20 +305,20 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 // listener, because absorbing the rule off the adapter made that listener ours to edit. It is
 // unreachable through registration, since `NeedsTypeChecker` is declared; it covers the harness
 // path, where a Context is built by hand. This test pins the declaration AND the guard.
-func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoUnsafeUnaryMinus.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 	if NoUnsafeUnaryMinus.Name != "@typescript-eslint/no-unsafe-unary-minus" {
-		t.Errorf("the registered name is %q, and the inventory writes typescript/no-unsafe-unary-minus", NoUnsafeUnaryMinus.Name)
+		test.Errorf("the registered name is %q, and the inventory writes typescript/no-unsafe-unary-minus", NoUnsafeUnaryMinus.Name)
 	}
 
 	source := "declare const a: string;\nconst negated = -a;"
-	typed := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
+	typed := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
@@ -327,7 +327,7 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
 	listeners := NoUnsafeUnaryMinus.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
 	listener, hasListener := listeners[ast.KindPrefixUnaryExpression]
 	if !hasListener {
-		t.Fatal("the rule stopped listening on prefix unary expressions")
+		test.Fatal("the rule stopped listening on prefix unary expressions")
 	}
 	for _, statement := range typed.SourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindVariableStatement {

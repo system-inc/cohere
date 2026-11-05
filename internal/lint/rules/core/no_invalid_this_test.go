@@ -29,8 +29,8 @@ const noInvalidThisFile = "/repository/source/NoInvalidThis.ts"
 // stripped source gives 215 groups and ZERO of them contain members whose verdicts disagree.
 //
 //	100 reporting cases, 115 clean cases, 45 carrying the capIsConstructor option.
-func TestNoInvalidThisFires(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -143,18 +143,18 @@ func TestNoInvalidThisFires(t *testing.T) {
 		// RunWithOptions, not Run: 45 of these rows carry an explicit capIsConstructor and Run
 		// would hand every one of them the default instead. That is not a weaker test, it is a
 		// different one -- the rows exist precisely because the option changes the verdict.
-		result := rule_testing.RunWithOptions(t, NoInvalidThis, noInvalidThisFile,
+		result := rule_testing.RunWithOptions(test, NoInvalidThis, noInvalidThisFile,
 			testCase.source, testCase.settings)
 		ids := make([]string, testCase.findings)
 		for index := range ids {
 			ids[index] = "unexpectedThis"
 		}
-		rule_testing.ExpectFindings(t, result, ids...)
+		rule_testing.ExpectFindings(test, result, ids...)
 	}
 }
 
-func TestNoInvalidThisStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -278,9 +278,9 @@ func TestNoInvalidThisStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, NoInvalidThis, noInvalidThisFile,
+		result := rule_testing.RunWithOptions(test, NoInvalidThis, noInvalidThisFile,
 			testCase.source, testCase.settings)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -296,8 +296,8 @@ func TestNoInvalidThisStaysSilent(t *testing.T) {
 // The rows are asserted with explicit spans, because a rule that reports the right COUNT while
 // pointing at the value instead of the key would pass a count-only fixture while being wrong about
 // the thing this test exists to check.
-func TestNoInvalidThisComputedKeysAreOutsideTheMember(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisComputedKeysAreOutsideTheMember(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -330,9 +330,9 @@ func TestNoInvalidThisComputedKeysAreOutsideTheMember(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, NoInvalidThis, noInvalidThisFile, testCase.source)
+		result := rule_testing.Run(test, NoInvalidThis, noInvalidThisFile, testCase.source)
 		if len(result.Diagnostics) != len(testCase.spans) {
-			t.Errorf("got %d findings, want %d, for %q",
+			test.Errorf("got %d findings, want %d, for %q",
 				len(result.Diagnostics), len(testCase.spans), testCase.source)
 			continue
 		}
@@ -340,7 +340,7 @@ func TestNoInvalidThisComputedKeysAreOutsideTheMember(t *testing.T) {
 			diagnostic := result.Diagnostics[index]
 			got := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != want {
-				t.Errorf("finding %d covers %q, want %q, for %q",
+				test.Errorf("finding %d covers %q, want %q, for %q",
 					index, got, want, testCase.source)
 			}
 		}
@@ -351,25 +351,25 @@ func TestNoInvalidThisComputedKeysAreOutsideTheMember(t *testing.T) {
 //
 // A message id proves which branch fired. The text proves what the rule computed, and a fixture
 // whose predicate is weaker than the property it guards is not a guard.
-func TestNoInvalidThisMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoInvalidThis, noInvalidThisFile, "function foo() {\n  this.x;\n}\n")
-	rule_testing.ExpectFindings(t, result, "unexpectedThis")
+	result := rule_testing.Run(test, NoInvalidThis, noInvalidThisFile, "function foo() {\n  this.x;\n}\n")
+	rule_testing.ExpectFindings(test, result, "unexpectedThis")
 
 	got := result.Diagnostics[0].Message
 	if got.Id != "unexpectedThis" {
-		t.Errorf("message id is %q, want unexpectedThis", got.Id)
+		test.Errorf("message id is %q, want unexpectedThis", got.Id)
 	}
 	// The WHOLE description, not a prefix or a Contains. A predicate weaker than the property it
 	// guards is not a guard: a two-hash string contains a one-hash needle, which is how a rule
 	// shipped a doubled `#` behind a green fixture.
 	if got.Description != messageNoInvalidThisUnexpectedThis.Description {
-		t.Errorf("description is %q, want %q", got.Description,
+		test.Errorf("description is %q, want %q", got.Description,
 			messageNoInvalidThisUnexpectedThis.Description)
 	}
 	if !strings.HasPrefix(got.Description, "Nothing binds `this` here") {
-		t.Errorf("description is %q, which does not open with the rule's explanation", got.Description)
+		test.Errorf("description is %q, which does not open with the rule's explanation", got.Description)
 	}
 }
 
@@ -381,8 +381,8 @@ func TestNoInvalidThisMessageText(t *testing.T) {
 // TRUE, so a rule reaching its settings through a generic decoder on empty input would silently
 // report every capitalized constructor function in the tree. The nil case matters just as much:
 // a rule configured as a bare "error" is handed nil options.
-func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -397,29 +397,29 @@ func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := DecodeNoInvalidThisOptions([]byte(testCase.raw))
 		if err != nil && testCase.raw != "" {
-			t.Errorf("%s: decode returned %v", testCase.name, err)
+			test.Errorf("%s: decode returned %v", testCase.name, err)
 			continue
 		}
 		settings, ok := decoded.(noInvalidThisSettings)
 		if !ok {
-			t.Errorf("%s: decode produced %T, not noInvalidThisSettings", testCase.name, decoded)
+			test.Errorf("%s: decode produced %T, not noInvalidThisSettings", testCase.name, decoded)
 			continue
 		}
 		if settings.CapIsConstructor != testCase.want {
-			t.Errorf("%s: capIsConstructor is %v, want %v",
+			test.Errorf("%s: capIsConstructor is %v, want %v",
 				testCase.name, settings.CapIsConstructor, testCase.want)
 		}
 	}
 
 	// Nil options is what a rule configured as a bare "error" actually receives.
 	if got := noInvalidThisSettingsFrom(nil); !got.CapIsConstructor {
-		t.Error("nil options gave capIsConstructor false, so a bare \"error\" would invert the default")
+		test.Error("nil options gave capIsConstructor false, so a bare \"error\" would invert the default")
 	}
 
 	// And the end-to-end consequence, so the default is pinned at the rule rather than only at the
 	// decoder: a capitalized function is clean by default and reports when the option is off.
 	source := "function Foo() {\n  this.x = 1;\n}\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoInvalidThis, noInvalidThisFile, source))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoInvalidThis, noInvalidThisFile, source))
 }
 
 // TestNoInvalidThisShapesTheCorpusDoesNotWrite covers thirteen inputs upstream's corpus never
@@ -442,8 +442,8 @@ func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(t *testing.T) {
 // heavily and the arm not at all, so the arm was dead against every imported case while being
 // load-bearing on real source. That is the standard's "a guard can be dead against every imported
 // case and still be load-bearing" arriving in this rule.
-func TestNoInvalidThisShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -472,11 +472,11 @@ func TestNoInvalidThisShapesTheCorpusDoesNotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, NoInvalidThis, noInvalidThisFile, testCase.source)
+		result := rule_testing.Run(test, NoInvalidThis, noInvalidThisFile, testCase.source)
 		ids := make([]string, testCase.findings)
 		for index := range ids {
 			ids[index] = "unexpectedThis"
 		}
-		rule_testing.ExpectFindings(t, result, ids...)
+		rule_testing.ExpectFindings(test, result, ids...)
 	}
 }

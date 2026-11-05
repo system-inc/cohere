@@ -9,8 +9,8 @@ import (
 
 // The lines are Kirk's, from the visual spec of 2026-10-04, with the glyph slots and path column filled
 // in as the spec describes them.
-func TestChangedFileLinesAlignMixedGlyphs(t *testing.T) {
-	t.Parallel()
+func TestChangedFileLinesAlignMixedGlyphs(test *testing.T) {
+	test.Parallel()
 	files := []changedFile{
 		{Path: "modules/pensieve/Recall.ts", Formatted: true},
 		{Path: "app/os/SessionRow.tsx", Fixed: true, Formatted: true,
@@ -24,36 +24,36 @@ func TestChangedFileLinesAlignMixedGlyphs(t *testing.T) {
 	}
 	got := changedFileLines(files, plain)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Errorf("changed files:\n got\n%s\n want\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+		test.Errorf("changed files:\n got\n%s\n want\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
 	// The rules are dim on a terminal, and nothing else on the line is styled.
 	colored := changedFileLines(files[2:], textStyle{color: true})
 	if want := "🪄   modules/data/DataSync.ts \x1b[2mno-useless-default-assignment\x1b[22m"; colored[0] != want {
-		t.Errorf("colored changed file:\n got  %q\n want %q", colored[0], want)
+		test.Errorf("colored changed file:\n got  %q\n want %q", colored[0], want)
 	}
 }
 
-func TestChangedFileLinesAreCapped(t *testing.T) {
-	t.Parallel()
+func TestChangedFileLinesAreCapped(test *testing.T) {
+	test.Parallel()
 	var files []changedFile
 	for index := range changedFilesShown + 5 {
 		files = append(files, changedFile{Path: fmt.Sprintf("file%02d.ts", index), Formatted: true})
 	}
 	got := changedFileLines(files, plain)
 	if len(got) != changedFilesShown+1 {
-		t.Fatalf("%d files listed %d lines, want %d and a line saying how many more", len(files), len(got), changedFilesShown)
+		test.Fatalf("%d files listed %d lines, want %d and a line saying how many more", len(files), len(got), changedFilesShown)
 	}
 	if want := "… 5 more · --verbose for all"; got[len(got)-1] != want {
-		t.Errorf("the last line is %q, want %q", got[len(got)-1], want)
+		test.Errorf("the last line is %q, want %q", got[len(got)-1], want)
 	}
 	if got := changedFileLines(files[:changedFilesShown], plain); len(got) != changedFilesShown {
-		t.Errorf("exactly %d files listed %d lines, want them all and no more-line", changedFilesShown, len(got))
+		test.Errorf("exactly %d files listed %d lines, want them all and no more-line", changedFilesShown, len(got))
 	}
 }
 
-func TestFindingLine(t *testing.T) {
-	t.Parallel()
+func TestFindingLine(test *testing.T) {
+	test.Parallel()
 	finding := runFinding{
 		Path: "app/os/Session.ts", Line: 12, Column: 5, Severity: "error",
 		Rule: "nexus/consistency-no-abbreviated-identifier", MessageID: "abbreviated",
@@ -61,42 +61,42 @@ func TestFindingLine(t *testing.T) {
 	}
 	want := "app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is an abbreviation. Write `context`."
 	if got := findingLine(finding, plain); got != want {
-		t.Errorf("finding line:\n got  %s\n want %s", got, want)
+		test.Errorf("finding line:\n got  %s\n want %s", got, want)
 	}
 
 	want = "app/os/Session.ts:12:5 \x1b[31merror\x1b[39m \x1b[2mnexus/consistency-no-abbreviated-identifier\x1b[22m `ctx` is an abbreviation. Write `context`."
 	if got := findingLine(finding, colored); got != want {
-		t.Errorf("colored finding line:\n got  %q\n want %q", got, want)
+		test.Errorf("colored finding line:\n got  %q\n want %q", got, want)
 	}
 
 	finding.Severity = "warn"
 	want = "app/os/Session.ts:12:5 \x1b[2mwarn\x1b[22m \x1b[2mnexus/consistency-no-abbreviated-identifier\x1b[22m `ctx` is an abbreviation. Write `context`."
 	if got := findingLine(finding, colored); got != want {
-		t.Errorf("colored warning line:\n got  %q\n want %q", got, want)
+		test.Errorf("colored warning line:\n got  %q\n want %q", got, want)
 	}
 }
 
 // TestStyleForHonorsNoColor sets NO_COLOR empty, which the convention counts as set.
-// Not parallel: it sets NO_COLOR with t.Setenv, which a parallel test may not
-func TestStyleForHonorsNoColor(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+// Not parallel: it sets NO_COLOR with test.Setenv, which a parallel test may not
+func TestStyleForHonorsNoColor(test *testing.T) {
+	test.Setenv("NO_COLOR", "")
 	if style := styleFor(nil); style.color {
-		t.Error("NO_COLOR is set and the style still colors")
+		test.Error("NO_COLOR is set and the style still colors")
 	}
 }
 
 // TestStyleForAFileIsPlain is output going to a file, as a log or a pipe would take it: no color.
 // Not parallel: it sets and unsets NO_COLOR in the process environment, which a parallel test may not
-func TestStyleForAFileIsPlain(t *testing.T) {
+func TestStyleForAFileIsPlain(test *testing.T) {
 	// Set first so the test restores whatever the environment held, then unset.
-	t.Setenv("NO_COLOR", "")
+	test.Setenv("NO_COLOR", "")
 	os.Unsetenv("NO_COLOR")
-	file, err := os.CreateTemp(t.TempDir(), "output")
+	file, err := os.CreateTemp(test.TempDir(), "output")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	defer file.Close()
 	if style := styleFor(file); style.color {
-		t.Error("output to a file is styled for a terminal")
+		test.Error("output to a file is styled for a terminal")
 	}
 }

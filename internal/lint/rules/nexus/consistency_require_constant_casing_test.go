@@ -10,8 +10,8 @@ import (
 const constantCasingFile = "/repository/source/Thing.ts"
 const constantCasingComponentFile = "/repository/source/Thing.tsx"
 
-func TestConsistencyRequireConstantCasingFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -118,16 +118,16 @@ func TestConsistencyRequireConstantCasingFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
-func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -302,33 +302,33 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The framework option exists because a name a library reads verbatim is a contract rather than a
 // choice, and the rule cannot know which names those are.
-func TestConsistencyRequireConstantCasingFrameworkNames(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingFrameworkNames(test *testing.T) {
+	test.Parallel()
 
 	source := "export const runtime = 'edge';\n"
 
-	reported := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, source)
-	rule_testing.ExpectFindings(t, reported, "requirePascalCaseExported")
+	reported := rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, source)
+	rule_testing.ExpectFindings(test, reported, "requirePascalCaseExported")
 
-	exempt := rule_testing.RunWithOptions(t, ConsistencyRequireConstantCasing, constantCasingFile, source,
+	exempt := rule_testing.RunWithOptions(test, ConsistencyRequireConstantCasing, constantCasingFile, source,
 		ConsistencyRequireConstantCasingOptions{FrameworkConstantNames: []string{"runtime"}})
-	rule_testing.ExpectClean(t, exempt)
+	rule_testing.ExpectClean(test, exempt)
 }
 
 // The suggestion has to be a name the rule's own predicates accept, or the reader who takes it gets
 // the same report again. This is the check that catches a converter handing back its own input.
-func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -345,11 +345,11 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 
 			// The message quotes the suggestion in parentheses, which is where the reader takes it
@@ -357,17 +357,17 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 			description := result.Diagnostics[0].Message.Description
 			opening := strings.Index(description, `("`)
 			if opening < 0 {
-				t.Fatalf("no suggestion in message: %s", description)
+				test.Fatalf("no suggestion in message: %s", description)
 			}
 			rest := description[opening+2:]
 			closing := strings.Index(rest, `"`)
 			if closing < 0 {
-				t.Fatalf("unterminated suggestion in message: %s", description)
+				test.Fatalf("unterminated suggestion in message: %s", description)
 			}
 			suggestion := rest[:closing]
 
 			if !testCase.wantAccept(suggestion) {
-				t.Fatalf("suggestion %q is not a casing the rule accepts", suggestion)
+				test.Fatalf("suggestion %q is not a casing the rule accepts", suggestion)
 			}
 		})
 	}
@@ -379,8 +379,8 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 // being exactly the shape the folding exists to prevent. A test that only asked "is the suggestion
 // acceptable" stayed green with the fold removed, so it was measuring the wrong property. These
 // assert the exact string, which is the only thing that pins the fold down.
-func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingSuggestionText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -400,14 +400,14 @@ func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
-			if suggestion := suggestionFrom(t, result.Diagnostics[0].Message.Description); suggestion != testCase.want {
-				t.Fatalf("suggestion = %q, want %q", suggestion, testCase.want)
+			if suggestion := suggestionFrom(test, result.Diagnostics[0].Message.Description); suggestion != testCase.want {
+				test.Fatalf("suggestion = %q, want %q", suggestion, testCase.want)
 			}
 		})
 	}
@@ -415,17 +415,17 @@ func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
 
 // suggestionFrom reads the name a message offers, which is quoted in parentheses and is where the
 // reader takes it from.
-func suggestionFrom(t *testing.T, description string) string {
-	t.Helper()
+func suggestionFrom(test *testing.T, description string) string {
+	test.Helper()
 
 	opening := strings.Index(description, `("`)
 	if opening < 0 {
-		t.Fatalf("no suggestion in message: %s", description)
+		test.Fatalf("no suggestion in message: %s", description)
 	}
 	rest := description[opening+2:]
 	closing := strings.Index(rest, `"`)
 	if closing < 0 {
-		t.Fatalf("unterminated suggestion in message: %s", description)
+		test.Fatalf("unterminated suggestion in message: %s", description)
 	}
 	return rest[:closing]
 }
@@ -448,8 +448,8 @@ const constantCasingGraphQlClientFactory = "export type BaseGraphQlExecutorType 
 // and PhiGraphQl.ts:57 in ahra, each holding the client `createGraphQlClient` returns and each called
 // by name across 16 files. The rule as it stood could not follow the import, so it told both to
 // become PascalCase and both carried a suppression saying so.
-func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(test *testing.T) {
+	test.Parallel()
 
 	const factoryPath = "source/system/base/BaseGraphQlClient.ts"
 	cases := []struct {
@@ -502,10 +502,10 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(t *te
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, testCase.files, testCase.subject)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, testCase.files, testCase.subject)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -539,8 +539,8 @@ const constantCasingReact = "export interface ReactElement {\n    type: unknown;
 // The neighbours of the real sites: what a type with a call signature must also be, or not be, for
 // the constant to count as a function. Each is a call to a factory in another module, the shape no
 // local evidence can answer.
-func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -634,9 +634,9 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 		{"a function returning any, camelCase", "import { createLooseHandler } from './Factories';\nexport const looseHandler = createLooseHandler();\n", []string{"requirePascalCaseExported"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, map[string]string{
 				"source/Factories.ts": constantCasingFactories,
 				"source/react.ts":     constantCasingReact,
 				"source/Subject.ts":   testCase.sourceText,
@@ -644,7 +644,7 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 				// rather than the drop-the-export one.
 				"source/Consumer.ts": "import * as Subject from './Subject';\nexport const Everything = Subject;\n",
 			}, "source/Subject.ts")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -652,8 +652,8 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 // The rename fix, against a real type graph, since references are resolved through the checker.
 // The first case is the shape of the pensieve batch that motivated it (PensieveRemember.ts:56,
 // `const MaximumDraftBytes = 512 * 1024;`, read further down the file).
-func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -727,19 +727,19 @@ func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(t *testing.T)
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }
 
 // Every refusal still reports. The fix is withheld where the rule cannot prove the rename keeps the
 // program's meaning, and the author renames by hand.
-func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -781,13 +781,13 @@ func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("expected no fix, got %q", diagnostic.Fixes[0].Text)
+					test.Fatalf("expected no fix, got %q", diagnostic.Fixes[0].Text)
 				}
 			}
 		})
@@ -795,14 +795,14 @@ func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(t *testing.T) {
 }
 
 // An exported constant is never renamed by the fix: its references cross files.
-func TestConsistencyRequireConstantCasingDoesNotRenameAnExport(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingDoesNotRenameAnExport(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile,
+	result := rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile,
 		"export const FormatNumber = (value: number) => String(value);\n")
-	rule_testing.ExpectFindings(t, result, "requireCamelCaseFunction")
+	rule_testing.ExpectFindings(test, result, "requireCamelCaseFunction")
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fix on an export, got %q", result.Diagnostics[0].Fixes[0].Text)
+		test.Fatalf("expected no fix on an export, got %q", result.Diagnostics[0].Fixes[0].Text)
 	}
 }
 
@@ -810,8 +810,8 @@ func TestConsistencyRequireConstantCasingDoesNotRenameAnExport(t *testing.T) {
 // or might, keeps the PascalCase advice. The shape is MediumConversationSource.ts:73
 // (`defaultMediumArchiveDirectory`, exported and read only in its own file) against
 // StructureLinter.ts:66 (`printConfigFlagName`, imported by Structure.ts).
-func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(test *testing.T) {
+	test.Parallel()
 
 	const subject = "source/MediumConversationSource.ts"
 	const subjectText = "export const defaultMediumArchiveDirectory = '/archive';\n" +
@@ -833,35 +833,35 @@ func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(
 		{"a dynamic import", "export async function load(): Promise<string> {\n    const medium = await import('./MediumConversationSource');\n    return medium.ArchivePath;\n}\n", "requirePascalCaseExported"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{subject: subjectText}
 			if testCase.consumer != "" {
 				files["source/Consumer.ts"] = testCase.consumer
 			}
-			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, files, subject)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, files, subject)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
 // A file a test runner or framework loads with no import is never told to drop an export, because
 // the absence of an importer proves nothing about it.
-func TestConsistencyRequireConstantCasingTrustsAFileLoadedWithoutAnImport(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingTrustsAFileLoadedWithoutAnImport(test *testing.T) {
+	test.Parallel()
 
 	const subject = "source/Medium.test.ts"
-	result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing,
+	result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing,
 		map[string]string{subject: "export const fixtureDirectory = '/archive';\n"}, subject)
-	rule_testing.ExpectFindings(t, result, "requirePascalCaseExported")
+	rule_testing.ExpectFindings(test, result, "requirePascalCaseExported")
 }
 
 // A constant exported by a local `export { ... }` clause is exported, matched to the clause through
 // the checker. The false finding this fixes: PensieveCommandBoundary.ts declares
 // `const IdentitySafePensieveCommandPaths = new Set([...])` and exports it on line 39 with
 // `export { IdentitySafePensieveCommandPaths };`, and the rule told it to become camelCase.
-func TestConsistencyRequireConstantCasingCountsALocalExportClause(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingCountsALocalExportClause(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -913,27 +913,27 @@ func TestConsistencyRequireConstantCasingCountsALocalExportClause(t *testing.T) 
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, map[string]string{
 				"source/Thing.ts": testCase.sourceText,
 				"source/Other.ts": "export const first = 1;\nexport const OrderColumns = [2];\n",
 			}, "source/Thing.ts")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // The importer check reads the name the clause exports, not the local one. Here the consumer imports
 // `Columns`, the clause's name for `orderColumns`, so it is imported and keeps the PascalCase advice.
-func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+	result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, map[string]string{
 		"source/Thing.ts":    "const orderColumns = [1];\nexport { orderColumns as Columns };\n",
 		"source/Consumer.ts": "import { Columns } from './Thing';\nexport const Total = Columns.length;\n",
 	}, "source/Thing.ts")
-	rule_testing.ExpectFindings(t, result, "requirePascalCaseExported")
+	rule_testing.ExpectFindings(test, result, "requirePascalCaseExported")
 }
 
 // TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone covers the floor
@@ -942,8 +942,8 @@ func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(t *te
 // Every clause of this rule would advise on a contract export: PascalCase for `revalidate`, camelCase
 // for an arrow-function `POST`, and dropping the export from a `metadata` nothing imports. Each silent
 // case is paired with the same text where Next does not read it.
-func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(test *testing.T) {
+	test.Parallel()
 
 	const routeFile = "/repository/app/api/report/route.ts"
 	const pageFile = "/repository/app/blog/[slug]/page.tsx"
@@ -966,14 +966,14 @@ func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testin
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -983,8 +983,8 @@ func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testin
 // XDocument = new TypedDocumentString(...)`, beside `class TypedDocumentString extends String` (#w26f1b0).
 // The heritage is read through the checker for an imported class and from this file's own classes without
 // one, transitively; a class that extends anything else is still an instance that acts.
-func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(test *testing.T) {
+	test.Parallel()
 
 	const document = "export class TypedDocumentString<TResult, TVariables> extends String {\n" +
 		"    constructor(private value: string) { super(value); }\n}\n"
@@ -999,13 +999,13 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *tes
 		{"a class extending a class of ours", "class Service {}\nclass NetworkService extends Service {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
 		{"a class extending nothing", "class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
 	} {
-		t.Run("untyped, "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+		test.Run("untyped, "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
 		})
-		t.Run("typed, "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+		test.Run("typed, "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 
@@ -1018,13 +1018,13 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *tes
 		{"an imported class extending String", document, nil},
 		{"an imported class extending a class of ours", "export class Service {}\nexport class TypedDocumentString<TResult, TVariables> extends Service {}\n", []string{"requireCamelCaseInstance"}},
 	} {
-		t.Run("imported, "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+		test.Run("imported, "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, map[string]string{
 				"source/Documents.ts":  testCase.library,
 				"source/Operations.ts": "import { TypedDocumentString } from './Documents';\nexport const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\nexport function use(): unknown { return AccountDocument; }\n",
 			}, "source/Operations.ts")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

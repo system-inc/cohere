@@ -11,31 +11,31 @@ import (
 
 // liveConfigPath is the real config cohere must agree with: ahra's, which is private, so a test that reads
 // it skips where the ahra corpus is not set, and the gate names it as not covered (#sycrdr6).
-func liveConfigPath(t testing.TB) string {
-	t.Helper()
-	return corpus.Ahra.Path(t, "CohereSettings.json")
+func liveConfigPath(test testing.TB) string {
+	test.Helper()
+	return corpus.Ahra.Path(test, "CohereSettings.json")
 }
 
 // TestAgainstTheLiveConfig loads the actual file rather than a hand-written model of it.
 //
 // A test that models a config can drift from the configuration. This one reads the bytes that are actually
 // gating the codebase, so a change there shows up here rather than at the next full run.
-func TestAgainstTheLiveConfig(t *testing.T) {
-	t.Parallel()
+func TestAgainstTheLiveConfig(test *testing.T) {
+	test.Parallel()
 
-	loaded, err := Load(liveConfigPath(t))
+	loaded, err := Load(liveConfigPath(test))
 	if err != nil {
-		t.Fatalf("loading the live config: %v", err)
+		test.Fatalf("loading the live config: %v", err)
 	}
 
 	// Prove the input is real before asserting anything about it. A config that parsed to zero rules
 	// would make every assertion below pass vacuously, which is the failure mode this project keeps
 	// finding.
 	if len(loaded.Rules) < 100 {
-		t.Fatalf("only %d rules loaded from the live config, which is not a real corpus", len(loaded.Rules))
+		test.Fatalf("only %d rules loaded from the live config, which is not a real corpus", len(loaded.Rules))
 	}
 	if len(loaded.Overrides) == 0 || len(loaded.IgnorePatterns) == 0 {
-		t.Fatalf("overrides=%d ignorePatterns=%d, expected both non-empty", len(loaded.Overrides), len(loaded.IgnorePatterns))
+		test.Fatalf("overrides=%d ignorePatterns=%d, expected both non-empty", len(loaded.Overrides), len(loaded.IgnorePatterns))
 	}
 
 	// Generated code gets every rule (#c076xbg). The one override left is the GraphQL output's
@@ -43,7 +43,7 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 	// generated file nothing is off.
 	graphQlOutput := loaded.Resolve("libraries/structure/source/api/graphql/GraphQlOperations.generated.ts")
 	if graphQlOutput.Enabled("nexus/consistency-no-abbreviated-identifier") {
-		t.Error("the GraphQL output's interim abbreviation override did not apply")
+		test.Error("the GraphQL output's interim abbreviation override did not apply")
 	}
 	workerBundle := loaded.Resolve("libraries/structure/source/api/web-sockets/shared-worker/WebSocketSharedWorkerCode.generated.ts")
 	// The folder spelling the ruling retired: a `generated/` override coming back would turn rules off here.
@@ -54,39 +54,39 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 		"@typescript-eslint/no-explicit-any",
 	} {
 		if !graphQlOutput.Enabled(ruleName) && ruleName != "nexus/consistency-no-abbreviated-identifier" {
-			t.Errorf("%s is off for the GraphQL output; generated code gets every rule", ruleName)
+			test.Errorf("%s is off for the GraphQL output; generated code gets every rule", ruleName)
 		}
 		if !workerBundle.Enabled(ruleName) {
-			t.Errorf("%s is off for a generated file; generated code gets every rule", ruleName)
+			test.Errorf("%s is off for a generated file; generated code gets every rule", ruleName)
 		}
 		if !inGeneratedFolder.Enabled(ruleName) {
-			t.Errorf("%s is off inside a generated/ folder; generated code gets every rule", ruleName)
+			test.Errorf("%s is off inside a generated/ folder; generated code gets every rule", ruleName)
 		}
 	}
 
 	// The same rule must still run on authored source, or the override is too broad.
 	authored := loaded.Resolve("libraries/structure/source/components/buttons/Button.tsx")
 	if !authored.Enabled("nexus/consistency-require-type-suffix") {
-		t.Error("consistency-require-type-suffix stopped running on authored source")
+		test.Error("consistency-require-type-suffix stopped running on authored source")
 	}
 
 	// The other two live override blocks.
 	if loaded.Resolve("next-env.d.ts").Enabled("structure/consistency-require-organized-imports") {
-		t.Error("the next-env.d.ts override did not apply")
+		test.Error("the next-env.d.ts override did not apply")
 	}
 	if loaded.Resolve("modules/finance/connections/QuickBooksAdapter.ts").Enabled("structure/network-no-direct-fetch") {
-		t.Error("the modules/** override did not apply")
+		test.Error("the modules/** override did not apply")
 	}
 	if !loaded.Resolve("libraries/structure/source/api/Fetch.ts").Enabled("structure/network-no-direct-fetch") {
-		t.Error("the modules/** override leaked outside modules/")
+		test.Error("the modules/** override leaked outside modules/")
 	}
 
 	// Ignored paths.
 	if !loaded.Resolve("node_modules/react/index.d.ts").Ignored {
-		t.Error("node_modules was not ignored")
+		test.Error("node_modules was not ignored")
 	}
 	if loaded.Resolve("libraries/structure/source/components/buttons/Button.tsx").Ignored {
-		t.Error("real source was ignored")
+		test.Error("real source was ignored")
 	}
 }
 
@@ -121,17 +121,17 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 // That is a decision somebody made and did not write down, and it is not this test's to reverse.
 // The test therefore asserts membership exactly and reports severity rather than requiring it to
 // match, so the difference is visible instead of blocking or being smoothed away.
-func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
-	t.Parallel()
-	asWritten, err := Load(liveConfigPath(t))
+func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
+	test.Parallel()
+	asWritten, err := Load(liveConfigPath(test))
 	if err != nil {
-		t.Fatalf("loading the live config: %v", err)
+		test.Fatalf("loading the live config: %v", err)
 	}
 
 	// Every plugin-default rule must be reachable through the declaration alone.
 	fromPlugins := RulesFromPlugins(asWritten.Plugins, map[string]RuleSetting{})
 	if len(fromPlugins) != len(PluginDefaultRules) {
-		t.Fatalf("the live config's plugins resolve %d of %d plugin-default rules; a rule whose "+
+		test.Fatalf("the live config's plugins resolve %d of %d plugin-default rules; a rule whose "+
 			"plugin is not declared would be lost the moment its hand-written line came out",
 			len(fromPlugins), len(PluginDefaultRules))
 	}
@@ -140,9 +140,9 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
-	namedInFile, err := ruleNamesInChain(liveConfigPath(t))
+	namedInFile, err := ruleNamesInChain(liveConfigPath(test))
 	if err != nil {
-		t.Fatalf("reading the rules block: %v", err)
+		test.Fatalf("reading the rules block: %v", err)
 	}
 
 	missingByHand, severityDiffers := 0, 0
@@ -159,12 +159,12 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 		}
 	}
 
-	t.Logf("plugin-default rules: %d resolved from the declaration, %d also named by hand, "+
+	test.Logf("plugin-default rules: %d resolved from the declaration, %d also named by hand, "+
 		"%d of those at a severity the declaration would not contribute",
 		len(fromPlugins), len(PluginDefaultRules)-missingByHand, severityDiffers)
 
 	if severityDiffers > 0 {
-		t.Logf("the hand-written lines set %d rules to a severity `warn_correctness` does not "+
+		test.Logf("the hand-written lines set %d rules to a severity `warn_correctness` does not "+
 			"contribute, so removing them would lower those rules to warn. Ruled 2026-08-25 that "+
 			"they stay at error: parity is the criterion for which rules run rather than how "+
 			"loudly, and this set holds no rule whose violation is arguably fine. See "+
@@ -177,7 +177,7 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	// these lines believing them redundant, this is the check that says otherwise, and a log line
 	// in a passing test is not something anyone reads.
 	if missingByHand != 0 {
-		t.Errorf("%d plugin-default rules are no longer named in the config, so they have dropped "+
+		test.Errorf("%d plugin-default rules are no longer named in the config, so they have dropped "+
 			"from error to warn. If that was deliberate, update this test and say so; if it was a "+
 			"cleanup removing lines that looked redundant, the lines were load-bearing and the "+
 			"reasoning is on `PluginDefaultSeverity`", missingByHand)
@@ -264,11 +264,11 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 // It writes nothing. The config being guarded is untracked and shared, so a check that needed a
 // mutated copy on disk would either touch the artifact it guards or drift from it; `ruleNamesInContents`
 // exists so this one does neither.
-func TestTheGuardCatchesARemovedLine(t *testing.T) {
-	t.Parallel()
-	intact, err := ruleNamesInChain(liveConfigPath(t))
+func TestTheGuardCatchesARemovedLine(test *testing.T) {
+	test.Parallel()
+	intact, err := ruleNamesInChain(liveConfigPath(test))
 	if err != nil {
-		t.Fatalf("reading the rules blocks: %v", err)
+		test.Fatalf("reading the rules blocks: %v", err)
 	}
 	unnamed := func(named map[string]RuleSetting) int {
 		missing := 0
@@ -283,7 +283,7 @@ func TestTheGuardCatchesARemovedLine(t *testing.T) {
 	// The control: as shipped, every plugin-default rule is named by hand. If this is ever not true
 	// the mutation below proves nothing, because the count was already moving.
 	if before := unnamed(intact); before != 0 {
-		t.Fatalf("%d plugin-default rules are already unnamed before any mutation, so this test "+
+		test.Fatalf("%d plugin-default rules are already unnamed before any mutation, so this test "+
 			"cannot attribute a change to the removal", before)
 	}
 
@@ -295,14 +295,14 @@ func TestTheGuardCatchesARemovedLine(t *testing.T) {
 	}
 	for _, name := range removed {
 		if _, present := stripped[name]; !present {
-			t.Fatalf("%q is not named in the live config, so removing it models nothing; pick a "+
+			test.Fatalf("%q is not named in the live config, so removing it models nothing; pick a "+
 				"rule the config actually carries", name)
 		}
 		delete(stripped, name)
 	}
 
 	if after := unnamed(stripped); after != len(removed) {
-		t.Errorf("after removing %d plugin-default lines the guard counts %d unnamed; it must count "+
+		test.Errorf("after removing %d plugin-default lines the guard counts %d unnamed; it must count "+
 			"exactly the removals or it cannot tell a cleanup from a no-op", len(removed), after)
 	}
 }

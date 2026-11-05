@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
-	t.Parallel()
+func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		binding string
@@ -16,9 +16,9 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 		{"local alias", "const alias = props; const items = alias ?? [];"},
 	} {
 		for _, functionName := range []string{"Component", "ordinary"} {
-			t.Run(testCase.name+"/"+functionName, func(t *testing.T) {
-				t.Parallel()
-				function, ranges := rangesFor(t, fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding))
+			test.Run(testCase.name+"/"+functionName, func(test *testing.T) {
+				test.Parallel()
+				function, ranges := rangesFor(test, fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding))
 				var mutationOrder static_single_assignment.EvaluationOrder
 				calls := 0
 				for _, instruction := range function.Instructions {
@@ -30,7 +30,7 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 					}
 				}
 				if calls != 1 {
-					t.Fatalf("found %d calls, want one conditional mutation", calls)
+					test.Fatalf("found %d calls, want one conditional mutation", calls)
 				}
 				foundSource, foundFallback, sourceWidened, fallbackWidened := false, false, false, false
 				for _, identifier := range function.Identifiers {
@@ -47,21 +47,21 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 					}
 				}
 				if !foundSource || !foundFallback {
-					t.Fatal("source or fallback was not exercised")
+					test.Fatal("source or fallback was not exercised")
 				}
 				if wantWidened := functionName == "ordinary"; fallbackWidened != wantWidened {
-					t.Errorf("fallback widened=%t, want %t", fallbackWidened, wantWidened)
+					test.Errorf("fallback widened=%t, want %t", fallbackWidened, wantWidened)
 				}
 				if wantWidened := functionName == "ordinary"; sourceWidened != wantWidened {
-					t.Errorf("source widened=%t, want %t", sourceWidened, wantWidened)
+					test.Errorf("source widened=%t, want %t", sourceWidened, wantWidened)
 				}
 			})
 		}
 	}
 }
 
-func TestManualMemoizationPreservesFrozenPropertyFallback(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationPreservesFrozenPropertyFallback(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -93,14 +93,14 @@ return <div>{result}</div>;
 function Component() {const request = useProjects(); const result = useMemo(() => request.data ?? [], [request.data]); return <div>{result}</div>;}`, false},
 		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered {
-				t.Fatal("fixture did not lower")
+				test.Fatal("fixture did not lower")
 			}
 			if (len(findings) != 0) != testCase.fires {
-				t.Fatalf("findings=%v, want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%v, want fires=%t", findings, testCase.fires)
 			}
 		})
 	}

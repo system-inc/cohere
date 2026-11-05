@@ -20,8 +20,8 @@ const noAwaitInLoopFile = "/repository/source/NoAwaitInLoop.ts"
 // different reason: an await on a for-of ITERABLE runs once, a for-await-of that is not itself
 // nested is deliberate asynchronous iteration, a plain `using` does not wait, and an `await using`
 // in a for-loop INITIALIZER runs once.
-func TestNoAwaitInLoopFires(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -47,16 +47,16 @@ func TestNoAwaitInLoopFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpectedAwait")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpectedAwait")
 		})
 	}
 }
 
-func TestNoAwaitInLoopStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -85,10 +85,10 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -104,8 +104,8 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 // The offsets were checked by converting each to a line and column and comparing against the
 // installed build, and the semicolon question specifically was settled by running the same source
 // with the semicolon removed and watching upstream's end column move.
-func TestNoAwaitInLoopSpans(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -122,21 +122,21 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0].Range
 			got := testCase.sourceText[reported.Pos():reported.End()]
 			if reported.Pos() != testCase.wantStart || reported.End() != testCase.wantEnd {
-				t.Fatalf("expected [%d,%d) which is %q, got [%d,%d) which is %q",
+				test.Fatalf("expected [%d,%d) which is %q, got [%d,%d) which is %q",
 					testCase.wantStart, testCase.wantEnd, testCase.wantText,
 					reported.Pos(), reported.End(), got)
 			}
 			if got != testCase.wantText {
-				t.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, got)
+				test.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, got)
 			}
 		})
 	}
@@ -147,19 +147,19 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 // Nothing is interpolated, so this is equality on a constant rather than a guard against a format
 // string. It is here because the rule has one message and three entry points, and a reworded
 // description would otherwise be invisible.
-func TestNoAwaitInLoopMessage(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnexpectedAwaitInLoop.Id != "unexpectedAwait" {
-		t.Fatalf("expected id %q, got %q", "unexpectedAwait", messageUnexpectedAwaitInLoop.Id)
+		test.Fatalf("expected id %q, got %q", "unexpectedAwait", messageUnexpectedAwaitInLoop.Id)
 	}
-	result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile,
+	result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile,
 		"async function foo() { while (baz) { await bar; } }")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Description != messageUnexpectedAwaitInLoop.Description {
-		t.Fatalf("the reported description is not the rule's own")
+		test.Fatalf("the reported description is not the rule's own")
 	}
 }
 
@@ -179,8 +179,8 @@ func TestNoAwaitInLoopMessage(t *testing.T) {
 // fatal rather than an empty list. The cases below are legal source, so the boundary is what makes
 // them clean, and a firing control was run alongside them to prove the measurement could see a
 // report at all.
-func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -205,10 +205,10 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 		{"an await in a setter, which is illegal and recovered", "async function f(){ while (true) { class C { set x(v) { foo(await bar); } } } }"},
 		{"an await in a static block, which is illegal and recovered", "async function f(){ while (true) { class C { static { foo(await bar); } } } }"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -218,8 +218,8 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 //
 // A loop header has parts that run once and parts the loop re-enters, and being anywhere inside a
 // loop node is not the question. Every row was measured against the installed build at 10.8.1.
-func TestNoAwaitInLoopLoopPositions(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopLoopPositions(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -239,14 +239,14 @@ func TestNoAwaitInLoopLoopPositions(t *testing.T) {
 		{"do-while test is re-entered", "async function f(){ do {} while (await bar); }", true},
 		{"do-while body is re-entered", "async function f(){ do { await bar; } while (baz); }", true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if testCase.wantReport {
-				rule_testing.ExpectFindings(t, result, "unexpectedAwait")
+				rule_testing.ExpectFindings(test, result, "unexpectedAwait")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

@@ -54,8 +54,8 @@ func idMatchOf(pattern string, flags map[string]bool) any {
 // cohere lacks.
 //
 //	49 reporting cases, 51 clean cases.
-func TestIdMatchFires(t *testing.T) {
-	t.Parallel()
+func TestIdMatchFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -123,20 +123,20 @@ func TestIdMatchFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectFindings(t, result, testCase.findings...)
+		rule_testing.ExpectFindings(test, result, testCase.findings...)
 	}
 }
 
 // TestIdMatchStaysSilent carries upstream's clean cases, which are the false positives it already
 // thought about. Each one is a class this port would otherwise ship.
-func TestIdMatchStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestIdMatchStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -200,11 +200,11 @@ func TestIdMatchStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
 		// matches the CALL NAME: a test that asserts the same property by hand reads to it as a
 		// rule nothing proves can stay quiet.
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -220,8 +220,8 @@ func TestIdMatchStaysSilent(t *testing.T) {
 //
 // Every expected span and message string is what the installed ESLint 10.8.1 rule produced on the
 // same source, read out of the oracle run rather than derived by hand.
-func TestIdMatchSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestIdMatchSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -274,9 +274,9 @@ func TestIdMatchSpansAndMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.spans) {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, len(testCase.spans), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -284,13 +284,13 @@ func TestIdMatchSpansAndMessages(t *testing.T) {
 		for index, diagnostic := range result.Diagnostics {
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.spans[index] {
-				t.Errorf("%q finding %d: expected the span to cover %q, got %q",
+				test.Errorf("%q finding %d: expected the span to cover %q, got %q",
 					testCase.source, index, testCase.spans[index], reported)
 			}
 			// The whole computed sentence, not a prefix of it: the name and the pattern are both
 			// interpolated and both are the parts a defect would get wrong.
 			if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]) {
-				t.Errorf("%q finding %d: expected the message to open with %q, got %q",
+				test.Errorf("%q finding %d: expected the message to open with %q, got %q",
 					testCase.source, index, testCase.messages[index], diagnostic.Message.Description)
 			}
 		}
@@ -305,46 +305,46 @@ func TestIdMatchSpansAndMessages(t *testing.T) {
 // "error" is handed nil, and `options.(IdMatchSettings)` on nil yields the zero value, whose
 // Pattern is nil. That has to mean "report nothing", matching upstream's `^.+$` default, rather
 // than panicking on a nil regexp at the first identifier.
-func TestIdMatchDecoderReadsBothTupleElements(t *testing.T) {
-	t.Parallel()
+func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`))
 	if err != nil {
-		t.Fatalf("decoding a full option tuple: %v", err)
+		test.Fatalf("decoding a full option tuple: %v", err)
 	}
 	settings, ok := decoded.(IdMatchSettings)
 	if !ok {
-		t.Fatalf("expected IdMatchSettings, got %T", decoded)
+		test.Fatalf("expected IdMatchSettings, got %T", decoded)
 	}
 	if settings.PatternText != "^[a-z]+$" || settings.Pattern == nil {
-		t.Errorf("expected the pattern to be read, got %q", settings.PatternText)
+		test.Errorf("expected the pattern to be read, got %q", settings.PatternText)
 	}
 	if !settings.CheckProperties || !settings.CheckClassFields ||
 		!settings.OnlyDeclarations || !settings.IgnoreDestructuring {
-		t.Errorf("expected all four flags on, got %+v", settings)
+		test.Errorf("expected all four flags on, got %+v", settings)
 	}
 
 	// A pattern alone leaves every flag off, which is upstream's defaultOptions.
 	decoded, err = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
 	if err != nil {
-		t.Fatalf("decoding a pattern-only tuple: %v", err)
+		test.Fatalf("decoding a pattern-only tuple: %v", err)
 	}
 	settings, _ = decoded.(IdMatchSettings)
 	if settings.CheckProperties || settings.CheckClassFields ||
 		settings.OnlyDeclarations || settings.IgnoreDestructuring {
-		t.Errorf("expected every flag off by default, got %+v", settings)
+		test.Errorf("expected every flag off by default, got %+v", settings)
 	}
 
 	// A pattern that does not compile is an error rather than a rule that silently matches
 	// everything, because an inert rule that looks configured is the worse of the two failures.
 	if _, err := DecodeIdMatchOptions([]byte(`["^[a-z"]`)); err == nil {
-		t.Error("expected an uncompilable pattern to be reported, got no error")
+		test.Error("expected an uncompilable pattern to be reported, got no error")
 	}
 
 	// A rule handed nil options reports nothing rather than dereferencing a nil pattern.
-	result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, "var no_camelcased = 1;", nil)
+	result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "var no_camelcased = 1;", nil)
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
+		test.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }
@@ -366,8 +366,8 @@ func TestIdMatchDecoderReadsBothTupleElements(t *testing.T) {
 //
 // The last row is the control: without it a rule that had simply gone silent on all destructuring
 // would pass the first three and prove nothing.
-func TestIdMatchDestructuringKeysAreNeverChecked(t *testing.T) {
-	t.Parallel()
+func TestIdMatchDestructuringKeysAreNeverChecked(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -401,9 +401,9 @@ func TestIdMatchDestructuringKeysAreNeverChecked(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -414,7 +414,7 @@ func TestIdMatchDestructuringKeysAreNeverChecked(t *testing.T) {
 		source := result.SourceFile.Text()
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.reported {
-			t.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
+			test.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
 		}
 	}
 }
@@ -447,8 +447,8 @@ func TestIdMatchDestructuringKeysAreNeverChecked(t *testing.T) {
 //
 // The rest-element and array-pattern rows are the same class from the other side: both report with
 // `properties` off, so neither is governed by it.
-func TestIdMatchOptionGatesAreArmSpecific(t *testing.T) {
-	t.Parallel()
+func TestIdMatchOptionGatesAreArmSpecific(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -481,9 +481,9 @@ func TestIdMatchOptionGatesAreArmSpecific(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -494,7 +494,7 @@ func TestIdMatchOptionGatesAreArmSpecific(t *testing.T) {
 		source := result.SourceFile.Text()
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.reported {
-			t.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
+			test.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
 		}
 	}
 }
@@ -511,28 +511,28 @@ func TestIdMatchOptionGatesAreArmSpecific(t *testing.T) {
 //
 // The second row also shows the message keeps the hash while the pattern never saw it, which is
 // upstream rendering `#{{name}}` from a name that carries none.
-func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(t *testing.T) {
-	t.Parallel()
+func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(test *testing.T) {
+	test.Parallel()
 
 	// A pattern forbidding `#` is satisfied, which is only possible if the name was stripped first.
-	result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, "class Ok { #field = 1; }",
+	result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "class Ok { #field = 1; }",
 		idMatchOf("^[^#]+$", map[string]bool{"classFields": true}))
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("expected the hash to be stripped before matching, got %d findings: %v",
+		test.Errorf("expected the hash to be stripped before matching, got %d findings: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 
 	// The control: a pattern REQUIRING `#` fails for both names, so the rule is not simply silent
 	// on this source.
-	result = rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, "class Ok { #field = 1; }",
+	result = rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "class Ok { #field = 1; }",
 		idMatchOf("^#", map[string]bool{"classFields": true}))
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("expected the control to report both names, got %d: %v",
+		test.Fatalf("expected the control to report both names, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 	// And the message renders the hash back, from a name that was matched without it.
 	if !strings.Contains(result.Diagnostics[1].Message.Description, "Identifier '#field'") {
-		t.Errorf("expected the message to render the hash, got %q", result.Diagnostics[1].Message.Description)
+		test.Errorf("expected the message to render the hash, got %q", result.Diagnostics[1].Message.Description)
 	}
 }
 
@@ -543,20 +543,20 @@ func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(t *testing.T) {
 // element after the severity, which for upstream's `["error", "^[a-z]+$", {...}]` is
 // `["^[a-z]+$", {...}]`. It used to hand over the bare pattern alone, so the rule ran with every
 // flag silently off: the "registered, plausible, and wrong" shape the standard warns about.
-func TestIdMatchDecoderAcceptsTheConfigLayersShape(t *testing.T) {
-	t.Parallel()
+func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
+	test.Parallel()
 
 	// Upstream's spelling: the pattern, then the flags as the second element.
 	decoded, err := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`))
 	if err != nil {
-		t.Fatalf("decoding the option list: %v", err)
+		test.Fatalf("decoding the option list: %v", err)
 	}
 	settings, _ := decoded.(IdMatchSettings)
 	if settings.PatternText != "^[a-z]+$" {
-		t.Errorf("expected the pattern to be read, got %q", settings.PatternText)
+		test.Errorf("expected the pattern to be read, got %q", settings.PatternText)
 	}
 	if !settings.CheckProperties || !settings.CheckClassFields {
-		t.Errorf("expected the second element's flags to be read, got %+v", settings)
+		test.Errorf("expected the second element's flags to be read, got %+v", settings)
 	}
 
 	// Shapes the config layer does not deliver, or that upstream's schema refuses, are refused
@@ -572,26 +572,26 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 		`["^[a-z]+$", {"properties": true}, {"classFields": true}]`,
 	} {
 		if _, err := DecodeIdMatchOptions([]byte(raw)); err == nil {
-			t.Errorf("expected %s to be refused, got no error", raw)
+			test.Errorf("expected %s to be refused, got no error", raw)
 		}
 	}
 
 	// And end to end through the rule, so the contract is pinned at the surface a config reaches
 	// rather than only at the decoder.
-	result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, "class C { no_under = 1; }",
-		mustDecodeIdMatch(t, `["^[^_]+$", {"classFields": true}]`))
+	result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "class C { no_under = 1; }",
+		mustDecodeIdMatch(test, `["^[^_]+$", {"classFields": true}]`))
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the second element's classFields flag to reach the rule, got %d findings: %v",
+		test.Errorf("expected the second element's classFields flag to reach the rule, got %d findings: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }
 
 // mustDecodeIdMatch decodes exactly the bytes the config layer would hand the rule.
-func mustDecodeIdMatch(t *testing.T, raw string) any {
-	t.Helper()
+func mustDecodeIdMatch(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeIdMatchOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", raw, err)
+		test.Fatalf("decoding %s: %v", raw, err)
 	}
 	return decoded
 }

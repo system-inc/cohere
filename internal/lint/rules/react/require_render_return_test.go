@@ -27,8 +27,8 @@ const requireRenderReturnFile = "/repository/source/RequireRenderReturn.tsx"
 // is unset. Three valid cases carry a `features: ['class fields']` marker, which selects a parser in
 // upstream's harness and has no counterpart here, since our parser reads class fields
 // unconditionally.
-func TestRequireRenderReturnFires(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -130,17 +130,17 @@ func TestRequireRenderReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
 // The clean cases. Upstream's thirteen, plus the ones that pin a decision the corpus never writes.
-func TestRequireRenderReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -237,10 +237,10 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -256,8 +256,8 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 // Each expectation below is the exact text the installed build underlines, taken from its
 // reported columns rather than from reading the rule. `rule_testing.Run` does not trim the fixture, so
 // the slice out of the literal and the bytes on disk are the same string.
-func TestRequireRenderReturnSpan(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -313,16 +313,16 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding points at %q, want %q", reported, testCase.reported)
+				test.Errorf("finding points at %q, want %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -333,20 +333,20 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 // `ExpectFindings` asserts the count and the ids and cannot see that the second finding points at
 // the second component. A rule collecting into a map rather than a slice passes that assertion and
 // emits these in whatever order the map iterated.
-func TestRequireRenderReturnSpansAreInSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnSpansAreInSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class A extends React.Component { render() { } }\nvar B = createReactClass({ render: function() { } });\n"
-	result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, sourceText)
+	result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, sourceText)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("want 2 diagnostics, got %d", len(result.Diagnostics))
+		test.Fatalf("want 2 diagnostics, got %d", len(result.Diagnostics))
 	}
 	want := []string{"render() { }", "render: function() { }"}
 	for i, expected := range want {
 		diagnostic := result.Diagnostics[i]
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != expected {
-			t.Errorf("diagnostic %d points at %q, want %q", i, reported, expected)
+			test.Errorf("diagnostic %d points at %q, want %q", i, reported, expected)
 		}
 	}
 }
@@ -357,15 +357,15 @@ func TestRequireRenderReturnSpansAreInSourceOrder(t *testing.T) {
 // and nothing a format string can move. What this guards is the pair staying attached to each
 // other: a rule reporting the right id with a description copied from a neighbour passes every
 // assertion above.
-func TestRequireRenderReturnMessage(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageNoRenderReturn.Id != "noRenderReturn" {
-		t.Errorf("message id is %q, want %q", messageNoRenderReturn.Id, "noRenderReturn")
+		test.Errorf("message id is %q, want %q", messageNoRenderReturn.Id, "noRenderReturn")
 	}
 	const wantPrefix = "A class component's `render` returns nothing, so React receives `undefined` where it expected an element."
 	if !strings.HasPrefix(messageNoRenderReturn.Description, wantPrefix) {
-		t.Errorf("description starts %q, want prefix %q", messageNoRenderReturn.Description, wantPrefix)
+		test.Errorf("description starts %q, want prefix %q", messageNoRenderReturn.Description, wantPrefix)
 	}
 }
 
@@ -379,8 +379,8 @@ func TestRequireRenderReturnMessage(t *testing.T) {
 // corpus is JSX.
 //
 // The source below is deliberately free of JSX so a `.ts` parse is legal.
-func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
 	for _, fileName := range []string{
@@ -389,10 +389,10 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.jsx",
 		"/repository/source/Probe.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RequireRenderReturn, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "noRenderReturn")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RequireRenderReturn, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "noRenderReturn")
 		})
 	}
 }
@@ -403,10 +403,10 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 // options without a fallback yields the zero value silently. This rule has no `Decode` at all and
 // therefore no decoder to go wrong, so this pins that the absence is deliberate: passing nil
 // explicitly reaches the rule the same way the live config does, and it still reports.
-func TestRequireRenderReturnIgnoresOptions(t *testing.T) {
-	t.Parallel()
+func TestRequireRenderReturnIgnoresOptions(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
-	result := rule_testing.RunWithOptions(t, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
-	rule_testing.ExpectFindings(t, result, "noRenderReturn")
+	result := rule_testing.RunWithOptions(test, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
+	rule_testing.ExpectFindings(test, result, "noRenderReturn")
 }

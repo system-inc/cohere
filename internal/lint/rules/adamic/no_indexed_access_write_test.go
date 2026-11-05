@@ -20,15 +20,15 @@ func indexedAccessSubject() rule.Rule {
 	return rule.Rule{Name: "adamic/no-indexed-access-write", Run: func(rule.Context, any) rule.Listeners { return nil }}
 }
 
-func TestIndexedAccessWrite(t *testing.T) {
-	t.Parallel()
+func TestIndexedAccessWrite(test *testing.T) {
+	test.Parallel()
 	refused, err := os.ReadFile("testdata/indexed-access/refused.ts")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	accepted, err := os.ReadFile("testdata/indexed-access/accepted.ts")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for name, source := range map[string]string{
 		"runtime probe": string(refused),
@@ -47,19 +47,19 @@ test<{ readonly value: 1 }>();`,
 		"nested":      `function make<T extends { readonly inner: { readonly value: number } }>(): T['inner']['value'] { const value: T['inner']['value'] = 2; return value; }`,
 		"nested slot": `function make<T extends { readonly value: number }>(): { readonly value: T['value'] } { return { value: 2 }; }`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if count := typeErrorCount(t, source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			if count := typeErrorCount(test, source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(t, indexedAccessSubject(), source)
-			rule_testing.ExpectFindings(t, result, "indexedAccessWrite")
-			expectSpans(t, source, result, "2")
+			result := runAdamic(test, indexedAccessSubject(), source)
+			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
+			expectSpans(test, source, result, "2")
 			if len(result.Diagnostics) == 1 {
 				message := result.Diagnostics[0].Message.Description
 				for _, text := range []string{"T[", "2", "number"} {
 					if !strings.Contains(message, text) {
-						t.Errorf("message %q lacks %q", message, text)
+						test.Errorf("message %q lacks %q", message, text)
 					}
 				}
 			}
@@ -71,52 +71,52 @@ test<{ readonly value: 1 }>();`,
 		"generic key":        `function make<T extends { readonly value: number }, K extends 'value'>(source: T, key: K): T[K] { const value: T[K] = source[key]; return value; }`,
 		"nested read":        `function make<T extends { readonly inner: { readonly value: number } }>(source: T): T['inner']['value'] { const value: T['inner']['value'] = source.inner.value; return value; }`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if count := typeErrorCount(t, source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			if count := typeErrorCount(test, source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(t, runAdamic(t, indexedAccessSubject(), source))
+			rule_testing.ExpectClean(test, runAdamic(test, indexedAccessSubject(), source))
 			// Plant a concrete source into the same slot: each clean fixture must expose a refusal.
 			plant := strings.NewReplacer("source.value", "2", "source[key]", "2", "source.inner.value", "2", "return source;", "return { value: 2 };").Replace(source)
-			result := runAdamic(t, indexedAccessSubject(), plant)
-			rule_testing.ExpectFindings(t, result, "indexedAccessWrite")
-			expectSpans(t, plant, result, "2")
+			result := runAdamic(test, indexedAccessSubject(), plant)
+			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
+			expectSpans(test, plant, result, "2")
 		})
 	}
 }
 
 // Both spread copies and contextual methods can move a concrete value into an
 // indexed generic slot. Each refused file is also a tsc-accepted Node failure.
-func TestIndexedAccessWriteEdges(t *testing.T) {
-	t.Parallel()
+func TestIndexedAccessWriteEdges(test *testing.T) {
+	test.Parallel()
 	for name, span := range map[string]string{
 		"spread": "source", "spread-override": "2", "method-return": "get", "method-argument": "put",
 		"method-reused": "result", "method-mixed-return": "get",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			bytes, err := os.ReadFile("testdata/indexed-access/" + name + ".ts")
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			source := string(bytes)
-			if count := typeErrorCount(t, source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+			if count := typeErrorCount(test, source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(t, indexedAccessSubject(), source)
-			rule_testing.ExpectFindings(t, result, "indexedAccessWrite")
-			expectSpans(t, source, result, span)
+			result := runAdamic(test, indexedAccessSubject(), source)
+			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
+			expectSpans(test, source, result, span)
 		})
 	}
 }
 
-func TestIndexedAccessWriteEdgesStayClean(t *testing.T) {
-	t.Parallel()
+func TestIndexedAccessWriteEdgesStayClean(test *testing.T) {
+	test.Parallel()
 	read := func(name string) string {
 		bytes, err := os.ReadFile("testdata/indexed-access/" + name + ".ts")
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		return string(bytes)
 	}
@@ -141,19 +141,19 @@ func TestIndexedAccessWriteEdgesStayClean(t *testing.T) {
 			"put(value: number): T['value'] { return source.value; }", "put(value: T['value']): T['value'] { return value; }", "put",
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if count := typeErrorCount(t, fixture.source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			if count := typeErrorCount(test, fixture.source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(t, runAdamic(t, indexedAccessSubject(), fixture.source))
+			rule_testing.ExpectClean(test, runAdamic(test, indexedAccessSubject(), fixture.source))
 			plant := strings.Replace(fixture.source, fixture.old, fixture.plant, 1)
-			if count := typeErrorCount(t, plant); count != 0 {
-				t.Fatalf("plant tsgo diagnostics: %d, want 0", count)
+			if count := typeErrorCount(test, plant); count != 0 {
+				test.Fatalf("plant tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(t, indexedAccessSubject(), plant)
-			rule_testing.ExpectFindings(t, result, "indexedAccessWrite")
-			expectSpans(t, plant, result, fixture.span)
+			result := runAdamic(test, indexedAccessSubject(), plant)
+			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
+			expectSpans(test, plant, result, fixture.span)
 		})
 	}
 }

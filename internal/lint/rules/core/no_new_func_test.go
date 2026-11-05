@@ -21,8 +21,8 @@ const newFuncFile = "/repository/source/NewFunc.ts"
 // hands the rule a nil checker, and because this rule guards on that it would go completely silent:
 // every silent case would pass vacuously and every reporting case would fail in a way that reads
 // like a rule defect. `TestNoNewFuncNeedsTheTypedHarness` at the bottom pins that.
-func TestNoNewFuncFires(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -41,10 +41,10 @@ func TestNoNewFuncFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
@@ -56,8 +56,8 @@ func TestNoNewFuncFires(t *testing.T) {
 // no bounded structural walk separates them from the two reporting cases where the shadow sits in an
 // inner scope. The rest pin that a mention of the global is not an invocation of it: passed as an
 // argument, used as a computed key, or reached through a method that does not construct.
-func TestNoNewFuncStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -79,10 +79,10 @@ func TestNoNewFuncStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -98,8 +98,8 @@ func TestNoNewFuncStaysSilent(t *testing.T) {
 // is one byte offset from the literal here. These have none, and the assertion slices the trimmed
 // text rather than the literal so that a later edit adding a blank line fails loudly instead of
 // silently sliding.
-func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncReportsTheInvokingExpression(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -113,16 +113,16 @@ func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := result.Diagnostics[0].Range
 			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
-				t.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
+				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), onDisk[got.Pos():got.End()],
 					testCase.wantPos, testCase.wantEnd,
 					onDisk[testCase.wantPos:testCase.wantEnd])
@@ -136,8 +136,8 @@ func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
 // The parenthesized receiver is the one the corpus nearly reaches: it writes
 // `(Function?.call)(null, ...)` but never a plain `(Function).call()`, and our tree keeps the
 // parenthesis node that ESTree discards, so both need the skip.
-func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncFiresOnShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -150,10 +150,10 @@ func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
@@ -164,8 +164,8 @@ func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
 // `Function.bind;` is the sharper of the two: the corpus asserts that `Function.bind(...)` reports
 // even when nothing calls the result, so a reader could reasonably conclude the rule anchors on the
 // member access. It does not, and this is the case that separates them.
-func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncDeclinesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -176,10 +176,10 @@ func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -189,35 +189,35 @@ func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
 // This rule guards on a nil checker, so under `rule_testing.Run` it goes completely silent rather than
 // panicking. Silence is the more dangerous failure: every StaysSilent case above would pass
 // vacuously. This asserts the difference directly on an input the rule certainly reports.
-func TestNoNewFuncNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "var a = new Function(\"b\", \"c\", \"return b+c\");"
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoNewFunc, newFuncFile, source), "noFunctionConstructor")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoNewFunc, newFuncFile, source), "noFunctionConstructor")
 
-	if got := len(rule_testing.Run(t, NoNewFunc, newFuncFile, source).Diagnostics); got != 0 {
-		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
+	if got := len(rule_testing.Run(test, NoNewFunc, newFuncFile, source).Diagnostics); got != 0 {
+		test.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
 	}
 }
 
 // The message, asserted against literals typed here rather than the rule's own constants.
-func TestNoNewFuncReportsWhyItMatters(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncReportsWhyItMatters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile,
+	result := rule_testing.RunTyped(test, NoNewFunc, newFuncFile,
 		"var a = new Function(\"b\", \"c\", \"return b+c\");")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noFunctionConstructor" {
-		t.Fatalf("message id was %q", got)
+		test.Fatalf("message id was %q", got)
 	}
 	const wantPrefix = "This builds a function by compiling a string at runtime"
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("description was %q", got)
+		test.Fatalf("description was %q", got)
 	}
 }
 
@@ -229,8 +229,8 @@ func TestNoNewFuncReportsWhyItMatters(t *testing.T) {
 // them, which is how this test came to exist.
 //
 // All four rows measured clean on eslint 10.8.1 before being written here.
-func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -243,10 +243,10 @@ func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -260,8 +260,8 @@ func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
 //
 // The numeric row is the other side of the same set: `Function[0]` names no method and is clean on
 // the same build, which is what makes the wider set safe rather than merely wider.
-func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncReadsATemplateMethodName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -272,17 +272,17 @@ func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
 }
 
-func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncDeclinesANumericMethodSubscript(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -292,10 +292,10 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -311,8 +311,8 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
 //
 // All four are clean on eslint 10.8.1: upstream reaches the global through its scope analysis rather
 // than by reading a receiver's text, so a qualified name never enters its loop at all.
-func TestNoNewFuncSurvivesANonIdentifierReceiver(t *testing.T) {
-	t.Parallel()
+func TestNoNewFuncSurvivesANonIdentifierReceiver(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -325,12 +325,12 @@ func TestNoNewFuncSurvivesANonIdentifierReceiver(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Reaching this assertion at all is most of the test: without the guard the call above
 			// panics inside the walk and the failure is a stack trace rather than a diagnostic count.
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }

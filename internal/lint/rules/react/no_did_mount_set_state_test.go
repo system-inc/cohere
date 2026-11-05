@@ -42,8 +42,8 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // written directly in the lifecycle body and one inside an event callback, and reports exactly
 // once by default. A port that ignored the function count would report twice here and still look
 // plausible, because the case is in the failing list either way.
-func TestNoDidMountSetStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -156,11 +156,11 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+			rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 		})
 	}
 }
@@ -172,8 +172,8 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 // a `setTimeout` or a promise continuation. Those five are the corpus doing the work: they are what
 // a port asking only "is this inside componentDidMount" gets wrong, and three of them reappear as
 // failures in the option table above.
-func TestNoDidMountSetStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -291,11 +291,11 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -308,8 +308,8 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 // never check that the finding points anywhere in particular. Every case below exists because a
 // mutation to the rule survived the imported corpus, or because reading the reference implementation
 // showed a branch nothing upstream reaches.
-func TestNoDidMountSetStateOwnCases(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateOwnCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -709,15 +709,15 @@ class Hello extends React.Component {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, testCase.fileName, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			if len(testCase.findings) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -734,8 +734,8 @@ class Hello extends React.Component {
 // The message text is asserted with an exact prefix rather than with `strings.Contains` on an
 // interpolated value, because a containment check on a rendered string passes for a string that has
 // the needle plus a defect.
-func TestNoDidMountSetStateReportsTheCallee(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateReportsTheCallee(test *testing.T) {
+	test.Parallel()
 
 	sourceText := `
 class Hello extends React.Component {
@@ -744,18 +744,18 @@ class Hello extends React.Component {
   }
 }
 `
-	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, sourceText,
 		NoMethodSetStateOptions{})
-	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "this.setState" {
-		t.Errorf("finding points at %q, want %q", reported, "this.setState")
+		test.Errorf("finding points at %q, want %q", reported, "this.setState")
 	}
 
 	if !strings.HasPrefix(diagnostic.Message.Description, "`setState` is called in `componentDidMount`.") {
-		t.Errorf("message description = %q, want it to open with the finding", diagnostic.Message.Description)
+		test.Errorf("message description = %q, want it to open with the finding", diagnostic.Message.Description)
 	}
 }
 
@@ -765,8 +765,8 @@ class Hello extends React.Component {
 // rather than `PropertyAccessExpression`, and a rule reporting the access's own name node rather
 // than the callee would point at four characters in one spelling and sixteen in the other while
 // passing an id assertion in both.
-func TestNoDidMountSetStateReportsTheCalleeOnASubscript(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateReportsTheCalleeOnASubscript(test *testing.T) {
+	test.Parallel()
 
 	sourceText := `
 class Hello extends React.Component {
@@ -775,13 +775,13 @@ class Hello extends React.Component {
   }
 }
 `
-	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, sourceText,
 		NoMethodSetStateOptions{})
-	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != `this["setState"]` {
-		t.Errorf("finding points at %q, want %q", reported, `this["setState"]`)
+		test.Errorf("finding points at %q, want %q", reported, `this["setState"]`)
 	}
 }

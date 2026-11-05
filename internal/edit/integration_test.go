@@ -76,9 +76,9 @@ func walkForRules(node *ast.Node, listeners rule.Listeners) {
 
 // A real rule's fix must land at the right bytes and produce a file that still parses. This is the
 // end-to-end proof: the rule computes ranges against a real parse, and the engine applies them.
-func TestARealRuleFixLandsCorrectly(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestARealRuleFixLandsCorrectly(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	fileName := filepath.Join(directory, "imports.ts")
 	source := "import * as NodeFileSystem from 'fs';\n" +
 		"import * as NodePath from 'path';\n" +
@@ -87,21 +87,21 @@ func TestARealRuleFixLandsCorrectly(t *testing.T) {
 		"export const roots = [NodeFileSystem, NodePath, NodeOperatingSystem];\n"
 
 	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 
 	if !result.Changed {
-		t.Fatalf("the rule proposes fixes for three bare specifiers and none landed: %+v", result)
+		test.Fatalf("the rule proposes fixes for three bare specifiers and none landed: %+v", result)
 	}
 
 	written, err := os.ReadFile(fileName)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	got := string(written)
 
@@ -112,17 +112,17 @@ func TestARealRuleFixLandsCorrectly(t *testing.T) {
 		"export const roots = [NodeFileSystem, NodePath, NodeOperatingSystem];\n"
 
 	if got != want {
-		t.Fatalf("the rewrite is wrong:\n  want %q\n  got  %q", want, got)
+		test.Fatalf("the rewrite is wrong:\n  want %q\n  got  %q", want, got)
 	}
 
 	// Three fixes to one file, and every one measured against text the earlier ones moved. This is
 	// the offset case in its real form rather than its synthetic one.
 	if len(result.Applied) != 3 {
-		t.Fatalf("expected 3 fixes applied, got %d", len(result.Applied))
+		test.Fatalf("expected 3 fixes applied, got %d", len(result.Applied))
 	}
 
 	if parses, reason := Parses(fileName, got); !parses {
-		t.Fatalf("the rewritten file does not parse: %s", reason)
+		test.Fatalf("the rewritten file does not parse: %s", reason)
 	}
 }
 
@@ -130,24 +130,24 @@ func TestARealRuleFixLandsCorrectly(t *testing.T) {
 //
 // A rule whose fix does not actually silence its own finding would loop to the pass ceiling, and
 // that is worth catching here rather than discovering it on a whole tree.
-func TestARealRuleConvergesInTwoPasses(t *testing.T) {
-	t.Parallel()
+func TestARealRuleConvergesInTwoPasses(test *testing.T) {
+	test.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n"
 
 	result, err := FixText("imports.ts", source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 
 	if !result.Converged {
-		t.Fatalf("a real rule did not converge: %+v", result)
+		test.Fatalf("a real rule did not converge: %+v", result)
 	}
 	// One pass to apply, one to confirm nothing is left.
 	if result.Passes != 2 {
-		t.Fatalf("expected 2 passes, got %d", result.Passes)
+		test.Fatalf("expected 2 passes, got %d", result.Passes)
 	}
 	if result.Text != "import * as NodeFileSystem from 'node:fs';\n" {
-		t.Fatalf("unexpected result: %q", result.Text)
+		test.Fatalf("unexpected result: %q", result.Text)
 	}
 }
 
@@ -168,8 +168,8 @@ func TestARealRuleConvergesInTwoPasses(t *testing.T) {
 //
 // Fixed in internal/rule/rule.go, which now trims through `TokenRange`. The three shapes below are
 // the ones measured as broken before the fix.
-func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
-	t.Parallel()
+func TestReplaceNodeMustNotEatLeadingTrivia(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -191,14 +191,14 @@ func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
 			want:   "import * as NodeFileSystem from /* pinned */ 'node:fs';\n",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result, err := FixText("imports.ts", testCase.source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			if result.Text != testCase.want {
-				t.Fatalf("trivia was consumed by the fix:\n  want %q\n  got  %q", testCase.want, result.Text)
+				test.Fatalf("trivia was consumed by the fix:\n  want %q\n  got  %q", testCase.want, result.Text)
 			}
 		})
 	}
@@ -207,31 +207,31 @@ func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
 // A rule that reports without a fix must leave the file alone. Most rules are in this shape
 // deliberately — the namespace case in this very rule declines to fix because rewriting the import
 // without re-rooting its references through scope would leave the file uncompilable.
-func TestAFindingWithNoFixChangesNothing(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAFindingWithNoFixChangesNothing(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	fileName := filepath.Join(directory, "named.ts")
 	// A named import of a builtin: reported, and deliberately not fixed.
 	source := "import { readFileSync } from 'node:fs';\n\nexport const read = readFileSync;\n"
 
 	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 	if result.Changed {
-		t.Fatalf("a finding with no fix caused a rewrite")
+		test.Fatalf("a finding with no fix caused a rewrite")
 	}
 
 	onDisk, err := os.ReadFile(fileName)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if string(onDisk) != source {
-		t.Fatalf("the file changed:\n  want %q\n  got  %q", source, onDisk)
+		test.Fatalf("the file changed:\n  want %q\n  got  %q", source, onDisk)
 	}
 }
 
@@ -261,30 +261,30 @@ var breakingRule = rule.Rule{
 	},
 }
 
-func TestARuleProposingBrokenSyntaxIsRefused(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	fileName := filepath.Join(directory, "probe.ts")
 	source := "export function alpha() { return 1; }\n"
 
 	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(breakingRule), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 	if result.Changed {
-		t.Fatalf("a syntax-breaking fix from a real rule was written")
+		test.Fatalf("a syntax-breaking fix from a real rule was written")
 	}
 
 	onDisk, err := os.ReadFile(fileName)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if string(onDisk) != source {
-		t.Fatalf("the file was modified:\n  want %q\n  got  %q", source, onDisk)
+		test.Fatalf("the file was modified:\n  want %q\n  got  %q", source, onDisk)
 	}
 
 	refused := false
@@ -294,7 +294,7 @@ func TestARuleProposingBrokenSyntaxIsRefused(t *testing.T) {
 		}
 	}
 	if !refused {
-		t.Fatalf("no parse-failure refusal was recorded: %+v", result.Rejected)
+		test.Fatalf("no parse-failure refusal was recorded: %+v", result.Rejected)
 	}
 }
 
@@ -345,57 +345,57 @@ var nonSilencingRule = rule.Rule{
 // The engine used to keep the last pass that parsed, reasoning that it was a valid file. It is: ten
 // passes of this rule produce `{ { { ... } } }`, which parses and is nobody's code. Parsing and
 // being finished are different properties, and only the first one was ever checked.
-func TestAFileThatDoesNotConvergeIsNotWritten(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	fileName := filepath.Join(directory, "switch.ts")
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
 	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 
 	if result.Converged {
-		t.Fatalf("the probe rule cannot converge; the test proves nothing if it did")
+		test.Fatalf("the probe rule cannot converge; the test proves nothing if it did")
 	}
 	if result.Changed {
-		t.Fatalf("a file that never reached a fixpoint was reported as changed")
+		test.Fatalf("a file that never reached a fixpoint was reported as changed")
 	}
 	if len(result.Applied) != 0 {
-		t.Fatalf("fixes from a discarded run were reported as applied: %d", len(result.Applied))
+		test.Fatalf("fixes from a discarded run were reported as applied: %d", len(result.Applied))
 	}
 
 	onDisk, err := os.ReadFile(fileName)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if string(onDisk) != source {
-		t.Fatalf("the file was rewritten:\n  want %q\n  got  %q", source, string(onDisk))
+		test.Fatalf("the file was rewritten:\n  want %q\n  got  %q", source, string(onDisk))
 	}
 	if result.Text != source {
-		t.Fatalf("the result text is not the original:\n  want %q\n  got  %q", source, result.Text)
+		test.Fatalf("the result text is not the original:\n  want %q\n  got  %q", source, result.Text)
 	}
 }
 
 // The refusal names the rule that would not settle, not only the file it landed on.
 //
 // A reader handed a filename goes and reads code that is not the problem. The rule is the defect.
-func TestNonConvergenceNamesTheRule(t *testing.T) {
-	t.Parallel()
+func TestNonConvergenceNamesTheRule(test *testing.T) {
+	test.Parallel()
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
 	result, err := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(result.UnconvergedRules) != 1 || result.UnconvergedRules[0] != "probe-never-silences" {
-		t.Fatalf("expected the rule named, got %v", result.UnconvergedRules)
+		test.Fatalf("expected the rule named, got %v", result.UnconvergedRules)
 	}
 
 	// The rejection survives the refusal rather than being replaced by it.
@@ -406,15 +406,15 @@ func TestNonConvergenceNamesTheRule(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("the pass-budget rejection was dropped: %+v", result.Rejected)
+		test.Fatalf("the pass-budget rejection was dropped: %+v", result.Rejected)
 	}
 
 	summary := Summarize([]FileResult{result})
 	if len(summary.UnconvergedRules) != 1 || summary.UnconvergedRules[0] != "probe-never-silences" {
-		t.Fatalf("the summary does not name the rule: %v", summary.UnconvergedRules)
+		test.Fatalf("the summary does not name the rule: %v", summary.UnconvergedRules)
 	}
 	if len(summary.FilesNotConverged) != 1 {
-		t.Fatalf("the summary does not name the file: %v", summary.FilesNotConverged)
+		test.Fatalf("the summary does not name the file: %v", summary.FilesNotConverged)
 	}
 }
 
@@ -451,17 +451,17 @@ var siblingOverlapRule = rule.Rule{
 // is written with half of an edit that no rule proposed as a whole, and it parses, so the refusal
 // guard has no reason to fire. That combination is the reason the multi-fix hazard is worth a
 // warning rather than a shrug: the failure is silent by construction.
-func TestSiblingFixesFromOneDiagnosticHalfApply(t *testing.T) {
-	t.Parallel()
+func TestSiblingFixesFromOneDiagnosticHalfApply(test *testing.T) {
+	test.Parallel()
 	source := "const a = \"xy\";\n"
 
 	result, err := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		test.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(result.Applied) != 1 {
-		t.Fatalf("expected exactly one sibling to land, got %d", len(result.Applied))
+		test.Fatalf("expected exactly one sibling to land, got %d", len(result.Applied))
 	}
 
 	refusedAsOverlap := 0
@@ -471,18 +471,18 @@ func TestSiblingFixesFromOneDiagnosticHalfApply(t *testing.T) {
 		}
 	}
 	if refusedAsOverlap == 0 {
-		t.Fatalf("no sibling was refused as an overlap: %+v", result.Rejected)
+		test.Fatalf("no sibling was refused as an overlap: %+v", result.Rejected)
 	}
 
 	if !strings.Contains(result.Text, `"A"`) {
-		t.Fatalf("the surviving half did not land: %q", result.Text)
+		test.Fatalf("the surviving half did not land: %q", result.Text)
 	}
 	if strings.Contains(result.Text, `B"`) {
-		t.Fatalf("both siblings landed, so this no longer tests a half-application: %q", result.Text)
+		test.Fatalf("both siblings landed, so this no longer tests a half-application: %q", result.Text)
 	}
 
 	// The half that survived leaves valid syntax, which is exactly why the parse guard cannot help.
 	if parses, reason := Parses("p.ts", result.Text); !parses {
-		t.Fatalf("expected the half-applied result to parse, got %s", reason)
+		test.Fatalf("expected the half-applied result to parse, got %s", reason)
 	}
 }

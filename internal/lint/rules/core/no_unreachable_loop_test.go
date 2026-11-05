@@ -26,18 +26,18 @@ const unreachableLoopFile = "/repository/source/Loops.ts"
 //
 // The finding count per input is upstream's rather than assumed: a loop nested in an invalid loop
 // can make both invalid, and eleven cases in the corpus report more than once.
-func TestNoUnreachableLoopFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range unreachableLoopFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "invalid"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source), wantIds...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, testCase.source), wantIds...)
 		})
 	}
 }
@@ -47,14 +47,14 @@ func TestNoUnreachableLoopFires(t *testing.T) {
 // This is the half that matters. A rule reporting "the body exits" from the syntax alone passes
 // most of the firing table and fails here on `while (a) { if (foo) break; }`, on every body holding
 // a `continue`, and on the three shapes upstream deliberately declines to evaluate.
-func TestNoUnreachableLoopStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range unreachableLoopCleanCases {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, source))
 		})
 	}
 }
@@ -67,24 +67,24 @@ func TestNoUnreachableLoopStaysSilent(t *testing.T) {
 //
 // The JSON here is the bare object. Upstream writes `[{...}]` in its corpus and cohere's config
 // layer unwraps the severity tuple before dispatch, so the array wrapper never reaches a decoder.
-func TestNoUnreachableLoopOptions(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopOptions(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
 
 	for _, testCase := range unreachableLoopOptionCases {
-		t.Run(testCase.source+" "+testCase.options, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.source+" "+testCase.options, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.options, err)
+				test.Fatalf("decoding %s: %v", testCase.options, err)
 			}
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "invalid"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, testCase.source, decoded),
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, testCase.source, decoded),
 				wantIds...)
 		})
 	}
@@ -97,15 +97,15 @@ func TestNoUnreachableLoopOptions(t *testing.T) {
 // ignores nothing, but it is right by accident unless something asserts it: a rule whose defaults
 // inverted under nil would pass every option fixture in the table above, because each of those
 // arrives through the decoder with a real value.
-func TestNoUnreachableLoopHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
 		"invalid")
 
-	rule_testing.ExpectClean(t,
-		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }", nil))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }", nil))
 }
 
 // TestNoUnreachableLoopSpans asserts where the finding points, which no message-id fixture can see.
@@ -116,8 +116,8 @@ func TestNoUnreachableLoopHandlesNilOptions(t *testing.T) {
 //
 // The nested case is the one worth having twice over: it pins both spans AND their order, and a
 // port emitting findings as its per-root walk discovers them would order these the other way.
-func TestNoUnreachableLoopSpans(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -158,11 +158,11 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
 			}
 			for index, want := range testCase.reports {
 				diagnostic := result.Diagnostics[index]
@@ -170,7 +170,7 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 				// the literal here are the same bytes and this slice needs no adjustment.
 				got := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d span: got %q, want %q", index, got, want)
+					test.Errorf("finding %d span: got %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -183,17 +183,17 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 // this is a direct equality on both fields. Asserted against literals typed here rather than
 // against the rule's own constant, because comparing a diagnostic to the constant it was built from
 // is an equality that moves in both directions under mutation and cannot fail.
-func TestNoUnreachableLoopMessage(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;")
+	result := rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, "while (a) break;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message
 
 	if message.Id != "invalid" {
-		t.Errorf("message id: got %q, want %q", message.Id, "invalid")
+		test.Errorf("message id: got %q, want %q", message.Id, "invalid")
 	}
 	// Upstream's whole message is "Invalid loop. Its body allows only one iteration." Ours says why
 	// rather than restating the rule name, so the text is not upstream's and the assertion is on
@@ -201,7 +201,7 @@ func TestNoUnreachableLoopMessage(t *testing.T) {
 	// satisfy.
 	const wantPrefix = "This loop can never run a second iteration, because every path through its body leaves the loop."
 	if !strings.HasPrefix(message.Description, wantPrefix) {
-		t.Errorf("message description: got %q, want it to start with %q", message.Description, wantPrefix)
+		test.Errorf("message description: got %q, want it to start with %q", message.Description, wantPrefix)
 	}
 }
 
@@ -211,19 +211,19 @@ func TestNoUnreachableLoopMessage(t *testing.T) {
 // matches nothing, and the corpus asserts it with one case. Kept as its own test because the arm is
 // a whole-rule short circuit rather than a per-loop decision, and a port that dropped it would
 // still pass that corpus case through the per-loop filter.
-func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
 	decoded, err := decode([]byte(`{"ignore":["WhileStatement","DoWhileStatement","ForStatement","ForInStatement","ForOfStatement"]}`))
 	if err != nil {
-		t.Fatalf("decoding: %v", err)
+		test.Fatalf("decoding: %v", err)
 	}
 
 	// Five loops, one of every kind, every one of them invalid without the option.
 	const source = "while (a) break; do break; while (b); for (;;) break; for (c in d) break; for (e of f) break;"
-	rule_testing.ExpectClean(t,
-		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, source, decoded))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, source, decoded))
 }
 
 // TestNoUnreachableLoopJudgesEachRootSeparately covers a shape the corpus does not write.
@@ -236,18 +236,18 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
 // body would answer the wrong question.
 //
 // Measured against the installed eslint 10.8.1 build: both loops report.
-func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopJudgesEachRootSeparately(test *testing.T) {
+	test.Parallel()
 
 	const source = "function outer() { return; function inner() { while (a) break; } } while (b) break;"
-	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source)
-	rule_testing.ExpectFindings(t, result, "invalid", "invalid")
+	result := rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, source)
+	rule_testing.ExpectFindings(test, result, "invalid", "invalid")
 
 	wantSpans := []string{"while (a) break;", "while (b) break;"}
 	for index, want := range wantSpans {
 		got := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 		if got != want {
-			t.Errorf("finding %d span: got %q, want %q", index, got, want)
+			test.Errorf("finding %d span: got %q, want %q", index, got, want)
 		}
 	}
 }
@@ -259,8 +259,8 @@ func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
 // Both are roots in `control_flow_graph.IsRoot`, so a rule enumerating only files and functions would go
 // silent on them. Measured against the installed eslint 10.8.1 build at ecmaVersion 2022: both
 // report.
-func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
-	t.Parallel()
+func TestNoUnreachableLoopInNonFunctionRoots(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -280,13 +280,13 @@ func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "invalid")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "invalid")
 			got := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.want {
-				t.Errorf("span: got %q, want %q", got, testCase.want)
+				test.Errorf("span: got %q, want %q", got, testCase.want)
 			}
 		})
 	}

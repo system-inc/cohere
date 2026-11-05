@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 //	ok  github.com/system-inc/cohere/internal/prettier  0.208s   exit=0
 //
 // The message that skip carried reached a `-v` reader and nobody else, and that was not a property
-// of `t.Skipf` that some other mechanism dodges. Measured both directions: a `TestMain` writing the
+// of `test.Skipf` that some other mechanism dodges. Measured both directions: a `TestMain` writing the
 // same warning straight to `os.Stderr` is swallowed in a passing package, and shown in a failing
 // one. `go test` suppresses a passing package's output regardless of source, so the only thing that
 // changes a plain run is the package not passing -- which forecloses every message-shaped fix and
@@ -48,43 +48,43 @@ func TestMain(m *testing.M) {
 //
 // The engine loads the embedded bundles because TestMain clears ForkPathVariable for the whole package,
 // so a fork a developer's shell points at cannot stand in for them.
-func newTestEngine(t *testing.T) *Engine {
-	t.Helper()
+func newTestEngine(test *testing.T) *Engine {
+	test.Helper()
 	engine, err := New(formatoptions.Default())
 	if err != nil {
-		t.Fatalf("building the engine from the embedded bundles: %v", err)
+		test.Fatalf("building the engine from the embedded bundles: %v", err)
 	}
 	return engine
 }
 
 // TestFormatsCrampedSource is the known-dirty control. A formatter that has never changed anything
 // has not been shown to run at all.
-func TestFormatsCrampedSource(t *testing.T) {
-	t.Parallel()
+func TestFormatsCrampedSource(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	formatted, err := engine.Format("probe.ts", "const   x=1\n")
 	if err != nil {
-		t.Fatalf("format: %v", err)
+		test.Fatalf("format: %v", err)
 	}
 	if formatted != "const x = 1;\n" {
-		t.Fatalf("formatted %q, want %q", formatted, "const x = 1;\n")
+		test.Fatalf("formatted %q, want %q", formatted, "const x = 1;\n")
 	}
 }
 
 // TestLeavesFormattedSourceAlone is the other half of the control. A formatter that rewrites
 // everything is as useless as one that rewrites nothing.
-func TestLeavesFormattedSourceAlone(t *testing.T) {
-	t.Parallel()
+func TestLeavesFormattedSourceAlone(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	source := "const x = 1;\n"
 	formatted, err := engine.Format("clean.ts", source)
 	if err != nil {
-		t.Fatalf("format: %v", err)
+		test.Fatalf("format: %v", err)
 	}
 	if formatted != source {
-		t.Fatalf("formatted %q, want it unchanged", formatted)
+		test.Fatalf("formatted %q, want it unchanged", formatted)
 	}
 }
 
@@ -93,26 +93,26 @@ func TestLeavesFormattedSourceAlone(t *testing.T) {
 // prettier.format returns a promise and goja has no event loop, so a version that stringifies the
 // result without pumping the job queue writes the literal text "[object Promise]" into the file.
 // That is what the first working version produced.
-func TestPromiseIsDrained(t *testing.T) {
-	t.Parallel()
+func TestPromiseIsDrained(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	formatted, err := engine.Format("probe.ts", "const x=1\n")
 	if err != nil {
-		t.Fatalf("format: %v", err)
+		test.Fatalf("format: %v", err)
 	}
 	if strings.Contains(formatted, "Promise") {
-		t.Fatalf("the promise was not drained: %q", formatted)
+		test.Fatalf("the promise was not drained: %q", formatted)
 	}
 }
 
 // TestForkCustomizationsSurvive pins the four divergences our fork carries on top of upstream. They
 // are the exact thing a reimplementation loses silently, and the reason we run the fork rather than
 // stock Prettier.
-func TestForkCustomizationsSurvive(t *testing.T) {
-	t.Parallel()
+func TestForkCustomizationsSurvive(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	source := "function probe(a) {\n" +
 		"    if(a) {\n        a = 1;\n    }\n" +
 		"    else {\n        a = 2;\n    }\n" +
@@ -123,11 +123,11 @@ func TestForkCustomizationsSurvive(t *testing.T) {
 		"    return f();\n}\n"
 	formatted, err := engine.Format("probe.js", source)
 	if err != nil {
-		t.Fatalf("format: %v", err)
+		test.Fatalf("format: %v", err)
 	}
 	for _, want := range []string{"if(a)", "for(const", "while(a)", "switch(a)", "function()", "\n    else {"} {
 		if !strings.Contains(formatted, want) {
-			t.Errorf("fork customization lost: %q missing from\n%s", want, formatted)
+			test.Errorf("fork customization lost: %q missing from\n%s", want, formatted)
 		}
 	}
 }
@@ -137,55 +137,55 @@ func TestForkCustomizationsSurvive(t *testing.T) {
 // goja implements no Unicode property escapes and returns false for every character rather than
 // throwing, which inverted CommonMark's flanking calculation and turned "approximately 25K" into
 // strikethrough. The fix lives in the fork's build; this proves the bundles being loaded carry it.
-func TestMarkdownTildeIsNotDoubled(t *testing.T) {
-	t.Parallel()
+func TestMarkdownTildeIsNotDoubled(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	source := "Sizes: `Seed` (~25K tokens), `Warm` (~75K tokens).\n"
 	formatted, err := engine.Format("probe.md", source)
 	if err != nil {
-		t.Fatalf("format: %v", err)
+		test.Fatalf("format: %v", err)
 	}
 	if strings.Contains(formatted, "~~") {
-		t.Fatalf("a standalone tilde was doubled, so the bundles predate the fix: %q", formatted)
+		test.Fatalf("a standalone tilde was doubled, so the bundles predate the fix: %q", formatted)
 	}
 }
 
 // TestUnhandledTypeIsAnError proves the engine refuses rather than silently passing a file through.
-func TestUnhandledTypeIsAnError(t *testing.T) {
-	t.Parallel()
+func TestUnhandledTypeIsAnError(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	if _, err := engine.Format("probe.rb", "puts 1\n"); err == nil {
-		t.Fatal("formatting a .rb file succeeded, want an error")
+		test.Fatal("formatting a .rb file succeeded, want an error")
 	}
 	if engine.Handles("probe.rb") {
-		t.Fatal("Handles said yes to .rb")
+		test.Fatal("Handles said yes to .rb")
 	}
 }
 
 // TestSyntaxErrorSurfaces confirms a malformed file produces an error whose text the pipeline's
 // matcher recognizes as a parse failure rather than a formatter crash.
-func TestSyntaxErrorSurfaces(t *testing.T) {
-	t.Parallel()
+func TestSyntaxErrorSurfaces(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	_, err := engine.Format("broken.ts", "const x = {{{ broken\n")
 	if err == nil {
-		t.Fatal("formatting malformed source succeeded, want an error")
+		test.Fatal("formatting malformed source succeeded, want an error")
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "syntaxerror") {
-		t.Fatalf("error %q does not name a syntax error, so the pipeline will count it as a crash", err)
+		test.Fatalf("error %q does not name a syntax error, so the pipeline will count it as a crash", err)
 	}
 }
 
 // TestFilepathReachesPrettier pins that the engine passes the file name, because Prettier's output
 // depends on it: `<T,>` on a single-parameter generic arrow is required in .tsx and dropped in .ts, and
 // Prettier tells the two apart by the path, not by the parser. Without a filepath both keep the comma.
-func TestFilepathReachesPrettier(t *testing.T) {
-	t.Parallel()
+func TestFilepathReachesPrettier(test *testing.T) {
+	test.Parallel()
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	source := "const identity = <T,>(value: T) => value;\n"
 	for fileName, want := range map[string]string{
 		"probe.ts":  "const identity = <T>(value: T) => value;\n",
@@ -193,10 +193,10 @@ func TestFilepathReachesPrettier(t *testing.T) {
 	} {
 		formatted, err := engine.Format(fileName, source)
 		if err != nil {
-			t.Fatalf("%s: %v", fileName, err)
+			test.Fatalf("%s: %v", fileName, err)
 		}
 		if formatted != want {
-			t.Errorf("%s formatted %q, want %q", fileName, formatted, want)
+			test.Errorf("%s formatted %q, want %q", fileName, formatted, want)
 		}
 	}
 }

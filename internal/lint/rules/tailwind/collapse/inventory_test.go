@@ -136,8 +136,8 @@ import (
 // reasons themselves are prose and cannot be asserted, which is why each table also carries its own
 // test: the collapse families assert their shorthand structure, the descriptor rows are compared
 // class for class by the differential, and the upstream diff catches Tailwind's own data moving.
-func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
-	t.Parallel()
+func TestEveryTableIsTailwindsOrHasAStatedReason(test *testing.T) {
+	test.Parallel()
 	upstream := map[string]int{
 		"PropertyOrder":                 len(PropertyOrder),
 		"FrameworkVariantRegistrations": len(FrameworkVariantRegistrations),
@@ -175,12 +175,12 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 
 	for name, count := range upstream {
 		if count == 0 {
-			t.Errorf("%s is empty; a table mirroring Tailwind's own data cannot be", name)
+			test.Errorf("%s is empty; a table mirroring Tailwind's own data cannot be", name)
 		}
 	}
 	for name, count := range ours {
 		if count == 0 {
-			t.Errorf("%s is empty; if it is genuinely no longer needed, delete it and its entry here "+
+			test.Errorf("%s is empty; if it is genuinely no longer needed, delete it and its entry here "+
 				"rather than leaving a zero that reads like a working table", name)
 		}
 	}
@@ -189,7 +189,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
 	if len(ours) != 3 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
+		test.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 
@@ -206,7 +206,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// a file is a failure here whether or not anyone remembered this test. That is the difference
 	// between a measurement and a restatement, which is the distinction this package keeps rebuilding
 	// the hard way.
-	declared := tablesDeclaredInPackage(t)
+	declared := tablesDeclaredInPackage(test)
 
 	accounted := make(map[string]bool, len(upstream)+len(ours))
 	for name := range upstream {
@@ -224,17 +224,17 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	}
 	sort.Strings(unaccounted)
 	for _, name := range unaccounted {
-		t.Errorf("%s is a table in this package with no entry in the inventory above", name)
+		test.Errorf("%s is a table in this package with no entry in the inventory above", name)
 	}
 
 	for name := range accounted {
 		if _, isDeclared := declared[name]; !isDeclared {
-			t.Errorf("%s has an inventory entry and is not declared in this package, so the two have drifted", name)
+			test.Errorf("%s has an inventory entry and is not declared in this package, so the two have drifted", name)
 		}
 	}
 
-	t.Logf("Tailwind's own: %v", upstream)
-	t.Logf("ours, each with a stated reason: %v", ours)
+	test.Logf("Tailwind's own: %v", upstream)
+	test.Logf("ours, each with a stated reason: %v", ours)
 }
 
 // tableInPackage is one top-level composite-literal table found in this package's source.
@@ -250,12 +250,12 @@ type tableInPackage struct {
 //
 // Composite literals only. A table is a set of entries written down, which is the thing that goes
 // stale and the thing this inventory is about; a `var x = someCall()` is code and is not.
-func tablesDeclaredInPackage(t *testing.T) map[string]tableInPackage {
-	t.Helper()
+func tablesDeclaredInPackage(test *testing.T) map[string]tableInPackage {
+	test.Helper()
 
 	paths, err := filepath.Glob("*.go")
 	if err != nil {
-		t.Fatalf("listing the package's files: %v", err)
+		test.Fatalf("listing the package's files: %v", err)
 	}
 
 	declared := make(map[string]tableInPackage)
@@ -266,7 +266,7 @@ func tablesDeclaredInPackage(t *testing.T) map[string]tableInPackage {
 		fileSet := token.NewFileSet()
 		parsed, err := parser.ParseFile(fileSet, path, nil, 0)
 		if err != nil {
-			t.Fatalf("parsing %s: %v", path, err)
+			test.Fatalf("parsing %s: %v", path, err)
 		}
 		for _, declaration := range parsed.Decls {
 			general, isGeneral := declaration.(*ast.GenDecl)
@@ -296,7 +296,7 @@ func tablesDeclaredInPackage(t *testing.T) map[string]tableInPackage {
 	}
 
 	if len(declared) == 0 {
-		t.Fatal("the parse found no tables at all, so this check measured nothing")
+		test.Fatal("the parse found no tables at all, so this check measured nothing")
 	}
 	return declared
 }

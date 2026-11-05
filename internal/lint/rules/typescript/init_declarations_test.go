@@ -26,23 +26,23 @@ func initDeclarationsCaseName(index int) string {
 // store only the first element after the severity, so the first version of this decoder read a list,
 // every fixture passed, and it failed at run time on the first real configuration. The fixtures here
 // pass the list, which is now what the config layer delivers; the decoder test pins that it does.
-func decodeInitDeclarationsOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeInitDeclarationsOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
 
 // runInitDeclarations runs one case, with or without options.
-func runInitDeclarations(t *testing.T, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runInitDeclarations(test *testing.T, sourceText string, options string) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.Run(t, InitDeclarations, initDeclarationsFile, sourceText)
+		return rule_testing.Run(test, InitDeclarations, initDeclarationsFile, sourceText)
 	}
-	return rule_testing.RunWithOptions(t, InitDeclarations, initDeclarationsFile, sourceText,
-		decodeInitDeclarationsOptionsForTest(t, options))
+	return rule_testing.RunWithOptions(test, InitDeclarations, initDeclarationsFile, sourceText,
+		decodeInitDeclarationsOptionsForTest(test, options))
 }
 
 // TestInitDeclarationsStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -54,8 +54,8 @@ func runInitDeclarations(t *testing.T, sourceText string, options string) rule_t
 //
 // The same source appears in this list and in the failing one under the opposite mode, which is why
 // the options travel with each row rather than being set once for the file.
-func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -114,9 +114,9 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ", options: "[\"never\"]"},
 	}
 	for index, testCase := range cases {
-		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runInitDeclarations(t, testCase.sourceText, testCase.options))
+		test.Run(initDeclarationsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runInitDeclarations(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -132,8 +132,8 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 //
 // The message interpolates the variable name, so it is asserted as text too. That is the one place a
 // format string could be wrong while every id and every span stayed right.
-func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -326,21 +326,21 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(initDeclarationsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
@@ -356,8 +356,8 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 // guard decides nothing there and a mutation removing it survives all seventy-seven imported rows.
 //
 // Measured against the installed 8.x build, with a reporting control for each mode in the same runs.
-func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsLeavesDestructuringPatternsAlone(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -425,19 +425,19 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -455,8 +455,8 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 // with a second bit set, which makes a naive flag test miss it specifically.
 //
 // Measured against the installed 8.x build with a reporting control in the same run.
-func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -495,19 +495,19 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, `["never"]`)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, `["never"]`)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -522,8 +522,8 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 // second element is optional. Three of those lines decide something no rule fixture can see: an
 // empty list, a value outside the schema's enum, and an absent second element. Two mutations of
 // them survived the whole imported corpus, because every option row there names a mode explicitly.
-func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsDecoderReadsThePositionalArray(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw  string
@@ -545,15 +545,15 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 		{raw: `["never", {}]`, want: InitDeclarationsOptions{Mode: InitDeclarationsNever}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodeInitDeclarationsOptionsForTest(t, testCase.raw)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodeInitDeclarationsOptionsForTest(test, testCase.raw)
 			settings, isSettings := decoded.(InitDeclarationsOptions)
 			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
+				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
 			}
 			if settings != testCase.want {
-				t.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+				test.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
 			}
 		})
 	}
@@ -565,8 +565,8 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 // ESLint refuses the key outright rather than running with a fallback. Measured. This decoder used to
 // resolve it to the inert unconfigured mode, the closest spelling of "this rule never ran" it had,
 // which is silence; the config layer now surfaces a decoder error at startup, so it is refused.
-func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`["bogus"]`,
@@ -580,7 +580,7 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		`{"mode": "never", "ignoreForLoopInit": true}`,
 	} {
 		if decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
@@ -604,19 +604,19 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 // first version of this port did exactly that, and only the dry run disagreed.
 //
 // `EnableRule.ts` writes the bare severity spelling, so this IS how the rule is configured here.
-func TestInitDeclarationsIsInertWhenNamedWithoutAMode(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsIsInertWhenNamedWithoutAMode(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "var foo;\nvar bar = 1;\n"
 
 	// Handed nil, which is what the config layer passes for a rule named as a bare severity.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, InitDeclarations,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, InitDeclarations,
 		initDeclarationsFile, sourceText, nil))
 
 	// Handed an empty array, which is the other spelling of the same configuration.
-	rule_testing.ExpectClean(t, runInitDeclarations(t, sourceText, `[]`))
+	rule_testing.ExpectClean(test, runInitDeclarations(test, sourceText, `[]`))
 
 	// And the controls, so the three silences above are verdicts rather than a rule that never ran.
-	rule_testing.ExpectFindings(t, runInitDeclarations(t, sourceText, `["always"]`), "initialized")
-	rule_testing.ExpectFindings(t, runInitDeclarations(t, sourceText, `["never"]`), "notInitialized")
+	rule_testing.ExpectFindings(test, runInitDeclarations(test, sourceText, `["always"]`), "initialized")
+	rule_testing.ExpectFindings(test, runInitDeclarations(test, sourceText, `["never"]`), "notInitialized")
 }

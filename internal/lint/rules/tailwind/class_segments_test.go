@@ -19,8 +19,8 @@ import (
 // its own static text and nothing else. A template head's own Loc spans "`flex  ${" with the
 // backtick and the interpolation opener included, so a fix written against the untrimmed range
 // deletes both and leaves a file that does not parse.
-func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
-	t.Parallel()
+func TestClassSegmentRangesCoverExactlyTheirText(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name         string
 		source       string
@@ -52,27 +52,27 @@ func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			segments, source := segmentsOf(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			segments, source := segmentsOf(test, testCase.source)
 
 			if len(segments) != len(testCase.wantSegments) {
-				t.Fatalf("expected %d segments %q, got %d", len(testCase.wantSegments), testCase.wantSegments, len(segments))
+				test.Fatalf("expected %d segments %q, got %d", len(testCase.wantSegments), testCase.wantSegments, len(segments))
 			}
 
 			for index, segment := range segments {
 				if segment.Text != testCase.wantSegments[index] {
-					t.Errorf("segment %d text %q, want %q", index, segment.Text, testCase.wantSegments[index])
+					test.Errorf("segment %d text %q, want %q", index, segment.Text, testCase.wantSegments[index])
 				}
 
 				if segment.Range.Pos() > segment.Range.End() {
-					t.Fatalf("segment %d has an inverted range [%d,%d), which is a fix that deletes backwards",
+					test.Fatalf("segment %d has an inverted range [%d,%d), which is a fix that deletes backwards",
 						index, segment.Range.Pos(), segment.Range.End())
 				}
 
 				covered := source[segment.Range.Pos():segment.Range.End()]
 				if covered != segment.Text {
-					t.Errorf("segment %d range covers %q but its text is %q, so a fix would rewrite the wrong bytes",
+					test.Errorf("segment %d range covers %q but its text is %q, so a fix would rewrite the wrong bytes",
 						index, covered, segment.Text)
 				}
 			}
@@ -85,12 +85,12 @@ func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
 // A segment with a hole beside it keeps one whitespace character there, because that space is the
 // separator between the substituted value and the neighbouring class. Getting these backwards fuses
 // two class names into one that does not exist.
-func TestClassSegmentHoleFlags(t *testing.T) {
-	t.Parallel()
-	segments, _ := segmentsOf(t, "const element = <div className={`a ${x} b ${y} c`} />;")
+func TestClassSegmentHoleFlags(test *testing.T) {
+	test.Parallel()
+	segments, _ := segmentsOf(test, "const element = <div className={`a ${x} b ${y} c`} />;")
 
 	if len(segments) != 3 {
-		t.Fatalf("expected 3 segments, got %d", len(segments))
+		test.Fatalf("expected 3 segments, got %d", len(segments))
 	}
 
 	expected := []struct {
@@ -104,7 +104,7 @@ func TestClassSegmentHoleFlags(t *testing.T) {
 
 	for index, want := range expected {
 		if segments[index].LeadingHole != want.leading || segments[index].TrailingHole != want.trailing {
-			t.Errorf("segment %d holes are leading=%v trailing=%v, want leading=%v trailing=%v",
+			test.Errorf("segment %d holes are leading=%v trailing=%v, want leading=%v trailing=%v",
 				index, segments[index].LeadingHole, segments[index].TrailingHole, want.leading, want.trailing)
 		}
 	}
@@ -115,25 +115,25 @@ func TestClassSegmentHoleFlags(t *testing.T) {
 // ClassSegmentsIn deliberately does not route through ClassTemplatesIn, which answers a different
 // question and returns nothing when every seam is well spaced. Reusing it here would have skipped
 // exactly the templates that are otherwise well written.
-func TestClassSegmentsReadTemplatesWithNoBoundaryDefects(t *testing.T) {
-	t.Parallel()
-	segments, _ := segmentsOf(t, "const element = <div className={`flex  ${x}  gap-2`} />;")
+func TestClassSegmentsReadTemplatesWithNoBoundaryDefects(test *testing.T) {
+	test.Parallel()
+	segments, _ := segmentsOf(test, "const element = <div className={`flex  ${x}  gap-2`} />;")
 
 	if len(segments) == 0 {
-		t.Fatal("a template whose seams are all clean still has segments, and its doubled spaces " +
+		test.Fatal("a template whose seams are all clean still has segments, and its doubled spaces " +
 			"still need collapsing")
 	}
 }
 
-func segmentsOf(t *testing.T, source string) ([]ClassSegment, string) {
-	t.Helper()
+func segmentsOf(test *testing.T, source string) ([]ClassSegment, string) {
+	test.Helper()
 
 	fileName := tspath.NormalizePath("/Component.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTSX)
 	if sourceFile == nil {
-		t.Fatalf("could not parse %s", source)
+		test.Fatalf("could not parse %s", source)
 	}
 
 	reader := NewClassLiteralReader(DefaultClassLiteralSettings())

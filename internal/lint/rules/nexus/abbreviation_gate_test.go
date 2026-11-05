@@ -24,10 +24,10 @@ import (
 // own word and discards the lowercase letter before it, and that boundary is precisely what the
 // `[a-z]Ms($|[A-Z])` arm tests. A list somebody wrote from reading the pattern does not contain the
 // case they misread.
-func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
-	t.Parallel()
+func TestAbbreviationGateHasNoFalseNegatives(test *testing.T) {
+	test.Parallel()
 
-	corpus := loadIdentifierCorpus(t)
+	corpus := loadIdentifierCorpus(test)
 
 	falseNegatives := []string{}
 	for _, name := range corpus {
@@ -41,7 +41,7 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 		if len(shown) > 20 {
 			shown = shown[:20]
 		}
-		t.Fatalf("gate misses %d names the vocabulary reports, which would silence the rule for each: %v",
+		test.Fatalf("gate misses %d names the vocabulary reports, which would silence the rule for each: %v",
 			len(falseNegatives), shown)
 	}
 }
@@ -51,10 +51,10 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 // This is the vacuous-pass guard: a gate returning true unconditionally has zero false negatives and
 // is worthless, and the test above would call it correct. Measuring the over-approximation rate
 // turns "no false negatives" into a claim about a real filter.
-func TestAbbreviationGateStaysSelective(t *testing.T) {
-	t.Parallel()
+func TestAbbreviationGateStaysSelective(test *testing.T) {
+	test.Parallel()
 
-	corpus := loadIdentifierCorpus(t)
+	corpus := loadIdentifierCorpus(test)
 
 	admitted := 0
 	reported := 0
@@ -71,10 +71,10 @@ func TestAbbreviationGateStaysSelective(t *testing.T) {
 	// by a margin that would put the expensive work back.
 	const maximumAdmittedFraction = 0.10
 	if float64(admitted) > float64(len(corpus))*maximumAdmittedFraction {
-		t.Fatalf("gate admits %d of %d names (%.1f%%), which is too coarse to be worth having",
+		test.Fatalf("gate admits %d of %d names (%.1f%%), which is too coarse to be worth having",
 			admitted, len(corpus), 100*float64(admitted)/float64(len(corpus)))
 	}
-	t.Logf("corpus %d, vocabulary reports %d, gate admits %d", len(corpus), reported, admitted)
+	test.Logf("corpus %d, vocabulary reports %d, gate admits %d", len(corpus), reported, admitted)
 }
 
 // The arms the two failed attempts lost, pinned by name so a regression names itself.
@@ -82,8 +82,8 @@ func TestAbbreviationGateStaysSelective(t *testing.T) {
 // Every one of these is a real spelling from the tree that the vocabulary reports. They are here in
 // addition to the corpus test, not instead of it: the corpus proves the gate today, and these say
 // which shapes were historically easy to drop.
-func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
-	t.Parallel()
+func TestAbbreviationGateCoversTheArmsThatWereLost(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// The `[a-z]Ms($|[A-Z])` arm. Splitting at uppercase discards the lowercase letter before
@@ -99,30 +99,30 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
 		"eventProps", "routeParams", "elementRef", "handlerFn",
 	}
 	for _, name := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			if _, reported := vocabulary.find(name); !reported {
-				t.Fatalf("the vocabulary does not report %q, so it proves nothing", name)
+				test.Fatalf("the vocabulary does not report %q, so it proves nothing", name)
 			}
 			if !isAbbreviationCandidate(name) {
-				t.Fatalf("gate misses %q, which the vocabulary reports", name)
+				test.Fatalf("gate misses %q, which the vocabulary reports", name)
 			}
 		})
 	}
 }
 
 // loadIdentifierCorpus reads every distinct identifier collected from the ahra tree.
-func loadIdentifierCorpus(t *testing.T) []string {
-	t.Helper()
+func loadIdentifierCorpus(test *testing.T) []string {
+	test.Helper()
 
 	data, err := os.ReadFile("testdata/identifiers.txt")
 	if err != nil {
-		t.Fatalf("could not read the identifier corpus: %v", err)
+		test.Fatalf("could not read the identifier corpus: %v", err)
 	}
 	corpus := strings.Split(strings.TrimSpace(string(data)), "\n")
 	// A corpus that failed to load would make every assertion above pass vacuously.
 	if len(corpus) < 10000 {
-		t.Fatalf("corpus holds only %d identifiers, which is too few to have been read correctly", len(corpus))
+		test.Fatalf("corpus holds only %d identifiers, which is too few to have been read correctly", len(corpus))
 	}
 	return corpus
 }

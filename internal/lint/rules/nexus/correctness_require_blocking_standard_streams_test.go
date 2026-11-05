@@ -93,20 +93,20 @@ func (testCase correctnessRequireBlockingStandardStreamsCase) files() map[string
 	return files
 }
 
-func correctnessRequireBlockingStandardStreamsRun(t *testing.T, testCase correctnessRequireBlockingStandardStreamsCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessRequireBlockingStandardStreams, testCase.files(), correctnessRequireBlockingStandardStreamsSubject)
+func correctnessRequireBlockingStandardStreamsRun(test *testing.T, testCase correctnessRequireBlockingStandardStreamsCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessRequireBlockingStandardStreams, testCase.files(), correctnessRequireBlockingStandardStreamsSubject)
 }
 
 // correctnessRequireBlockingStandardStreamsExpect asserts the one finding an entry gets: at the text
 // it points at, with a message holding every phrase in contains. An empty want asserts silence.
-func correctnessRequireBlockingStandardStreamsExpect(t *testing.T, result rule_testing.Result, want string, contains ...string) {
-	t.Helper()
+func correctnessRequireBlockingStandardStreamsExpect(test *testing.T, result rule_testing.Result, want string, contains ...string) {
+	test.Helper()
 	if want == "" {
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 		return
 	}
-	rule_testing.ExpectFindings(t, result, correctnessRequireBlockingStandardStreamsId)
+	rule_testing.ExpectFindings(test, result, correctnessRequireBlockingStandardStreamsId)
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -114,18 +114,18 @@ func correctnessRequireBlockingStandardStreamsExpect(t *testing.T, result rule_t
 	diagnostic := diagnostics[0]
 	text := result.SourceFile.Text()
 	if got := strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()]); got != want {
-		t.Fatalf("the finding is at %q, want %q", got, want)
+		test.Fatalf("the finding is at %q, want %q", got, want)
 	}
 	if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-		t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+		test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 	}
 	for _, phrase := range contains {
 		if !strings.Contains(diagnostic.Message.Description, phrase) {
-			t.Fatalf("the message %q does not say %q", diagnostic.Message.Description, phrase)
+			test.Fatalf("the message %q does not say %q", diagnostic.Message.Description, phrase)
 		}
 	}
 	if strings.Contains(diagnostic.Message.Description, "—") {
-		t.Fatalf("the message holds an em-dash: %q", diagnostic.Message.Description)
+		test.Fatalf("the message holds an em-dash: %q", diagnostic.Message.Description)
 	}
 }
 
@@ -288,8 +288,8 @@ func correctnessRequireBlockingStandardStreamsStructure(guardFirst bool) correct
 	return correctnessRequireBlockingStandardStreamsCase{imports: []string{correctnessRequireBlockingStandardStreamsImportRun}, lines: lines}
 }
 
-func TestCorrectnessRequireBlockingStandardStreamsRealSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireBlockingStandardStreamsRealSites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -304,28 +304,28 @@ func TestCorrectnessRequireBlockingStandardStreamsRealSites(t *testing.T) {
 		{"NewMigration", correctnessRequireBlockingStandardStreamsNewMigration, "process.exit(1)", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name+" as it stood", func(t *testing.T) {
-			t.Parallel()
-			correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, testCase.source(false)), testCase.want, testCase.contains...)
+		test.Run(testCase.name+" as it stood", func(test *testing.T) {
+			test.Parallel()
+			correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, testCase.source(false)), testCase.want, testCase.contains...)
 		})
-		t.Run(testCase.name+" fixed", func(t *testing.T) {
-			t.Parallel()
-			correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, testCase.source(true)), "")
+		test.Run(testCase.name+" fixed", func(test *testing.T) {
+			test.Parallel()
+			correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, testCase.source(true)), "")
 		})
 	}
 
-	t.Run("a runCommandLineInterface entry as it stands", func(t *testing.T) {
-		t.Parallel()
-		correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, correctnessRequireBlockingStandardStreamsStructure(false)), "")
+	test.Run("a runCommandLineInterface entry as it stands", func(test *testing.T) {
+		test.Parallel()
+		correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, correctnessRequireBlockingStandardStreamsStructure(false)), "")
 	})
-	t.Run("a runCommandLineInterface entry with a guard that exits above the hand-off", func(t *testing.T) {
-		t.Parallel()
-		correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, correctnessRequireBlockingStandardStreamsStructure(true)), "process.exit(1)")
+	test.Run("a runCommandLineInterface entry with a guard that exits above the hand-off", func(test *testing.T) {
+		test.Parallel()
+		correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, correctnessRequireBlockingStandardStreamsStructure(true)), "process.exit(1)")
 	})
 }
 
-func TestCorrectnessRequireBlockingStandardStreamsFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireBlockingStandardStreamsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		testCase correctnessRequireBlockingStandardStreamsCase
@@ -443,15 +443,15 @@ func TestCorrectnessRequireBlockingStandardStreamsFires(t *testing.T) {
 		}}, "process.exit(0)"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.testCase.name, func(t *testing.T) {
-			t.Parallel()
-			correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, testCase.testCase), testCase.want)
+		test.Run(testCase.testCase.name, func(test *testing.T) {
+			test.Parallel()
+			correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, testCase.testCase), testCase.want)
 		})
 	}
 }
 
-func TestCorrectnessRequireBlockingStandardStreamsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireBlockingStandardStreamsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	library := correctnessNoProcessExitAfterOutputLines(
 		"declare function use(value: unknown): void;",
@@ -602,9 +602,9 @@ func TestCorrectnessRequireBlockingStandardStreamsStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			correctnessRequireBlockingStandardStreamsExpect(t, correctnessRequireBlockingStandardStreamsRun(t, testCase), "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			correctnessRequireBlockingStandardStreamsExpect(test, correctnessRequireBlockingStandardStreamsRun(test, testCase), "")
 		})
 	}
 }

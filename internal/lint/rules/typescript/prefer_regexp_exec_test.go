@@ -75,8 +75,8 @@ func preferRegexpExecCases() []preferRegexpExecCase {
 }
 
 // TestPreferRegexpExecMatchesUpstream replays the whole corpus.
-func TestPreferRegexpExecMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecMatchesUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := preferRegexpExecCases()
 
@@ -87,22 +87,22 @@ func TestPreferRegexpExecMatchesUpstream(t *testing.T) {
 		}
 	}
 	if len(cases) != 37 {
-		t.Fatalf("expected 37 corpus cases, have %d", len(cases))
+		test.Fatalf("expected 37 corpus cases, have %d", len(cases))
 	}
 	if reporting != 12 {
-		t.Fatalf("expected 12 reporting cases, have %d", reporting)
+		test.Fatalf("expected 12 reporting cases, have %d", reporting)
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile,
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile,
 			testCase.sourceText)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
 // TestPreferRegexpExecRewritesWhatUpstreamRewrites is the fixer's only real coverage.
-func TestPreferRegexpExecRewritesWhatUpstreamRewrites(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecRewritesWhatUpstreamRewrites(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range preferRegexpExecCases() {
@@ -110,7 +110,7 @@ func TestPreferRegexpExecRewritesWhatUpstreamRewrites(t *testing.T) {
 			continue
 		}
 		checked++
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile,
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile,
 			testCase.sourceText)
 		// The typed harness writes each fixture to disk as `TrimSpace(source) + "\n"`, because a
 		// real program is built from real files. So the rewritten text differs from upstream's
@@ -119,11 +119,11 @@ func TestPreferRegexpExecRewritesWhatUpstreamRewrites(t *testing.T) {
 		//
 		// Only the OUTER whitespace is touched. Every newline and indent inside the fixture is
 		// compared exactly, which is where a fixer's real mistakes live.
-		rule_testing.ExpectFixedSource(t, result,
+		rule_testing.ExpectFixedSource(test, result,
 			strings.TrimSpace(*testCase.wantOutput)+"\n")
 	}
 	if checked != 12 {
-		t.Fatalf("expected to check 12 rewrites, checked %d", checked)
+		test.Fatalf("expected to check 12 rewrites, checked %d", checked)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestPreferRegexpExecRewritesWhatUpstreamRewrites(t *testing.T) {
 // Every expectation below was measured against the installed 8.67.0 build. The `let` case is the one
 // a plausible implementation gets wrong: resolving the binding finds `/x/g` either way, and only
 // refusing to trust a reassignable binding keeps the verdicts apart.
-func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(test *testing.T) {
+	test.Parallel()
 
 	silent := []string{
 		"declare const a: string;\na.match(/x/g);",
@@ -149,8 +149,8 @@ func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(t *testing.T) {
 		"declare const a: string;\ndeclare const r: RegExp;\na.match(r);",
 	}
 	for _, source := range silent {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile, source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, source)
+		rule_testing.ExpectClean(test, result)
 	}
 
 	// The control: the same shapes with the flag provably absent all report, so the silences above
@@ -161,8 +161,8 @@ func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(t *testing.T) {
 		"declare const a: string;\na.match(new RegExp('x', 'i'));",
 	}
 	for _, source := range reporting {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile, source)
-		rule_testing.ExpectFindings(t, result, "regExpExecOverStringMatch")
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, source)
+		rule_testing.ExpectFindings(test, result, "regExpExecOverStringMatch")
 	}
 }
 
@@ -177,8 +177,8 @@ func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(t *testing.T) {
 //
 // The line is whether the value can be COMPUTED, not whether a `g` can be ruled out. Every
 // expectation below was measured against the installed 8.67.0 build.
-func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -207,11 +207,11 @@ func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(t *testing
 		{"an inline construction from a variable", "declare const a: string;\ndeclare const p: string;\na.match(new RegExp(p));", true},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile, testCase.source)
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, testCase.source)
 		if testCase.report {
-			rule_testing.ExpectFindings(t, result, "regExpExecOverStringMatch")
+			rule_testing.ExpectFindings(test, result, "regExpExecOverStringMatch")
 		} else {
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		}
 	}
 }
@@ -222,8 +222,8 @@ func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(t *testing
 // parenthesised, because the new expression is not the one the surrounding code was written around.
 // Upstream's corpus has no case in this shape -- all twelve of its reporting cases are statements
 // with a bare receiver -- so these expectations come from driving the installed build.
-func TestPreferRegexpExecWrapsAWeakPrecedenceParent(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecWrapsAWeakPrecedenceParent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -237,8 +237,8 @@ func TestPreferRegexpExecWrapsAWeakPrecedenceParent(t *testing.T) {
 			"declare const a: string;\n/x/.exec(a);"},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile, testCase.source)
-		rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.want)+"\n")
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, testCase.source)
+		rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.want)+"\n")
 	}
 }
 
@@ -254,8 +254,8 @@ func TestPreferRegexpExecWrapsAWeakPrecedenceParent(t *testing.T) {
 // The last row is the one that rules out an ordering shortcut: a write AFTER the call site
 // disqualifies the fold just as much as one before it, so this cannot be answered by looking only at
 // what precedes the use.
-func TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -270,11 +270,11 @@ func TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword(t *testing.
 		{"let, reassigned inside a function", "declare const a: string;\nlet r = /x/;\nfunction f() {\n  r = /y/g;\n}\na.match(r);", false},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunTyped(t, PreferRegexpExec, preferRegexpExecFile, testCase.source)
+		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, testCase.source)
 		if testCase.report {
-			rule_testing.ExpectFindings(t, result, "regExpExecOverStringMatch")
+			rule_testing.ExpectFindings(test, result, "regExpExecOverStringMatch")
 		} else {
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		}
 	}
 }

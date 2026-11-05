@@ -11,8 +11,8 @@ import (
 // hold what the rule does with an answer: upstream's message, a fix on the class's own text, the option
 // that no longer silences it, and the filters that keep a class from being asked at all.
 
-func TestCanonicalSinglesReportInUpstreamsWords(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSinglesReportInUpstreamsWords(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name        string
 		source      string
@@ -122,22 +122,22 @@ func TestCanonicalSinglesReportInUpstreamsWords(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runCanonicalFixture(t, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "canonicalSingle")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runCanonicalFixture(test, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "canonicalSingle")
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantMessage {
-				t.Errorf("message\n got: %s\nwant: %s", got, testCase.wantMessage)
+				test.Errorf("message\n got: %s\nwant: %s", got, testCase.wantMessage)
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
 
 // TestCanonicalSinglesStaySilent is the half that keeps the rule on: classes Tailwind leaves as written,
 // including the near misses each ported pass must not reach.
-func TestCanonicalSinglesStaySilent(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSinglesStaySilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -176,9 +176,9 @@ func TestCanonicalSinglesStaySilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runCanonicalFixture(t, "Component.tsx", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runCanonicalFixture(test, "Component.tsx", testCase.source))
 		})
 	}
 }
@@ -187,20 +187,20 @@ func TestCanonicalSinglesStaySilent(t *testing.T) {
 // `background-content-1` beside the framework's `bg-content-1`, two non-negative classes signing alike, so
 // upstream leaves `bg-(--color-content-1)` as written. The control, the same theme without the block, has
 // one listed class and reports. Measured against Tailwind 4.3.3 both ways.
-func TestCanonicalSingleBailsOnARepositoryTwin(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSingleBailsOnARepositoryTwin(test *testing.T) {
+	test.Parallel()
 	source := `const element = <div className="bg-(--color-content-1)" />;`
 	theme := "@import \"tailwindcss\";\n@theme {\n    --color-content-1: #123456;\n}\n"
 
-	control := runCanonicalFixtureWithStylesheet(t, "Component.tsx", source, theme, nil)
-	rule_testing.ExpectFindings(t, control, "canonicalSingle")
+	control := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source, theme, nil)
+	rule_testing.ExpectFindings(test, control, "canonicalSingle")
 	if got := control.Diagnostics[0].Message.Description; got != `The class: "bg-(--color-content-1)" can be simplified to "bg-content-1".` {
-		t.Errorf("control message: %s", got)
+		test.Errorf("control message: %s", got)
 	}
 
-	twinned := runCanonicalFixtureWithStylesheet(t, "Component.tsx", source,
+	twinned := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source,
 		theme+"@utility background-* {\n    background-color: --value(--color-*);\n}\n", nil)
-	rule_testing.ExpectClean(t, twinned)
+	rule_testing.ExpectClean(test, twinned)
 }
 
 // TestCanonicalSingleDeclinesARedeclaredUtility holds the guard for a root declared in two `@utility`
@@ -208,18 +208,18 @@ func TestCanonicalSingleBailsOnARepositoryTwin(t *testing.T) {
 // both signing as `background-color: #111111`, and bails. The evaluator here keeps one block, and from
 // its list alone `paint-b` would be the one match, which is the rewrite Tailwind does not make: the
 // control, one block, is that rewrite. Measured against Tailwind 4.3.3 both ways.
-func TestCanonicalSingleDeclinesARedeclaredUtility(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSingleDeclinesARedeclaredUtility(test *testing.T) {
+	test.Parallel()
 	source := `const element = <div className="[background-color:#111111]" />;`
 	theme := "@import \"tailwindcss\";\n@theme {\n    --paint-a: #111111;\n    --hue-b: #111111;\n}\n"
 	second := "@utility paint-* {\n    background-color: --value(--hue-*);\n}\n"
 
-	single := runCanonicalFixtureWithStylesheet(t, "Component.tsx", source, theme+second, nil)
-	rule_testing.ExpectFindings(t, single, "canonicalSingle")
+	single := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source, theme+second, nil)
+	rule_testing.ExpectFindings(test, single, "canonicalSingle")
 
-	redeclared := runCanonicalFixtureWithStylesheet(t, "Component.tsx", source,
+	redeclared := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source,
 		theme+"@utility paint-* {\n    background-color: --value(--paint-*);\n}\n"+second, nil)
-	rule_testing.ExpectClean(t, redeclared)
+	rule_testing.ExpectClean(test, redeclared)
 }
 
 // TestCanonicalSingleCountsAnUnknownClassTowardTheBail is condition 1 of #15swfzq unit 1b. With
@@ -229,12 +229,12 @@ func TestCanonicalSingleDeclinesARedeclaredUtility(t *testing.T) {
 // has to count it. Dropping it from the count would leave `leading-one` the one match and report a
 // rewrite Tailwind does not make. Measured against Tailwind 4.3.3, which also rewrites to `leading-none`
 // when the theme key is absent, a rewrite this port leaves unreported.
-func TestCanonicalSingleCountsAnUnknownClassTowardTheBail(t *testing.T) {
-	t.Parallel()
-	result := runCanonicalFixtureWithStylesheet(t, "Component.tsx",
+func TestCanonicalSingleCountsAnUnknownClassTowardTheBail(test *testing.T) {
+	test.Parallel()
+	result := runCanonicalFixtureWithStylesheet(test, "Component.tsx",
 		`const element = <div className="[line-height:1]" />;`,
 		"@import \"tailwindcss\";\n@theme {\n    --leading-one: 1;\n}\n", nil)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestCanonicalSingleNeverNamesAShortReplacement holds the two places the pass declines rather than
@@ -244,8 +244,8 @@ func TestCanonicalSingleCountsAnUnknownClassTowardTheBail(t *testing.T) {
 // upstream takes the first registered, `tab-7`, an order this port does not hold. Either may be reported
 // once the port can name Tailwind's answer, and neither may be reported naming another. Measured against
 // Tailwind 4.3.3.
-func TestCanonicalSingleNeverNamesAShortReplacement(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSingleNeverNamesAShortReplacement(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name       string
 		source     string
@@ -266,12 +266,12 @@ func TestCanonicalSingleNeverNamesAShortReplacement(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runCanonicalFixtureWithStylesheet(t, "Component.tsx", testCase.source, testCase.stylesheet, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runCanonicalFixtureWithStylesheet(test, "Component.tsx", testCase.source, testCase.stylesheet, nil)
 			for _, diagnostic := range result.Diagnostics {
 				if got := diagnostic.Message.Description; got != testCase.upstream {
-					t.Errorf("reported %q; the only report allowed is upstream's, %q", got, testCase.upstream)
+					test.Errorf("reported %q; the only report allowed is upstream's, %q", got, testCase.upstream)
 				}
 			}
 		})
@@ -281,51 +281,51 @@ func TestCanonicalSingleNeverNamesAShortReplacement(t *testing.T) {
 // TestCanonicalSingleKeepsARepositoryOverride is upstream's "With custom implementation" case: a
 // repository that declares its own `start-*` meant something by it, and the sameness check is what keeps
 // the class as written. The control, the same class over the bare framework, reports.
-func TestCanonicalSingleKeepsARepositoryOverride(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSingleKeepsARepositoryOverride(test *testing.T) {
+	test.Parallel()
 	source := `const element = <div className="start-0" />;`
 
-	bare := runCanonicalFixture(t, "Component.tsx", source)
-	rule_testing.ExpectFindings(t, bare, "canonicalSingle")
+	bare := runCanonicalFixture(test, "Component.tsx", source)
+	rule_testing.ExpectFindings(test, bare, "canonicalSingle")
 
-	overridden := runCanonicalFixtureWithStylesheet(t, "Component.tsx", source,
+	overridden := runCanonicalFixtureWithStylesheet(test, "Component.tsx", source,
 		"@import \"tailwindcss\";\n@utility start-* {\n    --custom-start: --value(integer);\n}\n", nil)
-	rule_testing.ExpectClean(t, overridden)
+	rule_testing.ExpectClean(test, overridden)
 }
 
 // TestCanonicalSinglesReportWithCollapseOff holds upstream's `collapse: false`: pairs go quiet and single
 // classes still report. Before #15swfzq this option declined the whole file.
-func TestCanonicalSinglesReportWithCollapseOff(t *testing.T) {
-	t.Parallel()
+func TestCanonicalSinglesReportWithCollapseOff(test *testing.T) {
+	test.Parallel()
 	off := false
-	result := runCanonicalFixtureWithOptions(t, "Component.tsx",
+	result := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="px-4 py-4 end-0" />;`,
 		EnforceCanonicalClassesOptions{Collapse: &off})
-	rule_testing.ExpectFindings(t, result, "canonicalSingle")
+	rule_testing.ExpectFindings(test, result, "canonicalSingle")
 }
 
 // TestCanonicalSinglesSkipWhatUpstreamDoesNotAsk holds the filters in front of the canonicalizer: an
 // ignored class and a class the design system cannot compile are never asked about.
-func TestCanonicalSinglesSkipWhatUpstreamDoesNotAsk(t *testing.T) {
-	t.Parallel()
-	ignored := runCanonicalFixtureWithOptions(t, "Component.tsx",
+func TestCanonicalSinglesSkipWhatUpstreamDoesNotAsk(test *testing.T) {
+	test.Parallel()
+	ignored := runCanonicalFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="end-0" />;`,
 		EnforceCanonicalClassesOptions{Ignore: []string{"^end-"}})
-	rule_testing.ExpectClean(t, ignored)
+	rule_testing.ExpectClean(test, ignored)
 
 	// It parses, its variant would modernize to `*:`, and `zz` is no inset value, so it compiles to
 	// nothing. Upstream drops it before asking.
-	unknown := runCanonicalFixture(t, "Component.tsx",
+	unknown := runCanonicalFixture(test, "Component.tsx",
 		`const element = <div className="[&>*]:end-zz" />;`)
-	rule_testing.ExpectClean(t, unknown)
+	rule_testing.ExpectClean(test, unknown)
 }
 
 // TestCanonicalSingleFixesOnlyTheFirstRepeat holds the overlap rule reportDeprecations set: every
 // occurrence is reported, as upstream reports each, and only the first is rewritten, because
 // no-duplicate-classes deletes the second.
-func TestCanonicalSingleFixesOnlyTheFirstRepeat(t *testing.T) {
-	t.Parallel()
-	result := runCanonicalFixture(t, "Component.tsx", `const element = <div className="end-0 end-0" />;`)
-	rule_testing.ExpectFindings(t, result, "canonicalSingle", "canonicalSingle")
-	rule_testing.ExpectFixedSource(t, result, `const element = <div className="inset-e-0 end-0" />;`+"\n")
+func TestCanonicalSingleFixesOnlyTheFirstRepeat(test *testing.T) {
+	test.Parallel()
+	result := runCanonicalFixture(test, "Component.tsx", `const element = <div className="end-0 end-0" />;`)
+	rule_testing.ExpectFindings(test, result, "canonicalSingle", "canonicalSingle")
+	rule_testing.ExpectFixedSource(test, result, `const element = <div className="inset-e-0 end-0" />;`+"\n")
 }

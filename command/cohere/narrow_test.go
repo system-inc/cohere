@@ -14,28 +14,28 @@ import (
 //
 // A real graph rather than a stub, because what is under test is whether the scope, the closure and
 // the file slice agree with each other. A hand-built graph would let all three be wrong together.
-func buildNarrowFixtureGraph(t *testing.T, files map[string]string) (*program.Graph, string) {
-	t.Helper()
-	directory := t.TempDir()
+func buildNarrowFixtureGraph(test *testing.T, files map[string]string) (*program.Graph, string) {
+	test.Helper()
+	directory := test.TempDir()
 
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building the fixture graph: %v", err)
+		test.Fatalf("building the fixture graph: %v", err)
 	}
 	return graph, directory
 }
@@ -57,9 +57,9 @@ func narrowedNames(files []*ast.SourceFile) string {
 // Demonstrated on the real tree before this function existed: giving one function an `any` return
 // produced seven new findings, four of them in a consumer two directories from the edit, and a run
 // scoped to the edited file alone saw three.
-func TestNarrowToClosureAddsConsumersAndCountsThem(t *testing.T) {
-	t.Parallel()
-	graph, directory := buildNarrowFixtureGraph(t, map[string]string{
+func TestNarrowToClosureAddsConsumersAndCountsThem(test *testing.T) {
+	test.Parallel()
+	graph, directory := buildNarrowFixtureGraph(test, map[string]string{
 		"Producer.ts":  "export function value(): number {\n  return 1;\n}\n",
 		"Consumer.ts":  "import { value } from './Producer';\nexport const doubled = value() * 2;\n",
 		"Unrelated.ts": "export const alone = 1;\n",
@@ -76,19 +76,19 @@ func TestNarrowToClosureAddsConsumersAndCountsThem(t *testing.T) {
 
 	names := narrowedNames(files)
 	if !strings.Contains(names, "Consumer.ts") {
-		t.Errorf("the consumer was not added to the scope: %s", names)
+		test.Errorf("the consumer was not added to the scope: %s", names)
 	}
 	// The control. A closure that returned every project file would satisfy the assertion above, and
 	// that is the shape the defect actually took when the reverse map had no edges.
 	if strings.Contains(names, "Unrelated.ts") {
-		t.Errorf("a file unrelated to the seed was in the scope: %s", names)
+		test.Errorf("a file unrelated to the seed was in the scope: %s", names)
 	}
 	// One seed, one consumer, so exactly one file was added and the coverage line should say so.
 	if narrowed.DependentCount != 1 {
-		t.Errorf("the dependent count should be 1, got %d", narrowed.DependentCount)
+		test.Errorf("the dependent count should be 1, got %d", narrowed.DependentCount)
 	}
 	if narrowed.Everything {
-		t.Error("a scope well inside the limit reported itself as the whole tree")
+		test.Error("a scope well inside the limit reported itself as the whole tree")
 	}
 }
 
@@ -97,8 +97,8 @@ func TestNarrowToClosureAddsConsumersAndCountsThem(t *testing.T) {
 // Above the limit the honest answer is the whole tree. A truncated closure would be fast, silent,
 // and wrong in the direction that hides findings, which is the one failure a fast path must not
 // introduce, and it would look identical to a working scope from the coverage line.
-func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
-	t.Parallel()
+func TestNarrowToClosureFallsBackRatherThanTruncating(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{"Producer.ts": "export function value(): number {\n  return 1;\n}\n"}
 	for index := 0; index <= program.DependentClosureLimit; index++ {
 		name := filepath.Join("consumers", "Consumer"+itoaForTest(index)+".ts")
@@ -106,7 +106,7 @@ func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
 			itoaForTest(index) + " = value();\n"
 	}
 
-	graph, directory := buildNarrowFixtureGraph(t, files)
+	graph, directory := buildNarrowFixtureGraph(test, files)
 
 	producer := filepath.Join(directory, "Producer.ts")
 	scope := formatScope{
@@ -118,10 +118,10 @@ func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
 	narrowed, narrowedFiles := narrowToClosure(graph, scope, graph.ProjectFiles())
 
 	if !narrowed.Everything {
-		t.Fatalf("a closure past the limit did not fall back to the whole tree: %d files", len(narrowedFiles))
+		test.Fatalf("a closure past the limit did not fall back to the whole tree: %d files", len(narrowedFiles))
 	}
 	if len(narrowedFiles) != len(graph.ProjectFiles()) {
-		t.Errorf("the fallback returned %d files rather than the whole program's %d",
+		test.Errorf("the fallback returned %d files rather than the whole program's %d",
 			len(narrowedFiles), len(graph.ProjectFiles()))
 	}
 
@@ -134,15 +134,15 @@ func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
 		RequestDescription: "Consumer0.ts",
 	}
 	if narrowedLeaf, _ := narrowToClosure(graph, leafScope, graph.ProjectFiles()); narrowedLeaf.Everything {
-		t.Error("a leaf file's closure fell back to the whole tree")
+		test.Error("a leaf file's closure fell back to the whole tree")
 	}
 }
 
 // TestNarrowToClosureLeavesAWholeTreeScopeAlone is the case a bare run takes, and it must cost
 // nothing: no closure, no filtering, the same slice back.
-func TestNarrowToClosureLeavesAWholeTreeScopeAlone(t *testing.T) {
-	t.Parallel()
-	graph, _ := buildNarrowFixtureGraph(t, map[string]string{
+func TestNarrowToClosureLeavesAWholeTreeScopeAlone(test *testing.T) {
+	test.Parallel()
+	graph, _ := buildNarrowFixtureGraph(test, map[string]string{
 		"Producer.ts": "export function value(): number {\n  return 1;\n}\n",
 	})
 
@@ -150,11 +150,11 @@ func TestNarrowToClosureLeavesAWholeTreeScopeAlone(t *testing.T) {
 	narrowed, files := narrowToClosure(graph, formatScope{Everything: true}, projectFiles)
 
 	if !narrowed.Everything || len(files) != len(projectFiles) {
-		t.Errorf("a whole-tree scope was narrowed: everything=%v, %d files of %d",
+		test.Errorf("a whole-tree scope was narrowed: everything=%v, %d files of %d",
 			narrowed.Everything, len(files), len(projectFiles))
 	}
 	if narrowed.DependentCount != 0 {
-		t.Errorf("a whole-tree scope reported %d dependents", narrowed.DependentCount)
+		test.Errorf("a whole-tree scope reported %d dependents", narrowed.DependentCount)
 	}
 }
 

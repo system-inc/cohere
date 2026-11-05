@@ -24,8 +24,8 @@ func settingsOf(namespaces map[string]string) rule.OptionsBase {
 	return rule.OptionsBase{ConfigDirectory: "/repo", Settings: settings}
 }
 
-func TestCheckSettingsAcceptsWhatTheRunReads(t *testing.T) {
-	t.Parallel()
+func TestCheckSettingsAcceptsWhatTheRunReads(test *testing.T) {
+	test.Parallel()
 	accepted := map[string]rule.OptionsBase{
 		"no settings":                    {ConfigDirectory: "/repo"},
 		"our repositories' block":        settingsOf(map[string]string{"better-tailwindcss": ourTailwindSettings}),
@@ -37,14 +37,14 @@ func TestCheckSettingsAcceptsWhatTheRunReads(t *testing.T) {
 	}
 	for name, base := range accepted {
 		if err := CheckSettings(base); err != nil {
-			t.Errorf("%s was refused: %v", name, err)
+			test.Errorf("%s was refused: %v", name, err)
 		}
 	}
 }
 
 // Each refusal names what it refuses, so the fix is one edit.
-func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
-	t.Parallel()
+func TestCheckSettingsRefusesWhatWouldBeIgnored(test *testing.T) {
+	test.Parallel()
 	refused := []struct {
 		name     string
 		base     rule.OptionsBase
@@ -70,12 +70,12 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
 	for _, testCase := range refused {
 		err := CheckSettings(testCase.base)
 		if err == nil {
-			t.Errorf("%s loaded", testCase.name)
+			test.Errorf("%s loaded", testCase.name)
 			continue
 		}
 		for _, mention := range testCase.mentions {
 			if !strings.Contains(err.Error(), mention) {
-				t.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, err)
+				test.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, err)
 			}
 		}
 	}
@@ -83,27 +83,27 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
 
 // The settings reach a rule through the options registry the run builds, merged under the rule's own
 // element: the path a real config takes, not the decoder alone.
-func TestSettingsReachARuleThroughTheRunsOptions(t *testing.T) {
-	t.Parallel()
+func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
+	test.Parallel()
 	base := settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc", "callees": ["mergeClassNames"]}`})
 	options := OptionsAt(base)
 
 	bare, err := options.Decode("better-tailwindcss/enforce-consistent-class-order", nil)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if encoded, _ := json.Marshal(bare); !strings.Contains(string(encoded), `"order":"desc"`) ||
 		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		t.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
+		test.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
 	}
 
 	overridden, err := options.Decode("better-tailwindcss/enforce-consistent-class-order",
 		[]json.RawMessage{json.RawMessage(`{"order": "asc"}`)})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if encoded, _ := json.Marshal(overridden); !strings.Contains(string(encoded), `"order":"asc"`) ||
 		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		t.Fatalf("an options element decoded %s, want its own order over settings' and settings' callees kept", encoded)
+		test.Fatalf("an options element decoded %s, want its own order over settings' and settings' callees kept", encoded)
 	}
 }

@@ -23,9 +23,9 @@ type requireAwaitCase struct {
 	wantReplacements []string
 }
 
-func runRequireAwait(t *testing.T, testCase requireAwaitCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, RequireAwait, requireAwaitFile, testCase.sourceText)
+func runRequireAwait(test *testing.T, testCase requireAwaitCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, RequireAwait, requireAwaitFile, testCase.sourceText)
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
@@ -89,28 +89,28 @@ func requireAwaitSilentCases() []requireAwaitCase {
 	}
 }
 
-func TestRequireAwaitFires(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range requireAwaitFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, len(testCase.wantNames))
 			for index := range wantIds {
 				wantIds[index] = "missingAwait"
 			}
-			rule_testing.ExpectFindings(t, runRequireAwait(t, testCase), wantIds...)
+			rule_testing.ExpectFindings(test, runRequireAwait(test, testCase), wantIds...)
 		})
 	}
 }
 
-func TestRequireAwaitStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range requireAwaitSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runRequireAwait(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runRequireAwait(test, testCase))
 		})
 	}
 }
@@ -121,15 +121,15 @@ func TestRequireAwaitStaysSilent(t *testing.T) {
 // between them are real judgments rather than formatting: a method is named by its property rather
 // than by the function bound to it, an empty string literal name renders as a name rather than as
 // an absent one, and a computed name renders as no name at all.
-func TestRequireAwaitNamesTheFunction(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitNamesTheFunction(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range requireAwaitFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireAwait(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireAwait(test, testCase)
 			if len(result.Diagnostics) != len(testCase.wantNames) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantNames),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantNames),
 					len(result.Diagnostics))
 			}
 			for index, wantName := range testCase.wantNames {
@@ -137,7 +137,7 @@ func TestRequireAwaitNamesTheFunction(t *testing.T) {
 				// Anchored on the sentence opening rather than a bare Contains, so a
 				// description that merely mentioned the name somewhere would not satisfy it.
 				if !strings.HasPrefix(got, wantName+" has no ") {
-					t.Errorf("finding %d rendered\n  %q\nwhich does not open by naming %q",
+					test.Errorf("finding %d rendered\n  %q\nwhich does not open by naming %q",
 						index, got, wantName)
 				}
 			}
@@ -154,35 +154,35 @@ func TestRequireAwaitNamesTheFunction(t *testing.T) {
 // The semicolon rows are the ones to read. Removing `async` can let automatic semicolon insertion
 // join the construct to the line above, and upstream substitutes a semicolon rather than emitting
 // nothing. Three of its own cases exercise it, all measured.
-func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitSuggestsRemovingAsync(test *testing.T) {
+	test.Parallel()
 
 	semicolons := 0
 	for _, testCase := range requireAwaitFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireAwait(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireAwait(test, testCase)
 			if len(result.Diagnostics) != len(testCase.wantReplacements) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantReplacements),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantReplacements),
 					len(result.Diagnostics))
 			}
 			for index, wantText := range testCase.wantReplacements {
 				diagnostic := result.Diagnostics[index]
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d carried %d fixes; this rule only ever suggests",
+					test.Errorf("finding %d carried %d fixes; this rule only ever suggests",
 						index, len(diagnostic.Fixes))
 				}
 				if len(diagnostic.Suggestions) != 1 {
-					t.Fatalf("finding %d carried %d suggestions, wanted exactly one",
+					test.Fatalf("finding %d carried %d suggestions, wanted exactly one",
 						index, len(diagnostic.Suggestions))
 				}
 				fixes := diagnostic.Suggestions[0].Fixes
 				if len(fixes) != 1 {
-					t.Fatalf("finding %d's suggestion carried %d fixes, wanted one", index,
+					test.Fatalf("finding %d's suggestion carried %d fixes, wanted one", index,
 						len(fixes))
 				}
 				if got := fixes[0].Text; got != wantText {
-					t.Errorf("finding %d's suggestion writes %q, wanted %q", index, got,
+					test.Errorf("finding %d's suggestion writes %q, wanted %q", index, got,
 						wantText)
 				}
 			}
@@ -197,7 +197,7 @@ func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
 	// assumed: a change that stopped emitting it would otherwise leave every row still green
 	// on the empty-string cases alone.
 	if semicolons != 3 {
-		t.Errorf("%d rows exercised the semicolon arm, wanted 3", semicolons)
+		test.Errorf("%d rows exercised the semicolon arm, wanted 3", semicolons)
 	}
 }
 
@@ -211,8 +211,8 @@ func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
 // `a = 0` followed by `async m()` is that shape. A plain identifier cannot extend `0` into a larger
 // expression, so no semicolon is needed even though the property has an unterminated initializer.
 // Every verdict below was measured against the installed rule before the row was written.
-func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitSemicolonNeedsBothHalves(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -231,19 +231,19 @@ func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
 		{"class A {\n foo() {}\n async [bar] () { baz; }\n}", ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireAwait(test, requireAwaitCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-				t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions",
+				test.Fatalf("wanted one suggestion carrying one fix, got %d suggestions",
 					len(suggestions))
 			}
 			if got := suggestions[0].Fixes[0].Text; got != testCase.wantText {
-				t.Errorf("suggestion writes %q, wanted %q", got, testCase.wantText)
+				test.Errorf("suggestion writes %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -260,8 +260,8 @@ func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
 // and there the first modifier is the wrong one: the suggestion would delete `static` and leave the
 // function async, which is both wrong and silent, since the finding still appears and still carries
 // a repair. Upstream was driven over each shape below and removes exactly "async " every time.
-func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitFindsAsyncPastOtherModifiers(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class A { static async foo() { return 1; } }",
@@ -270,24 +270,24 @@ func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
 		"class A { private static async foo() { return 1; } }",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireAwait(t, requireAwaitCase{sourceText: sourceText})
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireAwait(test, requireAwaitCase{sourceText: sourceText})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-				t.Fatalf("wanted one suggestion carrying one fix")
+				test.Fatalf("wanted one suggestion carrying one fix")
 			}
 			fix := suggestions[0].Fixes[0]
 			// The span is asserted rather than the resulting text, because a repair that
 			// removed the wrong keyword would still produce compiling source.
 			if removed := sourceText[fix.Range.Pos():fix.Range.End()]; removed != "async " {
-				t.Errorf("suggestion removes %q, wanted %q", removed, "async ")
+				test.Errorf("suggestion removes %q, wanted %q", removed, "async ")
 			}
 			if fix.Text != "" {
-				t.Errorf("suggestion writes %q, wanted the empty string", fix.Text)
+				test.Errorf("suggestion writes %q, wanted the empty string", fix.Text)
 			}
 		})
 	}
@@ -305,8 +305,8 @@ func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
 // holding an arrow reports on the property rather than on the arrow token. Both orderings produce a
 // plausible span and only one matches. Every expectation below was measured against the installed
 // rule.
-func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitReportsOnTheFunctionHead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -350,15 +350,15 @@ func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
 		{"class A { async foo(a) { return 1; } }", "async foo"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireAwait(test, requireAwaitCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			span := result.Diagnostics[0].Range
 			if got := testCase.sourceText[span.Pos():span.End()]; got != testCase.wantHead {
-				t.Errorf("reported on %q, wanted %q", got, testCase.wantHead)
+				test.Errorf("reported on %q, wanted %q", got, testCase.wantHead)
 			}
 		})
 	}
@@ -370,12 +370,12 @@ func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
 // reporting it would be telling the author to make their code not compile. The exemption is only
 // sound if it is narrow, so both directions are asserted here: the contract case stays silent, and
 // the same body in a position that does NOT demand a promise still reports.
-func TestRequireAwaitExemptsAPromiseContract(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitExemptsAPromiseContract(test *testing.T) {
+	test.Parallel()
 
 	// The stub matches a map whose declared signature returns a promise, exactly the shape a
 	// not-yet-wired collector takes beside siblings that really do I/O.
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 type CollectorType = (key: string) => Promise<number>;
 const collectors: Record<string, CollectorType> = {
     wired: async function (key: string): Promise<number> {
@@ -387,7 +387,7 @@ const collectors: Record<string, CollectorType> = {
 };
 void collectors;
 `)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestRequireAwaitStillReportsWithoutAContract is the control for the exemption above.
@@ -395,16 +395,16 @@ void collectors;
 // A detector that cannot fire is indistinguishable from a clean corpus, so the same body written
 // where nothing demands a promise has to still report. Without this the exemption could be
 // swallowing every finding and the suite would look identical.
-func TestRequireAwaitStillReportsWithoutAContract(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitStillReportsWithoutAContract(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 async function notWiredYet(key: string): Promise<number> {
     return 0;
 }
 void notWiredYet;
 `)
-	rule_testing.ExpectFindings(t, result, "missingAwait")
+	rule_testing.ExpectFindings(test, result, "missingAwait")
 }
 
 // TestRequireAwaitReportsWhenTheContractAcceptsEither guards the narrowness of the exemption.
@@ -413,17 +413,17 @@ void notWiredYet;
 // the finding is real. This matters because that union is what a deliberately widened interface
 // looks like, and widening is the correct repair when no implementation awaits. Exempting it would
 // make the rule unable to see the very thing the widening was meant to expose.
-func TestRequireAwaitReportsWhenTheContractAcceptsEither(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitReportsWhenTheContractAcceptsEither(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 type EitherType = (key: string) => number | Promise<number>;
 const handler: EitherType = async function (key: string): Promise<number> {
     return key.length;
 };
 void handler;
 `)
-	rule_testing.ExpectFindings(t, result, "missingAwait")
+	rule_testing.ExpectFindings(test, result, "missingAwait")
 }
 
 // TestRequireAwaitDoesNotLetAGenericInferItsOwnContract guards the exemption against self-inference.
@@ -436,8 +436,8 @@ void handler;
 // were silent here and reported by ESLint, and ESLint was right. `[1, 2].map(async (n) => ...)` is
 // the rule's classic true positive and was silent too. Each shape below reported nothing before the
 // contextual type was asked for with inference from the node blocked.
-func TestRequireAwaitDoesNotLetAGenericInferItsOwnContract(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitDoesNotLetAGenericInferItsOwnContract(test *testing.T) {
+	test.Parallel()
 
 	shapes := []struct {
 		name       string
@@ -490,10 +490,10 @@ void items;
 	}
 
 	for _, shape := range shapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", shape.sourceText)
-			rule_testing.ExpectFindings(t, result, "missingAwait")
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", shape.sourceText)
+			rule_testing.ExpectFindings(test, result, "missingAwait")
 		})
 	}
 }
@@ -505,10 +505,10 @@ void items;
 // inferred, and a type parameter constrained to a promise-returning function falls back to that
 // constraint. Measured on ahra: `withDiscord<T>(callback: (api) => Promise<T>)` and its callers in
 // `DiscordCommandLineInterface.ts` are the shape, and they must stay silent.
-func TestRequireAwaitKeepsAGenericContractThatDemandsAPromise(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitKeepsAGenericContractThatDemandsAPromise(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 async function withClient<T>(callback: (client: { name: string }) => Promise<T>): Promise<T> {
     return await callback({ name: 'client' });
 }
@@ -522,13 +522,13 @@ void runTask(async function () {
     return;
 });
 `)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 
 	// A method of a generic INTERFACE is an instantiated signature with no type parameters of its
 	// own: `T` was fixed by the declared receiver, not inferred from this argument. Reading its
 	// uninstantiated parameter type would lose the demand and report code that cannot drop the
 	// keyword.
-	interfaceMethod := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	interfaceMethod := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 interface RegistryInterface<T> {
     register(handler: T): void;
 }
@@ -537,11 +537,11 @@ registry.register(async () => {
     return 1;
 });
 `)
-	rule_testing.ExpectClean(t, interfaceMethod)
+	rule_testing.ExpectClean(test, interfaceMethod)
 
 	// Explicit type arguments are the author's, so nothing was inferred from the callback and the
 	// instantiated parameter type is the real demand.
-	explicit := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	explicit := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 function identity<T>(value: T): T {
     return value;
 }
@@ -550,7 +550,7 @@ const handler = identity<() => Promise<number>>(async () => {
 });
 void handler;
 `)
-	rule_testing.ExpectClean(t, explicit)
+	rule_testing.ExpectClean(test, explicit)
 }
 
 // TestRequireAwaitReadsAGenericReturnFromItsTypedPosition covers the return-type stand-in.
@@ -560,8 +560,8 @@ void handler;
 // assignment, so the demand is real and the case stays silent. When the annotated type does not
 // declare the member at all, which is the ahra shape (`MenuItemButtonProperties[]` has no
 // `onSelected`), nothing demands a promise and the finding stands.
-func TestRequireAwaitReadsAGenericReturnFromItsTypedPosition(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitReadsAGenericReturnFromItsTypedPosition(test *testing.T) {
+	test.Parallel()
 
 	prelude := `
 function useMemo<T>(factory: () => T, dependencies: unknown[]): T {
@@ -571,7 +571,7 @@ function useMemo<T>(factory: () => T, dependencies: unknown[]): T {
 function exportFile(): void {}
 `
 
-	demanded := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+	demanded := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", prelude+`
 const items: { label: string; onSelected: () => Promise<void> }[] = useMemo(function () {
     return [
         {
@@ -584,11 +584,11 @@ const items: { label: string; onSelected: () => Promise<void> }[] = useMemo(func
 }, []);
 void items;
 `)
-	rule_testing.ExpectClean(t, demanded)
+	rule_testing.ExpectClean(test, demanded)
 
 	// A factory with its own return annotation fixes the demand without the call's help, so the walk
 	// stops there and the annotation answers.
-	annotatedFactory := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+	annotatedFactory := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", prelude+`
 const items = useMemo(function (): { onSelected: () => Promise<void> }[] {
     return [
         {
@@ -600,9 +600,9 @@ const items = useMemo(function (): { onSelected: () => Promise<void> }[] {
 }, []);
 void items;
 `)
-	rule_testing.ExpectClean(t, annotatedFactory)
+	rule_testing.ExpectClean(test, annotatedFactory)
 
-	undeclared := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+	undeclared := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", prelude+`
 const items: { label: string }[] = useMemo(function () {
     return [
         {
@@ -615,7 +615,7 @@ const items: { label: string }[] = useMemo(function () {
 }, []);
 void items;
 `)
-	rule_testing.ExpectFindings(t, undeclared, "missingAwait")
+	rule_testing.ExpectFindings(test, undeclared, "missingAwait")
 }
 
 // TestRequireAwaitExemptsAnInterfaceMethod covers the class-method half of the contract check.
@@ -623,10 +623,10 @@ void items;
 // `implements` puts the contract on the class rather than on the method, so the method has no
 // contextual type of its own and the object-literal path above does not reach it. The control
 // below asserts the exemption is not simply swallowing every method.
-func TestRequireAwaitExemptsAnInterfaceMethod(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitExemptsAnInterfaceMethod(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 interface AdapterInterface {
     fetchBalances: () => Promise<number[]>;
 }
@@ -637,17 +637,17 @@ class ScaffoldedAdapter implements AdapterInterface {
 }
 void ScaffoldedAdapter;
 `)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestRequireAwaitReportsAMethodWithNoInterface is the control for the exemption above.
 //
 // The same method on a class that implements nothing has no contract to satisfy, so the keyword is
 // the author's own choice and the finding stands.
-func TestRequireAwaitReportsAMethodWithNoInterface(t *testing.T) {
-	t.Parallel()
+func TestRequireAwaitReportsAMethodWithNoInterface(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+	result := rule_testing.RunTyped(test, RequireAwait, "Subject.ts", `
 class PlainAdapter {
     async fetchBalances(): Promise<number[]> {
         return [];
@@ -655,5 +655,5 @@ class PlainAdapter {
 }
 void PlainAdapter;
 `)
-	rule_testing.ExpectFindings(t, result, "missingAwait")
+	rule_testing.ExpectFindings(test, result, "missingAwait")
 }

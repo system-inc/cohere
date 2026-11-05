@@ -25,22 +25,22 @@ import (
 var noShadowShadowedPlace = regexp.MustCompile(`on line (\d+) column (\d+)\.$`)
 
 // noShadowTsconfigFor is the corpus tsconfig with include naming the row's file.
-func noShadowTsconfigFor(t *testing.T, fileName string) string {
-	t.Helper()
+func noShadowTsconfigFor(test *testing.T, fileName string) string {
+	test.Helper()
 	var configuration map[string]any
 	if err := json.Unmarshal([]byte(noShadowCorpusTsconfig), &configuration); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	configuration["include"] = []string{fileName}
 	encoded, err := json.Marshal(configuration)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return string(encoded)
 }
 
-func TestNoShadowUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoShadowUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	valid, invalid, pinned := 0, 0, 0
 	for _, row := range noShadowCorpus {
@@ -59,7 +59,7 @@ func TestNoShadowUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if valid != noShadowCorpusUpstreamValid || invalid != noShadowCorpusUpstreamInvalid || pinned != noShadowCorpusUpstreamPinned {
-		t.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
+		test.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
 			valid, invalid, pinned, noShadowCorpusUpstreamValid, noShadowCorpusUpstreamInvalid, noShadowCorpusUpstreamPinned)
 	}
 
@@ -68,17 +68,17 @@ func TestNoShadowUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			options, err := DecodeNoShadowOptions([]byte(row.options))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+				test.Fatalf("decoding %q: %v", row.options, err)
 			}
-			configuration := noShadowTsconfigFor(t, row.fileName)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoShadow, map[string]string{row.fileName: row.source}, row.fileName, options,
+			configuration := noShadowTsconfigFor(test, row.fileName)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoShadow, map[string]string{row.fileName: row.source}, row.fileName, options,
 				func(directory string) {
 					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						t.Fatal(err)
+						test.Fatal(err)
 					}
 				})
 
@@ -103,9 +103,9 @@ func TestNoShadowUpstreamCorpus(t *testing.T) {
 				})
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }
@@ -113,8 +113,8 @@ func TestNoShadowUpstreamCorpus(t *testing.T) {
 // The one thing cohere cannot express is pinned on the rows that carry it, by name, so a row cannot
 // lose its pin and quietly start asserting a verdict it was never recorded under, and a second kind
 // cannot appear without a reason being written for it.
-func TestNoShadowCorpusPinsWhatCohereCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestNoShadowCorpusPinsWhatCohereCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	reasons := map[string]bool{
 		// cohere carries no globals configuration, by the 1.0 contract (#bfxz13m item 4). The edge
@@ -127,14 +127,14 @@ func TestNoShadowCorpusPinsWhatCohereCannotExpress(t *testing.T) {
 	for _, row := range noShadowCorpus {
 		for _, feature := range row.pinned {
 			if !reasons[feature] {
-				t.Errorf("row %d pins %q, which has no reason here", row.index, feature)
+				test.Errorf("row %d pins %q, which has no reason here", row.index, feature)
 			}
 			counts[feature]++
 		}
 	}
 	for feature := range reasons {
 		if counts[feature] == 0 {
-			t.Errorf("no row pins %q, so its reason above is stale", feature)
+			test.Errorf("no row pins %q, so its reason above is stale", feature)
 		}
 	}
 }

@@ -16,8 +16,8 @@ import (
 // reference-escape family, which this port scopes out and the rule doc explains. The cases
 // carrying them are omitted rather than recorded as clean, because recording them as clean would
 // assert the opposite of upstream.
-func TestRulesOfHooksStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -692,16 +692,16 @@ func TestRulesOfHooksStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RulesOfHooks, "component.jsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestRulesOfHooksFires(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1294,10 +1294,10 @@ func TestRulesOfHooksFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RulesOfHooks, "component.jsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -1309,8 +1309,8 @@ func TestRulesOfHooksFires(t *testing.T) {
 // Measured on the release oxlint binary with `--format=json` rather than read from the Rust, and
 // then confirmed against `call.callee.span()` in `function_error` versus `call.span` elsewhere. A
 // port that pointed at the call in every arm passes the whole 150-case fixture set above.
-func TestRulesOfHooksSpans(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -1369,21 +1369,21 @@ func TestRulesOfHooksSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RulesOfHooks, "component.jsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
+				test.Fatalf("expected exactly one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 			}
 			diagnostic := result.Diagnostics[0]
 			// Asserted against a literal typed here rather than against the rule's own message
 			// constant, so a mutation moving the id cannot move both sides together.
 			if diagnostic.Message.Id != testCase.id {
-				t.Errorf("expected id %q, got %q", testCase.id, diagnostic.Message.Id)
+				test.Errorf("expected id %q, got %q", testCase.id, diagnostic.Message.Id)
 			}
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("expected the finding to cover %q, got %q", testCase.reported, reported)
+				test.Errorf("expected the finding to cover %q, got %q", testCase.reported, reported)
 			}
 		})
 	}
@@ -1394,8 +1394,8 @@ func TestRulesOfHooksSpans(t *testing.T) {
 // `rule.Message` carries no format verbs, so there is nothing rendered and nothing to interpolate;
 // the guard is an equality check on the id and a prefix check on the sentence a reader sees. Both
 // literals are typed here rather than read off the rule.
-func TestRulesOfHooksMessages(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksMessages(test *testing.T) {
+	test.Parallel()
 
 	pairs := []struct {
 		id         string
@@ -1415,10 +1415,10 @@ func TestRulesOfHooksMessages(t *testing.T) {
 	}
 	for _, pair := range pairs {
 		if pair.actualId != pair.id {
-			t.Errorf("expected id %q, got %q", pair.id, pair.actualId)
+			test.Errorf("expected id %q, got %q", pair.id, pair.actualId)
 		}
 		if !strings.HasPrefix(pair.actualText, pair.startsWith) {
-			t.Errorf("expected the description for %q to start with %q, got %q", pair.id, pair.startsWith, pair.actualText)
+			test.Errorf("expected the description for %q to start with %q, got %q", pair.id, pair.startsWith, pair.actualText)
 		}
 	}
 }
@@ -1428,8 +1428,8 @@ func TestRulesOfHooksMessages(t *testing.T) {
 //
 // Each case says which reading produced it, because a case invented from the same belief as the code
 // tests nothing.
-func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1537,36 +1537,36 @@ func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, RulesOfHooks, "component.jsx", testCase.source)
 			if len(testCase.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
 // TestRulesOfHooksAdditionalHooksChangesNothing pins upstream's inert option: the decoder accepts it,
 // and the findings with it are the findings without it, which is what the installed build does.
-func TestRulesOfHooksAdditionalHooksChangesNothing(t *testing.T) {
-	t.Parallel()
+func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalHooks": "useCustomEffect"}`))
 	if err != nil {
-		t.Fatalf("decoding additionalHooks: %v", err)
+		test.Fatalf("decoding additionalHooks: %v", err)
 	}
 	const source = "function MyComponent(props) { if (props.on) { useCustomEffect(() => {}); useState(0); } }"
-	with := rule_testing.RunWithOptions(t, RulesOfHooks, rulesOfHooksOptionFile, source, decoded)
-	without := rule_testing.Run(t, RulesOfHooks, rulesOfHooksOptionFile, source)
+	with := rule_testing.RunWithOptions(test, RulesOfHooks, rulesOfHooksOptionFile, source, decoded)
+	without := rule_testing.Run(test, RulesOfHooks, rulesOfHooksOptionFile, source)
 	if strings.Join(with.MessageIds(), ",") != strings.Join(without.MessageIds(), ",") || len(with.Diagnostics) == 0 {
-		t.Errorf("with the option %v, without %v; want the same, non-empty", with.MessageIds(), without.MessageIds())
+		test.Errorf("with the option %v, without %v; want the same, non-empty", with.MessageIds(), without.MessageIds())
 	}
 
 	if _, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalEffectHooks": "x"}`)); err == nil {
-		t.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
+		test.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
 	}
 }
 

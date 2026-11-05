@@ -7,8 +7,8 @@ import (
 	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
-func TestManualMemoizationPreservesComputedFrozenRead(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationPreservesComputedFrozenRead(test *testing.T) {
+	test.Parallel()
 	const source = `import {useCallback} from 'react'; function Component(props) {
 const item=props.items[0];
 const value=item.value;
@@ -27,18 +27,18 @@ return <div onClick={callback}/>;
 		{"missing dependency", strings.Replace(source, "[value]);", "[]);", 1), 1},
 		{"no later call", strings.Replace(source, "consume(item);", "", 1), 0},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
-				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
+				test.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
 			}
 		})
 	}
 }
 
-func TestComputedLoadCopiesReceiverKind(t *testing.T) {
-	t.Parallel()
+func TestComputedLoadCopiesReceiverKind(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		want mutation_aliasing.EffectValueKind
@@ -46,9 +46,9 @@ func TestComputedLoadCopiesReceiverKind(t *testing.T) {
 		{"Component", mutation_aliasing.EffectValueFrozen},
 		{"ordinary", mutation_aliasing.EffectValueMutable},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, effects := effectsFor(t, "function "+testCase.name+"(items, key) { return items[key]; }")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, effects := effectsFor(test, "function "+testCase.name+"(items, key) { return items[key]; }")
 			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
 			matched := 0
 			for _, instruction := range function.Instructions {
@@ -62,14 +62,14 @@ func TestComputedLoadCopiesReceiverKind(t *testing.T) {
 				matched++
 				list := effects.Get(instruction.Id)
 				if len(list) == 0 || list[0].Kind != mutation_aliasing.AliasingEffectCreateFrom || list[0].From.Identifier != load.Object.Identifier {
-					t.Errorf("computed load effects=%v, want CreateFrom receiver", list)
+					test.Errorf("computed load effects=%v, want CreateFrom receiver", list)
 				}
 				if got := aliasingGraph.Kind(instruction.LValue.Identifier); got != testCase.want {
-					t.Errorf("computed kind=%s, want %s", got, testCase.want)
+					test.Errorf("computed kind=%s, want %s", got, testCase.want)
 				}
 			}
 			if matched != 1 {
-				t.Fatalf("computed reads=%d, want one", matched)
+				test.Fatalf("computed reads=%d, want one", matched)
 			}
 		})
 	}

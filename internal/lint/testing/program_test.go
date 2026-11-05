@@ -58,30 +58,30 @@ func isNumeric(typeName string) bool {
 // A harness that handed rules a nil checker would make each of them take its decline path, report
 // nothing, and pass. Green, and having proven nothing. So this asserts the positive direction with
 // a rule that can only answer by asking the checker.
-func TestTypedHarnessSuppliesALiveChecker(t *testing.T) {
-	t.Parallel()
-	result := RunTyped(t, awaitedTypeIsThenable, "Subject.ts", `
+func TestTypedHarnessSuppliesALiveChecker(test *testing.T) {
+	test.Parallel()
+	result := RunTyped(test, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = 3;
 			return await value;
 		}
 	`)
 
-	ExpectFindings(t, result, "awaitNonThenable")
+	ExpectFindings(test, result, "awaitNonThenable")
 }
 
 // TestTypedHarnessStaysSilentOnCorrectCode is the other direction, and the half a violation-only
 // corpus never has. A harness whose rule fired on everything would pass the test above.
-func TestTypedHarnessStaysSilentOnCorrectCode(t *testing.T) {
-	t.Parallel()
-	result := RunTyped(t, awaitedTypeIsThenable, "Subject.ts", `
+func TestTypedHarnessStaysSilentOnCorrectCode(test *testing.T) {
+	test.Parallel()
+	result := RunTyped(test, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = Promise.resolve(3);
 			return await value;
 		}
 	`)
 
-	ExpectClean(t, result)
+	ExpectClean(test, result)
 }
 
 // TestSyntaxOnlyHarnessCannotProveATypeAwareRule states the defect this file exists to prevent, as
@@ -90,9 +90,9 @@ func TestTypedHarnessStaysSilentOnCorrectCode(t *testing.T) {
 // Run gives a rule no checker, so the same rule that fires above reports nothing here. A fixture
 // written that way passes while exercising only the nil path, which is why a type-aware rule must
 // use RunTyped and why that is worth failing loudly about rather than documenting.
-func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(t *testing.T) {
-	t.Parallel()
-	result := Run(t, awaitedTypeIsThenable, "Subject.ts", `
+func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(test *testing.T) {
+	test.Parallel()
+	result := Run(test, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = 3;
 			return await value;
@@ -100,7 +100,7 @@ func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(t *testing.T) {
 	`)
 
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("the syntax-only harness unexpectedly produced findings: %v", result.MessageIds())
+		test.Fatalf("the syntax-only harness unexpectedly produced findings: %v", result.MessageIds())
 	}
 	// The point is not that this is correct behavior. It is that a green result here proves nothing
 	// about the rule, and a reader has to know the difference.
@@ -108,9 +108,9 @@ func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(t *testing.T) {
 
 // TestTypedHarnessResolvesAcrossFiles covers the questions a single-file program cannot pose:
 // whether an imported symbol is what the rule thinks it is.
-func TestTypedHarnessResolvesAcrossFiles(t *testing.T) {
-	t.Parallel()
-	result := RunTypedFiles(t, awaitedTypeIsThenable, map[string]string{
+func TestTypedHarnessResolvesAcrossFiles(test *testing.T) {
+	test.Parallel()
+	result := RunTypedFiles(test, awaitedTypeIsThenable, map[string]string{
 		"Helper.ts": `export const helperValue = 3;`,
 		"Subject.ts": `
 			import { helperValue } from './Helper';
@@ -122,7 +122,7 @@ func TestTypedHarnessResolvesAcrossFiles(t *testing.T) {
 
 	// helperValue is a number declared in another file. Only a program that resolved the import can
 	// answer that, so a finding here proves cross-file resolution rather than a lucky local guess.
-	ExpectFindings(t, result, "awaitNonThenable")
+	ExpectFindings(test, result, "awaitNonThenable")
 }
 
 // TestNarrowedLiteralTypesReachTheRule records what the checker actually reports, because it is a
@@ -137,8 +137,8 @@ func TestTypedHarnessResolvesAcrossFiles(t *testing.T) {
 // from the test output alone. A type-aware rule that reports nothing has either lost its checker or
 // asked the wrong question, and knowing which is the difference between debugging the harness and
 // debugging the rule.
-func TestNarrowedLiteralTypesReachTheRule(t *testing.T) {
-	t.Parallel()
+func TestNarrowedLiteralTypesReachTheRule(test *testing.T) {
+	test.Parallel()
 	reported := []string{}
 	recorder := rule.Rule{
 		Name: "probe-type-names",
@@ -155,7 +155,7 @@ func TestNarrowedLiteralTypesReachTheRule(t *testing.T) {
 		},
 	}
 
-	RunTyped(t, recorder, "Subject.ts", `
+	RunTyped(test, recorder, "Subject.ts", `
 		async function main() {
 			const literal = 3;
 			const widened: number = 3;
@@ -164,12 +164,12 @@ func TestNarrowedLiteralTypesReachTheRule(t *testing.T) {
 	`)
 
 	if len(reported) != 2 {
-		t.Fatalf("expected the checker to be asked twice, got %v", reported)
+		test.Fatalf("expected the checker to be asked twice, got %v", reported)
 	}
 	if reported[0] != "3" {
-		t.Fatalf("expected the const to narrow to the literal type 3, got %q", reported[0])
+		test.Fatalf("expected the const to narrow to the literal type 3, got %q", reported[0])
 	}
 	if reported[1] != "number" {
-		t.Fatalf("expected the annotated binding to stay number, got %q", reported[1])
+		test.Fatalf("expected the annotated binding to stay number, got %q", reported[1])
 	}
 }

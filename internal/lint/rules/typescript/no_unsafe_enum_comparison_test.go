@@ -414,24 +414,24 @@ var noUnsafeEnumComparisonSilentCases = []noUnsafeEnumComparisonCase{
 	},
 }
 
-func TestNoUnsafeEnumComparisonFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeEnumComparisonFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noUnsafeEnumComparisonFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoUnsafeEnumComparisonStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeEnumComparisonStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noUnsafeEnumComparisonSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -455,8 +455,8 @@ func TestNoUnsafeEnumComparisonStaysSilent(t *testing.T) {
 // that is not gives the value a way to be something else. An intersection is number-like if any
 // constituent is, because an intersection is all of its parts at once and `number & {}` is still a
 // number.
-func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		source  string
@@ -478,15 +478,15 @@ func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile,
 				testCase.source)
 			if testCase.reports {
-				rule_testing.ExpectFindings(t, result, "mismatchedCondition")
+				rule_testing.ExpectFindings(test, result, "mismatchedCondition")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -504,18 +504,18 @@ func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
 // the first line could have stated. Asserted here so the equivalence is a recorded measurement
 // rather than an argument, and so a future change that makes gate four reachable without an enum
 // fails loudly.
-func TestNoUnsafeEnumComparisonGateOneIsACostGuard(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeEnumComparisonGateOneIsACostGuard(test *testing.T) {
+	test.Parallel()
 	const source = "declare const a: string;\ndeclare const b: number;\nconst c = a === b;\n"
 
-	result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
+	rule_testing.ExpectClean(test, result)
 
 	// The control: the same shape WITH an enum on one side does report, so the clean verdict above
 	// is a decision rather than the rule being inert on this file.
 	const withEnum = "enum SE { FOO = 'foo' }\ndeclare const se: SE;\ndeclare const a: string;\nconst c = a === se;\n"
-	controlResult := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, withEnum)
-	rule_testing.ExpectFindings(t, controlResult, "mismatchedCondition")
+	controlResult := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, withEnum)
+	rule_testing.ExpectFindings(test, controlResult, "mismatchedCondition")
 }
 
 // TestNoUnsafeEnumComparisonReadsUnionsConstituentwise pins which reading of `isTypeFlagSet` this
@@ -535,18 +535,18 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(t *testing.T) {
 // constituents carry the flag. If this rule ever stops iterating and starts testing the whole type,
 // that union stops being seen as carrying enums at all, gate one exits early, and the finding is
 // silently lost.
-func TestNoUnsafeEnumComparisonReadsUnionsConstituentwise(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeEnumComparisonReadsUnionsConstituentwise(test *testing.T) {
+	test.Parallel()
 	// A union of two enums compared against a bare string. Every constituent is an enum literal, so
 	// the comparison is unsafe and must report.
 	const source = "enum A { X = 'x' }\nenum B { Y = 'y' }\ndeclare const either: A | B;\nconst c = either === 'x';\n"
 
-	result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
-	rule_testing.ExpectFindings(t, result, "mismatchedCondition")
+	result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
+	rule_testing.ExpectFindings(test, result, "mismatchedCondition")
 
 	// The control: the same union compared against a member of one of its own enums is safe, so a
 	// rule that had started reporting every union would fail here.
 	const safe = "enum A { X = 'x' }\nenum B { Y = 'y' }\ndeclare const either: A | B;\nconst c = either === A.X;\n"
-	controlResult := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, safe)
-	rule_testing.ExpectClean(t, controlResult)
+	controlResult := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, safe)
+	rule_testing.ExpectClean(test, controlResult)
 }

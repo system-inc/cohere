@@ -1506,21 +1506,21 @@ var logicalAssignmentReportingCases = []logicalAssignmentReportingCase{
 // expectation compared against the whole file has to be transformed the same way. That is what
 // logicalAssignmentAsWritten does, and it is the harness fact the brief records a porter chasing
 // through the intermediate representation and the shim before finding.
-func runLogicalAssignment(t *testing.T, testCase struct {
+func runLogicalAssignment(test *testing.T, testCase struct {
 	source  string
 	options any
 },
 ) rule_testing.Result {
-	t.Helper()
+	test.Helper()
 	options := testCase.options
 	if options == nil {
 		options = DefaultLogicalAssignmentOperatorsSettings()
 	}
 	if logicalAssignmentNeedsScriptSource(testCase.source) {
-		return rule_testing.RunWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+		return rule_testing.RunWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 			testCase.source, options)
 	}
-	return rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	return rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		testCase.source, options)
 }
 
@@ -1571,34 +1571,34 @@ func logicalAssignmentAsWritten(original string, expected string) string {
 // a rule which fires on correct code. Several of them separate distinctions this port could
 // otherwise get away with: `a = (a || b)` is clean because the right side is parenthesized, and
 // `a = (a || b) || c` is clean because the leftmost walk stops at an explicit grouping.
-func TestLogicalAssignmentOperatorsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range logicalAssignmentCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestLogicalAssignmentOperatorsFires runs upstream's whole invalid list and asserts the message id
 // of each finding.
-func TestLogicalAssignmentOperatorsFires(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range logicalAssignmentReportingCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
-			rule_testing.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(test, result, testCase.messageId)
 		})
 	}
 }
@@ -1609,21 +1609,21 @@ func TestLogicalAssignmentOperatorsFires(t *testing.T) {
 // This is the half no message-id fixture can see. Upstream carries 142 `output` values against 184
 // cases, and each is the exact text the fixer must produce, so a repair landing on the right span
 // with the wrong text fails here rather than passing.
-func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsFixes(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if testCase.fixedSource == "" {
 			continue
 		}
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.fixedSource))
 		})
 		checked++
@@ -1631,7 +1631,7 @@ func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
 	// Pinned so a regeneration that silently drops the output field fails here rather than passing
 	// vacuously with nothing to check.
 	if checked != 142 {
-		t.Errorf("checked %d fixes, want 142", checked)
+		test.Errorf("checked %d fixes, want 142", checked)
 	}
 }
 
@@ -1644,42 +1644,42 @@ func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
 // The 28 cases here are the getter judgment made visible. Every one of them is a member access
 // rather than a bare identifier, and upstream refuses to rewrite them unattended because reading
 // `a.b` once where the source read it twice can skip a getter call.
-func TestLogicalAssignmentOperatorsSuggestions(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsSuggestions(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if len(testCase.suggestions) == 0 {
 			continue
 		}
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			offered := result.Diagnostics[0].Suggestions
 			if len(offered) != len(testCase.suggestions) {
-				t.Fatalf("offered %d suggestions, want %d", len(offered), len(testCase.suggestions))
+				test.Fatalf("offered %d suggestions, want %d", len(offered), len(testCase.suggestions))
 			}
 			// A suggestion must never arrive alongside a fix: the two report calls are exclusive
 			// upstream, and a rule offering both would have the edit engine apply the repair a
 			// human was meant to choose.
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("a suggestion case also carried %d fixes, which would be applied unattended",
+				test.Fatalf("a suggestion case also carried %d fixes, which would be applied unattended",
 					len(result.Diagnostics[0].Fixes))
 			}
 			for index, want := range testCase.suggestions {
 				if offered[index].Message.Id != want.id {
-					t.Errorf("suggestion %d is %q, want %q", index, offered[index].Message.Id, want.id)
+					test.Errorf("suggestion %d is %q, want %q", index, offered[index].Message.Id, want.id)
 					continue
 				}
 				applied := applyLogicalAssignmentFixes(result.SourceFile.Text(), offered[index].Fixes)
 				if applied != logicalAssignmentAsWritten(testCase.source, want.output) {
-					t.Errorf("applying %q produced\n  %q\nwant\n  %q",
+					test.Errorf("applying %q produced\n  %q\nwant\n  %q",
 						want.id, applied, want.output)
 				}
 			}
@@ -1687,7 +1687,7 @@ func TestLogicalAssignmentOperatorsSuggestions(t *testing.T) {
 		checked += len(testCase.suggestions)
 	}
 	if checked != 28 {
-		t.Errorf("checked %d suggestions, want 28", checked)
+		test.Errorf("checked %d suggestions, want 28", checked)
 	}
 }
 
@@ -1724,34 +1724,34 @@ func applyLogicalAssignmentFixes(source string, fixes []rule.Fix) string {
 //
 // A fixer that repaired one of these would pass every message-id fixture while writing source
 // upstream refuses to write, so the absence is asserted directly.
-func TestLogicalAssignmentOperatorsDeclinesToRepair(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsDeclinesToRepair(test *testing.T) {
+	test.Parallel()
 
 	declined := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if testCase.fixedSource != "" || len(testCase.suggestions) != 0 {
 			continue
 		}
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if count := len(result.Diagnostics[0].Fixes); count != 0 {
-				t.Errorf("proposed %d fixes on a case upstream refuses to repair", count)
+				test.Errorf("proposed %d fixes on a case upstream refuses to repair", count)
 			}
 			if count := len(result.Diagnostics[0].Suggestions); count != 0 {
-				t.Errorf("offered %d suggestions on a case upstream refuses to repair", count)
+				test.Errorf("offered %d suggestions on a case upstream refuses to repair", count)
 			}
 		})
 		declined++
 	}
 	if declined != 14 {
-		t.Errorf("checked %d declined repairs, want 14", declined)
+		test.Errorf("checked %d declined repairs, want 14", declined)
 	}
 }
 
@@ -1762,8 +1762,8 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(t *testing.T) {
 // suggestion is not. A rule that offered everything as a fix would rewrite getters across the tree
 // and every one of its message-id fixtures would stay green, which is why this is asserted as its
 // own property.
-func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -1783,23 +1783,23 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
 			"\"use strict\";\nwith (object) a = a || b", nil, true, false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
+				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
 					result.MessageIds())
 			}
 			gotFix := len(result.Diagnostics[0].Fixes) > 0
 			gotSuggest := len(result.Diagnostics[0].Suggestions) > 0
 			if gotFix != testCase.wantFix {
-				t.Errorf("carried a fix: %v, want %v", gotFix, testCase.wantFix)
+				test.Errorf("carried a fix: %v, want %v", gotFix, testCase.wantFix)
 			}
 			if gotSuggest != testCase.wantSuggest {
-				t.Errorf("offered a suggestion: %v, want %v", gotSuggest, testCase.wantSuggest)
+				test.Errorf("offered a suggestion: %v, want %v", gotSuggest, testCase.wantSuggest)
 			}
 		})
 	}
@@ -1814,8 +1814,8 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
 //
 // Upstream reports the whole assignment, the whole logical expression, and the whole `if` statement
 // respectively, rather than the operator.
-func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -1833,20 +1833,20 @@ func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
 		{"a nested assignment reports only its own span", "x = (a = a || b)", nil, "a = a || b"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
+				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
 					result.MessageIds())
 			}
 			diagnostic := result.Diagnostics[0]
 			got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantSpan {
-				t.Errorf("finding pointed at %q, want %q", got, testCase.wantSpan)
+				test.Errorf("finding pointed at %q, want %q", got, testCase.wantSpan)
 			}
 		})
 	}
@@ -1862,8 +1862,8 @@ func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
 // Compared against literal strings typed here rather than against the rule's own message
 // constructors, because comparing a diagnostic to the very function it was built by is an equality
 // whose two sides move together under mutation.
-func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source     string
@@ -1885,21 +1885,21 @@ func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
 			"Unexpected logical operator assignment (&&=) shorthand."},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			message := result.Diagnostics[0].Message
 			if message.Id != testCase.wantId {
-				t.Errorf("message id is %q, want %q", message.Id, testCase.wantId)
+				test.Errorf("message id is %q, want %q", message.Id, testCase.wantId)
 			}
 			if !strings.HasPrefix(message.Description, testCase.wantPrefix) {
-				t.Errorf("message description is\n  %q\nwant it to start with\n  %q",
+				test.Errorf("message description is\n  %q\nwant it to start with\n  %q",
 					message.Description, testCase.wantPrefix)
 			}
 		})
@@ -1911,8 +1911,8 @@ func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
 //
 // The suggestion test above asserts ids and applied text; a wrong description would pass both while
 // telling a human choosing the repair the wrong thing.
-func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsSuggestionMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source  string
@@ -1930,22 +1930,22 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 			"Separate the logical assignment into an assignment with a logical operator."},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-				t.Fatalf("wanted one finding with one suggestion, got %d findings",
+				test.Fatalf("wanted one finding with one suggestion, got %d findings",
 					len(result.Diagnostics))
 			}
 			suggestion := result.Diagnostics[0].Suggestions[0]
 			if suggestion.Message.Id != testCase.wantId {
-				t.Errorf("suggestion id is %q, want %q", suggestion.Message.Id, testCase.wantId)
+				test.Errorf("suggestion id is %q, want %q", suggestion.Message.Id, testCase.wantId)
 			}
 			if suggestion.Message.Description != testCase.want {
-				t.Errorf("suggestion description is\n  %q\nwant\n  %q",
+				test.Errorf("suggestion description is\n  %q\nwant\n  %q",
 					suggestion.Message.Description, testCase.want)
 			}
 		})
@@ -1959,8 +1959,8 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 // `rule.DecodeOptionsInto` would decode. The default is also not the zero value: an absent
 // option means `always`, while the zero value of the setting is the empty string, which matches
 // neither arm and would make the rule silent on every file it exists to catch.
-func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
+	test.Parallel()
 
 	always := LogicalAssignmentAlways
 	never := LogicalAssignmentNever
@@ -1993,24 +1993,24 @@ func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
 			nil, false, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeLogicalAssignmentOperatorsOptions([]byte(testCase.raw))
 			if testCase.wantError {
 				if err == nil {
-					t.Fatalf("wanted an error, got %+v", decoded)
+					test.Fatalf("wanted an error, got %+v", decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			settings := decoded.(LogicalAssignmentOperatorsOptions)
 			if settings.Require == nil || *settings.Require != *testCase.wantMode {
-				t.Errorf("mode is %v, want %v", settings.Require, *testCase.wantMode)
+				test.Errorf("mode is %v, want %v", settings.Require, *testCase.wantMode)
 			}
 			if settings.EnforceForIfStatements != testCase.wantIf {
-				t.Errorf("enforceForIfStatements is %v, want %v",
+				test.Errorf("enforceForIfStatements is %v, want %v",
 					settings.EnforceForIfStatements, testCase.wantIf)
 			}
 		})
@@ -2024,17 +2024,17 @@ func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
 // there, and this asserts it does. The brief records a rule that registered on 3,407 files and was
 // completely broken this way, with every fixture passing because every fixture reached the rule
 // through the decoder.
-func TestLogicalAssignmentOperatorsHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, LogicalAssignmentOperators, "logical.ts", "a = a || b")
-	rule_testing.ExpectFindings(t, result, "assignment")
-	rule_testing.ExpectFixedSource(t, result, logicalAssignmentAsWritten("a = a || b", "a ||= b"))
+	result := rule_testing.RunTyped(test, LogicalAssignmentOperators, "logical.ts", "a = a || b")
+	rule_testing.ExpectFindings(test, result, "assignment")
+	rule_testing.ExpectFixedSource(test, result, logicalAssignmentAsWritten("a = a || b", "a ||= b"))
 
 	// The control: the if-statement arm must stay OFF under the default, or the fallback would be
 	// enforcing something nobody configured.
-	silent := rule_testing.RunTyped(t, LogicalAssignmentOperators, "logical.ts", "if (a) a = b")
-	rule_testing.ExpectClean(t, silent)
+	silent := rule_testing.RunTyped(test, LogicalAssignmentOperators, "logical.ts", "if (a) a = b")
+	rule_testing.ExpectClean(test, silent)
 }
 
 // TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape is the parser divergence, pinned
@@ -2047,17 +2047,17 @@ func TestLogicalAssignmentOperatorsHandlesNilOptions(t *testing.T) {
 //
 // Measured in internal/logical_assignment_operators_probe: the right side of `a || (a = b)` is
 // KindParenthesizedExpression wrapping a KindBinaryExpression.
-func TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	result := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		"a || (a = b)", DefaultLogicalAssignmentOperatorsSettings())
-	rule_testing.ExpectFindings(t, result, "logical")
+	rule_testing.ExpectFindings(test, result, "logical")
 
 	// The doubly-parenthesized form nests, which is why the unwrap is a loop rather than one step.
-	nested := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	nested := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		"a || ((a = b))", DefaultLogicalAssignmentOperatorsSettings())
-	rule_testing.ExpectFindings(t, nested, "logical")
+	rule_testing.ExpectFindings(test, nested, "logical")
 }
 
 // TestLogicalAssignmentOperatorsTypeScriptShapes covers syntax upstream's corpus cannot express
@@ -2070,8 +2070,8 @@ func TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape(t *testin
 //
 // The non-null assertion cases are the ones that matter most, because they sit between the target
 // and the operator, which is exactly where the brief records two fixers losing type information.
-func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -2122,15 +2122,15 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, testCase.options})
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result,
+				rule_testing.ExpectFixedSource(test, result,
 					logicalAssignmentAsWritten(testCase.source, testCase.wantFixed))
 			}
 		})
@@ -2144,8 +2144,8 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
 // which is the failure the brief records twice: a lost return annotation and a stranded type
 // annotation, both from fixers that constructed a replacement instead of copying a span. Here the
 // target is written a second time by the repair, so anything inside it is at risk.
-func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -2157,12 +2157,12 @@ func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T
 		{"this.prop ??= 0", "this.prop = this.prop ?? 0"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 				testCase.source, logicalAssignmentNeverOptions())
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			repairs := result.Diagnostics[0].Fixes
 			if len(repairs) == 0 {
@@ -2170,7 +2170,7 @@ func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T
 			}
 			applied := applyLogicalAssignmentFixes(result.SourceFile.Text(), repairs)
 			if applied != logicalAssignmentAsWritten(testCase.source, testCase.want) {
-				t.Errorf("expanded to\n  %q\nwant\n  %q", applied, testCase.want)
+				test.Errorf("expanded to\n  %q\nwant\n  %q", applied, testCase.want)
 			}
 		})
 	}
@@ -2189,28 +2189,28 @@ func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T
 // Run through the typed harness, because the untyped one hands the rule a nil checker and the guard
 // then reads every `undefined` as the global. That fallback is the right answer for source that does
 // not shadow it, which is why the untyped fixtures above agree.
-func TestLogicalAssignmentOperatorsResolvesUndefinedThroughTheChecker(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsResolvesUndefinedThroughTheChecker(test *testing.T) {
+	test.Parallel()
 
-	reported := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "resolve.ts",
+	reported := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "resolve.ts",
 		"if (a === null || a === undefined) a = b;", logicalAssignmentAlwaysIfOptions())
-	rule_testing.ExpectFindings(t, reported, "if")
+	rule_testing.ExpectFindings(test, reported, "if")
 
 	// A local `undefined` is a different value, so the pair is no longer a nullish test.
-	shadowed := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "resolve.ts",
+	shadowed := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "resolve.ts",
 		"let undefined = 1;\nif (a === null || a === undefined) a = b;",
 		logicalAssignmentAlwaysIfOptions())
-	rule_testing.ExpectClean(t, shadowed)
+	rule_testing.ExpectClean(test, shadowed)
 
 	// The same for `Boolean`, whose cast arm resolves the callee the same way.
-	cast := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "resolve.ts",
+	cast := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "resolve.ts",
 		"if (Boolean(a)) a = b;", logicalAssignmentAlwaysIfOptions())
-	rule_testing.ExpectFindings(t, cast, "if")
+	rule_testing.ExpectFindings(test, cast, "if")
 
-	shadowedCast := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "resolve.ts",
+	shadowedCast := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "resolve.ts",
 		"function Boolean(value: unknown) { return 1; }\nif (Boolean(a)) a = b;",
 		logicalAssignmentAlwaysIfOptions())
-	rule_testing.ExpectClean(t, shadowedCast)
+	rule_testing.ExpectClean(test, shadowedCast)
 }
 
 // TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource pins the harness split above, with the
@@ -2226,20 +2226,20 @@ func TestLogicalAssignmentOperatorsResolvesUndefinedThroughTheChecker(t *testing
 // Second: the untyped harness reproduces upstream, and the checker those cases give up is one they
 // never needed. The control for that is a shadowing case run untyped, which reports where it should
 // be clean, showing the nil-checker fallback is a real limitation that simply does not reach here.
-func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(test *testing.T) {
+	test.Parallel()
 
 	source := "with (object) a = a || b"
 
 	// Untyped, which is upstream's script source type: the identifier may be a scrutinee property,
 	// so the repair is offered rather than applied.
-	untyped := rule_testing.RunWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	untyped := rule_testing.RunWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		source, DefaultLogicalAssignmentOperatorsSettings())
 	if len(untyped.Diagnostics) != 1 {
-		t.Fatalf("untyped: wanted one finding, got %d", len(untyped.Diagnostics))
+		test.Fatalf("untyped: wanted one finding, got %d", len(untyped.Diagnostics))
 	}
 	if len(untyped.Diagnostics[0].Suggestions) != 1 || len(untyped.Diagnostics[0].Fixes) != 0 {
-		t.Errorf("untyped: wanted one suggestion and no fix, got %d suggestions and %d fixes",
+		test.Errorf("untyped: wanted one suggestion and no fix, got %d suggestions and %d fixes",
 			len(untyped.Diagnostics[0].Suggestions), len(untyped.Diagnostics[0].Fixes))
 	}
 
@@ -2247,13 +2247,13 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
 	// then treats the identifier as an ordinary variable and applies the repair. This is asserted
 	// rather than avoided, so a later harness change that stops forcing moduleness fails here and
 	// names the reason instead of silently making the split above pointless.
-	typed := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	typed := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		source, DefaultLogicalAssignmentOperatorsSettings())
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("typed: wanted one finding, got %d", len(typed.Diagnostics))
+		test.Fatalf("typed: wanted one finding, got %d", len(typed.Diagnostics))
 	}
 	if len(typed.Diagnostics[0].Fixes) == 0 {
-		t.Errorf("typed: expected the forced module to read as strict and carry a fix, got %d fixes",
+		test.Errorf("typed: expected the forced module to read as strict and carry a fix, got %d fixes",
 			len(typed.Diagnostics[0].Fixes))
 	}
 
@@ -2261,20 +2261,20 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
 	// untyped harness cannot see it. This case is clean upstream and reports here, which is what
 	// makes the split above load bearing rather than arbitrary. No `with` case shadows anything,
 	// so the two limitations never overlap.
-	shadowed := rule_testing.RunWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	shadowed := rule_testing.RunWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		"{\n    const undefined = 0;\n    if (a == undefined) a = b\n}",
 		logicalAssignmentAlwaysIfOptions())
 	if len(shadowed.Diagnostics) != 1 {
-		t.Errorf("control: the untyped harness was expected to miss the shadow and report, got %d findings",
+		test.Errorf("control: the untyped harness was expected to miss the shadow and report, got %d findings",
 			len(shadowed.Diagnostics))
 	}
 
 	// And the same case typed, which is clean. Together these two say exactly what each harness can
 	// and cannot see.
-	resolved := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
+	resolved := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "logical.ts",
 		"{\n    const undefined = 0;\n    if (a == undefined) a = b\n}",
 		logicalAssignmentAlwaysIfOptions())
-	rule_testing.ExpectClean(t, resolved)
+	rule_testing.ExpectClean(test, resolved)
 }
 
 // TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps covers the outer-parenthesis decision on
@@ -2294,8 +2294,8 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
 //
 // Every expectation here was measured by driving the installed ESLint rule, not derived from
 // reading. Both readings of the source looked correct and one of them was wrong.
-func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -2326,14 +2326,14 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
 			"x = a ||= b"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runLogicalAssignment(t, struct {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runLogicalAssignment(test, struct {
 				source  string
 				options any
 			}{testCase.source, nil})
-			rule_testing.ExpectFindings(t, result, "logical")
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFindings(test, result, "logical")
+			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.want))
 		})
 	}
@@ -2353,13 +2353,13 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
 // than a shape the rule never reported. Which functions count as compiled is the react shelf's
 // `IsInsideComponentOrHook`, the same predicate eight react rules use, so a component-named function
 // that neither writes JSX nor calls a hook is not compiled and keeps reporting.
-func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(t *testing.T) {
-	t.Parallel()
+func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *testing.T) {
+	test.Parallel()
 
 	decode := func(raw string) LogicalAssignmentOperatorsOptions {
 		decoded, err := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		return decoded.(LogicalAssignmentOperatorsOptions)
 	}
@@ -2430,19 +2430,19 @@ export function Defaults(properties: { label?: string }) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			off := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOff)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			off := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOff)
 			if len(off.Diagnostics) == 0 {
-				t.Fatalf("with the compiler off the rule must report here, or the row proves nothing")
+				test.Fatalf("with the compiler off the rule must report here, or the row proves nothing")
 			}
-			on := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOn)
+			on := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOn)
 			if testCase.compiled {
-				rule_testing.ExpectClean(t, on)
+				rule_testing.ExpectClean(test, on)
 				return
 			}
 			if len(on.Diagnostics) != len(off.Diagnostics) {
-				t.Errorf("outside a compiled function the setting must change nothing: %d findings on, %d off",
+				test.Errorf("outside a compiled function the setting must change nothing: %d findings on, %d off",
 					len(on.Diagnostics), len(off.Diagnostics))
 			}
 		})
@@ -2450,11 +2450,11 @@ export function Defaults(properties: { label?: string }) {
 
 	// `never` reports the shorthand and expands it to the long form the compiler accepts, so it is
 	// not gated: inside a component it is the rule doing the compiler's work for it.
-	never := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", `
+	never := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "Compiled.tsx", `
 export function Badge(properties: { label?: string }) {
     let label = properties.label;
     label ||= 'none';
     return <span>{label}</span>;
 }`, logicalAssignmentNeverOptions())
-	rule_testing.ExpectFindings(t, never, "unexpected")
+	rule_testing.ExpectFindings(test, never, "unexpected")
 }

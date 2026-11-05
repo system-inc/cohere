@@ -145,12 +145,12 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 //   - A `## Code` block emitting zero guards: upstream compiled the fixture and memoized nothing.
 //     Scoring these inflates the gap from +17 to +44 while saying nothing about correspondence,
 //     since any scope we produce is over-production by construction.
-func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
-	t.Parallel()
+func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
+	test.Parallel()
 
 	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
 	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+		test.Fatalf("loading the vendored corpus: %v", err)
 	}
 
 	var lines []string
@@ -211,7 +211,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{
+		rule_testing.RunTypedFiles(test, probe, map[string]string{
 			"/react.d.ts":  reactiveDeclarations,
 			"/fixture.tsx": fixture.Source,
 		}, "/fixture.tsx")
@@ -251,15 +251,15 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 
 	sort.Strings(lines)
 	scored := survivedOver + survivedUnder + survivedExact
-	t.Logf("scored=%d upstream=%d assigned=%d survived=%d", scored,
+	test.Logf("scored=%d upstream=%d assigned=%d survived=%d", scored,
 		upstreamTotal, assignedTotal, survivedTotal)
-	t.Logf("assigned: over=%d under=%d exact=%d", assignedOver, assignedUnder, assignedExact)
-	t.Logf("survived: over=%d under=%d exact=%d underScopes=%d",
+	test.Logf("assigned: over=%d under=%d exact=%d", assignedOver, assignedUnder, assignedExact)
+	test.Logf("survived: over=%d under=%d exact=%d underScopes=%d",
 		survivedOver, survivedUnder, survivedExact, survivedUnderScopes)
-	t.Logf("excluded: flow=%d noCodeSection=%d zeroGuard=%d", flowExcluded, noCodeSection, zeroGuard)
+	test.Logf("excluded: flow=%d noCodeSection=%d zeroGuard=%d", flowExcluded, noCodeSection, zeroGuard)
 
 	if scored == 0 {
-		t.Fatal("no fixture was scored; the corpus, the gate string or the guard pattern is wrong, " +
+		test.Fatal("no fixture was scored; the corpus, the gate string or the guard pattern is wrong, " +
 			"and every count below would be a meaningless zero")
 	}
 
@@ -268,13 +268,13 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// denominator moving.
 	const knownScored = 48
 	if scored != knownScored {
-		t.Errorf("scored %d fixtures, want %d; the population changed, so every count below is "+
+		test.Errorf("scored %d fixtures, want %d; the population changed, so every count below is "+
 			"against a different set and none of them can be compared to its pin", scored,
 			knownScored)
 	}
 	const knownUpstreamTotal = 97
 	if upstreamTotal != knownUpstreamTotal {
-		t.Errorf("upstream guards = %d, want %d; the answer key itself moved, which means the "+
+		test.Errorf("upstream guards = %d, want %d; the answer key itself moved, which means the "+
 			"corpus was re-vendored or the guard pattern stopped matching", upstreamTotal,
 			knownUpstreamTotal)
 	}
@@ -297,7 +297,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	const knownSurvivedUnder = 0
 	const knownSurvivedUnderScopes = 0
 	if survivedUnder > knownSurvivedUnder || survivedUnderScopes > knownSurvivedUnderScopes {
-		t.Errorf("under-production = %d fixtures / %d scopes, want at most %d / %d; we now produce "+
+		test.Errorf("under-production = %d fixtures / %d scopes, want at most %d / %d; we now produce "+
 			"FEWER scopes than upstream somewhere new, which drops a memoization the developer "+
 			"wrote rather than adding one they did not. This is a behaviour change, not a "+
 			"performance one, and it outranks any improvement in the two counts below.\n  %s",
@@ -341,7 +341,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// agreement floor becomes ten fixtures stronger.
 	const knownSurvivedExact = 26
 	if survivedExact < knownSurvivedExact {
-		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
+		test.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
 			scored, knownSurvivedExact)
 	}
@@ -383,7 +383,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// is a stricter ceiling than the callback-counting approximation's 146, not a tolerance increase.
 	const knownSurvivedTotal = 142
 	if survivedTotal > knownSurvivedTotal {
-		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
+		test.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+
 			"prune pass that used to fire", survivedTotal, upstreamTotal, knownSurvivedTotal)
 	}
@@ -393,14 +393,14 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// two answers point at different passes. Pinning it would also fail this test for changes that
 	// improve the population upstream's output does not describe.
 	if assignedTotal < survivedTotal {
-		t.Errorf("assigned %d < survived %d, which is impossible: pruning cannot create a scope, "+
+		test.Errorf("assigned %d < survived %d, which is impossible: pruning cannot create a scope, "+
 			"so the two stages are being counted over different populations", assignedTotal,
 			survivedTotal)
 	}
 
 	if dump := os.Getenv("SCOPE_ORACLE_DUMP"); dump != "" {
 		if writeErr := os.WriteFile(dump, []byte(strings.Join(lines, "\n")+"\n"), 0o644); writeErr != nil {
-			t.Errorf("writing the per-fixture dump to %s: %v", dump, writeErr)
+			test.Errorf("writing the per-fixture dump to %s: %v", dump, writeErr)
 		}
 	}
 }

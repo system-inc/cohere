@@ -36,75 +36,75 @@ type preferDestructuringCase struct {
 }
 
 // decodePreferDestructuringOptionsForTest routes a case's options through the SHIPPED decoder.
-func decodePreferDestructuringOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodePreferDestructuringOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
 	}
 	return decoded
 }
 
 // preferDestructuringOffsetOf converts a 1-based line and column into a byte offset.
-func preferDestructuringOffsetOf(t *testing.T, source string, line int, column int) int {
-	t.Helper()
+func preferDestructuringOffsetOf(test *testing.T, source string, line int, column int) int {
+	test.Helper()
 	offset := 0
 	for current := 1; current < line; current++ {
 		next := strings.IndexByte(source[offset:], '\n')
 		if next < 0 {
-			t.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", line)
 		}
 		offset += next + 1
 	}
 	return offset + column - 1
 }
 
-func runPreferDestructuring(t *testing.T, testCase preferDestructuringCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunWithOptions(t, PreferDestructuring, preferDestructuringFile,
-		testCase.source, decodePreferDestructuringOptionsForTest(t, testCase.optionsJson))
+func runPreferDestructuring(test *testing.T, testCase preferDestructuringCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunWithOptions(test, PreferDestructuring, preferDestructuringFile,
+		testCase.source, decodePreferDestructuringOptionsForTest(test, testCase.optionsJson))
 }
 
 // TestPreferDestructuringStaysSilent runs upstream's whole `valid` list.
-func TestPreferDestructuringStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferDestructuringCleanCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runPreferDestructuring(t, testCase))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPreferDestructuring(test, testCase))
 		})
 	}
 }
 
 // TestPreferDestructuringFires runs upstream's whole `invalid` list, asserting spans and kinds.
-func TestPreferDestructuringFires(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferDestructuringReportingCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, testCase)
 
 			wantIds := make([]string, 0, len(testCase.findings))
 			for range testCase.findings {
 				wantIds = append(wantIds, messagePreferDestructuring.Id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := preferDestructuringOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := preferDestructuringOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
+				wantPos := preferDestructuringOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := preferDestructuringOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
 				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
+					test.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
 						index, wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
 						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 				want := "Use " + expected.kind + " destructuring."
 				if !strings.HasPrefix(diagnostic.Message.Description, want) {
-					t.Errorf("finding %d: expected %q, got %q",
+					test.Errorf("finding %d: expected %q, got %q",
 						index, want, diagnostic.Message.Description)
 				}
 			}
@@ -116,23 +116,23 @@ func TestPreferDestructuringFires(t *testing.T) {
 //
 // These are before-and-after pairs on the whole file rather than message ids, so they catch a fixer
 // that repairs the right span with the wrong text. Fourteen of the eighteen are about comments.
-func TestPreferDestructuringRewrites(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringRewrites(test *testing.T) {
+	test.Parallel()
 	asserted := 0
 	for _, testCase := range preferDestructuringReportingCases {
 		if testCase.output == "" {
 			continue
 		}
 		asserted++
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runPreferDestructuring(t, testCase), testCase.output)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runPreferDestructuring(test, testCase), testCase.output)
 		})
 	}
 	// A table-driven fix assertion that silently matched nothing would pass while checking no
 	// rewrite at all, which is the shape this repository keeps finding.
 	if asserted != 18 {
-		t.Fatalf("expected upstream's eighteen fix vectors, ran %d", asserted)
+		test.Fatalf("expected upstream's eighteen fix vectors, ran %d", asserted)
 	}
 }
 
@@ -143,27 +143,27 @@ func TestPreferDestructuringRewrites(t *testing.T) {
 // the eighteen rewrite vectors, because none of those cases is in either set.
 //
 // The count is asserted for the same reason as above: a loop that matched nothing would pass.
-func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(test *testing.T) {
+	test.Parallel()
 	declined := 0
 	for _, testCase := range preferDestructuringReportingCases {
 		if testCase.output != "" {
 			continue
 		}
 		declined++
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, testCase)
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d proposed a repair upstream declines (output: null): %q",
+					test.Errorf("finding %d proposed a repair upstream declines (output: null): %q",
 						index, diagnostic.Fixes[0].Text)
 				}
 			}
 		})
 	}
 	if declined != 30 {
-		t.Fatalf("expected upstream's thirty declines, checked %d", declined)
+		test.Fatalf("expected upstream's thirty declines, checked %d", declined)
 	}
 }
 
@@ -177,8 +177,8 @@ func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(t *testing.T) {
 // No fixture can prove the config layer delivers them, because every fixture hands the decoder bytes
 // this file built. `TestPreferDestructuringSecondElementCrossesTheConfigBoundary` is the one that
 // goes through the real layer.
-func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		raw     string
@@ -187,28 +187,28 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
 	}{
 		{
 			name: "absent options turn every arm on, which is upstream's default",
-			check: func(t *testing.T, o PreferDestructuringOptions) {
+			check: func(test *testing.T, o PreferDestructuringOptions) {
 				if !o.VariableDeclarator.enabled(true) || !o.VariableDeclarator.enabled(false) ||
 					!o.AssignmentExpression.enabled(true) || !o.AssignmentExpression.enabled(false) {
-					t.Errorf("all four switches default on: %#v", o)
+					test.Errorf("all four switches default on: %#v", o)
 				}
 				if o.EnforceForRenamedProperties {
-					t.Error("enforceForRenamedProperties defaults off")
+					test.Error("enforceForRenamedProperties defaults off")
 				}
 			},
 		},
 		{
 			name: "enforceForRenamedProperties arrives as the SECOND element, upstream's spelling",
 			raw:  `[{"VariableDeclarator":{"object":true}},{"enforceForRenamedProperties":true}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
+			check: func(test *testing.T, o PreferDestructuringOptions) {
 				if !o.EnforceForRenamedProperties {
-					t.Error("the second schema element was handed over and not read")
+					test.Error("the second schema element was handed over and not read")
 				}
 				if !o.VariableDeclarator.enabled(false) {
-					t.Error("the enabling keys must survive alongside it")
+					test.Error("the enabling keys must survive alongside it")
 				}
 				if o.AssignmentExpression.enabled(false) {
-					t.Error("naming only VariableDeclarator disables the other kind, which is " +
+					test.Error("naming only VariableDeclarator disables the other kind, which is " +
 						"upstream replacing normalizedOptions wholesale")
 				}
 			},
@@ -216,24 +216,24 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
 		{
 			name: "the flat spelling applies to both node kinds",
 			raw:  `[{"object":true}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
+			check: func(test *testing.T, o PreferDestructuringOptions) {
 				if !o.VariableDeclarator.enabled(false) || !o.AssignmentExpression.enabled(false) {
-					t.Error("a top-level object/array key is upstream's flat form and covers both")
+					test.Error("a top-level object/array key is upstream's flat form and covers both")
 				}
 				if o.VariableDeclarator.enabled(true) || o.AssignmentExpression.enabled(true) {
-					t.Error("the flat form replaces both pairs, so an unnamed switch is OFF")
+					test.Error("the flat form replaces both pairs, so an unnamed switch is OFF")
 				}
 				if o.EnforceForRenamedProperties {
-					t.Error("enforceForRenamedProperties defaults off when the second element is absent")
+					test.Error("enforceForRenamedProperties defaults off when the second element is absent")
 				}
 			},
 		},
 		{
 			name: "an explicit false in the second element stays false",
 			raw:  `[{"object":true},{"enforceForRenamedProperties":false}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
+			check: func(test *testing.T, o PreferDestructuringOptions) {
 				if o.EnforceForRenamedProperties {
-					t.Error("an explicit false was read as true")
+					test.Error("an explicit false was read as true")
 				}
 			},
 		},
@@ -267,24 +267,24 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodePreferDestructuringOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
+					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
 			}
 			options, ok := decoded.(PreferDestructuringOptions)
 			if !ok {
-				t.Fatalf("the decoder returned %T rather than PreferDestructuringOptions", decoded)
+				test.Fatalf("the decoder returned %T rather than PreferDestructuringOptions", decoded)
 			}
 			if testCase.check != nil {
-				testCase.check(t, options)
+				testCase.check(test, options)
 			}
 		})
 	}
@@ -294,21 +294,21 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
 //
 // A decoder that round-trips and a rule that ignores what it decoded look identical from the test
 // above. One source, two configurations, opposite verdicts.
-func TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule(test *testing.T) {
+	test.Parallel()
 	const source = `var foobar = object.bar;`
 
-	off := runPreferDestructuring(t, preferDestructuringCase{source: source})
+	off := runPreferDestructuring(test, preferDestructuringCase{source: source})
 	if len(off.Diagnostics) != 0 {
-		t.Errorf("the names differ, so nothing is repeated and this is clean by default, got %v",
+		test.Errorf("the names differ, so nothing is repeated and this is clean by default, got %v",
 			off.MessageIds())
 	}
 
-	on := runPreferDestructuring(t, preferDestructuringCase{
+	on := runPreferDestructuring(test, preferDestructuringCase{
 		source:      source,
 		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
 	})
-	rule_testing.ExpectFindings(t, on, messagePreferDestructuring.Id)
+	rule_testing.ExpectFindings(test, on, messagePreferDestructuring.Id)
 }
 
 // preferDestructuringCleanCases are upstream's `valid` list, verbatim.
@@ -793,8 +793,8 @@ var preferDestructuringReportingCases = []preferDestructuringCase{
 // here rather than merely convenient: `0x1` arrives as `1`, `1e2` as `100`, and `1.0` as `1`, so the
 // canonical forms are exactly the integers and the non-integers keep a `.` or a `-`. Every verdict
 // below was measured against the installed 10.8.1 build.
-func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringArrayIndexIsIntegerByVALUE(test *testing.T) {
+	test.Parallel()
 	reporting := []struct {
 		name   string
 		source string
@@ -810,12 +810,12 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 				"on the value rather than on whether the source contains a dot."},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name+" reports", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: testCase.source})
-			rule_testing.ExpectFindings(t, result, messagePreferDestructuring.Id)
+		test.Run(testCase.name+" reports", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: testCase.source})
+			rule_testing.ExpectFindings(test, result, messagePreferDestructuring.Id)
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "Use array") {
-				t.Errorf("expected the ARRAY arm, got %q. %s",
+				test.Errorf("expected the ARRAY arm, got %q. %s",
 					result.Diagnostics[0].Message.Description, testCase.reason)
 			}
 		})
@@ -837,11 +837,11 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 				"a Literal at all"},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name+" is clean", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: testCase.source})
+		test.Run(testCase.name+" is clean", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: testCase.source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
+				test.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
 			}
 		})
 	}
@@ -856,14 +856,14 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 //
 // Both directions are asserted, because a guard that declined ALL property access would also pass
 // the two clean rows.
-func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringOptionalChainingIsExcluded(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{`var foo = object?.foo;`, `var foo = array?.[0];`} {
-		t.Run(source+" is clean", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: source})
+		test.Run(source+" is clean", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("optional chaining is excluded upstream, got %v", result.MessageIds())
+				test.Errorf("optional chaining is excluded upstream, got %v", result.MessageIds())
 			}
 		})
 	}
@@ -871,10 +871,10 @@ func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
 	// The control: the same shapes without the `?.` must still report, or the two rows above pass
 	// for the wrong reason.
 	for _, source := range []string{`var foo = object.foo;`, `var foo = array[0];`} {
-		t.Run(source+" still reports", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				runPreferDestructuring(t, preferDestructuringCase{source: source}),
+		test.Run(source+" still reports", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				runPreferDestructuring(test, preferDestructuringCase{source: source}),
 				messagePreferDestructuring.Id)
 		})
 	}
@@ -889,18 +889,18 @@ func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
 //
 // Found by a dry run through the real config layer against a seeded tree, not by a test. This makes
 // it a test.
-func TestPreferDestructuringWorksOnConstAndLet(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringWorksOnConstAndLet(test *testing.T) {
+	test.Parallel()
 	for _, keyword := range []string{"var", "let", "const"} {
-		t.Run(keyword+" reports", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runPreferDestructuring(t,
+		test.Run(keyword+" reports", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runPreferDestructuring(test,
 				preferDestructuringCase{source: keyword + ` foo = object.foo;`}),
 				messagePreferDestructuring.Id)
 		})
-		t.Run(keyword+" is repaired", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runPreferDestructuring(t,
+		test.Run(keyword+" is repaired", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runPreferDestructuring(test,
 				preferDestructuringCase{source: keyword + ` foo = object.foo;`}),
 				keyword+` {foo} = object;`)
 		})
@@ -913,11 +913,11 @@ func TestPreferDestructuringWorksOnConstAndLet(t *testing.T) {
 		`using foo = object.foo;`,
 		`async function f() { await using foo = object.foo; }`,
 	} {
-		t.Run("using stays exempt: "+source, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: source})
+		test.Run("using stays exempt: "+source, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("a `using` declaration cannot be destructured, so it must be exempt, got %v",
+				test.Errorf("a `using` declaration cannot be destructured, so it must be exempt, got %v",
 					result.MessageIds())
 			}
 		})

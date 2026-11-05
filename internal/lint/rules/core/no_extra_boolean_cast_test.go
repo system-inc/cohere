@@ -32,8 +32,8 @@ const extraBooleanCastFile = "/repository/source/ExtraBooleanCast.ts"
 // is what oxc does, and the two blocks are kept separate below so the divergence stays visible: the
 // 14 extra inner cases are exactly the shapes ESLint's legacy option would decline.
 
-func TestNoExtraBooleanCastFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -489,10 +489,10 @@ func TestNoExtraBooleanCastFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.messageIds...)
 		})
 	}
@@ -505,8 +505,8 @@ func TestNoExtraBooleanCastFires(t *testing.T) {
 // it. `if ((Boolean(1), 2)) {}` is next: the call is in a sequence but not its last element, so its
 // value is discarded rather than tested. And every `var foo = bar || !!baz` case pins the recursion
 // terminating: the `||` is not itself in a coercing position, so nothing inside it is either.
-func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -567,10 +567,10 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options))
 		})
 	}
@@ -586,8 +586,8 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 // The expected output is upstream's own, from the `expect_fix` vector its Tester runs. That is the
 // assertion the message-id cases structurally cannot make: a rule reporting the right finding at the
 // wrong span, or writing the right text over the wrong bytes, passes all 441 of them and is broken.
-func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastFixesBooleanCalls(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -796,10 +796,10 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.wantSource)
 		})
 	}
@@ -815,8 +815,8 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 // Upstream's expected output covers them because its own tester applies suggestions alongside fixes.
 // Comparing against it is still the right assertion: it says what the offered repair would produce
 // if a human took it, which is exactly what a suggestion promises.
-func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastSuggestsTheRightRepairs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1009,12 +1009,12 @@ func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if got := applyEveryRepair(testCase.sourceText, result); got != testCase.wantSource {
-				t.Fatalf("applying the repairs gave %q, wanted %q", got, testCase.wantSource)
+				test.Fatalf("applying the repairs gave %q, wanted %q", got, testCase.wantSource)
 			}
 		})
 	}
@@ -1082,8 +1082,8 @@ func applyEveryRepair(sourceText string, result rule_testing.Result) string {
 // The `!!` cases are the ones that would catch an off-by-one: the finding covers the outer `!` and
 // everything under it, so reporting the inner negation instead is a span one byte to the right that
 // still lands inside the same expression.
-func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastReportsTheRightSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1111,18 +1111,18 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
 					len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Fatalf("finding %d pointed at %q, wanted %q", index, reported,
+					test.Fatalf("finding %d pointed at %q, wanted %q", index, reported,
 						testCase.wantSpans[index])
 				}
 			}
@@ -1136,33 +1136,33 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 // human chooses. Upstream declares exactly this with `conditional_fix_or_conditional_suggestion`,
 // which is the only occurrence of that declaration in its 946 rules, so there is no second rule to
 // copy the shape from and nothing else in this package would notice if the two were swapped.
-func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastSplitsFixFromSuggestion(test *testing.T) {
+	test.Parallel()
 
-	booleanCall := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (Boolean(foo)) {}")
+	booleanCall := rule_testing.Run(test, NoExtraBooleanCast, extraBooleanCastFile, "if (Boolean(foo)) {}")
 	if len(booleanCall.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding for the Boolean call, got %d", len(booleanCall.Diagnostics))
+		test.Fatalf("wanted one finding for the Boolean call, got %d", len(booleanCall.Diagnostics))
 	}
 	if len(booleanCall.Diagnostics[0].Fixes) != 1 {
-		t.Fatalf("the Boolean call should carry exactly one Fix, got %d",
+		test.Fatalf("the Boolean call should carry exactly one Fix, got %d",
 			len(booleanCall.Diagnostics[0].Fixes))
 	}
 	if len(booleanCall.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("the Boolean call should carry no Suggestion, got %d",
+		test.Fatalf("the Boolean call should carry no Suggestion, got %d",
 			len(booleanCall.Diagnostics[0].Suggestions))
 	}
 
-	doubleNegation := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (!!foo) {}")
+	doubleNegation := rule_testing.Run(test, NoExtraBooleanCast, extraBooleanCastFile, "if (!!foo) {}")
 	if len(doubleNegation.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding for the double negation, got %d",
+		test.Fatalf("wanted one finding for the double negation, got %d",
 			len(doubleNegation.Diagnostics))
 	}
 	if len(doubleNegation.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("the double negation should carry no Fix, got %d",
+		test.Fatalf("the double negation should carry no Fix, got %d",
 			len(doubleNegation.Diagnostics[0].Fixes))
 	}
 	if len(doubleNegation.Diagnostics[0].Suggestions) != 1 {
-		t.Fatalf("the double negation should carry exactly one Suggestion, got %d",
+		test.Fatalf("the double negation should carry exactly one Suggestion, got %d",
 			len(doubleNegation.Diagnostics[0].Suggestions))
 	}
 }
@@ -1173,21 +1173,21 @@ func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
 // proves nothing on its own. These two are read from the rule body instead: more than one argument,
 // or a spread, hits `fixer.noop()`, because there is no single expression `Boolean(...foo)` reduces
 // to without knowing what `foo` holds.
-func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{"!Boolean(...foo);", "!Boolean(foo, bar());"}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 ||
 				len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatalf("wanted a finding with no repair, got %d fixes and %d suggestions",
+				test.Fatalf("wanted a finding with no repair, got %d fixes and %d suggestions",
 					len(result.Diagnostics[0].Fixes), len(result.Diagnostics[0].Suggestions))
 			}
 		})
@@ -1199,8 +1199,8 @@ func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
 // Upstream's corpus runs both spellings but the harness above decodes neither: the cases arrive as
 // an already-built options struct. This is the only place the JSON path is exercised, and without it
 // a port that simply dropped `enforceForLogicalOperands` from the decoder passes all 441 fail cases.
-func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -1219,18 +1219,18 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := rule.DecodeOptionsInto[NoExtraBooleanCastOptions]()([]byte(testCase.rawJSON))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.rawJSON, err)
+				test.Fatalf("decoding %s: %v", testCase.rawJSON, err)
 			}
 			options, ok := decoded.(NoExtraBooleanCastOptions)
 			if !ok {
-				t.Fatalf("decoded to %T, wanted NoExtraBooleanCastOptions", decoded)
+				test.Fatalf("decoded to %T, wanted NoExtraBooleanCastOptions", decoded)
 			}
 			if options.EnforceForInnerExpressions != testCase.want {
-				t.Fatalf("EnforceForInnerExpressions was %v, wanted %v",
+				test.Fatalf("EnforceForInnerExpressions was %v, wanted %v",
 					options.EnforceForInnerExpressions, testCase.want)
 			}
 		})
@@ -1254,14 +1254,14 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
 // `&&` distinguishes them: it is precedence 6 against `??`'s 5, so neither earlier branch fires, and
 // without the guard the repair emits `a ?? b && c`. That does not merely mean something different,
 // it does not parse, which is the one failure an unattended fixer structurally cannot refuse.
-func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "if (a ?? Boolean(b && c)) {}"
 
-	result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
+	result := rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
 		NoExtraBooleanCastOptions{EnforceForInnerExpressions: true})
-	rule_testing.ExpectFixedSource(t, result, "if (a ?? (b && c)) {}")
+	rule_testing.ExpectFixedSource(test, result, "if (a ?? (b && c)) {}")
 }
 
 // A second case written for a survivor, covering the other half of the token-boundary padding.
@@ -1277,11 +1277,11 @@ func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testin
 // fails to compile against a name that does not exist. A fix producing source that parses and does
 // not compile is the one failure the edit engine structurally cannot refuse, which is what makes
 // this worth a fixture rather than a comment.
-func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "!Boolean()in x"
 
-	result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
-	rule_testing.ExpectFixedSource(t, result, "true in x")
+	result := rule_testing.Run(test, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
+	rule_testing.ExpectFixedSource(test, result, "true in x")
 }

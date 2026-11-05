@@ -22,22 +22,22 @@ const parseFromCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 // equal, property for property and comment for comment, to the one a fresh parse converts to, and it is the
 // tree ParseTypeScriptFrom takes rather than one it refuses and parses again. The mutant is a tree of other
 // bytes: converted, it must differ, so the comparison could have failed, and ParseTypeScriptFrom must refuse it.
-func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(t *testing.T) {
-	t.Parallel()
-	roots := []string{moduleRoot(t)}
+func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
+	test.Parallel()
+	roots := []string{moduleRoot(test)}
 	if extra := os.Getenv(parseFromCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
 	files := typeScriptFiles(roots)
 	if len(files) < 50 {
-		t.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
+		test.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
 
 	compared, hashbangs, unparseable, mutantsCaught := 0, 0, 0, 0
 	for _, fileName := range files {
 		contents, err := os.ReadFile(fileName)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		text := string(contents)
 		if strings.HasPrefix(text, "#!") {
@@ -57,39 +57,39 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(t *testing.T) {
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
 		if _, err := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); err != nil {
-			t.Fatalf("%s: %v", fileName, err)
+			test.Fatalf("%s: %v", fileName, err)
 		}
 		if guards == nil {
-			t.Errorf("%s: the engine handed the transform no tree", fileName)
+			test.Errorf("%s: the engine handed the transform no tree", fileName)
 			continue
 		}
 		if !treeIsFor(fileName, text, guards) {
-			t.Errorf("%s: ParseTypeScriptFrom refuses the guard's tree, so the file is still parsed twice", fileName)
+			test.Errorf("%s: ParseTypeScriptFrom refuses the guard's tree, so the file is still parsed twice", fileName)
 			continue
 		}
 
-		fresh := convertedDump(t, fileName, ParseSourceFile(fileName, text))
-		if taken := convertedDump(t, fileName, guards); taken != fresh {
-			t.Errorf("%s: the guard's tree converts to another ESTree than a fresh parse does", fileName)
+		fresh := convertedDump(test, fileName, ParseSourceFile(fileName, text))
+		if taken := convertedDump(test, fileName, guards); taken != fresh {
+			test.Errorf("%s: the guard's tree converts to another ESTree than a fresh parse does", fileName)
 		}
 		compared++
 
 		// The mutant: the tree of the text with one more space in front, every offset one past the file's own.
 		mutant := ParseSourceFile(fileName, " "+text)
 		if treeIsFor(fileName, text, mutant) {
-			t.Errorf("%s: ParseTypeScriptFrom would take a tree of other bytes", fileName)
+			test.Errorf("%s: ParseTypeScriptFrom would take a tree of other bytes", fileName)
 		}
-		if convertedDump(t, fileName, mutant) != fresh {
+		if convertedDump(test, fileName, mutant) != fresh {
 			mutantsCaught++
 		}
 	}
-	t.Logf("%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
+	test.Logf("%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
 		compared, hashbangs, unparseable, mutantsCaught)
 	if compared < 50 {
-		t.Fatalf("only %d files were compared", compared)
+		test.Fatalf("only %d files were compared", compared)
 	}
 	if mutantsCaught != compared {
-		t.Errorf("a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
+		test.Errorf("a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
 			compared-mutantsCaught, compared)
 	}
 }
@@ -97,8 +97,8 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(t *testing.T) {
 // convertedDump is the ESTree a tree converts to, with its comments, as JSON, postprocessed against the tree's
 // own text. A file that fails to convert dumps its error, so two trees that fail alike compare equal and one that
 // fails alone does not.
-func convertedDump(t *testing.T, fileName string, sourceFile *ast.SourceFile) string {
-	t.Helper()
+func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile) string {
+	test.Helper()
 	text := sourceFile.Text()
 	program, comments, _, err := convertTypeScript(sourceFile, text, nil)
 	if err != nil {
@@ -114,17 +114,17 @@ func convertedDump(t *testing.T, fileName string, sourceFile *ast.SourceFile) st
 	}
 	encoded, err := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
 	if err != nil {
-		t.Fatalf("%s: %v", fileName, err)
+		test.Fatalf("%s: %v", fileName, err)
 	}
 	return string(encoded)
 }
 
 // moduleRoot is the module's root, where the fixtures are.
-func moduleRoot(t *testing.T) string {
-	t.Helper()
+func moduleRoot(test *testing.T) string {
+	test.Helper()
 	directory, err := os.Getwd()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
@@ -132,7 +132,7 @@ func moduleRoot(t *testing.T) string {
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Fatal("no go.mod above the test's directory")
+			test.Fatal("no go.mod above the test's directory")
 		}
 		directory = parent
 	}

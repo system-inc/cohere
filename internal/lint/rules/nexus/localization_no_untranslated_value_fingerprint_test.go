@@ -10,9 +10,9 @@ import (
 // localizationNoUntranslatedValueFingerprintOf is the rule's program fingerprint over a fixture, read through
 // the Program the walk hands the rule, viewed under its own reads. Each fixture is built in a directory of its
 // own, so two that agree prove the tables are named relative to the root rather than where they were built.
-func localizationNoUntranslatedValueFingerprintOf(t *testing.T, files map[string]string) [sha256.Size]byte {
-	t.Helper()
-	graph, _ := buildTranslations(t, files)
+func localizationNoUntranslatedValueFingerprintOf(test *testing.T, files map[string]string) [sha256.Size]byte {
+	test.Helper()
+	graph, _ := buildTranslations(test, files)
 	return LocalizationNoUntranslatedValue.ProgramFingerprint(rule.ViewProgram(graph.Program, nil, LocalizationNoUntranslatedValue), nil)
 }
 
@@ -20,8 +20,8 @@ func localizationNoUntranslatedValueFingerprintOf(t *testing.T, files map[string
 // text, its presence or its name changing moves it, en.a beside en.ts and a set gaining its first table
 // included, since both change what a locale file reports; and an edit no locale file's verdict reads leaves
 // it, so the findings cache replays across it.
-func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(test *testing.T) {
+	test.Parallel()
 	const english = "source/translations/en.ts"
 	base := map[string]string{
 		english:                           englishTranslations,
@@ -43,7 +43,7 @@ func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(t *t
 		}
 		return files
 	}
-	original := localizationNoUntranslatedValueFingerprintOf(t, edited(nil))
+	original := localizationNoUntranslatedValueFingerprintOf(test, edited(nil))
 
 	moves := map[string]map[string]string{
 		"an English value edited":                edited(map[string]string{english: "export default {\n    Greeting: 'Hi there',\n};\n"}),
@@ -56,8 +56,8 @@ func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(t *t
 		"en.ts moved to another translation set": edited(map[string]string{"source/admin/translations/en.ts": englishTranslations}, english),
 	}
 	for name, files := range moves {
-		if localizationNoUntranslatedValueFingerprintOf(t, files) == original {
-			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		if localizationNoUntranslatedValueFingerprintOf(test, files) == original {
+			test.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
 		}
 	}
 
@@ -70,8 +70,8 @@ func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(t *t
 		"an en.ts in a translations-archive":   edited(map[string]string{"source/translations-archive/en.ts": englishTranslations}),
 	}
 	for name, files := range holds {
-		if localizationNoUntranslatedValueFingerprintOf(t, files) != original {
-			t.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
+		if localizationNoUntranslatedValueFingerprintOf(test, files) != original {
+			test.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
 		}
 	}
 }

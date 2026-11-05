@@ -61,31 +61,31 @@ var securityNoInterpolatedShellCommandOlderNodeTypes = securityNoInterpolatedShe
 	"}",
 )
 
-func securityNoInterpolatedShellCommandRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, SecurityNoInterpolatedShellCommand, map[string]string{
+func securityNoInterpolatedShellCommandRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, SecurityNoInterpolatedShellCommand, map[string]string{
 		securityNoInterpolatedShellCommandFile:     sourceText,
 		securityNoInterpolatedShellCommandNodeFile: securityNoInterpolatedShellCommandNodeTypes,
 	}, securityNoInterpolatedShellCommandFile)
 }
 
-func securityNoInterpolatedShellCommandExpectSpans(t *testing.T, result rule_testing.Result, sourceText string, wantSpans []string) {
-	t.Helper()
+func securityNoInterpolatedShellCommandExpectSpans(test *testing.T, result rule_testing.Result, sourceText string, wantSpans []string) {
+	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
 		wantIds = append(wantIds, securityNoInterpolatedShellCommandId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	for index, diagnostic := range result.Diagnostics {
 		reported := strings.TrimSpace(sourceText[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if reported != wantSpans[index] {
-			t.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported, wantSpans[index])
+			test.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported, wantSpans[index])
 		}
 		if diagnostic.Message.Description != securityNoInterpolatedShellCommandMessage().Description {
-			t.Fatalf("message is %q", diagnostic.Message.Description)
+			test.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 }
@@ -131,25 +131,25 @@ func securityNoInterpolatedShellCommandContactsApi(runLine string) string {
 
 // The real site, before the fix: the search words reach the shell through `query`, two `const`
 // bindings away from the call, and the finding is on the command.
-func TestSecurityNoInterpolatedShellCommandFiresOnContactsApi(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandFiresOnContactsApi(test *testing.T) {
+	test.Parallel()
 
 	sourceText := securityNoInterpolatedShellCommandContactsApi("const result = NodeChildProcess.execSync(`sqlite3 \"${databasePath}\" \"${query}\"`, {")
-	result := securityNoInterpolatedShellCommandRun(t, sourceText)
-	securityNoInterpolatedShellCommandExpectSpans(t, result, sourceText, []string{"`sqlite3 \"${databasePath}\" \"${query}\"`"})
+	result := securityNoInterpolatedShellCommandRun(test, sourceText)
+	securityNoInterpolatedShellCommandExpectSpans(test, result, sourceText, []string{"`sqlite3 \"${databasePath}\" \"${query}\"`"})
 }
 
 // The same search after the fix: `sqlite3` gets the path and the query as its own arguments, no
 // shell reads either, and nothing fires.
-func TestSecurityNoInterpolatedShellCommandStaysSilentOnFixedContactsApi(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandStaysSilentOnFixedContactsApi(test *testing.T) {
+	test.Parallel()
 
-	result := securityNoInterpolatedShellCommandRun(t, securityNoInterpolatedShellCommandContactsApi("const result = NodeChildProcess.execFileSync('sqlite3', [databasePath, query], {"))
-	rule_testing.ExpectClean(t, result)
+	result := securityNoInterpolatedShellCommandRun(test, securityNoInterpolatedShellCommandContactsApi("const result = NodeChildProcess.execFileSync('sqlite3', [databasePath, query], {"))
+	rule_testing.ExpectClean(test, result)
 }
 
-func TestSecurityNoInterpolatedShellCommandFires(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -332,17 +332,17 @@ func TestSecurityNoInterpolatedShellCommandFires(t *testing.T) {
 		}, []string{"branch"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := securityNoInterpolatedShellCommandSource(testCase.lines...)
-			result := securityNoInterpolatedShellCommandRun(t, sourceText)
-			securityNoInterpolatedShellCommandExpectSpans(t, result, sourceText, testCase.wantSpans)
+			result := securityNoInterpolatedShellCommandRun(test, sourceText)
+			securityNoInterpolatedShellCommandExpectSpans(test, result, sourceText, testCase.wantSpans)
 		})
 	}
 }
 
-func TestSecurityNoInterpolatedShellCommandStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -528,18 +528,18 @@ func TestSecurityNoInterpolatedShellCommandStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := securityNoInterpolatedShellCommandRun(t, securityNoInterpolatedShellCommandSource(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := securityNoInterpolatedShellCommandRun(test, securityNoInterpolatedShellCommandSource(testCase.lines...))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The older `@types/node` layout declares the functions under the unprefixed name; both import
 // spellings resolve there.
-func TestSecurityNoInterpolatedShellCommandResolvesTheOlderModuleLayout(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandResolvesTheOlderModuleLayout(test *testing.T) {
+	test.Parallel()
 
 	sourceText := securityNoInterpolatedShellCommandSource(
 		"import * as NodeChildProcess from 'node:child_process';",
@@ -549,21 +549,21 @@ func TestSecurityNoInterpolatedShellCommandResolvesTheOlderModuleLayout(t *testi
 		"    ChildProcess.execSync(`open -g ${url}`);",
 		"}",
 	)
-	result := rule_testing.RunTypedFiles(t, SecurityNoInterpolatedShellCommand, map[string]string{
+	result := rule_testing.RunTypedFiles(test, SecurityNoInterpolatedShellCommand, map[string]string{
 		securityNoInterpolatedShellCommandFile:     sourceText,
 		securityNoInterpolatedShellCommandNodeFile: securityNoInterpolatedShellCommandOlderNodeTypes,
 	}, securityNoInterpolatedShellCommandFile)
-	securityNoInterpolatedShellCommandExpectSpans(t, result, sourceText, []string{"`open ${url}`", "`open -g ${url}`"})
+	securityNoInterpolatedShellCommandExpectSpans(test, result, sourceText, []string{"`open ${url}`", "`open -g ${url}`"})
 }
 
 // The rule declares the checker and declines a file without one, rather than matching `exec` by
 // name.
-func TestSecurityNoInterpolatedShellCommandDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedShellCommandDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 	if !SecurityNoInterpolatedShellCommand.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker")
+		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
 	if listeners := SecurityNoInterpolatedShellCommand.Run(rule.Context{}, nil); listeners != nil {
-		t.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
+		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

@@ -107,7 +107,7 @@ var codeTextFixtures = []string{
 	"`a`\n***",
 }
 
-func TestCodeTextEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, codeTextFixtures)
+func TestCodeTextEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, codeTextFixtures)
 }

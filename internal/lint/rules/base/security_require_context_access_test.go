@@ -51,11 +51,11 @@ type securityRequireContextAccessCase struct {
 }
 
 func runContextRequiresAccess(
-	t *testing.T,
+	test *testing.T,
 	testCase securityRequireContextAccessCase,
 ) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunWithOptions(t, SecurityRequireContextAccess, securityRequireContextAccessFile,
+	test.Helper()
+	return rule_testing.RunWithOptions(test, SecurityRequireContextAccess, securityRequireContextAccessFile,
 		testCase.sourceText, testCase.options)
 }
 
@@ -129,28 +129,28 @@ func securityRequireContextAccessSilentCases() []securityRequireContextAccessCas
 	}
 }
 
-func TestContextRequiresAccessFires(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range securityRequireContextAccessFiresCases() {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, len(testCase.wantKeys))
 			for index := range testCase.wantKeys {
 				wantIds[index] = "missingProtector"
 			}
-			rule_testing.ExpectFindings(t, runContextRequiresAccess(t, testCase), wantIds...)
+			rule_testing.ExpectFindings(test, runContextRequiresAccess(test, testCase), wantIds...)
 		})
 	}
 }
 
-func TestContextRequiresAccessStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range securityRequireContextAccessSilentCases() {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runContextRequiresAccess(t, testCase))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runContextRequiresAccess(test, testCase))
 		})
 	}
 }
@@ -160,22 +160,22 @@ func TestContextRequiresAccessStaysSilent(t *testing.T) {
 // A method injecting two protected keys reports twice, and the two findings must name different
 // keys. A rule that found the right methods through the wrong key would report the right count with
 // the wrong word, and would tell the reader to add a decorator that fixes nothing.
-func TestContextRequiresAccessNamesTheKey(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessNamesTheKey(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range securityRequireContextAccessFiresCases() {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runContextRequiresAccess(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runContextRequiresAccess(test, testCase)
 			if len(result.Diagnostics) != len(testCase.wantKeys) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantKeys),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantKeys),
 					len(result.Diagnostics))
 			}
 			for index, wantKey := range testCase.wantKeys {
 				got := result.Diagnostics[index].Message.Description
 				needle := "injects `" + wantKey + "`"
 				if !strings.Contains(got, needle) {
-					t.Errorf("finding %d rendered\n  %q\nwhich does not name the key %q",
+					test.Errorf("finding %d rendered\n  %q\nwhich does not name the key %q",
 						index, got, wantKey)
 				}
 			}
@@ -199,8 +199,8 @@ func TestContextRequiresAccessNamesTheKey(t *testing.T) {
 //	                                 should not match, because the exemption check next to it
 //	                                 accepts calls only. It DOES: the access check uses a different
 //	                                 helper that also accepts a bare identifier.
-func TestContextRequiresAccessSurprises(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessSurprises(test *testing.T) {
+	test.Parallel()
 
 	cases := []securityRequireContextAccessCase{
 		{
@@ -259,18 +259,18 @@ func TestContextRequiresAccessSurprises(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runContextRequiresAccess(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runContextRequiresAccess(test, testCase)
 			if len(testCase.wantKeys) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			wantIds := make([]string, len(testCase.wantKeys))
 			for index := range testCase.wantKeys {
 				wantIds[index] = "missingProtector"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -295,8 +295,8 @@ func TestContextRequiresAccessSurprises(t *testing.T) {
 // Measured separately: none of the three occurs anywhere in api-phi-health's source today, so
 // nothing turns on these answers in practice. If one appears, this test is where the decision was
 // recorded rather than inferred.
-func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessUnmeasurableShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []securityRequireContextAccessCase{
 		{
@@ -335,18 +335,18 @@ func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runContextRequiresAccess(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runContextRequiresAccess(test, testCase)
 			if len(testCase.wantKeys) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			wantIds := make([]string, len(testCase.wantKeys))
 			for index := range testCase.wantKeys {
 				wantIds[index] = "missingProtector"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -361,23 +361,23 @@ func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
 // Asserted on the listener set rather than on findings, because that is the layer where the
 // difference exists -- an empty requirement map matches nothing either way, so no fixture over
 // findings could tell a guarded rule from an unguarded one.
-func TestContextRequiresAccessRegistersNothingUnconfigured(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessRegistersNothingUnconfigured(test *testing.T) {
+	test.Parallel()
 
 	listenersFor := func(options any) rule.Listeners {
 		return SecurityRequireContextAccess.Run(rule.Context{}, options)
 	}
 
 	if got := len(listenersFor(nil)); got != 0 {
-		t.Errorf("nil options registered %d listeners, wanted none", got)
+		test.Errorf("nil options registered %d listeners, wanted none", got)
 	}
 	if got := len(listenersFor(SecurityRequireContextAccessOptions{})); got != 0 {
-		t.Errorf("an empty requirement list registered %d listeners, wanted none", got)
+		test.Errorf("an empty requirement list registered %d listeners, wanted none", got)
 	}
 	// The control: a configured requirement registers, so the zeros above are the guard rather
 	// than a rule that never registers at all.
 	if got := len(listenersFor(securityRequireContextAccessLiveOptions())); got == 0 {
-		t.Error("the live configuration registered no listeners")
+		test.Error("the live configuration registered no listeners")
 	}
 }
 
@@ -386,42 +386,42 @@ func TestContextRequiresAccessRegistersNothingUnconfigured(t *testing.T) {
 // We have no schema layer, so an entry missing `contextKey` or carrying an empty `requiresAny` would
 // be accepted silently. The second is the dangerous one: it reports on every injection of that key
 // with a message naming no decorator to add.
-func TestDecodeContextRequiresAccessOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeContextRequiresAccessOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input yields an empty list", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input yields an empty list", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeContextRequiresAccessOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if len(decoded.(SecurityRequireContextAccessOptions).Requirements) != 0 {
-			t.Error("nil input produced requirements")
+			test.Error("nil input produced requirements")
 		}
 	})
 
-	t.Run("a requirement with no contextKey is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a requirement with no contextKey is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions(
 			[]byte(`{"requirements":[{"requiresAny":["A"]}]}`)); err == nil {
-			t.Error("a requirement naming no key decoded")
+			test.Error("a requirement naming no key decoded")
 		}
 	})
 
-	t.Run("an empty requiresAny is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty requiresAny is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions(
 			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`)); err == nil {
-			t.Error("a requirement nothing could satisfy decoded")
+			test.Error("a requirement nothing could satisfy decoded")
 		}
 	})
 
-	t.Run("the live wiring decodes", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the live wiring decodes", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions([]byte(
 			`{"requirements":[{"contextKey":"AccountRequestContextKey",` +
 				`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`)); err != nil {
-			t.Errorf("the configuration api-phi-health runs did not decode: %v", err)
+			test.Errorf("the configuration api-phi-health runs did not decode: %v", err)
 		}
 	})
 }
@@ -438,8 +438,8 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 // member's name rather than the parameter's. These rows turn that argument into a measurement, since
 // an argument about what a rule does not call is exactly the kind that stops being true after an
 // edit.
-func TestContextRequiresAccessSurvivesUnusualParameters(t *testing.T) {
-	t.Parallel()
+func TestContextRequiresAccessSurvivesUnusualParameters(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		// A destructured parameter, whose name is a binding pattern rather than an identifier.
@@ -451,12 +451,12 @@ func TestContextRequiresAccessSurvivesUnusualParameters(t *testing.T) {
 		// either, so the report target falls back to the member itself.
 		"class A { [computed](@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
 			// The assertion is that this returns at all. What it reports is covered above; a panic
 			// here would be invisible to every other test in this file, which all use ordinary
 			// parameters.
-			rule_testing.RunWithOptions(t, SecurityRequireContextAccess, securityRequireContextAccessFile,
+			rule_testing.RunWithOptions(test, SecurityRequireContextAccess, securityRequireContextAccessFile,
 				source, securityRequireContextAccessLiveOptions())
 		})
 	}

@@ -21,14 +21,14 @@ func returnAwaitCaseName(index int) string {
 // the DEFAULT lives. That default is `in-try-catch` rather than `always`, so a rule configured as
 // a plain "error" arrives with nil options and must land on it; the zero value is an empty mode
 // matching no arm, which would make the rule silently inert.
-func returnAwaitOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func returnAwaitOptionsFor(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" || optionsJson == "null" {
 		return DefaultReturnAwaitSettings()
 	}
 	decoded, err := DecodeReturnAwaitOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -38,8 +38,8 @@ func returnAwaitOptionsFor(t *testing.T, optionsJson string) any {
 // Each carries its own option, because this rule's verdict for one input moves with the mode: the
 // same source is valid under `never` and reports under `always`. Measured one file per program
 // against the installed 8.67.0 build, using upstream's own fixture compilerOptions verbatim.
-func TestReturnAwaitStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -251,11 +251,11 @@ func TestReturnAwaitStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, ReturnAwait,
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, ReturnAwait,
 				returnAwaitFile, testCase.sourceText,
-				returnAwaitOptionsFor(t, testCase.optionsJson)))
+				returnAwaitOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -278,8 +278,8 @@ type returnAwaitFinding struct {
 // below. Cases whose repair is a SUGGESTION are asserted separately, because the harness applies
 // fixes and not suggestions, and collapsing the two would have the edit engine rewriting which
 // frame catches a rejection.
-func TestReturnAwaitFires(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -915,16 +915,16 @@ func TestReturnAwaitFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so span slices are against that text rather
 			// than the Go literal above.
@@ -934,14 +934,14 @@ func TestReturnAwaitFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -963,8 +963,8 @@ func TestReturnAwaitFires(t *testing.T) {
 // 8.67 build. Removing `await` from an arrow body that begins with `{` leaves source parsing as a
 // Block rather than an object literal, so the function silently stops returning anything. The
 // installed build produces exactly that; these rows assert the corrected output.
-func TestReturnAwaitFixes(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -1148,14 +1148,14 @@ func TestReturnAwaitFixes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			// The harness writes the fixture trimmed, so the expected rewrite is transformed the
 			// same way the input was rather than compared against the Go literal.
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
@@ -1170,8 +1170,8 @@ func TestReturnAwaitFixes(t *testing.T) {
 // ExpectFixedSource cannot see a suggestion, so these rows assert that the finding carries a
 // suggestion and NO fix, plus the suggestion text. A row that arrived as a fix would pass every
 // message-id assertion in the firing test above.
-func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitOffersSuggestionsRatherThanFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -1265,15 +1265,15 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("finding %q carries a fix; upstream offers only a suggestion here, and a "+
+					test.Fatalf("finding %q carries a fix; upstream offers only a suggestion here, and a "+
 						"fix would let the engine rewrite control flow unattended", diagnostic.Message.Id)
 				}
 				for _, suggestion := range diagnostic.Suggestions {
@@ -1281,12 +1281,12 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
 				}
 			}
 			if len(got) != len(testCase.wantSuggestions) {
-				t.Fatalf("expected %d suggestions %q, got %d %q", len(testCase.wantSuggestions),
+				test.Fatalf("expected %d suggestions %q, got %d %q", len(testCase.wantSuggestions),
 					testCase.wantSuggestions, len(got), got)
 			}
 			for position, want := range testCase.wantSuggestions {
 				if got[position] != want {
-					t.Fatalf("suggestion %d: expected %q, got %q", position, want, got[position])
+					test.Fatalf("suggestion %d: expected %q, got %q", position, want, got[position])
 				}
 			}
 		})

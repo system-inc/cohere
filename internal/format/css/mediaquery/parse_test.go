@@ -42,8 +42,8 @@ func itoa(number int) string {
 }
 
 // TestParseTrees runs without node: trees taken from the library's own output for these params.
-func TestParseTrees(t *testing.T) {
-	t.Parallel()
+func TestParseTrees(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		params string
 		want   string
@@ -133,30 +133,30 @@ func TestParseTrees(t *testing.T) {
 		params := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.params)
 		tree, err := Parse(params)
 		if err != nil {
-			t.Errorf("%q: %v", each.params, err)
+			test.Errorf("%q: %v", each.params, err)
 			continue
 		}
 		var builder strings.Builder
 		renderTree(tree, 0, &builder)
 		want := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.want)
 		if builder.String() != want {
-			t.Errorf("%q:\ngot\n%s\nwant\n%s", each.params, builder.String(), want)
+			test.Errorf("%q:\ngot\n%s\nwant\n%s", each.params, builder.String(), want)
 		}
 	}
 }
 
 // TestParseRefusals checks the two ways the library does not return: a TypeError from an unbalanced "}"
 // in a feature, and an endless loop on an unclosed url( (which the oracle cannot run).
-func TestParseRefusals(t *testing.T) {
-	t.Parallel()
+func TestParseRefusals(test *testing.T) {
+	test.Parallel()
 	for _, params := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {
 		tree, err := Parse(params)
 		if err == nil {
-			t.Errorf("%q: parsed to %v, want a refusal", params, tree.Type())
+			test.Errorf("%q: parsed to %v, want a refusal", params, tree.Type())
 			continue
 		}
 		if !printing.IsSyntax(err) {
-			t.Errorf("%q: %v is not marked as a syntax error", params, err)
+			test.Errorf("%q: %v is not marked as a syntax error", params, err)
 		}
 	}
 }

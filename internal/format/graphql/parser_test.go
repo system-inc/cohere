@@ -61,8 +61,8 @@ func outline(node *estree.Node) string {
 	return builder.String()
 }
 
-func TestParseShapes(t *testing.T) {
-	t.Parallel()
+func TestParseShapes(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name string
 		text string
@@ -118,17 +118,17 @@ func TestParseShapes(t *testing.T) {
 	for _, each := range cases {
 		document, _, err := Parse(each.text)
 		if err != nil {
-			t.Errorf("%s: %v", each.name, err)
+			test.Errorf("%s: %v", each.name, err)
 			continue
 		}
 		if got := outline(document); got != each.want {
-			t.Errorf("%s:\n got %s\nwant %s", each.name, got, each.want)
+			test.Errorf("%s:\n got %s\nwant %s", each.name, got, each.want)
 		}
 	}
 }
 
-func TestParseStringValues(t *testing.T) {
-	t.Parallel()
+func TestParseStringValues(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name string
 		text string
@@ -144,25 +144,25 @@ func TestParseStringValues(t *testing.T) {
 	for _, each := range cases {
 		document, _, err := Parse(each.text)
 		if err != nil {
-			t.Errorf("%s: %v", each.name, err)
+			test.Errorf("%s: %v", each.name, err)
 			continue
 		}
 		value := document.List("definitions")[0].Child("selectionSet").List("selections")[0].List("arguments")[0].Child("value")
 		if got := value.String("value"); got != each.want {
-			t.Errorf("%s: got %q, want %q", each.name, got, each.want)
+			test.Errorf("%s: got %q, want %q", each.name, got, each.want)
 		}
 		if want := strings.Contains(each.text, `"""`); value.Bool("block") != want {
-			t.Errorf("%s: block is %v", each.name, value.Bool("block"))
+			test.Errorf("%s: block is %v", each.name, value.Bool("block"))
 		}
 	}
 }
 
-func TestParseComments(t *testing.T) {
-	t.Parallel()
+func TestParseComments(test *testing.T) {
+	test.Parallel()
 	text := "# one 😀\n{ a # two\n}\n#"
 	_, comments, err := Parse(text)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var got []string
 	for _, comment := range comments {
@@ -170,12 +170,12 @@ func TestParseComments(t *testing.T) {
 	}
 	want := []string{"Comment[0,10] one 😀", "Comment[15,20] two", "Comment[23,24]"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Errorf("got %q, want %q", got, want)
+		test.Errorf("got %q, want %q", got, want)
 	}
 }
 
-func TestParseErrors(t *testing.T) {
-	t.Parallel()
+func TestParseErrors(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		text string
 		want string
@@ -191,11 +191,11 @@ func TestParseErrors(t *testing.T) {
 	for _, each := range cases {
 		document, comments, err := Parse(each.text)
 		if err == nil || document != nil || comments != nil {
-			t.Errorf("%q: parsed, want %s", each.text, each.want)
+			test.Errorf("%q: parsed, want %s", each.text, each.want)
 			continue
 		}
 		if err.Error() != each.want {
-			t.Errorf("%q:\n got %s\nwant %s", each.text, err.Error(), each.want)
+			test.Errorf("%q:\n got %s\nwant %s", each.text, err.Error(), each.want)
 		}
 	}
 }

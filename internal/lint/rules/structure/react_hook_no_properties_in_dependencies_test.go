@@ -8,8 +8,8 @@ import (
 
 const propertiesInDependenciesFile = "/repository/source/components/Thing.tsx"
 
-func TestReactHookNoPropertiesInDependenciesFires(t *testing.T) {
-	t.Parallel()
+func TestReactHookNoPropertiesInDependenciesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -90,20 +90,20 @@ func TestReactHookNoPropertiesInDependenciesFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "extractPropertiesFirst"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactHookNoPropertiesInDependenciesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -212,10 +212,10 @@ func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ReactHookNoPropertiesInDependencies, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ReactHookNoPropertiesInDependencies, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
@@ -226,15 +226,15 @@ func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
 // `(React).useEffect(...)` is the same call as `React.useEffect(...)`, and the hand-rolled receiver
 // test read the parenthesis as a non-identifier and declined. Nobody writes it deliberately, which
 // is exactly why no fixture covered it and the miss was invisible.
-func TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver(t *testing.T) {
-	t.Parallel()
+func TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "function Thing(properties: { id: string }) {\n" +
 		"    (React).useEffect(() => { run(properties.id); }, [properties]);\n" +
 		"    return <div />;\n}\n"
-	result := rule_testing.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, sourceText)
+	result := rule_testing.Run(test, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("a parenthesized React receiver produced %d findings, want 1",
+		test.Errorf("a parenthesized React receiver produced %d findings, want 1",
 			len(result.Diagnostics))
 	}
 }

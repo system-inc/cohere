@@ -76,17 +76,17 @@ var formatVariants = func() []formatoptions.Options {
 }()
 
 // compareFormat formats every input both ways and reports each difference; it returns how many differ.
-func compareFormat(t *testing.T, inputs []string) int {
-	t.Helper()
+func compareFormat(test *testing.T, inputs []string) int {
+	test.Helper()
 	failures := 0
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for _, input := range inputs {
 			expected, err := engine.Format("fixture.md", input)
 			if err != nil {
-				t.Fatalf("the oracle failed on %q: %v", input, err)
+				test.Fatalf("the oracle failed on %q: %v", input, err)
 			}
 			if dependsOnEmbed(input) {
 				continue
@@ -94,49 +94,49 @@ func compareFormat(t *testing.T, inputs []string) int {
 			actual, err := Format(input, options, nil)
 			if err != nil {
 				failures++
-				t.Errorf("variant %d, %q: %v", variantIndex, input, err)
+				test.Errorf("variant %d, %q: %v", variantIndex, input, err)
 				continue
 			}
 			if actual != expected {
 				failures++
-				t.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
+				test.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
 			}
 		}
 	}
 	return failures
 }
 
-func TestFormatFixturesMatchOracle(t *testing.T) {
-	t.Parallel()
-	compareFormat(t, formatFixtures)
+func TestFormatFixturesMatchOracle(test *testing.T) {
+	test.Parallel()
+	compareFormat(test, formatFixtures)
 }
 
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // compared against the oracle's for another must differ.
-func TestFormatOracleCanFail(t *testing.T) {
-	t.Parallel()
+func TestFormatOracleCanFail(test *testing.T) {
+	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	engine := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
+	engine := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
 	expected, err := engine.Format("fixture.md", "* a")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	actual, err := Format("1. a", formatoptions.Default(), nil)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if strings.EqualFold(expected, actual) {
-		t.Fatal("the comparison found no difference between a bullet list and an ordered one")
+		test.Fatal("the comparison found no difference between a bullet list and an ordered one")
 	}
 }
 
 // TestExhaustiveDelimitersMatchOracle formats every string of up to five of `a`, `*`, `_`, space and `.`,
 // bare and inside emphasis and strong: the escapes word.js adds to delimiter runs depend on which side
 // of a run is flanking, and only an exhaustive sweep reaches every combination. A measuring run.
-func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
+	test.Parallel()
 	if os.Getenv("COHERE_MARKDOWN_EXHAUSTIVE") == "" {
-		t.Skip("set COHERE_MARKDOWN_EXHAUSTIVE to run the sweep")
+		test.Skip("set COHERE_MARKDOWN_EXHAUSTIVE to run the sweep")
 	}
 	alphabet := []string{"a", "*", "_", " ", "."}
 	var inputs []string
@@ -158,7 +158,7 @@ func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
 	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
 	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	failures := 0
 	for _, input := range inputs {
@@ -170,9 +170,9 @@ func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
 		if err != nil || actual != expected {
 			failures++
 			if failures <= 20 {
-				t.Errorf("%q: %v %s", input, err, differential.FirstDifference(expected, actual))
+				test.Errorf("%q: %v %s", input, err, differential.FirstDifference(expected, actual))
 			}
 		}
 	}
-	t.Logf("%d of %d inputs differ", failures, len(inputs))
+	test.Logf("%d of %d inputs differ", failures, len(inputs))
 }

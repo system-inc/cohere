@@ -23,8 +23,8 @@ func noUnsafeTypeAssertionCaseName(index int) string {
 // one program those merge, identity starts answering true, and cases that really report come back
 // clean. RunTyped is one file per call, so the fixtures are safe by construction and the oracle
 // used to measure them had to be built that way on purpose.
-func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeTypeAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// Upstream's valid list, byte for byte.
@@ -59,9 +59,9 @@ func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
 		"declare const x: string;\nconst y = x as string;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnsafeTypeAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeTypeAssertion,
+		test.Run(noUnsafeTypeAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeTypeAssertion,
 				noUnsafeTypeAssertionFile, sourceText))
 		})
 	}
@@ -74,8 +74,8 @@ func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
 // five messages interpolate a type name through the checker and one of them interpolates it TWICE.
 // A substring predicate cannot see a wrong name in either slot, and the type name is the only part
 // of this rule's output that a reader uses to find the site.
-func TestNoUnsafeTypeAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeTypeAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -417,16 +417,16 @@ func TestNoUnsafeTypeAssertionFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeTypeAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeTypeAssertion, noUnsafeTypeAssertionFile,
+		test.Run(noUnsafeTypeAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeTypeAssertion, noUnsafeTypeAssertionFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, 0, len(testCase.wantFindings))
 			for _, want := range testCase.wantFindings {
 				wantIds = append(wantIds, want.id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// RunTyped writes the fixture trimmed, so the span slice is against that text rather
 			// than against the Go literal above.
@@ -434,12 +434,12 @@ func TestNoUnsafeTypeAssertionFires(t *testing.T) {
 			for findingIndex, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[findingIndex]
 				if diagnostic.Message.Description != want.message {
-					t.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
+					test.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
 						diagnostic.Message.Description)
 				}
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.span {
-					t.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
 				}
 			}
 		})
@@ -453,20 +453,20 @@ func TestNoUnsafeTypeAssertionFires(t *testing.T) {
 // mutant neutralizing the guard survives the whole fixture set. The plain harness is the only
 // instrument that sees it, and the risk it covers is not theoretical for this rule: the body
 // dereferences the checker four times on its first path.
-func TestNoUnsafeTypeAssertionRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeTypeAssertionRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoUnsafeTypeAssertion.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: every step of its judgment is a type question")
+		test.Fatal("the rule must declare NeedsTypeChecker: every step of its judgment is a type question")
 	}
 
 	sourceText := "declare const x: string | number;\nconst y = x as string;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeTypeAssertion,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeTypeAssertion,
 		noUnsafeTypeAssertionFile, sourceText))
 
 	// The control, so the silence above is the guard declining rather than the rule being unable to
 	// see this shape at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeTypeAssertion,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeTypeAssertion,
 		noUnsafeTypeAssertionFile, sourceText), "unsafeTypeAssertion")
 }

@@ -16,15 +16,15 @@ const consistentThisFile = "/repository/source/ConsistentThis.ts"
 // where this rule's two most dangerous lines live: the default of ["that"] rather than the zero
 // value, and reading upstream's variadic list, one alias per element. A struct built by hand passes
 // every fixture while an inverted default ships.
-func consistentThisOptions(t *testing.T, aliases ...string) any {
-	t.Helper()
+func consistentThisOptions(test *testing.T, aliases ...string) any {
+	test.Helper()
 	raw, err := json.Marshal(aliases)
 	if err != nil {
-		t.Fatalf("could not marshal the alias list: %v", err)
+		test.Fatalf("could not marshal the alias list: %v", err)
 	}
 	decoded, err := DecodeConsistentThisOptions(raw)
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
@@ -40,8 +40,8 @@ func consistentThisOptions(t *testing.T, aliases ...string) any {
 // The cases were extracted by loading upstream's tester module with a stubbed RuleTester and
 // rendering these literals from that JSON, so nothing was retyped and no escape sequence was
 // hand-written. The generator refuses any case holding a byte outside printable ASCII.
-func TestConsistentThisFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -64,11 +64,11 @@ func TestConsistentThisFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-				testCase.sourceText, consistentThisOptions(t, testCase.aliases...))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+				testCase.sourceText, consistentThisOptions(test, testCase.aliases...))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -78,8 +78,8 @@ func TestConsistentThisFires(t *testing.T) {
 // "var {foo, bar} = this" captures properties of this rather than this itself, so no name in it
 // is an alias for the context. A port matching on the initializer alone reports all four of the
 // destructuring cases, since every one of them assigns a this expression.
-func TestConsistentThisStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -103,10 +103,10 @@ func TestConsistentThisStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentThis,
-				consistentThisFile, testCase.sourceText, consistentThisOptions(t, testCase.aliases...)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentThis,
+				consistentThisFile, testCase.sourceText, consistentThisOptions(test, testCase.aliases...)))
 		})
 	}
 }
@@ -128,8 +128,8 @@ func TestConsistentThisStaysSilent(t *testing.T) {
 // scope rather than a nested one, and without that exemption the inner write never rescued the inner
 // declaration, so this port reported twice where upstream reports once at column 5. Nothing in the
 // imported corpus could see it: it writes no nested function declaring its own alias.
-func TestConsistentThisScopeModel(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisScopeModel(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -152,11 +152,11 @@ func TestConsistentThisScopeModel(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-				testCase.sourceText, consistentThisOptions(t, "self"))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+				testCase.sourceText, consistentThisOptions(test, "self"))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -167,8 +167,8 @@ func TestConsistentThisScopeModel(t *testing.T) {
 // on the declaration keyword rather than on the binding would go silent on both. The `||=` row is
 // the compound-operator discrimination reaching a logical assignment, which reports twice: once
 // because the alias never received a plain assignment and once because the operator is not `=`.
-func TestConsistentThisOtherDeclarationForms(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisOtherDeclarationForms(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -187,11 +187,11 @@ func TestConsistentThisOtherDeclarationForms(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-				testCase.sourceText, consistentThisOptions(t, "self"))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+				testCase.sourceText, consistentThisOptions(test, "self"))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -202,85 +202,85 @@ func TestConsistentThisOtherDeclarationForms(t *testing.T) {
 // back a zero-value struct would give an EMPTY alias list, which does not disable the rule. It makes
 // aliasNotAssignedToThis unreachable and makes unexpectedAlias report every capture of `this` under
 // any name at all. So the nil case is asserted by behaviour rather than only by field.
-func TestDecodeConsistentThisOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeConsistentThisOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent option is the alias that", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an absent option is the alias that", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeConsistentThisOptions(nil)
 		if err != nil {
-			t.Fatalf("the decoder refused an absent option: %v", err)
+			test.Fatalf("the decoder refused an absent option: %v", err)
 		}
 		settings, ok := decoded.(ConsistentThisSettings)
 		if !ok {
-			t.Fatalf("expected ConsistentThisSettings, got %T", decoded)
+			test.Fatalf("expected ConsistentThisSettings, got %T", decoded)
 		}
 		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			t.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
 		}
 	})
 
-	t.Run("a bare severity leaves the rule on its default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare severity leaves the rule on its default", func(test *testing.T) {
+		test.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. Asserting through the rule rather than the decoder is what
 		// covers the fallback inside Run, which no decoder test can reach.
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ConsistentThis,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, ConsistentThis,
 			consistentThisFile, "var context = this", nil), "unexpectedAlias")
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentThis,
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentThis,
 			consistentThisFile, "var that = this", nil))
 	})
 
-	t.Run("one element is one alias", func(t *testing.T) {
-		t.Parallel()
+	test.Run("one element is one alias", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self"]`))
 		if err != nil {
-			t.Fatalf("the decoder refused one alias: %v", err)
+			test.Fatalf("the decoder refused one alias: %v", err)
 		}
 		settings := decoded.(ConsistentThisSettings)
 		if len(settings.Aliases) != 1 || settings.Aliases[0] != "self" {
-			t.Errorf("expected [self], got %v", settings.Aliases)
+			test.Errorf("expected [self], got %v", settings.Aliases)
 		}
 	})
 
-	t.Run("every element is an alias, upstream's variadic spelling", func(t *testing.T) {
-		t.Parallel()
+	test.Run("every element is an alias, upstream's variadic spelling", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self","vm"]`))
 		if err != nil {
-			t.Fatalf("the decoder refused two aliases: %v", err)
+			test.Fatalf("the decoder refused two aliases: %v", err)
 		}
 		settings := decoded.(ConsistentThisSettings)
 		if len(settings.Aliases) != 2 || settings.Aliases[0] != "self" || settings.Aliases[1] != "vm" {
-			t.Errorf("expected [self vm], got %v", settings.Aliases)
+			test.Errorf("expected [self vm], got %v", settings.Aliases)
 		}
 	})
 
-	t.Run("the nested-array workaround is refused rather than read", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the nested-array workaround is refused rather than read", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); err == nil {
-			t.Error("an element that is not a string decoded; upstream's schema refuses it")
+			test.Error("an element that is not a string decoded; upstream's schema refuses it")
 		}
 	})
 
-	t.Run("an empty name is refused", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty name is refused", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); err == nil {
-			t.Error("expected the decoder to refuse an empty alias")
+			test.Error("expected the decoder to refuse an empty alias")
 		}
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`["self",""]`)); err == nil {
-			t.Error("expected the decoder to refuse an empty alias in a list")
+			test.Error("expected the decoder to refuse an empty alias in a list")
 		}
 	})
 
-	t.Run("an empty list falls back to the default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty list falls back to the default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`[]`))
 		if err != nil {
-			t.Fatalf("the decoder refused an empty list: %v", err)
+			test.Fatalf("the decoder refused an empty list: %v", err)
 		}
 		settings := decoded.(ConsistentThisSettings)
 		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			t.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
 		}
 	})
 }
@@ -290,25 +290,25 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 // Every ExpectFindings assertion above is satisfied by a rule reporting the whole statement, so the
 // span is the only thing separating that from upstream's node. Upstream reports the VariableDeclarator
 // and the AssignmentExpression, neither of which includes the `var` keyword or the semicolon.
-func TestConsistentThisPointsAtTheAssignment(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisPointsAtTheAssignment(test *testing.T) {
+	test.Parallel()
 
-	declaration := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-		"var context = this", consistentThisOptions(t, "self"))
-	rule_testing.ExpectFindings(t, declaration, "unexpectedAlias")
+	declaration := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+		"var context = this", consistentThisOptions(test, "self"))
+	rule_testing.ExpectFindings(test, declaration, "unexpectedAlias")
 	source := declaration.SourceFile.Text()
 	reported := source[declaration.Diagnostics[0].Range.Pos():declaration.Diagnostics[0].Range.End()]
 	if reported != "context = this" {
-		t.Errorf("expected the finding on the declarator, pointed at %q", reported)
+		test.Errorf("expected the finding on the declarator, pointed at %q", reported)
 	}
 
-	assignment := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-		"self = 42", consistentThisOptions(t, "self"))
-	rule_testing.ExpectFindings(t, assignment, "aliasNotAssignedToThis")
+	assignment := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+		"self = 42", consistentThisOptions(test, "self"))
+	rule_testing.ExpectFindings(test, assignment, "aliasNotAssignedToThis")
 	assignmentSource := assignment.SourceFile.Text()
 	assignmentReported := assignmentSource[assignment.Diagnostics[0].Range.Pos():assignment.Diagnostics[0].Range.End()]
 	if assignmentReported != "self = 42" {
-		t.Errorf("expected the finding on the assignment, pointed at %q", assignmentReported)
+		test.Errorf("expected the finding on the assignment, pointed at %q", assignmentReported)
 	}
 }
 
@@ -328,8 +328,8 @@ func TestConsistentThisPointsAtTheAssignment(t *testing.T) {
 //
 // The last row is the one that pins the descent resuming: a real function nested inside an arrow is
 // a scope again, so its unassigned alias reports.
-func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -347,11 +347,11 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-				testCase.sourceText, consistentThisOptions(t, "self"))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+				testCase.sourceText, consistentThisOptions(test, "self"))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -362,8 +362,8 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
 // alias, so they exercise the outer scope declining a foreign write rather than a function
 // expression judging its own declarations. Dropping function expressions from the scope list
 // survives the whole imported corpus and costs the first two rows here.
-func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(t *testing.T) {
-	t.Parallel()
+func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -378,11 +378,11 @@ func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
-				testCase.sourceText, consistentThisOptions(t, "self"))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentThis, consistentThisFile,
+				testCase.sourceText, consistentThisOptions(test, "self"))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }

@@ -28,20 +28,20 @@ type noWarningCommentsCase struct {
 // Through the decoder rather than by building the struct, because the decoder is where the location
 // enum is validated and where a decoration entry is checked for being exactly one non-whitespace
 // character. Neither has an upstream counterpart to inherit correctness from.
-func runNoWarningComments(t *testing.T, testCase noWarningCommentsCase) rule_testing.Result {
-	t.Helper()
+func runNoWarningComments(test *testing.T, testCase noWarningCommentsCase) rule_testing.Result {
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, NoWarningComments, noWarningCommentsFile, testCase.sourceText)
+		return rule_testing.Run(test, NoWarningComments, noWarningCommentsFile, testCase.sourceText)
 	}
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeNoWarningCommentsOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, NoWarningComments, noWarningCommentsFile,
+	return rule_testing.RunWithOptions(test, NoWarningComments, noWarningCommentsFile,
 		testCase.sourceText, decoded)
 }
 
@@ -132,24 +132,24 @@ func noWarningCommentsSilentCases() []noWarningCommentsCase {
 	}
 }
 
-func TestNoWarningCommentsFires(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noWarningCommentsFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoWarningComments(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoWarningComments(test, testCase), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoWarningCommentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noWarningCommentsSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoWarningComments(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoWarningComments(test, testCase))
 		})
 	}
 }
@@ -161,15 +161,15 @@ func TestNoWarningCommentsStaysSilent(t *testing.T) {
 // The eight multi-finding cases are where this bites: a comment matching two configured terms
 // reports twice and the two findings must name different terms, in the order the terms were
 // configured.
-func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsNamesTheMatchedTerm(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noWarningCommentsFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoWarningComments(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoWarningComments(test, testCase)
 			if len(result.Diagnostics) != len(testCase.wantTerms) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantTerms),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantTerms),
 					len(result.Diagnostics))
 			}
 			for index, wantTerm := range testCase.wantTerms {
@@ -179,7 +179,7 @@ func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
 				// quoted a comment containing it.
 				needle := "opens with `" + wantTerm + "`"
 				if !strings.Contains(got, needle) {
-					t.Errorf("finding %d rendered\n  %q\nwhich does not name the term %q",
+					test.Errorf("finding %d rendered\n  %q\nwhich does not name the term %q",
 						index, got, wantTerm)
 				}
 			}
@@ -201,8 +201,8 @@ func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
 // disagree with the tool it replaces on exactly the comments people write.
 //
 // Every expectation here was read off the installed rule's own rendered message.
-func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsTruncatesOnAWordBoundary(test *testing.T) {
+	test.Parallel()
 
 	anywhere := NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}
 	cases := []struct {
@@ -227,12 +227,12 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
 			"..."},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoWarningComments(t, noWarningCommentsCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoWarningComments(test, noWarningCommentsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("wanted at least one finding")
+				test.Fatal("wanted at least one finding")
 			}
 			// EVERY finding on one comment quotes that same comment, so the quote is asserted on
 			// all of them rather than on the first. A comment carrying three configured terms
@@ -245,7 +245,7 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
 			needle := ": " + strconv.Quote(testCase.wantQuote) + "."
 			for index, diagnostic := range result.Diagnostics {
 				if !strings.Contains(diagnostic.Message.Description, needle) {
-					t.Errorf("finding %d rendered\n  %q\nwhich does not carry the quote %s",
+					test.Errorf("finding %d rendered\n  %q\nwhich does not carry the quote %s",
 						index, diagnostic.Message.Description, needle)
 				}
 			}
@@ -265,8 +265,8 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
 //
 // The Cyrillic row is the control that makes the rest meaningful -- it is clean because the Te is a
 // different letter from an ASCII T, not because of any boundary rule.
-func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsUsesAsciiWordBoundaries(test *testing.T) {
+	test.Parallel()
 
 	anywhere := NoWarningCommentsOptions{
 		Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere,
@@ -284,14 +284,14 @@ func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
 		{"// ТODO", anywhere, nil, nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoWarningComments(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoWarningComments(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -307,8 +307,8 @@ func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
 // That last row is the one to read. `/** TODO */` is CLEAN by default because the surviving asterisk
 // sits between the anchor and the term, and configuring that asterisk as a decoration character
 // makes the same comment report. Both measured.
-func TestNoWarningCommentsReadsTheCommentValue(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsReadsTheCommentValue(test *testing.T) {
+	test.Parallel()
 
 	decorated := NoWarningCommentsOptions{Decoration: []string{"*"}}
 	cases := []noWarningCommentsCase{
@@ -323,14 +323,14 @@ func TestNoWarningCommentsReadsTheCommentValue(t *testing.T) {
 		{"//   TODO indented", nil, []string{"unexpectedComment"}, []string{"todo"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+" "+fmtOptions(testCase.options), func(t *testing.T) {
-			t.Parallel()
-			result := runNoWarningComments(t, testCase)
+		test.Run(testCase.sourceText+" "+fmtOptions(testCase.options), func(test *testing.T) {
+			test.Parallel()
+			result := runNoWarningComments(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -353,8 +353,8 @@ func fmtOptions(options any) string {
 // a directive AND name this rule. Dropping either half breaks a different case: without the name
 // test, an `eslint-disable` for any other rule would be exempt; without the directive test, an
 // ordinary comment discussing the rule would be.
-func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsExemptsItsOwnDirective(test *testing.T) {
+	test.Parallel()
 
 	cases := []noWarningCommentsCase{
 		// A directive naming this rule: exempt even though it contains no term at all, which is
@@ -370,14 +370,14 @@ func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
 			[]string{"unexpectedComment"}, []string{"todo"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoWarningComments(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoWarningComments(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -387,18 +387,18 @@ func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
 // We have no schema layer, so an unrecognized location would silently select a third behaviour of
 // matching nothing, and a multi-character decoration entry would widen the character class in a way
 // nobody wrote. Neither is reachable from a fixture that builds the options struct directly.
-func TestDecodeNoWarningCommentsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoWarningCommentsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input yields the defaults", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input yields the defaults", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoWarningCommentsOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		options := decoded.(NoWarningCommentsOptions)
 		if options.Terms != nil || options.Location != "" {
-			t.Errorf("nil input produced %+v, wanted the zero value so the rule applies its "+
+			test.Errorf("nil input produced %+v, wanted the zero value so the rule applies its "+
 				"own defaults", options)
 		}
 	})
@@ -410,14 +410,14 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 		{`{"location":"start"}`, NoWarningCommentsStart},
 		{`{"location":"anywhere"}`, NoWarningCommentsAnywhere},
 	} {
-		t.Run("upstream's "+testCase.raw+" is read", func(t *testing.T) {
-			t.Parallel()
+		test.Run("upstream's "+testCase.raw+" is read", func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoWarningCommentsOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			if decoded.(NoWarningCommentsOptions).Location != testCase.want {
-				t.Errorf("location = %q, wanted %q", decoded.(NoWarningCommentsOptions).Location, testCase.want)
+				test.Errorf("location = %q, wanted %q", decoded.(NoWarningCommentsOptions).Location, testCase.want)
 			}
 		})
 	}
@@ -431,25 +431,25 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 		`{"location":""}`,
 		`{"location":null}`,
 	} {
-		t.Run(raw+" is refused", func(t *testing.T) {
-			t.Parallel()
+		test.Run(raw+" is refused", func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeNoWarningCommentsOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})
 	}
 
-	t.Run("a multi-character decoration is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a multi-character decoration is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":["**"]}`)); err == nil {
-			t.Error("a two-character decoration decoded, which would widen the class")
+			test.Error("a two-character decoration decoded, which would widen the class")
 		}
 	})
 
-	t.Run("a whitespace decoration is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a whitespace decoration is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":[" "]}`)); err == nil {
-			t.Error("a whitespace decoration decoded")
+			test.Error("a whitespace decoration decoded")
 		}
 	})
 }
@@ -459,17 +459,17 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 // `options.(T)` on nil yields the zero value, whose nil Terms and empty Location match nothing, so
 // the rule would report on no comment at all. Every fixture above reaches the rule through the
 // decoder, so none of them can see that.
-func TestNoWarningCommentsWithNilOptionsUsesTheDefaults(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsWithNilOptionsUsesTheDefaults(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{"// TODO x", "// FIXME x", "// XXX x"} {
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoWarningComments,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoWarningComments,
 			noWarningCommentsFile, source), "unexpectedComment")
 	}
 	// The Start location is the default, so a term in the middle is clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoWarningComments, noWarningCommentsFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoWarningComments, noWarningCommentsFile,
 		"// something todo"))
 	// And a term not in the default set is clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoWarningComments, noWarningCommentsFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoWarningComments, noWarningCommentsFile,
 		"// HACK x"))
 }

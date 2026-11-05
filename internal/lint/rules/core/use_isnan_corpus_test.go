@@ -21,8 +21,8 @@ import (
  * indexOfNaN: the option was decoded and never read until this task, so off and on looked the same.
  */
 
-func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNAgreesWithESLintsCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		options string
@@ -265,7 +265,7 @@ func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 		{"{\"enforceForIndexOf\":true}", "foo.indexOf((1, NaN), 1)", []string{"indexOfNaN foo.indexOf((1, NaN), 1)"}},
 	}
 	if len(cases) != 234 {
-		t.Fatalf("%d rows, and 234 were replayed", len(cases))
+		test.Fatalf("%d rows, and 234 were replayed", len(cases))
 	}
 
 	for _, testCase := range cases {
@@ -274,9 +274,9 @@ func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 		run := func(options string) []string {
 			var settings UseIsNaNOptions
 			if err := rule.UnmarshalOptions([]byte(options), &settings); err != nil {
-				t.Fatalf("decoding %s: %v", options, err)
+				test.Fatalf("decoding %s: %v", options, err)
 			}
-			result := rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source, settings)
+			result := rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source, settings)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
@@ -286,12 +286,12 @@ func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 		got := strings.Join(run(testCase.options), " | ")
 		want := strings.Join(testCase.want, " | ")
 		if got != want {
-			t.Errorf("%s %q: reported [%s], ESLint reports [%s]", testCase.options, testCase.code, got, want)
+			test.Errorf("%s %q: reported [%s], ESLint reports [%s]", testCase.options, testCase.code, got, want)
 		}
 		if strings.Contains(testCase.options, `"enforceForIndexOf":true`) {
 			off := strings.Replace(testCase.options, `"enforceForIndexOf":true`, `"enforceForIndexOf":false`, 1)
 			if findings := run(off); len(findings) != 0 {
-				t.Errorf("%s %q: reported %v with the option off", off, testCase.code, findings)
+				test.Errorf("%s %q: reported %v with the option off", off, testCase.code, findings)
 			}
 		}
 	}

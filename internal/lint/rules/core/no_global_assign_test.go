@@ -32,8 +32,8 @@ const globalAssignFile = "/repository/source/GlobalAssign.ts"
 // This port answers the same question from the TypeScript standard library instead: a name declared
 // in a declaration file is a global, a name declared in source is a shadow. That covers every
 // builtin upstream's `GLOBALS_BUILTIN` covers and nothing that depends on an `env`.
-func TestNoGlobalAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -81,10 +81,10 @@ func TestNoGlobalAssignFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -97,8 +97,8 @@ func TestNoGlobalAssignFires(t *testing.T) {
 // why upstream's 8 pass cases contain **zero** shadowing cases. A port matching on the name passes
 // every visible clean case and still reports `function f(Object) { Object = 1; }`, which is correct
 // code. The absent test is the hazard here, so it is written below rather than imported.
-func TestNoGlobalAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -144,10 +144,10 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -157,34 +157,34 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 // It does. `NoGlobalAssignConfig { exceptions: Vec<CompactStr> }` in oxc, and the matching
 // `schema: [{ properties: { exceptions: { type: "array", items: { type: "string" } } } }]` in
 // ESLint. Upstream exercises it with one pass case, which is the first below.
-func TestNoGlobalAssignExceptions(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignExceptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a listed name is not reported", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a listed name is not reported", func(test *testing.T) {
+		test.Parallel()
 		// Upstream pass case 3, verbatim source and options.
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{"Object"}}))
 	})
 
-	t.Run("an unlisted name is still reported", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unlisted name is still reported", func(test *testing.T) {
+		test.Parallel()
 		// The other half of the option, which upstream does not test: an exceptions list must
 		// exempt the names in it and nothing else. Without this, an option handler that exempts
 		// everything once any name is listed passes upstream's only case.
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoGlobalAssign, globalAssignFile,
 			"String = 0;", NoGlobalAssignOptions{Exceptions: []string{"Object"}}), "noGlobalAssign")
 	})
 
-	t.Run("an empty exceptions list exempts nothing", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+	test.Run("an empty exceptions list exempts nothing", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{}}), "noGlobalAssign")
 	})
 
-	t.Run("several listed names are all exempt", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+	test.Run("several listed names are all exempt", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoGlobalAssign, globalAssignFile,
 			"({Object = 0, String = 0} = {});",
 			NoGlobalAssignOptions{Exceptions: []string{"Object", "String"}}))
 	})
@@ -200,8 +200,8 @@ func TestNoGlobalAssignExceptions(t *testing.T) {
 //
 // Sliced out of the source with the finding's own range rather than compared against an offset the
 // test computes, since a computed offset is wrong in the same direction as the code that produced it.
-func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignPointsAtTheWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -220,18 +220,18 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			// The harness trims and appends a newline, so read positions against that same text.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			for i, want := range testCase.want {
 				reported := source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
 				if reported != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
 				}
 			}
 		})
@@ -243,15 +243,15 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 // A rule reporting the object literal twice satisfies both the count and the id assertions above and
 // points both findings at the same place. `no-class-assign` carries the same guard for the same
 // reason.
-func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, "({Object = 0, String = 0} = {});")
+	result := rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, "({Object = 0, String = 0} = {});")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-		t.Errorf("both findings pointed at offset %d; each should point at its own name",
+		test.Errorf("both findings pointed at offset %d; each should point at its own name",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -261,22 +261,22 @@ func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
 // The engine hands a rule a nil checker unless it declares NeedsTypeChecker. This rule answers
 // nothing without one, so under `rule_testing.Run` it goes completely silent: every clean case above
 // would pass vacuously and the whole suite would look green over a rule that reports nothing.
-func TestNoGlobalAssignRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoGlobalAssign.NeedsTypeChecker {
-		t.Fatal("NoGlobalAssign must declare NeedsTypeChecker; without it the checker is nil and " +
+		test.Fatal("NoGlobalAssign must declare NeedsTypeChecker; without it the checker is nil and " +
 			"the rule reports nothing while every StaysSilent fixture passes vacuously")
 	}
-	untyped := rule_testing.Run(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
+	untyped := rule_testing.Run(test, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
 	if len(untyped.Diagnostics) != 0 {
-		t.Fatalf("expected the untyped harness to produce nothing, got %d findings; if this "+
+		test.Fatalf("expected the untyped harness to produce nothing, got %d findings; if this "+
 			"changed, the fixtures above may no longer be measuring what they claim",
 			len(untyped.Diagnostics))
 	}
-	typed := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
+	typed := rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("expected the typed harness to report once, got %d", len(typed.Diagnostics))
+		test.Fatalf("expected the typed harness to report once, got %d", len(typed.Diagnostics))
 	}
 }
 
@@ -298,8 +298,8 @@ func TestNoGlobalAssignRequiresTheTypedHarness(t *testing.T) {
 // map there is no information in the file that separates them, so this port reports on none of them.
 // That is the conservative direction: a name this tree cannot prove is a read-only global is left
 // alone. The test below pins that behavior so it is a decision rather than a drift.
-func TestNoGlobalAssignBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalAssignBoundary(test *testing.T) {
+	test.Parallel()
 
 	// Each of these is a name with no declaration anywhere the program can see. Upstream would
 	// report the ones its env tables cover; this port does not, and asserting that keeps the
@@ -315,10 +315,10 @@ func TestNoGlobalAssignBoundary(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})
 	}
 }

@@ -22,12 +22,12 @@ import (
 // Note that `forEachFunctionLike` visits only OUTERMOST function-likes, so nested functions are not
 // walked. That is the same denominator every measurement in this package uses, and it is stated here
 // because a number taken from a different walk is not comparable to the ones in these comments.
-func forEachCorpusFunction(t *testing.T, limit int,
+func forEachCorpusFunction(test *testing.T, limit int,
 	visit func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes)) {
-	t.Helper()
+	test.Helper()
 
 	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
-	files, contentsOf := pinnedCorpusFiles(t, limit)
+	files, contentsOf := pinnedCorpusFiles(test, limit)
 
 	for _, path := range files {
 		contents := contentsOf[path]
@@ -39,7 +39,7 @@ func forEachCorpusFunction(t *testing.T, limit int,
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -56,7 +56,7 @@ func forEachCorpusFunction(t *testing.T, limit int,
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: contents}, fileName)
 	}
 }
 

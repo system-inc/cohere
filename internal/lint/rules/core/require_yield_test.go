@@ -8,8 +8,8 @@ import (
 
 const requireYieldFile = "/repository/source/Thing.ts"
 
-func TestRequireYieldFires(t *testing.T) {
-	t.Parallel()
+func TestRequireYieldFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -30,16 +30,16 @@ func TestRequireYieldFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, RequireYield, requireYieldFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, RequireYield, requireYieldFile, testCase.sourceText),
 				"missingYield")
 		})
 	}
 }
 
-func TestRequireYieldStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRequireYieldStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -70,9 +70,9 @@ func TestRequireYieldStaysSilent(t *testing.T) {
 		{"no functions at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, RequireYield, requireYieldFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, RequireYield, requireYieldFile, testCase.sourceText))
 		})
 	}
 }

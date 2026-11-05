@@ -35,8 +35,8 @@ const exhaustiveDepsFile = "/repository/source/ExhaustiveDeps.tsx"
 // the dependency array are reported as the array is read, and the finding about the array as a
 // whole comes last. ESLint reports the summary first, so an expectation copied from its output
 // order would be wrong about eleven cases while being right about every id.
-func TestExhaustiveDepsFires(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -223,10 +223,10 @@ func TestExhaustiveDepsFires(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText),
+		test.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -240,8 +240,8 @@ func TestExhaustiveDepsFires(t *testing.T) {
 // divergence recorded in the rule's doc comment: a TypeScript non-null assertion inside the
 // dependency array, which React turns into two findings because its chain walk throws on a node
 // kind it does not name, and which this rule unwraps because `!` cannot change what is read.
-func TestExhaustiveDepsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          });\n        }",
@@ -392,10 +392,10 @@ func TestExhaustiveDepsStaysSilent(t *testing.T) {
 	}
 
 	for index, sourceText := range cases {
-		t.Run(exhaustiveDepsCaseName(index, sourceText), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText))
+		test.Run(exhaustiveDepsCaseName(index, sourceText), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, sourceText))
 		})
 	}
 }
@@ -410,8 +410,8 @@ func TestExhaustiveDepsStaysSilent(t *testing.T) {
 // The test asserts they still parse and that the rule survives them, which is the part that can
 // regress: an unported kind's input must not crash the walk or produce a finding of a DIFFERENT
 // kind, and only running them says so.
-func TestExhaustiveDepsScopeIsStated(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsScopeIsStated(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -436,13 +436,13 @@ func TestExhaustiveDepsScopeIsStated(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+		test.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			for _, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Id == "exhaustiveDepsRefCleanup" ||
 					diagnostic.Message.Id == "exhaustiveDepsStaleAssignment" {
-					t.Errorf("this port does not carry %s, so nothing should report it (%s)",
+					test.Errorf("this port does not carry %s, so nothing should report it (%s)",
 						diagnostic.Message.Id, testCase.reason)
 				}
 			}
@@ -481,19 +481,19 @@ func exhaustiveDepsIndexLabel(value int) string {
 // returns nil rather than panicking, so every reference would look unresolved, every dependency
 // would look external, and the rule would go completely quiet while every StaysSilent case above
 // passed vacuously. A later revert to `rule_testing.Run` would look like a green suite.
-func TestExhaustiveDepsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !ExhaustiveDeps.NeedsTypeChecker {
-		t.Fatal("this rule resolves every identifier through the checker and must declare it")
+		test.Fatal("this rule resolves every identifier through the checker and must declare it")
 	}
 	source := "function C(props) { useEffect(() => { console.log(props.foo); }, []); }"
-	if findings := rule_testing.Run(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 0 {
-		t.Fatalf("the untyped harness produced %d findings, so this test is not measuring what it claims",
+	if findings := rule_testing.Run(test, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 0 {
+		test.Fatalf("the untyped harness produced %d findings, so this test is not measuring what it claims",
 			len(findings.Diagnostics))
 	}
-	if findings := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 1 {
-		t.Fatalf("the typed harness produced %d findings, want 1", len(findings.Diagnostics))
+	if findings := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 1 {
+		test.Fatalf("the typed harness produced %d findings, want 1", len(findings.Diagnostics))
 	}
 }
 
@@ -511,8 +511,8 @@ func TestExhaustiveDepsRequiresTheTypedHarness(t *testing.T) {
 // an EFFECT keeps a declared dependency it never reads, and a non-effect calls that dependency
 // unnecessary. So `useEffective` reports and `useMyEffect2` is silent, and a substring test gets
 // both backwards.
-func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsAdditionalHooks(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -561,20 +561,20 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(
 				json.RawMessage(testCase.optionsJson))
 			if err != nil {
-				t.Fatalf("the decoder refused %s: %v", testCase.optionsJson, err)
+				test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, err)
 			}
-			result := rule_testing.RunTypedWithOptions(t, ExhaustiveDeps, exhaustiveDepsFile,
+			result := rule_testing.RunTypedWithOptions(test, ExhaustiveDeps, exhaustiveDepsFile,
 				testCase.sourceText, decoded)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -591,8 +591,8 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 // Every expected string below was taken from React 7.1.1's own suggestion on the same input, and
 // the same comparison was run over seventeen real components from this repository, where all
 // seventeen suggested arrays matched character for character.
-func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsSuggestsTheCorrectedArray(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -632,22 +632,22 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding to read the advice from, got %d",
+				test.Fatalf("want exactly one finding to read the advice from, got %d",
 					len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Suggestions) != 1 {
-				t.Fatalf("want exactly one suggestion, got %d",
+				test.Fatalf("want exactly one suggestion, got %d",
 					len(result.Diagnostics[0].Suggestions))
 			}
 			// Equality on the rendered text, not `strings.Contains`. A predicate weaker than the
 			// property it guards is not a guard, and `[props.foo]` is a substring of
 			// `[props.foo, wrong]`.
 			if advice := result.Diagnostics[0].Suggestions[0].Message.Description; advice != testCase.wantAdvice {
-				t.Errorf("advice was %q, want %q", advice, testCase.wantAdvice)
+				test.Errorf("advice was %q, want %q", advice, testCase.wantAdvice)
 			}
 		})
 	}
@@ -664,19 +664,19 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 // `internal/fix.ProposalsFrom` collects `Fixes` and ignores `Suggestions`, so this is the mechanical
 // difference between advice a person reads and an edit that lands in their file unattended. A later
 // change moving the rewrite into `Fixes` would be invisible to every other test here.
-func TestExhaustiveDepsProposesNoAutomaticFix(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsProposesNoAutomaticFix(test *testing.T) {
+	test.Parallel()
 
 	source := "function C(props) { useEffect(() => { console.log(props.foo); }, []); }"
-	result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source)
+	result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if fixes := len(result.Diagnostics[0].Fixes); fixes != 0 {
-		t.Errorf("this rule proposes %d automatic fixes and must propose none: a wrong dependency array applied unattended is an infinite render loop", fixes)
+		test.Errorf("this rule proposes %d automatic fixes and must propose none: a wrong dependency array applied unattended is an infinite render loop", fixes)
 	}
 	if suggestions := len(result.Diagnostics[0].Suggestions); suggestions != 1 {
-		t.Errorf("the corrected array must still be offered as a suggestion, got %d", suggestions)
+		test.Errorf("the corrected array must still be offered as a suggestion, got %d", suggestions)
 	}
 }
 
@@ -691,8 +691,8 @@ func TestExhaustiveDepsProposesNoAutomaticFix(t *testing.T) {
 // The third row is the one that makes the other two mean something. Without a ternary that
 // constructs in neither branch, a rule answering "any ternary is a construction" would pass the
 // first two and be wrong about ordinary code.
-func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsConstructionRecursesThroughBranches(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -714,14 +714,14 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if testCase.reports {
-				rule_testing.ExpectFindings(t, result, "exhaustiveDepsConstruction")
+				rule_testing.ExpectFindings(test, result, "exhaustiveDepsConstruction")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -732,8 +732,8 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
 // than convenient: the array as a whole for a list problem, the offending entry for an entry
 // problem, and the DECLARATION for a construction, because the fix is at the declaration and not at
 // the Hook. A rule pointing all three at the Hook call would pass every other test in this file.
-func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsPointsAtTheRightNode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -752,16 +752,16 @@ func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("no finding to read a span from")
+				test.Fatal("no finding to read a span from")
 			}
 			last := result.Diagnostics[len(result.Diagnostics)-1]
 			reported := result.SourceFile.Text()[last.Range.Pos():last.Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("the finding covers %q, want %q", reported, testCase.wantText)
+				test.Errorf("the finding covers %q, want %q", reported, testCase.wantText)
 			}
 		})
 	}
@@ -783,8 +783,8 @@ func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
 // because the ORIGINAL is wrong.
 //
 // Every expectation below was read off React 7.1.1 before it was written.
-func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsNonEffectRebuildsTheArray(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -831,34 +831,34 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-				t.Fatalf("want one finding carrying one suggestion, got %d findings",
+				test.Fatalf("want one finding carrying one suggestion, got %d findings",
 					len(result.Diagnostics))
 			}
 			if advice := result.Diagnostics[0].Suggestions[0].Message.Description; advice != testCase.wantAdvice {
-				t.Errorf("advice was %q, want %q", advice, testCase.wantAdvice)
+				test.Errorf("advice was %q, want %q", advice, testCase.wantAdvice)
 			}
 		})
 	}
 }
 
 // exhaustiveDepsWithOptions runs a fixture through the registered decoder with the given options.
-func exhaustiveDepsWithOptions(t *testing.T, optionsJson string, sourceText string) rule_testing.Result {
-	t.Helper()
+func exhaustiveDepsWithOptions(test *testing.T, optionsJson string, sourceText string) rule_testing.Result {
+	test.Helper()
 	decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
 	}
-	return rule_testing.RunTypedWithOptions(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText, decoded)
+	return rule_testing.RunTypedWithOptions(test, ExhaustiveDeps, exhaustiveDepsFile, sourceText, decoded)
 }
 
 // requireExplicitEffectDeps, from React's row and its controls: an effect with no second argument
 // reports, an explicit `undefined` is an answer, and the option is what turns it on.
-func TestExhaustiveDepsRequireExplicitEffectDeps(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsRequireExplicitEffectDeps(test *testing.T) {
+	test.Parallel()
 
 	const required = `{"requireExplicitEffectDeps": true}`
 	cases := []struct {
@@ -881,22 +881,22 @@ func TestExhaustiveDepsRequireExplicitEffectDeps(t *testing.T) {
 			[]string{"exhaustiveDepsUselessWithoutDependencies"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := exhaustiveDepsWithOptions(t, testCase.optionsJson, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := exhaustiveDepsWithOptions(test, testCase.optionsJson, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // experimental_autoDependenciesHooks, from React's three rows: a literal `null` array is no array to
 // check, the absent array is not the setState loop, and a real array is still checked.
-func TestExhaustiveDepsAutoDependenciesHooks(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsAutoDependenciesHooks(test *testing.T) {
+	test.Parallel()
 
 	const auto = `{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": ["useSpecialEffect"]}`
 	const additionalOnly = `{"additionalHooks": "useSpecialEffect"}`
@@ -920,14 +920,14 @@ func TestExhaustiveDepsAutoDependenciesHooks(t *testing.T) {
 			[]string{"exhaustiveDepsMissing"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := exhaustiveDepsWithOptions(t, testCase.optionsJson, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := exhaustiveDepsWithOptions(test, testCase.optionsJson, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -935,8 +935,8 @@ func TestExhaustiveDepsAutoDependenciesHooks(t *testing.T) {
 // enableDangerousAutofixThisMayCauseInfiniteLoops, at each of the five places React offers a repair,
 // with the source React's own fixer produces, measured through ESLint's verifyAndFix on the installed
 // build. Without the option none of them is applied, which the last row pins.
-func TestExhaustiveDepsDangerousAutofix(t *testing.T) {
-	t.Parallel()
+func TestExhaustiveDepsDangerousAutofix(test *testing.T) {
+	test.Parallel()
 
 	const dangerous = `{"enableDangerousAutofixThisMayCauseInfiniteLoops": true}`
 	cases := []struct {
@@ -967,18 +967,18 @@ func TestExhaustiveDepsDangerousAutofix(t *testing.T) {
 			"function MyComponent() { const handle = useCallback(() => {}); useEffect(() => { handle(); }, [handle]); return handle; }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := exhaustiveDepsWithOptions(t, dangerous, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource+"\n")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := exhaustiveDepsWithOptions(test, dangerous, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource+"\n")
 
 			// The control: without the option the finding stands and carries no fix.
-			unconfigured := exhaustiveDepsWithOptions(t, `{}`, testCase.sourceText)
-			rule_testing.ExpectFindings(t, unconfigured, testCase.wantId)
+			unconfigured := exhaustiveDepsWithOptions(test, `{}`, testCase.sourceText)
+			rule_testing.ExpectFindings(test, unconfigured, testCase.wantId)
 			for _, diagnostic := range unconfigured.Diagnostics {
 				if len(diagnostic.Fixes) > 0 {
-					t.Errorf("without the option %s carries a fix", diagnostic.Message.Id)
+					test.Errorf("without the option %s carries a fix", diagnostic.Message.Id)
 				}
 			}
 		})

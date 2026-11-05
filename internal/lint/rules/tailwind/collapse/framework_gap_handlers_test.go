@@ -165,8 +165,8 @@ var gapCellsMeasuredElsewhere = map[string]string{
 // `PropertySort` is where a wrong property name stops being a typo and becomes a wrong sort key.
 // TestGapRootPropertyNamesAgreeWithTheTable compares the names, which the reading cannot separate
 // for two properties `PropertyOrder` does not know.
-func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
-	t.Parallel()
+func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
+	test.Parallel()
 	var agreed, compared int
 	var disagreements, unported []string
 
@@ -179,7 +179,7 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
 	for _, root := range gapRoots {
 		descriptor, found := baseDescriptors[root]
 		if !found {
-			t.Errorf("%s is in the list this slice ports and has no baseDescriptors row, so there is nothing to compare it against", root)
+			test.Errorf("%s is in the list this slice ports and has no baseDescriptors row, so there is nothing to compare it against", root)
 			continue
 		}
 		if _, ported := gapEmitters[root]; !ported {
@@ -211,23 +211,23 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
 
 	// The population, stated before the disagreements. A run that compared nothing disagrees about
 	// nothing and is otherwise indistinguishable from a run that compared everything.
-	t.Logf("gap handles: %d roots in this slice, %d cells compared, %d agreed, %d unported, %d disagreed",
+	test.Logf("gap handles: %d roots in this slice, %d cells compared, %d agreed, %d unported, %d disagreed",
 		len(gapRoots), compared, agreed, len(unported), len(disagreements))
 
 	if len(gapRoots) != 57 {
-		t.Errorf("this slice lists %d roots and the assertions below were sized for 57; the population moved", len(gapRoots))
+		test.Errorf("this slice lists %d roots and the assertions below were sized for 57; the population moved", len(gapRoots))
 	}
 	if compared == 0 {
-		t.Error("no cell was compared, so this test proves nothing about any emitter")
+		test.Error("no cell was compared, so this test proves nothing about any emitter")
 	}
 	if agreed != compared {
-		t.Errorf("%d of %d cells agreed; the acceptance condition is every cell, not a rate", agreed, compared)
+		test.Errorf("%d of %d cells agreed; the acceptance condition is every cell, not a rate", agreed, compared)
 	}
 	for _, root := range unported {
-		t.Errorf("%s has a baseDescriptors row and no ported handle, so it emits nothing and reads nothing", root)
+		test.Errorf("%s has a baseDescriptors row and no ported handle, so it emits nothing and reads nothing", root)
 	}
 	for _, disagreement := range disagreements {
-		t.Error(disagreement)
+		test.Error(disagreement)
 	}
 
 	// Every documented exemption has to have fired. See `used`.
@@ -239,7 +239,7 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
 	}
 	sort.Strings(unmatched)
 	for _, key := range unmatched {
-		t.Errorf("gapCellsMeasuredElsewhere names %q and no cell matched it; an exemption that never fires "+
+		test.Errorf("gapCellsMeasuredElsewhere names %q and no cell matched it; an exemption that never fires "+
 			"documents a skip that is not happening, which is how a cell goes uncompared under a comment "+
 			"saying why it was skipped", key)
 	}
@@ -250,8 +250,8 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
 // Separate from the acceptance test because they fail differently: this one catches a root nobody
 // wrote a body for, where the acceptance test above would report it as unported and could be read as
 // a smaller population rather than as a gap.
-func TestEveryGapRootHasAnEmitter(t *testing.T) {
-	t.Parallel()
+func TestEveryGapRootHasAnEmitter(test *testing.T) {
+	test.Parallel()
 	var missing []string
 	for _, root := range gapRoots {
 		if _, ported := gapEmitters[root]; !ported {
@@ -260,7 +260,7 @@ func TestEveryGapRootHasAnEmitter(t *testing.T) {
 	}
 	sort.Strings(missing)
 	for _, root := range missing {
-		t.Errorf("%s is one of the 57 and has no entry in gapEmitters", root)
+		test.Errorf("%s is one of the 57 and has no entry in gapEmitters", root)
 	}
 
 	// And the reverse. An emitter for a root outside this slice would be a body nothing compares
@@ -271,10 +271,10 @@ func TestEveryGapRootHasAnEmitter(t *testing.T) {
 	}
 	for root := range gapEmitters {
 		if !inSlice[root] {
-			t.Errorf("gapEmitters carries %s, which is not one of the 57 this slice ports and which no test compares", root)
+			test.Errorf("gapEmitters carries %s, which is not one of the 57 this slice ports and which no test compares", root)
 		}
 	}
-	t.Logf("emitters: %d roots in the slice, %d in gapEmitters", len(gapRoots), len(gapEmitters))
+	test.Logf("emitters: %d roots in the slice, %d in gapEmitters", len(gapRoots), len(gapEmitters))
 }
 
 // TestGapRootPropertyNamesAreDistinctPerArm replaces a comparison whose other side is gone.
@@ -287,8 +287,8 @@ func TestEveryGapRootHasAnEmitter(t *testing.T) {
 // What it was really asserting was that the arms are distinct, and that is asserted directly here.
 // A root whose arms returned the same property list would have made the old comparison AGREE, which
 // is the direction that reads as success, so this is the check that carried the weight.
-func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
-	t.Parallel()
+func TestGapRootPropertyNamesAreDistinctPerArm(test *testing.T) {
+	test.Parallel()
 	// The roots that branch colour against not-colour. Each must declare different properties on the
 	// two arms, or a width and a colour of the same root would read as conflicting.
 	var distinct, identical int
@@ -308,14 +308,14 @@ func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
 		distinct++
 	}
 
-	t.Logf("arms: %d gap roots read differently for a colour than for their ordinary value, %d read the same",
+	test.Logf("arms: %d gap roots read differently for a colour than for their ordinary value, %d read the same",
 		distinct, identical)
 
 	// Named rather than asserted loosely. The border family alone is eleven roots that must split,
 	// and a zero here means every root now returns one answer for both values, which is the flattening
 	// the deleted override tables existed to work around.
 	if distinct == 0 {
-		t.Error("no gap root distinguishes a colour value from its ordinary one, so every branch has " +
+		test.Error("no gap root distinguishes a colour value from its ordinary one, so every branch has " +
 			"been flattened and a width would conflict with a colour on the same root")
 	}
 }
@@ -331,26 +331,26 @@ func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
 //
 // Both tables are deleted. This asserts the two registrations still answer separately, which is what
 // makes the patch unnecessary rather than merely absent.
-func TestObjectRootAndItsStaticsDeclareDifferentProperties(t *testing.T) {
-	t.Parallel()
+func TestObjectRootAndItsStaticsDeclareDifferentProperties(test *testing.T) {
+	test.Parallel()
 	utility, known := FrameworkFunctionalUtilities["object"]
 	if !known {
-		t.Fatal("object is not in FrameworkFunctionalUtilities")
+		test.Fatal("object is not in FrameworkFunctionalUtilities")
 	}
 	emitted := utility.Emit("object", ResolvedUtilityValue{Value: "zzsentinel"})
 	if len(emitted) != 1 || emitted[0].Property != "object-position" {
-		t.Errorf("the functional root object emits %s; it declares object-position, and reading "+
+		test.Errorf("the functional root object emits %s; it declares object-position, and reading "+
 			"object-fit here is the defect the deleted table had", describeDeclarations(emitted))
 	}
 
 	for _, className := range []string{"object-cover", "object-fill", "object-contain"} {
 		declarations, isStatic := FrameworkStaticDeclarations[className]
 		if !isStatic {
-			t.Errorf("%s is not in FrameworkStaticDeclarations; it is a staticUtility declaring object-fit", className)
+			test.Errorf("%s is not in FrameworkStaticDeclarations; it is a staticUtility declaring object-fit", className)
 			continue
 		}
 		if len(declarations) != 1 || declarations[0].Property != "object-fit" {
-			t.Errorf("%s declares %v; upstream registers it as a static object-fit", className, declarations)
+			test.Errorf("%s declares %v; upstream registers it as a static object-fit", className, declarations)
 		}
 	}
 }
@@ -364,28 +364,28 @@ func TestObjectRootAndItsStaticsDeclareDifferentProperties(t *testing.T) {
 //
 // The emitter returning nil is therefore correct rather than unported, and this test is what keeps
 // that distinction from being read as a gap.
-func TestBlockAndInlineHaveNoFunctionalRegistration(t *testing.T) {
-	t.Parallel()
+func TestBlockAndInlineHaveNoFunctionalRegistration(test *testing.T) {
+	test.Parallel()
 	for _, root := range []string{"block", "inline"} {
 		emitted := EmitGapRoot(root, UtilityBranch{HasValue: true})
 		if len(emitted) != 0 {
-			t.Errorf("%s emitted %s for a value form; it has no functional registration, so a value form compiles to nothing",
+			test.Errorf("%s emitted %s for a value form; it has no functional registration, so a value form compiles to nothing",
 				root, describeDeclarations(emitted))
 		}
 		descriptor, found := baseDescriptors[root]
 		if !found {
-			t.Errorf("%s has no baseDescriptors row, so the collision this test records is no longer observable", root)
+			test.Errorf("%s has no baseDescriptors row, so the collision this test records is no longer observable", root)
 			continue
 		}
 		if descriptor.Absent.Empty == nil {
-			t.Errorf("%s has no Empty reading; the row exists because the static utility of the same name has one", root)
+			test.Errorf("%s has no Empty reading; the row exists because the static utility of the same name has one", root)
 			continue
 		}
 		// The static utility's own reading, which is what the row's Empty is recording.
 		if position, known := PropertyOrder["display"]; known {
 			empty := *descriptor.Absent.Empty
 			if len(empty.Order) != 1 || empty.Order[0] != position {
-				t.Errorf("%s reads %s for its empty form; this test records that the row is the static display "+
+				test.Errorf("%s reads %s for its empty form; this test records that the row is the static display "+
 					"utility's, and it no longer is", root, formatReading(empty))
 			}
 		}
@@ -402,19 +402,19 @@ func TestBlockAndInlineHaveNoFunctionalRegistration(t *testing.T) {
 // That is a branch on the candidate rather than on the value, which is why the emitters here take a
 // `UtilityBranch` and not a `ResolvedUtilityValue`: resolution consumes the modifier and reports
 // nothing about it, so on a resolved value alone this branch is unreachable.
-func TestShadowFamilyAlphaDeclarationDecidesTheCount(t *testing.T) {
-	t.Parallel()
+func TestShadowFamilyAlphaDeclarationDecidesTheCount(test *testing.T) {
+	test.Parallel()
 	for _, root := range []string{"shadow", "inset-shadow", "drop-shadow", "text-shadow"} {
 		unmodified := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true}))
 		modified := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true, HasModifier: true}))
 
 		if modified.Count != unmodified.Count+1 {
-			t.Errorf("%s counts %d unmodified and %d modified; the alpha declaration is absent-valued without a "+
+			test.Errorf("%s counts %d unmodified and %d modified; the alpha declaration is absent-valued without a "+
 				"modifier and present with one, so the modified form must count exactly one more",
 				root, unmodified.Count, modified.Count)
 		}
 		if len(modified.Order) != len(unmodified.Order) {
-			t.Errorf("%s reads %d positions unmodified and %d modified; the alpha property is outside PropertyOrder, "+
+			test.Errorf("%s reads %d positions unmodified and %d modified; the alpha property is outside PropertyOrder, "+
 				"so it changes the count and never the order", root, len(unmodified.Order), len(modified.Order))
 		}
 	}
@@ -428,19 +428,19 @@ func TestShadowFamilyAlphaDeclarationDecidesTheCount(t *testing.T) {
 //
 // Without this the `IsArbitrary` field could be deleted and every type-keyed comparison above would
 // still pass, since the type maps are probed with arbitrary branches throughout.
-func TestGapRootArbitraryAndNamedCanDiffer(t *testing.T) {
-	t.Parallel()
+func TestGapRootArbitraryAndNamedCanDiffer(test *testing.T) {
+	test.Parallel()
 	arbitrary := PropertySort(EmitGapRoot("scale", UtilityBranch{HasValue: true, IsArbitrary: true}))
 	named := PropertySort(EmitGapRoot("scale", UtilityBranch{HasValue: true}))
 
 	if arbitrary.Count != 1 {
-		t.Errorf("scale-[2] emitted %d declarations; upstream's arbitrary arm returns a single scale declaration", arbitrary.Count)
+		test.Errorf("scale-[2] emitted %d declarations; upstream's arbitrary arm returns a single scale declaration", arbitrary.Count)
 	}
 	if named.Count != 4 {
-		t.Errorf("scale-150 emitted %d declarations; upstream's named path writes three axis variables and the shorthand", named.Count)
+		test.Errorf("scale-150 emitted %d declarations; upstream's named path writes three axis variables and the shorthand", named.Count)
 	}
 	if arbitrary.Count == named.Count {
-		t.Error("scale reads the same for an arbitrary and a named value, so IsArbitrary is deletable and this " +
+		test.Error("scale reads the same for an arbitrary and a named value, so IsArbitrary is deletable and this " +
 			"slice's branch model is carrying a field nothing turns on")
 	}
 }
@@ -473,22 +473,22 @@ func joinStrings(values []string) string {
 // exempted 47 cells to excuse 7; the other 40 were agreeing all along and were being discarded
 // under a comment saying they could not be compared. Requiring every key to name one cell of one of
 // the three collided roots makes that mistake unrepresentable rather than merely discouraged.
-func TestGapRootExemptionsAreExactlyTheStaticCollision(t *testing.T) {
-	t.Parallel()
+func TestGapRootExemptionsAreExactlyTheStaticCollision(test *testing.T) {
+	test.Parallel()
 	if len(gapCellsMeasuredElsewhere) != 9 {
-		t.Errorf("gapCellsMeasuredElsewhere holds %d exemptions and this test was written against 9; "+
+		test.Errorf("gapCellsMeasuredElsewhere holds %d exemptions and this test was written against 9; "+
 			"an exemption is the one way a cell stops being compared without failing, so growing the map "+
 			"should cost a line here", len(gapCellsMeasuredElsewhere))
 	}
 	for key := range gapCellsMeasuredElsewhere {
 		root, _, split := strings.Cut(key, ".")
 		if !split {
-			t.Errorf("%q exempts a whole root rather than a cell; that is the shape that hid 41 passing "+
+			test.Errorf("%q exempts a whole root rather than a cell; that is the shape that hid 41 passing "+
 				"comparisons behind 6 real ones", key)
 			continue
 		}
 		if root != "block" && root != "inline" && root != "flex" {
-			t.Errorf("%q exempts a cell of %s; the only rows this port cannot answer belong to block, inline "+
+			test.Errorf("%q exempts a cell of %s; the only rows this port cannot answer belong to block, inline "+
 				"and flex, each of which has a staticUtility declaring display standing where the extractor "+
 				"probed for a functional one", key, root)
 		}

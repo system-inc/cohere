@@ -32,10 +32,10 @@ const translationsConfig = `{
 // reaching it through the program instead of through the filesystem is the whole porting decision.
 // A fixture that faked the English side would be testing the comparison while skipping the part
 // most likely to be wrong.
-func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePath string) rule_testing.Result {
-	t.Helper()
+func runOnTranslations(test *testing.T, files map[string]string, subjectRelativePath string) rule_testing.Result {
+	test.Helper()
 
-	graph, directory := buildTranslations(t, files)
+	graph, directory := buildTranslations(test, files)
 	subjectPath := filepath.Join(directory, subjectRelativePath)
 	var subject *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -45,7 +45,7 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 		}
 	}
 	if subject == nil {
-		t.Fatalf("the program does not hold %s", subjectPath)
+		test.Fatalf("the program does not hold %s", subjectPath)
 	}
 
 	var diagnostics []rule.Diagnostic
@@ -67,24 +67,24 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 
 // buildTranslations writes files to a directory of their own, beside translationsConfig, and builds a real
 // program over them, returning it and the directory.
-func buildTranslations(t *testing.T, files map[string]string) (*program.Graph, string) {
-	t.Helper()
+func buildTranslations(test *testing.T, files map[string]string) (*program.Graph, string) {
+	test.Helper()
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	files["tsconfig.json"] = translationsConfig
 	for name, contents := range files {
 		full := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("creating %s: %v", filepath.Dir(full), err)
+			test.Fatalf("creating %s: %v", filepath.Dir(full), err)
 		}
 		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", full, err)
+			test.Fatalf("writing %s: %v", full, err)
 		}
 	}
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building the program: %v", err)
+		test.Fatalf("building the program: %v", err)
 	}
 	return graph, directory
 }
@@ -116,8 +116,8 @@ const englishTranslations = `export default {
 };
 `
 
-func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -182,19 +182,19 @@ func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runOnTranslations(t, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnTranslations(test, map[string]string{
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
 			}, "translations/es.ts")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -220,13 +220,13 @@ func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
 		{"a spread", "const other = { Greeting: 'Hola' };\nexport default {\n    ...other,\n};\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runOnTranslations(t, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnTranslations(test, map[string]string{
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
 			}, "translations/es.ts")
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -234,8 +234,8 @@ func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
 // Every filename exclusion is a file that would otherwise be compared against itself or against
 // nothing. en.ts is the sharpest: it is the basis of the comparison, so every value in it is
 // identical to English by definition and the rule would report the entire file.
-func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(test *testing.T) {
+	test.Parallel()
 
 	// Content identical to English, so any file this rule agrees to read will report. That is what
 	// makes these fixtures discriminate rather than merely pass.
@@ -262,16 +262,16 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 		{"a directory whose name merely contains translations", "translations-archive/es.ts"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{
 				"translations/en.ts":         englishTranslations,
 				"translations-archive/en.ts": englishTranslations,
 				"source/en.ts":               englishTranslations,
 			}
 			files[testCase.relativePath] = copiedFromEnglish
-			result := runOnTranslations(t, files, testCase.relativePath)
-			rule_testing.ExpectClean(t, result)
+			result := runOnTranslations(test, files, testCase.relativePath)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -279,14 +279,14 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 // An underscore-prefixed translations directory is the other spelling in the tree, and it must be
 // read rather than skipped. A locale directory this rule silently declines is a locale nobody is
 // checking, which reads exactly like a fully translated one.
-func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(test *testing.T) {
+	test.Parallel()
 
-	result := runOnTranslations(t, map[string]string{
+	result := runOnTranslations(test, map[string]string{
 		"_translations/en.ts": englishTranslations,
 		"_translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "_translations/es.ts")
-	rule_testing.ExpectFindings(t, result, "identicalToSource")
+	rule_testing.ExpectFindings(test, result, "identicalToSource")
 }
 
 // A locale file with no English sibling gets one finding at its start, naming the siblings it looked
@@ -295,8 +295,8 @@ func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(t
 // Declining it silently let a set whose en.ts was missing or misnamed read as clean. Reporting every
 // key instead would be a wall of findings that says nothing about the translations, so the content is
 // copied English on purpose: a comparison that ran anyway would add identicalToSource beside it.
-func TestLocalizationNoUntranslatedValueReportsAMissingEnglishSibling(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueReportsAMissingEnglishSibling(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -319,13 +319,13 @@ func TestLocalizationNoUntranslatedValueReportsAMissingEnglishSibling(t *testing
 			"translations/support/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 		}, "translations/support/es.ts", "en.ts", "en.a"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runOnTranslations(t, testCase.files, testCase.subject)
-			rule_testing.ExpectFindings(t, result, "missingEnglishSibling")
-			expectMissingSiblingNames(t, result, testCase.expected, testCase.alternative)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnTranslations(test, testCase.files, testCase.subject)
+			rule_testing.ExpectFindings(test, result, "missingEnglishSibling")
+			expectMissingSiblingNames(test, result, testCase.expected, testCase.alternative)
 			if result.Diagnostics[0].Range.Pos() != 0 || result.Diagnostics[0].Range.End() != 0 {
-				t.Fatalf("expected the finding at the file's start, got %d to %d",
+				test.Fatalf("expected the finding at the file's start, got %d to %d",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End())
 			}
 		})
@@ -334,81 +334,81 @@ func TestLocalizationNoUntranslatedValueReportsAMissingEnglishSibling(t *testing
 
 // A file named like a locale outside any translations directory is ordinary code, so it has no
 // English sibling to miss and stays quiet. The control beside it proves the content would report.
-func TestLocalizationNoUntranslatedValueLeavesALocaleNamedFileOutsideASetQuiet(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueLeavesALocaleNamedFileOutsideASetQuiet(test *testing.T) {
+	test.Parallel()
 
 	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
-	rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{"translations/fr.ts": copied},
+	rule_testing.ExpectFindings(test, runOnTranslations(test, map[string]string{"translations/fr.ts": copied},
 		"translations/fr.ts"), "missingEnglishSibling")
 	for _, relativePath := range []string{"source/fr.ts", "translations-archive/fr.ts", "locales/fr.ts"} {
-		t.Run(relativePath, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runOnTranslations(t, map[string]string{relativePath: copied}, relativePath))
+		test.Run(relativePath, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnTranslations(test, map[string]string{relativePath: copied}, relativePath))
 		})
 	}
 }
 
 // A helper in a set with no English table stays quiet: it is not locale data, so it misses no sibling.
 // This is the false missingEnglishSibling #xt9hkse removes, beside a control locale that reports.
-func TestLocalizationNoUntranslatedValueLeavesAHelperInASetQuiet(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueLeavesAHelperInASetQuiet(test *testing.T) {
+	test.Parallel()
 
 	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
-	rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{"translations/fr.ts": copied},
+	rule_testing.ExpectFindings(test, runOnTranslations(test, map[string]string{"translations/fr.ts": copied},
 		"translations/fr.ts"), "missingEnglishSibling")
 	for _, relativePath := range []string{"translations/TranslationTemplate.ts", "translations/index.ts", "translations/locales.ts"} {
-		t.Run(relativePath, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runOnTranslations(t, map[string]string{relativePath: copied}, relativePath))
+		test.Run(relativePath, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnTranslations(test, map[string]string{relativePath: copied}, relativePath))
 		})
 	}
 }
 
 // A locale code with a region or script subtag is a locale: zh-TW is in our sets, and pt-BR and
 // zh_Hant are the other spellings a set may use. Each compares against English, and each misses it.
-func TestLocalizationNoUntranslatedValueRecognizesRegionedLocales(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueRecognizesRegionedLocales(test *testing.T) {
+	test.Parallel()
 
 	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
 	for _, localeCode := range []string{"zh-TW", "pt-BR", "zh_Hant", "ckb"} {
-		t.Run(localeCode, func(t *testing.T) {
-			t.Parallel()
+		test.Run(localeCode, func(test *testing.T) {
+			test.Parallel()
 			subject := "translations/" + localeCode + ".ts"
-			rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{
+			rule_testing.ExpectFindings(test, runOnTranslations(test, map[string]string{
 				"translations/en.ts": englishTranslations,
 				subject:              copied,
 			}, subject), "identicalToSource")
-			rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{subject: copied}, subject),
+			rule_testing.ExpectFindings(test, runOnTranslations(test, map[string]string{subject: copied}, subject),
 				"missingEnglishSibling")
 		})
 	}
 }
 
 // expectMissingSiblingNames checks a missingEnglishSibling finding names both base names, in lookup order.
-func expectMissingSiblingNames(t *testing.T, result rule_testing.Result, expected string, alternative string) {
-	t.Helper()
+func expectMissingSiblingNames(test *testing.T, result rule_testing.Result, expected string, alternative string) {
+	test.Helper()
 	description := result.Diagnostics[0].Message.Description
 	want := "neither " + expected + " nor " + alternative + " is in its directory"
 	if !strings.Contains(description, want) {
-		t.Fatalf("expected the message to say %q, got %q", want, description)
+		test.Fatalf("expected the message to say %q, got %q", want, description)
 	}
 }
 
 // The rule reports and never rewrites: the repair is a translation, which a rule cannot write.
-func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueProposesNoFix(test *testing.T) {
+	test.Parallel()
 
-	result := runOnTranslations(t, map[string]string{
+	result := runOnTranslations(test, map[string]string{
 		"translations/en.ts": englishTranslations,
 		"translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "translations/es.ts")
-	rule_testing.ExpectFindings(t, result, "identicalToSource")
+	rule_testing.ExpectFindings(test, result, "identicalToSource")
 
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("expected no suggestions, got %d", len(result.Diagnostics[0].Suggestions))
+		test.Fatalf("expected no suggestions, got %d", len(result.Diagnostics[0].Suggestions))
 	}
 }
 
@@ -425,8 +425,8 @@ func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
 // returning any listener, and each of those guards can silence every fixture written for the
 // behavior behind it. A sweep that returns several survivors at once is the tell: individually they
 // read as several gaps, and they are usually one guard upstream of all of them.
-func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(t *testing.T) {
-	t.Parallel()
+func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(test *testing.T) {
+	test.Parallel()
 
 	// The subject sits outside any translations directory and carries a value identical to the
 	// English one, so the only reason it reports nothing is the path guard. Placing it inside
@@ -436,11 +436,11 @@ func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(t *testing.T) {
 	// identicalToSource. Before #techtr1, a subject without one stopped silently at the next guard and
 	// the clean result said nothing: measured by making `isTranslationFile` always true and watching this
 	// test still pass, which is the dead fixture it exists to rule out.
-	result := runOnTranslations(t, map[string]string{
+	result := runOnTranslations(test, map[string]string{
 		"translations/en.ts": englishTranslations,
 		"app/en.ts":          englishTranslations,
 		"app/Probe.ts":       "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "app/Probe.ts")
 
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }

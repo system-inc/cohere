@@ -36,12 +36,12 @@ var tailwindAcceptedBefore = map[string][]string{
 // cohere's real decoders. A list whose every key is ported (or was accepted before) must load; a list
 // setting any option not yet ported must still be refused. The second half is the point as much as the first: it is what stops
 // an option from being accepted before it does anything.
-func TestTailwindForwardSamplesLoadOncePorted(t *testing.T) {
-	t.Parallel()
+func TestTailwindForwardSamplesLoadOncePorted(test *testing.T) {
+	test.Parallel()
 
 	data, err := os.ReadFile(filepath.Join("testdata", "better-tailwindcss-forward-samples.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var file struct {
 		Samples []struct {
@@ -50,20 +50,20 @@ func TestTailwindForwardSamplesLoadOncePorted(t *testing.T) {
 		} `json:"samples"`
 	}
 	if err := json.Unmarshal(data, &file); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(file.Samples) == 0 {
-		t.Fatal("no samples were read, so this test would prove nothing")
+		test.Fatal("no samples were read, so this test would prove nothing")
 	}
 
-	options := OptionsAt(rule.OptionsBase{ConfigDirectory: t.TempDir(), ProjectRoot: t.TempDir()})
+	options := OptionsAt(rule.OptionsBase{ConfigDirectory: test.TempDir(), ProjectRoot: test.TempDir()})
 	loaded, refused := 0, 0
 	for _, sample := range file.Samples {
 		var element map[string]json.RawMessage
 		if len(sample.Elements) != 1 || json.Unmarshal(sample.Elements[0], &element) != nil {
-			t.Fatalf("%s %s: each sample is one object element", sample.Rule, sample.Elements)
+			test.Fatalf("%s %s: each sample is one object element", sample.Rule, sample.Elements)
 		}
-		described := sample.Rule + " " + string(compactJSON(t, sample.Elements[0]))
+		described := sample.Rule + " " + string(compactJSON(test, sample.Elements[0]))
 
 		ported := true
 		for key := range element {
@@ -72,18 +72,18 @@ func TestTailwindForwardSamplesLoadOncePorted(t *testing.T) {
 		_, decodeError := options.Decode(sample.Rule, sample.Elements)
 		switch {
 		case ported && decodeError != nil:
-			t.Errorf("%s: ported, and refused: %v", described, decodeError)
+			test.Errorf("%s: ported, and refused: %v", described, decodeError)
 		case !ported && decodeError == nil:
-			t.Errorf("%s: not ported, and loaded; it must stay refused until it does what it says", described)
+			test.Errorf("%s: not ported, and loaded; it must stay refused until it does what it says", described)
 		case ported:
 			loaded++
 		default:
 			refused++
 		}
 	}
-	t.Logf("%d samples load, %d stay refused until their options are ported", loaded, refused)
+	test.Logf("%d samples load, %d stay refused until their options are ported", loaded, refused)
 	if loaded == 0 {
-		t.Fatal("no sample loaded, so the ported list is not being exercised")
+		test.Fatal("no sample loaded, so the ported list is not being exercised")
 	}
 }
 
@@ -98,15 +98,15 @@ func isTailwindPorted(ruleName string, key string) bool {
 }
 
 // compactJSON is a sample's element without whitespace, so a refused value is named one way.
-func compactJSON(t *testing.T, raw json.RawMessage) []byte {
-	t.Helper()
+func compactJSON(test *testing.T, raw json.RawMessage) []byte {
+	test.Helper()
 	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	encoded, err := json.Marshal(value)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return encoded
 }

@@ -22,13 +22,13 @@ type noRestrictedImportsGlobCase struct {
 // 90 of the 864 pairs match. That ratio is the control: a matcher that answered false everywhere
 // would fail 90 rows, and one that answered true everywhere would fail 774, so neither degenerate
 // answer can pass.
-func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
+	test.Parallel()
 
 	cases := noRestrictedImportsGlobCases()
 
 	if len(cases) != 864 {
-		t.Fatalf("expected 864 measured pairs from the corpus cross product, have %d", len(cases))
+		test.Fatalf("expected 864 measured pairs from the corpus cross product, have %d", len(cases))
 	}
 	matching := 0
 	for _, testCase := range cases {
@@ -37,7 +37,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		}
 	}
 	if matching != 90 {
-		t.Fatalf("expected 90 matching pairs, have %d", matching)
+		test.Fatalf("expected 90 matching pairs, have %d", matching)
 	}
 
 	// Four pairs the cross product cannot supply, because the only `./`-prefixed specifier in
@@ -644,7 +644,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 	// Every table's rows are counted after merging, so a block deleted or half-pasted fails here
 	// rather than leaving a suite that passes on whatever survived.
 	if len(cases) != 1424 {
-		t.Fatalf("expected 1424 pairs across all three tables, have %d", len(cases))
+		test.Fatalf("expected 1424 pairs across all three tables, have %d", len(cases))
 	}
 	merged := 0
 	for _, testCase := range cases {
@@ -653,17 +653,17 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		}
 	}
 	if merged != 174 {
-		t.Fatalf("expected 174 matching pairs across all three tables, have %d", merged)
+		test.Fatalf("expected 174 matching pairs across all three tables, have %d", merged)
 	}
 
 	for _, testCase := range cases {
 		matcher, ok := noRestrictedImportsCompileGroup(testCase.group, testCase.caseSensitive)
 		if !ok {
-			t.Errorf("group %v did not compile", testCase.group)
+			test.Errorf("group %v did not compile", testCase.group)
 			continue
 		}
 		if got := matcher.Ignores(testCase.source); got != testCase.wantIgnores {
-			t.Errorf("group %v (caseSensitive %v) against %q: got %v, want %v",
+			test.Errorf("group %v (caseSensitive %v) against %q: got %v, want %v",
 				testCase.group, testCase.caseSensitive, testCase.source, got, testCase.wantIgnores)
 		}
 	}

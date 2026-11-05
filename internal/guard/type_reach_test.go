@@ -37,25 +37,25 @@ import (
 // a future visitor-style helper turns this red instead of blind.
 //
 // It reads the overlay GOFLAGS names, if any (guardOverlay), never the one `go test -overlay` names.
-func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(t *testing.T) {
-	t.Parallel()
+func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(test *testing.T) {
+	test.Parallel()
 
-	scan := scanTypeReach(t, guardOverlay(t))
+	scan := scanTypeReach(test, guardOverlay(test))
 	if len(scan.claims) == 0 && len(scan.mayReadImportedBodies) == 0 {
-		t.Fatal("the scan found no rules at all, so this test proved nothing")
+		test.Fatal("the scan found no rules at all, so this test proved nothing")
 	}
 	if len(scan.mayReadImportedBodies) == 0 {
 		// Dozens of rules reach a declaration and descend today. Zero would mean the scan stopped seeing
 		// the accessors, which would admit every claim.
-		t.Fatal("no rule reaches both an imported declaration and a body, which is implausible: the scan is blind")
+		test.Fatal("no rule reaches both an imported declaration and a body, which is implausible: the scan is blind")
 	}
 	for _, path := range scan.callsNodeInterfaces {
-		t.Errorf("%s reaches a call through an interface that takes an *ast.Node, which this scan cannot follow, "+
+		test.Errorf("%s reaches a call through an interface that takes an *ast.Node, which this scan cannot follow, "+
 			"so what it reads of an imported declaration is unknown; call the helper directly", path)
 	}
 	for _, name := range scan.claims {
 		if scan.mayReadImportedBodies[name] {
-			t.Errorf("rule %q claims TypeReach Shapes and can reach both an imported declaration and a body "+
+			test.Errorf("rule %q claims TypeReach Shapes and can reach both an imported declaration and a body "+
 				"(%s), so a shape-keyed replay could serve a finding computed against a body that changed; "+
 				"leave it on Contents", name, scan.reason[name])
 		}
@@ -125,29 +125,29 @@ var shapeReaders = map[string]bool{"rule.IsReactPragmaBinding": true, "rule.Expo
 // A shape reader's answer is plain data. A result that could carry a compiler value would let a caller
 // take a node from another file and descend into its body, which is the read the scan exists to see, so
 // the trust in shapeReaders rests on this.
-func TestShapeReadersHandBackNoSyntax(t *testing.T) {
-	t.Parallel()
+func TestShapeReadersHandBackNoSyntax(test *testing.T) {
+	test.Parallel()
 
 	var rulePackage *gotypes.Package
-	for _, pkg := range lintPackages(t, guardOverlay(t)) {
+	for _, pkg := range lintPackages(test, guardOverlay(test)) {
 		if strings.HasSuffix(pkg.ImportPath, "/internal/lint/rule") {
 			rulePackage = pkg
 		}
 	}
 	if rulePackage == nil || rulePackage.Types == nil || len(rulePackage.Errors) > 0 {
-		t.Fatalf("loading the rule package: %v", rulePackage)
+		test.Fatalf("loading the rule package: %v", rulePackage)
 	}
 	scope := rulePackage.Types.Scope()
 	for name := range shapeReaders {
 		function, ok := scope.Lookup(strings.TrimPrefix(name, "rule.")).(*types.Func)
 		if !ok {
-			t.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
+			test.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
 			continue
 		}
 		results := function.Type().(*types.Signature).Results()
 		for index := range results.Len() {
 			if carried := carriesCompilerValue(results.At(index).Type(), map[types.Type]bool{}); carried != "" {
-				t.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
+				test.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
 					name, types.TypeString(results.At(index).Type(), nil), carried)
 			}
 		}
@@ -294,9 +294,9 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 }
 
 // scanTypeReach reads the rule packages with overlay in place of the files it names.
-func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
-	t.Helper()
-	loaded := lintPackages(t, overlay)
+func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
+	test.Helper()
+	loaded := lintPackages(test, overlay)
 
 	type body struct {
 		node ast.Node

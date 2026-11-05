@@ -10,8 +10,8 @@ const localStorageFile = "/repository/source/components/Panel.tsx"
 const localStorageServiceFile = "/repository/source/services/local-storage/LocalStorageService.ts"
 const localStorageInternalFile = "/repository/source/services/local-storage/internal/LocalStorageServiceUtilities.ts"
 
-func TestStorageNoDirectLocalStorageFires(t *testing.T) {
-	t.Parallel()
+func TestStorageNoDirectLocalStorageFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -65,16 +65,16 @@ func TestStorageNoDirectLocalStorageFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, StorageNoDirectLocalStorage, localStorageFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, StorageNoDirectLocalStorage, localStorageFile,
 				testCase.sourceText), testCase.wantId)
 		})
 	}
 }
 
-func TestStorageNoDirectLocalStorageStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStorageNoDirectLocalStorageStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -130,9 +130,9 @@ func TestStorageNoDirectLocalStorageStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, StorageNoDirectLocalStorage, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, StorageNoDirectLocalStorage, testCase.fileName,
 				testCase.sourceText))
 		})
 	}

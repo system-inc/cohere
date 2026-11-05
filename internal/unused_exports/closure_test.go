@@ -17,11 +17,11 @@ import (
 // directory, and a test binary's working directory is its own package directory. Hardcoding a
 // developer's scratch path here would pass on one machine and fail everywhere else, which is the
 // shape of green that means nothing.
-func fixturePath(t *testing.T, name string) string {
-	t.Helper()
+func fixturePath(test *testing.T, name string) string {
+	test.Helper()
 	absolute, err := filepath.Abs(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("resolving the %s fixture: %v", name, err)
+		test.Fatalf("resolving the %s fixture: %v", name, err)
 	}
 	return absolute
 }
@@ -29,20 +29,20 @@ func fixturePath(t *testing.T, name string) string {
 // The island fixture holds an abandoned export, the private world only it reaches, a live export
 // reached from a rooted file, and a function referenced only by itself. Four shapes, one program, so
 // the firing half and the declining half are answered by the same run.
-func runFixture(t *testing.T, deep bool) *Report {
-	t.Helper()
-	islandFixture := fixturePath(t, "island")
+func runFixture(test *testing.T, deep bool) *Report {
+	test.Helper()
+	islandFixture := fixturePath(test, "island")
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   islandFixture + "/tsconfig.json",
 		CurrentDirectory: islandFixture,
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the fixture program: %v", err)
+		test.Fatalf("building the fixture program: %v", err)
 	}
 	report, err := Run(context.Background(), graph, graph.ProjectFiles(), deep)
 	if err != nil {
-		t.Fatalf("running the report: %v", err)
+		test.Fatalf("running the report: %v", err)
 	}
 	return report
 }
@@ -66,9 +66,9 @@ func describeIslands(report *Report) string {
 // two private declarations that existed only to serve it, and the whole point of the closure is
 // that it reports them as ONE cluster rather than as an export the flat view can see and two
 // private declarations the flat view cannot see at all.
-func TestClosureFindsTheIsland(t *testing.T) {
-	t.Parallel()
-	report := runFixture(t, true)
+func TestClosureFindsTheIsland(test *testing.T) {
+	test.Parallel()
+	report := runFixture(test, true)
 
 	var cluster *Island
 	for index := range report.Islands {
@@ -79,7 +79,7 @@ func TestClosureFindsTheIsland(t *testing.T) {
 		}
 	}
 	if cluster == nil {
-		t.Fatalf("ScoreWindow was not reported dead, so the closure found nothing: %s", describeIslands(report))
+		test.Fatalf("ScoreWindow was not reported dead, so the closure found nothing: %s", describeIslands(report))
 	}
 
 	want := map[string]bool{"ScoreWindow": true, "normalizeDecay": true, "DecayTable": true}
@@ -89,19 +89,19 @@ func TestClosureFindsTheIsland(t *testing.T) {
 	}
 	for name := range want {
 		if !got[name] {
-			t.Fatalf("%s was not in the cluster, so the private world did not travel with the export: %s",
+			test.Fatalf("%s was not in the cluster, so the private world did not travel with the export: %s",
 				name, describeIslands(report))
 		}
 	}
 	if len(cluster.Members) != 3 {
-		t.Fatalf("the cluster held %d members, want 3: %s", len(cluster.Members), describeIslands(report))
+		test.Fatalf("the cluster held %d members, want 3: %s", len(cluster.Members), describeIslands(report))
 	}
 	// The export leads, because it is the name the reader recognizes.
 	if !cluster.Members[0].Exported || cluster.Members[0].Name != "ScoreWindow" {
-		t.Fatalf("the cluster did not lead with its export: %+v", cluster.Members[0])
+		test.Fatalf("the cluster did not lead with its export: %+v", cluster.Members[0])
 	}
 	if cluster.Exported != 1 {
-		t.Fatalf("the cluster counted %d exports, want 1", cluster.Exported)
+		test.Fatalf("the cluster counted %d exports, want 1", cluster.Exported)
 	}
 }
 
@@ -109,17 +109,17 @@ func TestClosureFindsTheIsland(t *testing.T) {
 // `page.tsx`, which nothing imports and the root set spares, so a closure that does not seed the
 // rooted files' declarations as roots reports it dead. That is the cascade this whole feature has
 // to not do.
-func TestClosureSparesLiveCode(t *testing.T) {
-	t.Parallel()
-	report := runFixture(t, true)
+func TestClosureSparesLiveCode(test *testing.T) {
+	test.Parallel()
+	report := runFixture(test, true)
 	for _, island := range report.Islands {
 		for _, member := range island.Members {
 			if member.Name == "LiveHelper" {
-				t.Fatalf("LiveHelper was reported dead, so the root set did not seed the closure: %s",
+				test.Fatalf("LiveHelper was reported dead, so the root set did not seed the closure: %s",
 					describeIslands(report))
 			}
 			if member.Name == "Page" {
-				t.Fatalf("the rooted page itself was reported dead: %s", describeIslands(report))
+				test.Fatalf("the rooted page itself was reported dead: %s", describeIslands(report))
 			}
 		}
 	}
@@ -130,53 +130,53 @@ func TestClosureSparesLiveCode(t *testing.T) {
 // alive. The closure does not, because nothing marks it first. This is the clearest case where the
 // two answers differ, and it is written down as a test so a future no-unused-vars port that
 // disagrees disagrees loudly.
-func TestClosureReportsSelfReferenceAsDead(t *testing.T) {
-	t.Parallel()
-	flat := runFixture(t, false)
+func TestClosureReportsSelfReferenceAsDead(test *testing.T) {
+	test.Parallel()
+	flat := runFixture(test, false)
 	for _, finding := range flat.Unreferenced {
 		if finding.Name == "recursiveOrphan" {
-			t.Fatalf("the flat view reported recursiveOrphan, so the self-reference no longer counts as a use there")
+			test.Fatalf("the flat view reported recursiveOrphan, so the self-reference no longer counts as a use there")
 		}
 	}
 
-	deep := runFixture(t, true)
+	deep := runFixture(test, true)
 	found := false
 	for _, island := range deep.Islands {
 		for _, member := range island.Members {
 			if member.Name == "recursiveOrphan" {
 				found = true
 				if len(island.Members) != 1 {
-					t.Fatalf("recursiveOrphan formed a %d-member island; a self-edge must not make a cluster: %s",
+					test.Fatalf("recursiveOrphan formed a %d-member island; a self-edge must not make a cluster: %s",
 						len(island.Members), describeIslands(deep))
 				}
 			}
 		}
 	}
 	if !found {
-		t.Fatalf("the closure did not report recursiveOrphan, so a function only calling itself reads as alive: %s",
+		test.Fatalf("the closure did not report recursiveOrphan, so a function only calling itself reads as alive: %s",
 			describeIslands(deep))
 	}
 }
 
 // TestClosureIsOptIn proves the flat report is unchanged when the closure is not asked for, so a
 // reader comparing the two numbers is comparing the same flat analysis against itself.
-func TestClosureIsOptIn(t *testing.T) {
-	t.Parallel()
-	flat := runFixture(t, false)
+func TestClosureIsOptIn(test *testing.T) {
+	test.Parallel()
+	flat := runFixture(test, false)
 	if len(flat.Islands) != 0 {
-		t.Fatalf("islands were computed without being asked for: %d", len(flat.Islands))
+		test.Fatalf("islands were computed without being asked for: %d", len(flat.Islands))
 	}
 	if flat.DeclarationsAnalyzed != 0 {
-		t.Fatalf("the closure inventory was built without being asked for: %d", flat.DeclarationsAnalyzed)
+		test.Fatalf("the closure inventory was built without being asked for: %d", flat.DeclarationsAnalyzed)
 	}
 
-	deep := runFixture(t, true)
+	deep := runFixture(test, true)
 	if len(deep.Unreferenced) != len(flat.Unreferenced) || len(deep.Files) != len(flat.Files) {
-		t.Fatalf("asking for the closure changed the flat report: flat %d/%d, deep %d/%d",
+		test.Fatalf("asking for the closure changed the flat report: flat %d/%d, deep %d/%d",
 			len(flat.Unreferenced), len(flat.Files), len(deep.Unreferenced), len(deep.Files))
 	}
 	if deep.DeclarationsAnalyzed == 0 {
-		t.Fatalf("the closure ran with an empty inventory, which reports everything dead for free")
+		test.Fatalf("the closure ran with an empty inventory, which reports everything dead for free")
 	}
 }
 
@@ -191,21 +191,21 @@ func TestClosureIsOptIn(t *testing.T) {
 // root — which protects everything behind it and makes the report go quiet. On the real tree this
 // rule is what correctly reports four abandoned payment icons whose only mention anywhere is a
 // barrel nothing imports.
-func TestReExportIsAPassThrough(t *testing.T) {
-	t.Parallel()
+func TestReExportIsAPassThrough(test *testing.T) {
+	test.Parallel()
 	// One export reachable only through a re-export, and a barrel nothing imports.
-	barrelFixture := fixturePath(t, "barrel")
+	barrelFixture := fixturePath(test, "barrel")
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   barrelFixture + "/tsconfig.json",
 		CurrentDirectory: barrelFixture,
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the barrel fixture: %v", err)
+		test.Fatalf("building the barrel fixture: %v", err)
 	}
 	report, err := Run(context.Background(), graph, graph.ProjectFiles(), true)
 	if err != nil {
-		t.Fatalf("running the report: %v", err)
+		test.Fatalf("running the report: %v", err)
 	}
 
 	found := false
@@ -215,12 +215,12 @@ func TestReExportIsAPassThrough(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("BarrelOnlyThing was spared, so a re-export now counts as a use and every unimported barrel is a root")
+		test.Fatalf("BarrelOnlyThing was spared, so a re-export now counts as a use and every unimported barrel is a root")
 	}
 
 	// The barrel itself contributes no exports, which is the gap this documents rather than fixes.
 	if report.ExportsAnalyzed != 1 {
-		t.Fatalf("analyzed %d exports, want 1: a barrel's `export ... from` is not a declaration statement",
+		test.Fatalf("analyzed %d exports, want 1: a barrel's `export ... from` is not a declaration statement",
 			report.ExportsAnalyzed)
 	}
 }
@@ -245,20 +245,20 @@ func TestReExportIsAPassThrough(t *testing.T) {
 // comment is corrected alongside it. A doc comment making a falsifiable claim needs a test or it
 // needs deleting -- this one survived being labelled considered judgment for exactly as long as
 // nothing checked it.
-func TestDeadCodeReferenceStillCountsAsAUse(t *testing.T) {
-	t.Parallel()
-	deadrefFixture := fixturePath(t, "deadref")
+func TestDeadCodeReferenceStillCountsAsAUse(test *testing.T) {
+	test.Parallel()
+	deadrefFixture := fixturePath(test, "deadref")
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   deadrefFixture + "/tsconfig.json",
 		CurrentDirectory: deadrefFixture,
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the deadref fixture: %v", err)
+		test.Fatalf("building the deadref fixture: %v", err)
 	}
 	report, err := Run(context.Background(), graph, graph.ProjectFiles(), true)
 	if err != nil {
-		t.Fatalf("running the report: %v", err)
+		test.Fatalf("running the report: %v", err)
 	}
 
 	reported := map[string]bool{}
@@ -269,17 +269,17 @@ func TestDeadCodeReferenceStillCountsAsAUse(t *testing.T) {
 	}
 	for _, file := range report.Files {
 		if strings.HasSuffix(file.FileName, "icons.ts") {
-			t.Error("icons.ts was reported as wholly unreferenced; both of its exports are " +
+			test.Error("icons.ts was reported as wholly unreferenced; both of its exports are " +
 				"referenced once, so this fixture is not testing what it believes it is")
 		}
 	}
 
 	if reported["ReachedNormally"] {
-		t.Error("ReachedNormally was reported dead; it is referenced from a live path reached by a " +
+		test.Error("ReachedNormally was reported dead; it is referenced from a live path reached by a " +
 			"spared root, so the fixture's control is broken rather than the claim being confirmed")
 	}
 	if reported["ReachedOnlyAfterReturn"] {
-		t.Error("ReachedOnlyAfterReturn was reported dead, so the closure now discounts references " +
+		test.Error("ReachedOnlyAfterReturn was reported dead, so the closure now discounts references " +
 			"from unreachable code. That would make the JUDGMENT entry in roots.go true and this " +
 			"test is what should be updated -- but note that discounting is a strictly stronger " +
 			"claim than reference analysis, and a wrong answer cascades through the whole closure")
@@ -295,7 +295,7 @@ func TestDeadCodeReferenceStillCountsAsAUse(t *testing.T) {
 		}
 	}
 	if unreachableInUses != 1 {
-		t.Errorf("unreachable statements reported in uses.ts = %d, want 1; the reachability half "+
+		test.Errorf("unreachable statements reported in uses.ts = %d, want 1; the reachability half "+
 			"of this fixture is what makes the reference half meaningful", unreachableInUses)
 	}
 }

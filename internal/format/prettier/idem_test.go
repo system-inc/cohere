@@ -10,14 +10,14 @@ import (
 //
 // A formatter whose second pass differs from its first would report writes forever, and the count
 // would be honest while the tree never converged.
-func TestFormatIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestFormatIsIdempotent(test *testing.T) {
+	test.Parallel()
 
 	listPath := os.Getenv("COHERE_IDEM_LIST")
 	if listPath == "" {
-		t.Skip("set COHERE_IDEM_LIST")
+		test.Skip("set COHERE_IDEM_LIST")
 	}
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	listBytes, _ := os.ReadFile(listPath)
 	var checked, unstable, changedFromSource int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
@@ -43,8 +43,8 @@ func TestFormatIsIdempotent(t *testing.T) {
 		}
 		if once != twice {
 			unstable++
-			t.Errorf("%s: second pass differs from first", path)
+			test.Errorf("%s: second pass differs from first", path)
 		}
 	}
-	t.Logf("checked=%d changedFromSource=%d unstable=%d", checked, changedFromSource, unstable)
+	test.Logf("checked=%d changedFromSource=%d unstable=%d", checked, changedFromSource, unstable)
 }

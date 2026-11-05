@@ -7,26 +7,26 @@ import (
 )
 
 // syntaxOf parses text as lib.ts in a fresh project and returns its syntax hash.
-func syntaxOf(t *testing.T, text string) string {
-	t.Helper()
-	root := t.TempDir()
+func syntaxOf(test *testing.T, text string) string {
+	test.Helper()
+	root := test.TempDir()
 	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
 	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte(text), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	graph, err := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
 		if filepath.Base(sourceFile.FileName().AsString()) == "lib.ts" {
 			return elidedBodiesVersion(sourceFile)
 		}
 	}
-	t.Fatal("lib.ts is not in the program")
+	test.Fatal("lib.ts is not in the program")
 	return ""
 }
 
@@ -34,10 +34,10 @@ func syntaxOf(t *testing.T, text string) string {
 // the file's text, plain comments and whitespace, and keeps what a rule or the compiler reads without it:
 // JSDoc, directives, pragmas, and every token, a regular expression or string holding "//" included
 // (#zqsdzbq: a comment appended to a file moved every importer's shape key).
-func TestTheSyntaxShapeIgnoresPlainCommentsAndKeepsWhatCanBeRead(t *testing.T) {
-	t.Parallel()
+func TestTheSyntaxShapeIgnoresPlainCommentsAndKeepsWhatCanBeRead(test *testing.T) {
+	test.Parallel()
 	base := "/** The value. */\nexport function value(a: string): string {\n  return a;\n}\nexport const pattern = /a\\/\\/b/;\nexport const url = \"http://x\";\n"
-	original := syntaxOf(t, base)
+	original := syntaxOf(test, base)
 
 	same := map[string]string{
 		"a comment appended":           base + "// bench edit 1\n",
@@ -48,8 +48,8 @@ func TestTheSyntaxShapeIgnoresPlainCommentsAndKeepsWhatCanBeRead(t *testing.T) {
 		"an edit inside the body":      "/** The value. */\nexport function value(a: string): string {\n  return a + \"\";\n}\nexport const pattern = /a\\/\\/b/;\nexport const url = \"http://x\";\n",
 	}
 	for name, text := range same {
-		if got := syntaxOf(t, text); got != original {
-			t.Errorf("%s moved the syntax shape", name)
+		if got := syntaxOf(test, text); got != original {
+			test.Errorf("%s moved the syntax shape", name)
 		}
 	}
 
@@ -65,8 +65,8 @@ func TestTheSyntaxShapeIgnoresPlainCommentsAndKeepsWhatCanBeRead(t *testing.T) {
 		"two tokens a space apart joined":    "/** The value. */\nexport function value(a: string): string {\n  return a;\n}\nexport const pattern = /a\\/\\/b/;\nexport const url = \"http://x\";\nexport type T = typeof url;\n",
 	}
 	for name, text := range moved {
-		if got := syntaxOf(t, text); got == original {
-			t.Errorf("%s left the syntax shape unmoved", name)
+		if got := syntaxOf(test, text); got == original {
+			test.Errorf("%s left the syntax shape unmoved", name)
 		}
 	}
 }

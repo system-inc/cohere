@@ -9,8 +9,8 @@ import (
 
 const outcomeFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoBooleanOutcomeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -26,16 +26,16 @@ func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
 		{"three of cloudflare's four fields", "export interface SyncResult {\n    success: boolean;\n    errors: string[];\n    result: string;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "booleanOutcome")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoBooleanOutcome, outcomeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "booleanOutcome")
 		})
 	}
 }
 
-func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoBooleanOutcomeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	// Every one of these is a shape that would fire if the rule keyed on the flag name alone. The
 	// exemptions are the difference between a rule people keep and one they switch off.
@@ -57,49 +57,49 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 		{"an unrelated interface", outcomeFile, "export interface Point {\n    x: number;\n    y: number;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
 // a generator emitting a boolean outcome is fixed at the generator. The rule used to skip these files.
-func TestConsistencyNoBooleanOutcomeHoldsGeneratedFilesToTheRule(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoBooleanOutcomeHoldsGeneratedFilesToTheRule(test *testing.T) {
+	test.Parallel()
 	for _, fileName := range []string{"/repository/source/generated/Api.ts", "/repository/source/Api.generated.ts"} {
-		result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, fileName, "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n")
-		rule_testing.ExpectFindings(t, result, "booleanOutcome")
+		result := rule_testing.Run(test, ConsistencyNoBooleanOutcome, fileName, "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n")
+		rule_testing.ExpectFindings(test, result, "booleanOutcome")
 	}
 }
 
-func TestConsistencyNoBooleanOutcomeRespectsTheAllowedTypeNamesOption(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoBooleanOutcomeRespectsTheAllowedTypeNamesOption(test *testing.T) {
+	test.Parallel()
 
 	// Telemetry envelopes carry timing or cost on both paths, since a failed model call still bills.
 	// Splitting those into a union puts the cost in the success arm and loses it where it is needed.
 	sourceText := "export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n"
 
-	withoutOption := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText)
-	rule_testing.ExpectFindings(t, withoutOption, "booleanOutcome")
+	withoutOption := rule_testing.Run(test, ConsistencyNoBooleanOutcome, outcomeFile, sourceText)
+	rule_testing.ExpectFindings(test, withoutOption, "booleanOutcome")
 
-	withOption := rule_testing.RunWithOptions(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText,
+	withOption := rule_testing.RunWithOptions(test, ConsistencyNoBooleanOutcome, outcomeFile, sourceText,
 		ConsistencyNoBooleanOutcomeOptions{AllowedTypeNames: []string{"ClaudeCallResultInterface"}})
-	rule_testing.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(test, withOption)
 }
 
 // The suggestion strips role suffixes so the name it offers is one someone would actually write.
-func TestConsistencyNoBooleanOutcomeSuggestsAStrippedName(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoBooleanOutcomeSuggestsAStrippedName(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile,
+	result := rule_testing.Run(test, ConsistencyNoBooleanOutcome, outcomeFile,
 		"export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n")
-	rule_testing.ExpectFindings(t, result, "booleanOutcome")
+	rule_testing.ExpectFindings(test, result, "booleanOutcome")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "ClaudeCallOutcomeType") {
-		t.Fatalf("expected a stripped suggestion, got: %s", description)
+		test.Fatalf("expected a stripped suggestion, got: %s", description)
 	}
 }

@@ -28,8 +28,8 @@ const thisInSfcFile = "/repository/source/Thing.tsx"
 // body and once in a spread. Recovered by reading the snapshot's own source lines rather than by
 // counting in order, and the two diagnostics print `this.itemRef = ref;` and
 // `{...this.getBasicProps()}`, which appear in no other input.
-func TestNoThisInSfcStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -61,16 +61,16 @@ func TestNoThisInSfcStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText))
 		})
 	}
 }
 
 // The failing corpus, verbatim. All but the last report exactly once.
-func TestNoThisInSfcFires(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -92,10 +92,10 @@ func TestNoThisInSfcFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText), "noThisInSfc")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText), "noThisInSfc")
 		})
 	}
 }
@@ -116,12 +116,12 @@ func TestNoThisInSfcFires(t *testing.T) {
 // in the body of a `ref` callback arrow, and one in a spread. Neither is exempted, because an arrow
 // does not rebind `this` and a spread is not a nested context at all. Asserting two ids rather than
 // one is what separates this from a port that reports once and looks correct.
-func TestNoThisInSfcReportsTwiceInOneComponent(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcReportsTwiceInOneComponent(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile,
+	result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile,
 		"\n                    class ItemAdapter {\n                      constructor() {\n                        const ElementWrapper = (props) => (\n                          <div\n                            ref={ref => {\n                              this.itemRef = ref;\n                            }}\n                            {...this.getBasicProps()}\n                          >\n                            {props.label}\n                          </div>\n                        );\n                        this.el = ElementWrapper;\n                      }\n                    }\n                  ")
-	rule_testing.ExpectFindings(t, result, "noThisInSfc", "noThisInSfc")
+	rule_testing.ExpectFindings(test, result, "noThisInSfc", "noThisInSfc")
 }
 
 // Where the finding points, which no message-id assertion can see.
@@ -130,8 +130,8 @@ func TestNoThisInSfcReportsTwiceInOneComponent(t *testing.T) {
 // expression around it. ESLint's rule reports the whole `MemberExpression`, so a port following
 // ESLint would be green on every id assertion above while pointing at `this.props.foo`. The
 // upstream snapshot underlines exactly `this` on all fifteen findings, which is the authority here.
-func TestNoThisInSfcPointsAtTheKeywordAlone(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcPointsAtTheKeywordAlone(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -144,15 +144,15 @@ func TestNoThisInSfcPointsAtTheKeywordAlone(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != "this" {
-				t.Errorf("want the finding to point at `this`, got %q", reported)
+				test.Errorf("want the finding to point at `this`, got %q", reported)
 			}
 		})
 	}
@@ -164,24 +164,24 @@ func TestNoThisInSfcPointsAtTheKeywordAlone(t *testing.T) {
 // interpolated value passes for a message that is wrong in a way the needle does not reach. This
 // message interpolates nothing, so equality is the honest assertion and it also pins that nothing
 // was added to it.
-func TestNoThisInSfcMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile,
+	result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile,
 		"function Foo(props) {\n  return <div>{this.props.foo}</div>;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noThisInSfc" {
-		t.Errorf("want the id noThisInSfc, got %q", got)
+		test.Errorf("want the id noThisInSfc, got %q", got)
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoThisInSfc.Description {
-		t.Errorf("the rendered description drifted from the declared one:\n got %q", got)
+		test.Errorf("the rendered description drifted from the declared one:\n got %q", got)
 	}
 	// The description says why the code is wrong rather than restating the rule name, so it must
 	// not be the rule's own title.
 	if strings.Contains(result.Diagnostics[0].Message.Description, "no-this-in-sfc") {
-		t.Error("the description restates the rule name")
+		test.Error("the description restates the rule name")
 	}
 }
 
@@ -199,12 +199,12 @@ func TestNoThisInSfcMessageText(t *testing.T) {
 // to make it green would have been to break the port. It is pinned here as REPORTING instead, which
 // is what the rule genuinely decides, and the suppression layer is what upstream's version of this
 // assertion belongs to.
-func TestNoThisInSfcReportsUnderADisableDirective(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcReportsUnderADisableDirective(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile,
+	result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile,
 		"\n                    class ItemAdapter {\n                      constructor() {\n                        const ElementWrapper = () => (\n                          <div ref={ref => {\n                            // eslint-disable-next-line react/no-this-in-sfc\n                            this.itemRef = ref;\n                          }} />\n                        );\n                        this.el = ElementWrapper;\n                      }\n                    }\n                  ")
-	rule_testing.ExpectFindings(t, result, "noThisInSfc")
+	rule_testing.ExpectFindings(test, result, "noThisInSfc")
 }
 
 // Parenthesis behavior, which no imported fixture in either corpus writes.
@@ -218,8 +218,8 @@ func TestNoThisInSfcReportsUnderADisableDirective(t *testing.T) {
 //
 // Adding the `SkipParentheses` that usually reads as a free correctness improvement would report
 // the two silent rows.
-func TestNoThisInSfcParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcParentheses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -235,13 +235,13 @@ func TestNoThisInSfcParentheses(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -253,8 +253,8 @@ func TestNoThisInSfcParentheses(t *testing.T) {
 // so the boundary is invented here from probing the release binary. Every row below was measured,
 // and several contradict what the rule's name suggests: returning JSX is not part of the test at
 // all, and no wrapper is recognized.
-func TestNoThisInSfcComponentBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcComponentBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -288,13 +288,13 @@ func TestNoThisInSfcComponentBoundary(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -306,19 +306,19 @@ func TestNoThisInSfcComponentBoundary(t *testing.T) {
 // all three of these, so a port reaching for it by name would report all three. oxc's
 // `is_react_component_name` is `c.is_ascii_uppercase()` and all three are silent on the release
 // binary. This is the fixture that fails if somebody later swaps the local predicate for the shelf.
-func TestNoThisInSfcNameTestIsAscii(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcNameTestIsAscii(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"function Фoo(props) {\n  return this.props.a;\n}\n",
 		"function Λoo(props) {\n  return this.props.a;\n}\n",
 		"function Éoo(props) {\n  return this.props.a;\n}\n",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile, sourceText))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile, sourceText))
 	}
 
 	// The control, so a zero above cannot come from the source failing to parse.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile,
 		"function Foo(props) {\n  return this.props.a;\n}\n"), "noThisInSfc")
 }
 
@@ -329,8 +329,8 @@ func TestNoThisInSfcNameTestIsAscii(t *testing.T) {
 // not component-named is stepped over and the walk continues, which is what lets a callback inside
 // a component still belong to it. The corpus covers the nested declaration and the inline arrow;
 // the rest is measured.
-func TestNoThisInSfcNesting(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcNesting(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -350,13 +350,13 @@ func TestNoThisInSfcNesting(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -369,8 +369,8 @@ func TestNoThisInSfcNesting(t *testing.T) {
 // all, so every row here is measured on the release binary. The four accepted spellings and the
 // three rejected ones are what `IsEs6ComponentClass` answers, which is why that shelf helper is
 // used rather than replaced.
-func TestNoThisInSfcClassComponentAncestor(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcClassComponentAncestor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -389,13 +389,13 @@ func TestNoThisInSfcClassComponentAncestor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -412,8 +412,8 @@ func TestNoThisInSfcClassComponentAncestor(t *testing.T) {
 // passes because its `render: function () {...}` is anonymous, so no name can be read and the walk
 // ends at the function. Removing the factory leaves it passing, which was measured. That is why
 // this test writes a component-named arrow inside each factory rather than reusing that shape.
-func TestNoThisInSfcEs5FactoryNameIsStrict(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcEs5FactoryNameIsStrict(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -427,13 +427,13 @@ func TestNoThisInSfcEs5FactoryNameIsStrict(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -446,8 +446,8 @@ func TestNoThisInSfcEs5FactoryNameIsStrict(t *testing.T) {
 // about a plain property is. Both accessor rows are in the corpus, one passing and one failing, so
 // this is the one part of the exemption the imported fixtures can see; the two plain rows are
 // measured and pin that the unconditional arm is really unconditional.
-func TestNoThisInSfcAccessorSplit(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcAccessorSplit(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -462,13 +462,13 @@ func TestNoThisInSfcAccessorSplit(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "noThisInSfc")
+				rule_testing.ExpectFindings(test, result, "noThisInSfc")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -480,12 +480,12 @@ func TestNoThisInSfcAccessorSplit(t *testing.T) {
 // suffix, so a `.ts` file registered no listener at all. eslint-plugin-react, the authority this
 // rule is ported against, has no such gate, and a function component in a `.ts` file is ordinary.
 // Both suffixes now report the same source.
-func TestNoThisInSfcReportsUnderAnySuffix(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcReportsUnderAnySuffix(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "function Foo(props) {\n  return this.props.a;\n}\n"
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile, sourceText), "noThisInSfc")
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, "/repository/source/Thing.ts", sourceText), "noThisInSfc")
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile, sourceText), "noThisInSfc")
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, "/repository/source/Thing.ts", sourceText), "noThisInSfc")
 }
 
 // A `this` in the ARGUMENT of an element access, which the parent-kind check accepts.
@@ -494,9 +494,9 @@ func TestNoThisInSfcReportsUnderAnySuffix(t *testing.T) {
 // is the OBJECT of that member expression. So `a[this]` inside a component satisfies the anchor
 // even though nothing is being read off `this`. Measured on the release binary rather than assumed,
 // because it looks like a case a port would narrow away as obviously unintended.
-func TestNoThisInSfcAcceptsAnElementAccessArgument(t *testing.T) {
-	t.Parallel()
+func TestNoThisInSfcAcceptsAnElementAccessArgument(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile,
 		"function Foo(props) {\n  return <div>{props.a[this]}</div>;\n}\n"), "noThisInSfc")
 }

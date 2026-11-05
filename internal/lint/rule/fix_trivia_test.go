@@ -24,8 +24,8 @@ import (
 //
 // Found by @system_cohere_lint_fix running real rules through the engine rather than reasoning
 // about ranges.
-func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
-	t.Parallel()
+func TestFixHelpersDoNotEatLeadingTrivia(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -37,16 +37,16 @@ func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			sourceFile, specifier := parseModuleSpecifier(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile, specifier := parseModuleSpecifier(test, testCase.source)
 			context := Context{SourceFile: sourceFile}
 
 			fix := context.ReplaceNode(specifier, "'node:fs'")
 			applied := testCase.source[:fix.Range.Pos()] + fix.Text + testCase.source[fix.Range.End():]
 
 			if applied != testCase.want {
-				t.Fatalf("applying the fix produced\n  %q\nwant\n  %q", applied, testCase.want)
+				test.Fatalf("applying the fix produced\n  %q\nwant\n  %q", applied, testCase.want)
 			}
 		})
 	}
@@ -57,17 +57,17 @@ func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
 // Removing a node and removing the blank line above it are different intentions, and a helper that
 // guessed would be wrong half the time. A rule that wants the surrounding whitespace gone says so
 // with ReplaceRange over a range it computed.
-func TestRemoveNodeLeavesTriviaBehind(t *testing.T) {
-	t.Parallel()
+func TestRemoveNodeLeavesTriviaBehind(test *testing.T) {
+	test.Parallel()
 	source := "import * as X from /* pinned */ 'fs';"
-	sourceFile, specifier := parseModuleSpecifier(t, source)
+	sourceFile, specifier := parseModuleSpecifier(test, source)
 	context := Context{SourceFile: sourceFile}
 
 	fix := context.RemoveNode(specifier)
 	applied := source[:fix.Range.Pos()] + source[fix.Range.End():]
 
 	if applied != "import * as X from /* pinned */ ;" {
-		t.Fatalf("RemoveNode swept up trivia: %q", applied)
+		test.Fatalf("RemoveNode swept up trivia: %q", applied)
 	}
 }
 
@@ -75,56 +75,56 @@ func TestRemoveNodeLeavesTriviaBehind(t *testing.T) {
 //
 // Inserting before a node's trivia rather than before the node puts a modifier above the comment
 // that documents the declaration, which is never what a rule means.
-func TestInsertBeforeLandsOnTheTokenNotItsComment(t *testing.T) {
-	t.Parallel()
+func TestInsertBeforeLandsOnTheTokenNotItsComment(test *testing.T) {
+	test.Parallel()
 	source := "import * as X from /* pinned */ 'fs';"
-	sourceFile, specifier := parseModuleSpecifier(t, source)
+	sourceFile, specifier := parseModuleSpecifier(test, source)
 	context := Context{SourceFile: sourceFile}
 
 	fix := context.InsertBefore(specifier, "!")
 	applied := source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
 
 	if applied != "import * as X from /* pinned */ !'fs';" {
-		t.Fatalf("InsertBefore landed before the trivia: %q", applied)
+		test.Fatalf("InsertBefore landed before the trivia: %q", applied)
 	}
 }
 
 // TestInsertAfterNeedsNoTrimming confirms the one helper that was already correct, so a later
 // refactor cannot quietly break it while fixing the others.
-func TestInsertAfterNeedsNoTrimming(t *testing.T) {
-	t.Parallel()
+func TestInsertAfterNeedsNoTrimming(test *testing.T) {
+	test.Parallel()
 	source := "import * as X from 'fs';"
-	sourceFile, specifier := parseModuleSpecifier(t, source)
+	sourceFile, specifier := parseModuleSpecifier(test, source)
 	context := Context{SourceFile: sourceFile}
 
 	fix := context.InsertAfter(specifier, "!")
 	applied := source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
 
 	if applied != "import * as X from 'fs'!;" {
-		t.Fatalf("InsertAfter moved: %q", applied)
+		test.Fatalf("InsertAfter moved: %q", applied)
 	}
 }
 
 // TestTokenRangeSurvivesANilSourceFile keeps the helper from panicking in a harness that parsed no
 // file. Untrimmed is wrong, but a crash inside a linter is worse.
-func TestTokenRangeSurvivesANilSourceFile(t *testing.T) {
-	t.Parallel()
-	_, specifier := parseModuleSpecifier(t, "import * as X from 'fs';")
+func TestTokenRangeSurvivesANilSourceFile(test *testing.T) {
+	test.Parallel()
+	_, specifier := parseModuleSpecifier(test, "import * as X from 'fs';")
 
 	if got := TokenRange(nil, specifier); got != specifier.Loc {
-		t.Fatalf("expected the untrimmed Loc as a fallback, got %+v", got)
+		test.Fatalf("expected the untrimmed Loc as a fallback, got %+v", got)
 	}
 }
 
-func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.Node) {
-	t.Helper()
+func parseModuleSpecifier(test *testing.T, source string) (*ast.SourceFile, *ast.Node) {
+	test.Helper()
 
 	fileName := tspath.NormalizePath("/Fixture.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTS)
 	if sourceFile == nil {
-		t.Fatalf("could not parse %q", source)
+		test.Fatalf("could not parse %q", source)
 	}
 
 	var specifier *ast.Node
@@ -142,7 +142,7 @@ func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.No
 	walk(sourceFile.AsNode())
 
 	if specifier == nil {
-		t.Fatalf("no module specifier in %q", source)
+		test.Fatalf("no module specifier in %q", source)
 	}
 	return sourceFile, specifier
 }
@@ -164,8 +164,8 @@ func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.No
 //
 // This is worse than an offset because it is invisible in a count. A finding at the wrong line
 // still reads as a real finding.
-func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
-	t.Parallel()
+func TestReportNodeAnchorsOnTheTokenNotItsComment(test *testing.T) {
+	test.Parallel()
 	source := strings.Join([]string{
 		"const {",
 		"    method,",
@@ -174,7 +174,7 @@ func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
 		"} = message;",
 	}, "\n")
 
-	sourceFile, binding := parseNamedBinding(t, source, "params")
+	sourceFile, binding := parseNamedBinding(test, source, "params")
 	context := Context{SourceFile: sourceFile}
 
 	var reported Diagnostic
@@ -183,17 +183,17 @@ func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
 
 	line := 1 + strings.Count(source[:reported.Range.Pos()], "\n")
 	if line != 4 {
-		t.Fatalf("the finding anchored on line %d, want 4 (the binding). Anchoring earlier puts it on or above the suppression comment, where no -next-line directive can reach it", line)
+		test.Fatalf("the finding anchored on line %d, want 4 (the binding). Anchoring earlier puts it on or above the suppression comment, where no -next-line directive can reach it", line)
 	}
 }
 
 // TestReportNodeWithFixesAnchorsOnTheToken covers the variant that matters twice over: a finding at
 // the wrong line carrying a fix means the repair lands somewhere the reader was never shown.
-func TestReportNodeWithFixesAnchorsOnTheToken(t *testing.T) {
-	t.Parallel()
+func TestReportNodeWithFixesAnchorsOnTheToken(test *testing.T) {
+	test.Parallel()
 	source := "const {\n    // a comment\n    params,\n} = message;"
 
-	sourceFile, binding := parseNamedBinding(t, source, "params")
+	sourceFile, binding := parseNamedBinding(test, source, "params")
 	context := Context{SourceFile: sourceFile}
 
 	var reported Diagnostic
@@ -202,27 +202,27 @@ func TestReportNodeWithFixesAnchorsOnTheToken(t *testing.T) {
 		context.ReplaceNode(binding, "parameters"))
 
 	if got := source[reported.Range.Pos():reported.Range.End()]; got != "params" {
-		t.Fatalf("the finding covers %q, want exactly the token", got)
+		test.Fatalf("the finding covers %q, want exactly the token", got)
 	}
 	if len(reported.Fixes) != 1 {
-		t.Fatalf("expected one fix, got %d", len(reported.Fixes))
+		test.Fatalf("expected one fix, got %d", len(reported.Fixes))
 	}
 	if got := source[reported.Fixes[0].Range.Pos():reported.Fixes[0].Range.End()]; got != "params" {
-		t.Fatalf("the fix covers %q, want exactly the token", got)
+		test.Fatalf("the fix covers %q, want exactly the token", got)
 	}
 }
 
 // parseNamedBinding finds an identifier by text, which is how these fixtures name a subject without
 // depending on the shape of the tree around it.
-func parseNamedBinding(t *testing.T, source string, want string) (*ast.SourceFile, *ast.Node) {
-	t.Helper()
+func parseNamedBinding(test *testing.T, source string, want string) (*ast.SourceFile, *ast.Node) {
+	test.Helper()
 
 	fileName := tspath.NormalizePath("/Fixture.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, source, core.ScriptKindTS)
 	if sourceFile == nil {
-		t.Fatalf("could not parse %q", source)
+		test.Fatalf("could not parse %q", source)
 	}
 
 	var found *ast.Node
@@ -240,7 +240,7 @@ func parseNamedBinding(t *testing.T, source string, want string) (*ast.SourceFil
 	walk(sourceFile.AsNode())
 
 	if found == nil {
-		t.Fatalf("no identifier %q in %q", want, source)
+		test.Fatalf("no identifier %q in %q", want, source)
 	}
 	return sourceFile, found
 }

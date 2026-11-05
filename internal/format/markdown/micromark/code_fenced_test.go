@@ -120,7 +120,7 @@ var codeFencedFixtures = []string{
 	"```\n\U0001F600\n```\U0001F600",
 }
 
-func TestCodeFencedEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, codeFencedFixtures)
+func TestCodeFencedEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, codeFencedFixtures)
 }

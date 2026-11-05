@@ -18,9 +18,9 @@ import (
 //
 // Typed for the reason `scopesFor` is: a checker-less lowering never emits `StoreContext`, so
 // several assertions below would pass vacuously against a plain harness.
-func dependenciesFor(t *testing.T, source string) (*Function, *ReactiveScopes, *ScopeDependencies) {
-	t.Helper()
-	function, scopes := scopesFor(t, source)
+func dependenciesFor(test *testing.T, source string) (*Function, *ReactiveScopes, *ScopeDependencies) {
+	test.Helper()
+	function, scopes := scopesFor(test, source)
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 	BuildReactiveScopeTerminals(function, scopes, identity)
@@ -60,8 +60,8 @@ func containsName(names []string, want string) bool {
 // This is the distinction that made three earlier stages necessary, and it is worth a test because
 // the failure it guards is silent: a caller that has scopes in the side table but has not built
 // terminals gets an empty result that looks exactly like a function with no dependencies.
-func TestDependenciesRequireScopeTerminals(t *testing.T) {
-	t.Parallel()
+func TestDependenciesRequireScopeTerminals(test *testing.T) {
+	test.Parallel()
 
 	source := `
 		function Component(props) {
@@ -70,9 +70,9 @@ func TestDependenciesRequireScopeTerminals(t *testing.T) {
 			return object;
 		}
 	`
-	function, scopes := scopesFor(t, source)
+	function, scopes := scopesFor(test, source)
 	if scopes.Len() == 0 {
-		t.Fatal("no scopes, so this test measured nothing")
+		test.Fatal("no scopes, so this test measured nothing")
 	}
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
@@ -80,22 +80,22 @@ func TestDependenciesRequireScopeTerminals(t *testing.T) {
 	// Terminals NOT built: the table is populated but the graph carries no Scope terminal.
 	before := CollectScopeDependencies(function, identity)
 	if before.Len() != 0 {
-		t.Errorf("collected %d scopes' dependencies before terminals were built; this pass is "+
+		test.Errorf("collected %d scopes' dependencies before terminals were built; this pass is "+
 			"supposed to read the graph", before.Len())
 	}
 
 	BuildReactiveScopeTerminals(function, scopes, identity)
 	after := CollectScopeDependencies(function, identity)
 	if after.Len() == 0 {
-		t.Fatal("collected nothing after terminals were built, so the pass never runs")
+		test.Fatal("collected nothing after terminals were built, so the pass never runs")
 	}
 }
 
 // TestDependenciesFindTheRootOfAnAccessPath pins that a scope reading props depends on props.
-func TestDependenciesFindTheRootOfAnAccessPath(t *testing.T) {
-	t.Parallel()
+func TestDependenciesFindTheRootOfAnAccessPath(test *testing.T) {
+	test.Parallel()
 
-	function, _, deps := dependenciesFor(t, `
+	function, _, deps := dependenciesFor(test, `
 		function Component(props) {
 			const object = {a: props.alpha};
 			object.b = props.beta;
@@ -104,7 +104,7 @@ func TestDependenciesFindTheRootOfAnAccessPath(t *testing.T) {
 	`)
 	names := dependencyRootNames(function, deps)
 	if !containsName(names, "props") {
-		t.Errorf("no scope depends on props, but every value in the scope is read from it; got %v",
+		test.Errorf("no scope depends on props, but every value in the scope is read from it; got %v",
 			names)
 	}
 }
@@ -113,10 +113,10 @@ func TestDependenciesFindTheRootOfAnAccessPath(t *testing.T) {
 //
 // A value created INSIDE a scope is not an input to it. This is `checkValidDependency`'s whole job,
 // and a pass that skipped it would report a scope as depending on its own output.
-func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
-	t.Parallel()
+func TestDependenciesExcludeValuesTheScopeItselfProduces(test *testing.T) {
+	test.Parallel()
 
-	function, _, deps := dependenciesFor(t, `
+	function, _, deps := dependenciesFor(test, `
 		function Component(props) {
 			const object = {a: props.alpha};
 			object.b = props.beta;
@@ -127,7 +127,7 @@ func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
 		for _, dep := range deps.DependenciesOf(scope) {
 			identifier := function.Identifiers[dep.Identifier]
 			if identifier != nil && identifier.Name == "object" {
-				t.Error("a scope reports its own product `object` as a dependency, so " +
+				test.Error("a scope reports its own product `object` as a dependency, so " +
 					"checkValidDependency is not gating on the declaration point")
 			}
 		}
@@ -140,10 +140,10 @@ func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
 // Reconstructing `input?.x.y` records both StoreLocal instructions in the optional sidemap. Their
 // operands are prefixes of the reconstructed dependency, so dependency collection must wait for a
 // phi or another site of use to submit the full path.
-func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
-	t.Parallel()
+func TestOptionalChainProcessedStoresAreDeferred(test *testing.T) {
+	test.Parallel()
 
-	function := lowerTypedFunctions(t, "optional-processed-store.ts", `
+	function := lowerTypedFunctions(test, "optional-processed-store.ts", `
 		function Component(input) {
 			return consume(input?.x.y);
 		}
@@ -159,25 +159,25 @@ func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
 	for instructionID := range optional.ProcessedInstructions {
 		instruction := function.Instructions[instructionID]
 		if instruction == nil {
-			t.Fatalf("optional traversal recorded missing instruction %d", instructionID)
+			test.Fatalf("optional traversal recorded missing instruction %d", instructionID)
 		}
 		if _, ok := instruction.Value.(*StoreLocal); !ok {
 			continue
 		}
 		processedStores++
 		if !collector.isDeferredDependency(instruction) {
-			t.Errorf("optional StoreLocal %d was visited again; its operand would submit a chain prefix",
+			test.Errorf("optional StoreLocal %d was visited again; its operand would submit a chain prefix",
 				instructionID)
 		}
 
 		withoutOptionalSet := dependencyCollector{temporaries: temporaries{}}
 		if withoutOptionalSet.isDeferredDependency(instruction) {
-			t.Errorf("optional StoreLocal %d was also deferred without the processed set; the test is "+
+			test.Errorf("optional StoreLocal %d was also deferred without the processed set; the test is "+
 				"not exercising the optional-chain protocol", instructionID)
 		}
 	}
 	if processedStores == 0 {
-		t.Fatal("optional traversal recorded no StoreLocal instructions")
+		test.Fatal("optional traversal recorded no StoreLocal instructions")
 	}
 }
 
@@ -185,8 +185,8 @@ func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
 // production pipeline. The intermediate store after `.x` must not submit `input?.x`. Once range
 // inference places the optional join before the call's singleton scope, the full chain need not be
 // an outer memo dependency at all; the invariant here is its depth, not its presence.
-func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
-	t.Parallel()
+func TestOptionalChainProcessedStoreDoesNotLeakPrefix(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 		// @validatePreserveExistingMemoizationGuarantees
@@ -200,9 +200,9 @@ func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
 		}
 	`
 
-	dependencies, ok := inferredDependencyStrings(t, source)
+	dependencies, ok := inferredDependencyStrings(test, source)
 	if !ok {
-		t.Fatal("source did not lower")
+		test.Fatal("source did not lower")
 	}
 	prefix, control := false, false
 	for _, dependency := range dependencies {
@@ -214,11 +214,11 @@ func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
 		}
 	}
 	if prefix {
-		t.Errorf("optional dependency paths = %v, intermediate input.x store leaked into the scope",
+		test.Errorf("optional dependency paths = %v, intermediate input.x store leaked into the scope",
 			dependencies)
 	}
 	if !control {
-		t.Errorf("optional dependency paths = %v, want the unrelated `other` control dependency",
+		test.Errorf("optional dependency paths = %v, want the unrelated `other` control dependency",
 			dependencies)
 	}
 }
@@ -232,19 +232,19 @@ func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
 // Upstream's `areEqualPaths` compares the `Optional` flag as well as the property name. A predicate
 // comparing only names passes every fixture built from unguarded accesses and silently merges a
 // null-guarded read with an unguarded one, which is a real behaviour change rather than a tidy-up.
-func TestDependencyPathsCompareOptionality(t *testing.T) {
-	t.Parallel()
+func TestDependencyPathsCompareOptionality(test *testing.T) {
+	test.Parallel()
 
 	guarded := []DependencyPathEntry{{Property: "b", Optional: true}}
 	plain := []DependencyPathEntry{{Property: "b"}}
 	if equalPaths(guarded, plain) {
-		t.Error("`a?.b` and `a.b` compared equal, so the Optional flag is not part of path identity")
+		test.Error("`a?.b` and `a.b` compared equal, so the Optional flag is not part of path identity")
 	}
 	if !equalPaths(plain, []DependencyPathEntry{{Property: "b"}}) {
-		t.Error("two identical paths compared unequal")
+		test.Error("two identical paths compared unequal")
 	}
 	if equalPaths(plain, []DependencyPathEntry{{Property: "b"}, {Property: "c"}}) {
-		t.Error("paths of different lengths compared equal")
+		test.Error("paths of different lengths compared equal")
 	}
 }
 
@@ -253,22 +253,22 @@ func TestDependencyPathsCompareOptionality(t *testing.T) {
 // The two bits in `propertyAccessType` combine differently and it is easy to write both as unions.
 // "Dependency" is a union; "unconditional" is an intersection, so a value read once guarded and once
 // unguarded is unconditional, because the unguarded read already happened.
-func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(t *testing.T) {
-	t.Parallel()
+func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(test *testing.T) {
+	test.Parallel()
 
 	if got := mergeAccess(optionalAccess, optionalAccess); got != optionalAccess {
-		t.Errorf("two optional accesses merged to %v, want optionalAccess", got)
+		test.Errorf("two optional accesses merged to %v, want optionalAccess", got)
 	}
 	if got := mergeAccess(optionalAccess, unconditionalAccess); got != unconditionalAccess {
-		t.Errorf("optional + unconditional merged to %v, want unconditionalAccess; optionality "+
+		test.Errorf("optional + unconditional merged to %v, want unconditionalAccess; optionality "+
 			"is an intersection, so one unguarded read makes the access unguarded", got)
 	}
 	if got := mergeAccess(optionalAccess, optionalDependency); got != optionalDependency {
-		t.Errorf("access + dependency merged to %v, want optionalDependency; dependency is a "+
+		test.Errorf("access + dependency merged to %v, want optionalDependency; dependency is a "+
 			"union", got)
 	}
 	if got := mergeAccess(unconditionalAccess, optionalDependency); got != unconditionalDependency {
-		t.Errorf("merged to %v, want unconditionalDependency", got)
+		test.Errorf("merged to %v, want unconditionalDependency", got)
 	}
 }
 
@@ -279,8 +279,8 @@ func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(t *testin
 // populated: with it the path survives at full depth, without it the path truncates to its root.
 // This isolates the tree's nil-input fallback from the real production path, where
 // `CollectHoistablePropertyLoads` supplies the non-null facts.
-func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
-	t.Parallel()
+func TestDependencyTreeTruncatesWithoutAHoistableSet(test *testing.T) {
+	test.Parallel()
 
 	path := []DependencyPathEntry{{Property: "alpha"}, {Property: "beta"}}
 
@@ -288,10 +288,10 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 	empty.addDependency(ReactiveScopeDependency{Identifier: 7, Path: path})
 	truncated := empty.deriveMinimalDependencies()
 	if len(truncated) != 1 {
-		t.Fatalf("expected one dependency, got %d", len(truncated))
+		test.Fatalf("expected one dependency, got %d", len(truncated))
 	}
 	if len(truncated[0].Path) != 0 {
-		t.Errorf("with an empty hoistable set the path kept %d entries; upstream's `break` arm "+
+		test.Errorf("with an empty hoistable set the path kept %d entries; upstream's `break` arm "+
 			"truncates it to the root", len(truncated[0].Path))
 	}
 
@@ -303,10 +303,10 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 	hoistable.addDependency(ReactiveScopeDependency{Identifier: 7, Path: path})
 	kept := hoistable.deriveMinimalDependencies()
 	if len(kept) != 1 {
-		t.Fatalf("expected one dependency, got %d", len(kept))
+		test.Fatalf("expected one dependency, got %d", len(kept))
 	}
 	if len(kept[0].Path) != 2 {
-		t.Errorf("with a hoistable set the path kept %d entries, want 2; if this drops to 0 the "+
+		test.Errorf("with a hoistable set the path kept %d entries, want 2; if this drops to 0 the "+
 			"truncation is unconditional and the counterfactual above proves nothing",
 			len(kept[0].Path))
 	}
@@ -316,8 +316,8 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 //
 // A scope reading `props.a`, `props.a.b` and `props.a.c` depends on `props.a` once. Without the
 // pruning the scope would report three dependencies that all invalidate together.
-func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
-	t.Parallel()
+func TestDependencyTreeReducesToTheShallowestPath(test *testing.T) {
+	test.Parallel()
 
 	hoistable := map[static_single_assignment.IdentifierId]*hoistableNode{
 		7: {nonNull: true, properties: map[string]*hoistableNode{
@@ -334,10 +334,10 @@ func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
 
 	result := tree.deriveMinimalDependencies()
 	if len(result) != 1 {
-		t.Fatalf("three accesses under one prefix reduced to %d dependencies, want 1", len(result))
+		test.Fatalf("three accesses under one prefix reduced to %d dependencies, want 1", len(result))
 	}
 	if len(result[0].Path) != 1 || result[0].Path[0].Property != "a" {
-		t.Errorf("reduced to %v, want the single shallowest path `a`", result[0].Path)
+		test.Errorf("reduced to %v, want the single shallowest path `a`", result[0].Path)
 	}
 }
 
@@ -349,8 +349,8 @@ func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
 //
 // The pass builds several maps of its own. Ranging any of them directly would make the output order
 // vary between runs -- invisible in every other test and fatal to a cache keyed on this result.
-func TestDependencyCollectionIsDeterministic(t *testing.T) {
-	t.Parallel()
+func TestDependencyCollectionIsDeterministic(test *testing.T) {
+	test.Parallel()
 
 	source := `
 		function Component(props) {
@@ -362,7 +362,7 @@ func TestDependencyCollectionIsDeterministic(t *testing.T) {
 		}
 	`
 	render := func() []string {
-		function, _, deps := dependenciesFor(t, source)
+		function, _, deps := dependenciesFor(test, source)
 		var lines []string
 		for _, scope := range deps.Ids() {
 			for _, dep := range deps.DependenciesOf(scope) {
@@ -377,11 +377,11 @@ func TestDependencyCollectionIsDeterministic(t *testing.T) {
 	}
 	first, second := render(), render()
 	if len(first) != len(second) {
-		t.Fatalf("two runs produced %d and %d dependencies", len(first), len(second))
+		test.Fatalf("two runs produced %d and %d dependencies", len(first), len(second))
 	}
 	for index := range first {
 		if first[index] != second[index] {
-			t.Fatalf("two runs disagreed at %d: %q vs %q; something ranges a map",
+			test.Fatalf("two runs disagreed at %d: %q vs %q; something ranges a map",
 				index, first[index], second[index])
 		}
 	}
@@ -393,10 +393,10 @@ func TestDependencyCollectionIsDeterministic(t *testing.T) {
 // instruction and operand visited exactly once. Counted here rather than argued, because the passes
 // upstream of this one each needed a different termination story and a reader should not have to
 // assume this one inherited any of them.
-func TestDependencyCollectionIsASinglePass(t *testing.T) {
-	t.Parallel()
+func TestDependencyCollectionIsASinglePass(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const object = {a: props.a, b: props.b};
 			object.c = props.c;
@@ -431,12 +431,12 @@ func TestDependencyCollectionIsASinglePass(t *testing.T) {
 
 	for instructionId, count := range visits {
 		if count != 1 {
-			t.Errorf("instruction %d appears %d times in the block walk; the pass would visit it "+
+			test.Errorf("instruction %d appears %d times in the block walk; the pass would visit it "+
 				"more than once and the single-pass claim is wrong", instructionId, count)
 		}
 	}
 	if len(visits) == 0 {
-		t.Fatal("counted no instructions, so this test measured nothing")
+		test.Fatal("counted no instructions, so this test measured nothing")
 	}
 }
 
@@ -449,10 +449,10 @@ func TestDependencyCollectionIsASinglePass(t *testing.T) {
 // before reduction, not the reduced output: on the fixture below the real walk collects 4 and the
 // mutant collects 12, while the reduced dependency lists happened to coincide. That is why the
 // earlier tests missed it, and why this asserts on the pre-reduction count.
-func TestScopesCloseAtTheirFallthrough(t *testing.T) {
-	t.Parallel()
+func TestScopesCloseAtTheirFallthrough(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const object = {a: props.a};
 			object.c = props.c;
@@ -473,7 +473,7 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 		}
 	}
 	if ends == 0 {
-		t.Fatal("the traversal recorded no scope-end blocks, so this test measured nothing")
+		test.Fatal("the traversal recorded no scope-end blocks, so this test measured nothing")
 	}
 
 	collect := func(infos map[static_single_assignment.BlockId]scopeBlockInfo) int {
@@ -505,34 +505,34 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 
 	real, leaking := collect(terminals), collect(beginsOnly)
 	if real >= leaking {
-		t.Errorf("closing scopes collected %d raw accesses and never closing them collected %d; "+
+		test.Errorf("closing scopes collected %d raw accesses and never closing them collected %d; "+
 			"a scope that never closes should accumulate strictly more", real, leaking)
 	}
 }
 
 // TestDependencyGapsAreDeclared pins the gap list so closing one is a visible event.
-func TestDependencyGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestDependencyGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := DependencyGaps()
 	if len(gaps) != 2 || gaps[0] != DependencyGapOptionalChains ||
 		gaps[1] != DependencyGapTypeExclusions {
-		t.Errorf("DependencyGaps() = %v, want the residual optional-call/computed-access and type "+
+		test.Errorf("DependencyGaps() = %v, want the residual optional-call/computed-access and type "+
 			"gaps; a closed gap must leave this list", gaps)
 	}
 }
 
 // TestDependenciesHandleANilFunction pins that the pass declines rather than panicking.
-func TestDependenciesHandleANilFunction(t *testing.T) {
-	t.Parallel()
+func TestDependenciesHandleANilFunction(test *testing.T) {
+	test.Parallel()
 
 	if got := CollectScopeDependencies(nil, MergedScopeIdentity{}); got.Len() != 0 {
-		t.Errorf("a nil function produced %d scopes", got.Len())
+		test.Errorf("a nil function produced %d scopes", got.Len())
 	}
 	var empty *ScopeDependencies
 	if empty.DependenciesOf(1) != nil || empty.DeclarationsOf(1) != nil ||
 		empty.ReassignmentsOf(1) != nil || empty.Ids() != nil || empty.Len() != 0 {
-		t.Error("the nil table is not readable, but its zero value is documented as ready to read")
+		test.Error("the nil table is not readable, but its zero value is documented as ready to read")
 	}
 }
 
@@ -558,13 +558,13 @@ func TestDependenciesHandleANilFunction(t *testing.T) {
 //
 // The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
 // which moves when the tree does.
-func TestDependencyDistributionIsReal(t *testing.T) {
-	t.Parallel()
+func TestDependencyDistributionIsReal(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -578,7 +578,7 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 		files = files[:200]
 	}
 	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
+		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
 	scopes, withDependencies, withoutDependencies, totalDependencies := 0, 0, 0, 0
@@ -595,7 +595,7 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -627,25 +627,25 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
 	}
 
 	if scopes < 100 {
-		t.Fatalf("only %d scopes carried an entry; the pipeline is probably not running", scopes)
+		test.Fatalf("only %d scopes carried an entry; the pipeline is probably not running", scopes)
 	}
 	if withDependencies == 0 {
-		t.Error("every scope carries zero dependencies, which is exactly what a pass that " +
+		test.Error("every scope carries zero dependencies, which is exactly what a pass that " +
 			"collects nothing produces")
 	}
 	if withoutDependencies == 0 {
-		t.Error("no scope carries zero dependencies; the control cell is empty, which is what " +
+		test.Error("no scope carries zero dependencies; the control cell is empty, which is what " +
 			"over-collection looks like")
 	}
 	if totalDependencies < scopes/4 {
-		t.Errorf("only %d dependencies across %d scopes, which is far below the measured density",
+		test.Errorf("only %d dependencies across %d scopes, which is far below the measured density",
 			totalDependencies, scopes)
 	}
-	t.Logf("%d scopes: %d with dependencies, %d without, %d dependencies total",
+	test.Logf("%d scopes: %d with dependencies, %d without, %d dependencies total",
 		scopes, withDependencies, withoutDependencies, totalDependencies)
 }
 
@@ -659,12 +659,12 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 // They differ: measured over 200 corpus files, 28 of 2,178 declarations are held by a scope other
 // than the one that produced them. Asserted as a nonzero rather than as 28, because the corpus moves
 // and the property that matters is that the two are not the same question.
-func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
-	t.Parallel()
+func TestDeclarationOriginDiffersFromHoldingScope(test *testing.T) {
+	test.Parallel()
 
 	total, known, differing := 0, 0, 0
 
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)
@@ -688,15 +688,15 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 	})
 
 	if total == 0 {
-		t.Fatal("no declarations were collected, so every assertion below is vacuous")
+		test.Fatal("no declarations were collected, so every assertion below is vacuous")
 	}
 	if known != total {
-		t.Errorf("%d of %d declarations have no recorded origin; `hasOwnDeclaration` cannot be "+
+		test.Errorf("%d of %d declarations have no recorded origin; `hasOwnDeclaration` cannot be "+
 			"asked about those and a scope holding one would be judged on missing information",
 			total-known, total)
 	}
 	if differing == 0 {
-		t.Errorf("no declaration is held by a scope other than its origin across %d declarations; "+
+		test.Errorf("no declaration is held by a scope other than its origin across %d declarations; "+
 			"if that is now always true the origin table is redundant and the key answers it",
 			total)
 	}
@@ -713,7 +713,7 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 	// contained within -- or equal to -- that scope's range. An origin naming an enclosing scope is
 	// the outermost-entry bug; an origin naming an unrelated scope is the holding-scope bug.
 	containmentViolations := 0
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)
@@ -736,12 +736,12 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 		}
 	})
 	if containmentViolations != 0 {
-		t.Errorf("%d declaration(s) name an origin whose range is not contained in the scope "+
+		test.Errorf("%d declaration(s) name an origin whose range is not contained in the scope "+
 			"holding them; an origin must be the innermost scope that held the value, so an "+
 			"enclosing or unrelated scope is a recording bug", containmentViolations)
 	}
 
-	t.Logf("declarations=%d withKnownOrigin=%d originDiffersFromHoldingScope=%d containmentViolations=%d",
+	test.Logf("declarations=%d withKnownOrigin=%d originDiffersFromHoldingScope=%d containmentViolations=%d",
 		total, known, differing, containmentViolations)
 }
 
@@ -755,12 +755,12 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 // arises in React code, and `pruneAlwaysInvalidatingScopes` reads declarations to propagate, so a
 // declaration left in that upstream would have dropped prunes a scope upstream keeps. Given that,
 // leaving the helper untested until the case appears is worse than testing it directly.
-func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
-	t.Parallel()
+func TestPruneDeclarationsLastUsedBefore(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	function, _ := rangesFor(test, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 	// Identifier 1's declaration, whichever it is, is what the usage table below is keyed on.
 	declaration := declarationOf(function, 1)
@@ -777,8 +777,8 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 		{name: "last used exactly at the end", lastUsedAt: 10, recorded: true, scopeEnd: 10, wantRemoved: 0},
 		{name: "no recorded usage keeps it", recorded: false, scopeEnd: 10, wantRemoved: 0},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			dependencies := &ScopeDependencies{
 				declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}},
 			}
@@ -789,10 +789,10 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 
 			removed := dependencies.PruneDeclarationsLastUsedBefore(1, testCase.scopeEnd, usage, function)
 			if removed != testCase.wantRemoved {
-				t.Errorf("removed %d, want %d", removed, testCase.wantRemoved)
+				test.Errorf("removed %d, want %d", removed, testCase.wantRemoved)
 			}
 			if want := 1 - testCase.wantRemoved; len(dependencies.DeclarationsOf(1)) != want {
-				t.Errorf("the scope holds %d declarations, want %d",
+				test.Errorf("the scope holds %d declarations, want %d",
 					len(dependencies.DeclarationsOf(1)), want)
 			}
 		})
@@ -801,10 +801,10 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 	// Nil inputs decline rather than panic, and decline means removing nothing.
 	var nilTable *ScopeDependencies
 	if nilTable.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
-		t.Error("a nil table removed something")
+		test.Error("a nil table removed something")
 	}
 	live := &ScopeDependencies{declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}}}
 	if live.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
-		t.Error("a nil usage table removed something; missing information must keep declarations")
+		test.Error("a nil usage table removed something; missing information must keep declarations")
 	}
 }

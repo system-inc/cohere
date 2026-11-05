@@ -14,32 +14,32 @@ import (
 // The second run is the mutation control: changing only the selector from an impossible path to the
 // file that exists must turn the configuration failure into a successful lint run. Without the call
 // in run(), the first invocation exits cleanly and this test catches the original vacuous pass.
-func TestPipelineRefusesAZeroMatchOverrideSelector(t *testing.T) {
-	t.Parallel()
+func TestPipelineRefusesAZeroMatchOverrideSelector(test *testing.T) {
+	test.Parallel()
 
-	binary := buildCohere(t)
+	binary := buildCohere(test)
 
-	directory := t.TempDir()
-	writeSelectorValidationProject(t, directory, "missing/**")
+	directory := test.TempDir()
+	writeSelectorValidationProject(test, directory, "missing/**")
 
 	command := exec.Command(binary, "--lint", "--no-fix", "--directory", directory)
 	output, err := command.CombinedOutput()
 	if err == nil {
-		t.Fatalf("the pipeline exited successfully with a zero-match override selector:\n%s", output)
+		test.Fatalf("the pipeline exited successfully with a zero-match override selector:\n%s", output)
 	}
 	if !strings.Contains(string(output), "missing/**") {
-		t.Fatalf("the pipeline failure does not name the selector to repair:\n%s", output)
+		test.Fatalf("the pipeline failure does not name the selector to repair:\n%s", output)
 	}
 
-	writeSelectorValidationProject(t, directory, "**/*.ts")
+	writeSelectorValidationProject(test, directory, "**/*.ts")
 	command = exec.Command(binary, "--lint", "--no-fix", "--directory", directory)
 	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("the same project failed after its selector was changed to match index.ts: %v\n%s", err, output)
+		test.Fatalf("the same project failed after its selector was changed to match index.ts: %v\n%s", err, output)
 	}
 }
 
-func writeSelectorValidationProject(t *testing.T, directory string, selector string) {
-	t.Helper()
+func writeSelectorValidationProject(test *testing.T, directory string, selector string) {
+	test.Helper()
 
 	files := map[string]string{
 		"tsconfig.json": `{"compilerOptions":{"strict":true},"include":["*.ts"]}`,
@@ -49,7 +49,7 @@ func writeSelectorValidationProject(t *testing.T, directory string, selector str
 	}
 	for name, contents := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", name, err)
+			test.Fatalf("writing %s: %v", name, err)
 		}
 	}
 }

@@ -20,11 +20,11 @@ func consistentGenericConstructorsCaseName(index int) string {
 // the two lines most likely to be wrong live: the bare-string wire shape cohere actually delivers,
 // and the fallback that keeps a bare `"error"` meaning upstream's default rather than meaning an
 // empty mode that matches no arm.
-func consistentGenericConstructorsSettingsFor(t *testing.T, wire string) any {
-	t.Helper()
+func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) any {
+	test.Helper()
 	decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(wire))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", wire, err)
+		test.Fatalf("decoding %q: %v", wire, err)
 	}
 	return decoded
 }
@@ -35,8 +35,8 @@ func consistentGenericConstructorsSettingsFor(t *testing.T, wire string) any {
 // `isolatedDeclarations` is on, which this harness cannot express. It is recorded in
 // TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations below rather than quietly
 // dropped or forced green.
-func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -114,11 +114,11 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 		{sourceText: "const a: readonly Foo<string>[] = new Foo();\n", wire: "\"constructor\""},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		test.Run(consistentGenericConstructorsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 				ConsistentGenericConstructors, consistentGenericConstructorsFile, testCase.sourceText,
-				consistentGenericConstructorsSettingsFor(t, testCase.wire)))
+				consistentGenericConstructorsSettingsFor(test, testCase.wire)))
 		})
 	}
 }
@@ -130,8 +130,8 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 // the fix assertions worth more than the id assertions here: `new Map <string, number> ()` and
 // `new \n Foo<string> \n ()` both report, and a fixer computing ranges by arithmetic rather than by
 // scanning for the brackets writes the wrong text on both while satisfying every id.
-func TestConsistentGenericConstructorsFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -415,13 +415,13 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentGenericConstructors,
+		test.Run(consistentGenericConstructorsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentGenericConstructors,
 				consistentGenericConstructorsFile, testCase.sourceText,
-				consistentGenericConstructorsSettingsFor(t, testCase.wire))
+				consistentGenericConstructorsSettingsFor(test, testCase.wire))
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// RunTyped writes the fixture trimmed, so both the span slice and the expected rewrite
 			// are taken against that text rather than against the Go literal above.
@@ -430,10 +430,10 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
@@ -456,22 +456,22 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 // So the case is recorded as a fact about the harness rather than hidden by relaxing the rule to
 // make it green. The branch it guards is the one part of this port no fixture covers, and saying so
 // here is more useful than a mutation score that quietly counts it as unreachable.
-func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const foo: Foo<string> = new Foo();\n"
 
 	// Control one: without the option, this source reports. So the case upstream lists as clean is
 	// clean because of the setting rather than because of anything in the source.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile, sourceText,
-		consistentGenericConstructorsSettingsFor(t, "\"constructor\"")), "preferConstructor")
+		consistentGenericConstructorsSettingsFor(test, "\"constructor\"")), "preferConstructor")
 
 	// Control two: the same source is clean in the other mode, which shows the finding above is the
 	// constructor-mode judgment rather than the rule reporting on anything it sees.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile, sourceText,
-		consistentGenericConstructorsSettingsFor(t, "\"type-annotation\"")))
+		consistentGenericConstructorsSettingsFor(test, "\"type-annotation\"")))
 }
 
 // TestConsistentGenericConstructorsDecoderReadsEveryWireShape pins the option surface, including the
@@ -481,8 +481,8 @@ func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testi
 // bytes, and a decoder returning a zero-value struct there gives Mode the empty string, which
 // matches neither arm and makes the rule silently inert while every fixture built from an explicit
 // struct still passes.
-func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		wire string
@@ -503,18 +503,18 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.wire, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.wire, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.wire, err)
+				test.Fatalf("decoding %q: %v", testCase.wire, err)
 			}
 			settings, isSettings := decoded.(ConsistentGenericConstructorsOptions)
 			if !isSettings {
-				t.Fatalf("decoding %q produced %T rather than the options struct", testCase.wire, decoded)
+				test.Fatalf("decoding %q produced %T rather than the options struct", testCase.wire, decoded)
 			}
 			if settings.Mode != testCase.want {
-				t.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
+				test.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
 					settings.Mode)
 			}
 		})
@@ -522,7 +522,7 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 
 	// And the nil-options path the rule itself takes when the config layer hands it nothing, which
 	// is a different route than the decoder and has its own fallback.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile,
 		"const a: Map<string, number> = new Map();\n", nil), "preferConstructor")
 }
@@ -533,8 +533,8 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 // and ran a mode nobody wrote. Upstream's schema is a string enum and refuses every one at load. The
 // error must name the value, because the config layer prefixes the rule's name and the value is the
 // half the author needs to find the line.
-func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		wire, named string
@@ -548,14 +548,14 @@ func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *tes
 		{wire: `["constructor", "type-annotation"]`, named: "type-annotation"},
 		{wire: `[]`, named: "[]"},
 	} {
-		t.Run(testCase.wire, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.wire, func(test *testing.T) {
+			test.Parallel()
 			_, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
 			if err == nil {
-				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
+				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
 			}
 			if !strings.Contains(err.Error(), testCase.named) {
-				t.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, err)
+				test.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, err)
 			}
 		})
 	}

@@ -7,14 +7,14 @@ import (
 )
 
 // collect walks a pattern and returns every character it reports.
-func collect(t *testing.T, pattern string, flags string) []Character {
-	t.Helper()
+func collect(test *testing.T, pattern string, flags string) []Character {
+	test.Helper()
 	var characters []Character
 	if !Walk(pattern, regexsyntax.ParseRegexFlags(flags), func(character Character) bool {
 		characters = append(characters, character)
 		return true
 	}) {
-		t.Fatalf("walk refused %q with flags %q", pattern, flags)
+		test.Fatalf("walk refused %q with flags %q", pattern, flags)
 	}
 	return characters
 }
@@ -22,8 +22,8 @@ func collect(t *testing.T, pattern string, flags string) []Character {
 // The kind is the whole reason this package reports more than values. `\0` and `\u0000` are one
 // code point written two ways, and the rule this exists for reports the second and not the first.
 // A walk returning values alone cannot express that difference, so it is asserted first.
-func TestWalkReportsHowACharacterWasSpelled(t *testing.T) {
-	t.Parallel()
+func TestWalkReportsHowACharacterWasSpelled(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		pattern   string
@@ -48,17 +48,17 @@ func TestWalkReportsHowACharacterWasSpelled(t *testing.T) {
 		{"an identity escape", `\-`, "", '-', KindIdentityEscape},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			characters := collect(t, testCase.pattern, testCase.flags)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			characters := collect(test, testCase.pattern, testCase.flags)
 			if len(characters) != 1 {
-				t.Fatalf("want one character, got %d", len(characters))
+				test.Fatalf("want one character, got %d", len(characters))
 			}
 			if characters[0].Value != testCase.wantValue {
-				t.Fatalf("want value %d, got %d", testCase.wantValue, characters[0].Value)
+				test.Fatalf("want value %d, got %d", testCase.wantValue, characters[0].Value)
 			}
 			if characters[0].Kind != testCase.wantKind {
-				t.Fatalf("want kind %d, got %d", testCase.wantKind, characters[0].Kind)
+				test.Fatalf("want kind %d, got %d", testCase.wantKind, characters[0].Kind)
 			}
 		})
 	}
@@ -70,8 +70,8 @@ func TestWalkReportsHowACharacterWasSpelled(t *testing.T) {
 // already been emitted by the time the quantifier was seen, which is true of the scan order and
 // false of the structure, and it produced a walk that reported every quantified character at depth
 // zero. That is precisely the case the first caller exists to skip.
-func TestWalkRaisesDepthForAQuantifiedCharacter(t *testing.T) {
-	t.Parallel()
+func TestWalkRaisesDepthForAQuantifiedCharacter(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		pattern   string
@@ -91,15 +91,15 @@ func TestWalkRaisesDepthForAQuantifiedCharacter(t *testing.T) {
 		{"nothing quantified", "ab", []int{0, 0}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			characters := collect(t, testCase.pattern, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			characters := collect(test, testCase.pattern, "")
 			if len(characters) != len(testCase.wantDepth) {
-				t.Fatalf("want %d characters, got %d", len(testCase.wantDepth), len(characters))
+				test.Fatalf("want %d characters, got %d", len(testCase.wantDepth), len(characters))
 			}
 			for index, want := range testCase.wantDepth {
 				if characters[index].QuantifierDepth != want {
-					t.Fatalf("character %d: want quantifier depth %d, got %d",
+					test.Fatalf("character %d: want quantifier depth %d, got %d",
 						index, want, characters[index].QuantifierDepth)
 				}
 			}
@@ -113,8 +113,8 @@ func TestWalkRaisesDepthForAQuantifiedCharacter(t *testing.T) {
 // only in the class branch left every other fixture green, since none of them put a quantifier on a
 // class. A shared package with an unmeasured branch is worse than a duplicated helper, because the
 // weakness is invisible from every rule that depends on it.
-func TestWalkRaisesQuantifierDepthForAQuantifiedClass(t *testing.T) {
-	t.Parallel()
+func TestWalkRaisesQuantifierDepthForAQuantifiedClass(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		pattern   string
@@ -126,15 +126,15 @@ func TestWalkRaisesQuantifierDepthForAQuantifiedClass(t *testing.T) {
 		{"a quantified class beside a plain one", "[a][b]+", []int{0, 1}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			characters := collect(t, testCase.pattern, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			characters := collect(test, testCase.pattern, "")
 			if len(characters) != len(testCase.wantDepth) {
-				t.Fatalf("want %d characters, got %d", len(testCase.wantDepth), len(characters))
+				test.Fatalf("want %d characters, got %d", len(testCase.wantDepth), len(characters))
 			}
 			for index, want := range testCase.wantDepth {
 				if characters[index].QuantifierDepth != want {
-					t.Fatalf("character %d: want quantifier depth %d, got %d",
+					test.Fatalf("character %d: want quantifier depth %d, got %d",
 						index, want, characters[index].QuantifierDepth)
 				}
 			}
@@ -144,8 +144,8 @@ func TestWalkRaisesQuantifierDepthForAQuantifiedClass(t *testing.T) {
 
 // The quantifier scan has three edges a sweep found unmeasured, and each is the kind that produces
 // a plausible wrong answer rather than a crash.
-func TestWalkConsumesQuantifiersExactly(t *testing.T) {
-	t.Parallel()
+func TestWalkConsumesQuantifiersExactly(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		pattern   string
@@ -163,15 +163,15 @@ func TestWalkConsumesQuantifiersExactly(t *testing.T) {
 		{"a brace holding a trailing comma only", "a{,2}", 5, []int{0, 0, 0, 0, 0}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			characters := collect(t, testCase.pattern, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			characters := collect(test, testCase.pattern, "")
 			if len(characters) != testCase.wantCount {
-				t.Fatalf("want %d characters, got %d", testCase.wantCount, len(characters))
+				test.Fatalf("want %d characters, got %d", testCase.wantCount, len(characters))
 			}
 			for index, want := range testCase.wantDepth {
 				if characters[index].QuantifierDepth != want {
-					t.Fatalf("character %d: want quantifier depth %d, got %d",
+					test.Fatalf("character %d: want quantifier depth %d, got %d",
 						index, want, characters[index].QuantifierDepth)
 				}
 			}
@@ -182,8 +182,8 @@ func TestWalkConsumesQuantifiersExactly(t *testing.T) {
 // An octal escape stops at three digits or at 255, whichever comes first, so the reported span
 // equals the text the escape actually covers. Without the bound, a pattern reports one character
 // where the language sees an escape plus a literal digit.
-func TestWalkBoundsAnOctalEscape(t *testing.T) {
-	t.Parallel()
+func TestWalkBoundsAnOctalEscape(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		pattern   string
@@ -197,14 +197,14 @@ func TestWalkBoundsAnOctalEscape(t *testing.T) {
 		{"a non-octal digit ends it", `8`, 2, 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			characters := collect(t, testCase.pattern, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			characters := collect(test, testCase.pattern, "")
 			if len(characters) != testCase.wantCount {
-				t.Fatalf("want %d characters, got %d", testCase.wantCount, len(characters))
+				test.Fatalf("want %d characters, got %d", testCase.wantCount, len(characters))
 			}
 			if characters[0].Value != testCase.wantFirst {
-				t.Fatalf("want first value %d, got %d", testCase.wantFirst, characters[0].Value)
+				test.Fatalf("want first value %d, got %d", testCase.wantFirst, characters[0].Value)
 			}
 		})
 	}
@@ -212,16 +212,16 @@ func TestWalkBoundsAnOctalEscape(t *testing.T) {
 
 // Class depth is the other half of the structure the first caller reads, and it is separate from
 // quantifier depth because a caller might one day want one without the other.
-func TestWalkRaisesDepthInsideACharacterClass(t *testing.T) {
-	t.Parallel()
-	characters := collect(t, " [  ] ", "")
+func TestWalkRaisesDepthInsideACharacterClass(test *testing.T) {
+	test.Parallel()
+	characters := collect(test, " [  ] ", "")
 	if len(characters) != 4 {
-		t.Fatalf("want four characters, got %d", len(characters))
+		test.Fatalf("want four characters, got %d", len(characters))
 	}
 	wantClassDepth := []int{0, 1, 1, 0}
 	for index, want := range wantClassDepth {
 		if characters[index].ClassDepth != want {
-			t.Fatalf("character %d: want class depth %d, got %d", index, want, characters[index].ClassDepth)
+			test.Fatalf("character %d: want class depth %d, got %d", index, want, characters[index].ClassDepth)
 		}
 	}
 }
@@ -229,8 +229,8 @@ func TestWalkRaisesDepthInsideACharacterClass(t *testing.T) {
 // Group syntax is structure rather than content, and a walk reporting matched characters must step
 // over it. A probe caught this reporting the question mark and colon of a non-capturing group as
 // things the pattern matches, which would have made every such group look like literal text.
-func TestWalkSkipsGroupSyntax(t *testing.T) {
-	t.Parallel()
+func TestWalkSkipsGroupSyntax(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		pattern string
@@ -246,14 +246,14 @@ func TestWalkSkipsGroupSyntax(t *testing.T) {
 		{"several groups in a row", "(?:a)(?<name>b)(?=c)", "abc"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var got string
-			for _, character := range collect(t, testCase.pattern, "") {
+			for _, character := range collect(test, testCase.pattern, "") {
 				got += string(rune(character.Value))
 			}
 			if got != testCase.want {
-				t.Fatalf("want the walk to report %q, got %q", testCase.want, got)
+				test.Fatalf("want the walk to report %q, got %q", testCase.want, got)
 			}
 		})
 	}
@@ -262,8 +262,8 @@ func TestWalkSkipsGroupSyntax(t *testing.T) {
 // Anchors, alternation and set escapes match positions or sets rather than single characters, so
 // none of them has a value to report. Inventing one would put characters in the stream that the
 // pattern never matches.
-func TestWalkReportsNothingForNonCharacters(t *testing.T) {
-	t.Parallel()
+func TestWalkReportsNothingForNonCharacters(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		pattern string
@@ -278,10 +278,10 @@ func TestWalkReportsNothingForNonCharacters(t *testing.T) {
 		{"a negated class escape", `\D`},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			if characters := collect(t, testCase.pattern, ""); len(characters) != 0 {
-				t.Fatalf("want no characters, got %d", len(characters))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if characters := collect(test, testCase.pattern, ""); len(characters) != 0 {
+				test.Fatalf("want no characters, got %d", len(characters))
 			}
 		})
 	}
@@ -290,8 +290,8 @@ func TestWalkReportsNothingForNonCharacters(t *testing.T) {
 // The count has to be the total before any escape is judged, because a group may be referenced
 // before it is defined. A running count calls the same escape a control character early in a
 // pattern and a backreference later in it.
-func TestCountCapturingGroups(t *testing.T) {
-	t.Parallel()
+func TestCountCapturingGroups(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		pattern string
@@ -312,11 +312,11 @@ func TestCountCapturingGroups(t *testing.T) {
 		{"a mixture", "(a)(?:b)(?<c>d)(?=e)", 2},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			got := CountCapturingGroups(testCase.pattern, regexsyntax.ParseRegexFlags(""))
 			if got != testCase.want {
-				t.Fatalf("want %d groups, got %d", testCase.want, got)
+				test.Fatalf("want %d groups, got %d", testCase.want, got)
 			}
 		})
 	}
@@ -325,16 +325,16 @@ func TestCountCapturingGroups(t *testing.T) {
 // Spans are pattern-relative byte offsets, which is what lets one walk serve a regex literal and a
 // string handed to the RegExp constructor. A caller adds its own offset; a walk reporting
 // file-relative positions could not be reused.
-func TestWalkReportsPatternRelativeSpans(t *testing.T) {
-	t.Parallel()
-	characters := collect(t, `a\x1fb`, "")
+func TestWalkReportsPatternRelativeSpans(test *testing.T) {
+	test.Parallel()
+	characters := collect(test, `a\x1fb`, "")
 	if len(characters) != 3 {
-		t.Fatalf("want three characters, got %d", len(characters))
+		test.Fatalf("want three characters, got %d", len(characters))
 	}
 	wantSpans := [][2]int{{0, 1}, {1, 5}, {5, 6}}
 	for index, want := range wantSpans {
 		if characters[index].Start != want[0] || characters[index].End != want[1] {
-			t.Fatalf("character %d: want span %d:%d, got %d:%d",
+			test.Fatalf("character %d: want span %d:%d, got %d:%d",
 				index, want[0], want[1], characters[index].Start, characters[index].End)
 		}
 	}
@@ -342,26 +342,26 @@ func TestWalkReportsPatternRelativeSpans(t *testing.T) {
 
 // The callback returning false stops the walk, so a caller that has decided can avoid scanning the
 // rest of a long pattern.
-func TestWalkStopsWhenTheCallbackDeclines(t *testing.T) {
-	t.Parallel()
+func TestWalkStopsWhenTheCallbackDeclines(test *testing.T) {
+	test.Parallel()
 	seen := 0
 	completed := Walk("abcdef", regexsyntax.ParseRegexFlags(""), func(character Character) bool {
 		seen++
 		return seen < 2
 	})
 	if seen != 2 {
-		t.Fatalf("want the walk to stop after two characters, saw %d", seen)
+		test.Fatalf("want the walk to stop after two characters, saw %d", seen)
 	}
 	if completed {
-		t.Fatal("want a stopped walk to report that it did not complete")
+		test.Fatal("want a stopped walk to report that it did not complete")
 	}
 }
 
 // A pattern the scanner cannot finish stops the walk and says so, matching regexsyntax. An
 // unterminated construct is a syntax error the parser has already refused, so a second opinion here
 // would be noise on a file that does not compile.
-func TestWalkRefusesMalformedInput(t *testing.T) {
-	t.Parallel()
+func TestWalkRefusesMalformedInput(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		pattern string
@@ -370,10 +370,10 @@ func TestWalkRefusesMalformedInput(t *testing.T) {
 		{"a trailing backslash", `abc\`},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if Walk(testCase.pattern, regexsyntax.ParseRegexFlags(""), func(Character) bool { return true }) {
-				t.Fatalf("want the walk to refuse %q", testCase.pattern)
+				test.Fatalf("want the walk to refuse %q", testCase.pattern)
 			}
 		})
 	}

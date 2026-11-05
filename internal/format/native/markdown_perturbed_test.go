@@ -87,11 +87,11 @@ type markdownCorpus struct {
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the engine's
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
-func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
-	t.Helper()
+func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
+	test.Helper()
 	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var corpora []markdownCorpus
 	pending := strings.Split(roots, ":")
@@ -112,7 +112,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
 		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
 		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+			test.Fatalf("finding the repositories nested in %s: %v", root, err)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -120,11 +120,11 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 
 		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+			test.Fatalf("enumerating %s: %v", root, err)
 		}
 		var files []string
 		for _, file := range enumeration.Files {
@@ -139,11 +139,11 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+			test.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
@@ -152,7 +152,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 	for _, corpus := range corpora {
 		measured = append(measured, fmt.Sprintf("%s (%d .md)", corpus.root, len(corpus.files)))
 	}
-	t.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
+	test.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
@@ -183,11 +183,11 @@ func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellB
 	}
 }
 
-func TestPerturbedMarkdownCorpus(t *testing.T) {
-	t.Parallel()
+func TestPerturbedMarkdownCorpus(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_MARKDOWN_PERTURB_CORPORA")
 	if roots == "" {
-		t.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")
 	}
 
 	type job struct {
@@ -201,7 +201,7 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 	}
 
 	var jobs []job
-	for _, corpus := range markdownCorpora(t, roots) {
+	for _, corpus := range markdownCorpora(test, roots) {
 		narrow := corpus.options
 		narrow.PrintWidth, narrow.TabWidth = 40, 2
 		tabs := corpus.options
@@ -306,19 +306,19 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 	sort.Strings(unattributed)
 	sort.Strings(misses)
 
-	t.Logf("perturbed markdown: %d/%d identical over %d inputs, %d oracle failures excluded; attributed %v",
+	test.Logf("perturbed markdown: %d/%d identical over %d inputs, %d oracle failures excluded; attributed %v",
 		identical, measured, len(jobs), oracleFailures, attributed)
 	if path := os.Getenv("COHERE_MARKDOWN_PERTURB_REPORT"); path != "" {
 		if err := os.WriteFile(path, []byte(strings.Join(misses, "\n")+"\n"), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	for index, line := range unattributed {
 		if index == 20 {
-			t.Errorf("... and %d more", len(unattributed)-20)
+			test.Errorf("... and %d more", len(unattributed)-20)
 			break
 		}
-		t.Errorf("markdown's own: %s", line)
+		test.Errorf("markdown's own: %s", line)
 	}
 }
 

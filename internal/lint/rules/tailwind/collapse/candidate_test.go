@@ -125,24 +125,24 @@ type fixtureVariantValue struct {
 	Value string `json:"value"`
 }
 
-func loadCandidateCorpus(t *testing.T) candidateCorpus {
-	t.Helper()
+func loadCandidateCorpus(test *testing.T) candidateCorpus {
+	test.Helper()
 
 	path := filepath.Join("testdata", "candidate_fixtures.json")
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+		test.Fatalf("read %s: %v", path, err)
 	}
 
 	var corpus candidateCorpus
 	if err := json.Unmarshal(contents, &corpus); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
+		test.Fatalf("parse %s: %v", path, err)
 	}
 	if len(corpus.Cases) == 0 {
-		t.Fatalf("%s holds no cases", path)
+		test.Fatalf("%s holds no cases", path)
 	}
 	if !corpus.CandidateResolvedByIdentity {
-		t.Fatalf("%s was captured without confirming parseCandidate by identity", path)
+		test.Fatalf("%s was captured without confirming parseCandidate by identity", path)
 	}
 	return corpus
 }
@@ -304,8 +304,8 @@ func describeParsedVariant(variant ParsedVariant) string {
 // candidatesFromFixture converts the engine's serialized readings into the port's type, so the
 // comparison is between two values of the same Go type and the conversion is an explicit step this
 // test controls rather than something struct tags do invisibly.
-func candidatesFromFixture(t *testing.T, fixtures []fixtureCandidate) []ParsedCandidate {
-	t.Helper()
+func candidatesFromFixture(test *testing.T, fixtures []fixtureCandidate) []ParsedCandidate {
+	test.Helper()
 
 	candidates := make([]ParsedCandidate, 0, len(fixtures))
 	for _, fixture := range fixtures {
@@ -314,7 +314,7 @@ func candidatesFromFixture(t *testing.T, fixtures []fixtureCandidate) []ParsedCa
 			Root:      fixture.Root,
 			Important: fixture.Important,
 			Raw:       fixture.Raw,
-			Variants:  variantsFromFixture(t, fixture.Variants),
+			Variants:  variantsFromFixture(test, fixture.Variants),
 		}
 
 		if fixture.Modifier != nil {
@@ -332,7 +332,7 @@ func candidatesFromFixture(t *testing.T, fixtures []fixtureCandidate) []ParsedCa
 			// different shapes depending on the kind.
 			var propertyValue string
 			if err := json.Unmarshal(fixture.Value, &propertyValue); err != nil {
-				t.Fatalf("arbitrary candidate value was not a string: %v", err)
+				test.Fatalf("arbitrary candidate value was not a string: %v", err)
 			}
 			candidate.PropertyValue = propertyValue
 
@@ -340,7 +340,7 @@ func candidatesFromFixture(t *testing.T, fixtures []fixtureCandidate) []ParsedCa
 			if len(fixture.Value) > 0 && string(fixture.Value) != "null" {
 				var utilityValue fixtureUtilityValue
 				if err := json.Unmarshal(fixture.Value, &utilityValue); err != nil {
-					t.Fatalf("functional candidate value was not an object: %v", err)
+					test.Fatalf("functional candidate value was not an object: %v", err)
 				}
 				value := &ParsedValue{
 					Kind:  ParsedValueKind(utilityValue.Kind),
@@ -361,18 +361,18 @@ func candidatesFromFixture(t *testing.T, fixtures []fixtureCandidate) []ParsedCa
 	return candidates
 }
 
-func variantsFromFixture(t *testing.T, fixtures []fixtureVariantNode) []ParsedVariant {
-	t.Helper()
+func variantsFromFixture(test *testing.T, fixtures []fixtureVariantNode) []ParsedVariant {
+	test.Helper()
 
 	variants := make([]ParsedVariant, 0, len(fixtures))
 	for _, fixture := range fixtures {
-		variants = append(variants, variantFromFixture(t, fixture))
+		variants = append(variants, variantFromFixture(test, fixture))
 	}
 	return variants
 }
 
-func variantFromFixture(t *testing.T, fixture fixtureVariantNode) ParsedVariant {
-	t.Helper()
+func variantFromFixture(test *testing.T, fixture fixtureVariantNode) ParsedVariant {
+	test.Helper()
 
 	variant := ParsedVariant{
 		Kind:     ParsedVariantKind(fixture.Kind),
@@ -393,7 +393,7 @@ func variantFromFixture(t *testing.T, fixture fixtureVariantNode) ParsedVariant 
 		}
 	}
 	if fixture.Variant != nil {
-		nested := variantFromFixture(t, *fixture.Variant)
+		nested := variantFromFixture(test, *fixture.Variant)
 		variant.Variant = &nested
 	}
 	return variant
@@ -404,9 +404,9 @@ func variantFromFixture(t *testing.T, fixture fixtureVariantNode) ParsedVariant 
 //
 // The counts are printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran five thousand are indistinguishable from a green line.
-func TestParseCandidateMatchesEngine(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestParseCandidateMatchesEngine(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	comparedClasses := 0
@@ -417,11 +417,11 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 		if testCase.Threw != nil {
 			// No case in the corpus does this, and if a future capture produces one it is a finding
 			// about the corpus rather than about the port.
-			t.Errorf("%s: the engine threw %q; this port has no error path to compare against", testCase.Name, *testCase.Threw)
+			test.Errorf("%s: the engine threw %q; this port has no error path to compare against", testCase.Name, *testCase.Threw)
 			continue
 		}
 
-		expected := candidatesFromFixture(t, testCase.Candidates)
+		expected := candidatesFromFixture(test, testCase.Candidates)
 		actual := ParseCandidate(testCase.Input, designSystem)
 
 		comparedClasses++
@@ -433,7 +433,7 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 		expectedText := describeParsedCandidates(expected)
 		actualText := describeParsedCandidates(actual)
 		if expectedText != actualText {
-			t.Errorf(
+			test.Errorf(
 				"%s: reading %s (%s)\nengine:\n%sport:\n%s",
 				testCase.Name, quoteForDiff(testCase.Input), testCase.Source, expectedText, actualText,
 			)
@@ -444,13 +444,13 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 	// compared everything and agreed, so what makes the green line mean something is asserted here
 	// rather than assumed.
 	if comparedClasses < 1000 {
-		t.Fatalf("only %d classes compared; the corpus is too small to mean anything", comparedClasses)
+		test.Fatalf("only %d classes compared; the corpus is too small to mean anything", comparedClasses)
 	}
 	if comparedAmbiguous < 500 {
-		t.Fatalf("only %d ambiguous classes compared; the ordering claim rests on too few", comparedAmbiguous)
+		test.Fatalf("only %d ambiguous classes compared; the ordering claim rests on too few", comparedAmbiguous)
 	}
 	if corpus.UtilityRootCount < 500 || corpus.VariantRootCount < 50 {
-		t.Fatalf(
+		test.Fatalf(
 			"the captured design system holds only %d utility roots and %d variant roots; even the framework defaults are missing",
 			corpus.UtilityRootCount, corpus.VariantRootCount,
 		)
@@ -460,20 +460,20 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 	// distinguishes a fixture that read this repository from one that read Tailwind's own defaults
 	// while claiming otherwise.
 	if len(corpus.RepositoryUtilityMarkers) == 0 || len(corpus.RepositoryVariantMarkers) == 0 {
-		t.Fatalf("the fixture names no repository markers, so it cannot show that the theme graph loaded")
+		test.Fatalf("the fixture names no repository markers, so it cannot show that the theme graph loaded")
 	}
 	for _, marker := range corpus.RepositoryUtilityMarkers {
 		if _, exists := corpus.UtilityRoots[marker]; !exists {
-			t.Errorf("the repository utility root %q is absent; these tables are framework defaults", marker)
+			test.Errorf("the repository utility root %q is absent; these tables are framework defaults", marker)
 		}
 	}
 	for _, marker := range corpus.RepositoryVariantMarkers {
 		if _, exists := corpus.VariantRoots[marker]; !exists {
-			t.Errorf("the repository variant root %q is absent; the @theme block did not load", marker)
+			test.Errorf("the repository variant root %q is absent; the @theme block did not load", marker)
 		}
 	}
 
-	t.Logf(
+	test.Logf(
 		"compared %d classes against tailwind %s, %d readings in total; "+
 			"%d classes read more than one way and their order was compared positionally; "+
 			"the design system held %d utility roots and %d variant roots; "+
@@ -482,7 +482,7 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 		comparedAmbiguous, corpus.UtilityRootCount, corpus.VariantRootCount,
 		corpus.RepositoryClassCount, corpus.AmbiguousRepositoryCount,
 	)
-	t.Logf(
+	test.Logf(
 		"the design system carried this repository's own roots, confirmed by %d utility and %d variant markers",
 		len(corpus.RepositoryUtilityMarkers), len(corpus.RepositoryVariantMarkers),
 	)
@@ -495,9 +495,9 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 // produce a different rendering, so the ordering assertion cannot quietly become a set comparison.
 //
 // A check that has never returned a positive has not been shown to be able to.
-func TestParseCandidateOrderIsCompared(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestParseCandidateOrderIsCompared(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	checked := 0
@@ -508,7 +508,7 @@ func TestParseCandidateOrderIsCompared(t *testing.T) {
 
 		actual := ParseCandidate(testCase.Input, designSystem)
 		if len(actual) < 2 {
-			t.Errorf("%s: the fixture calls this ambiguous but the port produced %d readings", testCase.Name, len(actual))
+			test.Errorf("%s: the fixture calls this ambiguous but the port produced %d readings", testCase.Name, len(actual))
 			continue
 		}
 
@@ -518,7 +518,7 @@ func TestParseCandidateOrderIsCompared(t *testing.T) {
 		}
 
 		if describeParsedCandidates(actual) == describeParsedCandidates(reversed) {
-			t.Errorf("%s: reversing the readings did not change the rendering, so order is not being compared", testCase.Name)
+			test.Errorf("%s: reversing the readings did not change the rendering, so order is not being compared", testCase.Name)
 		}
 
 		checked++
@@ -528,30 +528,30 @@ func TestParseCandidateOrderIsCompared(t *testing.T) {
 	}
 
 	if checked < 100 {
-		t.Fatalf("only %d ambiguous classes were available to check; the fixture is not exercising order", checked)
+		test.Fatalf("only %d ambiguous classes were available to check; the fixture is not exercising order", checked)
 	}
-	t.Logf("confirmed on %d ambiguous classes that a reversed reading list renders differently", checked)
+	test.Logf("confirmed on %d ambiguous classes that a reversed reading list renders differently", checked)
 }
 
 // TestBorderBReadsBothWaysInOrder pins the single case the whole task is built around, by name.
 //
 // The suite above would catch this too, as one failure among five thousand. This one names it, so a
 // regression reports `border-b` rather than reporting a diff someone has to read to understand.
-func TestBorderBReadsBothWaysInOrder(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestBorderBReadsBothWaysInOrder(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	readings := ParseCandidate("border-b", designSystem)
 	if len(readings) != 2 {
-		t.Fatalf("border-b produced %d readings, want 2:\n%s", len(readings), describeParsedCandidates(readings))
+		test.Fatalf("border-b produced %d readings, want 2:\n%s", len(readings), describeParsedCandidates(readings))
 	}
 
 	if readings[0].Root != "border-b" || readings[0].Value != nil {
-		t.Errorf("the first reading of border-b must be the root `border-b` with no value, got %s", describeParsedCandidate(readings[0]))
+		test.Errorf("the first reading of border-b must be the root `border-b` with no value, got %s", describeParsedCandidate(readings[0]))
 	}
 	if readings[1].Root != "border" || readings[1].Value == nil || readings[1].Value.Value != "b" {
-		t.Errorf("the second reading of border-b must be the root `border` with the named value `b`, got %s", describeParsedCandidate(readings[1]))
+		test.Errorf("the second reading of border-b must be the root `border` with the named value `b`, got %s", describeParsedCandidate(readings[1]))
 	}
 }
 
@@ -561,13 +561,13 @@ func TestBorderBReadsBothWaysInOrder(t *testing.T) {
 // Every other question the parser asks is a table lookup the fixture can answer directly. An
 // arbitrary child variant's compounding is not: it is derived from the selector text, so the
 // derivation is ported and has to be measured like everything else.
-func TestCompoundsForSelectorsMatchesEngine(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestCompoundsForSelectorsMatchesEngine(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	if len(corpus.CompoundsForSelectorsProbes) == 0 {
-		t.Fatalf("the fixture holds no compoundsForSelectors probes")
+		test.Fatalf("the fixture holds no compoundsForSelectors probes")
 	}
 
 	for _, probe := range corpus.CompoundsForSelectorsProbes {
@@ -578,14 +578,14 @@ func TestCompoundsForSelectorsMatchesEngine(t *testing.T) {
 		}
 		actual := designSystem.VariantCompoundsWith(probe.Parent, child)
 		if actual != probe.CompoundsWith {
-			t.Errorf(
+			test.Errorf(
 				"compoundsWith(%s, %s) = %t, engine says %t",
 				probe.Parent, quoteForDiff(probe.Selector), actual, probe.CompoundsWith,
 			)
 		}
 	}
 
-	t.Logf("compared %d compoundsForSelectors probes", len(corpus.CompoundsForSelectorsProbes))
+	test.Logf("compared %d compoundsForSelectors probes", len(corpus.CompoundsForSelectorsProbes))
 }
 
 // TestGateCandidatesPreservesOrder pins the property gate.go depends on across the conversion.
@@ -593,9 +593,9 @@ func TestCompoundsForSelectorsMatchesEngine(t *testing.T) {
 // gate.go's computeGroupKey takes candidates[0]. If GateCandidates ever reordered, sorted, or
 // deduplicated, that choice would silently start reading a different candidate, which is the same
 // class of silent wrong answer the whole component is built to prevent.
-func TestGateCandidatesPreservesOrder(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestGateCandidatesPreservesOrder(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	checked := 0
@@ -608,11 +608,11 @@ func TestGateCandidatesPreservesOrder(t *testing.T) {
 		gated := GateCandidates(parsed)
 
 		if len(gated) != len(parsed) {
-			t.Fatalf("%s: %d readings became %d gate candidates", testCase.Name, len(parsed), len(gated))
+			test.Fatalf("%s: %d readings became %d gate candidates", testCase.Name, len(parsed), len(gated))
 		}
 		for index := range parsed {
 			if gated[index].Root != parsed[index].Root {
-				t.Fatalf(
+				test.Fatalf(
 					"%s: gate candidate %d has root %q but reading %d has root %q; the conversion reordered",
 					testCase.Name, index, gated[index].Root, index, parsed[index].Root,
 				)
@@ -626,9 +626,9 @@ func TestGateCandidatesPreservesOrder(t *testing.T) {
 	}
 
 	if checked < 100 {
-		t.Fatalf("only %d ambiguous classes were checked; the order claim is not being exercised", checked)
+		test.Fatalf("only %d ambiguous classes were checked; the order claim is not being exercised", checked)
 	}
-	t.Logf("confirmed order is preserved through the gate conversion on %d ambiguous classes", checked)
+	test.Logf("confirmed order is preserved through the gate conversion on %d ambiguous classes", checked)
 }
 
 // TestGateCandidatesSeparatesWhatMustNotMerge asserts the two facts the conversion could plausibly
@@ -637,15 +637,15 @@ func TestGateCandidatesPreservesOrder(t *testing.T) {
 // Both are dropped by a naive flattening, and both are the difference between two classes that
 // produce different CSS. A bucketing view is allowed to lose information; it is not allowed to lose
 // this.
-func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestGateCandidatesSeparatesWhatMustNotMerge(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	keyOf := func(className string) string {
 		gated := GateCandidates(ParseCandidate(className, designSystem))
 		if len(gated) == 0 {
-			t.Fatalf("%s produced no readings, so it cannot be compared", className)
+			test.Fatalf("%s produced no readings, so it cannot be compared", className)
 		}
 		return variantsKey(gated[0].Variants) + "|" + importanceKey(gated[0].Important) + "|" + valueKey(gated[0].Value)
 	}
@@ -673,11 +673,11 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
 
 	for _, pair := range mustDiffer {
 		if keyOf(pair[0]) == keyOf(pair[1]) {
-			t.Errorf("%s and %s produced the same gate key; the conversion lost what separates them", pair[0], pair[1])
+			test.Errorf("%s and %s produced the same gate key; the conversion lost what separates them", pair[0], pair[1])
 		}
 	}
 
-	t.Logf("confirmed %d pairs that must not share a bucket do not", len(mustDiffer))
+	test.Logf("confirmed %d pairs that must not share a bucket do not", len(mustDiffer))
 }
 
 // TestArbitraryTypehintIsSplitFromTheValue pins the coupling the descriptor table depends on.
@@ -695,9 +695,9 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
 //
 // The corpus test covers these cases too, as two rows among five thousand. This one names the
 // contract, so a regression reports what broke rather than a diff someone has to interpret.
-func TestArbitraryTypehintIsSplitFromTheValue(t *testing.T) {
-	t.Parallel()
-	corpus := loadCandidateCorpus(t)
+func TestArbitraryTypehintIsSplitFromTheValue(test *testing.T) {
+	test.Parallel()
+	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
 
 	cases := []struct {
@@ -717,25 +717,25 @@ func TestArbitraryTypehintIsSplitFromTheValue(t *testing.T) {
 	for _, testCase := range cases {
 		readings := ParseCandidate(testCase.className, designSystem)
 		if len(readings) == 0 {
-			t.Errorf("%s produced no readings", testCase.className)
+			test.Errorf("%s produced no readings", testCase.className)
 			continue
 		}
 
 		value := readings[0].Value
 		if value == nil {
-			t.Errorf("%s: the first reading carries no value", testCase.className)
+			test.Errorf("%s: the first reading carries no value", testCase.className)
 			continue
 		}
 		if value.Kind != ParsedValueKindArbitrary {
-			t.Errorf("%s: the first reading's value is %s, want arbitrary", testCase.className, value.Kind)
+			test.Errorf("%s: the first reading's value is %s, want arbitrary", testCase.className, value.Kind)
 			continue
 		}
 		if value.DataType != testCase.dataType {
-			t.Errorf("%s: DataType is %q, want %q", testCase.className, value.DataType, testCase.dataType)
+			test.Errorf("%s: DataType is %q, want %q", testCase.className, value.DataType, testCase.dataType)
 		}
 		// The annotation must be gone from the value, not merely also present in DataType.
 		if value.Value != testCase.value {
-			t.Errorf("%s: Value is %q, want %q", testCase.className, value.Value, testCase.value)
+			test.Errorf("%s: Value is %q, want %q", testCase.className, value.Value, testCase.value)
 		}
 	}
 }

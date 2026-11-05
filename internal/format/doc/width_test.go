@@ -46,9 +46,9 @@ var widthCases = []string{
 // Off unless COHERE_PRETTIER_FORK names the fork checkout, because it runs node. Then it checks the
 // curated cases and, when COHERE_FORMAT_CORPORA is also set, every distinct line containing a
 // non-ASCII byte in those repositories, which is the population that actually reaches the printer.
-func TestStringWidthAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestStringWidthAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	inputs := append([]string(nil), widthCases...)
 	seen := map[string]bool{}
@@ -59,7 +59,7 @@ func TestStringWidthAgreesWithUpstream(t *testing.T) {
 		if corpus == "" {
 			continue
 		}
-		inputs = append(inputs, nonASCIILines(t, corpus, seen)...)
+		inputs = append(inputs, nonASCIILines(test, corpus, seen)...)
 	}
 
 	// Batched, because the corpus population is hundreds of megabytes and a single JSON payload
@@ -69,25 +69,25 @@ func TestStringWidthAgreesWithUpstream(t *testing.T) {
 	expected := make([]int, 0, len(inputs))
 	for start := 0; start < len(inputs); start += batchSize {
 		end := min(start+batchSize, len(inputs))
-		expected = append(expected, upstreamWidths(t, root, inputs[start:end])...)
+		expected = append(expected, upstreamWidths(test, root, inputs[start:end])...)
 	}
 	mismatches := 0
 	for index, input := range inputs {
 		if got := StringWidth(input); got != expected[index] {
 			mismatches++
 			if mismatches <= 20 {
-				t.Errorf("StringWidth(%q) = %d, upstream %d", input, got, expected[index])
+				test.Errorf("StringWidth(%q) = %d, upstream %d", input, got, expected[index])
 			}
 		}
 	}
-	t.Logf("%d strings measured, %d curated, %d mismatches", len(inputs), len(widthCases), mismatches)
+	test.Logf("%d strings measured, %d curated, %d mismatches", len(inputs), len(widthCases), mismatches)
 }
 
 // TestWidthControlCanFail proves the comparison above can disagree, so its agreement means something.
-func TestWidthControlCanFail(t *testing.T) {
-	t.Parallel()
+func TestWidthControlCanFail(test *testing.T) {
+	test.Parallel()
 	if StringWidth("中") != 2 || StringWidth("a") != 1 || StringWidth("😀") != 2 || StringWidth("é") != 1 {
-		t.Fatalf("basic widths wrong: 中=%d a=%d 😀=%d e+combining=%d",
+		test.Fatalf("basic widths wrong: 中=%d a=%d 😀=%d e+combining=%d",
 			StringWidth("中"), StringWidth("a"), StringWidth("😀"), StringWidth("é"))
 	}
 }
@@ -98,8 +98,8 @@ func TestWidthControlCanFail(t *testing.T) {
 // each chunk on its own, so a multi-byte character split across a 64 KB boundary became two U+FFFD
 // and measured one or two columns wider. The first corpus run reported eight such "mismatches", all on
 // non-ASCII lines, all with Go narrower; every one was the instrument splitting a character.
-func upstreamWidths(t *testing.T, root string, inputs []string) []int {
-	t.Helper()
+func upstreamWidths(test *testing.T, root string, inputs []string) []int {
+	test.Helper()
 	script := `
 import getStringWidth from "./src/utilities/get-string-width.js";
 process.stdin.setEncoding("utf8");
@@ -108,7 +108,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 `
 	encoded, err := json.Marshal(inputs)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", script)
 	command.Dir = root
@@ -116,14 +116,14 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var widths []int
 	if err := json.Unmarshal(stdout.Bytes(), &widths); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(widths) != len(inputs) {
-		t.Fatalf("upstream returned %d widths for %d inputs", len(widths), len(inputs))
+		test.Fatalf("upstream returned %d widths for %d inputs", len(widths), len(inputs))
 	}
 	return widths
 }
@@ -138,11 +138,11 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 //
 // Invalid UTF-8 is skipped: json.Marshal would replace it before node saw it, so the two sides would
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
-func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
-	t.Helper()
+func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string {
+	test.Helper()
 	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var lines []string
 	pending := []string{root}
@@ -155,7 +155,7 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 		// (#k6vebep): a repository under a path current never formats is still a corpus.
 		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(current)
 		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", current, err)
+			test.Fatalf("finding the repositories nested in %s: %v", current, err)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(current, nested))
@@ -163,11 +163,11 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 
 		enumeration, err := engine.Enumerate(current)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", current, err)
+			test.Logf("skipping %s, not yet adopted: %v", current, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", current, err)
+			test.Fatalf("enumerating %s: %v", current, err)
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", current, len(enumeration.Files)))
 		for _, path := range enumeration.Files {
@@ -188,6 +188,6 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 			file.Close()
 		}
 	}
-	t.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
+	test.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
 	return lines
 }

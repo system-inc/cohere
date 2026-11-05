@@ -31,8 +31,8 @@ type errorBoundariesCase struct {
 	count  int
 }
 
-func TestErrorBoundariesFires(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []errorBoundariesCase{
 		{
@@ -226,20 +226,20 @@ func TestErrorBoundariesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ErrorBoundaries, "component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "jsxInTryStatement"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestErrorBoundariesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []errorBoundariesCase{
 		{
@@ -452,10 +452,10 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ErrorBoundaries, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -467,19 +467,19 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 // `"index":130`; slicing that fixture's bytes at those offsets yields `<div />`, seven bytes. The
 // source below is that fixture with its pragma comment removed, so the offsets differ while the
 // reported text does not, and the text is what this asserts.
-func TestErrorBoundariesSpan(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesSpan(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
+	result := rule_testing.Run(test, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	// A literal typed here rather than anything derived from the rule, so the assertion cannot
 	// move together with the code it guards.
 	if reported != "<div />" {
-		t.Errorf("finding points at %q, want %q", reported, "<div />")
+		test.Errorf("finding points at %q, want %q", reported, "<div />")
 	}
 }
 
@@ -488,13 +488,13 @@ func TestErrorBoundariesSpan(t *testing.T) {
 //
 // Measured on React first: `<div><span /></div>` inside a try produces two findings, one spanning
 // the whole outer element and one spanning the inner.
-func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesSpanOnNestedElements(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component() {\n  let el;\n  try {\n    el = <div><span /></div>;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
+	result := rule_testing.Run(test, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("expected two findings, got %d", len(result.Diagnostics))
+		test.Fatalf("expected two findings, got %d", len(result.Diagnostics))
 	}
 	got := []string{}
 	for _, diagnostic := range result.Diagnostics {
@@ -503,7 +503,7 @@ func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
 	want := []string{"<div><span /></div>", "<span />"}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Errorf("finding %d points at %q, want %q", index, got[index], want[index])
+			test.Errorf("finding %d points at %q, want %q", index, got[index], want[index])
 		}
 	}
 }
@@ -513,17 +513,17 @@ func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
 // `rule.Message` is `{Id, Description}` with no interpolation, so there is no rendered text to
 // guard and equality on both fields is the whole assertion. Asserting against the rule's own
 // constant would move with it under mutation and guard nothing.
-func TestErrorBoundariesMessage(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageJsxInTryStatement.Id != "jsxInTryStatement" {
-		t.Errorf("message id is %q", messageJsxInTryStatement.Id)
+		test.Errorf("message id is %q", messageJsxInTryStatement.Id)
 	}
 	if !strings.HasPrefix(messageJsxInTryStatement.Description, "This JSX is constructed inside a try block") {
-		t.Errorf("message description opens %q", messageJsxInTryStatement.Description[:40])
+		test.Errorf("message description opens %q", messageJsxInTryStatement.Description[:40])
 	}
 	if !strings.Contains(messageJsxInTryStatement.Description, "error boundary") {
-		t.Error("the description never names the mechanism that does catch rendering errors")
+		test.Error("the description never names the mechanism that does catch rendering errors")
 	}
 }
 
@@ -532,13 +532,13 @@ func TestErrorBoundariesMessage(t *testing.T) {
 // It resolves nothing: the try question is answered from the parent chain and the component gate
 // from names, parameters and returns. A later revert adding a checker call would go silent under
 // the plain harness rather than failing, which is why this is asserted rather than assumed.
-func TestErrorBoundariesRunsWithoutTheTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestErrorBoundariesRunsWithoutTheTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if ErrorBoundaries.NeedsTypeChecker {
-		t.Error("the rule declares a type checker it never asks anything")
+		test.Error("the rule declares a type checker it never asks anything")
 	}
 	source := "function Component() {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
-	rule_testing.ExpectFindings(t, result, "jsxInTryStatement")
+	result := rule_testing.Run(test, ErrorBoundaries, "component.tsx", source)
+	rule_testing.ExpectFindings(test, result, "jsxInTryStatement")
 }

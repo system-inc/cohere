@@ -18,10 +18,10 @@ import (
 //
 // Typed for the reason `rangesFor` and `scopesFor` are: a checker-less lowering never emits
 // `StoreContext`, so several assertions below would pass vacuously on a nil checker.
-func terminalsFor(t *testing.T, source string) (*Function, *ReactiveScopes, ScopeIdentity,
+func terminalsFor(test *testing.T, source string) (*Function, *ReactiveScopes, ScopeIdentity,
 	ScopeTerminals) {
-	t.Helper()
-	function, scopes := scopesFor(t, source)
+	test.Helper()
+	function, scopes := scopesFor(test, source)
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 	return function, scopes, identity, BuildReactiveScopeTerminals(function, scopes, identity)
@@ -52,10 +52,10 @@ func scopeTerminalsIn(function *Function) []*Scope {
 // Four stages declined to add `Scope` early for exactly that reason. This test is what makes the
 // decision reversible: if the producer is ever removed or silently stops firing, this fails rather
 // than leaving a hole in every switch.
-func TestScopeTerminalsAreBuilt(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsAreBuilt(test *testing.T) {
+	test.Parallel()
 
-	function, _, _, result := terminalsFor(t, `
+	function, _, _, result := terminalsFor(test, `
 		function Component(props) {
 			const items = [];
 			items.push(props.a);
@@ -63,21 +63,21 @@ func TestScopeTerminalsAreBuilt(t *testing.T) {
 		}
 	`)
 	if result.Built == 0 {
-		t.Fatal("no Scope terminal was constructed; the variant would be a second Optional")
+		test.Fatal("no Scope terminal was constructed; the variant would be a second Optional")
 	}
 	built := scopeTerminalsIn(function)
 	if len(built) != result.Built {
-		t.Errorf("reported %d terminals built but the graph holds %d", result.Built, len(built))
+		test.Errorf("reported %d terminals built but the graph holds %d", result.Built, len(built))
 	}
 	for _, terminal := range built {
 		if terminal.Scope == 0 {
-			t.Error("a Scope terminal names scope zero, which is the absent value")
+			test.Error("a Scope terminal names scope zero, which is the absent value")
 		}
 		if !HasBlock(terminal.Block) {
-			t.Error("a Scope terminal names no body block")
+			test.Error("a Scope terminal names no body block")
 		}
 		if !HasBlock(terminal.Fallthrough) {
-			t.Error("a Scope terminal names no fallthrough")
+			test.Error("a Scope terminal names no fallthrough")
 		}
 	}
 }
@@ -88,32 +88,32 @@ func TestScopeTerminalsAreBuilt(t *testing.T) {
 // `Fallthrough` and `terminalTestIsReactive` both default rather than going red, so the compiler
 // could not have found them. They were found by enumerating every switch over `Terminal` before the
 // variant was added, which is the method this test exists to keep honest.
-func TestScopeTerminalIsReachableThroughFallthrough(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalIsReachableThroughFallthrough(test *testing.T) {
+	test.Parallel()
 
 	terminal := &Scope{Scope: 7, Block: 3, Fallthrough: 9, Order: 4}
 
 	block, ok := Fallthrough(terminal)
 	if !ok || block != 9 {
-		t.Errorf("Fallthrough gave (%d, %v), want (9, true): the default arm swallowed the variant",
+		test.Errorf("Fallthrough gave (%d, %v), want (9, true): the default arm swallowed the variant",
 			block, ok)
 	}
 	if order := TerminalOrder(terminal); order != 4 {
-		t.Errorf("TerminalOrder gave %d, want 4", order)
+		test.Errorf("TerminalOrder gave %d, want 4", order)
 	}
 
 	// The body is a real edge; the fallthrough is not.
 	var successors []static_single_assignment.BlockId
 	EachSuccessor(terminal, func(id static_single_assignment.BlockId) { successors = append(successors, id) })
 	if len(successors) != 1 || successors[0] != 3 {
-		t.Errorf("EachSuccessor gave %v, want [3]: the fallthrough must not be an edge", successors)
+		test.Errorf("EachSuccessor gave %v, want [3]: the fallthrough must not be an edge", successors)
 	}
 	var withFallthrough []static_single_assignment.BlockId
 	EachSuccessorAndFallthrough(terminal, func(id static_single_assignment.BlockId) {
 		withFallthrough = append(withFallthrough, id)
 	})
 	if len(withFallthrough) != 2 {
-		t.Errorf("EachSuccessorAndFallthrough gave %v, want the body and the fallthrough",
+		test.Errorf("EachSuccessorAndFallthrough gave %v, want the body and the fallthrough",
 			withFallthrough)
 	}
 
@@ -121,20 +121,20 @@ func TestScopeTerminalIsReachableThroughFallthrough(t *testing.T) {
 	places := 0
 	EachTerminalPlace(terminal, func(Place, PlaceRole) { places++ })
 	if places != 0 {
-		t.Errorf("a Scope terminal reported %d places, want 0", places)
+		test.Errorf("a Scope terminal reported %d places, want 0", places)
 	}
 }
 
 // TestScopeTerminalPrints pins the printer arm, which has no default and would have gone red, but
 // whose OUTPUT nothing else asserts.
-func TestScopeTerminalPrints(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalPrints(test *testing.T) {
+	test.Parallel()
 
 	function := NewFunction(nil, "probe", FunctionKindOther)
 	got := printTerminal(function, &Scope{Scope: 2, Block: 5, Fallthrough: 8})
 	want := "Scope @2 block=bb5 fallthrough=bb8"
 	if got != want {
-		t.Errorf("printTerminal gave %q, want %q", got, want)
+		test.Errorf("printTerminal gave %q, want %q", got, want)
 	}
 }
 
@@ -152,10 +152,10 @@ func TestScopeTerminalPrints(t *testing.T) {
 //
 // The tell was that the built count EXCEEDED the control, which is why the corpus test below asserts
 // against the merged count rather than merely asserting the count is non-zero.
-func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsKeyOnTheMergedGroup(test *testing.T) {
+	test.Parallel()
 
-	function, scopes, identity, result := terminalsFor(t, `
+	function, scopes, identity, result := terminalsFor(test, `
 		function Component(props) {
 			const a = {};
 			const b = {};
@@ -165,7 +165,7 @@ func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
 		}
 	`)
 	if result.Built == 0 {
-		t.Skip("this source produced no scopes, so there is nothing to key")
+		test.Skip("this source produced no scopes, so there is nothing to key")
 	}
 
 	// No two terminals may name the same surviving scope.
@@ -175,7 +175,7 @@ func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
 	}
 	for scope, count := range seen {
 		if count > 1 {
-			t.Errorf("scope %d has %d terminals; duplicates mean the pass keyed on the pre-merge id",
+			test.Errorf("scope %d has %d terminals; duplicates mean the pass keyed on the pre-merge id",
 				scope, count)
 		}
 	}
@@ -183,7 +183,7 @@ func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
 	// Every terminal must name a SURVIVING scope: one that is its own group.
 	for scope := range seen {
 		if group := identity.GroupOf(scope); group != scope {
-			t.Errorf("terminal names scope %d, which merged into %d", scope, group)
+			test.Errorf("terminal names scope %d, which merged into %d", scope, group)
 		}
 	}
 	_ = scopes
@@ -199,10 +199,10 @@ func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
 // Upstream raises `CompilerError.invariant('Invalid nesting in program blocks or scopes')` and
 // stops. A linter declines the function instead, for the reason `ValidateScopes` gives: a linter
 // that stops on a graph it dislikes is worse than one that declines a function.
-func TestScopeTerminalsDeclineOnUnnestedScopes(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsDeclineOnUnnestedScopes(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const a = {};
 			a.x = props.x;
@@ -210,21 +210,21 @@ func TestScopeTerminalsDeclineOnUnnestedScopes(t *testing.T) {
 		}
 	`)
 	if scopes.Len() == 0 {
-		t.Skip("no scopes in this source")
+		test.Skip("no scopes in this source")
 	}
 
 	// Force a violation: two scopes that overlap without nesting.
 	broken := overlappingIdentity{scopes: scopes}
 	if ScopeTerminalsPrecondition(function, scopes, broken) == 0 {
-		t.Skip("this source has too few scopes to construct an overlap")
+		test.Skip("this source has too few scopes to construct an overlap")
 	}
 	before := len(scopeTerminalsIn(function))
 	result := BuildReactiveScopeTerminals(function, scopes, broken)
 	if result.Built != 0 {
-		t.Errorf("built %d terminals on a graph violating the nesting precondition", result.Built)
+		test.Errorf("built %d terminals on a graph violating the nesting precondition", result.Built)
 	}
 	if after := len(scopeTerminalsIn(function)); after != before {
-		t.Errorf("the graph was mutated on a declined function: %d terminals became %d", before, after)
+		test.Errorf("the graph was mutated on a declined function: %d terminals became %d", before, after)
 	}
 }
 
@@ -249,10 +249,10 @@ func (o overlappingIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRan
 // once, and the block sweep visits each block once and each instruction position within it once,
 // consuming from a queue that only shrinks. This counts the visits and asserts they are bounded by
 // exactly that, so an accidental re-entry becomes a failure rather than a slowdown.
-func TestScopeTerminalsAreASinglePass(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsAreASinglePass(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const list = [];
 			for (const item of props.items) {
@@ -264,7 +264,7 @@ func TestScopeTerminalsAreASinglePass(t *testing.T) {
 		}
 	`)
 	if scopes.Len() == 0 {
-		t.Skip("no scopes in this source")
+		test.Skip("no scopes in this source")
 	}
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
@@ -274,7 +274,7 @@ func TestScopeTerminalsAreASinglePass(t *testing.T) {
 
 	// Exactly one start and one end per scope: 2n rewrites, never more.
 	if len(rewrites) != 2*len(items) {
-		t.Errorf("queued %d rewrites for %d scopes, want exactly %d",
+		test.Errorf("queued %d rewrites for %d scopes, want exactly %d",
 			len(rewrites), len(items), 2*len(items))
 	}
 	starts, ends := 0, 0
@@ -288,11 +288,11 @@ func TestScopeTerminalsAreASinglePass(t *testing.T) {
 		}
 	}
 	if starts != len(items) || ends != len(items) {
-		t.Errorf("got %d starts and %d ends for %d scopes", starts, ends, len(items))
+		test.Errorf("got %d starts and %d ends for %d scopes", starts, ends, len(items))
 	}
 	for scope, count := range perScope {
 		if count != 1 {
-			t.Errorf("scope %d was entered %d times, want once", scope, count)
+			test.Errorf("scope %d was entered %d times, want once", scope, count)
 		}
 	}
 }
@@ -310,10 +310,10 @@ func TestScopeTerminalsAreASinglePass(t *testing.T) {
 // What must hold is that popping from the end yields non-decreasing positions, which is what makes
 // the single forward sweep over instructions correct. That is a consequence of the traversal, not of
 // a sort, and asserting it here means a future reintroduction of a sort has to keep it true.
-func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T) {
-	t.Parallel()
+func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const a = {};
 			a.x = props.x;
@@ -327,7 +327,7 @@ func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T)
 	items := scopeItemsInNestingOrder(function, scopes, identity)
 	rewrites := queueScopeRewrites(function, items)
 	if len(rewrites) < 4 {
-		t.Fatalf("this source produced only %d rewrites; it can no longer discriminate", len(rewrites))
+		test.Fatalf("this source produced only %d rewrites; it can no longer discriminate", len(rewrites))
 	}
 
 	// Consumed back to front, positions must never decrease: the sweep walks instructions forward
@@ -336,7 +336,7 @@ func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T)
 	previous := rewrites[len(rewrites)-1].order
 	for index := len(rewrites) - 2; index >= 0; index-- {
 		if rewrites[index].order < previous {
-			t.Errorf("popping yields position %d after %d; the sweep applies rewrites in one "+
+			test.Errorf("popping yields position %d after %d; the sweep applies rewrites in one "+
 				"forward pass and cannot revisit an earlier position",
 				rewrites[index].order, previous)
 		}
@@ -353,10 +353,10 @@ func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T)
 // This is the case a sort with a tiebreak gets wrong in whichever direction the tiebreak is written,
 // which is why both mutants of it survived: the fixtures could not see a comparator that should not
 // have been consulted. Measured on this source, the collision is at position 7.
-func TestAScopeEndingWhereAnotherBeginsClosesFirst(t *testing.T) {
-	t.Parallel()
+func TestAScopeEndingWhereAnotherBeginsClosesFirst(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := scopesFor(t, `
+	function, scopes := scopesFor(test, `
 		function Component(props) {
 			const a = {};
 			a.x = props.x;
@@ -378,13 +378,13 @@ func TestAScopeEndingWhereAnotherBeginsClosesFirst(t *testing.T) {
 		}
 		collisions++
 		if applied.isStart && !next.isStart {
-			t.Errorf("at position %d a start is applied before an end at the same position; the "+
+			test.Errorf("at position %d a start is applied before an end at the same position; the "+
 				"traversal exits a disjoint scope before entering the next and must queue the end "+
 				"first", applied.order)
 		}
 	}
 	if collisions == 0 {
-		t.Fatal("this source no longer produces two rewrites at one position, so it cannot see " +
+		test.Fatal("this source no longer produces two rewrites at one position, so it cannot see " +
 			"the collision case; find a new one by logging rewrite positions")
 	}
 }
@@ -400,10 +400,10 @@ func TestAScopeEndingWhereAnotherBeginsClosesFirst(t *testing.T) {
 // first three are re-established by `Finalize`; the fourth is repaired by this pass, and getting it
 // wrong is silent -- a phi reading from a block that no longer flows there produces wrong values and
 // no crash.
-func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsPreserveSingleAssignmentForm(test *testing.T) {
+	test.Parallel()
 
-	function, _, _, result := terminalsFor(t, `
+	function, _, _, result := terminalsFor(test, `
 		function Component(props) {
 			let total = 0;
 			for (const item of props.items) {
@@ -415,33 +415,33 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
 		}
 	`)
 	if result.Built == 0 {
-		t.Skip("no terminals built for this source")
+		test.Skip("no terminals built for this source")
 	}
 	if violations := VerifySSA(function); len(violations) != 0 {
-		t.Errorf("the rewrite left %d single-assignment violations: %v", len(violations), violations)
+		test.Errorf("the rewrite left %d single-assignment violations: %v", len(violations), violations)
 	}
 
 	byId := map[static_single_assignment.BlockId]*BasicBlock{}
 	for _, block := range function.Blocks {
 		if byId[block.Id] != nil {
-			t.Fatalf("duplicate block id %d after the rewrite", block.Id)
+			test.Fatalf("duplicate block id %d after the rewrite", block.Id)
 		}
 		byId[block.Id] = block
 	}
 	for _, block := range function.Blocks {
 		if block.Terminal == nil {
-			t.Errorf("block %d has no terminal after the rewrite", block.Id)
+			test.Errorf("block %d has no terminal after the rewrite", block.Id)
 			continue
 		}
 		EachSuccessorAndFallthrough(block.Terminal, func(id static_single_assignment.BlockId) {
 			if byId[id] == nil {
-				t.Errorf("block %d names block %d, which is not in the graph", block.Id, id)
+				test.Errorf("block %d names block %d, which is not in the graph", block.Id, id)
 			}
 		})
 		for _, phi := range block.Phis {
 			for _, predecessor := range PhiOperandsInOrder(phi) {
 				if byId[predecessor] == nil {
-					t.Errorf("a phi in block %d names predecessor %d, which is gone",
+					test.Errorf("a phi in block %d names predecessor %d, which is gone",
 						block.Id, predecessor)
 				}
 			}
@@ -460,10 +460,10 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
 // only the annotation, so single-assignment form, edges, and ordering all stay valid. This is the
 // "fixtures assert the wrong layer" category -- every fixture covering these blocks asserted their
 // structure and none asserted what the jump claimed to be.
-func TestScopeEndJumpsWithBreak(t *testing.T) {
-	t.Parallel()
+func TestScopeEndJumpsWithBreak(test *testing.T) {
+	test.Parallel()
 
-	function, _, _, result := terminalsFor(t, `
+	function, _, _, result := terminalsFor(test, `
 		function Component(props) {
 			const a = {};
 			a.x = props.x;
@@ -471,7 +471,7 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 		}
 	`)
 	if result.Built == 0 {
-		t.Skip("no terminals built for this source")
+		test.Skip("no terminals built for this source")
 	}
 
 	// Every fallthrough named by a Scope terminal must be reached by a Goto with variant Break.
@@ -480,7 +480,7 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 		fallthroughs[terminal.Fallthrough] = true
 	}
 	if len(fallthroughs) == 0 {
-		t.Fatal("no scope fallthrough to check")
+		test.Fatal("no scope fallthrough to check")
 	}
 	closing := 0
 	for _, block := range function.Blocks {
@@ -490,12 +490,12 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 		}
 		closing++
 		if jump.Variant != GotoVariantBreak {
-			t.Errorf("the jump closing a scope has variant %v, want GotoVariantBreak: a scope exit "+
+			test.Errorf("the jump closing a scope has variant %v, want GotoVariantBreak: a scope exit "+
 				"is not a loop back edge", jump.Variant)
 		}
 	}
 	if closing == 0 {
-		t.Error("no Goto reaches a scope fallthrough, so this test asserts nothing")
+		test.Error("no Goto reaches a scope fallthrough, so this test asserts nothing")
 	}
 }
 
@@ -512,10 +512,10 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 // non-monotone order steps; with the mutant it yields six, and the new blocks carry terminal order
 // ZERO -- which `MarkEvaluationOrder` documents as meaning the finalizer never reached them. Any
 // pass reading evaluation order after this one would silently compare against zero.
-func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsRenumberTheGraph(test *testing.T) {
+	test.Parallel()
 
-	function, _, _, result := terminalsFor(t, `
+	function, _, _, result := terminalsFor(test, `
 		function Component(props) {
 			const a = {};
 			a.x = props.x;
@@ -525,7 +525,7 @@ func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
 		}
 	`)
 	if result.Built == 0 {
-		t.Skip("no terminals built for this source")
+		test.Skip("no terminals built for this source")
 	}
 
 	// Every instruction and terminal must carry a real position, and positions must increase across
@@ -535,33 +535,33 @@ func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
 		for _, instructionId := range block.Instructions {
 			order := function.Instructions[instructionId].Order
 			if order == 0 {
-				t.Errorf("an instruction in block %d has evaluation order zero, which means the "+
+				test.Errorf("an instruction in block %d has evaluation order zero, which means the "+
 					"finalizer never reached it", block.Id)
 			}
 			if order <= previous {
-				t.Errorf("evaluation order went from %d to %d across the block slice; the blocks "+
+				test.Errorf("evaluation order went from %d to %d across the block slice; the blocks "+
 					"are not in reverse postorder or were not renumbered", previous, order)
 			}
 			previous = order
 		}
 		order := TerminalOrder(block.Terminal)
 		if order == 0 {
-			t.Errorf("block %d's terminal has evaluation order zero after the rewrite", block.Id)
+			test.Errorf("block %d's terminal has evaluation order zero after the rewrite", block.Id)
 		}
 		if order <= previous {
-			t.Errorf("terminal order went from %d to %d across the block slice", previous, order)
+			test.Errorf("terminal order went from %d to %d across the block slice", previous, order)
 		}
 		previous = order
 	}
 }
 
 // TestScopeTerminalsGapsAreDeclared pins the gap list, so closing one is a visible event.
-func TestScopeTerminalsGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := ScopeTerminalsGaps()
 	if len(gaps) != 1 || gaps[0] != ScopeTerminalsGapPrunedScope {
-		t.Errorf("gaps are %v, want exactly [ScopeTerminalsGapPrunedScope]", gaps)
+		test.Errorf("gaps are %v, want exactly [ScopeTerminalsGapPrunedScope]", gaps)
 	}
 }
 
@@ -571,15 +571,15 @@ func TestScopeTerminalsGapsAreDeclared(t *testing.T) {
 // `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes`. All four are ported and
 // record the decision as `ReactiveScopeBlock.Pruned` instead, so adding the variant would create the
 // exact `Optional` shape this package already carries as a warning.
-func TestPrunedScopeIsNotDeclared(t *testing.T) {
-	t.Parallel()
+func TestPrunedScopeIsNotDeclared(test *testing.T) {
+	test.Parallel()
 
 	contents, err := os.ReadFile("terminal.go")
 	if err != nil {
-		t.Fatalf("reading terminal.go: %v", err)
+		test.Fatalf("reading terminal.go: %v", err)
 	}
 	if strings.Contains(string(contents), "type PrunedScope struct") {
-		t.Error("PrunedScope is declared but nothing in this tree constructs it, which is the " +
+		test.Error("PrunedScope is declared but nothing in this tree constructs it, which is the " +
 			"Optional failure this package already carries once")
 	}
 }
@@ -600,13 +600,13 @@ func TestPrunedScopeIsNotDeclared(t *testing.T) {
 // The control is what makes the number meaningful: an earlier version of this pass built 3,286
 // terminals against 2,874 scopes, and the excess was 412 duplicates. A bare non-zero count could not
 // have seen that.
-func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
-	t.Parallel()
+func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -616,14 +616,14 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
+		test.Fatalf("walking the corpus: %v", err)
 	}
 	sort.Strings(files)
 	if len(files) > 400 {
 		files = files[:400]
 	}
 	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
+		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
 	functions, mergedTotal, recovered, built := 0, 0, 0, 0
@@ -642,7 +642,7 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -689,36 +689,36 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
 	}
 
-	t.Logf("functions                             %d", functions)
-	t.Logf("scopes after align-then-merge         %d", mergedTotal)
-	t.Logf("Scope terminals built                 %d", built)
-	t.Logf("scopes recovered from the graph       %d", recovered)
+	test.Logf("functions                             %d", functions)
+	test.Logf("scopes after align-then-merge         %d", mergedTotal)
+	test.Logf("Scope terminals built                 %d", built)
+	test.Logf("scopes recovered from the graph       %d", recovered)
 
 	if functions < 100 {
-		t.Fatalf("only %d functions lowered; the corpus is probably wrong", functions)
+		test.Fatalf("only %d functions lowered; the corpus is probably wrong", functions)
 	}
 	if declined != 0 {
-		t.Errorf("%d functions were declined on the nesting precondition, want 0 after alignment "+
+		test.Errorf("%d functions were declined on the nesting precondition, want 0 after alignment "+
 			"and merging", declined)
 	}
 	if recovered == 0 {
-		t.Fatal("no scope is recoverable from a CFG terminal, which is the zero this pass exists " +
+		test.Fatal("no scope is recoverable from a CFG terminal, which is the zero this pass exists " +
 			"to move")
 	}
 	if recovered != mergedTotal {
-		t.Errorf("recovered %d scopes from the graph but the merged table holds %d; a mismatch "+
+		test.Errorf("recovered %d scopes from the graph but the merged table holds %d; a mismatch "+
 			"means the pass built duplicates or dropped scopes", recovered, mergedTotal)
 	}
 	if built != mergedTotal {
-		t.Errorf("built %d terminals for %d merged scopes", built, mergedTotal)
+		test.Errorf("built %d terminals for %d merged scopes", built, mergedTotal)
 	}
 	if ssaViolations != 0 {
-		t.Errorf("the rewrite left %d single-assignment violations across the corpus", ssaViolations)
+		test.Errorf("the rewrite left %d single-assignment violations across the corpus", ssaViolations)
 	}
 	if emptyBodies != 0 {
-		t.Errorf("%d Scope terminals name a body block that is not in the graph", emptyBodies)
+		test.Errorf("%d Scope terminals name a body block that is not in the graph", emptyBodies)
 	}
 }

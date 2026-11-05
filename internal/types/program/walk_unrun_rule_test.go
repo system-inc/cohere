@@ -20,8 +20,8 @@ import (
 //
 // @eslint-react/no-array-index-key is the trap: cohere runs react/no-array-index-key, and matching on the
 // bare name would report a TanStack directive as a stale prefix pointing at a rule of another plugin.
-func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(t *testing.T) {
-	t.Parallel()
+func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *testing.T) {
+	test.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line import/no-cycle -- another plugin's rule",
 		"export const a = 1;",
@@ -37,10 +37,10 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(t *tes
 		"export const f = 1;",
 		"",
 	}, "\n")
-	directory := writeProject(t, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
+	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	graph.RegisteredRuleNames = []string{"no-console", "react/no-array-index-key", "nexus/consistency-no-enum"}
 	listening := rule.Rule{
@@ -52,7 +52,7 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(t *tes
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	reported := []string{}
@@ -60,11 +60,11 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(t *tes
 		reported = append(reported, diagnostic.RuleName+"/"+diagnostic.Message.Id)
 	}
 	if want := []string{"no-witth/ruleNotFound", "nexus/consistency-no-enumm/ruleNotFound"}; !slices.Equal(reported, want) {
-		t.Errorf("the findings are %q, want only the two typos %q", reported, want)
+		test.Errorf("the findings are %q, want only the two typos %q", reported, want)
 	}
 
 	want := map[string]int{"import/no-cycle": 2, "jsx-a11y/alt-text": 1, "@eslint-react/no-array-index-key": 1, "no-with": 1}
 	if !maps.Equal(result.Coverage.UnrunRuleReferences, want) {
-		t.Errorf("the rules counted as not run are %v, want %v", result.Coverage.UnrunRuleReferences, want)
+		test.Errorf("the rules counted as not run are %v, want %v", result.Coverage.UnrunRuleReferences, want)
 	}
 }

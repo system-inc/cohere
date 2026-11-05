@@ -20,15 +20,15 @@ import (
 //
 // A test that only checked the true cases would pass on a predicate that returns true for
 // everything, which is the failure this file is most likely to have.
-func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(t *testing.T) {
-	t.Parallel()
+func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(test *testing.T) {
+	test.Parallel()
 
 	// The callable forms are here because the predicate is ONE flag check rather than upstream's
 	// two arms. A separate call-signature arm was written, then removed when a mutation sweep
 	// showed deleting it changed no answer: every callable form TypeScript has carries the Object
 	// flag. These five hold that reduction in place -- if a callable form is ever found without the
 	// flag, one of them fails and the arm comes back.
-	answers := invalidatingAnswers(t, `
+	answers := invalidatingAnswers(test, `
 		interface CallableValue { (x: number): number; }
 		type AliasedFunction = (x: number) => number;
 		function f(flag, aliasedValue: AliasedFunction, callableValue: CallableValue,
@@ -66,12 +66,12 @@ func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(t *testing.T) {
 	} {
 		got, found := answers[testCase.name]
 		if !found {
-			t.Errorf("%q never reached the predicate; the lowering did not give it an identifier "+
+			test.Errorf("%q never reached the predicate; the lowering did not give it an identifier "+
 				"with a node, so this case asserts nothing", testCase.name)
 			continue
 		}
 		if got != testCase.want {
-			t.Errorf("%s: got %t, want %t (%s)", testCase.name, got, testCase.want, testCase.why)
+			test.Errorf("%s: got %t, want %t (%s)", testCase.name, got, testCase.want, testCase.why)
 		}
 	}
 }
@@ -81,12 +81,12 @@ func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(t *testing.T) {
 // Both upstream call sites use a TRUE answer to permit a merge, so a missing type must answer false
 // rather than true: declining to merge on missing information is safe, merging on it is not. A
 // predicate that defaulted the other way would still pass the separation test above.
-func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f() { const a = [1]; return a; }`)
+	function, _ := rangesFor(test, `function f() { const a = [1]; return a; }`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 
 	reached := 0
@@ -96,16 +96,16 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
 		}
 		reached++
 		if IsAlwaysInvalidatingType(function, identifier.Id, nil) {
-			t.Errorf("identifier %q answered true with a nil checker; a missing type must decline",
+			test.Errorf("identifier %q answered true with a nil checker; a missing type must decline",
 				identifier.Name)
 		}
 	}
 	if reached == 0 {
-		t.Fatal("the function holds no identifiers, so the loop asserted nothing")
+		test.Fatal("the function holds no identifiers, so the loop asserted nothing")
 	}
 
 	if IsAlwaysInvalidatingType(nil, 0, nil) {
-		t.Error("a nil function answered true")
+		test.Error("a nil function answered true")
 	}
 }
 
@@ -120,12 +120,12 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
 // The assertion is that the predicate answers rather than panicking, and that it answers false. A
 // nodeless identifier has no type to ask about, and both upstream call sites use a true answer to
 // PERMIT a merge, so the missing-information direction must be false.
-func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(t *testing.T) {
-	t.Parallel()
+func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(test *testing.T) {
+	test.Parallel()
 
 	nodeless, answeredTrue := 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 100, func(function *Function, checker *shimchecker.Checker) {
+	forEachCorpusFunctionWithChecker(test, 100, func(function *Function, checker *shimchecker.Checker) {
 		for _, identifier := range function.Identifiers {
 			if identifier == nil || identifier.Node != nil {
 				continue
@@ -146,20 +146,20 @@ func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(t *testing.T) {
 		// computes it drifts as the corpus moves, and a stale number in the failure message of a
 		// coverage guard is the worst place for one: it hands a future reader a phantom
 		// discrepancy inside the very assertion meant to prove the guard is exercised.
-		t.Fatal("no nodeless identifier was found in the corpus, so this guard is unexercised " +
+		test.Fatal("no nodeless identifier was found in the corpus, so this guard is unexercised " +
 			"and the test proves nothing")
 	}
 	if answeredTrue != 0 {
-		t.Errorf("%d of %d nodeless identifiers answered true; a value with no type must decline, "+
+		test.Errorf("%d of %d nodeless identifiers answered true; a value with no type must decline, "+
 			"because both call sites use true to permit a merge", answeredTrue, nodeless)
 	}
 
-	t.Logf("nodelessIdentifiers=%d answeredTrue=%d", nodeless, answeredTrue)
+	test.Logf("nodelessIdentifiers=%d answeredTrue=%d", nodeless, answeredTrue)
 }
 
 // invalidatingAnswers runs the predicate over a source and returns its answer per named identifier.
-func invalidatingAnswers(t *testing.T, source string) map[string]bool {
-	t.Helper()
+func invalidatingAnswers(test *testing.T, source string) map[string]bool {
+	test.Helper()
 
 	answers := map[string]bool{}
 	probe := rule.Rule{
@@ -169,7 +169,7 @@ func invalidatingAnswers(t *testing.T, source string) map[string]bool {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so every " +
+						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"answer below would be the nil-checker default rather than a type")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -190,7 +190,7 @@ func invalidatingAnswers(t *testing.T, source string) map[string]bool {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"/invalidating.ts": source}, "/invalidating.ts")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"/invalidating.ts": source}, "/invalidating.ts")
 	return answers
 }
 
@@ -199,12 +199,12 @@ func invalidatingAnswers(t *testing.T, source string) map[string]bool {
 // The shared helper drops it, and every consumer so far only needed the graph. This one needs the
 // checker itself, because the predicate under test takes one and passing nil short-circuits before
 // the code being asserted runs.
-func forEachCorpusFunctionWithChecker(t *testing.T, limit int,
+func forEachCorpusFunctionWithChecker(test *testing.T, limit int,
 	visit func(function *Function, checker *shimchecker.Checker)) {
-	t.Helper()
+	test.Helper()
 
 	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
-	files, contentsOf := pinnedCorpusFiles(t, limit)
+	files, contentsOf := pinnedCorpusFiles(test, limit)
 
 	for _, path := range files {
 		contents := contentsOf[path]
@@ -216,7 +216,7 @@ func forEachCorpusFunctionWithChecker(t *testing.T, limit int,
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker")
+							test.Fatal("the typed harness handed this probe a nil checker")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
 							function := Lower(functionNode, ctx.TypeChecker)
@@ -230,6 +230,6 @@ func forEachCorpusFunctionWithChecker(t *testing.T, limit int,
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: contents}, fileName)
 	}
 }

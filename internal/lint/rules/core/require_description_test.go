@@ -23,13 +23,13 @@ type requireDescriptionCase struct {
 
 // runRequireDescription drives one case through the rule's own exported decoder, so the option
 // object reaches the rule the way the config layer hands it over.
-func runRequireDescription(t *testing.T, testCase requireDescriptionCase) rule_testing.Result {
-	t.Helper()
+func runRequireDescription(test *testing.T, testCase requireDescriptionCase) rule_testing.Result {
+	test.Helper()
 	decoded, err := DecodeRequireDescriptionOptions([]byte(testCase.options))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", testCase.options, err)
+		test.Fatalf("decoding %q: %v", testCase.options, err)
 	}
-	return rule_testing.RunWithOptions(t, RequireDescription, requireDescriptionFile, testCase.sourceText, decoded)
+	return rule_testing.RunWithOptions(test, RequireDescription, requireDescriptionFile, testCase.sourceText, decoded)
 }
 
 // checkRequireDescription asserts the count, the message id and the exact span text of every finding.
@@ -37,32 +37,32 @@ func runRequireDescription(t *testing.T, testCase requireDescriptionCase) rule_t
 // The span is asserted as text rather than as offsets because `rule_testing.Run` does not trim the
 // fixture, so the literal and the parsed file are byte-identical and a slice of one is a slice of
 // the other.
-func checkRequireDescription(t *testing.T, testCase requireDescriptionCase) {
-	t.Helper()
-	result := runRequireDescription(t, testCase)
+func checkRequireDescription(test *testing.T, testCase requireDescriptionCase) {
+	test.Helper()
+	result := runRequireDescription(test, testCase)
 	if len(testCase.wantSpans) == 0 {
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 		return
 	}
 	wantIds := make([]string, len(testCase.wantSpans))
 	for index := range wantIds {
 		wantIds[index] = "missingDescription"
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	for index, diagnostic := range result.Diagnostics {
 		got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if got != testCase.wantSpans[index] {
-			t.Errorf("finding %d spans %q, want %q", index, got, testCase.wantSpans[index])
+			test.Errorf("finding %d spans %q, want %q", index, got, testCase.wantSpans[index])
 		}
 	}
 }
 
-func runRequireDescriptionCases(t *testing.T, cases []requireDescriptionCase) {
-	t.Helper()
+func runRequireDescriptionCases(test *testing.T, cases []requireDescriptionCase) {
+	test.Helper()
 	for index, testCase := range cases {
-		t.Run("case"+strconv.Itoa(index), func(t *testing.T) {
-			t.Parallel()
-			checkRequireDescription(t, testCase)
+		test.Run("case"+strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			checkRequireDescription(test, testCase)
 		})
 	}
 }
@@ -75,9 +75,9 @@ func runRequireDescriptionCases(t *testing.T, cases []requireDescriptionCase) {
 // `eslint-env` rows, which upstream itself gates to ESLint <= 9; the `@eslint/css` language-plugin
 // row, since cohere lints no CSS; and the two sibling-plugin rows, which test a cache shared with
 // other rules in the plugin and whose code is already present below as plain rows.
-func TestRequireDescriptionStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
-	runRequireDescriptionCases(t, []requireDescriptionCase{
+func TestRequireDescriptionStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
+	runRequireDescriptionCases(test, []requireDescriptionCase{
 		{sourceText: `/* eslint eqeqeq: "off", curly: "error" -- Here's a description about why this configuration is necessary. */`},
 		{sourceText: "/* eslint-disable -- description */"},
 		{sourceText: "/* eslint-enable -- description */"},
@@ -111,12 +111,12 @@ func TestRequireDescriptionStaysSilentOnUpstreamPassCases(t *testing.T) {
 // each. The span is the whole comment: upstream's end column matched the comment's end on every row
 // (for example `/* eslint-disable */` ends at column 21), and its start is column -1, which is the
 // suppression escape documented on the rule rather than a place to point.
-func TestRequireDescriptionFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestRequireDescriptionFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 	whole := func(sourceText string, options string) requireDescriptionCase {
 		return requireDescriptionCase{sourceText: sourceText, options: options, wantSpans: []string{sourceText}}
 	}
-	runRequireDescriptionCases(t, []requireDescriptionCase{
+	runRequireDescriptionCases(test, []requireDescriptionCase{
 		whole("/* eslint */", ""),
 		whole(`/* eslint eqeqeq: "off", curly: "error" */`, ""),
 		whole("/* eslint-enable */", ""),
@@ -149,9 +149,9 @@ func TestRequireDescriptionFiresOnUpstreamFailCases(t *testing.T) {
 // the cloned rule through ESLint 10.8.1 (scratchpad `clone-suppression/probe-cases.json`).
 //
 // The `--` followed only by whitespace is the row the task names: a separator is not a reason.
-func TestRequireDescriptionReadsTheSeparatorAsESLintDoes(t *testing.T) {
-	t.Parallel()
-	runRequireDescriptionCases(t, []requireDescriptionCase{
+func TestRequireDescriptionReadsTheSeparatorAsESLintDoes(test *testing.T) {
+	test.Parallel()
+	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// Reports: no reason.
 		{sourceText: "// eslint-disable-next-line foo -- ", wantSpans: []string{"// eslint-disable-next-line foo -- "}},
 		{sourceText: "// eslint-disable-next-line foo --", wantSpans: []string{"// eslint-disable-next-line foo --"}},
@@ -171,9 +171,9 @@ func TestRequireDescriptionReadsTheSeparatorAsESLintDoes(t *testing.T) {
 
 // TestRequireDescriptionMatchesUpstreamOnCommentShapes is every other shape the oracle was asked
 // about where upstream's parser decides, so both engines agree.
-func TestRequireDescriptionMatchesUpstreamOnCommentShapes(t *testing.T) {
-	t.Parallel()
-	runRequireDescriptionCases(t, []requireDescriptionCase{
+func TestRequireDescriptionMatchesUpstreamOnCommentShapes(test *testing.T) {
+	test.Parallel()
+	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// A trailing directive: upstream reports from column -1, here the comment alone.
 		{sourceText: "x; // eslint-disable-line foo", wantSpans: []string{"// eslint-disable-line foo"}},
 		{sourceText: "const a = 1;\n    /* eslint-disable */\nconst b = 2;", wantSpans: []string{"/* eslint-disable */"}},
@@ -216,9 +216,9 @@ func TestRequireDescriptionMatchesUpstreamOnCommentShapes(t *testing.T) {
 // The `eslint-` rows here are the one measured divergence from upstream, and each was measured
 // silent on the cloned rule: ESLint ignores a line-comment `// eslint-disable`, a star-continued
 // block, and a multi-line `eslint-disable-line`, while cohere suppresses with every one of them.
-func TestRequireDescriptionCoversWhatCohereHonors(t *testing.T) {
-	t.Parallel()
-	runRequireDescriptionCases(t, []requireDescriptionCase{
+func TestRequireDescriptionCoversWhatCohereHonors(test *testing.T) {
+	test.Parallel()
+	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// cohere's own spellings, every scope, and the enable.
 		{sourceText: "// cohere-disable-next-line no-alert", wantSpans: []string{"// cohere-disable-next-line no-alert"}},
 		{sourceText: "x; // cohere-disable-line", wantSpans: []string{"// cohere-disable-line"}},
@@ -262,29 +262,29 @@ func TestRequireDescriptionCoversWhatCohereHonors(t *testing.T) {
 // and every blanket `// eslint-disable-line` in a real run would silence its own finding.
 //
 // The control is an ordinary rule name at the same offset, which the same directive does silence.
-func TestRequireDescriptionIsRegisteredAsADirectiveSubject(t *testing.T) {
-	t.Parallel()
+func TestRequireDescriptionIsRegisteredAsADirectiveSubject(test *testing.T) {
+	test.Parallel()
 	source := "x; // eslint-disable-line\n"
 	if !suppression.Build(source).Suppresses("no-alert", 3) {
-		t.Fatal("control: a blanket same-line directive should silence an ordinary rule on its line")
+		test.Fatal("control: a blanket same-line directive should silence an ordinary rule on its line")
 	}
 	if suppression.Build(source).Suppresses(RequireDescription.Name, 3) {
-		t.Fatal("a same-line directive silenced the finding about itself; the rule is not registered as a directive subject")
+		test.Fatal("a same-line directive silenced the finding about itself; the rule is not registered as a directive subject")
 	}
 }
 
 // TestRequireDescriptionWithNoOptionsAtAll bypasses the decoder, which is how a bare severity
 // reached a rule as nil and left another rule inert across the whole tree.
-func TestRequireDescriptionWithNoOptionsAtAll(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.Run(t, RequireDescription, requireDescriptionFile, "// eslint-disable-line\n")
-	rule_testing.ExpectFindings(t, result, "missingDescription")
+func TestRequireDescriptionWithNoOptionsAtAll(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.Run(test, RequireDescription, requireDescriptionFile, "// eslint-disable-line\n")
+	rule_testing.ExpectFindings(test, result, "missingDescription")
 }
 
 // TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses covers `additionalProperties: false`,
 // the `ignore` enum and `uniqueItems`, each of which would otherwise decode to "ignore nothing".
-func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(t *testing.T) {
-	t.Parallel()
+func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(test *testing.T) {
+	test.Parallel()
 	refused := map[string]string{
 		`{"ignored":["eslint"]}`:                       "unknown field",
 		`{"ignore":["eslint-disable-file"]}`:           "wanted one of",
@@ -304,17 +304,17 @@ func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(t *testing.T) {
 	for raw, wantFragment := range refused {
 		_, err := DecodeRequireDescriptionOptions([]byte(raw))
 		if err == nil || !strings.Contains(err.Error(), wantFragment) {
-			t.Errorf("decoding %s: got %v, want an error containing %q", raw, err, wantFragment)
+			test.Errorf("decoding %s: got %v, want an error containing %q", raw, err, wantFragment)
 		}
 	}
 
 	decoded, err := DecodeRequireDescriptionOptions(nil)
 	if err != nil || len(decoded.(RequireDescriptionOptions).Ignore) != 0 {
-		t.Errorf("a bare severity should decode to the zero options, got %#v, %v", decoded, err)
+		test.Errorf("a bare severity should decode to the zero options, got %#v, %v", decoded, err)
 	}
 	decoded, err = DecodeRequireDescriptionOptions([]byte(`{"ignore":["eslint-disable","eslint-enable"],"additionalDirectives":["c8"]}`))
 	options, _ := decoded.(RequireDescriptionOptions)
 	if err != nil || len(options.Ignore) != 2 || len(options.AdditionalDirectives) != 1 {
-		t.Errorf("a valid object should decode whole, got %#v, %v", decoded, err)
+		test.Errorf("a valid object should decode whole, got %#v, %v", decoded, err)
 	}
 }

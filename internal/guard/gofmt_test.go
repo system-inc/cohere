@@ -28,13 +28,13 @@ import (
 // Files whose name begins with a dot are skipped too, as gofmt skips them. go/format is gofmt's own printer,
 // run in process and on every core rather than as a command. A file that does not parse fails too, since
 // gofmt stops the release on it as surely.
-func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
-	t.Parallel()
+func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
+	test.Parallel()
 
 	// This package sits two directories below the module root.
 	module, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	var files []string
@@ -55,7 +55,7 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	// The same guard the release keeps: a walk that found nothing would pass over a tree nobody examined.
 	// The release's own set is required in particular, so a walk that lost it cannot pass on the rest.
@@ -67,7 +67,7 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 		}
 	}
 	if underReleaseSet == 0 {
-		t.Fatal("found no Go files under command/ and internal/, so a clean answer would mean nothing")
+		test.Fatal("found no Go files under command/ and internal/, so a clean answer would mean nothing")
 	}
 
 	var mutex sync.Mutex
@@ -98,7 +98,7 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 
 	if len(unformatted) > 0 {
 		sort.Strings(unformatted)
-		t.Fatalf("%d of %d Go files are not gofmt-clean, and any under command/ or internal/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
+		test.Fatalf("%d of %d Go files are not gofmt-clean, and any under command/ or internal/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
 			len(unformatted), len(files), strings.Join(unformatted, "\n  "))
 	}
 }

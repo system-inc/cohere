@@ -16,8 +16,8 @@ import (
 
 // TestJsxNoConstructedContextValuesReportsAnUnstableMemoDependency covers each way a memo's input is
 // proven to change every render.
-func TestJsxNoConstructedContextValuesReportsAnUnstableMemoDependency(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesReportsAnUnstableMemoDependency(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -233,11 +233,11 @@ export function Component() {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unstableDependencyMsg")
+			rule_testing.ExpectFindings(test, result, "unstableDependencyMsg")
 		})
 	}
 }
@@ -245,8 +245,8 @@ export function Component() {
 // TestJsxNoConstructedContextValuesTrustsWhatItCannotProveUnstable is the other direction: every
 // input the analysis treats as stable, each one a shape that sits beside the reporting sites in the
 // same real files.
-func TestJsxNoConstructedContextValuesTrustsWhatItCannotProveUnstable(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesTrustsWhatItCannotProveUnstable(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -535,33 +535,33 @@ export function Component(properties: { n: number }) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestJsxNoConstructedContextValuesReportsAMemoWithoutDependencies pins the second new message: a
 // memo with no list recomputes every render, which no input can rescue.
-func TestJsxNoConstructedContextValuesReportsAMemoWithoutDependencies(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesReportsAMemoWithoutDependencies(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(properties: { n: number }) {
     const value = React.useMemo(() => ({ n: properties.n }));
     return <Ctx.Provider value={value} />;
 }`
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, result, "memoWithoutDependenciesMsg")
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
+	rule_testing.ExpectFindings(test, result, "memoWithoutDependenciesMsg")
 }
 
 // TestJsxNoConstructedContextValuesUnstableDependencyMessage pins the finding's anchor and text: it
 // points at the dependency in the list, names it, and says where the new identity is made.
-func TestJsxNoConstructedContextValuesUnstableDependencyMessage(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesUnstableDependencyMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "function mergeTheme(base: { a: number }, override?: { a: number }) {\n" +
 		"    if(!override) return base;\n" +
@@ -574,16 +574,16 @@ func TestJsxNoConstructedContextValuesUnstableDependencyMessage(t *testing.T) {
 		"    const contextValue = React.useMemo(() => ({ dialogTheme }), [dialogTheme]);\n" +
 		"    return <DialogContext.Provider value={contextValue} />;\n" +
 		"}\n"
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, result, "unstableDependencyMsg")
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
+	rule_testing.ExpectFindings(test, result, "unstableDependencyMsg")
 
 	diagnostic := result.Diagnostics[0]
 	text := strings.TrimSpace(source) + "\n"
 	if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; got != "dialogTheme" {
-		t.Errorf("span = %q, wanted the dependency entry \"dialogTheme\"", got)
+		test.Errorf("span = %q, wanted the dependency entry \"dialogTheme\"", got)
 	}
 	if line := strings.Count(text[:diagnostic.Range.Pos()], "\n") + 1; line != 9 {
-		t.Errorf("finding on line %d, wanted line 9 where the dependency list is", line)
+		test.Errorf("finding on line %d, wanted line 9 where the dependency list is", line)
 	}
 	want := "The \"dialogTheme\" dependency of the useMemo that builds the Context provider's value " +
 		"(at line 9) is the result of `mergeTheme(...)`, which can return a new value on every call " +
@@ -592,13 +592,13 @@ func TestJsxNoConstructedContextValuesUnstableDependencyMessage(t *testing.T) {
 		"value is only stable when every input is: make \"dialogTheme\" stable too, by memoizing it or " +
 		"by building it outside the component."
 	if got := diagnostic.Message.Description; got != want {
-		t.Errorf("message =\n%q\nwanted\n%q", got, want)
+		test.Errorf("message =\n%q\nwanted\n%q", got, want)
 	}
 }
 
 // TestJsxNoConstructedContextValuesNamesTheNestedMemoDependency pins the transitive wording.
-func TestJsxNoConstructedContextValuesNamesTheNestedMemoDependency(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesNamesTheNestedMemoDependency(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(properties: { n: number }) {
@@ -607,11 +607,11 @@ export function Component(properties: { n: number }) {
     const value = useMemo(() => ({ derived }), [derived]);
     return <Ctx.Provider value={value} />;
 }`
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, result, "unstableDependencyMsg")
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues, jsxNoConstructedContextValuesFile, source)
+	rule_testing.ExpectFindings(test, result, "unstableDependencyMsg")
 	want := "comes from a useMemo whose own dependency \"options\" is a new object built during render (at line 2)"
 	if got := result.Diagnostics[0].Message.Description; !strings.Contains(got, want) {
-		t.Errorf("message =\n%q\nwanted it to contain\n%q", got, want)
+		test.Errorf("message =\n%q\nwanted it to contain\n%q", got, want)
 	}
 }
 
@@ -621,8 +621,8 @@ export function Component(properties: { n: number }) {
 // The silent rows were each measured silent on the installed eslint-plugin-react 7.37.5; the first
 // is the Providers.tsx shape that cohere reported and ESLint did not. The last reporting row is the
 // one upstream misses (it resolves names only in the JSX's own block scope) and cohere reports.
-func TestJsxNoConstructedContextValuesOnlyCountsPerRenderDeclarations(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesOnlyCountsPerRenderDeclarations(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -659,11 +659,11 @@ export function makeComponent() {
 }`},
 	}
 	for _, testCase := range silent {
-		t.Run("silent "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run("silent "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -686,11 +686,11 @@ export function Component(properties: { show: boolean }) {
 }`},
 	}
 	for _, testCase := range reporting {
-		t.Run("reports "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run("reports "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "withIdentifierMsg")
+			rule_testing.ExpectFindings(test, result, "withIdentifierMsg")
 		})
 	}
 }

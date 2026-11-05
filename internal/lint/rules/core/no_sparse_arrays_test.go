@@ -8,8 +8,8 @@ import (
 
 const sparseArrayFile = "/repository/source/Thing.ts"
 
-func TestNoSparseArraysFires(t *testing.T) {
-	t.Parallel()
+func TestNoSparseArraysFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -24,16 +24,16 @@ func TestNoSparseArraysFires(t *testing.T) {
 		{"a nested array's hole", "export const Values = [[1, , 3]];\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
 				"unexpectedSparseArray")
 		})
 	}
 }
 
-func TestNoSparseArraysStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSparseArraysStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -52,9 +52,9 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 		{"no array at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText))
 		})
 	}
 }
@@ -62,8 +62,8 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 // A hole in a destructuring target skips a value; it builds no array. ESLint never sees these:
 // ESTree spells an assignment target as an ArrayPattern and the rule listens only to
 // ArrayExpression, while TypeScript's tree spells both as an ArrayLiteralExpression.
-func TestNoSparseArraysSkipsDestructuringTargets(t *testing.T) {
-	t.Parallel()
+func TestNoSparseArraysSkipsDestructuringTargets(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -79,17 +79,17 @@ func TestNoSparseArraysSkipsDestructuringTargets(t *testing.T) {
 		{"a target with a default", "declare const u: string[][];\nlet f = '';\n[[, f] = []] = u;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText))
 		})
 	}
 }
 
 // The controls beside the destructuring cases: an array literal that is a value, even one sitting
 // next to a target, still builds an array, so its hole still reports.
-func TestNoSparseArraysStillFiresBesideDestructuring(t *testing.T) {
-	t.Parallel()
+func TestNoSparseArraysStillFiresBesideDestructuring(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -101,9 +101,9 @@ func TestNoSparseArraysStillFiresBesideDestructuring(t *testing.T) {
 		{"a destructuring default's value", "declare const u: number[][];\nlet a = 0;\n[[a] = [1, , 2]] = u;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
 				"unexpectedSparseArray")
 		})
 	}
@@ -111,11 +111,11 @@ func TestNoSparseArraysStillFiresBesideDestructuring(t *testing.T) {
 
 // One finding per array rather than one per hole, so a two-hole array reports once. Reported on the
 // literal rather than the hole because the hole has no text of its own to point at.
-func TestNoSparseArraysReportsOncePerArray(t *testing.T) {
-	t.Parallel()
+func TestNoSparseArraysReportsOncePerArray(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoSparseArrays, sparseArrayFile, "export const Values = [1, , , 4];\n")
+	result := rule_testing.Run(test, NoSparseArrays, sparseArrayFile, "export const Values = [1, , , 4];\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want exactly one finding for a two-hole array, got %d", len(result.Diagnostics))
+		test.Fatalf("want exactly one finding for a two-hole array, got %d", len(result.Diagnostics))
 	}
 }

@@ -69,25 +69,25 @@ func (p recordedParser) DeclaredValues(className string) []string {
 	return p.declared[className]
 }
 
-func loadFixtures(t *testing.T) fixtureCorpus {
-	t.Helper()
+func loadFixtures(test *testing.T) fixtureCorpus {
+	test.Helper()
 
 	path := filepath.Join("testdata", "gate_fixtures.json")
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("reading %s: %v", path, err)
+		test.Fatalf("reading %s: %v", path, err)
 	}
 
 	var corpus fixtureCorpus
 	if err := json.Unmarshal(contents, &corpus); err != nil {
-		t.Fatalf("parsing %s: %v", path, err)
+		test.Fatalf("parsing %s: %v", path, err)
 	}
 
 	// A fixture file that loaded nothing would let every assertion below pass for the wrong reason.
 	// This is the "prove the input is real" half: a vacuous corpus and a clean one are
 	// indistinguishable from inside the test.
 	if len(corpus.Fixtures) < 20 {
-		t.Fatalf("expected a real fixture corpus, got %d fixtures", len(corpus.Fixtures))
+		test.Fatalf("expected a real fixture corpus, got %d fixtures", len(corpus.Fixtures))
 	}
 
 	return corpus
@@ -103,9 +103,9 @@ func gateForFixture(fixture gateFixture) *Gate {
 // The tree this rule guards is already canonical, which is exactly the condition under which a
 // broken gate looks correct, so the corpus has to carry known-collapsing cases and this has to
 // confirm they are there.
-func TestCorpusDiscriminates(t *testing.T) {
-	t.Parallel()
-	corpus := loadFixtures(t)
+func TestCorpusDiscriminates(test *testing.T) {
+	test.Parallel()
+	corpus := loadFixtures(test)
 
 	collapsing := 0
 	silent := 0
@@ -118,13 +118,13 @@ func TestCorpusDiscriminates(t *testing.T) {
 	}
 
 	if collapsing == 0 {
-		t.Fatal("no fixture collapses, so a gate that never asks the engine would pass every test here")
+		test.Fatal("no fixture collapses, so a gate that never asks the engine would pass every test here")
 	}
 	if silent == 0 {
-		t.Fatal("no fixture stays silent, so a gate that always asks the engine would pass every test here")
+		test.Fatal("no fixture stays silent, so a gate that always asks the engine would pass every test here")
 	}
 
-	t.Logf("corpus: %d collapsing, %d silent, tailwind %s", collapsing, silent, corpus.TailwindVersion)
+	test.Logf("corpus: %d collapsing, %d silent, tailwind %s", collapsing, silent, corpus.TailwindVersion)
 }
 
 // TestGateNeverLosesACollapse is the assertion the whole package exists to satisfy.
@@ -132,9 +132,9 @@ func TestCorpusDiscriminates(t *testing.T) {
 // For every literal the real engine found a collapse in, the gate must send it to the engine. A
 // failure here is the silent kind: the rule keeps running, the tree keeps looking clean, and a real
 // finding stops being reported.
-func TestGateNeverLosesACollapse(t *testing.T) {
-	t.Parallel()
-	corpus := loadFixtures(t)
+func TestGateNeverLosesACollapse(test *testing.T) {
+	test.Parallel()
+	corpus := loadFixtures(test)
 
 	checked := 0
 	for _, fixture := range corpus.Fixtures {
@@ -145,13 +145,13 @@ func TestGateNeverLosesACollapse(t *testing.T) {
 
 		gate := gateForFixture(fixture)
 		if !gate.NeedsEngine(fixture.Classes, nil) {
-			t.Errorf("gate suppressed %q, but the engine collapses it into %v",
+			test.Errorf("gate suppressed %q, but the engine collapses it into %v",
 				fixture.Literal, collapseOutputs(fixture))
 		}
 	}
 
 	if checked == 0 {
-		t.Fatal("checked no collapsing fixtures, so this test proved nothing")
+		test.Fatal("checked no collapsing fixtures, so this test proved nothing")
 	}
 }
 
@@ -160,9 +160,9 @@ func TestGateNeverLosesACollapse(t *testing.T) {
 // A gate can reach the right answer through wrong keys and stay right only by accident. The keys are
 // what a future change breaks first, so they are asserted directly against what the JavaScript gate
 // computed on the same classes.
-func TestGateMatchesRecordedBucketKeys(t *testing.T) {
-	t.Parallel()
-	corpus := loadFixtures(t)
+func TestGateMatchesRecordedBucketKeys(test *testing.T) {
+	test.Parallel()
+	corpus := loadFixtures(test)
 
 	compared := 0
 	for _, fixture := range corpus.Fixtures {
@@ -170,16 +170,16 @@ func TestGateMatchesRecordedBucketKeys(t *testing.T) {
 		for className, wantKey := range fixture.BucketKeys {
 			gotKey := gate.GroupKey(className)
 			if gotKey != wantKey {
-				t.Errorf("%s: bucket key %q, want %q", className, gotKey, wantKey)
+				test.Errorf("%s: bucket key %q, want %q", className, gotKey, wantKey)
 			}
 			compared++
 		}
 	}
 
 	if compared == 0 {
-		t.Fatal("compared no bucket keys, so this test proved nothing")
+		test.Fatal("compared no bucket keys, so this test proved nothing")
 	}
-	t.Logf("compared %d bucket keys", compared)
+	test.Logf("compared %d bucket keys", compared)
 }
 
 // TestGateSkipsWhatItCan records the gate's value rather than only its safety.
@@ -187,9 +187,9 @@ func TestGateMatchesRecordedBucketKeys(t *testing.T) {
 // Safety alone is satisfiable by a gate that always says yes, which would be correct and useless.
 // This asserts the silent fixtures are actually skipped, so a regression toward always-ask shows up
 // as a failure rather than as a slow run nobody notices.
-func TestGateSkipsWhatItCan(t *testing.T) {
-	t.Parallel()
-	corpus := loadFixtures(t)
+func TestGateSkipsWhatItCan(test *testing.T) {
+	test.Parallel()
+	corpus := loadFixtures(test)
 
 	skipped := 0
 	asked := 0
@@ -201,16 +201,16 @@ func TestGateSkipsWhatItCan(t *testing.T) {
 		gate := gateForFixture(fixture)
 		if gate.NeedsEngine(fixture.Classes, nil) {
 			asked++
-			t.Logf("gate still asks about silent literal %q (safe, but costs a call)", fixture.Literal)
+			test.Logf("gate still asks about silent literal %q (safe, but costs a call)", fixture.Literal)
 		} else {
 			skipped++
 		}
 	}
 
 	if skipped == 0 {
-		t.Fatal("the gate skipped nothing, so it is not a gate")
+		test.Fatal("the gate skipped nothing, so it is not a gate")
 	}
-	t.Logf("silent fixtures: %d skipped, %d still asked", skipped, asked)
+	test.Logf("silent fixtures: %d skipped, %d still asked", skipped, asked)
 }
 
 // TestKnownWrongGatesLoseFindings is the known-dirty control.
@@ -221,9 +221,9 @@ func TestGateSkipsWhatItCan(t *testing.T) {
 //
 // A guard that has never returned a positive has not been shown to work, so these deliberately
 // broken gates are run against the same fixtures and required to fail.
-func TestKnownWrongGatesLoseFindings(t *testing.T) {
-	t.Parallel()
-	corpus := loadFixtures(t)
+func TestKnownWrongGatesLoseFindings(test *testing.T) {
+	test.Parallel()
+	corpus := loadFixtures(test)
 
 	testCases := []struct {
 		name string
@@ -254,18 +254,18 @@ func TestKnownWrongGatesLoseFindings(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			lost := brokenGateLosses(corpus, testCase.key)
 
 			if len(lost) == 0 {
-				t.Fatalf("the %q shortcut lost nothing on this corpus, so the corpus no longer "+
+				test.Fatalf("the %q shortcut lost nothing on this corpus, so the corpus no longer "+
 					"discriminates and the passing tests above prove less than they appear to",
 					testCase.name)
 			}
 
 			if !contains(lost, testCase.wantLoses) {
-				t.Errorf("expected the %q shortcut to lose %q, it lost %v",
+				test.Errorf("expected the %q shortcut to lose %q, it lost %v",
 					testCase.name, testCase.wantLoses, lost)
 			}
 
@@ -274,7 +274,7 @@ func TestKnownWrongGatesLoseFindings(t *testing.T) {
 				fixture := fixtureByLiteral(corpus, literal)
 				gate := gateForFixture(fixture)
 				if !gate.NeedsEngine(fixture.Classes, nil) {
-					t.Errorf("the real gate also loses %q, which the %q shortcut was supposed to "+
+					test.Errorf("the real gate also loses %q, which the %q shortcut was supposed to "+
 						"be alone in losing", literal, testCase.name)
 				}
 			}
@@ -375,8 +375,8 @@ func contains(values []string, want string) bool {
 // A project-specific class such as `background--2/50` is not something Tailwind can read. Grouping
 // every unreadable class under one empty key would make them send each other to the engine forever,
 // and grouping them with a real class would let one suppress a question about the other.
-func TestUnparseableClassesNeverGroup(t *testing.T) {
-	t.Parallel()
+func TestUnparseableClassesNeverGroup(test *testing.T) {
+	test.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"mystery-one": {},
@@ -387,13 +387,13 @@ func TestUnparseableClassesNeverGroup(t *testing.T) {
 	gate := NewGate(parser)
 
 	if gate.GroupKey("mystery-one") == gate.GroupKey("mystery-two") {
-		t.Fatal("two unparseable classes shared a bucket, so each would send the other to the engine")
+		test.Fatal("two unparseable classes shared a bucket, so each would send the other to the engine")
 	}
 	if gate.CouldRewriteAlone("mystery-one") {
-		t.Fatal("an unparseable class cannot be canonicalized, so it is not worth an engine call")
+		test.Fatal("an unparseable class cannot be canonicalized, so it is not worth an engine call")
 	}
 	if !gate.CannotCollapse([]string{"mystery-one", "mystery-two"}) {
-		t.Fatal("two unparseable classes cannot collapse into each other")
+		test.Fatal("two unparseable classes cannot collapse into each other")
 	}
 }
 
@@ -402,8 +402,8 @@ func TestUnparseableClassesNeverGroup(t *testing.T) {
 // The gate can see that `z-[1]` is worth asking about but not that it is `z-1`. Once an authority
 // says so, every later literal containing it must reach the engine, including ones where no two
 // classes share a bucket.
-func TestRecordedSingleRewriteForcesAnEngineCall(t *testing.T) {
-	t.Parallel()
+func TestRecordedSingleRewriteForcesAnEngineCall(test *testing.T) {
+	test.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"z-[1]": {{Kind: CandidateKindFunctional, Root: "z", Value: Value{Kind: ValueKindArbitrary, Value: "1"}}},
@@ -415,19 +415,19 @@ func TestRecordedSingleRewriteForcesAnEngineCall(t *testing.T) {
 
 	classes := []string{"z-[1]", "flex"}
 	if !gate.NeedsEngine(classes, nil) {
-		t.Fatal("an arbitrary value is always worth one engine call, because only the theme knows if it has a name")
+		test.Fatal("an arbitrary value is always worth one engine call, because only the theme knows if it has a name")
 	}
 
 	// Once asked, it should not be asked again by the singles path.
 	alreadyChecked := map[string]bool{"z-[1]": true, "flex": true}
 	if len(gate.SingleClassesWorthChecking(classes, alreadyChecked)) != 0 {
-		t.Fatal("a class already asked about should not be asked again")
+		test.Fatal("a class already asked about should not be asked again")
 	}
 
 	// But a recorded rewrite must still force the call, because the literal genuinely has a finding.
 	gate.RecordSingleRewrites([]string{"z-[1]"})
 	if !gate.NeedsEngine(classes, alreadyChecked) {
-		t.Fatal("a class known to rewrite alone must always reach the engine")
+		test.Fatal("a class known to rewrite alone must always reach the engine")
 	}
 }
 
@@ -435,8 +435,8 @@ func TestRecordedSingleRewriteForcesAnEngineCall(t *testing.T) {
 //
 // `flex flex` is a different rule's finding. If the gate treated the repeat as two classes sharing a
 // bucket, every duplicate in the tree would buy an engine call and report nothing.
-func TestDuplicateClassesDoNotFakeACollapse(t *testing.T) {
-	t.Parallel()
+func TestDuplicateClassesDoNotFakeACollapse(test *testing.T) {
+	test.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"flex": {{Kind: CandidateKindStatic, Root: "flex"}},
@@ -446,6 +446,6 @@ func TestDuplicateClassesDoNotFakeACollapse(t *testing.T) {
 	gate := NewGate(parser)
 
 	if gate.NeedsEngine([]string{"flex", "flex"}, map[string]bool{"flex": true}) {
-		t.Fatal("a repeated class is a duplicate, not a collapse")
+		test.Fatal("a repeated class is a duplicate, not a collapse")
 	}
 }

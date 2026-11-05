@@ -34,8 +34,8 @@ const unusedPrivateClassMembersFile = "/repository/source/PrivateMembers.ts"
 // the only semantic disagreement between the two implementations, and the other ten differences are
 // TypeScript syntax ESLint's own parser rejects. This follows ESLint, and the four live in
 // `TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals` with the reasoning.
-func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -245,21 +245,21 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "noUnusedPrivateClassMember"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
 					testCase.sourceText), expected...)
 		})
 	}
 }
 
-func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -572,9 +572,9 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
 	}
@@ -595,8 +595,8 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 //
 // If this is ever revisited, the decision to revisit is which of the two upstreams to follow, not
 // whether the rule has a bug.
-func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -608,9 +608,9 @@ func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *te
 		{"oxc fail 24", `class Foo { #a; #b; #c; method() { this.#a ? this.#b : this.#c; } }`}}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
 	}
@@ -627,8 +627,8 @@ func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *te
 // snapshot marks 13 columns under `#unusedMember` for a 12-character name, and ESLint reports
 // `declaredNode.key.loc`, the same node. Both upstreams agree, so this is measured against them
 // rather than chosen.
-func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -651,17 +651,17 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.reported[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
 				}
 			}
 		})
@@ -678,20 +678,20 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 // Asserted rather than left implicit, because a later revision adding an unattended fix would be a
 // rule silently deleting code while nobody is looking, and it would pass every other test in this
 // file.
-func TestNoUnusedPrivateClassMembersProposesNoRepair(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersProposesNoRepair(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
+	result := rule_testing.Run(test, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
 		`class A { #unused = 1; }`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Errorf("rule proposes %d fixes; removing a member changes the class shape and is a "+
+		test.Errorf("rule proposes %d fixes; removing a member changes the class shape and is a "+
 			"choice a human makes", len(result.Diagnostics[0].Fixes))
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Errorf("rule proposes %d suggestions; see the comment above this test before adding one",
+		test.Errorf("rule proposes %d suggestions; see the comment above this test before adding one",
 			len(result.Diagnostics[0].Suggestions))
 	}
 }
@@ -707,8 +707,8 @@ func TestNoUnusedPrivateClassMembersProposesNoRepair(t *testing.T) {
 // format rendered `'##unusedField'`, and a containment check for `#unusedField` is satisfied by a
 // string with two hashes. The dry run against the real tree caught it; this test did not. A test
 // whose predicate is weaker than the property it is guarding is how that happens.
-func TestNoUnusedPrivateClassMembersNamesTheMember(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersNamesTheMember(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -721,16 +721,16 @@ func TestNoUnusedPrivateClassMembersNamesTheMember(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.HasPrefix(description, testCase.rendered) {
-				t.Errorf("message begins %q, want it to begin %q",
+				test.Errorf("message begins %q, want it to begin %q",
 					description[:min(len(description), len(testCase.rendered)+10)], testCase.rendered)
 			}
 		})

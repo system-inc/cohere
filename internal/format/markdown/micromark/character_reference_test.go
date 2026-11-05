@@ -114,7 +114,7 @@ var characterReferenceFixtures = []string{
 	"&amp;\n\n&copy;",
 }
 
-func TestCharacterReferenceEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, characterReferenceFixtures)
+func TestCharacterReferenceEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, characterReferenceFixtures)
 }

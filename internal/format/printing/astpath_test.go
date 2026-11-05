@@ -9,8 +9,8 @@ import (
 // and the label property both, and checks that FindAncestor answers as a search of Ancestors does
 // (#vbjv3d6): for a predicate that matches several ancestors, so the nearest must win, one that matches
 // only the root, and one that matches nothing.
-func TestFindAncestorAgreesWithAncestors(t *testing.T) {
-	t.Parallel()
+func TestFindAncestorAgreesWithAncestors(test *testing.T) {
+	test.Parallel()
 	predicates := map[string]func(*toyNode) bool{
 		"list":    func(node *toyNode) bool { return node.Kind == "List" },
 		"program": func(node *toyNode) bool { return node.Kind == "Program" },
@@ -25,7 +25,7 @@ func TestFindAncestorAgreesWithAncestors(t *testing.T) {
 			expected, expectedFound := searchAncestors(path, predicate)
 			actual, actualFound := path.FindAncestor(predicate)
 			if actual != expected || actualFound != expectedFound {
-				t.Fatalf("%s: FindAncestor found %v (%t), a search of Ancestors %v (%t)", name, actual, actualFound, expected, expectedFound)
+				test.Fatalf("%s: FindAncestor found %v (%t), a search of Ancestors %v (%t)", name, actual, actualFound, expected, expectedFound)
 			}
 			if expectedFound {
 				matched[name]++
@@ -46,7 +46,7 @@ func TestFindAncestorAgreesWithAncestors(t *testing.T) {
 	}
 
 	if matched["list"] == 0 || matched["program"] == 0 || matched["none"] != 0 {
-		t.Fatalf("over %d nodes the predicates matched %v; the walk did not reach both a match and none", checked, matched)
+		test.Fatalf("over %d nodes the predicates matched %v; the walk did not reach both a match and none", checked, matched)
 	}
 }
 

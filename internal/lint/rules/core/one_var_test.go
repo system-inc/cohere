@@ -52,11 +52,11 @@ type oneVarFixCase struct {
 //
 // An empty string means the config carried no options at all, which is what a bare `"error"`
 // delivers, and the decoder answers with upstream's `defaultOptions: ["always"]`.
-func decodedOneVar(t *testing.T, raw string) any {
-	t.Helper()
+func decodedOneVar(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeOneVarOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding one-var options %q: %v", raw, err)
+		test.Fatalf("decoding one-var options %q: %v", raw, err)
 	}
 	return decoded
 }
@@ -940,26 +940,26 @@ var oneVarDeclineCases = []oneVarCase{
 	{name: "invalid-283", source: "class C { static { var x; if (foo) { var y; } } }", options: "\"always\""},
 }
 
-func TestOneVarFires(t *testing.T) {
-	t.Parallel()
+func TestOneVarFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestOneVarStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestOneVarStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -976,20 +976,20 @@ func TestOneVarStaysSilent(t *testing.T) {
 // messages carry an explanation upstream does not have. That is a weaker predicate than the whole
 // string, so the prefix asserted is the entire sentence upstream renders, up to and including its
 // terminating period.
-func TestOneVarRendersTheTypeUpstreamRenders(t *testing.T) {
-	t.Parallel()
+func TestOneVarRendersTheTypeUpstreamRenders(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.messages) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.messages))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.messages))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				wanted := testCase.messages[index]
 				if !strings.HasPrefix(diagnostic.Message.Description, wanted) {
-					t.Errorf("finding %d rendered:\n  %q\nwant it to begin with upstream's:\n  %q",
+					test.Errorf("finding %d rendered:\n  %q\nwant it to begin with upstream's:\n  %q",
 						index, diagnostic.Message.Description, wanted)
 				}
 			}
@@ -1006,22 +1006,22 @@ func TestOneVarRendersTheTypeUpstreamRenders(t *testing.T) {
 //
 // Upstream reports on the whole declaration statement, so the reported text must begin with the
 // declaration keyword -- or with `export`, for an exported one.
-func TestOneVarAnchorsOnTheDeclarationStatement(t *testing.T) {
-	t.Parallel()
+func TestOneVarAnchorsOnTheDeclarationStatement(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
 				if start < 0 || end > len(source) || start >= end {
-					t.Fatalf("finding %d has range [%d,%d) outside %q", index, start, end, source)
+					test.Fatalf("finding %d has range [%d,%d) outside %q", index, start, end, source)
 				}
 				reported := source[start:end]
 				if !oneVarBeginsADeclaration(reported) {
-					t.Errorf("finding %d points at %q, which does not begin a declaration statement",
+					test.Errorf("finding %d points at %q, which does not begin a declaration statement",
 						index, reported)
 				}
 			}
@@ -1039,14 +1039,14 @@ func oneVarBeginsADeclaration(reported string) bool {
 	return false
 }
 
-func TestOneVarRepairsWhatUpstreamRepairs(t *testing.T) {
-	t.Parallel()
+func TestOneVarRepairsWhatUpstreamRepairs(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarRepairCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectFixedSource(t, result, testCase.wanted)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
@@ -1056,19 +1056,19 @@ func TestOneVarRepairsWhatUpstreamRepairs(t *testing.T) {
 // Not "the output equals the input": `ExpectFixedSource` fatals when no fix was proposed, so
 // routing a decline through it would make the assertion agree with any expectation at all. The
 // decline withholds the REPAIR, not the report, so the finding must still be there.
-func TestOneVarDeclinesTheRepairsUpstreamDeclines(t *testing.T) {
-	t.Parallel()
+func TestOneVarDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarDeclineCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding; a decline withholds the FIX, not the report")
+				test.Fatalf("expected a finding; a decline withholds the FIX, not the report")
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("proposed %d fix(es); upstream declines this case", len(diagnostic.Fixes))
+					test.Errorf("proposed %d fix(es); upstream declines this case", len(diagnostic.Fixes))
 				}
 			}
 		})
@@ -1127,30 +1127,30 @@ var oneVarTypeScriptGapFiringCases = []oneVarCase{
 		messages: []string{"Combine this with the previous 'const' statement."}},
 }
 
-func TestOneVarStaysSilentOnTypeScriptShapesUpstreamCannotWrite(t *testing.T) {
-	t.Parallel()
+func TestOneVarStaysSilentOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarTypeScriptGapCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(t *testing.T) {
-	t.Parallel()
+func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range oneVarTypeScriptGapFiringCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			if len(result.Diagnostics) == len(testCase.messages) {
 				for index, diagnostic := range result.Diagnostics {
 					if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]) {
-						t.Errorf("finding %d rendered:\n  %q\nwant it to begin with:\n  %q",
+						test.Errorf("finding %d rendered:\n  %q\nwant it to begin with:\n  %q",
 							index, diagnostic.Message.Description, testCase.messages[index])
 					}
 				}
@@ -1169,8 +1169,8 @@ func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(t *testing.T) {
 // The behaviour is still a contract, and this test asserts it where the guard cannot be seen: a
 // change to `modeIs` that made nil compare equal would break these rows immediately, which is
 // exactly the failure the guard exists to prevent.
-func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(t *testing.T) {
-	t.Parallel()
+func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(test *testing.T) {
+	test.Parallel()
 	cases := []oneVarCase{
 		// `never` on var alone: the let list has two declarators and must stay clean.
 		{name: "var-never-leaves-let", source: "let foo = true, bar = false;", options: "{\"var\":\"never\"}"},
@@ -1182,20 +1182,20 @@ func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(t *testing.T) {
 		{name: "var-never-leaves-using", source: "using a = f(), b = g();", options: "{\"var\":\"never\"}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// A control, so the four clean rows above cannot pass by the rule being silent everywhere.
-	t.Run("control-the-named-kind-does-report", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, OneVar, oneVarFile,
-			"var foo = true, bar = false;", decodedOneVar(t, "{\"var\":\"never\"}"))
-		rule_testing.ExpectFindings(t, result, "split")
+	test.Run("control-the-named-kind-does-report", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
+			"var foo = true, bar = false;", decodedOneVar(test, "{\"var\":\"never\"}"))
+		rule_testing.ExpectFindings(test, result, "split")
 	})
 }
 
@@ -1235,8 +1235,8 @@ type oneVarExportCase struct {
 // fixes in a single pass exactly as RuleTester records `output`. The corpus is blind to all of it:
 // all seven of its exported cases are under "never", which reaches the split fixer and never the
 // join.
-func TestOneVarDeclinesToRepairExportedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestOneVarDeclinesToRepairExportedDeclarations(test *testing.T) {
+	test.Parallel()
 	cases := []oneVarExportCase{
 		{name: "export-join", source: "export const a = 1; export const b = 2;",
 			options: "\"always\"", findings: 1, fixes: 0},
@@ -1257,19 +1257,19 @@ func TestOneVarDeclinesToRepairExportedDeclarations(t *testing.T) {
 			options: "\"always\"", findings: 1, fixes: 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
 			}
 			proposed := 0
 			for _, diagnostic := range result.Diagnostics {
 				proposed += len(diagnostic.Fixes)
 			}
 			if proposed != testCase.fixes {
-				t.Errorf("proposed %d fix(es), want %d", proposed, testCase.fixes)
+				test.Errorf("proposed %d fix(es), want %d", proposed, testCase.fixes)
 			}
 		})
 	}
@@ -1282,12 +1282,12 @@ func TestOneVarDeclinesToRepairExportedDeclarations(t *testing.T) {
 // whether to write an `export ` prefix, so it very much does repair an exported declaration under
 // "never". Seven corpus cases pin it. A collapse that turned off every repair for exports would
 // pass every join test above and break all seven.
-func TestOneVarSplitStillRepairsExports(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.RunWithOptions(t, OneVar, oneVarFile,
-		"export const foo=1, bar=2;", decodedOneVar(t, "\"never\""))
-	rule_testing.ExpectFindings(t, result, "split")
-	rule_testing.ExpectFixedSource(t, result, "export const foo=1; export const bar=2;")
+func TestOneVarSplitStillRepairsExports(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
+		"export const foo=1, bar=2;", decodedOneVar(test, "\"never\""))
+	rule_testing.ExpectFindings(test, result, "split")
+	rule_testing.ExpectFixedSource(test, result, "export const foo=1; export const bar=2;")
 }
 
 // TestOneVarCarriesDeclareThroughTheSplit pins the `declare` modifier on every statement a split
@@ -1298,8 +1298,8 @@ func TestOneVarSplitStillRepairsExports(t *testing.T) {
 // `declare let a: number; let b: number;`, a binding that now exists at runtime, and the exported
 // const form became `export const b: number;`, which does not compile. The third row is the
 // control that the plain split is untouched.
-func TestOneVarCarriesDeclareThroughTheSplit(t *testing.T) {
-	t.Parallel()
+func TestOneVarCarriesDeclareThroughTheSplit(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []oneVarFixCase{
 		{name: "declare", source: "declare let a: number, b: number;",
 			options: "\"never\"", wanted: "declare let a: number; declare let b: number;"},
@@ -1308,12 +1308,12 @@ func TestOneVarCarriesDeclareThroughTheSplit(t *testing.T) {
 		{name: "control-plain", source: "let a: number, b: number;",
 			options: "\"never\"", wanted: "let a: number; let b: number;"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, "split")
-			rule_testing.ExpectFixedSource(t, result, testCase.wanted)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, "split")
+			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
@@ -1325,8 +1325,8 @@ func TestOneVarCarriesDeclareThroughTheSplit(t *testing.T) {
 // `declare`, not the first statement's semicolon. It is still reported; it is no longer repaired.
 // A mixed pair declines too, since joining an ambient binding into a real one changes whether it
 // exists at runtime. The control shows the join is otherwise alive.
-func TestOneVarDeclinesToJoinAmbientDeclarations(t *testing.T) {
-	t.Parallel()
+func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
+	test.Parallel()
 	cases := []oneVarExportCase{
 		{name: "both-ambient", source: "declare let a: number;\ndeclare let b: number;",
 			options: "\"always\"", findings: 1, fixes: 0},
@@ -1338,19 +1338,19 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(t *testing.T) {
 			options: "\"always\"", findings: 1, fixes: 2},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
 			}
 			proposed := 0
 			for _, diagnostic := range result.Diagnostics {
 				proposed += len(diagnostic.Fixes)
 			}
 			if proposed != testCase.fixes {
-				t.Errorf("proposed %d fix(es), want %d", proposed, testCase.fixes)
+				test.Errorf("proposed %d fix(es), want %d", proposed, testCase.fixes)
 			}
 		})
 	}
@@ -1374,17 +1374,17 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(t *testing.T) {
 //
 // A mutation dropping the fixer's own check survives the entire 296-case corpus, because no corpus
 // case puts a different-kind statement between two same-kind ones under `always`.
-func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(t *testing.T) {
-	t.Parallel()
+func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
+	test.Parallel()
 
-	t.Run("declines", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, OneVar, oneVarFile,
-			"function f() { var a = 1; let b = 2; var c = 3; }", decodedOneVar(t, "\"always\""))
-		rule_testing.ExpectFindings(t, result, "combine")
+	test.Run("declines", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
+			"function f() { var a = 1; let b = 2; var c = 3; }", decodedOneVar(test, "\"always\""))
+		rule_testing.ExpectFindings(test, result, "combine")
 		for _, diagnostic := range result.Diagnostics {
 			if len(diagnostic.Fixes) != 0 {
-				t.Errorf("proposed %d fix(es); upstream declines when the predecessor is another kind",
+				test.Errorf("proposed %d fix(es); upstream declines when the predecessor is another kind",
 					len(diagnostic.Fixes))
 			}
 		}
@@ -1400,11 +1400,11 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(t *testing.T) {
 		{name: "control-same-kind", source: "function f() { var a = 1; var b = 2; }",
 			options: "\"always\"", wanted: "function f() { var a = 1,  b = 2; }"},
 	} {
-		t.Run(control.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, control.source,
-				decodedOneVar(t, control.options))
-			rule_testing.ExpectFixedSource(t, result, control.wanted)
+		test.Run(control.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, control.source,
+				decodedOneVar(test, control.options))
+			rule_testing.ExpectFixedSource(test, result, control.wanted)
 		})
 	}
 }
@@ -1425,8 +1425,8 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(t *testing.T) {
 //
 // A mutation making `isRequire` answer true for every call survives the whole corpus. These rows
 // are what kill it.
-func TestOneVarRequireIsASpellingNotAResolution(t *testing.T) {
-	t.Parallel()
+func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
+	test.Parallel()
 	separateRequires := "{\"separateRequires\":true,\"var\":\"always\"}"
 	cases := []oneVarCase{
 		{name: "require-mixed", source: "var foo = require('foo'), bar;",
@@ -1442,15 +1442,15 @@ func TestOneVarRequireIsASpellingNotAResolution(t *testing.T) {
 			options: separateRequires, ids: nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
 			if len(testCase.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -1472,8 +1472,8 @@ func TestOneVarRequireIsASpellingNotAResolution(t *testing.T) {
 // arm off for every unusual container would pass the switch rows and break the namespace ones.
 //
 // Every expectation measured against ESLint 10.10.0.
-func TestOneVarConsecutiveNeedsUpstreamsParentBody(t *testing.T) {
-	t.Parallel()
+func TestOneVarConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
+	test.Parallel()
 	silent := []oneVarCase{
 		{name: "case-consecutive", source: "switch (x) { case 1: let a = 1; let b = 2; }",
 			options: "\"consecutive\""},
@@ -1485,11 +1485,11 @@ func TestOneVarConsecutiveNeedsUpstreamsParentBody(t *testing.T) {
 			options: "\"consecutive\""},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -1508,11 +1508,11 @@ func TestOneVarConsecutiveNeedsUpstreamsParentBody(t *testing.T) {
 			options: "\"consecutive\"", ids: []string{"combine"}},
 	}
 	for _, testCase := range firing {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }

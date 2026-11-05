@@ -21,8 +21,8 @@ func noConfusingNonNullAssertionCaseName(index int) string {
 // Four of upstream's eight are parenthesized, which is not decoration: they are the whole of its
 // `tokenAfterLeft !== ')'` test, and they are what keeps this port from reporting a left operand
 // that merely CONTAINS an assertion.
-func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// Upstream's valid list, byte for byte.
@@ -63,9 +63,9 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 		"a /* ! */ == b;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConfusingNonNullAssertion,
+		test.Run(noConfusingNonNullAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, sourceText))
 		})
 	}
@@ -79,8 +79,8 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 // suggestion. A suggestion asserted only by its message id is a repair nothing checks, and this
 // rule's wrap suggestion writes two separate edits, so a single-edit applier would pass it while
 // producing the wrong text.
-func TestNoConfusingNonNullAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingNonNullAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -241,39 +241,39 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConfusingNonNullAssertion,
+		test.Run(noConfusingNonNullAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, testCase.sourceText)
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Fatalf("message id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
+				test.Fatalf("message id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
 			}
 
 			// Equality rather than a substring test. `confusingOperator` splices the operator into
 			// its text twice, and a substring predicate cannot see a wrong operator in either slot.
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 
 			// rule_testing.Run does not trim, so the source on disk is the literal above.
 			gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
 			if len(diagnostic.Suggestions) != len(testCase.wantSuggestions) {
-				t.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
+				test.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
 					len(diagnostic.Suggestions))
 			}
 			for suggestionIndex, want := range testCase.wantSuggestions {
 				got := diagnostic.Suggestions[suggestionIndex]
 				if got.Message.Id != want.id {
-					t.Fatalf("suggestion %d id: expected %q, got %q", suggestionIndex, want.id,
+					test.Fatalf("suggestion %d id: expected %q, got %q", suggestionIndex, want.id,
 						got.Message.Id)
 				}
 				// The rendered suggestion text, asserted by equality. `notNeedInOperator` and
@@ -282,12 +282,12 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				// mutant hardcoding `in` into that slot survived the whole suite until this line
 				// existed.
 				if got.Message.Description != want.description {
-					t.Fatalf("suggestion %d description: expected %q, got %q", suggestionIndex,
+					test.Fatalf("suggestion %d description: expected %q, got %q", suggestionIndex,
 						want.description, got.Message.Description)
 				}
 				rewritten := applySuggestionFixes(testCase.sourceText, got)
 				if rewritten != want.rewrite {
-					t.Fatalf("suggestion %d rewrites to %q, wanted %q", suggestionIndex, rewritten,
+					test.Fatalf("suggestion %d rewrites to %q, wanted %q", suggestionIndex, rewritten,
 						want.rewrite)
 				}
 			}

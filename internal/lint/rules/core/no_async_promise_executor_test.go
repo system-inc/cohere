@@ -18,8 +18,8 @@ const asyncPromiseExecutorFile = "/repository/source/AsyncPromiseExecutor.ts"
 // port, so it passes for exactly the reason the code is wrong.
 //
 // This is the smallest corpus in the lane, which is why the added cases below outnumber it.
-func TestNoAsyncPromiseExecutorFires(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncPromiseExecutorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -31,10 +31,10 @@ func TestNoAsyncPromiseExecutorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
 		})
 	}
@@ -45,8 +45,8 @@ func TestNoAsyncPromiseExecutorFires(t *testing.T) {
 // The first is the ordinary executor and must never report. The second is the load-bearing one: an
 // async function in argument *position 1* is somebody else's callback, not the executor, so a rule
 // scanning all arguments reports it. The third pins that the callee name is part of the predicate.
-func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncPromiseExecutorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -58,10 +58,10 @@ func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
 	}
 }
@@ -71,8 +71,8 @@ func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
 // The imported corpus is three fail cases and three pass cases, the smallest in the lane, so it is a
 // floor and a low one. Each case below covers a decision this rule makes that no upstream fixture
 // touches, and each is a spelling a plausible port gets wrong.
-func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -99,18 +99,18 @@ func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
 		})
 	}
 }
 
 // Clean cases written from reading our code, for decisions upstream's three pass cases do not reach.
-func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -159,10 +159,10 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
 	}
 }
@@ -177,8 +177,8 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing
 //
 // Sliced out of the source with the finding's own range and compared as text, so the assertion
 // cannot agree with the rule by sharing its arithmetic.
-func TestNoAsyncPromiseExecutorPointsAtTheKeyword(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncPromiseExecutorPointsAtTheKeyword(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,16 +198,16 @@ func TestNoAsyncPromiseExecutorPointsAtTheKeyword(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAsyncPromiseExecutor, asyncPromiseExecutorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != "async" {
-				t.Fatalf("finding covers %q, wanted %q", reported, "async")
+				test.Fatalf("finding covers %q, wanted %q", reported, "async")
 			}
 		})
 	}

@@ -23,15 +23,15 @@ var (
 	keyed = "package user\n\nimport \"example.com/root/other\"\n\nvar Span = other.Range{Start: 1, End: 2}\n"
 )
 
-func writeFiles(t *testing.T, directory string, files map[string]string) {
-	t.Helper()
+func writeFiles(test *testing.T, directory string, files map[string]string) {
+	test.Helper()
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 }
@@ -39,13 +39,13 @@ func writeFiles(t *testing.T, directory string, files map[string]string) {
 // The landing gate runs every check plain go vet runs: an unkeyed literal of another package's struct
 // refuses the landing, and the same landing lands once its fields are keyed. This runs the real go through
 // the land fixture.
-func TestTheGateRefusesWhatPlainGoVetReports(t *testing.T) {
-	t.Parallel()
-	fixture := newLandFixture(t)
+func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
 	// The real go: the stand-in's directory comes off the front of PATH.
 	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
 	a := fixture.worktree("a")
-	writeFiles(t, a, unkeyedLiteral)
+	writeFiles(test, a, unkeyedLiteral)
 	fixture.git(a, "add", "go.mod", "other", "user")
 	fixture.git(a, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
 	land := func() (string, error) {
@@ -55,13 +55,13 @@ func TestTheGateRefusesWhatPlainGoVetReports(t *testing.T) {
 		return string(output), err
 	}
 	if output, err := land(); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		t.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
+		test.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
 	}
-	writeFiles(t, a, map[string]string{"user/user.go": keyed})
+	writeFiles(test, a, map[string]string{"user/user.go": keyed})
 	fixture.git(a, "add", "user/user.go")
 	fixture.git(a, "commit", "-q", "-m", "its fields keyed")
 	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
-		t.Errorf("the landing did not land once the fields were keyed (%v):\n%s", err, output)
+		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", err, output)
 	}
 }
 

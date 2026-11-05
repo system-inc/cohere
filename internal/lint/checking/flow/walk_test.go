@@ -5,8 +5,8 @@ import "testing"
 // TestPathTextReadsAsTheReaderReachesThePart: the slot a finding names is the one a reader would write
 // through, so the path reads from the whole value inward. The walks themselves are exercised through the
 // rules that judge them, in internal/lint/rules/adamic, against the probes on #drbrp8c.
-func TestPathTextReadsAsTheReaderReachesThePart(t *testing.T) {
-	t.Parallel()
+func TestPathTextReadsAsTheReaderReachesThePart(test *testing.T) {
+	test.Parallel()
 	for want, path := range map[string][]Step{
 		"":                {},
 		"[]":              {{Kind: StepElement, Index: -1}},
@@ -22,7 +22,7 @@ func TestPathTextReadsAsTheReaderReachesThePart(t *testing.T) {
 		`["content-type"]`:    {{Kind: StepProperty, Name: "content-type"}},
 	} {
 		if got := PathText(path); got != want {
-			t.Errorf("%+v reads %q, want %q", path, got, want)
+			test.Errorf("%+v reads %q, want %q", path, got, want)
 		}
 	}
 }

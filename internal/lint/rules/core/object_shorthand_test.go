@@ -33,8 +33,8 @@ func objectShorthandOf(optionJson string) any {
 // than a repeated one: a rule reporting the right count under the wrong id would otherwise pass.
 //
 //	134 reporting cases (16 declines), 128 clean cases.
-func TestObjectShorthandFires(t *testing.T) {
-	t.Parallel()
+func TestObjectShorthandFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source         string
@@ -184,14 +184,14 @@ func TestObjectShorthandFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, ObjectShorthand, objectShorthandFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings),
 				len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectFindings(t, result, testCase.findings...)
+		rule_testing.ExpectFindings(test, result, testCase.findings...)
 
 		proposed := 0
 		for _, diagnostic := range result.Diagnostics {
@@ -200,21 +200,21 @@ func TestObjectShorthandFires(t *testing.T) {
 		switch {
 		case testCase.declinesRepair:
 			if proposed != 0 {
-				t.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
+				test.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
 					testCase.source, proposed)
 			}
 		case testCase.fixed != nil:
 			// `RunWithOptions` does NOT trim, unlike `RunTyped`: the untyped harness hands the
 			// rule the source exactly as written, so the expectation is the corpus string as-is.
 			// prefer-arrow-callback needs the opposite because it is a typed rule.
-			rule_testing.ExpectFixedSource(t, result, *testCase.fixed)
+			rule_testing.ExpectFixedSource(test, result, *testCase.fixed)
 		}
 	}
 }
 
 // TestObjectShorthandStaysSilent carries upstream's clean cases.
-func TestObjectShorthandStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestObjectShorthandStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -357,13 +357,13 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, ObjectShorthand, objectShorthandFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("%q with %+v: expected no findings, got %d: %v",
+			test.Errorf("%q with %+v: expected no findings, got %d: %v",
 				testCase.source, testCase.settings, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -378,8 +378,8 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 // ARROWS, so the function-expression branch's handling of `<T>` is unreached by it, and a mutation
 // removing that handling survived all 262 imported fixtures. Every expectation is what the
 // installed ESLint 10.8.1 rule produced.
-func TestObjectShorthandRepairKeepsSignatureAndSpacing(t *testing.T) {
-	t.Parallel()
+func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -422,13 +422,13 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, ObjectShorthand, objectShorthandFile,
+		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile,
 			testCase.source, testCase.settings)
 		if len(result.Diagnostics) == 0 {
-			t.Errorf("%q: expected a finding, got none", testCase.source)
+			test.Errorf("%q: expected a finding, got none", testCase.source)
 			continue
 		}
-		rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+		rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 	}
 }
 
@@ -453,8 +453,8 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(t *testing.T) {
 // Rows four and five are the ones that fail without the consistency filter: counting the accessor
 // as shorthand makes each object look mixed and reports `unexpectedMix`. Row six is the control,
 // confirming the object is still being judged rather than skipped entirely.
-func TestObjectShorthandIgnoresAccessors(t *testing.T) {
-	t.Parallel()
+func TestObjectShorthandIgnoresAccessors(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -473,16 +473,16 @@ func TestObjectShorthandIgnoresAccessors(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, ObjectShorthand, objectShorthandFile,
+		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile,
 			testCase.source, objectShorthandOf(testCase.mode))
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q under %s: expected %d findings, got %d %v",
+			test.Errorf("%q under %s: expected %d findings, got %d %v",
 				testCase.source, testCase.mode, len(testCase.findings),
 				len(result.Diagnostics), result.MessageIds())
 			continue
 		}
 		if len(testCase.findings) > 0 {
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		}
 	}
 }
@@ -490,16 +490,16 @@ func TestObjectShorthandIgnoresAccessors(t *testing.T) {
 // TestDecodeObjectShorthandOptions pins the list shapes the config layer delivers and the ones it
 // must refuse, including upstream's mode-dependent flag pairing. Every fixture above passes a list
 // this file wrote, so the refusals live here.
-func TestDecodeObjectShorthandOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeObjectShorthandOptions(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeObjectShorthandOptions([]byte(`["methods", {"ignoreConstructors": true, "avoidQuotes": true}]`))
 	if err != nil {
-		t.Fatalf("a legal mode and flags were refused: %v", err)
+		test.Fatalf("a legal mode and flags were refused: %v", err)
 	}
 	settings := decoded.(ObjectShorthandSettings)
 	if settings.Mode != ObjectShorthandMethods || !settings.IgnoreConstructors || !settings.AvoidQuotes {
-		t.Errorf("the second element was not read: %+v", settings)
+		test.Errorf("the second element was not read: %+v", settings)
 	}
 
 	for _, raw := range []string{
@@ -519,7 +519,7 @@ func TestDecodeObjectShorthandOptions(t *testing.T) {
 		`["sometimes"]`,
 	} {
 		if decoded, err := DecodeObjectShorthandOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }

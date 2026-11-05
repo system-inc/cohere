@@ -36,8 +36,8 @@ const (
 // below were measured against this port and then reconciled against the snapshot by message id:
 // 72 without-flag surrogate pairs, 47 joins, 36 combining marks, 9 emoji modifiers, 6 regional
 // indicators and 4 escaped surrogate pairs, which is 174 and matches upstream on every id.
-func TestNoMisleadingCharacterClassFires(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -167,10 +167,10 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -184,8 +184,8 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 // adjacency and not about membership; the v-flag cases say a nested class or a `\q{...}` breaks a
 // run in two; the invalid-regex cases say a pattern that cannot compile gets no finding at all; and
 // the unresolvable-argument cases say a flags argument nobody can read means the rule declines.
-func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"var r = /[👍]/u",
@@ -236,10 +236,10 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
+		test.Run(testCase, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
 		})
 	}
 }
@@ -251,8 +251,8 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 // fail list reports either way, because what excuses a member is its own spelling: a combining mark
 // written out after an escaped base, `\\` or `\è` which are only backslashes in front of the
 // character itself, and `\👍` whose halves are both written out.
-func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassAllowEscape(test *testing.T) {
+	test.Parallel()
 
 	allowEscape := NoMisleadingCharacterClassOptions{AllowEscape: true}
 
@@ -275,16 +275,16 @@ func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
 	}
 
 	for _, testCase := range cleanOnlyWithTheOption {
-		t.Run("off "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run("off "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
-		t.Run("on "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run("on "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText, allowEscape))
 		})
 	}
@@ -307,21 +307,21 @@ func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
 	}
 
 	for _, testCase := range reportedEitherWay {
-		t.Run("off "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run("off "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
-		t.Run("on "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass,
+		test.Run("on "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass,
 				misleadingCharacterClassFile, testCase.sourceText, allowEscape)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			body := testCase.sourceText[strings.Index(testCase.sourceText, "[")+1 : strings.LastIndex(testCase.sourceText, "]")]
 			for _, diagnostic := range result.Diagnostics {
 				if got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; got != body {
-					t.Fatalf("points at %q, wanted %q", got, body)
+					test.Fatalf("points at %q, wanted %q", got, body)
 				}
 			}
 		})
@@ -329,14 +329,14 @@ func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
 
 	// A pattern that reached the call through a name has no source text of its own, so nothing in
 	// it counts as escaped and it reports at the argument, as upstream's corpus has it.
-	t.Run("a pattern held in a name", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a pattern held in a name", func(test *testing.T) {
+		test.Parallel()
 		sourceText := "const pattern = \"[\\x41\\u0301]\"; RegExp(pattern);"
-		result := rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		result := rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 			sourceText, allowEscape)
-		rule_testing.ExpectFindings(t, result, combining)
+		rule_testing.ExpectFindings(test, result, combining)
 		if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != "pattern" {
-			t.Fatalf("points at %q, wanted the argument", got)
+			test.Fatalf("points at %q, wanted the argument", got)
 		}
 	})
 
@@ -349,18 +349,18 @@ func TestNoMisleadingCharacterClassAllowEscape(t *testing.T) {
 		{"/[A\\u0300-\u036F]/u", []string{}},
 		{"/[A\u0300-\\u036F]/u", []string{combining}},
 	} {
-		t.Run("range "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run("range "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText, allowEscape), testCase.wantIds...)
 		})
 	}
 }
 
 // The option decodes under upstream's spelling and nothing else.
-func TestNoMisleadingCharacterClassDecodesItsOption(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassDecodesItsOption(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoMisleadingCharacterClassOptions]()
 	for raw, want := range map[string]NoMisleadingCharacterClassOptions{
@@ -370,15 +370,15 @@ func TestNoMisleadingCharacterClassDecodesItsOption(t *testing.T) {
 	} {
 		decoded, err := decode([]byte(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		if decoded != any(want) {
-			t.Fatalf("decoding %s gave %+v, wanted %+v", raw, decoded, want)
+			test.Fatalf("decoding %s gave %+v, wanted %+v", raw, decoded, want)
 		}
 	}
 	for _, raw := range []string{`{"allowescape":true}`, `{"allowEscapes":true}`, `{"allowEscape":"yes"}`} {
 		if _, err := decode([]byte(raw)); err == nil {
-			t.Fatalf("decoding %s was accepted", raw)
+			test.Fatalf("decoding %s was accepted", raw)
 		}
 	}
 }
@@ -389,18 +389,18 @@ func TestNoMisleadingCharacterClassDecodesItsOption(t *testing.T) {
 // holds one surrogate and some ordinary letters and there is no pair. Kept separate from the block
 // above because it proves the opposite thing: not every case in upstream's option list depends on
 // the option.
-func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"/[�d83d\\udc4d]/u // U+D83D + Backslash + \"udc4d\"",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedWithOptions(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					sourceText, NoMisleadingCharacterClassOptions{AllowEscape: true}))
 		})
 	}
@@ -415,8 +415,8 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 //
 // The offsets are checked by slicing the source rather than by comparing numbers, because a number
 // computed from the same wrong base as the code that produced it agrees with itself.
-func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -453,18 +453,18 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantSpans),
+				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantSpans),
 					len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantSpans[index] {
-					t.Fatalf("diagnostic %d points at %q, wanted %q", index, got,
+					test.Fatalf("diagnostic %d points at %q, wanted %q", index, got,
 						testCase.wantSpans[index])
 				}
 			}
@@ -477,8 +477,8 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 // A fix writing the right string over the wrong span passes a text comparison while being a real
 // defect, so the source is rewritten and compared whole. Only the without-flag surrogate finding
 // carries a repair, and only on a regex literal.
-func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -494,22 +494,22 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("wanted a diagnostic, got none")
+				test.Fatalf("wanted a diagnostic, got none")
 			}
 			diagnostic := result.Diagnostics[0]
 			if len(diagnostic.Suggestions) != 1 {
-				t.Fatalf("wanted one suggestion, got %d", len(diagnostic.Suggestions))
+				test.Fatalf("wanted one suggestion, got %d", len(diagnostic.Suggestions))
 			}
 			fix := diagnostic.Suggestions[0].Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSource {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten,
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten,
 					testCase.wantSource)
 			}
 		})
@@ -526,16 +526,16 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 //
 // So two things are asserted: the rule never proposes an unattended fix, and it withholds even the
 // suggestion when the pattern holds a construct the flag would break.
-func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+	result := rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 		"var r = /[👍]/")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("the rule proposed %d unattended fixes; the u flag changes meaning and must be "+
+		test.Fatalf("the rule proposed %d unattended fixes; the u flag changes meaning and must be "+
 			"offered rather than applied", len(result.Diagnostics[0].Fixes))
 	}
 
@@ -547,15 +547,15 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 		// An unquantified brace is a SyntaxError under `u`.
 		"var r = /[👍]{/",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("wanted a diagnostic, got none")
+				test.Fatalf("wanted a diagnostic, got none")
 			}
 			if len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatalf("wanted no suggestion on a pattern the flag would break, got %d",
+				test.Fatalf("wanted no suggestion on a pattern the flag would break, got %d",
 					len(result.Diagnostics[0].Suggestions))
 			}
 		})
@@ -566,19 +566,19 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 //
 // The findings that survive the flag are the four that are about code points rather than about code
 // units, so this is the ordinary case for a combining mark rather than an edge.
-func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{"var r = /[Á]/u", "var r = /[Á]/v"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatalf("wanted no suggestion, got %d", len(result.Diagnostics[0].Suggestions))
+				test.Fatalf("wanted no suggestion, got %d", len(result.Diagnostics[0].Suggestions))
 			}
 		})
 	}
@@ -590,8 +590,8 @@ func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *test
 // cases do not reach, and each exists because the mutation sweep or the shelf's own shape put the
 // question. Stated per case rather than in a block, because a reader hitting one of these failing
 // needs to know what it was protecting.
-func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassCoversOurOwnDecisions(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -680,10 +680,10 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -793,10 +793,10 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText))
 		})
 	}

@@ -21,17 +21,17 @@ func correctnessNoWriteOnlyCollectionSource(lines ...string) string {
 	return correctnessNoWriteOnlyCollectionPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoWriteOnlyCollectionRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoWriteOnlyCollection, map[string]string{
+func correctnessNoWriteOnlyCollectionRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoWriteOnlyCollection, map[string]string{
 		correctnessNoWriteOnlyCollectionFile: sourceText,
 	}, correctnessNoWriteOnlyCollectionFile)
 }
 
 // correctnessNoWriteOnlyCollectionExpect asserts the reported names in source order, and that no
 // finding carries a fix.
-func correctnessNoWriteOnlyCollectionExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoWriteOnlyCollectionExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold
 	// each finding's exact text.
 	if len(want) > 0 {
@@ -39,7 +39,7 @@ func correctnessNoWriteOnlyCollectionExpect(t *testing.T, result rule_testing.Re
 		for index := range wantIds {
 			wantIds[index] = correctnessNoWriteOnlyCollectionId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -49,19 +49,19 @@ func correctnessNoWriteOnlyCollectionExpect(t *testing.T, result rule_testing.Re
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoWriteOnlyCollectionId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
 		}
 	}
 }
@@ -116,21 +116,21 @@ func correctnessNoWriteOnlyCollectionHybridSearch(fixed bool) string {
 }
 
 // The real rank fusion: the two rank maps are reported, and the three collections that are read are not.
-func TestCorrectnessNoWriteOnlyCollectionFiresOnProfileCommitsStore(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoWriteOnlyCollectionFiresOnProfileCommitsStore(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoWriteOnlyCollectionRun(t, correctnessNoWriteOnlyCollectionHybridSearch(false))
-	correctnessNoWriteOnlyCollectionExpect(t, result, "bmRanks", "vecRanks")
+	result := correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionHybridSearch(false))
+	correctnessNoWriteOnlyCollectionExpect(test, result, "bmRanks", "vecRanks")
 }
 
-func TestCorrectnessNoWriteOnlyCollectionStaysSilentOnFixedProfileCommitsStore(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoWriteOnlyCollectionStaysSilentOnFixedProfileCommitsStore(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoWriteOnlyCollectionRun(t, correctnessNoWriteOnlyCollectionHybridSearch(true)))
+	rule_testing.ExpectClean(test, correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionHybridSearch(true)))
 }
 
-func TestCorrectnessNoWriteOnlyCollectionFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoWriteOnlyCollectionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -188,17 +188,17 @@ func TestCorrectnessNoWriteOnlyCollectionFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoWriteOnlyCollectionRun(t, correctnessNoWriteOnlyCollectionSource(testCase.lines...))
-			correctnessNoWriteOnlyCollectionExpect(t, result, testCase.want...)
+			result := correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(testCase.lines...))
+			correctnessNoWriteOnlyCollectionExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoWriteOnlyCollectionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoWriteOnlyCollectionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -328,20 +328,20 @@ func TestCorrectnessNoWriteOnlyCollectionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoWriteOnlyCollectionRun(t, correctnessNoWriteOnlyCollectionSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(testCase.lines...)))
 		})
 	}
 }
 
 // Symbol identity, not the name: the outer collection is only written, and a shadowing inner binding
 // of the same name is read. The outer is reported and the inner is not.
-func TestCorrectnessNoWriteOnlyCollectionResolvesShadowing(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoWriteOnlyCollectionResolvesShadowing(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoWriteOnlyCollectionRun(t, correctnessNoWriteOnlyCollectionSource(
+	result := correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(
 		"export function collect() {",
 		"    const ids: string[] = [];",
 		"    ids.push('a');",
@@ -352,9 +352,9 @@ func TestCorrectnessNoWriteOnlyCollectionResolvesShadowing(t *testing.T) {
 		"    }",
 		"}",
 	))
-	correctnessNoWriteOnlyCollectionExpect(t, result, "ids")
+	correctnessNoWriteOnlyCollectionExpect(test, result, "ids")
 	outer := strings.Index(result.SourceFile.Text(), "const ids: string[]") + len("const ")
 	if position := result.Diagnostics[0].Range.Pos(); position != outer {
-		t.Fatalf("reported at %d, want the outer binding at %d", position, outer)
+		test.Fatalf("reported at %d, want the outer binding at %d", position, outer)
 	}
 }

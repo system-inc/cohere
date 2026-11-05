@@ -81,9 +81,9 @@ process.stdin.on("end", () => {
 `
 
 // TestTextAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestTextAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestTextAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	random := rand.New(rand.NewSource(20261003))
 	type pending struct {
 		text      string
@@ -111,7 +111,7 @@ func TestTextAgreesWithUpstream(t *testing.T) {
 
 	encoded, err := json.Marshal(cases)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", textUpstreamScript)
 	command.Dir = root
@@ -119,11 +119,11 @@ func TestTextAgreesWithUpstream(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var upstream []textAnswers
 	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	mismatches, unmapped, nonASCII := 0, 0, 0
@@ -171,13 +171,13 @@ func TestTextAgreesWithUpstream(t *testing.T) {
 		if got != expected {
 			mismatches++
 			if mismatches <= 5 {
-				t.Errorf("text %q start %d\nwant %+v\ngot  %+v", text, start, expected, got)
+				test.Errorf("text %q start %d\nwant %+v\ngot  %+v", text, start, expected, got)
 			}
 		}
 	}
-	t.Logf("%d cases, %d with non-ASCII, %d answers upstream lands mid surrogate pair (held to the containing rune's start), %d mismatches", len(cases), nonASCII, unmapped, mismatches)
+	test.Logf("%d cases, %d with non-ASCII, %d answers upstream lands mid surrogate pair (held to the containing rune's start), %d mismatches", len(cases), nonASCII, unmapped, mismatches)
 	if nonASCII < len(cases)/2 {
-		t.Errorf("only %d of %d cases contain non-ASCII text, which is the population this test exists for", nonASCII, len(cases))
+		test.Errorf("only %d of %d cases contain non-ASCII text, which is the population this test exists for", nonASCII, len(cases))
 	}
 }
 

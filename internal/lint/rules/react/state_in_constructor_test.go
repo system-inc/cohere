@@ -34,8 +34,8 @@ const stateInConstructorFile = "/repository/source/StateInConstructor.tsx"
 // The two arms are exercised by the same table because the option is what selects which one runs,
 // and the corpus makes that the point rather than an edge: three of these inputs are byte-identical
 // to cases in the valid table, separated only by the option.
-func TestStateInConstructorFires(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,10 +135,10 @@ func TestStateInConstructorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runStateInConstructor(test, testCase.mode, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -149,8 +149,8 @@ func TestStateInConstructorFires(t *testing.T) {
 // the ones holding a property named something other than state beside a real state initialization,
 // which is how the corpus says the rule keys on the name rather than on the presence of any
 // property at all.
-func TestStateInConstructorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -326,10 +326,10 @@ func TestStateInConstructorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runStateInConstructor(test, testCase.mode, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -339,13 +339,13 @@ func TestStateInConstructorStaysSilent(t *testing.T) {
 // Routing through DecodeStateInConstructorOptions rather than building the options struct directly
 // is what puts the decoder under test: each mode reaches the rule as upstream writes it, `"always"`
 // or `"never"`. A fixture handing RunWithOptions a struct would leave the decoder untested.
-func runStateInConstructor(t *testing.T, mode StateInConstructorMode, sourceText string) rule_testing.Result {
-	t.Helper()
+func runStateInConstructor(test *testing.T, mode StateInConstructorMode, sourceText string) rule_testing.Result {
+	test.Helper()
 	decoded, err := DecodeStateInConstructorOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
 	if err != nil {
-		t.Fatalf("decoding mode %q: %v", mode, err)
+		test.Fatalf("decoding mode %q: %v", mode, err)
 	}
-	return rule_testing.RunWithOptions(t, StateInConstructor, stateInConstructorFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, StateInConstructor, stateInConstructorFile, sourceText, decoded)
 }
 
 // TestStateInConstructorReportsWithoutOptions pins the nil-options fallback.
@@ -355,8 +355,8 @@ func runStateInConstructor(t *testing.T, mode StateInConstructorMode, sourceText
 // fixture above, and report nothing on the real tree, which is the wired-and-inert failure the
 // brief describes. Every other fixture here reaches the rule through the decoder, so nothing else
 // in this file can see it.
-func TestStateInConstructorReportsWithoutOptions(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorReportsWithoutOptions(test *testing.T) {
+	test.Parallel()
 
 	source := `
 class Foo extends React.Component {
@@ -364,8 +364,8 @@ class Foo extends React.Component {
   render() { return null; }
 }
 `
-	result := rule_testing.Run(t, StateInConstructor, stateInConstructorFile, source)
-	rule_testing.ExpectFindings(t, result, "stateInitConstructor")
+	result := rule_testing.Run(test, StateInConstructor, stateInConstructorFile, source)
+	rule_testing.ExpectFindings(test, result, "stateInitConstructor")
 }
 
 // TestStateInConstructorHasNoFileSuffixGate pins the absence of the gate three siblings carry.
@@ -375,8 +375,8 @@ class Foo extends React.Component {
 // by driving the installed build (7.37.5) over this exact source under all four suffixes: every one
 // reported. The source deliberately holds no JSX, so a `.ts` file parses and the parser's opinion
 // cannot be confused with the rule's.
-func TestStateInConstructorHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := `
 class Foo extends React.Component {
@@ -390,10 +390,10 @@ class Foo extends React.Component {
 		"/repository/source/Suffix.ts",
 		"/repository/source/Suffix.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, StateInConstructor, fileName, source)
-			rule_testing.ExpectFindings(t, result, "stateInitConstructor")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, StateInConstructor, fileName, source)
+			rule_testing.ExpectFindings(test, result, "stateInitConstructor")
 		})
 	}
 }
@@ -405,8 +405,8 @@ class Foo extends React.Component {
 // halves of this table are places a text-only comparison would ship a defect green: silent on
 // `#state` where upstream reports, and reporting on `"state"` where upstream is silent. Every
 // verdict below was measured by driving the installed rule.
-func TestStateInConstructorKeyShapes(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorKeyShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -439,12 +439,12 @@ func TestStateInConstructorKeyShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "\nclass Foo extends React.Component {\n  " + testCase.member +
 				"\n  render() { return null; }\n}\n"
-			result := runStateInConstructor(t, StateInConstructorAlways, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := runStateInConstructor(test, StateInConstructorAlways, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -457,8 +457,8 @@ func TestStateInConstructorKeyShapes(t *testing.T) {
 // ESLint's AST does not materialize a parenthesized expression in either position and ours does;
 // without the unwrapping both would go silent on inputs upstream reports. Every verdict measured
 // on the installed rule, and none of these shapes is in the corpus.
-func TestStateInConstructorNeverTargets(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorNeverTargets(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -485,13 +485,13 @@ func TestStateInConstructorNeverTargets(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "\nclass Foo extends React.Component {\n" +
 				"  constructor(props) {\n    super(props);\n    " + testCase.statement +
 				"\n  }\n  render() { return null; }\n}\n"
-			result := runStateInConstructor(t, StateInConstructorNever, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := runStateInConstructor(test, StateInConstructorNever, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -501,8 +501,8 @@ func TestStateInConstructorNeverTargets(t *testing.T) {
 // A `this.state` assignment in any other method is silent upstream, which is what makes this rule
 // about initialization style rather than about state mutation. `no-direct-mutation-state` is the
 // rule that watches the other methods.
-func TestStateInConstructorNeverRequiresTheConstructor(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorNeverRequiresTheConstructor(test *testing.T) {
+	test.Parallel()
 
 	source := `
 class Foo extends React.Component {
@@ -510,8 +510,8 @@ class Foo extends React.Component {
   render() { return null; }
 }
 `
-	result := runStateInConstructor(t, StateInConstructorNever, source)
-	rule_testing.ExpectClean(t, result)
+	result := runStateInConstructor(test, StateInConstructorNever, source)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestStateInConstructorNearestClassDecides pins that an inner class is not rescued by an outer one.
@@ -521,11 +521,11 @@ class Foo extends React.Component {
 // for `react.EnclosingComponent` instead would skip past the plain class to the outer component and
 // report on both of these, which is why this rule walks to the nearest class itself. Both measured
 // silent on the installed rule.
-func TestStateInConstructorNearestClassDecides(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorNearestClassDecides(test *testing.T) {
+	test.Parallel()
 
-	t.Run("plain class inside a component, Always", func(t *testing.T) {
-		t.Parallel()
+	test.Run("plain class inside a component, Always", func(test *testing.T) {
+		test.Parallel()
 		source := `
 class Foo extends React.Component {
   render() {
@@ -534,12 +534,12 @@ class Foo extends React.Component {
   }
 }
 `
-		result := runStateInConstructor(t, StateInConstructorAlways, source)
-		rule_testing.ExpectClean(t, result)
+		result := runStateInConstructor(test, StateInConstructorAlways, source)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("plain class inside a component constructor, Never", func(t *testing.T) {
-		t.Parallel()
+	test.Run("plain class inside a component constructor, Never", func(test *testing.T) {
+		test.Parallel()
 		// Silent because the NEAREST class is Inner, and Inner is not a component. This is the
 		// component gate declining, not the constructor walk: see TestStateInConstructorWalkCrosses
 		// a class boundary for the proof that the walk itself goes straight through.
@@ -552,12 +552,12 @@ class Foo extends React.Component {
   render() { return null; }
 }
 `
-		result := runStateInConstructor(t, StateInConstructorNever, source)
-		rule_testing.ExpectClean(t, result)
+		result := runStateInConstructor(test, StateInConstructorNever, source)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("component class inside a component reports on its own", func(t *testing.T) {
-		t.Parallel()
+	test.Run("component class inside a component reports on its own", func(test *testing.T) {
+		test.Parallel()
 		source := `
 class Foo extends React.Component {
   render() {
@@ -566,8 +566,8 @@ class Foo extends React.Component {
   }
 }
 `
-		result := runStateInConstructor(t, StateInConstructorAlways, source)
-		rule_testing.ExpectFindings(t, result, "stateInitConstructor")
+		result := runStateInConstructor(test, StateInConstructorAlways, source)
+		rule_testing.ExpectFindings(test, result, "stateInitConstructor")
 	})
 }
 
@@ -577,8 +577,8 @@ class Foo extends React.Component {
 // shelf helper skips parentheses on the heritage receiver, and its doc comment flags that skip as a
 // possible divergence measured on a different rule. Measured against THIS rule's authority,
 // `extends (React.Component)` reports, so the skip is correct here rather than a divergence.
-func TestStateInConstructorComponentGate(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorComponentGate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -617,12 +617,12 @@ func TestStateInConstructorComponentGate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "\nclass Foo" + testCase.heritage +
 				" {\n  state = { bar: 0 };\n  render() { return null; }\n}\n"
-			result := runStateInConstructor(t, StateInConstructorAlways, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := runStateInConstructor(test, StateInConstructorAlways, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -632,31 +632,31 @@ func TestStateInConstructorComponentGate(t *testing.T) {
 // `const Foo = class extends React.Component {}` is the same component written where a declaration
 // will not fit, and upstream's scope walk finds a class scope either way. Measured reporting on the
 // installed rule in both arms.
-func TestStateInConstructorClassExpression(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorClassExpression(test *testing.T) {
+	test.Parallel()
 
-	t.Run("Always", func(t *testing.T) {
-		t.Parallel()
+	test.Run("Always", func(test *testing.T) {
+		test.Parallel()
 		source := `
 const Foo = class extends React.Component {
   state = { bar: 0 };
   render() { return null; }
 };
 `
-		result := runStateInConstructor(t, StateInConstructorAlways, source)
-		rule_testing.ExpectFindings(t, result, "stateInitConstructor")
+		result := runStateInConstructor(test, StateInConstructorAlways, source)
+		rule_testing.ExpectFindings(test, result, "stateInitConstructor")
 	})
 
-	t.Run("Never", func(t *testing.T) {
-		t.Parallel()
+	test.Run("Never", func(test *testing.T) {
+		test.Parallel()
 		source := `
 const Foo = class extends React.Component {
   constructor(props) { super(props); this.state = {}; }
   render() { return null; }
 };
 `
-		result := runStateInConstructor(t, StateInConstructorNever, source)
-		rule_testing.ExpectFindings(t, result, "stateInitClassProp")
+		result := runStateInConstructor(test, StateInConstructorNever, source)
+		rule_testing.ExpectFindings(test, result, "stateInitClassProp")
 	})
 }
 
@@ -667,8 +667,8 @@ const Foo = class extends React.Component {
 // side included. A message-id assertion cannot see any of that. The reported text is sliced out of
 // the source the harness actually wrote rather than out of the Go literal, because `rule_testing`
 // trims the fixture and a slice of the literal would be off by one byte.
-func TestStateInConstructorSpans(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -703,11 +703,11 @@ func TestStateInConstructorSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runStateInConstructor(test, testCase.mode, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			// `rule_testing.Run` writes the source verbatim, unlike `RunTyped` which trims it, so
 			// the literal here IS the file on disk and slicing it directly is correct. Asserting
@@ -716,7 +716,7 @@ func TestStateInConstructorSpans(t *testing.T) {
 			diagnostic := result.Diagnostics[0]
 			got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("span text = %q, wanted %q", got, testCase.wantText)
+				test.Errorf("span text = %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -728,29 +728,29 @@ func TestStateInConstructorSpans(t *testing.T) {
 // assertion is on the constants themselves. Asserting the id against a literal string typed here
 // rather than against the rule's own constant is deliberate: comparing a finding to the constant it
 // was reported with is an equality that moves on both sides under mutation and cannot fail.
-func TestStateInConstructorMessages(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorMessages(test *testing.T) {
+	test.Parallel()
 
 	if messageStateInConstructorInConstructor.Id != "stateInitConstructor" {
-		t.Errorf("Always arm id = %q", messageStateInConstructorInConstructor.Id)
+		test.Errorf("Always arm id = %q", messageStateInConstructorInConstructor.Id)
 	}
 	if messageStateInConstructorClassProperty.Id != "stateInitClassProp" {
-		t.Errorf("Never arm id = %q", messageStateInConstructorClassProperty.Id)
+		test.Errorf("Never arm id = %q", messageStateInConstructorClassProperty.Id)
 	}
 	for _, message := range []rule.Message{
 		messageStateInConstructorInConstructor,
 		messageStateInConstructorClassProperty,
 	} {
 		if len(message.Description) < 80 {
-			t.Errorf("message %q has a description too short to say why: %q", message.Id, message.Description)
+			test.Errorf("message %q has a description too short to say why: %q", message.Id, message.Description)
 		}
 	}
 }
 
 // TestDecodeStateInConstructorOptions pins the decoder against upstream's schema,
 // `[{ enum: ["always", "never"] }]`.
-func TestDecodeStateInConstructorOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeStateInConstructorOptions(test *testing.T) {
+	test.Parallel()
 
 	accepted := []struct {
 		name string
@@ -762,14 +762,14 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 		{"upstream's never", `"never"`, StateInConstructorNever},
 	}
 	for _, testCase := range accepted {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeStateInConstructorOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			if decoded.(StateInConstructorOptions).Mode != testCase.want {
-				t.Errorf("mode = %q, wanted %q", decoded.(StateInConstructorOptions).Mode, testCase.want)
+				test.Errorf("mode = %q, wanted %q", decoded.(StateInConstructorOptions).Mode, testCase.want)
 			}
 		})
 	}
@@ -789,10 +789,10 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 		{"null", `null`},
 	}
 	for _, testCase := range refused {
-		t.Run(testCase.name+" is refused", func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name+" is refused", func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeStateInConstructorOptions([]byte(testCase.raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
+				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})
 	}
@@ -813,8 +813,8 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 // inner structure and differ only in whether the outer context is a constructor, which is what
 // proves the walk crosses the class rather than something else explaining the verdict. The third
 // keeps the walk from being vacuous by showing a constructor is still required somewhere.
-func TestStateInConstructorWalkCrossesAClassBoundary(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorWalkCrossesAClassBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -865,10 +865,10 @@ class Outer extends React.Component {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runStateInConstructor(t, StateInConstructorNever, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runStateInConstructor(test, StateInConstructorNever, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -883,8 +883,8 @@ class Outer extends React.Component {
 //
 // Every row measured against the installed build: the assignment reports and none of the seven
 // comparisons does.
-func TestStateInConstructorNeverRequiresAnAssignment(t *testing.T) {
-	t.Parallel()
+func TestStateInConstructorNeverRequiresAnAssignment(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -904,13 +904,13 @@ func TestStateInConstructorNeverRequiresAnAssignment(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "\nclass Foo extends React.Component {\n" +
 				"  constructor(props) {\n    super(props);\n    " + testCase.statement +
 				"\n  }\n  render() { return null; }\n}\n"
-			result := runStateInConstructor(t, StateInConstructorNever, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := runStateInConstructor(test, StateInConstructorNever, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

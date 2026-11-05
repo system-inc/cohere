@@ -20,10 +20,10 @@ import (
 // both run over every function the sources below lower to, nested functions included: the control-flow
 // shapes written for this, and the pinned Structure corpus when it is on this machine. The answers must
 // be equal, frontier order included, since the reactivity pass reads that order.
-func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
-	t.Parallel()
+func TestPostDominatorFrontiersMatchTheChainWalk(test *testing.T) {
+	test.Parallel()
 	// Its count below needs the pinned corpus beside the hand-written functions, so it is a corpus walk.
-	skipCorpusWalkInFastTier(t)
+	skipCorpusWalkInFastTier(test)
 
 	handWritten := map[string]string{
 		"Shapes.tsx": strings.Join([]string{
@@ -42,7 +42,7 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 	for name, code := range handWritten {
 		sources[name] = code
 	}
-	paths, contents := pinnedCorpusFilesIfPresent(t, 400)
+	paths, contents := pinnedCorpusFilesIfPresent(test, 400)
 	if paths != nil {
 		for _, path := range paths {
 			sources[path] = contents[path]
@@ -81,7 +81,7 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 				got := r.postDominatorFrontiers()
 				want := chainWalkFrontiers(function)
 				if !reflect.DeepEqual(got, want) {
-					t.Errorf("%s, %q: the frontiers are\n  %v\nand the chain walk says\n  %v", name, function.Name,
+					test.Errorf("%s, %q: the frontiers are\n  %v\nand the chain walk says\n  %v", name, function.Name,
 						fmt.Sprint(got), fmt.Sprint(want))
 				}
 				for _, nested := range function.Functions {
@@ -97,13 +97,13 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 	// it, its subtest skipped naming the variable. This used to require 20 in total on every machine, so it
 	// failed wherever the Structure checkout was absent, until #sycrdr6.
 	if handWrittenCompared < handWrittenFunctions {
-		t.Fatalf("compared %d of the %d hand-written functions, so the rest stopped lowering", handWrittenCompared,
+		test.Fatalf("compared %d of the %d hand-written functions, so the rest stopped lowering", handWrittenCompared,
 			handWrittenFunctions)
 	}
 	if paths != nil && corpusCompared < 20 {
-		t.Fatalf("compared only %d corpus functions, so the corpus proved little", corpusCompared)
+		test.Fatalf("compared only %d corpus functions, so the corpus proved little", corpusCompared)
 	}
-	t.Logf("compared %d hand-written and %d corpus functions", handWrittenCompared, corpusCompared)
+	test.Logf("compared %d hand-written and %d corpus functions", handWrittenCompared, corpusCompared)
 }
 
 // functionLikeCount is how many function-like nodes a parsed source holds, at any depth.
@@ -120,14 +120,14 @@ func functionLikeCount(node *ast.Node) int {
 }
 
 // pinnedCorpusFilesIfPresent is pinnedCorpusFiles, answering nothing when the repository is absent.
-func pinnedCorpusFilesIfPresent(t *testing.T, count int) ([]string, map[string]string) {
-	t.Helper()
+func pinnedCorpusFilesIfPresent(test *testing.T, count int) ([]string, map[string]string) {
+	test.Helper()
 	var paths []string
 	var contents map[string]string
 	// Not parallel: the subtest is a scope for pinnedCorpusFiles to skip in, and it writes the two
 	// results this function returns, which a parallel subtest would not have written yet.
-	t.Run("pinned corpus", func(t *testing.T) {
-		paths, contents = pinnedCorpusFiles(t, count)
+	test.Run("pinned corpus", func(test *testing.T) {
+		paths, contents = pinnedCorpusFiles(test, count)
 	})
 	return paths, contents
 }

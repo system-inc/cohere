@@ -19,8 +19,8 @@ import (
 // repair.
 const preferNumericLiteralsDeclinesToFix = "\x00declines"
 
-func TestPreferNumericLiteralsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -57,16 +57,16 @@ func TestPreferNumericLiteralsStaysSilent(t *testing.T) {
 		{name: "valid28", source: "function foo() { var Number; Number.parseInt(\"111110111\", 2); }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source))
 		})
 	}
 }
 
-func TestPreferNumericLiteralsFires(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -137,27 +137,27 @@ func TestPreferNumericLiteralsFires(t *testing.T) {
 		{name: "invalid61", source: "Number.parseInt('0_0', 16);", wantFixed: preferNumericLiteralsDeclinesToFix},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "useLiteral")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "useLiteral")
 			if testCase.wantFixed == preferNumericLiteralsDeclinesToFix {
 				if len(result.Diagnostics) > 0 && len(result.Diagnostics[0].Fixes) > 0 {
-					t.Errorf("upstream declines to fix this case and this offered %d fixes; the "+
+					test.Errorf("upstream declines to fix this case and this offered %d fixes; the "+
 						"repair would change what the program computes",
 						len(result.Diagnostics[0].Fixes))
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
 
 // The span and the interpolated function name, neither of which ExpectFindings can see. The name is
 // read out of the source rather than being a constant, so each callee spelling names itself.
-func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -177,21 +177,21 @@ func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
 			"binary", "(Number.parseInt)"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			written := strings.TrimSpace(testCase.source) + "\n"
 			if got := written[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 			wantPrefix := "Use " + testCase.wantSystem + " literals instead of " +
 				testCase.wantFunction + "(). "
 			if got := finding.Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
+				test.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
 			}
 		})
 	}
@@ -200,8 +200,8 @@ func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
 // The global-reference guard, which is the half of this rule that does not fall out of the syntax.
 // Five of upstream's passing cases are shadows and nothing about the syntax separates them from the
 // real thing.
-func TestPreferNumericLiteralsGlobalGuard(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsGlobalGuard(test *testing.T) {
+	test.Parallel()
 
 	shadowed := []string{
 		"function foo(parseInt: any) { parseInt('111110111', 2); }",
@@ -211,19 +211,19 @@ func TestPreferNumericLiteralsGlobalGuard(t *testing.T) {
 		"{ const parseInt = (a: string, b: number) => 0; parseInt('11', 2); }",
 	}
 	for _, source := range shadowed {
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", source))
 	}
 
 	// A control, so five clean verdicts mean something.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts",
 		"parseInt('111110111', 2);"), "useLiteral")
 }
 
 // The value comparison, which is what decides most of the declines. Each pair here writes an input
 // that reports with a fix beside one that reports without, differing only in the thing being
 // measured, so a comparison that answered the same for both would fail rather than half-pass.
-func TestPreferNumericLiteralsValueComparison(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsValueComparison(test *testing.T) {
+	test.Parallel()
 
 	fixed := []struct {
 		name      string
@@ -236,10 +236,10 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 		{"leadingZeroIsFine", "parseInt('0011', 2);", "0b0011;"},
 	}
 	for _, testCase := range fixed {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed+"\n")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed+"\n")
 		})
 	}
 
@@ -261,14 +261,14 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 			"parseInt is -3 while 0b-11 is not a literal"},
 	}
 	for _, testCase := range declined {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Errorf("offered a fix where upstream declines: %s", testCase.why)
+				test.Errorf("offered a fix where upstream declines: %s", testCase.why)
 			}
 		})
 	}
@@ -280,8 +280,8 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 // Upstream gets both of these for free from a selector, `CallExpression[arguments.length=2]` and
 // `isSpecificId(calleeNode, "parseInt")`, so neither needed a test there. Expressed as code here,
 // each becomes a line that can be wrong on its own.
-func TestPreferNumericLiteralsArgumentCountAndCalleeName(t *testing.T) {
-	t.Parallel()
+func TestPreferNumericLiteralsArgumentCountAndCalleeName(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name   string
@@ -302,22 +302,22 @@ func TestPreferNumericLiteralsArgumentCountAndCalleeName(t *testing.T) {
 		{"numberIsInteger", "Number.isInteger('11', 2);"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts", testCase.source))
 		})
 	}
 
 	// Controls, so seven clean verdicts mean something.
-	t.Run("controlTwoArgumentsReports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts",
+	test.Run("controlTwoArgumentsReports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts",
 			"parseInt('11', 2);"), "useLiteral")
 	})
-	t.Run("controlNumberParseIntReports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts",
+	test.Run("controlNumberParseIntReports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferNumericLiterals, "file.ts",
 			"Number.parseInt('11', 2);"), "useLiteral")
 	})
 }

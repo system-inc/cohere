@@ -42,22 +42,22 @@ type useBeforeDefineCase struct {
 // That routing is the point rather than a convenience. Six of this rule's seven options default to
 // TRUE, so a test that constructed the struct itself would exercise a shape the live config never
 // produces, and a default inversion or a broken "nofunc" string form would pass unnoticed.
-func runUseBeforeDefineCase(t *testing.T, testCase useBeforeDefineCase) rule_testing.Result {
-	t.Helper()
+func runUseBeforeDefineCase(test *testing.T, testCase useBeforeDefineCase) rule_testing.Result {
+	test.Helper()
 
 	if testCase.rawOptions == "" {
-		return rule_testing.RunTyped(t, NoUseBeforeDefine, testCase.fileName, testCase.source)
+		return rule_testing.RunTyped(test, NoUseBeforeDefine, testCase.fileName, testCase.source)
 	}
 
 	decoded, err := DecodeNoUseBeforeDefineOptions(json.RawMessage(testCase.rawOptions))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", testCase.rawOptions, err)
+		test.Fatalf("decoding %s: %v", testCase.rawOptions, err)
 	}
-	return rule_testing.RunTypedWithOptions(t, NoUseBeforeDefine, testCase.fileName, testCase.source, decoded)
+	return rule_testing.RunTypedWithOptions(test, NoUseBeforeDefine, testCase.fileName, testCase.source, decoded)
 }
 
-func TestNoUseBeforeDefineFires(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []useBeforeDefineCase{
 		{
@@ -1199,21 +1199,21 @@ func TestNoUseBeforeDefineFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUseBeforeDefineCase(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUseBeforeDefineCase(test, testCase)
 
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "usedBeforeDefined"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []useBeforeDefineCase{
 		{
@@ -2146,10 +2146,10 @@ func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUseBeforeDefineCase(t, testCase)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUseBeforeDefineCase(test, testCase)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -2160,8 +2160,8 @@ func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
 // rather than on the reference passes the entire imported corpus while pointing every finding at the
 // wrong line. The two positions are far apart in exactly the cases this rule exists for, and
 // upstream reports on the reference.
-func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -2176,11 +2176,11 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 
 			diagnostic := result.Diagnostics[0]
@@ -2191,14 +2191,14 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 			written := strings.TrimSpace(testCase.source) + "\n"
 			reported := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.reportedText {
-				t.Errorf("finding text is %q, want %q", reported, testCase.reportedText)
+				test.Errorf("finding text is %q, want %q", reported, testCase.reportedText)
 			}
 
 			// The offset is asserted as well as the text, because every one of these sources
 			// contains the reported name twice and a text comparison alone cannot tell the
 			// reference from the declaration.
 			if diagnostic.Range.Pos() != testCase.reportedOffset {
-				t.Errorf("finding starts at %d, want %d", diagnostic.Range.Pos(), testCase.reportedOffset)
+				test.Errorf("finding starts at %d, want %d", diagnostic.Range.Pos(), testCase.reportedOffset)
 			}
 		})
 	}
@@ -2212,8 +2212,8 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 // message described a crash that cannot happen; the other two read a module-level `let` and `const`
 // from inside a function written above them, which throws only if that function is called first.
 // Each row below is a kind the message now distinguishes, asserted against literals typed here.
-func TestNoUseBeforeDefineMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineMessageText(test *testing.T) {
+	test.Parallel()
 
 	const repair = " Move the declaration above its first use."
 	const readingOrder = "the cost is reading order: the reader meets the name before learning what it is, " +
@@ -2279,22 +2279,22 @@ func TestNoUseBeforeDefineMessageText(t *testing.T) {
 				"hoisted without its value, so a call made before the declaration runs reads `undefined` " +
 				"silently, and the failure surfaces later and somewhere else." + repair},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := runUseBeforeDefineCase(t, useBeforeDefineCase{
+			result := runUseBeforeDefineCase(test, useBeforeDefineCase{
 				fileName:   "a.ts",
 				source:     testCase.source,
 				rawOptions: testCase.options,
 			})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Id; got != "usedBeforeDefined" {
-				t.Errorf("message id is %q, want %q", got, "usedBeforeDefined")
+				test.Errorf("message id is %q, want %q", got, "usedBeforeDefined")
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
+				test.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
 			}
 		})
 	}
@@ -2306,22 +2306,22 @@ func TestNoUseBeforeDefineMessageText(t *testing.T) {
 // object, meaning exactly {"functions": false}. It reaches the decoder as a JSON string, which a
 // struct unmarshal rejects outright, so without the string arm the config layer would surface a
 // legal spelling as a configuration error.
-func TestNoUseBeforeDefineDecodesTheStringForm(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineDecodesTheStringForm(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeNoUseBeforeDefineOptions(json.RawMessage(`"nofunc"`))
 	if err != nil {
-		t.Fatalf("decoding the string form: %v", err)
+		test.Fatalf("decoding the string form: %v", err)
 	}
 
 	settings := resolveNoUseBeforeDefineSettings(decoded)
 	if settings.functions {
-		t.Error(`"nofunc" left the functions option on`)
+		test.Error(`"nofunc" left the functions option on`)
 	}
 	// Everything else must keep its default, which is what makes this a shorthand for one option
 	// rather than a reset.
 	if !settings.classes || !settings.variables || !settings.enums || !settings.typedefs {
-		t.Errorf(`"nofunc" disturbed an option other than functions: %+v`, settings)
+		test.Errorf(`"nofunc" disturbed an option other than functions: %+v`, settings)
 	}
 }
 
@@ -2334,24 +2334,24 @@ func TestNoUseBeforeDefineDecodesTheStringForm(t *testing.T) {
 // options default to TRUE, so that path would leave a rule registered on every file and judging
 // almost nothing, with every fixture above still green because every one of them reaches the rule
 // through the decoder.
-func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(test *testing.T) {
+	test.Parallel()
 
 	for _, options := range []any{nil, any(nil), NoUseBeforeDefineOptions{}} {
 		settings := resolveNoUseBeforeDefineSettings(options)
 
 		if !settings.functions || !settings.classes || !settings.variables ||
 			!settings.enums || !settings.typedefs || !settings.ignoreTypeReferences {
-			t.Errorf("an absent configuration switched an option off: %+v", settings)
+			test.Errorf("an absent configuration switched an option off: %+v", settings)
 		}
 		if settings.allowNamedExports {
-			t.Errorf("an absent configuration switched allowNamedExports on: %+v", settings)
+			test.Errorf("an absent configuration switched allowNamedExports on: %+v", settings)
 		}
 	}
 
 	// And the rule must actually report through that path, not merely hold the right settings.
-	result := rule_testing.RunTypedWithOptions(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;", nil)
-	rule_testing.ExpectFindings(t, result, "usedBeforeDefined")
+	result := rule_testing.RunTypedWithOptions(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;", nil)
+	rule_testing.ExpectFindings(test, result, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineRequiresTheTypedHarness pins the checker guard.
@@ -2361,16 +2361,16 @@ func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(t *testing.T) {
 // untyped harness GetSymbolAtLocation would be reached on a nil checker, so the guard is what stands
 // between the rule and either a panic or, worse, a vacuous silence. This case asserts the decline is
 // silent rather than fatal, so a later revert of the guard fails loudly here.
-func TestNoUseBeforeDefineRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.Run(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
+	rule_testing.ExpectClean(test, result)
 
 	// The control: the same source through the typed harness must report, or the case above is
 	// passing because the rule is broken rather than because the guard fired.
-	typed := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
-	rule_testing.ExpectFindings(t, typed, "usedBeforeDefined")
+	typed := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
+	rule_testing.ExpectFindings(test, typed, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineSubstrateDivergences records the five imported cases this port does not
@@ -2396,8 +2396,8 @@ func TestNoUseBeforeDefineRequiresTheTypedHarness(t *testing.T) {
 // eslint-scope models the legacy web-compatibility hoisting that predates block scoping. The control
 // separating these is `a(); function a() {}` at top level, which resolves and which this rule
 // reports.
-func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineSubstrateDivergences(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -2411,17 +2411,17 @@ func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// The control. Without it every row above passes for any reason at all, including a rule that
 	// reports nothing anywhere, which is the failure mode this whole file exists to catch.
-	control := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "a(); function a() {}")
-	rule_testing.ExpectFindings(t, control, "usedBeforeDefined")
+	control := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "a(); function a() {}")
+	rule_testing.ExpectFindings(test, control, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineMergedDeclarations pins which declaration of a merged symbol the rule judges
@@ -2437,8 +2437,8 @@ func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
 // shapes below through the ESLint Linter API with the typescript-eslint parser, and reports every
 // one of them at column 1; this rule agrees only because of that choice. A mutation replacing it
 // with `Declarations[0]` survives the entire 349-row corpus, which is why these cases exist.
-func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineMergedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -2452,15 +2452,15 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "usedBeforeDefined")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "usedBeforeDefined")
 
 			// The span matters as much as the count here. Reporting once against the wrong
 			// declaration produces the same id and the same total.
 			if len(result.Diagnostics) == 1 && result.Diagnostics[0].Range.Pos() != 0 {
-				t.Errorf("finding starts at %d, want 0", result.Diagnostics[0].Range.Pos())
+				test.Errorf("finding starts at %d, want 0", result.Diagnostics[0].Range.Pos())
 			}
 		})
 	}
@@ -2483,18 +2483,18 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 		{"between two enum declarations", "enum Foo { A } Foo; enum Foo { B }"},
 		{"between class and namespace", "class Foo {} Foo; namespace Foo { export let x = 1; }"},
 	} {
-		t.Run(clean.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", clean.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(clean.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", clean.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// The control for the block above: the same merged shape with the reference below EVERY
 	// declaration is also clean, so a rule reporting nothing at all would pass those four rows. The
 	// reporting rows earlier in this function are what make the pair meaningful.
-	control := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "interface Foo {} function Foo() {} Foo;")
-	rule_testing.ExpectClean(t, control)
+	control := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "interface Foo {} function Foo() {} Foo;")
+	rule_testing.ExpectClean(test, control)
 }
 
 // TestNoUseBeforeDefineQualifiedNames pins the interaction between a namespace path and the
@@ -2510,8 +2510,8 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 //
 // Every expectation below was measured by driving the installed ESLint rule through the Linter API
 // with the typescript-eslint parser, not read off the source.
-func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineQualifiedNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -2536,14 +2536,14 @@ func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "usedBeforeDefined"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -2560,8 +2560,8 @@ func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
 //
 // Every expectation was measured against the installed ESLint rule with the typescript-eslint parser
 // and jsx enabled.
-func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineJsxAttributes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -2579,14 +2579,14 @@ func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.tsx", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "usedBeforeDefined"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -2599,8 +2599,8 @@ func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
 //
 // The corpus writes no shorthand property anywhere in its 354 cases, so nothing imported can see
 // this. On the real tree it was 3,243 findings, and the first three read at source were all this.
-func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineShorthandProperties(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -2619,14 +2619,14 @@ func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "usedBeforeDefined"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -2645,8 +2645,8 @@ func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
 // can see this. It was found by differencing the real tree against the installed rule.
 //
 // Every count below was measured against that rule.
-func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineDestructuringPropertyNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -2664,14 +2664,14 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "usedBeforeDefined"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -2692,8 +2692,8 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
 // The pair that makes it visible is the last two rows: byte-equivalent code, one spelled as a
 // shorthand method and one as a function expression, which upstream's parser renders identically and
 // ours does not.
-func TestNoUseBeforeDefineObjectMethodParameters(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineObjectMethodParameters(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"const o = { start(controller) { controller.close(); } };",
@@ -2704,16 +2704,16 @@ func TestNoUseBeforeDefineObjectMethodParameters(t *testing.T) {
 		"class K { get p() { return 1; } set p(v) { this.q = v; } }",
 		"class K { constructor(c) { this.c = c; } }",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// The control: a parameter is clean, but a genuine forward reference from inside an object
 	// method still reports. Without this, dropping the whole initialization arm would pass the rows
 	// above.
-	control := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "const o = { start() { return later; } }; const later = 1;")
-	rule_testing.ExpectFindings(t, control, "usedBeforeDefined")
+	control := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "const o = { start() { return later; } }; const later = 1;")
+	rule_testing.ExpectFindings(test, control, "usedBeforeDefined")
 }

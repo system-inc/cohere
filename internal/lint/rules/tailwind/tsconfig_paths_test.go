@@ -15,8 +15,8 @@ import (
 // Mapped by a tsconfig's `paths`, it is `design/brand.css`, which declares brand-glow. `not-a-class` is
 // unknown either way, so a run whose design system failed to load, and which reports nothing, can never
 // pass for one that read the mapping.
-func TestTsconfigPathsResolveStylesheetImports(t *testing.T) {
-	t.Parallel()
+func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{
 		"Component.tsx":         `export const element = <div className="brand-glow flex not-a-class" />;`,
 		"app/globals.css":       "@import \"tailwindcss\";\n@import \"@design/brand.css\";",
@@ -35,17 +35,17 @@ func TestTsconfigPathsResolveStylesheetImports(t *testing.T) {
 		"config/elsewhere.json": `{ "compilerOptions": { "paths": { "@design/*": ["../missing/*"] } } }`,
 	}
 	run := func(tsconfig string) rule_testing.Result {
-		t.Helper()
+		test.Helper()
 		options := NoUnknownClassesOptions{TailwindLocationOptions: TailwindLocationOptions{
 			EntryPoint: "app/globals.css", Tsconfig: tsconfig,
 		}}
-		return rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
+		return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
 			modules := filepath.Join(root, "node_modules")
 			if err := os.MkdirAll(modules, 0o755); err != nil {
-				t.Fatalf("creating node_modules: %v", err)
+				test.Fatalf("creating node_modules: %v", err)
 			}
 			if err := os.Symlink(unknownFixturePackageRoot(), filepath.Join(modules, "tailwindcss")); err != nil {
-				t.Fatalf("linking tailwindcss: %v", err)
+				test.Fatalf("linking tailwindcss: %v", err)
 			}
 		})
 	}
@@ -60,8 +60,8 @@ func TestTsconfigPathsResolveStylesheetImports(t *testing.T) {
 		"paths onto nothing that exists":                     {tsconfig: "config/elsewhere.json", reported: "brand-glow not-a-class"},
 		"an option naming no file falls back to the default": {tsconfig: "config/absent.json", reported: "brand-glow not-a-class"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			result := run(testCase.tsconfig)
 			// The class each finding names, which its description quotes; a decline names neither.
 			var reported []string
@@ -73,7 +73,7 @@ func TestTsconfigPathsResolveStylesheetImports(t *testing.T) {
 				}
 			}
 			if got := strings.Join(reported, " "); got != testCase.reported {
-				t.Errorf("reported %q, want %q", got, testCase.reported)
+				test.Errorf("reported %q, want %q", got, testCase.reported)
 			}
 		})
 	}
@@ -81,26 +81,26 @@ func TestTsconfigPathsResolveStylesheetImports(t *testing.T) {
 
 // TestFindFirstPathRecursiveIsUpstreamsQueue pins upstream's order for several entries: each is tried
 // where it was asked for before any is tried a directory up, and none climbs past cwd.
-func TestFindFirstPathRecursiveIsUpstreamsQueue(t *testing.T) {
-	t.Parallel()
+func TestFindFirstPathRecursiveIsUpstreamsQueue(test *testing.T) {
+	test.Parallel()
 	present := map[string]bool{"/repo/tsconfig.json": true, "/repo/app/jsconfig.json": true, "/repo/configs/custom.json": false}
 	fileExists := func(path string) bool { return present[path] }
 
 	if got := findFirstPathRecursive("/repo/app", "/repo/app", []string{"tsconfig.json", "jsconfig.json"}, fileExists); got != "/repo/app/jsconfig.json" {
-		t.Errorf("from /repo/app found %q, want the jsconfig.json in cwd before any tsconfig.json above it", got)
+		test.Errorf("from /repo/app found %q, want the jsconfig.json in cwd before any tsconfig.json above it", got)
 	}
 	if got := findFirstPathRecursive("/repo", "/repo", []string{"configs/custom.json", "tsconfig.json"}, fileExists); got != "/repo/tsconfig.json" {
-		t.Errorf("found %q, want /repo/tsconfig.json once configs/custom.json is not there", got)
+		test.Errorf("found %q, want /repo/tsconfig.json once configs/custom.json is not there", got)
 	}
 	if got := findFirstPathRecursive("/repo/app", "/repo/app", []string{"tsconfig.json"}, fileExists); got != "" {
-		t.Errorf("found %q; the search never climbs above cwd", got)
+		test.Errorf("found %q; the search never climbs above cwd", got)
 	}
 }
 
 // TestTsconfigMatchingIsTsconfigPaths pins the mapping's decisions: a relative specifier is never mapped,
 // the longest prefix wins, and the match-all onto the base URL is added when the tsconfig names none.
-func TestTsconfigMatchingIsTsconfigPaths(t *testing.T) {
-	t.Parallel()
+func TestTsconfigMatchingIsTsconfigPaths(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{
 		"/repo/tsconfig.json":          `{ "compilerOptions": { "baseUrl": "src", "paths": { "@/*": ["styles/*"], "@/brand/*": ["brand/*"] } } }`,
 		"/repo/src/styles/a.css":       "",
@@ -119,7 +119,7 @@ func TestTsconfigMatchingIsTsconfigPaths(t *testing.T) {
 
 	mapping, err := loadTsconfigPaths("/repo/tsconfig.json", readFile, fileExists)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for specifier, want := range map[string]string{
 		"@/a.css":       "/repo/src/styles/a.css",
@@ -132,7 +132,7 @@ func TestTsconfigMatchingIsTsconfigPaths(t *testing.T) {
 	} {
 		got, _ := mapping.resolve(specifier, readFile, fileExists)
 		if got != want {
-			t.Errorf("%s resolved to %q, want %q", specifier, got, want)
+			test.Errorf("%s resolved to %q, want %q", specifier, got, want)
 		}
 	}
 }

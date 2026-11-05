@@ -20,8 +20,8 @@ func attributeSelectorValue(value string) *string {
 	return &value
 }
 
-func TestParseAttributeSelectorRejectsInvalid(t *testing.T) {
-	t.Parallel()
+func TestParseAttributeSelectorRejectsInvalid(test *testing.T) {
+	test.Parallel()
 	for _, input := range []string{
 		``,
 		`]`,
@@ -36,18 +36,18 @@ func TestParseAttributeSelectorRejectsInvalid(t *testing.T) {
 		`[data-foo=value x]`,
 		`[data-foo=value ix]`,
 	} {
-		t.Run(input, func(t *testing.T) {
-			t.Parallel()
+		test.Run(input, func(test *testing.T) {
+			test.Parallel()
 			if selector, ok := ParseAttributeSelector(input); ok {
-				t.Errorf("ParseAttributeSelector(%q) = %s, want rejected", input, describeAttributeSelector(selector))
+				test.Errorf("ParseAttributeSelector(%q) = %s, want rejected", input, describeAttributeSelector(selector))
 			}
 		})
 	}
 }
 
-func TestParseAttributeSelectorParsesValid(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
+func TestParseAttributeSelectorParsesValid(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
 		input    string
 		expected AttributeSelector
 	}{
@@ -61,16 +61,16 @@ func TestParseAttributeSelectorParsesValid(t *testing.T) {
 		{`[data-state*="expanded"i]`, AttributeSelector{Attribute: "data-state", Operator: "*=", Quote: `"`, Value: attributeSelectorValue("expanded"), Sensitivity: "i"}},
 		{`[data-state*=expanded i]`, AttributeSelector{Attribute: "data-state", Operator: "*=", Value: attributeSelectorValue("expanded"), Sensitivity: "i"}},
 	} {
-		t.Run(test.input, func(t *testing.T) {
-			t.Parallel()
-			assertAttributeSelector(t, test.input, test.expected)
+		test.Run(testCase.input, func(test *testing.T) {
+			test.Parallel()
+			assertAttributeSelector(test, testCase.input, testCase.expected)
 		})
 	}
 }
 
-func TestParseAttributeSelectorRealWorldExample(t *testing.T) {
-	t.Parallel()
-	assertAttributeSelector(t, `[data-url$=".com"i]`, AttributeSelector{
+func TestParseAttributeSelectorRealWorldExample(test *testing.T) {
+	test.Parallel()
+	assertAttributeSelector(test, `[data-url$=".com"i]`, AttributeSelector{
 		Attribute:   "data-url",
 		Operator:    "$=",
 		Quote:       `"`,
@@ -79,9 +79,9 @@ func TestParseAttributeSelectorRealWorldExample(t *testing.T) {
 	})
 }
 
-func TestParseAttributeSelectorMatchesUpstreamBeyondItsTests(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
+func TestParseAttributeSelectorMatchesUpstreamBeyondItsTests(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
 		name     string
 		input    string
 		expected *AttributeSelector
@@ -110,29 +110,29 @@ func TestParseAttributeSelectorMatchesUpstreamBeyondItsTests(t *testing.T) {
 		// An unterminated quote is an empty value, and what follows the quote is read as the flag.
 		{"unterminated quote", `[a="i]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(""), Sensitivity: "i"}},
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			if test.expected == nil {
-				if selector, ok := ParseAttributeSelector(test.input); ok {
-					t.Errorf("ParseAttributeSelector(%q) = %s, want rejected", test.input, describeAttributeSelector(selector))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if testCase.expected == nil {
+				if selector, ok := ParseAttributeSelector(testCase.input); ok {
+					test.Errorf("ParseAttributeSelector(%q) = %s, want rejected", testCase.input, describeAttributeSelector(selector))
 				}
 				return
 			}
-			assertAttributeSelector(t, test.input, *test.expected)
+			assertAttributeSelector(test, testCase.input, *testCase.expected)
 		})
 	}
 }
 
 // assertAttributeSelector parses input and compares every field, following Value's pointer, so a
 // nil Value and a present empty one are different results, as upstream's null and empty string are.
-func assertAttributeSelector(t *testing.T, input string, expected AttributeSelector) {
-	t.Helper()
+func assertAttributeSelector(test *testing.T, input string, expected AttributeSelector) {
+	test.Helper()
 	selector, ok := ParseAttributeSelector(input)
 	if !ok {
-		t.Fatalf("ParseAttributeSelector(%q) rejected, want %s", input, describeAttributeSelector(expected))
+		test.Fatalf("ParseAttributeSelector(%q) rejected, want %s", input, describeAttributeSelector(expected))
 	}
 	if !reflect.DeepEqual(selector, expected) {
-		t.Errorf("ParseAttributeSelector(%q) = %s, want %s", input, describeAttributeSelector(selector), describeAttributeSelector(expected))
+		test.Errorf("ParseAttributeSelector(%q) = %s, want %s", input, describeAttributeSelector(selector), describeAttributeSelector(expected))
 	}
 }
 

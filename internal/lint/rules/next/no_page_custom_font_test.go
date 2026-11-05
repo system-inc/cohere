@@ -19,8 +19,8 @@ const documentFile = "pages/_document.jsx"
 //
 // The snapshot records 3 diagnostics from 2 failing inputs, so one finding per input is wrong for
 // this corpus. The second failing case asserts two ids.
-func TestNoPageCustomFontFires(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -138,17 +138,17 @@ func TestNoPageCustomFontFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoPageCustomFont, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
 
 // The clean cases. Every upstream one, plus the invented twins that pin what makes each pass.
-func TestNoPageCustomFontStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -306,10 +306,10 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoPageCustomFont, testCase.fileName, testCase.source))
 		})
 	}
 }
@@ -324,19 +324,19 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 //
 // The literal strings here are typed rather than derived from the rule's own message constants: a
 // comparison against the constant moves with the constant under mutation and passes either way.
-func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontPointsAtTheWholeElement(test *testing.T) {
+	test.Parallel()
 
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n"
-	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
+	result := rule_testing.Run(test, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	wanted := "<link href=\"https://fonts.googleapis.com/css2?family=Inter\" rel=\"stylesheet\" />"
 	if reported != wanted {
-		t.Errorf("finding points at %q, wanted %q", reported, wanted)
+		test.Errorf("finding points at %q, wanted %q", reported, wanted)
 	}
 
 	// Asserted exactly rather than with strings.Contains, because a predicate weaker than the
@@ -346,10 +346,10 @@ func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
 		"link written there is fetched once and shared; written in a page it is fetched again per " +
 		"page and the framework cannot optimize it. Move the link into the custom document."
 	if result.Diagnostics[0].Message.Description != wantedMessage {
-		t.Errorf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "noPageCustomFontNotInDocument" {
-		t.Errorf("message id is %q", result.Diagnostics[0].Message.Id)
+		test.Errorf("message id is %q", result.Diagnostics[0].Message.Id)
 	}
 }
 
@@ -357,34 +357,34 @@ func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
 // walk. Upstream reports the enclosing JSXElement, so for `<link ...></link>` its range covers the
 // closing tag too. Ours anchors on the opening element, so it does not. Recorded as what our rule
 // decides, with the difference stated rather than left for a reader to find.
-func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(test *testing.T) {
+	test.Parallel()
 
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\"></link></div>\n}\n"
-	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
+	result := rule_testing.Run(test, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	wanted := "<link href=\"https://fonts.googleapis.com/css2?family=Inter\">"
 	if reported != wanted {
-		t.Errorf("finding points at %q, wanted %q", reported, wanted)
+		test.Errorf("finding points at %q, wanted %q", reported, wanted)
 	}
 }
 
 // The second finding's span and message, so both message constants are pinned rather than one.
-func TestNoPageCustomFontOutsideDefaultExportMessage(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontOutsideDefaultExportMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "function Links() {\n  return <link href=\"https://fonts.googleapis.com/css2?family=Inter\" />\n}\nexport default function D() { return <div><Links /></div> }\n"
-	result := rule_testing.Run(t, NoPageCustomFont, "pages/_document.tsx", source)
+	result := rule_testing.Run(test, NoPageCustomFont, "pages/_document.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	wanted := "<link href=\"https://fonts.googleapis.com/css2?family=Inter\" />"
 	if reported != wanted {
-		t.Errorf("finding points at %q, wanted %q", reported, wanted)
+		test.Errorf("finding points at %q, wanted %q", reported, wanted)
 	}
 	wantedMessage := "This is a Google Fonts stylesheet inside the custom document but outside the " +
 		"component the document default-exports. The framework rewrites font links it finds in " +
@@ -392,23 +392,23 @@ func TestNoPageCustomFontOutsideDefaultExportMessage(t *testing.T) {
 		"to that rewriting, so automatic font optimization silently does nothing. Inline the link " +
 		"into the default-exported component."
 	if result.Diagnostics[0].Message.Description != wantedMessage {
-		t.Errorf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "noPageCustomFontOutsideDefaultExport" {
-		t.Errorf("message id is %q", result.Diagnostics[0].Message.Id)
+		test.Errorf("message id is %q", result.Diagnostics[0].Message.Id)
 	}
 	// `strings` is used here deliberately: the two message descriptions must not be one string,
 	// which a copy-paste in the rule file could silently make them.
 	if strings.EqualFold(wantedMessage, "") {
-		t.Fatal("unreachable")
+		test.Fatal("unreachable")
 	}
 }
 
 // TestNoPageCustomFontDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
 // JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
-func TestNoPageCustomFontDecodesEntities(t *testing.T) {
-	t.Parallel()
+func TestNoPageCustomFontDecodesEntities(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name   string
@@ -418,14 +418,14 @@ func TestNoPageCustomFontDecodesEntities(t *testing.T) {
 		{`an encoded slash in the font href`, "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n", []string{messageNoPageCustomFontNotInDocument.Id}},
 		{`an encoded slash in another href`, "export default function D() {\n  return <div><link href=\"https://example.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n", []string{}},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoPageCustomFont, "pages/index.tsx", row.source)
 			if len(row.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, row.ids...)
+			rule_testing.ExpectFindings(test, result, row.ids...)
 		})
 	}
 }

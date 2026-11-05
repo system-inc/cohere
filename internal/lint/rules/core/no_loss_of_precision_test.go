@@ -14,8 +14,8 @@ const lossOfPrecisionFile = "/repository/source/Numbers.ts"
 // One Tester block, 89 pass and 56 fail, and the snapshot records 56 diagnostics from 56 fail
 // inputs. One finding per input holds throughout, which is unusual enough to be worth stating: no
 // input here reports twice, so every fail case asserts exactly one message id.
-func TestNoLossOfPrecisionFires(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -80,10 +80,10 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -99,8 +99,8 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 // its neighbour `0x20000000000001` is the first hex value that does not fit. And `3e-308` is
 // subnormal territory, where a formatter with a fixed fractional width runs out of digits before it
 // reaches a significant one.
-func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,10 +198,10 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }
@@ -213,8 +213,8 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 // its decimal value, so this rule reads the raw span out of the source file. These cases pin that
 // decision: each one is a literal whose normalized text and source text differ, and a rule reading
 // `.Text` reports the wrong answer on all of them.
-func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionReadsRawSourceText(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -226,10 +226,10 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 		{"hex whose normalized text is decimal", "var x = 0x20000000000001"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -261,10 +261,10 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 		{"binary over 53 bits whose low bits are zero", "var x = 0b1100000000000000000000000000000000000000000000000000000"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }

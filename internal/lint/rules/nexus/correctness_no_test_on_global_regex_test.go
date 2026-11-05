@@ -22,17 +22,17 @@ func correctnessNoTestOnGlobalRegexSource(lines ...string) string {
 	return correctnessNoTestOnGlobalRegexPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoTestOnGlobalRegexRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoTestOnGlobalRegex, map[string]string{
+func correctnessNoTestOnGlobalRegexRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoTestOnGlobalRegex, map[string]string{
 		correctnessNoTestOnGlobalRegexFile: sourceText,
 	}, correctnessNoTestOnGlobalRegexFile)
 }
 
 // correctnessNoTestOnGlobalRegexExpect asserts the reported spans in source order, and that no finding
 // carries a fix.
-func correctnessNoTestOnGlobalRegexExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoTestOnGlobalRegexExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold
 	// each finding's exact text.
 	if len(want) > 0 {
@@ -40,7 +40,7 @@ func correctnessNoTestOnGlobalRegexExpect(t *testing.T, result rule_testing.Resu
 		for index := range wantIds {
 			wantIds[index] = correctnessNoTestOnGlobalRegexId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -50,19 +50,19 @@ func correctnessNoTestOnGlobalRegexExpect(t *testing.T, result rule_testing.Resu
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoTestOnGlobalRegexId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
 		}
 	}
 }
@@ -101,30 +101,30 @@ func correctnessNoTestOnGlobalRegexCompLeak(reset bool, fixed bool) string {
 }
 
 // The real guard as it shipped, hand patch and all: the `.test()` on the shared `g` regex is reported.
-func TestCorrectnessNoTestOnGlobalRegexFiresOnAhraOsWisdom(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoTestOnGlobalRegexFiresOnAhraOsWisdom(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoTestOnGlobalRegexRun(t, correctnessNoTestOnGlobalRegexCompLeak(true, false))
-	correctnessNoTestOnGlobalRegexExpect(t, result, "compLeakDollarPattern.test(text)")
+	result := correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexCompLeak(true, false))
+	correctnessNoTestOnGlobalRegexExpect(test, result, "compLeakDollarPattern.test(text)")
 }
 
 // Without the hand patch, the shape the patch was written for: reported the same.
-func TestCorrectnessNoTestOnGlobalRegexFiresOnUnpatchedAhraOsWisdom(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoTestOnGlobalRegexFiresOnUnpatchedAhraOsWisdom(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoTestOnGlobalRegexRun(t, correctnessNoTestOnGlobalRegexCompLeak(false, false))
-	correctnessNoTestOnGlobalRegexExpect(t, result, "compLeakDollarPattern.test(text)")
+	result := correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexCompLeak(false, false))
+	correctnessNoTestOnGlobalRegexExpect(test, result, "compLeakDollarPattern.test(text)")
 }
 
 // After the fix: the `.test()` has a regex without `g`, the `replace` keeps its own, and nothing fires.
-func TestCorrectnessNoTestOnGlobalRegexStaysSilentOnFixedAhraOsWisdom(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoTestOnGlobalRegexStaysSilentOnFixedAhraOsWisdom(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoTestOnGlobalRegexRun(t, correctnessNoTestOnGlobalRegexCompLeak(false, true)))
+	rule_testing.ExpectClean(test, correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexCompLeak(false, true)))
 }
 
-func TestCorrectnessNoTestOnGlobalRegexFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoTestOnGlobalRegexFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -194,17 +194,17 @@ func TestCorrectnessNoTestOnGlobalRegexFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoTestOnGlobalRegexRun(t, correctnessNoTestOnGlobalRegexSource(testCase.lines...))
-			correctnessNoTestOnGlobalRegexExpect(t, result, testCase.want...)
+			result := correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexSource(testCase.lines...))
+			correctnessNoTestOnGlobalRegexExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoTestOnGlobalRegexStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoTestOnGlobalRegexStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -315,10 +315,10 @@ func TestCorrectnessNoTestOnGlobalRegexStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoTestOnGlobalRegexRun(t, correctnessNoTestOnGlobalRegexSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexSource(testCase.lines...)))
 		})
 	}
 }

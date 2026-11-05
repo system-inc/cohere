@@ -47,8 +47,8 @@ import (
 var goldenDependencyPattern = regexp.MustCompile(`\$\[[0-9]+\] !== ([A-Za-z_$][A-Za-z0-9_$]*(?:\??\.[A-Za-z_$][A-Za-z0-9_$]*)*)`)
 
 // goldenDependencies returns the dependency expressions upstream's compiled output compares.
-func goldenDependencies(t *testing.T, expectPath string) []string {
-	t.Helper()
+func goldenDependencies(test *testing.T, expectPath string) []string {
+	test.Helper()
 	body, err := os.ReadFile(expectPath)
 	if err != nil {
 		return nil
@@ -91,12 +91,12 @@ func goldenDependencies(t *testing.T, expectPath string) []string {
 // is an expression upstream chose not to spell out, so some slots are unmatchable by construction.
 // And this package declares `DependencyGapOptionalChains`, so an optional chain is expected to score
 // short. Asserting equality would fail on upstream's own choices rather than on our defects.
-func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
-	t.Parallel()
+func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
+	test.Parallel()
 
 	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
 	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+		test.Fatalf("loading the vendored corpus: %v", err)
 	}
 
 	scored, matched, missed, unmatchable, flowExcluded := 0, 0, 0, 0, 0
@@ -114,11 +114,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 			flowExcluded++
 			continue
 		}
-		expected := goldenDependencies(t, fixture.ExpectPath)
+		expected := goldenDependencies(test, fixture.ExpectPath)
 		if len(expected) == 0 {
 			continue
 		}
-		ours, ok := inferredDependencyStrings(t, fixture.Source)
+		ours, ok := inferredDependencyStrings(test, fixture.Source)
 		if !ok {
 			continue
 		}
@@ -170,7 +170,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	}
 
 	if scored == 0 {
-		t.Fatal("no golden cache slot was scored, so this test asserts nothing; the `## Code` " +
+		test.Fatal("no golden cache slot was scored, so this test asserts nothing; the `## Code` " +
 			"section or the cache-slot spelling changed rather than the collector being correct")
 	}
 
@@ -276,7 +276,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// precise-deps without adding dependencies. MANUAL_MEMO_HOISTING.md records all four changed rows.
 	const knownMatched = 83
 	if matched < knownMatched {
-		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
+		test.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
 	}
 	// A floor cannot catch the failure that produced the 72: a pattern that reads upstream's answer
@@ -292,7 +292,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// collection genuinely improves.
 	const knownMatchedCeiling = 83
 	if matched > knownMatchedCeiling {
-		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
+		test.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
 			"dependency shorter than upstream wrote it, so our shallower answer matches something "+
 			"upstream never said. Confirm collection actually improved, then raise both pins",
@@ -422,24 +422,24 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// 82 matched. EFFECT_HOOK_EFFECTS.md records the unchanged remaining fixture lists.
 	const knownOursTotal = 125
 	if upstreamTotal != knownUpstreamTotal {
-		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
+		test.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
 	}
 	if oursTotal != knownOursTotal {
-		t.Errorf("we produce %d raw dependencies against upstream's %d final cache inputs, want %d; "+
+		test.Errorf("we produce %d raw dependencies against upstream's %d final cache inputs, want %d; "+
 			"attribute changed rows and check pruning before treating a raw count as codegen parity",
 			oursTotal, upstreamTotal, knownOursTotal)
 	}
 
-	t.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable; "+
+	test.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable; "+
 		"%d flow fixtures excluded", scored, matched, missed, unmatchable, flowExcluded)
-	t.Logf("dependency counts: upstream %d, ours %d (%d over-producing, %d under, %d exact)",
+	test.Logf("dependency counts: upstream %d, ours %d (%d over-producing, %d under, %d exact)",
 		upstreamTotal, oursTotal, overProducing, underProducing, exactCount)
 }
 
 // inferredDependencyStrings renders every scope dependency the way source would spell it.
-func inferredDependencyStrings(t *testing.T, source string) ([]string, bool) {
-	t.Helper()
+func inferredDependencyStrings(test *testing.T, source string) ([]string, bool) {
+	test.Helper()
 	var rendered []string
 	ran := false
 	probe := rule.Rule{
@@ -490,7 +490,7 @@ func inferredDependencyStrings(t *testing.T, source string) ([]string, bool) {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")

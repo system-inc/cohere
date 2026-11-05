@@ -25,8 +25,8 @@ func consistencyNoHandBuiltDeclaredErrorCaseName(index int) string {
 // about: a computed key, a string-literal key, a spread, and a namespaced constructor. Each plainly
 // carries or names the option, and widening any of them would report inputs the original is silent
 // on.
-func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoHandBuiltDeclaredErrorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName   string
@@ -91,9 +91,9 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoHandBuiltDeclaredError,
+		test.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoHandBuiltDeclaredError,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -104,8 +104,8 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
 // The span is the whole `new` expression rather than the option that triggered the finding, which is
 // the original's `node`. Asserting it matters because pointing at the option instead would satisfy
 // every message-id assertion while underlining something the reader was not shown.
-func TestNoHandBuiltDeclaredErrorFires(t *testing.T) {
-	t.Parallel()
+func TestNoHandBuiltDeclaredErrorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName   string
@@ -148,20 +148,20 @@ func TestNoHandBuiltDeclaredErrorFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoHandBuiltDeclaredError, testCase.fileName,
+		test.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoHandBuiltDeclaredError, testCase.fileName,
 				testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "consistencyNoHandBuiltDeclaredError")
+			rule_testing.ExpectFindings(test, result, "consistencyNoHandBuiltDeclaredError")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Description != messageNoHandBuiltDeclaredError().Description {
-				t.Fatalf("message: expected %q, got %q",
+				test.Fatalf("message: expected %q, got %q",
 					messageNoHandBuiltDeclaredError().Description, diagnostic.Message.Description)
 			}
 		})

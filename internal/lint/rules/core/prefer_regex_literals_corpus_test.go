@@ -23,8 +23,8 @@ import (
  * on it: `window.RegExp('a')`, which ESLint reports only under browser globals, and which the tracker
  * follows, since an undeclared `window` is the runtime's global object here. Its own test says so.
  */
-func TestPreferRegexLiteralsAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()
 	cases := []struct {
@@ -293,11 +293,11 @@ func TestPreferRegexLiteralsAgreesWithESLint(t *testing.T) {
 		if testCase.options != "" {
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
-				t.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
+				test.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
 			}
 			options = decoded
 		}
-		result := rule_testing.RunTypedVerbatimWithOptions(t, PreferRegexLiterals, "input.ts", testCase.code, options)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferRegexLiterals, "input.ts", testCase.code, options)
 		source := result.SourceFile.Text()
 		got := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -308,7 +308,7 @@ func TestPreferRegexLiteralsAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
+			test.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
 		}
 	}
 }

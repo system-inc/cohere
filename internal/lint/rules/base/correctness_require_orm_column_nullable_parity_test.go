@@ -29,8 +29,8 @@ type correctnessRequireOrmColumnNullableParityFinding struct {
 // Three clean rows are the ones a reading of the source would get wrong: a property written with a
 // question mark is already nullable, `any` and `unknown` count as nullable because the claim was
 // never checked, and a non-boolean `nullable` value is a skip rather than a false.
-func TestOrmColumnNullableParityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestOrmColumnNullableParityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// The same decorator on a METHOD rather than a property. Closes a mutant that accepted any
@@ -50,15 +50,15 @@ func TestOrmColumnNullableParityStaysSilent(t *testing.T) {
 		"\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SomethingElse({ nullable: true }) x!: string; }",
 	}
 	for index, sourceText := range cases {
-		t.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, sourceText))
+		test.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, sourceText))
 		})
 	}
 }
 
-func TestOrmColumnNullableParityFires(t *testing.T) {
-	t.Parallel()
+func TestOrmColumnNullableParityFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -90,28 +90,28 @@ func TestOrmColumnNullableParityFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, testCase.sourceText)
+		test.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
 				}
 				if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-					t.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
+					test.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
 						position, len(diagnostic.Fixes), len(diagnostic.Suggestions))
 				}
 			}
@@ -134,17 +134,17 @@ func TestOrmColumnNullableParityFires(t *testing.T) {
 //
 // Pinned because a reader meeting the first row will reasonably want to resolve the binding, and
 // doing that would change what the rule is.
-func TestOrmColumnNullableParityKeysOnTheDecoratorName(t *testing.T) {
-	t.Parallel()
+func TestOrmColumnNullableParityKeysOnTheDecoratorName(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\n"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity,
 		correctnessRequireOrmColumnNullableParityFile,
 		preamble+"function OrmColumn(o?: any): any { return null; }\nclass A { @OrmColumn({ nullable: true }) x!: string; }"),
 		"columnNullableButTypeNot")
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity,
 		correctnessRequireOrmColumnNullableParityFile,
 		preamble+"namespace N { export function OrmColumn(o?: any): any { return null; } }\nclass A { @N.OrmColumn({ nullable: true }) x!: string; }"))
 }

@@ -8,8 +8,8 @@ import (
 
 const unsafeFunctionFile = "/repository/source/Thing.ts"
 
-func TestNoUnsafeFunctionTypeFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFunctionTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -30,16 +30,16 @@ func TestNoUnsafeFunctionTypeFires(t *testing.T) {
 		{"as a type argument", "export let handlers: Array<Function>;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
 				"bannedFunctionType")
 		})
 	}
 }
 
-func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFunctionTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -82,9 +82,9 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 		{"a generic signature", "export let value: <T>(input: T) => T;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
 		})
 	}
 }

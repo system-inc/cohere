@@ -21,8 +21,8 @@ func unionWriteSubject() rule.Rule {
 	return rule.Rule{Name: "adamic/union-write", Run: func(rule.Context, any) rule.Listeners { return nil }}
 }
 
-func TestUnionWriteRefused(t *testing.T) {
-	t.Parallel()
+func TestUnionWriteRefused(test *testing.T) {
+	test.Parallel()
 	for name, slot := range map[string]string{
 		"rest-array-union-source":      "holder.items",
 		"rest-object-union-source":     "holder.bag",
@@ -80,25 +80,25 @@ func TestUnionWriteRefused(t *testing.T) {
 		"compound":       "cell.value",
 		"increment":      "cell.value",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			bytes, err := os.ReadFile("testdata/union-write/" + name + ".ts")
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			source := string(bytes)
-			if count := typeErrorCount(t, source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+			if count := typeErrorCount(test, source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(t, unionWriteSubject(), source)
-			rule_testing.ExpectFindings(t, result, "unionWrite")
-			expectSpans(t, source, result, slot)
+			result := runAdamic(test, unionWriteSubject(), source)
+			rule_testing.ExpectFindings(test, result, "unionWrite")
+			expectSpans(test, source, result, slot)
 			messageSlot := slot
 			if strings.HasPrefix(name, "assign-") || name == "object-assign" {
 				messageSlot += ".value"
 			}
 			if len(result.Diagnostics) == 1 && !strings.Contains(result.Diagnostics[0].Message.Description, messageSlot) {
-				t.Errorf("message %q does not name slot %s", result.Diagnostics[0].Message.Description, slot)
+				test.Errorf("message %q does not name slot %s", result.Diagnostics[0].Message.Description, slot)
 			}
 		})
 	}
@@ -106,46 +106,46 @@ func TestUnionWriteRefused(t *testing.T) {
 
 // Every refused form is a Node failure. Removing probe() is the control: the
 // exact same program no longer throws, so a runtime check that always fails is caught.
-func TestUnionWriteNodeProbes(t *testing.T) {
-	t.Parallel()
+func TestUnionWriteNodeProbes(test *testing.T) {
+	test.Parallel()
 	paths, err := filepath.Glob("testdata/union-write/*.ts")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(paths) != 54 {
-		t.Fatalf("got %d probes, want 54", len(paths))
+		test.Fatalf("got %d probes, want 54", len(paths))
 	}
 	for _, path := range paths {
-		t.Run(filepath.Base(path), func(t *testing.T) {
-			t.Parallel()
+		test.Run(filepath.Base(path), func(test *testing.T) {
+			test.Parallel()
 			bytes, err := os.ReadFile(path)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			run := func(source string) ([]byte, error) {
-				file := filepath.Join(t.TempDir(), "probe.mts")
+				file := filepath.Join(test.TempDir(), "probe.mts")
 				if err := os.WriteFile(file, []byte(source), 0600); err != nil {
-					t.Fatal(err)
+					test.Fatal(err)
 				}
 				return exec.Command("node", file).CombinedOutput()
 			}
 			output, err := run(string(bytes))
 			if err == nil || !strings.Contains(string(output), "TypeError") {
-				t.Fatalf("want Node TypeError, got %v: %s", err, output)
+				test.Fatalf("want Node TypeError, got %v: %s", err, output)
 			}
 			control := strings.Replace(string(bytes), "\nprobe();", "", 1)
 			if control == string(bytes) {
-				t.Fatal("probe control did not change the source")
+				test.Fatal("probe control did not change the source")
 			}
 			if output, err := run(control); err != nil {
-				t.Fatalf("control: %v: %s", err, output)
+				test.Fatalf("control: %v: %s", err, output)
 			}
 		})
 	}
 }
 
-func TestUnionWriteLegalNeighbours(t *testing.T) {
-	t.Parallel()
+func TestUnionWriteLegalNeighbours(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct{ source, old, plant string }{
 		"rest tuple-valued slot":       {`function put(holder: {items: [number]} | {items: [1]}): void { const source: [1] = [1]; [...holder.items] = source; }`, `const source: [1] = [1]`, `const source: [2] = [2]`},
 		"rest array fits":              {`function put(holder: {items: string[]} | {items: (string | number)[]}): void { [...holder.items] = ['text']; }`, `{items: string[]} |`, `{items: number[]} |`},
@@ -215,49 +215,49 @@ func TestUnionWriteLegalNeighbours(t *testing.T) {
 		"plain":                        {`function put(cell: { n: number | string }): void { cell.n = 'text'; }`, "{ n: number | string }", "{ n: number } | { n: number | string }"},
 		"logical fits":                 {`function put(cell: { n: number | undefined } | { n: 1 | undefined }): void { cell.n ??= 1; }`, "??= 1", "??= 2"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if count := typeErrorCount(t, fixture.source); count != 0 {
-				t.Fatalf("tsgo diagnostics: %d, want 0", count)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			if count := typeErrorCount(test, fixture.source); count != 0 {
+				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(t, runAdamic(t, unionWriteSubject(), fixture.source))
+			rule_testing.ExpectClean(test, runAdamic(test, unionWriteSubject(), fixture.source))
 			plant := strings.Replace(fixture.source, fixture.old, fixture.plant, 1)
 			if plant == fixture.source {
-				t.Fatal("plant did not change source")
+				test.Fatal("plant did not change source")
 			}
-			rule_testing.ExpectFindings(t, runAdamic(t, unionWriteSubject(), plant), "unionWrite")
+			rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
 		})
 	}
 }
 
-func TestUnionWriteDeleteStaysQuiet(t *testing.T) {
-	t.Parallel()
+func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
+	test.Parallel()
 	bytes, err := os.ReadFile("testdata/union-write-legal/delete.ts")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	source := string(bytes)
-	if count := typeErrorCount(t, source); count != 0 {
-		t.Fatalf("tsgo diagnostics: %d, want 0", count)
+	if count := typeErrorCount(test, source); count != 0 {
+		test.Fatalf("tsgo diagnostics: %d, want 0", count)
 	}
-	rule_testing.ExpectClean(t, runAdamic(t, unionWriteSubject(), source))
+	rule_testing.ExpectClean(test, runAdamic(test, unionWriteSubject(), source))
 	plant := strings.Replace(source, "delete cell.value", "cell.value = 'text'", 1)
-	rule_testing.ExpectFindings(t, runAdamic(t, unionWriteSubject(), plant), "unionWrite")
+	rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
 	run := func(source string) string {
-		file := filepath.Join(t.TempDir(), "probe.mts")
+		file := filepath.Join(test.TempDir(), "probe.mts")
 		if err := os.WriteFile(file, []byte(source), 0600); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		output, err := exec.Command("node", file).CombinedOutput()
 		if err != nil {
-			t.Fatalf("Node: %v: %s", err, output)
+			test.Fatalf("Node: %v: %s", err, output)
 		}
 		return strings.TrimSpace(string(output))
 	}
 	if got := run(source); got != "0" {
-		t.Fatalf("delete: got %q, want 0", got)
+		test.Fatalf("delete: got %q, want 0", got)
 	}
 	if got := run(strings.Replace(source, "clear(counter);", "", 1)); got != "1" {
-		t.Fatalf("delete control: got %q, want 1", got)
+		test.Fatalf("delete control: got %q, want 1", got)
 	}
 }

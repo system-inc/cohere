@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-func names(t *testing.T, source string) []string {
-	t.Helper()
+func names(test *testing.T, source string) []string {
+	test.Helper()
 	violations, err := SerialTests("planted_test.go", []byte(source))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var found []string
 	for _, violation := range violations {
@@ -21,8 +21,8 @@ func names(t *testing.T, source string) []string {
 }
 
 // TestSerialTestsFindsAPlantedSerialTest is the checker against planted tests, each beside its control.
-func TestSerialTestsFindsAPlantedSerialTest(t *testing.T) {
-	t.Parallel()
+func TestSerialTestsFindsAPlantedSerialTest(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -43,19 +43,19 @@ func TestSerialTestsFindsAPlantedSerialTest(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		source := "package p\n\nimport \"testing\"\n\n" + testCase.source + "\n"
-		found := strings.Join(names(t, source), ",")
+		found := strings.Join(names(test, source), ",")
 		if found != testCase.want {
-			t.Errorf("%s: found %q, expected %q", testCase.name, found, testCase.want)
+			test.Errorf("%s: found %q, expected %q", testCase.name, found, testCase.want)
 		}
 	}
 }
 
 // TestEveryCohereTestRunsInParallel holds the module to the house default: every test and subtest calls
-// t.Parallel(), or the comment above it says why it cannot (#nxgt2ca).
-func TestEveryCohereTestRunsInParallel(t *testing.T) {
-	t.Parallel()
+// test.Parallel(), or the comment above it says why it cannot (#nxgt2ca).
+func TestEveryCohereTestRunsInParallel(test *testing.T) {
+	test.Parallel()
 	var violations []Violation
-	root, files := eachTestFile(t, func(path string, source []byte) error {
+	root, files := eachTestFile(test, func(path string, source []byte) error {
 		found, err := SerialTests(path, source)
 		violations = append(violations, found...)
 		return err
@@ -68,6 +68,6 @@ func TestEveryCohereTestRunsInParallel(t *testing.T) {
 		relative, _ := filepath.Rel(root, violation.Position.Filename)
 		lines = append(lines, fmt.Sprintf("  %s:%d %s", relative, violation.Position.Line, violation.Name))
 	}
-	t.Errorf("%d tests of %d files neither call t.Parallel() nor say why above them with %q and a reason:\n%s",
+	test.Errorf("%d tests of %d files neither call t.Parallel() nor say why above them with %q and a reason:\n%s",
 		len(violations), files, NotParallelMarker, strings.Join(lines, "\n"))
 }

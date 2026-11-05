@@ -38,8 +38,8 @@ func parameterPropertyCaseName(number int) string {
 // in upstream's visitor, NOT because arrows are skipped, and reading it the other way is the single
 // most available wrong conclusion here. Case 23 (a block redeclaring `foo`) is the only case in the
 // corpus that turns on resolving the identifier rather than matching its spelling.
-func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		number     int
@@ -77,17 +77,17 @@ func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t,
+		test.Run(parameterPropertyCaseName(testCase.number), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})
 	}
 }
 
 // The reporting cases, with the per-input diagnostic count recovered from the snapshot.
-func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		number     int
@@ -118,13 +118,13 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
-			t.Parallel()
+		test.Run(parameterPropertyCaseName(testCase.number), func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unnecessaryAssign"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.Run(t,
+			rule_testing.ExpectFindings(test, rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText),
 				wantIds...)
 		})
@@ -137,8 +137,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
 // every suggestion back to front and compare the resulting source with upstream's own after-text.
 // Upstream ships these as SUGGESTIONS rather than fixes, which is why `ExpectFixedSource` cannot be
 // used at all: it applies `Fixes`, and this rule proposes none. The applier is hand-rolled below.
-func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		number int
@@ -169,13 +169,13 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T)
 	}
 
 	for _, testCase := range cases {
-		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t,
+		test.Run(parameterPropertyCaseName(testCase.number), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.before)
-			got := applyEveryParameterPropertySuggestion(t, testCase.before, result)
+			got := applyEveryParameterPropertySuggestion(test, testCase.before, result)
 			if got != testCase.after {
-				t.Fatalf("applying the suggestions gave\n%q\nwanted\n%q", got, testCase.after)
+				test.Fatalf("applying the suggestions gave\n%q\nwanted\n%q", got, testCase.after)
 			}
 		})
 	}
@@ -187,8 +187,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T)
 // against. `rule_testing` has no suggestion applier, only `ExpectFixedSource` for fixes, so this exists
 // rather than the assertion being skipped: a rule whose only repair is a suggestion would otherwise
 // ship with nothing checking where the repair points.
-func applyEveryParameterPropertySuggestion(t *testing.T, source string, result rule_testing.Result) string {
-	t.Helper()
+func applyEveryParameterPropertySuggestion(test *testing.T, source string, result rule_testing.Result) string {
+	test.Helper()
 
 	type edit struct {
 		start int
@@ -199,7 +199,7 @@ func applyEveryParameterPropertySuggestion(t *testing.T, source string, result r
 	var edits []edit
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Suggestions) != 1 {
-			t.Fatalf("wanted exactly one suggestion per finding, got %d", len(diagnostic.Suggestions))
+			test.Fatalf("wanted exactly one suggestion per finding, got %d", len(diagnostic.Suggestions))
 		}
 		for _, fix := range diagnostic.Suggestions[0].Fixes {
 			edits = append(edits, edit{start: fix.Range.Pos(), end: fix.Range.End(), text: fix.Text})
@@ -210,7 +210,7 @@ func applyEveryParameterPropertySuggestion(t *testing.T, source string, result r
 
 	for _, e := range edits {
 		if e.start < 0 || e.end > len(source) || e.start > e.end {
-			t.Fatalf("suggestion range [%d,%d) is outside the source of length %d", e.start, e.end, len(source))
+			test.Fatalf("suggestion range [%d,%d) is outside the source of length %d", e.start, e.end, len(source))
 		}
 		source = source[:e.start] + e.text + source[e.end:]
 	}
@@ -225,10 +225,10 @@ func applyEveryParameterPropertySuggestion(t *testing.T, source string, result r
 // on the resulting KindObjectBindingPattern. A mutation removing the kind guard survived every
 // other fixture in this file, because no `ExpectFindings` assertion can observe a panic. This test
 // exists to make that guard visible: it fails by crashing rather than by mismatching.
-func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterProperty(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterProperty(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t,
+	rule_testing.ExpectClean(test, rule_testing.Run(test,
 		NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public { a }: { a: string }) {\n    this.a = a;\n  }\n}\n"))
 }
@@ -238,29 +238,29 @@ func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterP
 //
 // Comparing a diagnostic with the very constant it was reported from is equality that looks correct
 // and moves in lockstep under mutation, so it can never fail. These are literals.
-func TestNoUnnecessaryParameterPropertyAssignmentMessage(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
+	result := rule_testing.Run(test, NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public name: unknown) {\n    this.name = name;\n  }\n}\n")
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 
 	if got := result.Diagnostics[0].Message.Id; got != "unnecessaryAssign" {
-		t.Fatalf("message id was %q", got)
+		test.Fatalf("message id was %q", got)
 	}
 	wantDescription := "A constructor parameter carrying `public`, `private`, `protected`, " +
 		"`readonly` or `override` is already assigned to the matching property before the " +
 		"constructor body runs. Writing it again does nothing, and it invites the next reader to " +
 		"believe the two names could diverge. Delete the assignment."
 	if got := result.Diagnostics[0].Message.Description; got != wantDescription {
-		t.Fatalf("message description was %q", got)
+		test.Fatalf("message description was %q", got)
 	}
 
 	if got := result.Diagnostics[0].Suggestions[0].Message.Id; got != "removeAssignment" {
-		t.Fatalf("suggestion id was %q", got)
+		test.Fatalf("suggestion id was %q", got)
 	}
 }
 
@@ -269,8 +269,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentMessage(t *testing.T) {
 // Sliced out of the source with the finding's own range and compared with the text it should cover.
 // Upstream's span is the whole assignment expression, which the second case pins in the one shape
 // where that is not obvious: a parenthesized target puts the leading `(` inside the reported range.
-func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -299,16 +299,16 @@ func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("the finding pointed at %q, wanted %q", reported, testCase.want)
+				test.Fatalf("the finding pointed at %q, wanted %q", reported, testCase.want)
 			}
 		})
 	}
@@ -318,8 +318,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
 //
 // The corpus writes no parentheses anywhere and no `override` or `readonly` parameter with a body,
 // so a port could fall either way on all of these and every imported fixture would stay green.
-func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *testing.T) {
+	test.Parallel()
 
 	reporting := []struct {
 		name       string
@@ -385,9 +385,9 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 	}
 
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText),
 				"unnecessaryAssign")
 		})
@@ -454,9 +454,9 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})
 	}

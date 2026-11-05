@@ -19,8 +19,8 @@ const fallthroughFile = "/repository/source/Fallthrough.tsx"
 // From `oxc/crates/oxc_linter/src/rules/eslint/no_fallthrough.rs`: one Tester block, 56 pass and
 // 30 fail inputs, and the snapshot records 32 diagnostics. That gap is real and recovered by hand
 // below: exactly two inputs report twice, and every other fail input reports once.
-func TestNoFallthroughFires(t *testing.T) {
-	t.Parallel()
+func TestNoFallthroughFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -140,23 +140,23 @@ func TestNoFallthroughFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
-				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
+				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
 			} else {
-				result = rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 					testCase.sourceText, testCase.options)
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // The clean cases are the whole discrimination, and each was added upstream when somebody hit it.
-func TestNoFallthroughStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoFallthroughStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -309,16 +309,16 @@ func TestNoFallthroughStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
-				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
+				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
 			} else {
-				result = rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 					testCase.sourceText, testCase.options)
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -329,8 +329,8 @@ func TestNoFallthroughStaysSilent(t *testing.T) {
 // the wrong node with a fully green suite. The span is upstream's `next_case.span`: the clause that
 // is fallen *into*, from its `case` or `default` keyword through the end of its body, and not the
 // clause that failed to break. Read off the snapshot's underline rather than guessed.
-func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
-	t.Parallel()
+func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -370,22 +370,22 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
-				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
+				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
 			} else {
-				result = rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 					testCase.sourceText, testCase.options)
 			}
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}
 			for index, wantText := range testCase.wantTexts {
 				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantText {
-					t.Fatalf("finding %d pointed at %q, wanted %q", index, reported, wantText)
+					test.Fatalf("finding %d pointed at %q, wanted %q", index, reported, wantText)
 				}
 			}
 		})
@@ -394,74 +394,74 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
 
 // Cases written from reading our own code rather than upstream's, each covering a discrimination
 // the imported corpus never exercises.
-func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
-	t.Parallel()
+func TestNoFallthroughCasesFromOurOwnReading(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a labeled break naming the switch leaves it", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a labeled break naming the switch leaves it", func(test *testing.T) {
+		test.Parallel()
 		// Upstream's corpus has no labeled break at all, and a port crediting only a bare `break`
 		// would report this. A labeled break jumps out of whatever it names, and in every case that
 		// is somewhere at or outside the switch, so the clause does not fall through either way.
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"outer: switch(foo) { case 0: a(); break outer; case 1: b(); }"))
 	})
 
-	t.Run("a labeled break naming an inner loop does not leave the switch", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a labeled break naming an inner loop does not leave the switch", func(test *testing.T) {
+		test.Parallel()
 		// The other half of the pair. `break inner` leaves the loop and lands back in the clause,
 		// so the clause still falls through. A port treating every labeled break as an exit stays
 		// silent here and nothing upstream would notice.
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: inner: while (a) { break inner; } case 1: b(); }"), "case")
 	})
 
-	t.Run("a continue with a label leaves the switch", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a continue with a label leaves the switch", func(test *testing.T) {
+		test.Parallel()
 		// `continue` can only target a loop, and no loop is inside this clause, so it necessarily
 		// leaves the switch. Upstream covers unlabeled continue only.
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"outer: while (a) { switch(foo) { case 0: a(); continue outer; case 1: b(); } }"))
 	})
 
-	t.Run("a switch nested in a clause does not lend its break to the outer clause", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a switch nested in a clause does not lend its break to the outer clause", func(test *testing.T) {
+		test.Parallel()
 		// The pair with upstream's nested-switch pass case, which is clean only because of its
 		// comment. Without the comment the outer clause falls through, and this pins that the inner
 		// break is not credited outward.
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: switch(bar) { case 2: break; } case 1: break; }"), "case")
 	})
 
-	t.Run("a return inside a nested function does not exit the clause", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a return inside a nested function does not exit the clause", func(test *testing.T) {
+		test.Parallel()
 		// The walk has to stop at a function boundary. A return in an inner function returns from
 		// that function, and the clause carries straight on into the next one.
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"function f() { switch(foo) { case 0: (function () { return 1; }); case 1: b(); } }"), "case")
 	})
 
-	t.Run("a comment pattern is matched case-insensitively", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a comment pattern is matched case-insensitively", func(test *testing.T) {
+		test.Parallel()
 		// oxc compiles the configured pattern with `(?iu)` prepended, so a lower-case pattern
 		// matches an upper-case comment. Nothing in the corpus pairs a custom pattern with a
 		// differing case, so a port compiling the pattern verbatim passes all 56 pass cases.
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: a(); /* NO BREAK */ case 1: b(); }",
 			NoFallthroughOptions{CommentPattern: "no break"}))
 	})
 
-	t.Run("an invalid comment pattern does not match everything", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an invalid comment pattern does not match everything", func(test *testing.T) {
+		test.Parallel()
 		// A pattern that fails to compile must not silently become "matches anything", which is
 		// what a port ignoring the compile error would produce: the rule would go quiet on every
 		// file the option touches. Falling back to the default set keeps the rule honest.
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: a(); /* whatever */ case 1: b(); }",
 			NoFallthroughOptions{CommentPattern: "("}), "case")
 	})
 
-	t.Run("a directive is never a fallthrough comment, even under a matching pattern", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a directive is never a fallthrough comment, even under a matching pattern", func(test *testing.T) {
+		test.Parallel()
 		// oxc rejects a comment opening with `oxlint-` or `eslint-` before consulting the pattern,
 		// and the guard is only load-bearing when a pattern would otherwise match a directive. A
 		// mutation deleting it survived the whole corpus and the first version of this case, both
@@ -473,22 +473,22 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 			"switch(foo) { case 0: a();\n// oxlint-disable no-fallthrough\ncase 1: b(); }",
 			"switch(foo) { case 0: a();\n// eslint-disable no-fallthrough\ncase 1: b(); }",
 		} {
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoFallthrough, fallthroughFile,
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
 				sourceText, NoFallthroughOptions{CommentPattern: "no-fallthrough"}), "case")
 		}
 	})
 
-	t.Run("a clause whose only statement is a labeled block carries its comment", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a clause whose only statement is a labeled block carries its comment", func(test *testing.T) {
+		test.Parallel()
 		// The in-block comment window is gated on the clause's only statement being a block. A
 		// labeled block is a LabeledStatement wrapping one, so the window does not apply and the
 		// comment has to be found by the ordinary between-clauses scan, which it is.
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: lbl: { a(); } /* falls through */ case 1: b(); }"))
 	})
 
-	t.Run("a suppression directive is not a fallthrough comment", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a suppression directive is not a fallthrough comment", func(test *testing.T) {
+		test.Parallel()
 		// Upstream lists this input as a *pass* case, and it is a pass case there because oxc's
 		// Tester runs the whole engine and the engine consumes the directive. Our
 		// `rule_testing.Run` walks one rule and applies no suppressions, so the finding is expected
@@ -497,19 +497,19 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 		// were the directive guard removed, a custom pattern could turn any suppression into an
 		// excuse. Moved out of the imported clean set with the divergence stated rather than
 		// deleted, so the next reader does not re-derive it.
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"switch (foo) { case 0: a(); \n// eslint-disable-next-line no-fallthrough\n case 1: }"), "case")
 	})
 
-	t.Run("declaring the rule needs no checker", func(t *testing.T) {
-		t.Parallel()
+	test.Run("declaring the rule needs no checker", func(test *testing.T) {
+		test.Parallel()
 		// The rule reads the statement tree only, so the untyped harness is enough. If a later
 		// change reaches for the checker without declaring it, the rule goes silent under
 		// `rule_testing.Run` and this case fails loudly rather than passing vacuously.
 		if NoFallthrough.NeedsTypeChecker {
-			t.Fatal("this rule answers structurally and must not declare a type checker")
+			test.Fatal("this rule answers structurally and must not declare a type checker")
 		}
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoFallthrough, fallthroughFile,
 			"switch(foo) { case 0: a();\ncase 1: b() }"), "case")
 	})
 }
@@ -517,14 +517,14 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 // TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay: a user's pattern whose match overruns the time bound
 // (#7mztrdd) is no answer, which neither use may turn into a report: it spares a fallthrough, and names no unused
 // fallthrough comment. `(a|aa)+$` against a long run of `a` backtracks past the bound.
-func TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay(t *testing.T) {
-	t.Parallel()
+func TestNoFallthroughCommentPatternOverrunIsNoAnswerEitherWay(test *testing.T) {
+	test.Parallel()
 	excuses, names := fallthroughCommentMatchers("(a|aa)+$")
 	comment := strings.Repeat("a", 64) + "b"
 	if !excuses(comment) {
-		t.Error("an overrun did not spare the fallthrough, so no answer became a report")
+		test.Error("an overrun did not spare the fallthrough, so no answer became a report")
 	}
 	if names(comment) {
-		t.Error("an overrun named an unused fallthrough comment, so no answer became a report")
+		test.Error("an overrun named an unused fallthrough comment, so no answer became a report")
 	}
 }

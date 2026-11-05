@@ -4,8 +4,8 @@ import "testing"
 
 // TestIntentionalMarker proves the marker is read where written and not read where it is merely
 // resembled, so a word like `cohere-keeper` cannot silently suppress a finding.
-func TestIntentionalMarker(t *testing.T) {
-	t.Parallel()
+func TestIntentionalMarker(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name       string
 		text       string
@@ -25,14 +25,14 @@ func TestIntentionalMarker(t *testing.T) {
 		// source, not a directive.
 		{"marker in code rather than a comment", "export const label = 'cohere-keep';", false, ""},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			got := findIntentionalMarker(testCase.text)
 			if got.Present != testCase.wantMarked {
-				t.Fatalf("marked = %v, want %v", got.Present, testCase.wantMarked)
+				test.Fatalf("marked = %v, want %v", got.Present, testCase.wantMarked)
 			}
 			if got.Present && got.Text != testCase.wantReason {
-				t.Fatalf("reason = %q, want %q", got.Text, testCase.wantReason)
+				test.Fatalf("reason = %q, want %q", got.Text, testCase.wantReason)
 			}
 		})
 	}

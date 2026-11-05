@@ -18,14 +18,14 @@ const promiseExecutorFile = "/repository/source/PromiseExecutor.ts"
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
 // does and what hands the rule nil.
-func decodedPromiseExecutorOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedPromiseExecutorOptions(test *testing.T, raw string) any {
+	test.Helper()
 	if raw == "" {
 		return nil
 	}
 	options, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return options
 }
@@ -37,8 +37,8 @@ func decodedPromiseExecutorOptions(t *testing.T, raw string) any {
 // 66 clean cases upstream, of which 59 are here. The other seven need a globals or a commonjs
 // global-return surface this harness does not have; they are recorded in
 // `TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress` rather than deleted or greened.
-func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -106,10 +106,10 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options)))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options)))
 		})
 	}
 }
@@ -120,8 +120,8 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 // means the rule offers nothing, and the empty list means it considered offering and declined,
 // which happens for an unnamed function or class body that braces would make invalid syntax.
 // Both arrive here as a zero-length want, and the distinction is recorded in the rule.
-func TestNoPromiseExecutorReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -191,17 +191,17 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, "returnsValue")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, "returnsValue")
 			got := []string{}
 			for _, suggestion := range result.Diagnostics[0].Suggestions {
 				got = append(got, suggestion.Message.Id)
 			}
 			if strings.Join(got, ",") != strings.Join(testCase.wantSuggest, ",") {
-				t.Errorf("offered suggestions %v, want %v", got, testCase.wantSuggest)
+				test.Errorf("offered suggestions %v, want %v", got, testCase.wantSuggest)
 			}
 		})
 	}
@@ -220,8 +220,8 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 // The FIX anchors run the OTHER way. `wrapBraces` on `new Promise(r => (1))` writes `{(1)}`, so
 // the braces sit outside the parentheses the span excludes. One node, two answers, and only a
 // span assertion beside a suggestion-output assertion records which is which.
-func TestNoPromiseExecutorReturnSpans(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -240,17 +240,17 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantReported {
-				t.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
+				test.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
 			}
 		})
 	}
@@ -273,8 +273,8 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 // Both are facts about the harness rather than about the rule, so hiding them inside a relaxed
 // rule would turn them into facts about the rule. What IS asserted here is the part that does not
 // depend on the missing surface: each input reaches the rule and the rule does not crash on it.
-func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -290,13 +290,13 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			// Not asserted clean, because the surface that makes them clean upstream is absent here.
 			// Asserted only to run, so a later crash on one of these shapes fails loudly.
-			rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
+			rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn, promiseExecutorFile,
 				testCase.sourceText, nil)
-			t.Logf("upstream holds this clean, and reproducing that %s", testCase.reason)
+			test.Logf("upstream holds this clean, and reproducing that %s", testCase.reason)
 		})
 	}
 }
@@ -304,8 +304,8 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
 // The decoder is the line with no upstream counterpart. `allowVoid` defaults to FALSE, so the
 // zero value happens to be right, and the fallback is written out anyway so a later default change
 // cannot invert the rule silently.
-func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -319,19 +319,19 @@ func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(NoPromiseExecutorReturnOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than NoPromiseExecutorReturnOptions", decoded)
+				test.Fatalf("the decoder returned %T rather than NoPromiseExecutorReturnOptions", decoded)
 			}
 			got := options.AllowVoid != nil && *options.AllowVoid
 			if got != testCase.want {
-				t.Errorf("allowVoid decodes to %v, want %v", got, testCase.want)
+				test.Errorf("allowVoid decodes to %v, want %v", got, testCase.want)
 			}
 		})
 	}
@@ -339,21 +339,21 @@ func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
 
 // A rule configured as bare "error" reaches Run with nil rather than with an options struct. No
 // fixture routed through the decoder can see that path.
-func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(test *testing.T) {
+	test.Parallel()
 
 	// Under the default, `return void 0` still reports: allowVoid is what exempts it.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
 		promiseExecutorFile, "new Promise(() => { return void 1; })", nil), "returnsValue")
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
 		promiseExecutorFile, "new Promise(function (resolve, reject) { return; })", nil))
 }
 
 // The rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and the guard
 // makes it go completely silent. That is the more dangerous of the two failure modes, because
 // every clean case would then pass vacuously.
-func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	// Both listeners, because they guard separately and a test covering only one leaves the other's
 	// guard unmeasured. A mutation removing the arrow listener's guard survived a version of this
@@ -363,11 +363,11 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 		"new Promise(() => 1)",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, sourceText, nil), "returnsValue")
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoPromiseExecutorReturn,
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, sourceText, nil))
 		})
 	}
@@ -376,24 +376,24 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 // The message text is asserted against a literal typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
-func TestNoPromiseExecutorReturnMessages(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnMessages(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
-		"new Promise(r => 1)", decodedPromiseExecutorOptions(t, `{"allowVoid": true}`))
+	result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn, promiseExecutorFile,
+		"new Promise(r => 1)", decodedPromiseExecutorOptions(test, `{"allowVoid": true}`))
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "returnsValue" {
-		t.Errorf("message id is %q, want %q", got, "returnsValue")
+		test.Errorf("message id is %q, want %q", got, "returnsValue")
 	}
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This returns a value from a promise executor") {
-		t.Errorf("message description starts %q, which is not the sentence this rule reports", got)
+		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 	wantSuggestionIds := []string{"prependVoid", "wrapBraces"}
 	for index, suggestion := range result.Diagnostics[0].Suggestions {
 		if suggestion.Message.Id != wantSuggestionIds[index] {
-			t.Errorf("suggestion %d is %q, want %q", index, suggestion.Message.Id, wantSuggestionIds[index])
+			test.Errorf("suggestion %d is %q, want %q", index, suggestion.Message.Id, wantSuggestionIds[index])
 		}
 	}
 }
@@ -406,8 +406,8 @@ func TestNoPromiseExecutorReturnMessages(t *testing.T) {
 // separate insertions each, so the span is most of what can go wrong.
 //
 // Every `output` here is upstream's own, extracted from its corpus rather than retyped.
-func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -460,20 +460,20 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+"/"+testCase.wantId, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
+		test.Run(testCase.sourceText+"/"+testCase.wantId, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if testCase.index >= len(suggestions) {
-				t.Fatalf("want a suggestion at index %d, got %d suggestions", testCase.index, len(suggestions))
+				test.Fatalf("want a suggestion at index %d, got %d suggestions", testCase.index, len(suggestions))
 			}
 			suggestion := suggestions[testCase.index]
 			if suggestion.Message.Id != testCase.wantId {
-				t.Fatalf("suggestion %d is %q, want %q", testCase.index, suggestion.Message.Id, testCase.wantId)
+				test.Fatalf("suggestion %d is %q, want %q", testCase.index, suggestion.Message.Id, testCase.wantId)
 			}
 			// The harness applies fixes and not suggestions, so this replays the suggestion's own
 			// fixes the way the engine would: back to front, so an earlier edit cannot move the
@@ -485,8 +485,8 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 			// newline that upstream's `output` does not carry, and five byte-correct repairs failed
 			// on it before this line existed.
 			wantOutput := strings.TrimSpace(testCase.wantOutput) + "\n"
-			if got := applySuggestion(t, result.SourceFile.Text(), suggestion); got != wantOutput {
-				t.Errorf("applying %q produced:\n  %q\nwant:\n  %q", testCase.wantId, got, wantOutput)
+			if got := applySuggestion(test, result.SourceFile.Text(), suggestion); got != wantOutput {
+				test.Errorf("applying %q produced:\n  %q\nwant:\n  %q", testCase.wantId, got, wantOutput)
 			}
 		})
 	}
@@ -497,10 +497,10 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 // Same ordering the fix engine and `rule_testing.ExpectFixedSource` use, and for the same reason.
 // Written here rather than in the harness because it is the only rule in this batch that needs it
 // and the harness has no suggestion support at all; if a second rule wants it, it belongs there.
-func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applySuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	if len(suggestion.Fixes) == 0 {
-		t.Fatalf("suggestion %q carries no fixes, so there is nothing to apply", suggestion.Message.Id)
+		test.Fatalf("suggestion %q carries no fixes, so there is nothing to apply", suggestion.Message.Id)
 	}
 	ordered := make([]rule.Fix, len(suggestion.Fixes))
 	copy(ordered, suggestion.Fixes)
@@ -509,7 +509,7 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 	})
 	for _, fix := range ordered {
 		if fix.Range.Pos() < 0 || fix.Range.End() > len(source) || fix.Range.Pos() > fix.Range.End() {
-			t.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
+			test.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
 				fix.Range.Pos(), fix.Range.End())
 		}
 		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
@@ -526,8 +526,8 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 // in the name, which is what separates the two tests.
 //
 // All five measured clean against the installed eslint at 10.8.1.
-func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"new Array(function (resolve, reject) { return 1; });",
@@ -538,9 +538,9 @@ func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, sourceText, nil))
 		})
 	}

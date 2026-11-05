@@ -48,8 +48,8 @@ type useMemoCase struct {
 	reported string
 }
 
-func TestUseMemoFires(t *testing.T) {
-	t.Parallel()
+func TestUseMemoFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []useMemoCase{
 		{
@@ -356,24 +356,24 @@ func TestUseMemoFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			if len(result.Diagnostics) == 0 {
 				return
 			}
 			first := result.Diagnostics[0].Range
 			got := testCase.source[first.Pos():first.End()]
 			if got != testCase.reported {
-				t.Errorf("finding covers %q, want %q", got, testCase.reported)
+				test.Errorf("finding covers %q, want %q", got, testCase.reported)
 			}
 		})
 	}
 }
 
-func TestUseMemoStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUseMemoStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []useMemoCase{
 		{
@@ -531,10 +531,10 @@ func TestUseMemoStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -547,16 +547,16 @@ func TestUseMemoStaysSilent(t *testing.T) {
 // outside, so it is pinned here rather than left to a reader to notice: an input that reports under
 // `RunTyped` must be silent under `Run`, and if a later change makes the plain harness report, this
 // test fails and says the guard moved.
-func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestUseMemoRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  const x = useMemo(props.fn, [props.a]);\n  return <div>{x}</div>;\n}\n"
 
-	typed := rule_testing.RunTyped(t, UseMemo, useMemoFile, source)
-	rule_testing.ExpectFindings(t, typed, "useMemoCallbackNotInline")
+	typed := rule_testing.RunTyped(test, UseMemo, useMemoFile, source)
+	rule_testing.ExpectFindings(test, typed, "useMemoCallbackNotInline")
 
-	untyped := rule_testing.Run(t, UseMemo, useMemoFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, UseMemo, useMemoFile, source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestUseMemoMessages asserts the message identifiers and descriptions against literals typed here.
@@ -567,8 +567,8 @@ func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
 //
 // A `rule.Message` is `{Id, Description}` with no interpolation layer, and this rule uses no format
 // verbs, so there is no rendered text to guard beyond these two fields.
-func TestUseMemoMessages(t *testing.T) {
-	t.Parallel()
+func TestUseMemoMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		message         rule.Message
@@ -592,13 +592,13 @@ func TestUseMemoMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.id, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.id, func(test *testing.T) {
+			test.Parallel()
 			if testCase.message.Id != testCase.id {
-				t.Errorf("id is %q, want %q", testCase.message.Id, testCase.id)
+				test.Errorf("id is %q, want %q", testCase.message.Id, testCase.id)
 			}
 			if !strings.HasPrefix(testCase.message.Description, testCase.descriptionHead) {
-				t.Errorf("description is %q, want it to start with %q",
+				test.Errorf("description is %q, want it to start with %q",
 					testCase.message.Description, testCase.descriptionHead)
 			}
 		})
@@ -611,13 +611,13 @@ func TestUseMemoMessages(t *testing.T) {
 // `matchRegistered` tries an exact match against the inventory entry `react/use-memo` before it
 // strips the namespace. So the parity guard reports the same count either way and cannot see the
 // mistake. This is the assertion that can.
-func TestUseMemoRuleName(t *testing.T) {
-	t.Parallel()
+func TestUseMemoRuleName(test *testing.T) {
+	test.Parallel()
 
 	if UseMemo.Name != "react-hooks/use-memo" {
-		t.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
+		test.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
 	}
 	if !UseMemo.NeedsTypeChecker {
-		t.Error("rule must declare NeedsTypeChecker: the callee test resolves bindings")
+		test.Error("rule must declare NeedsTypeChecker: the callee test resolves bindings")
 	}
 }

@@ -14,14 +14,14 @@ func strictVoidReturnCaseName(index int) string {
 	return "case" + strconv.Itoa(index)
 }
 
-func strictVoidReturnOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return DefaultStrictVoidReturnSettings()
 	}
 	decoded, err := DecodeStrictVoidReturnOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -37,8 +37,8 @@ func strictVoidReturnOptionsFor(t *testing.T, optionsJson string) any {
 // The clean half is where this rule's risk lives. It asks the checker what type is expected at a
 // position, and a rule that answers that question too broadly reports on ordinary callbacks
 // everywhere. Every one of these is a false positive somebody already thought about.
-func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -151,11 +151,11 @@ func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\ninterface HookFunction<T extends void | Hook = void> {\n  (fn: () => void): T;\n  (fn: () => Promise<void>): T;\n}\n\nclass Hook {}\n\ndeclare var beforeEach: HookFunction<Hook>;\n\nbeforeEach(() => {});\n\nbeforeEach(async () => {});\n      ", optionsJson: ""},
 	}
 	for index, testCase := range cases {
-		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+		test.Run(strictVoidReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 				strictVoidReturnFile, testCase.sourceText,
-				strictVoidReturnOptionsFor(t, testCase.optionsJson)))
+				strictVoidReturnOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -174,8 +174,8 @@ func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
 // The three ids are asserted per finding and in order, because this rule chooses between them from
 // the shape of the value it found, and a rule that reported the right count with the wrong id would
 // pass a count-only assertion while telling the reader the wrong thing.
-func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -291,19 +291,19 @@ func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
 		{sourceText: "\ndeclare function foo(cb: (arg: string) => () => void): void;\ndeclare function foo(cb: (arg: number) => () => boolean): void;\nfoo((arg: string) => {\n  return cb;\n});\nasync function* cb() {\n  yield true;\n}\n      ", optionsJson: "", wantIds: []string{"nonVoidFunc"}},
 	}
 	for index, testCase := range cases {
-		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+		test.Run(strictVoidReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 				strictVoidReturnFile, testCase.sourceText,
-				strictVoidReturnOptionsFor(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				strictVoidReturnOptionsFor(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			// No repair. Upstream ships suggestions for two of the three findings and this port
 			// carries none of them, which is stated in the rule's doc comment as a deliberate
 			// decline rather than an omission.
 			for position, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("finding %d proposes %d fixes; this port ships no repair",
+					test.Fatalf("finding %d proposes %d fixes; this port ships no repair",
 						position, len(diagnostic.Fixes))
 				}
 			}
@@ -315,20 +315,20 @@ func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing.
-func TestStrictVoidReturnNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !StrictVoidReturn.NeedsTypeChecker {
-		t.Fatal("every finding comes from a contextual type, so the checker is required")
+		test.Fatal("every finding comes from a contextual type, so the checker is required")
 	}
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, StrictVoidReturn, strictVoidReturnFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, StrictVoidReturn, strictVoidReturnFile,
 		"declare function takes(cb: () => void): void;\ntakes(() => 1);"))
 }
 
 // TestDecodeStrictVoidReturnOptions pins the decoder against its default.
-func TestDecodeStrictVoidReturnOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeStrictVoidReturnOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -340,18 +340,18 @@ func TestDecodeStrictVoidReturnOptions(t *testing.T) {
 		{name: "explicitFalse", raw: `{"allowReturnAny": false}`, want: false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeStrictVoidReturnOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.raw, err)
+				test.Fatalf("decoding %s: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(StrictVoidReturnOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.AllowReturnAny != testCase.want {
-				t.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, options.AllowReturnAny)
+				test.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, options.AllowReturnAny)
 			}
 		})
 	}
@@ -362,15 +362,15 @@ func TestDecodeStrictVoidReturnOptions(t *testing.T) {
 // A rule configured as a bare "error" is handed nil options, and every fixture above reaches the
 // rule through the decoder, so nothing there can see the fallback. An `any`-returning callback is
 // the separating input: it reports under the default and is clean when the option is on.
-func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(test *testing.T) {
+	test.Parallel()
 
 	const anyReturning = "declare function takes(cb: () => void): void;\ndeclare function makeAny(): any;\ntakes(() => makeAny());"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile, anyReturning, nil), "nonVoidReturn")
 
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile, anyReturning,
 		StrictVoidReturnOptions{AllowReturnAny: true}))
 }
@@ -385,8 +385,8 @@ func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(t *testing.T) {
 // survived all two hundred and twelve imported cases. All three rows below were measured clean
 // against the installed 8.x build before being written here, with the control confirming the same
 // callback reports when the return is its own.
-func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(test *testing.T) {
+	test.Parallel()
 
 	clean := []string{
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  function inner() { return 1; }\n  inner();\n});",
@@ -394,16 +394,16 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  class K { m() { return 3; } }\n  new K();\n});",
 	}
 	for index, sourceText := range clean {
-		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+		test.Run(strictVoidReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 				strictVoidReturnFile, sourceText, DefaultStrictVoidReturnSettings()))
 		})
 	}
 
 	// The control: the same callback with the return as its OWN reports, so the silence above is
 	// the nesting rule rather than the rule failing to see block bodies at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile,
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  return 1;\n});",
 		DefaultStrictVoidReturnSettings()), "nonVoidReturn")
@@ -415,7 +415,7 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
 	// survived all of them for that reason. This callback genuinely returns a value, so the gate
 	// lets it through, and it also holds a nested function that returns. Upstream reports exactly
 	// ONE finding, for the outer return only. Measured before being written here.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile,
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  function inner() { return 'nested'; }\n  if (Math.random()) { return 1; }\n});",
 		DefaultStrictVoidReturnSettings()), "nonVoidReturn")
@@ -430,8 +430,8 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
 //
 // Their expected message ids were measured the same way as the rest, by replaying each through the
 // installed 8.x build against a real program, with the tsconfig set to preserve JSX.
-func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnFiresOnJsxCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -449,12 +449,12 @@ func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
 		{sourceText: "\n        declare function foo(cb: () => () => void): void;\n        foo(() => () => {\n          if (n == 1) {\n            console.log('asd')\n            return [1].map(x => x)\n          }\n          if (n == 2) {\n            console.log('asd')\n            return -Math.random()\n          }\n          if (n == 3) {\n            console.log('asd')\n            return `x`.toUpperCase()\n          }\n          return <i>{Math.random()}</i>\n        });\n      ", optionsJson: "", wantIds: []string{"nonVoidReturn", "nonVoidReturn", "nonVoidReturn", "nonVoidReturn"}},
 	}
 	for index, testCase := range cases {
-		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
+		test.Run(strictVoidReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 				"/repository/source/Component.tsx", testCase.sourceText,
-				strictVoidReturnOptionsFor(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				strictVoidReturnOptionsFor(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -467,8 +467,8 @@ func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
 // early: measured on ahra, eight sites in `modules/data/` written
 // `(chunk: Buffer) => (tarError += chunk.toString())` disagreed with ESLint by exactly that column.
 // The spans below were measured on the installed 8.67.0 build, including a doubled parenthesis.
-func TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses(t *testing.T) {
-	t.Parallel()
+func TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses(test *testing.T) {
+	test.Parallel()
 
 	const prelude = "declare function on(callback: (chunk: string) => void): void;\nlet total = '';\n"
 	for _, testCase := range []struct {
@@ -479,21 +479,21 @@ func TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses(t *testing.T) 
 		{"doubly parenthesized", "on((chunk: string) => ((total += chunk)));\nvoid total;"},
 		{"bare", "on((chunk: string) => total += chunk);\nvoid total;"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			sourceText := prelude + testCase.source
-			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn, strictVoidReturnFile, sourceText,
+			result := rule_testing.RunTypedWithOptions(test, StrictVoidReturn, strictVoidReturnFile, sourceText,
 				DefaultStrictVoidReturnSettings())
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != "total += chunk" {
-				t.Errorf("the finding covers %q, want %q", reported, "total += chunk")
+				test.Errorf("the finding covers %q, want %q", reported, "total += chunk")
 			}
 			if diagnostic.Message.Id != "nonVoidReturn" {
-				t.Errorf("message id is %q", diagnostic.Message.Id)
+				test.Errorf("message id is %q", diagnostic.Message.Id)
 			}
 		})
 	}

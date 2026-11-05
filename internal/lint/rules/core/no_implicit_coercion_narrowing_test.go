@@ -42,20 +42,20 @@ const narrowingDeclarations = "declare const request: { data: { energy: { credit
 	"declare function load(): { name: string } | undefined;\n"
 
 // compileErrors type-checks one file under the harness's strict config and returns its diagnostics.
-func compileErrors(t *testing.T, source string) []string {
-	t.Helper()
-	directory := t.TempDir()
+func compileErrors(test *testing.T, source string) []string {
+	test.Helper()
+	directory := test.TempDir()
 	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"moduleDetection":"force","types":[],"noEmit":true},"include":["*.ts"]}`
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	fileName := filepath.Join(directory, "fixture.ts")
 	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building the program: %v", err)
+		test.Fatalf("building the program: %v", err)
 	}
 	messages := []string{}
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -66,16 +66,16 @@ func compileErrors(t *testing.T, source string) []string {
 	return messages
 }
 
-func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionFixKeepsNarrowing(test *testing.T) {
+	test.Parallel()
 
 	// The control first. If the old output compiled, the check below would pass for any fix.
-	t.Run("the Boolean rewrite of the phi shape does not compile", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the Boolean rewrite of the phi shape does not compile", func(test *testing.T) {
+		test.Parallel()
 		broken := narrowingDeclarations + "const data = request.data;\nconst hasData = Boolean(data);\n" +
 			"export const total = hasData ? data.energy.credits : 0;\n"
-		if errors := compileErrors(t, broken); len(errors) == 0 {
-			t.Fatal("the Boolean rewrite compiled, so this test cannot tell a narrowing-safe fix from a broken one")
+		if errors := compileErrors(test, broken); len(errors) == 0 {
+			test.Fatal("the Boolean rewrite compiled, so this test cannot tell a narrowing-safe fix from a broken one")
 		}
 	})
 
@@ -124,14 +124,14 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 			want:   "export const hasText = Boolean(text);\n",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
 				narrowingDeclarations+testCase.source, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
-			rule_testing.ExpectFixedSource(t, result, narrowingDeclarations+testCase.want)
-			if errors := compileErrors(t, narrowingDeclarations+testCase.want); len(errors) > 0 {
-				t.Errorf("the fixed source does not compile:\n%s", strings.Join(errors, "\n"))
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
+			rule_testing.ExpectFixedSource(test, result, narrowingDeclarations+testCase.want)
+			if errors := compileErrors(test, narrowingDeclarations+testCase.want); len(errors) > 0 {
+				test.Errorf("the fixed source does not compile:\n%s", strings.Join(errors, "\n"))
 			}
 		})
 	}
@@ -149,17 +149,17 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 		// comparison removes.
 		{name: "a boolean that may be undefined", source: "export const on = !!fallback;\n"},
 	} {
-		t.Run("declines: "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
+		test.Run("declines: "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
 				narrowingDeclarations+testCase.source, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) > 0 {
-					t.Errorf("a fix was proposed where no rewrite is safe: %q", diagnostic.Fixes[0].Text)
+					test.Errorf("a fix was proposed where no rewrite is safe: %q", diagnostic.Fixes[0].Text)
 				}
 				if len(diagnostic.Suggestions) == 0 {
-					t.Error("the declined fix was not offered as a suggestion")
+					test.Error("the declined fix was not offered as a suggestion")
 				}
 			}
 		})

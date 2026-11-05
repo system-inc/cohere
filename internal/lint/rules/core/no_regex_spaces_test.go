@@ -23,8 +23,8 @@ const regexSpacesFile = "/repository/source/RegexSpaces.ts"
 // catches a bug is the one nobody would think to write. Two of upstream's pass cases are byte
 // identical duplicates (`var foo = / /;` appears at both index 3 and index 17); both are kept, so
 // this file holds the corpus rather than a tidied reading of it.
-func TestNoRegexSpacesFires(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -59,10 +59,10 @@ func TestNoRegexSpacesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText), "multipleSpaces")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText), "multipleSpaces")
 		})
 	}
 }
@@ -80,8 +80,8 @@ func TestNoRegexSpacesFires(t *testing.T) {
 // `new RegExp('  ', flags)` and `new RegExp('[[abc]  ]', flags + 'v')` are the indeterminate flag
 // guard, and they are pass cases rather than fail cases: with flags unknown the parse is unknown,
 // and reporting on a guess would be worse than staying quiet.
-func TestNoRegexSpacesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -138,9 +138,9 @@ func TestNoRegexSpacesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText))
 		})
 	}
 }
@@ -158,8 +158,8 @@ func TestNoRegexSpacesStaysSilent(t *testing.T) {
 // trustworthy: a wrong offset would slice to something with a non-space in it.
 //
 // The last case is the one place we do not match oxc. See the rule's doc comment.
-func TestNoRegexSpacesReportsTheRunItself(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesReportsTheRunItself(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -198,15 +198,15 @@ func TestNoRegexSpacesReportsTheRunItself(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -224,8 +224,8 @@ func TestNoRegexSpacesReportsTheRunItself(t *testing.T) {
 // The repair is a fix rather than a suggestion because it preserves what the pattern matches: a run
 // of n spaces and ` {n}` accept exactly the same input. Nothing here picks between valid answers,
 // so nothing needs a human to choose it.
-func TestNoRegexSpacesFixes(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -263,10 +263,10 @@ func TestNoRegexSpacesFixes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -285,8 +285,8 @@ func TestNoRegexSpacesFixes(t *testing.T) {
 // other 25. These make the distinction explicit rather than resting on a single imported case, and
 // the last two are the ones upstream has no equivalent of: a lone space between two real runs, and
 // three runs where the middle is widest.
-func TestNoRegexSpacesReportsOnlyTheFirstRun(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesReportsOnlyTheFirstRun(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -301,15 +301,15 @@ func TestNoRegexSpacesReportsOnlyTheFirstRun(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -328,8 +328,8 @@ func TestNoRegexSpacesReportsOnlyTheFirstRun(t *testing.T) {
 // The middle case is the control: without `v`, classes do not nest, `[[    ]` closes at the first
 // bracket, and the depth zero run genuinely is the earlier one. A port that simply ignored flags
 // everywhere would pass that case and fail the other two.
-func TestNoRegexSpacesAgreesAcrossSpellings(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesAgreesAcrossSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -343,15 +343,15 @@ func TestNoRegexSpacesAgreesAcrossSpellings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -369,26 +369,26 @@ func TestNoRegexSpacesAgreesAcrossSpellings(t *testing.T) {
 // The remaining cases are call shapes our tree contains and upstream's corpus does not: a
 // parenthesized callee, a member call that merely ends in the right name, a shadowing local, and a
 // call with no arguments.
-func TestNoRegexSpacesShapesOurCorpusDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesShapesOurCorpusDoesNotCover(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a literal preceded by a comment reports inside the pattern", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a literal preceded by a comment reports inside the pattern", func(test *testing.T) {
+		test.Parallel()
 		sourceText := "// a comment about the pattern\nvar foo = /bar  baz/;"
-		result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, sourceText)
+		result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, sourceText)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+			test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 		}
 		reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "  " {
-			t.Errorf("finding = %q, want the two spaces inside the pattern", reported)
+			test.Errorf("finding = %q, want the two spaces inside the pattern", reported)
 		}
 	})
 
-	t.Run("a parenthesized callee is still the RegExp constructor", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t,
-			rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, "var foo = new (RegExp)('bar  baz');"), "multipleSpaces")
+	test.Run("a parenthesized callee is still the RegExp constructor", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test,
+			rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, "var foo = new (RegExp)('bar  baz');"), "multipleSpaces")
 	})
 
 	silent := []struct {
@@ -402,9 +402,9 @@ func TestNoRegexSpacesShapesOurCorpusDoesNotCover(t *testing.T) {
 		{"a template literal pattern argument", "var foo = new RegExp(`bar  baz`);"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText))
 		})
 	}
 }
@@ -428,57 +428,57 @@ func TestNoRegexSpacesShapesOurCorpusDoesNotCover(t *testing.T) {
 // was written, so a cooked offset applied to the file lands two bytes early and the fix eats the
 // `d`. That case is in the imported corpus and its fix pair is what pins it, but it pins it only
 // once; these make the general rule explicit.
-func TestNoRegexSpacesParsesTheCookedPatternAndReportsRawOffsets(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesParsesTheCookedPatternAndReportsRawOffsets(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an escaped bracket cooks to a real class opener", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile,
+	test.Run("an escaped bracket cooks to a real class opener", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile,
 			`var foo = new RegExp(' \[   ');`))
 	})
 
-	t.Run("the same pattern as a literal has no string layer and reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the same pattern as a literal has no string layer and reports", func(test *testing.T) {
+		test.Parallel()
 		sourceText := `var foo = /\[   /;`
-		result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, sourceText)
+		result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, sourceText)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+			test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 		}
 		reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "   " {
-			t.Errorf("finding = %q, want the three spaces", reported)
+			test.Errorf("finding = %q, want the three spaces", reported)
 		}
 	})
 
-	t.Run("a cooked escape shifts the raw offset", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a cooked escape shifts the raw offset", func(test *testing.T) {
+		test.Parallel()
 		// Raw body `\\d  ` is five bytes; cooked `\d  ` is four. The run sits at cooked index 2
 		// and raw index 3, so a rule reporting the cooked offset would slice `d ` instead.
 		sourceText := `var foo = new RegExp('\\d  ')`
-		result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, sourceText)
+		result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, sourceText)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+			test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 		}
 		reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "  " {
-			t.Errorf("finding = %q, want the two spaces and not the character before them", reported)
+			test.Errorf("finding = %q, want the two spaces and not the character before them", reported)
 		}
 	})
 
-	t.Run("a unicode escape before the run shifts it further", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a unicode escape before the run shifts it further", func(test *testing.T) {
+		test.Parallel()
 		// Raw `\\u0041   ` is ten bytes, cooked `A   ` is nine.
-		rule_testing.ExpectFixedSource(t,
-			rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, `var foo = RegExp('\\u0041   ')`),
+		rule_testing.ExpectFixedSource(test,
+			rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, `var foo = RegExp('\\u0041   ')`),
 			`var foo = RegExp('\\u0041 {3}')`)
 	})
 
-	t.Run("a cooked escape that is itself a space is not a run", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a cooked escape that is itself a space is not a run", func(test *testing.T) {
+		test.Parallel()
 		// `\x20\x20` cooks to two real adjacent spaces, so a rule walking only the cooked value
 		// would report a run nobody wrote. The raw gate is what refuses it, and this is why that
 		// gate runs on the raw body rather than on the cooked one.
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile,
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile,
 			`var foo = new RegExp('\x20\x20');`))
 	})
 }
@@ -495,15 +495,15 @@ func TestNoRegexSpacesParsesTheCookedPatternAndReportsRawOffsets(t *testing.T) {
 // This is silence by design rather than a gap worth closing later. The run really is there and a
 // perfect rule would report it, but a finding at a position derived from a correspondence already
 // known to be wrong is worse than no finding: the fix would rewrite bytes nobody pointed at.
-func TestNoRegexSpacesDropsAPatternItCannotMap(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesDropsAPatternItCannotMap(test *testing.T) {
+	test.Parallel()
 
 	// A real line continuation inside the argument, written as an actual newline in the source.
 	// Here it sits BEFORE the run, so the walk desynchronizes while cooked characters remain and
 	// the loop's own bail is what fires.
-	t.Run("a continuation before the run", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile,
+	test.Run("a continuation before the run", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile,
 			"var foo = new RegExp('bar\\\n    baz');"))
 	})
 
@@ -512,9 +512,9 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(t *testing.T) {
 	// loop never notices: without the check the offsets look complete and well formed, and the rule
 	// reports a run whose position rests on a correspondence that stopped being true. A mutation
 	// sweep is what found this, and the case before it does not cover it.
-	t.Run("a continuation after the run", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile,
+	test.Run("a continuation after the run", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoRegexSpaces, regexSpacesFile,
 			"var foo = new RegExp('a  b\\\n');"))
 	})
 }
@@ -531,8 +531,8 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(t *testing.T) {
 // the last digit of it instead.
 //
 // The brace form is here for the same reason and is the one whose width is not a constant at all.
-func TestNoRegexSpacesMapsThroughEveryEscapeForm(t *testing.T) {
-	t.Parallel()
+func TestNoRegexSpacesMapsThroughEveryEscapeForm(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -567,15 +567,15 @@ func TestNoRegexSpacesMapsThroughEveryEscapeForm(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "multipleSpaces")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "multipleSpaces")
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != "  " {
-				t.Errorf("finding = %q, want exactly the two spaces", reported)
+				test.Errorf("finding = %q, want exactly the two spaces", reported)
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }

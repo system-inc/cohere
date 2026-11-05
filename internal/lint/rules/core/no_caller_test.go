@@ -14,8 +14,8 @@ const callerFile = "/repository/source/Caller.ts"
 // Verbatim from `oxc/crates/oxc_linter/src/rules/eslint/no_caller.rs`: 4 pass, 2 fail, and the
 // snapshot records 2 diagnostics from those 2 inputs, so one finding per input holds here rather
 // than being assumed.
-func TestNoCallerFires(t *testing.T) {
-	t.Parallel()
+func TestNoCallerFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -26,10 +26,10 @@ func TestNoCallerFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoCaller, callerFile, testCase.sourceText), "noCaller")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoCaller, callerFile, testCase.sourceText), "noCaller")
 		})
 	}
 }
@@ -40,8 +40,8 @@ func TestNoCallerFires(t *testing.T) {
 // it is a different access from `arguments.caller` and may be neither of the two. A rule matching
 // on source text reports it, and one treating a computed access as equivalent to a static member
 // does too.
-func TestNoCallerStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoCallerStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -54,9 +54,9 @@ func TestNoCallerStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaller, callerFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoCaller, callerFile, testCase.sourceText))
 		})
 	}
 }
@@ -67,13 +67,13 @@ func TestNoCallerStaysSilent(t *testing.T) {
 // parenthesizes the receiver. The first would report under a rule that checked only the property
 // name; the second is the behavior `isIdentifierNamed` gives us for free by skipping parentheses,
 // and upstream's `is_specific_id` does the same, so it is parity rather than divergence.
-func TestNoCallerReadsTheReceiver(t *testing.T) {
-	t.Parallel()
+func TestNoCallerReadsTheReceiver(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaller, callerFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoCaller, callerFile,
 		"declare const options: { callee: number };\nexport const a = options.callee;\n"))
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoCaller, callerFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoCaller, callerFile,
 		"export function f() { return (arguments).callee; }\n"), "noCaller")
 }
 
@@ -86,17 +86,17 @@ func TestNoCallerReadsTheReceiver(t *testing.T) {
 //
 // Asserted against the source text the range covers, rather than against offsets, because an offset
 // expectation is most likely to be wrong in the same direction as the code that produced it.
-func TestNoCallerReportsTheProperty(t *testing.T) {
-	t.Parallel()
+func TestNoCallerReportsTheProperty(test *testing.T) {
+	test.Parallel()
 
 	const source = "var x = arguments.callee"
-	result := rule_testing.Run(t, NoCaller, callerFile, source)
+	result := rule_testing.Run(test, NoCaller, callerFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "callee" {
-		t.Fatalf("the finding covers %q, wanted just the property name", reported)
+		test.Fatalf("the finding covers %q, wanted just the property name", reported)
 	}
 }

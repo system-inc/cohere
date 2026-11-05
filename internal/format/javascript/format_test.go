@@ -117,45 +117,45 @@ func formatFor(fileName string) func(string, string, formatoptions.Options) (str
 
 // TestJavaScriptRefusesWhatTypeScriptReadsDifferently: `a < b > (c)` is two comparisons to babel and a
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
-func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
-	t.Parallel()
+func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
+	test.Parallel()
 	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); err == nil {
-		t.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
+		test.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
 	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", formatoptions.Default(), nil); err != nil {
-		t.Fatalf("plain JavaScript was refused: %v", err)
+		test.Fatalf("plain JavaScript was refused: %v", err)
 	}
 }
 
-func TestFormatMatchesTheFork(t *testing.T) {
-	t.Parallel()
+func TestFormatMatchesTheFork(test *testing.T) {
+	test.Parallel()
 	sameLine := formatoptions.Default()
 	sameLine.BracketSameLine = true
 	for _, options := range []formatoptions.Options{formatoptions.Default(), sameLine} {
 		oracle, err := prettier.New(options)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format(testCase.fileName, testCase.source)
 			if err != nil {
-				t.Fatalf("%s: the oracle failed: %v", testCase.name, err)
+				test.Fatalf("%s: the oracle failed: %v", testCase.name, err)
 			}
 			if expected == testCase.source {
-				t.Fatalf("%s: the oracle left the snippet unchanged, so an identity printer would pass", testCase.name)
+				test.Fatalf("%s: the oracle left the snippet unchanged, so an identity printer would pass", testCase.name)
 			}
 			for _, substring := range testCase.contains {
 				if !strings.Contains(expected, substring) {
-					t.Errorf("%s: the fork's output lacks %q:\n%s", testCase.name, substring, expected)
+					test.Errorf("%s: the fork's output lacks %q:\n%s", testCase.name, substring, expected)
 				}
 			}
 			actual, err := formatFor(testCase.fileName)(testCase.fileName, testCase.source, options)
 			if err != nil {
-				t.Errorf("%s (bracketSameLine %v): %v", testCase.name, options.BracketSameLine, err)
+				test.Errorf("%s (bracketSameLine %v): %v", testCase.name, options.BracketSameLine, err)
 				continue
 			}
 			if actual != expected {
-				t.Errorf("%s (bracketSameLine %v):\n--- fork\n%s--- native\n%s", testCase.name, options.BracketSameLine, expected, actual)
+				test.Errorf("%s (bracketSameLine %v):\n--- fork\n%s--- native\n%s", testCase.name, options.BracketSameLine, expected, actual)
 			}
 		}
 	}

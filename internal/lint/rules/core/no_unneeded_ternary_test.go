@@ -28,20 +28,20 @@ type noUnneededTernaryCase struct {
 }
 
 // runNoUnneededTernary drives one case through the rule's own exported decoder.
-func runNoUnneededTernary(t *testing.T, testCase noUnneededTernaryCase) rule_testing.Result {
-	t.Helper()
+func runNoUnneededTernary(test *testing.T, testCase noUnneededTernaryCase) rule_testing.Result {
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, NoUnneededTernary, noUnneededTernaryFile, testCase.sourceText)
+		return rule_testing.Run(test, NoUnneededTernary, noUnneededTernaryFile, testCase.sourceText)
 	}
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeNoUnneededTernaryOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, NoUnneededTernary, noUnneededTernaryFile,
+	return rule_testing.RunWithOptions(test, NoUnneededTernary, noUnneededTernaryFile,
 		testCase.sourceText, decoded)
 }
 
@@ -112,24 +112,24 @@ func noUnneededTernarySilentCases() []noUnneededTernaryCase {
 	}
 }
 
-func TestNoUnneededTernaryFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUnneededTernaryFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnneededTernary(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnneededTernary(test, testCase), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoUnneededTernaryStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUnneededTernarySilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoUnneededTernary(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoUnneededTernary(test, testCase))
 		})
 	}
 }
@@ -139,8 +139,8 @@ func TestNoUnneededTernaryStaysSilent(t *testing.T) {
 // Every arm replaces the whole ternary with reconstructed text, so a repair that lands on the right
 // span with the wrong content passes every assertion above. Thirty of upstream's cases carry an
 // exact expected output and one deliberately carries none.
-func TestNoUnneededTernaryFixesTheSource(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryFixesTheSource(test *testing.T) {
+	test.Parallel()
 
 	applied := 0
 	for _, testCase := range noUnneededTernaryFiresCases() {
@@ -148,14 +148,14 @@ func TestNoUnneededTernaryFixesTheSource(t *testing.T) {
 			continue
 		}
 		applied++
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runNoUnneededTernary(t, testCase),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runNoUnneededTernary(test, testCase),
 				testCase.wantFixedSource)
 		})
 	}
 	if applied != 30 {
-		t.Errorf("%d cases asserted a rewrite, wanted 30", applied)
+		test.Errorf("%d cases asserted a rewrite, wanted 30", applied)
 	}
 }
 
@@ -164,8 +164,8 @@ func TestNoUnneededTernaryFixesTheSource(t *testing.T) {
 // `f() ? true : true` collapses to `true` only if the call did not matter, and the rule cannot know
 // that, so upstream returns no fix and the finding stands alone. A fixer that helpfully collapsed it
 // would delete a call, which is a behaviour change no message-id fixture can see.
-func TestNoUnneededTernaryDeclinesToDropACall(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryDeclinesToDropACall(test *testing.T) {
+	test.Parallel()
 
 	declined := 0
 	for _, testCase := range noUnneededTernaryFiresCases() {
@@ -173,22 +173,22 @@ func TestNoUnneededTernaryDeclinesToDropACall(t *testing.T) {
 			continue
 		}
 		declined++
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnneededTernary(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnneededTernary(test, testCase)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("wanted a finding")
+				test.Fatal("wanted a finding")
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d carried %d fixes, wanted none", index,
+					test.Errorf("finding %d carried %d fixes, wanted none", index,
 						len(diagnostic.Fixes))
 				}
 			}
 		})
 	}
 	if declined != 1 {
-		t.Errorf("%d cases declined a repair, wanted 1", declined)
+		test.Errorf("%d cases declined a repair, wanted 1", declined)
 	}
 }
 
@@ -207,8 +207,8 @@ func TestNoUnneededTernaryDeclinesToDropACall(t *testing.T) {
 // The `as`/`satisfies` rows are the load-bearing ones. Upstream's precedence table has no entry for
 // either, so a port inheriting it unchanged gives them the TIGHTEST precedence and emits
 // `a || b as any`, which parses as `(a || b) as any` and asserts the type of the wrong expression.
-func TestNoUnneededTernaryPreservesTypeSyntax(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
+	test.Parallel()
 
 	defaultAssignmentOff := NoUnneededTernaryOptions{
 		DefaultAssignment: noUnneededTernaryBoolean(false),
@@ -268,15 +268,15 @@ func TestNoUnneededTernaryPreservesTypeSyntax(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnneededTernary(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnneededTernary(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -285,8 +285,8 @@ func TestNoUnneededTernaryPreservesTypeSyntax(t *testing.T) {
 //
 // Upstream reports the whole conditional expression, and the repair replaces exactly that span. A
 // repair whose range were wider than the finding would edit code the reader was never shown.
-func TestNoUnneededTernaryPointsAtTheWholeConditional(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryPointsAtTheWholeConditional(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -301,23 +301,23 @@ func TestNoUnneededTernaryPointsAtTheWholeConditional(t *testing.T) {
 		{"var a = f() ? true : true;", nil, "f() ? true : true"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnneededTernary(t, noUnneededTernaryCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnneededTernary(test, noUnneededTernaryCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			if got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; got !=
 				testCase.wantSpan {
-				t.Errorf("finding pointed at %q, wanted %q", got, testCase.wantSpan)
+				test.Errorf("finding pointed at %q, wanted %q", got, testCase.wantSpan)
 			}
 			// The repair, where there is one, must cover exactly the reported span.
 			for index, fix := range diagnostic.Fixes {
 				if fix.Range.Pos() != diagnostic.Range.Pos() ||
 					fix.Range.End() != diagnostic.Range.End() {
-					t.Errorf("fix %d spans [%d,%d) while the finding spans [%d,%d)", index,
+					test.Errorf("fix %d spans [%d,%d) while the finding spans [%d,%d)", index,
 						fix.Range.Pos(), fix.Range.End(), diagnostic.Range.Pos(),
 						diagnostic.Range.End())
 				}
@@ -331,39 +331,39 @@ func TestNoUnneededTernaryPointsAtTheWholeConditional(t *testing.T) {
 // A rule configured as a bare severity is handed nil, and `options.(T)` on nil yields the zero
 // value, whose false would switch the second judgment ON for everyone. Every fixture above reaches
 // the rule through the decoder, so none of them can see that.
-func TestDecodeNoUnneededTernaryOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input keeps the true default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input keeps the true default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoUnneededTernaryOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if !decoded.(NoUnneededTernaryOptions).resolve() {
-			t.Error("defaultAssignment resolved to false, which turns the second judgment on")
+			test.Error("defaultAssignment resolved to false, which turns the second judgment on")
 		}
 	})
 
-	t.Run("an explicit false overrides it", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an explicit false overrides it", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoUnneededTernaryOptions([]byte(`{"defaultAssignment":false}`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if decoded.(NoUnneededTernaryOptions).resolve() {
-			t.Error("an explicit false was read as the default true")
+			test.Error("an explicit false was read as the default true")
 		}
 	})
 }
 
 // With nil options the default-assignment judgment stays OFF and the boolean one stays on.
-func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnneededTernary, noUnneededTernaryFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnneededTernary, noUnneededTernaryFile,
 		"var a = x ? true : false;"), "unnecessaryConditionalExpression")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnneededTernary, noUnneededTernaryFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnneededTernary, noUnneededTernaryFile,
 		"var a = foo ? foo : bar;"))
 }
 
@@ -381,8 +381,8 @@ func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(t *testing.T) {
 //
 // Both were found by a failing fixture rather than by reading the table, and neither can be reached
 // from upstream's JavaScript corpus.
-func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(test *testing.T) {
+	test.Parallel()
 
 	cases := []noUnneededTernaryCase{
 		// A parenthesized loose-binding test keeps its own pair AND gains one.
@@ -399,11 +399,11 @@ func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(t *testing.T) {
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!(a + b);"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnneededTernary(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnneededTernary(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -419,8 +419,8 @@ func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(t *testing.T) {
 //	                        emitted bare rather than double-negated
 //
 // Every verdict was measured against the installed rule before the row was written.
-func TestNoUnneededTernaryCoversEveryInverseAndParenthesizedBranch(t *testing.T) {
-	t.Parallel()
+func TestNoUnneededTernaryCoversEveryInverseAndParenthesizedBranch(test *testing.T) {
+	test.Parallel()
 
 	cases := []noUnneededTernaryCase{
 		// All four equality operators have a true inverse, and each row pins one direction.
@@ -448,11 +448,11 @@ func TestNoUnneededTernaryCoversEveryInverseAndParenthesizedBranch(t *testing.T)
 			[]string{"unnecessaryConditionalExpression"}, "var a = x instanceof y;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnneededTernary(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnneededTernary(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }

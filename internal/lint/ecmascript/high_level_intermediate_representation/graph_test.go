@@ -12,10 +12,10 @@ import (
 // conventional DFS that visits the loop edge first produces another mathematically valid reverse
 // postorder, but it puts the continuation first and widens every loop mutation through the rest of
 // the function.
-func TestReversePostorderKeepsLoopBodyBeforeContinuation(t *testing.T) {
-	t.Parallel()
+func TestReversePostorderKeepsLoopBodyBeforeContinuation(test *testing.T) {
+	test.Parallel()
 
-	function := lowerSource(t, `
+	function := lowerSource(test, `
 		function f(items) {
 			for (const item of items) {
 				sink(item);
@@ -43,10 +43,10 @@ func TestReversePostorderKeepsLoopBodyBeforeContinuation(t *testing.T) {
 	sink, hasSink := locations["sink"]
 	done, hasDone := locations["done"]
 	if !hasSink || !hasDone {
-		t.Fatalf("fixture did not retain both calls: locations=%v\n%s", locations, Print(function))
+		test.Fatalf("fixture did not retain both calls: locations=%v\n%s", locations, Print(function))
 	}
 	if sink.block >= done.block || sink.order >= done.order {
-		t.Fatalf("loop body must precede its continuation: sink=%+v done=%+v\n%s",
+		test.Fatalf("loop body must precede its continuation: sink=%+v done=%+v\n%s",
 			sink, done, Print(function))
 	}
 }

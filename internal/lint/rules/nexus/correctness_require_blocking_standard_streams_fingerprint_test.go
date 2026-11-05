@@ -10,17 +10,17 @@ import (
 
 // correctnessRequireBlockingStandardStreamsFingerprintOf is the rule's program fingerprint over a fixture,
 // read through the Program the walk hands the rule, viewed under its own reads.
-func correctnessRequireBlockingStandardStreamsFingerprintOf(t *testing.T, files map[string]string, subject string) [sha256.Size]byte {
-	t.Helper()
+func correctnessRequireBlockingStandardStreamsFingerprintOf(test *testing.T, files map[string]string, subject string) [sha256.Size]byte {
+	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessRequireBlockingStandardStreams
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
 		fingerprint = CorrectnessRequireBlockingStandardStreams.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFiles(t, probe, files, subject)
+	rule_testing.RunTypedFiles(test, probe, files, subject)
 	if fingerprint == ([sha256.Size]byte{}) {
-		t.Fatal("the probe never ran, so no fingerprint was read")
+		test.Fatal("the probe never ran, so no fingerprint was read")
 	}
 	return fingerprint
 }
@@ -29,8 +29,8 @@ func correctnessRequireBlockingStandardStreamsFingerprintOf(t *testing.T, files 
 // imported or unimported moves it, and one that does neither leaves it, so the findings cache replays across
 // it. The rest of what a verdict reads, what an entry's imports reach and say, is its import closure, which
 // the type fingerprint holds.
-func TestCorrectnessRequireBlockingStandardStreamsFingerprintsExactlyTheImportedFiles(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireBlockingStandardStreamsFingerprintsExactlyTheImportedFiles(test *testing.T) {
+	test.Parallel()
 	const entry = "/repository/source/Entry.ts"
 	const worker = "/repository/source/Worker.ts"
 	const helper = "/repository/source/Helper.ts"
@@ -52,7 +52,7 @@ func TestCorrectnessRequireBlockingStandardStreamsFingerprintsExactlyTheImported
 		}
 		return files
 	}
-	original := correctnessRequireBlockingStandardStreamsFingerprintOf(t, base, entry)
+	original := correctnessRequireBlockingStandardStreamsFingerprintOf(test, base, entry)
 
 	moves := map[string]map[string]string{
 		"a file becoming imported": edited(map[string]string{
@@ -66,8 +66,8 @@ func TestCorrectnessRequireBlockingStandardStreamsFingerprintsExactlyTheImported
 		}),
 	}
 	for name, files := range moves {
-		if correctnessRequireBlockingStandardStreamsFingerprintOf(t, files, entry) == original {
-			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		if correctnessRequireBlockingStandardStreamsFingerprintOf(test, files, entry) == original {
+			test.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
 		}
 	}
 
@@ -86,8 +86,8 @@ func TestCorrectnessRequireBlockingStandardStreamsFingerprintsExactlyTheImported
 		}),
 	}
 	for name, files := range holds {
-		if correctnessRequireBlockingStandardStreamsFingerprintOf(t, files, entry) != original {
-			t.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
+		if correctnessRequireBlockingStandardStreamsFingerprintOf(test, files, entry) != original {
+			test.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
 		}
 	}
 }

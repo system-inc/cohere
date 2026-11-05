@@ -8,8 +8,8 @@ import (
 
 const exAssignFile = "/repository/source/Thing.ts"
 
-func TestNoExAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoExAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -24,16 +24,16 @@ func TestNoExAssignFires(t *testing.T) {
 		{"a parenthesized target", "export function run() {\n    try { work(); } catch(error) { (error) = new Error('x'); }\n}\ndeclare function work(): void;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")
 		})
 	}
 }
 
-func TestNoExAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -53,9 +53,9 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 		{"no try at all", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExAssign, exAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -69,8 +69,8 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 //
 // Found while measuring whether the four reference-blocked rules could be answered syntactically,
 // not by reviewing this rule. The walker it shares with them was missing a whole category of write.
-func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
-	t.Parallel()
+func TestNoExAssignSeesUpdateExpressions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,10 +83,10 @@ func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")
 		})
 	}
@@ -94,14 +94,14 @@ func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
 
 // A unary that reads its operand is not a write, which is what keeps the arm above from being a
 // blanket rule about unary expressions.
-func TestNoExAssignIgnoresReadingUnaryOperators(t *testing.T) {
-	t.Parallel()
+func TestNoExAssignIgnoresReadingUnaryOperators(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"try {} catch (error) { const a = -error; }",
 		"try {} catch (error) { const a = !error; }",
 		"try {} catch (error) { const a = typeof error; }",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoExAssign, exAssignFile, sourceText))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoExAssign, exAssignFile, sourceText))
 	}
 }

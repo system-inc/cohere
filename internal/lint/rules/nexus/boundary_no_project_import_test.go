@@ -14,8 +14,8 @@ var baseLibraryOptions = BoundaryNoProjectImportOptions{
 	Allowed:          []string{"@project/ProjectSettings"},
 }
 
-func TestBoundaryNoProjectImportFires(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -29,16 +29,16 @@ func TestBoundaryNoProjectImportFires(t *testing.T) {
 		{"near miss on whitelist", "import { secret } from '@project/ProjectSettingsSecret';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
-			rule_testing.ExpectFindings(t, result, "forbiddenProjectImport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
+			rule_testing.ExpectFindings(test, result, "forbiddenProjectImport")
 		})
 	}
 }
 
-func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -58,10 +58,10 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 		{"empty library directory", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", BoundaryNoProjectImportOptions{}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -69,19 +69,19 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 // A finding has to land on the line the author can suppress. A node's Pos() includes its leading
 // trivia, so reporting the declaration anchors the finding at the first comment above the import,
 // where no `eslint-disable-next-line` can reach it.
-func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportReportsAtTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
 
-	result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
+	result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
 	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected a finding, got none")
+		test.Fatalf("expected a finding, got none")
 	}
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 2 // zero-based, so the third line
 	if line != importLine {
-		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
+		test.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }

@@ -751,13 +751,13 @@ var noUnusedVarsUpstreamReports = []string{
 // oxc ships 409. Two of them are clean only under oxc's leading-underscore default, which this rule
 // no longer has, and they moved to noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault below.
 // A third, an override method's unused parameter, is withheld above because typescript-eslint reports it.
-func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range noUnusedVarsUpstreamClean {
-		result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source)
+		result := rule_testing.RunTyped(test, NoUnusedVars, "a.ts", source)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
+			test.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
 		}
 	}
 }
@@ -774,17 +774,17 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 // explained rather than absorbed.
 //
 // One of the two is a case upstream cannot report either and documents as such in its own source.
-func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsFiresOnUpstreamReportingCases(test *testing.T) {
+	test.Parallel()
 
 	silent := 0
 	for _, source := range noUnusedVarsUpstreamReports {
-		if len(rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
+		if len(rule_testing.RunTyped(test, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
 			silent++
 		}
 	}
 	if silent != len(noUnusedVarsKnownGaps) {
-		t.Errorf("want %d upstream reporting cases silent, got %d — a change here means the "+
+		test.Errorf("want %d upstream reporting cases silent, got %d — a change here means the "+
 			"ported subset moved and the gap list needs updating with the reason",
 			len(noUnusedVarsKnownGaps), silent)
 	}
@@ -834,10 +834,10 @@ var noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault = []string{
 }
 
 // TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid pins the two cases above as reporting.
-func TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault {
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source), "noUnusedVars")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnusedVars, "a.ts", source), "noUnusedVars")
 	}
 }

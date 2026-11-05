@@ -15,14 +15,14 @@ import (
 // a release would then have failed at the first cross-compilation of a platform we told npm we
 // support. A field nobody derives drifts toward whatever was easiest to write.
 
-func TestEveryTargetIsAPlatformGoCanActuallyBuild(t *testing.T) {
-	t.Parallel()
+func TestEveryTargetIsAPlatformGoCanActuallyBuild(test *testing.T) {
+	test.Parallel()
 
-	supported := supportedPlatforms(t)
+	supported := supportedPlatforms(test)
 
 	for _, target := range Targets {
 		if !supported[target.String()] {
-			t.Errorf(
+			test.Errorf(
 				"%s is in Targets and `go tool dist list` does not offer it, so a release would fail at its cross-compilation",
 				target,
 			)
@@ -30,8 +30,8 @@ func TestEveryTargetIsAPlatformGoCanActuallyBuild(t *testing.T) {
 	}
 }
 
-func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(t *testing.T) {
-	t.Parallel()
+func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(test *testing.T) {
+	test.Parallel()
 
 	// The manifests tell npm we support darwin, linux, and win32, and the launcher resolves a
 	// package per platform. A target list that quietly lost one would publish a dispatcher whose
@@ -49,13 +49,13 @@ func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(t *testing.T) {
 
 	for operatingSystem, count := range required {
 		if count < 2 {
-			t.Errorf("%s has %d targets; both amd64 and arm64 are needed to cover the machines people run", operatingSystem, count)
+			test.Errorf("%s has %d targets; both amd64 and arm64 are needed to cover the machines people run", operatingSystem, count)
 		}
 	}
 }
 
-func TestTargetsHasNoDuplicates(t *testing.T) {
-	t.Parallel()
+func TestTargetsHasNoDuplicates(test *testing.T) {
+	test.Parallel()
 
 	// Two entries for one platform stage the same package twice, and the second write wins silently.
 	// Whichever manifest lands last is the one published, so a duplicate with a typo'd architecture
@@ -63,7 +63,7 @@ func TestTargetsHasNoDuplicates(t *testing.T) {
 	seen := map[string]bool{}
 	for _, target := range Targets {
 		if seen[target.String()] {
-			t.Errorf("%s appears twice in Targets", target)
+			test.Errorf("%s appears twice in Targets", target)
 		}
 		seen[target.String()] = true
 	}
@@ -75,12 +75,12 @@ func TestTargetsHasNoDuplicates(t *testing.T) {
 // second list written here, because a hand-written expectation would drift exactly the way the one
 // it checks does. The control below is what makes the result trustworthy — a probe that cannot
 // return "absent" would pass every target including impossible ones.
-func supportedPlatforms(t *testing.T) map[string]bool {
-	t.Helper()
+func supportedPlatforms(test *testing.T) map[string]bool {
+	test.Helper()
 
 	output, err := exec.Command("go", "tool", "dist", "list").Output()
 	if err != nil {
-		t.Fatalf("asking the toolchain which platforms it supports: %v", err)
+		test.Fatalf("asking the toolchain which platforms it supports: %v", err)
 	}
 
 	supported := map[string]bool{}
@@ -94,13 +94,13 @@ func supportedPlatforms(t *testing.T) map[string]bool {
 	// nothing, or that this parsed wrongly, would make every target look supported and the check
 	// would pass while measuring nothing.
 	if len(supported) < 10 {
-		t.Fatalf("the toolchain reported only %d platforms, which cannot be right", len(supported))
+		test.Fatalf("the toolchain reported only %d platforms, which cannot be right", len(supported))
 	}
 	if !supported["linux/amd64"] {
-		t.Fatalf("linux/amd64 is missing from the platform list, so it was not parsed correctly")
+		test.Fatalf("linux/amd64 is missing from the platform list, so it was not parsed correctly")
 	}
 	if supported["plan9/sparc64"] {
-		t.Fatalf("an impossible platform reported as supported, so this check cannot return absent")
+		test.Fatalf("an impossible platform reported as supported, so this check cannot return absent")
 	}
 
 	return supported

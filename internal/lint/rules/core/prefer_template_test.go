@@ -560,34 +560,34 @@ var preferTemplateSilentCases = []preferTemplateCase{
 // prefer-template has no option surface (upstream's schema is []), so there is no decoder to
 // route through and the harness is handed nil, which is what the config layer passes for a bare
 // "error".
-func decodedPreferTemplate(t *testing.T, raw string) any {
-	t.Helper()
+func decodedPreferTemplate(test *testing.T, raw string) any {
+	test.Helper()
 	if raw != "" {
-		t.Fatalf("prefer-template takes no options, got %q", raw)
+		test.Fatalf("prefer-template takes no options, got %q", raw)
 	}
 	return nil
 }
 
-func TestPreferTemplateFires(t *testing.T) {
-	t.Parallel()
+func TestPreferTemplateFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferTemplateFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferTemplate, preferTemplateFile, testCase.source,
-				decodedPreferTemplate(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile, testCase.source,
+				decodedPreferTemplate(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestPreferTemplateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferTemplateStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferTemplateSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferTemplate, preferTemplateFile, testCase.source,
-				decodedPreferTemplate(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile, testCase.source,
+				decodedPreferTemplate(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1006,31 +1006,31 @@ var preferTemplateDeclineCases = []preferTemplateFixCase{
 	},
 }
 
-func TestPreferTemplateRepairsWhatUpstreamRepairs(t *testing.T) {
-	t.Parallel()
+func TestPreferTemplateRepairsWhatUpstreamRepairs(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferTemplateRepairCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferTemplate, preferTemplateFile,
-				testCase.source, decodedPreferTemplate(t, ""))
-			rule_testing.ExpectFixedSource(t, result, testCase.wanted)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile,
+				testCase.source, decodedPreferTemplate(test, ""))
+			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
 
-func TestPreferTemplateDeclinesTheRepairsUpstreamDeclines(t *testing.T) {
-	t.Parallel()
+func TestPreferTemplateDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range preferTemplateDeclineCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferTemplate, preferTemplateFile,
-				testCase.source, decodedPreferTemplate(t, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile,
+				testCase.source, decodedPreferTemplate(test, ""))
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding; a decline withholds the FIX, not the report")
+				test.Fatalf("expected a finding; a decline withholds the FIX, not the report")
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("proposed %d fix(es); upstream declines this case", len(diagnostic.Fixes))
+					test.Errorf("proposed %d fix(es); upstream declines this case", len(diagnostic.Fixes))
 				}
 			}
 		})

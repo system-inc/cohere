@@ -115,13 +115,13 @@ var postDominatorShapes = []struct {
 
 // TestPostDominatorsMatchTheDefinition checks every ordered pair of blocks in every shape against a
 // reachability walk that shares no code with the tree.
-func TestPostDominatorsMatchTheDefinition(t *testing.T) {
-	t.Parallel()
+func TestPostDominatorsMatchTheDefinition(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			tree := computePostDominance(function)
 
 			pairs := 0
@@ -140,14 +140,14 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 					wanted := !reachesAReturnWithout(function, from.Id, candidate.Id)
 					got := postDominates(tree, from.Id, candidate.Id)
 					if got != wanted {
-						t.Errorf(
+						test.Errorf(
 							"bb%d post-dominated by bb%d: tree says %v, deleting bb%d and walking says %v\n%s",
 							from.Id, candidate.Id, got, candidate.Id, wanted, Print(function))
 					}
 				}
 			}
 			if pairs < shape.minimumPairs {
-				t.Fatalf("only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
+				test.Fatalf("only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
 					pairs, shape.minimumPairs)
 			}
 		})
@@ -163,8 +163,8 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 // The corruption is chosen to be the kind a real bug produces: not a nil tree or an empty map,
 // which any assertion catches, but a plausible tree with one edge redirected, which is exactly what
 // a wrong node ordering in Cooper-Harvey-Kennedy yields.
-func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
-	t.Parallel()
+func TestPostDominatorDefinitionCheckCanFail(test *testing.T) {
+	test.Parallel()
 
 	// A corruption is only detectable where there was structure to destroy. Self-parenting a block
 	// removes every ancestor from its chain, so it changes an answer only when the chain held a
@@ -182,8 +182,8 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 	for _, shape := range postDominatorShapes {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
-		t.Run(shape.name, func(t *testing.T) {
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			function := lowerSource(test, shape.code)
 			pristine := computePostDominance(function)
 
 			withContent := 0
@@ -226,20 +226,20 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 			if withContent == 0 {
 				// Legitimate for a multi-return shape. Recorded rather than failed, and the
 				// aggregate assertion below makes sure this is not every shape.
-				t.Logf("no block has a real post-dominator, so there is nothing to corrupt here")
+				test.Logf("no block has a real post-dominator, so there is nothing to corrupt here")
 				return
 			}
 			if detected != withContent {
-				t.Errorf("only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
+				test.Errorf("only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
 					detected, withContent, Print(function))
 			}
 			shapesWithContent++
-			t.Logf("%d of %d corruptions detected", detected, withContent)
+			test.Logf("%d of %d corruptions detected", detected, withContent)
 		})
 	}
 
 	if shapesWithContent == 0 {
-		t.Fatal("no shape offered a corruptible post-dominator chain; the falsification check is inert")
+		test.Fatal("no shape offered a corruptible post-dominator chain; the falsification check is inert")
 	}
 }
 
@@ -249,8 +249,8 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 // Each `want` below is the set of blocks holding an instruction React reports on, established by
 // running `eslint-plugin-react-hooks`'s `set-state-in-render` on the equivalent input. They are
 // recorded as membership questions about the block a call lands in, which is what the rule asks.
-func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksOnMeasuredShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -276,17 +276,17 @@ func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, testCase.code)
 			unconditional := UnconditionalBlocks(function)
 
 			block, ok := blockHoldingLastCall(function)
 			if !ok {
-				t.Fatalf("no call instruction found, so this case asserts nothing\n%s", Print(function))
+				test.Fatalf("no call instruction found, so this case asserts nothing\n%s", Print(function))
 			}
 			if got := unconditional[block]; got != testCase.wantUnconditional {
-				t.Errorf("block bb%d holding the last call: unconditional = %v, want %v\n%s",
+				test.Errorf("block bb%d holding the last call: unconditional = %v, want %v\n%s",
 					block, got, testCase.wantUnconditional, Print(function))
 			}
 		})
@@ -320,16 +320,16 @@ func blockHoldingLastCall(function *Function) (static_single_assignment.BlockId,
 //
 // It is separate from the definition check because it is true even for a function with no return at
 // all, where the post-dominator tree is empty and every other question is vacuous.
-func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksAlwaysContainsTheEntry(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			unconditional := UnconditionalBlocks(function)
 			if !unconditional[function.Entry] {
-				t.Errorf("the entry block bb%d is not unconditional\n%s", function.Entry, Print(function))
+				test.Errorf("the entry block bb%d is not unconditional\n%s", function.Entry, Print(function))
 			}
 		})
 	}
@@ -337,17 +337,17 @@ func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
 
 // TestUnconditionalBlocksIsASubsetOfPostDominators states the relationship between the two
 // functions in this file, so a change to one that silently diverges from the other is caught.
-func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksIsASubsetOfPostDominators(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			tree := computePostDominance(function)
 			for id := range UnconditionalBlocks(function) {
 				if !postDominates(tree, function.Entry, id) {
-					t.Errorf("bb%d is reported unconditional but does not post-dominate the entry bb%d\n%s",
+					test.Errorf("bb%d is reported unconditional but does not post-dominate the entry bb%d\n%s",
 						id, function.Entry, Print(function))
 				}
 			}
@@ -357,13 +357,13 @@ func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
 
 // TestUnconditionalBlocksHandlesDegenerateInput checks the two shapes a caller can produce that are
 // not functions at all.
-func TestUnconditionalBlocksHandlesDegenerateInput(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksHandlesDegenerateInput(test *testing.T) {
+	test.Parallel()
 
 	if got := UnconditionalBlocks(nil); got != nil {
-		t.Errorf("UnconditionalBlocks(nil) = %v, want nil", got)
+		test.Errorf("UnconditionalBlocks(nil) = %v, want nil", got)
 	}
 	if got := UnconditionalBlocks(&Function{}); got != nil {
-		t.Errorf("UnconditionalBlocks on a function with no blocks = %v, want nil", got)
+		test.Errorf("UnconditionalBlocks on a function with no blocks = %v, want nil", got)
 	}
 }

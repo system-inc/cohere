@@ -18,8 +18,8 @@ import (
 // fixture rather than a distinction a port could miss.
 
 // Every case here reports exactly once.
-func TestNoHeadImportInDocumentReports(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -144,10 +144,10 @@ func TestNoHeadImportInDocumentReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoHeadImportInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoHeadImportInDocument.Id)
 		})
 	}
 }
@@ -155,8 +155,8 @@ func TestNoHeadImportInDocumentReports(t *testing.T) {
 // The rule reports per import declaration with no deduplication, which no upstream fixture pins
 // because not one of them writes the module twice. Measured on the release binary, which
 // reports at both column 1 and column 34 for a file holding two.
-func TestNoHeadImportInDocumentReportsOncePerImport(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentReportsOncePerImport(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -173,21 +173,21 @@ func TestNoHeadImportInDocumentReportsOncePerImport(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoHeadImportInDocument, testCase.fileName, testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = messageNoHeadImportInDocument.Id
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
 // No case here reports.
-func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -322,10 +322,10 @@ func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoHeadImportInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -342,36 +342,36 @@ func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
 // reach of any suppression a reader could write. `ctx.ReportNode` routes through TokenRange and
 // already strips it, so wrapping here would move the finding off upstream's span onto the
 // specifier for no gain.
-func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(test *testing.T) {
+	test.Parallel()
 
 	source := "// a comment\n// another\nimport Head from 'next/head';\n"
 
-	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+	result := rule_testing.Run(test, NoHeadImportInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoHeadImportInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if want := "import Head from 'next/head';"; reported != want {
-		t.Fatalf("pointed at %q, want %q", reported, want)
+		test.Fatalf("pointed at %q, want %q", reported, want)
 	}
 }
 
 // The two findings on one file must point at their own declarations rather than both at the first,
 // which a count assertion cannot see. Upstream reports at column 1 and column 34 for the single-line
 // form; here they are on separate lines.
-func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentPointsAtEachImportSeparately(test *testing.T) {
+	test.Parallel()
 
 	source := "import Head from 'next/head';\nimport Other from 'next/head';\n"
 
-	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id, messageNoHeadImportInDocument.Id)
+	result := rule_testing.Run(test, NoHeadImportInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoHeadImportInDocument.Id, messageNoHeadImportInDocument.Id)
 
 	want := []string{"import Head from 'next/head';", "import Other from 'next/head';"}
 	for index, expected := range want {
 		range_ := result.Diagnostics[index].Range
 		if reported := source[range_.Pos():range_.End()]; reported != expected {
-			t.Fatalf("finding %d pointed at %q, want %q", index, reported, expected)
+			test.Fatalf("finding %d pointed at %q, want %q", index, reported, expected)
 		}
 	}
 }
@@ -384,15 +384,15 @@ func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
 //
 // Equality rather than containment, because a predicate weaker than the property it guards is not a
 // guard.
-func TestNoHeadImportInDocumentMessage(t *testing.T) {
-	t.Parallel()
+func TestNoHeadImportInDocumentMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx",
+	result := rule_testing.Run(test, NoHeadImportInDocument, "pages/_document.tsx",
 		"import Head from 'next/head';\n")
-	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+	rule_testing.ExpectFindings(test, result, messageNoHeadImportInDocument.Id)
 
 	if got := result.Diagnostics[0].Message.Id; got != "noHeadImportInDocument" {
-		t.Fatalf("reported under the id %q", got)
+		test.Fatalf("reported under the id %q", got)
 	}
 
 	want := "This is the custom document and it imports `next/head`. That component collects " +
@@ -401,6 +401,6 @@ func TestNoHeadImportInDocumentMessage(t *testing.T) {
 		"gathers here is silently dropped or duplicated into the shell. The document has its own " +
 		"`Head`, exported from `next/document`, and that is the one that writes the shell."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Fatalf("rendered %q, want %q", got, want)
+		test.Fatalf("rendered %q, want %q", got, want)
 	}
 }

@@ -30,26 +30,26 @@ type strictCase struct {
 }
 
 // runStrict drives one corpus case through the rule's own exported decoder.
-func runStrict(t *testing.T, testCase strictCase) rule_testing.Result {
-	t.Helper()
-	return runStrictIn(t, strictFile, testCase)
+func runStrict(test *testing.T, testCase strictCase) rule_testing.Result {
+	test.Helper()
+	return runStrictIn(test, strictFile, testCase)
 }
 
 // runStrictIn is runStrict at a chosen path, for the rows whose answer turns on the file kind.
-func runStrictIn(t *testing.T, fileName string, testCase strictCase) rule_testing.Result {
-	t.Helper()
+func runStrictIn(test *testing.T, fileName string, testCase strictCase) rule_testing.Result {
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, Strict, fileName, testCase.sourceText)
+		return rule_testing.Run(test, Strict, fileName, testCase.sourceText)
 	}
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeStrictOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, Strict, fileName, testCase.sourceText, decoded)
+	return rule_testing.RunWithOptions(test, Strict, fileName, testCase.sourceText, decoded)
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
@@ -170,24 +170,24 @@ func strictSilentCases() []strictCase {
 	}
 }
 
-func TestStrictFires(t *testing.T) {
-	t.Parallel()
+func TestStrictFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range strictFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runStrict(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runStrict(test, testCase), testCase.wantIds...)
 		})
 	}
 }
 
-func TestStrictStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStrictStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range strictSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runStrict(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runStrict(test, testCase))
 		})
 	}
 }
@@ -197,8 +197,8 @@ func TestStrictStaysSilent(t *testing.T) {
 // Twenty-one of the imported rows assert an exact rewritten source. The repair always deletes one
 // whole directive statement, so a fixer that deleted the wrong statement, or trimmed a neighbour,
 // passes every assertion above.
-func TestStrictFixesTheSource(t *testing.T) {
-	t.Parallel()
+func TestStrictFixesTheSource(test *testing.T) {
+	test.Parallel()
 
 	applied := 0
 	for _, testCase := range strictFiresCases() {
@@ -206,9 +206,9 @@ func TestStrictFixesTheSource(t *testing.T) {
 			continue
 		}
 		applied++
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runStrict(t, testCase), testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runStrict(test, testCase), testCase.wantFixedSource)
 		})
 	}
 	// The floor is asserted rather than the exact count, because the imported set is filtered
@@ -216,7 +216,7 @@ func TestStrictFixesTheSource(t *testing.T) {
 	// hardcoded total caught a real drift once and then became the thing most likely to be
 	// stale; a floor still fails if the repair arm stops being exercised at all.
 	if applied < 14 {
-		t.Errorf("only %d cases asserted a rewrite, wanted at least 14: the repair arm is "+
+		test.Errorf("only %d cases asserted a rewrite, wanted at least 14: the repair arm is "+
 			"barely covered", applied)
 	}
 }
@@ -227,8 +227,8 @@ func TestStrictFixesTheSource(t *testing.T) {
 // in the wrong FORM for the configuration, or one that is a syntax error because of the parameter
 // list, is reported with nothing offered, because choosing between deleting the directive and
 // changing the surrounding code is a judgment the rule cannot make.
-func TestStrictDeclinesToRepair(t *testing.T) {
-	t.Parallel()
+func TestStrictDeclinesToRepair(test *testing.T) {
+	test.Parallel()
 
 	declined := 0
 	for _, testCase := range strictFiresCases() {
@@ -236,22 +236,22 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 			continue
 		}
 		declined++
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runStrict(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runStrict(test, testCase)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("wanted a finding")
+				test.Fatal("wanted a finding")
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d carried %d fixes, wanted none", index,
+					test.Errorf("finding %d carried %d fixes, wanted none", index,
 						len(diagnostic.Fixes))
 				}
 			}
 		})
 	}
 	if declined == 0 {
-		t.Error("no case declined a repair, so the shouldFix split is untested")
+		test.Error("no case declined a repair, so the shouldFix split is untested")
 	}
 }
 
@@ -270,8 +270,8 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 // as it is upstream, which is what keeps it from mattering. The first four rows are the ones
 // upstream's corpus cannot contain; the last three are the controls that keep them honest by showing
 // the predicate still says no to the three real cases.
-func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
-	t.Parallel()
+func TestStrictReadsTypeScriptParameterLists(test *testing.T) {
+	test.Parallel()
 
 	cases := []strictCase{
 		// An annotation and a return type leave the parameter simple, so the directive is merely
@@ -296,12 +296,12 @@ func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 			[]string{"nonSimpleParameterList"}, ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runStrictIn(t, strictTypeScriptFile, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runStrictIn(test, strictTypeScriptFile, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixedSource != "" {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 			}
 		})
 	}
@@ -315,19 +315,19 @@ func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 // (#hks3djf). The compiler's `alwaysStrict` makes the file strict, and that is upstream's
 // `impliedStrict`. Every row was replayed through the installed rule with the TypeScript parser and
 // `impliedStrict` on, the fixed source included.
-func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
-	t.Parallel()
+func TestStrictReadsATypeScriptFileAsImpliedStrict(test *testing.T) {
+	test.Parallel()
 
 	script := "function foo(): number { return 1; }\nfoo();"
 	// The #hks3djf shape, under every mode: nothing to ask for, because nothing is missing.
 	for _, mode := range []StrictMode{"", StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
-		t.Run("a script under "+string(mode), func(t *testing.T) {
-			t.Parallel()
+		test.Run("a script under "+string(mode), func(test *testing.T) {
+			test.Parallel()
 			testCase := strictCase{sourceText: script}
 			if mode != "" {
 				testCase.options = mode
 			}
-			rule_testing.ExpectClean(t, runStrictIn(t, strictTypeScriptFile, testCase))
+			rule_testing.ExpectClean(test, runStrictIn(test, strictTypeScriptFile, testCase))
 		})
 	}
 
@@ -348,19 +348,19 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 			"\nexport const a: number = 1;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runStrictIn(t, strictTypeScriptFile, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runStrictIn(test, strictTypeScriptFile, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 
 	// The control: the same script in a JavaScript file is run as written, so it still needs the
 	// directive. Without this a rule that read every file as implied would pass every row above.
-	t.Run("a JavaScript script is not implied", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, runStrict(t, strictCase{
+	test.Run("a JavaScript script is not implied", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, runStrict(test, strictCase{
 			sourceText: "function foo() { return 1; }\nfoo();"}), "function")
 	})
 }
@@ -371,8 +371,8 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 // `strict: false` turns `alwaysStrict` off with it, and the script arms come back. An explicit
 // `alwaysStrict` beside it turns them off again, which separates reading the option from reading
 // `strict`.
-func TestStrictFollowsTheCompilersAlwaysStrict(t *testing.T) {
-	t.Parallel()
+func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
+	test.Parallel()
 
 	files := map[string]string{"Strict.ts": "function foo(): number { return 1; }\nfoo();"}
 	withConfig := func(compilerOptions string) func(directory string) {
@@ -381,23 +381,23 @@ func TestStrictFollowsTheCompilersAlwaysStrict(t *testing.T) {
 				`"lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
 			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config),
 				0o644); err != nil {
-				t.Fatalf("writing the tsconfig: %v", err)
+				test.Fatalf("writing the tsconfig: %v", err)
 			}
 		}
 	}
 
-	t.Run("strict on implies it", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, Strict, files, "Strict.ts"))
+	test.Run("strict on implies it", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, Strict, files, "Strict.ts"))
 	})
-	t.Run("strict off leaves a script sloppy", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
+	test.Run("strict off leaves a script sloppy", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
 			"Strict.ts", withConfig(`"strict": false`)), "function")
 	})
-	t.Run("alwaysStrict on its own implies it", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
+	test.Run("alwaysStrict on its own implies it", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
 			"Strict.ts", withConfig(`"strict": false, "alwaysStrict": true`)))
 	})
 }
@@ -408,8 +408,8 @@ func TestStrictFollowsTheCompilersAlwaysStrict(t *testing.T) {
 // both because they built a replacement span from a node's neighbour. This one removes the
 // directive STATEMENT, so a parameter annotation, a return type and a generic list all sit outside
 // the deleted range by construction. These rows turn that argument into a measurement.
-func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
-	t.Parallel()
+func TestStrictRepairPreservesTypeSyntax(test *testing.T) {
+	test.Parallel()
 
 	cases := []strictCase{
 		// The `never` mode does not repair, so these use the module collapse, which does.
@@ -421,11 +421,11 @@ func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
 			[]string{"module"}, " export const h = (a?: number): string => String(a);"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runStrictIn(t, strictTypeScriptFile, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runStrictIn(test, strictTypeScriptFile, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -438,29 +438,29 @@ func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
 //
 // Each row configures a DIFFERENT mode and expects the same `module` finding, which is what pins
 // the override. Without them a rule that simply ignored the option would look correct.
-func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
-	t.Parallel()
+func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
+	test.Parallel()
 
 	source := "'use strict'; export const a = 1;"
 	for _, mode := range []StrictMode{StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
-		t.Run(string(mode), func(t *testing.T) {
-			t.Parallel()
-			result := runStrict(t, strictCase{sourceText: source,
+		test.Run(string(mode), func(test *testing.T) {
+			test.Parallel()
+			result := runStrict(test, strictCase{sourceText: source,
 				options: mode})
-			rule_testing.ExpectFindings(t, result, "module")
-			rule_testing.ExpectFixedSource(t, result, " export const a = 1;")
+			rule_testing.ExpectFindings(test, result, "module")
+			rule_testing.ExpectFixedSource(test, result, " export const a = 1;")
 		})
 	}
 	// And with no options at all, which is how the rule would be configured here.
-	t.Run("nil options", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, Strict, strictFile, source), "module")
+	test.Run("nil options", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, Strict, strictFile, source), "module")
 	})
 	// The control: a module with no directive is clean, so the rows above are the directive
 	// rather than a rule that reports on every module.
-	t.Run("the control", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, Strict, strictFile,
+	test.Run("the control", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, Strict, strictFile,
 			"export const a = 1;"))
 	})
 }
@@ -492,8 +492,8 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 // TypeScript file under `alwaysStrict` is upstream's `impliedStrict`, proven in
 // TestStrictReadsATypeScriptFileAsImpliedStrict. The seventeen rows stay unimported because they are
 // JavaScript, which the compiler does not make strict.
-func TestStrictHasNoImpliedMode(t *testing.T) {
-	t.Parallel()
+func TestStrictHasNoImpliedMode(test *testing.T) {
+	test.Parallel()
 
 	// Upstream has no `implied` option either: `impliedStrict` is a parser feature, and here the
 	// file kind and the tsconfig stand in for it. An option spelling would be a second way to say
@@ -503,12 +503,12 @@ func TestStrictHasNoImpliedMode(t *testing.T) {
 		_, err := DecodeStrictOptions([]byte(`"` + mode + `"`))
 		if mode == "implied" || mode == "module" {
 			if err == nil {
-				t.Errorf("mode %q decoded, but it is selected by the file, not the option", mode)
+				test.Errorf("mode %q decoded, but it is selected by the file, not the option", mode)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("mode %q should decode: %v", mode, err)
+			test.Errorf("mode %q should decode: %v", mode, err)
 		}
 	}
 }
@@ -517,53 +517,53 @@ func TestStrictHasNoImpliedMode(t *testing.T) {
 //
 // Every arm of the rule is selected by string equality, so an unrecognized spelling must fail rather
 // than pick a silent fifth behaviour of reporting nothing.
-func TestDecodeStrictOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeStrictOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input selects Safe", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input selects Safe", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeStrictOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if mode := decoded.(StrictMode); mode != StrictSafe {
-			t.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
+			test.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
 		}
 	})
 
-	t.Run("upstream's bare string decodes to its mode", func(t *testing.T) {
-		t.Parallel()
+	test.Run("upstream's bare string decodes to its mode", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeStrictOptions([]byte(`"never"`))
 		if err != nil {
-			t.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", err)
+			test.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", err)
 		}
 		if mode := decoded.(StrictMode); mode != StrictNever {
-			t.Errorf("mode came back %q, wanted %q", mode, StrictNever)
+			test.Errorf("mode came back %q, wanted %q", mode, StrictNever)
 		}
 	})
 
 	// The object form was this decoder's own invention and no ESLint version accepts it, so a config
 	// carrying it was never valid ESLint. Refusing it keeps one spelling for one setting.
-	t.Run("the object form is refused", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the object form is refused", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeStrictOptions([]byte(`{"mode":"never"}`)); err == nil {
-			t.Error(`{"mode":"never"} decoded; upstream's option is a bare string`)
+			test.Error(`{"mode":"never"} decoded; upstream's option is a bare string`)
 		}
 	})
 
 	// Upstream's enum is case-sensitive, so a PascalCase spelling is a typo rather than a synonym.
-	t.Run("another casing is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("another casing is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeStrictOptions([]byte(`"Never"`)); err == nil {
-			t.Error(`"Never" decoded; upstream spells it "never"`)
+			test.Error(`"Never" decoded; upstream spells it "never"`)
 		}
 	})
 
-	t.Run("an unknown mode is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unknown mode is rejected", func(test *testing.T) {
+		test.Parallel()
 		for _, raw := range []string{`"sometimes"`, `""`, `null`, `1`} {
 			if _, err := DecodeStrictOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded", raw)
+				test.Errorf("%s decoded", raw)
 			}
 		}
 	})
@@ -586,8 +586,8 @@ func TestDecodeStrictOptions(t *testing.T) {
 // way round, so this is a defect rather than a judgment, and it is reproduced rather than corrected:
 // a port that helpfully reported the middle row would disagree with the tool it replaces on real
 // source, and nothing in the corpus would have said so.
-func TestStrictStopsAtANonStrictDirective(t *testing.T) {
-	t.Parallel()
+func TestStrictStopsAtANonStrictDirective(test *testing.T) {
+	test.Parallel()
 
 	cases := []strictCase{
 		{"'use strict'; foo();", StrictNever, []string{"never"}, ""},
@@ -602,14 +602,14 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 		{"'use strict'; 'use strict'; foo();", StrictNever, []string{"never", "never"}, ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runStrict(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runStrict(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -630,14 +630,14 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 // fact about the harness and the file extension, not about the rule.
 //
 // This test asserts the reachable half, so a change that broke Safe entirely still fails.
-func TestStrictSafeResolvesToFunctionForAScript(t *testing.T) {
-	t.Parallel()
+func TestStrictSafeResolvesToFunctionForAScript(test *testing.T) {
+	test.Parallel()
 
 	// A script with a top-level function and no directive: Function mode reports, Global would
 	// have reported on the whole program instead, so the message id separates them.
-	rule_testing.ExpectFindings(t, runStrict(t, strictCase{
+	rule_testing.ExpectFindings(test, runStrict(test, strictCase{
 		sourceText: "function foo() { return; }", options: StrictSafe}), "function")
 	// And the CommonJS spelling resolves the same way here, which is the divergence itself.
-	rule_testing.ExpectFindings(t, runStrict(t, strictCase{
+	rule_testing.ExpectFindings(test, runStrict(test, strictCase{
 		sourceText: "module.exports = function foo() { return; };", options: StrictSafe}), "function")
 }

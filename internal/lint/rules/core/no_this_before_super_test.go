@@ -24,8 +24,8 @@ const thisBeforeSuperFile = "/repository/source/Derived.tsx"
 //
 // That per-constructor granularity is the sharpest divergence between the two upstreams and it is
 // resolved in favour of oxc deliberately. See the rule's doc comment.
-func TestNoThisBeforeSuperFires(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -104,10 +104,10 @@ func TestNoThisBeforeSuperFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
 		})
 	}
@@ -122,8 +122,8 @@ func TestNoThisBeforeSuperFires(t *testing.T) {
 //   - `this` inside a nested function, arrow, or nested class belongs to that scope
 //   - a field initializer always evaluates after `super()` regardless of where it is written
 //   - `super()` reached on *every* path counts, even when it is written twice
-func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -219,10 +219,10 @@ func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -237,8 +237,8 @@ func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
 //
 // The expected text is taken from oxc's snapshot, which renders the caret under the whole method
 // definition starting at `constructor`.
-func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperReportsAtTheConstructor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -263,15 +263,15 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding points at %q, want %q", reported, testCase.want)
+				test.Errorf("finding points at %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -283,17 +283,17 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 // the node's `Pos()`, which includes leading trivia. Asserted here rather than trusted, because a
 // port building the range from `node.Pos()` directly passes every other test in this file and
 // breaks `-next-line` suppressions written above the constructor.
-func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperSkipsLeadingTrivia(test *testing.T) {
+	test.Parallel()
 
 	source := "class A extends B {\n  // build it\n  constructor() { this.c = 0; }\n}"
-	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, source)
+	result := rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "constructor() { this.c = 0; }" {
-		t.Errorf("finding points at %q, want the constructor with no leading comment", reported)
+		test.Errorf("finding points at %q, want the constructor with no leading comment", reported)
 	}
 }
 
@@ -303,27 +303,27 @@ func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
 // is clean, and the caret moves from column 21 to column 57 between them. A rule reporting the
 // outermost constructor unconditionally produces the right count on both and the right span on
 // exactly one, so counting cannot see this and only the span can.
-func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(test *testing.T) {
+	test.Parallel()
 
 	outerOffends := "class A extends B { constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); } }"
-	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, outerOffends)
+	result := rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, outerOffends)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("outer case: expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("outer case: expected one finding, got %d", len(result.Diagnostics))
 	}
 	reported := outerOffends[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if want := "constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); }"; reported != want {
-		t.Errorf("outer case points at %q, want %q", reported, want)
+		test.Errorf("outer case points at %q, want %q", reported, want)
 	}
 
 	innerOffends := "class A extends B { constructor() { class C extends D { constructor() { this.e(); super(); } } super(); this.f(); } }"
-	result = rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, innerOffends)
+	result = rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, innerOffends)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("inner case: expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("inner case: expected one finding, got %d", len(result.Diagnostics))
 	}
 	reported = innerOffends[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if want := "constructor() { this.e(); super(); }"; reported != want {
-		t.Errorf("inner case points at %q, want %q", reported, want)
+		test.Errorf("inner case points at %q, want %q", reported, want)
 	}
 }
 
@@ -331,22 +331,22 @@ func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
 //
 // `ExpectFindings` matches the id, so a rule reporting the right id with a description that says
 // the wrong thing, or renders a placeholder unsubstituted, passes everything else here.
-func TestNoThisBeforeSuperMessage(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile,
+	result := rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile,
 		"class A extends B { constructor() { this.c = 0; } }")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
 	want := "This derived constructor reads `this` or `super` on a path that has not called " +
 		"`super()` yet, which throws a ReferenceError because the `this` binding does not exist " +
 		"until `super()` returns."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("description is %q, want %q", got, want)
+		test.Errorf("description is %q, want %q", got, want)
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "thisBeforeSuper" {
-		t.Errorf("message id is %q, want %q", got, "thisBeforeSuper")
+		test.Errorf("message id is %q, want %q", got, "thisBeforeSuper")
 	}
 }
 
@@ -355,8 +355,8 @@ func TestNoThisBeforeSuperMessage(t *testing.T) {
 // Upstream's corpus exercises `if`, `try`, `while` and the logical assignments, and says nothing
 // about the rest of the statement grammar. Every case below names a construct the scanner routes
 // deliberately, and each one exists because the routing is a choice rather than a consequence.
-func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -440,10 +440,10 @@ func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
 		})
 	}
@@ -453,8 +453,8 @@ func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
 //
 // These are the ones that catch an over-eager scanner, and three of them guard a specific way this
 // port could have gone wrong that upstream's corpus does not reach.
-func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -543,10 +543,10 @@ func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -556,8 +556,8 @@ func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 // constructor calling `super()` first and then assigning `this` in two or more sequential `if` blocks
 // reported: BaseError.ts:174 and eight FormComponentData constructors in api-phi-health. The
 // reporter's repro at one, two and six blocks stays silent; the nearest real violations still report.
-func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
-	t.Parallel()
+func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(test *testing.T) {
+	test.Parallel()
 
 	constructor := func(blocks int) string {
 		source := "class A extends B { constructor(flag) { super();"
@@ -567,9 +567,9 @@ func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
 		return source + " } }"
 	}
 	for _, blocks := range []int{1, 2, 6} {
-		t.Run(fmt.Sprintf("super first, then %d else-less ifs", blocks), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)))
+		test.Run(fmt.Sprintf("super first, then %d else-less ifs", blocks), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)))
 		})
 	}
 
@@ -580,9 +580,9 @@ func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
 		{"super in an else-less if, this in the next", "class A extends B { constructor(flag) { if (flag) { super(); } if (flag) { this.b = 2; } } }"},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText), "thisBeforeSuper")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText), "thisBeforeSuper")
 		})
 	}
 }

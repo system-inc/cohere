@@ -53,15 +53,15 @@ func contains(names []string, name string) bool {
 // the root's resolved target, which on macOS differs from the first, since /var is a link to /private/var. After
 // the first run records, each spelling in turn replays. An edit made through the link replays every other file's
 // findings, and a replay prints its paths as the replaying run spells the root.
-func TestEverySpellingOfTheRootIsOneCache(t *testing.T) {
-	t.Parallel()
-	fixture := newRunCacheFixture(t, buildCohere(t))
+func TestEverySpellingOfTheRootIsOneCache(test *testing.T) {
+	test.Parallel()
+	fixture := newRunCacheFixture(test, buildCohere(test))
 	fixture.write("source/debug.ts", "export function stop(): void {\n    debugger;\n}\n")
 	fixture.commit("a finding, so a replay prints a path")
 
-	link := filepath.Join(t.TempDir(), "linked-project")
+	link := filepath.Join(test.TempDir(), "linked-project")
 	if err := os.Symlink(fixture.root, link); err != nil {
-		t.Skipf("this filesystem cannot make symbolic links: %v", err)
+		test.Skipf("this filesystem cannot make symbolic links: %v", err)
 	}
 	spellings := []string{fixture.root, link}
 	if resolved, err := filepath.EvalSymlinks(fixture.root); err == nil && resolved != fixture.root {
@@ -73,24 +73,24 @@ func TestEverySpellingOfTheRootIsOneCache(t *testing.T) {
 	fixture.runFrom(fixture.root)
 	fixture.runFrom(fixture.root)
 	if primed := fixture.runFrom(fixture.root); !isRunCacheReplay(primed) {
-		t.Fatalf("an unchanged tree did not replay from its own spelling, so nothing below can show another was noticed:\n%s", primed)
+		test.Fatalf("an unchanged tree did not replay from its own spelling, so nothing below can show another was noticed:\n%s", primed)
 	}
 	for round := range 2 {
 		for _, spelling := range append(spellings[1:], spellings[0]) {
 			output := fixture.runFrom(spelling)
 			if !isRunCacheReplay(output) {
-				t.Fatalf("round %d: a run from %s did not replay the run recorded from another spelling of the same root:\n%s",
+				test.Fatalf("round %d: a run from %s did not replay the run recorded from another spelling of the same root:\n%s",
 					round+1, spelling, output)
 			}
 			if want := filepath.Join(spelling, "source", "debug.ts"); !strings.Contains(output, want) {
-				t.Errorf("round %d: the replay from %s does not print %s, the finding's path as this run spells the root:\n%s",
+				test.Errorf("round %d: the replay from %s does not print %s, the finding's path as this run spells the root:\n%s",
 					round+1, spelling, want, output)
 			}
 			// At a line's start, where a finding's path is printed: /tmp/x is inside /private/tmp/x.
 			for _, other := range spellings {
 				printed := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(filepath.Join(other, "source", "debug.ts")+":"))
 				if other != spelling && printed.MatchString(output) {
-					t.Errorf("round %d: the replay from %s prints the path as %s spells it:\n%s", round+1, spelling, other, output)
+					test.Errorf("round %d: the replay from %s prints the path as %s spells it:\n%s", round+1, spelling, other, output)
 				}
 			}
 		}
@@ -101,49 +101,49 @@ func TestEverySpellingOfTheRootIsOneCache(t *testing.T) {
 	fixture.write("source/a.ts", "// edited through the link\nexport const a: number = 1;\n")
 	edited := fixture.runFrom(link)
 	if isRunCacheReplay(edited) {
-		t.Fatalf("a run after an edit replayed:\n%s", edited)
+		test.Fatalf("a run after an edit replayed:\n%s", edited)
 	}
 	replayed := regexp.MustCompile(`(\d+) of (\d+) files replayed from cache`).FindStringSubmatch(edited)
 	if replayed == nil || replayed[1] == "0" {
-		t.Errorf("after an edit through the link, no file's findings replayed from the entries another spelling recorded:\n%s", edited)
+		test.Errorf("after an edit through the link, no file's findings replayed from the entries another spelling recorded:\n%s", edited)
 	}
 	if again := fixture.runFrom(spellings[len(spellings)-1]); !isRunCacheReplay(again) {
-		t.Errorf("the run after the link's recorded nothing another spelling could replay:\n%s", again)
+		test.Errorf("the run after the link's recorded nothing another spelling could replay:\n%s", again)
 	}
 }
 
 // A run that could have replayed and did not says why, in --verbose and --json (#547dhjz): here, a run after an
 // edit names the input that changed, and a run under another binary names the binary.
-func TestARunThatMissesTheCacheSaysWhy(t *testing.T) {
-	t.Parallel()
-	fixture := newRunCacheFixture(t, buildCohere(t))
+func TestARunThatMissesTheCacheSaysWhy(test *testing.T) {
+	test.Parallel()
+	fixture := newRunCacheFixture(test, buildCohere(test))
 	fixture.establishHit()
 
 	fixture.write("source/a.ts", "// edited\nexport const a: number = 1;\n")
 	edited, _ := fixture.run(true)
 	if !strings.Contains(edited, "cache: not replayed whole: ") || !strings.Contains(edited, "a.ts") {
-		t.Errorf("a run after an edit does not say which input kept it from replaying:\n%s", edited)
+		test.Errorf("a run after an edit does not say which input kept it from replaying:\n%s", edited)
 	}
 	// And --json counts the files whose findings did replay, which it used to report as none.
 	fixture.write("source/a.ts", "// edited again\nexport const a: number = 1;\n")
 	counted, _ := fixture.run(true, "--json")
 	if !regexp.MustCompile(`"filesReplayed":[1-9]`).MatchString(counted) {
-		t.Errorf("a run that replayed files' findings reports none in --json:\n%s", counted)
+		test.Errorf("a run that replayed files' findings reports none in --json:\n%s", counted)
 	}
 	// And a whole replay counts every file in scope, never the 0 a full check reads.
 	if replayed, _ := fixture.run(true, "--json"); !isRunCacheReplay(replayed) && !strings.Contains(replayed, `"replayed":true`) {
-		t.Errorf("an unchanged tree's second --json run did not replay:\n%s", replayed)
+		test.Errorf("an unchanged tree's second --json run did not replay:\n%s", replayed)
 	} else if !regexp.MustCompile(`"filesReplayed":[1-9]`).MatchString(replayed) {
-		t.Errorf("a whole replay reports no file replayed in --json:\n%s", replayed)
+		test.Errorf("a whole replay reports no file replayed in --json:\n%s", replayed)
 	}
 
-	copied := filepath.Join(t.TempDir(), "cohere")
+	copied := filepath.Join(test.TempDir(), "cohere")
 	contents, err := os.ReadFile(fixture.binary)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.WriteFile(copied, contents, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	other := *fixture
 	other.binary = copied
@@ -151,7 +151,7 @@ func TestARunThatMissesTheCacheSaysWhy(t *testing.T) {
 	for _, want := range []string{`"missReason":"the run on record was taken under another key: the cohere binary changed"`,
 		`"findingsMissReason":"the findings on record were taken under another key: the cohere binary changed"`} {
 		if !strings.Contains(output, want) {
-			t.Errorf("a run under another binary's --json does not say %s:\n%s", want, output)
+			test.Errorf("a run under another binary's --json does not say %s:\n%s", want, output)
 		}
 	}
 }

@@ -158,22 +158,22 @@ const preferObjectSpreadGlobalDeclaration = ""
 // repair is asserted through `rule_testing.ExpectFixedSource` rather than by eye. That helper is
 // also what `TestEveryRuleShipsAFixturePair` looks for by name, so a hand-rolled comparison would
 // read to the guard as no proof at all.
-func TestPreferObjectSpreadFires(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectSpreadFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range preferObjectSpreadFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
 			if testCase.ecmaVersionGated {
-				t.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
+				test.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
 					"globalThis is not a known global; our program is ES2022 and the checker " +
 					"knows it unconditionally. Measured: the same input reports at 2020 and 2022 " +
 					"and is clean at 2018, so this is a language-version gate rather than a rule " +
 					"judgment")
 			}
 			source := preferObjectSpreadGlobalDeclaration + testCase.source
-			result := rule_testing.RunTyped(t, PreferObjectSpread, preferObjectSpreadFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			result := rule_testing.RunTyped(test, PreferObjectSpread, preferObjectSpreadFile, source)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 
 			if testCase.repairNotExpressible {
 				// The findings above are the assertion. See the field's own comment for the two
@@ -183,7 +183,7 @@ func TestPreferObjectSpreadFires(t *testing.T) {
 			if testCase.fixedSource == nil {
 				for i, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes a fix; upstream declines this case", i)
+						test.Errorf("finding %d proposes a fix; upstream declines this case", i)
 					}
 				}
 				return
@@ -192,26 +192,26 @@ func TestPreferObjectSpreadFires(t *testing.T) {
 			// transformed the same way rather than compared raw. Padding the rule to make the
 			// comparison line up would be the wrong repair for that mismatch.
 			want := strings.TrimSpace(preferObjectSpreadGlobalDeclaration+*testCase.fixedSource) + "\n"
-			rule_testing.ExpectFixedSource(t, result, want)
+			rule_testing.ExpectFixedSource(test, result, want)
 		})
 	}
 }
 
 // TestPreferObjectSpreadStaysSilent runs upstream's 32 valid cases.
-func TestPreferObjectSpreadStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectSpreadStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range preferObjectSpreadCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
 			if testCase.ecmaVersionGated {
-				t.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
+				test.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
 					"globalThis is not a known global; our program is ES2022 and the checker " +
 					"knows it unconditionally. Measured: the same input reports at 2020 and 2022 " +
 					"and is clean at 2018, so this is a language-version gate rather than a rule " +
 					"judgment")
 			}
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferObjectSpread,
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferObjectSpread,
 				preferObjectSpreadFile, preferObjectSpreadGlobalDeclaration+testCase.source))
 		})
 	}
@@ -221,8 +221,8 @@ func TestPreferObjectSpreadStaysSilent(t *testing.T) {
 //
 // Each exists because a mutation survived all 95 imported cases, and each verdict was measured
 // against the installed rule rather than derived from reading the fixer.
-func TestPreferObjectSpreadAddedCases(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectSpreadAddedCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -250,12 +250,12 @@ func TestPreferObjectSpreadAddedCases(t *testing.T) {
 			reason:      "the start-of-statement walk",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferObjectSpread, preferObjectSpreadFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferObjectSpread, preferObjectSpreadFile,
 				testCase.source)
-			rule_testing.ExpectFindings(t, result, "useSpreadMessage")
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFindings(test, result, "useSpreadMessage")
+			rule_testing.ExpectFixedSource(test, result,
 				strings.TrimSpace(testCase.fixedSource)+"\n")
 		})
 	}
@@ -272,16 +272,16 @@ func TestPreferObjectSpreadAddedCases(t *testing.T) {
 // mutation removing it survived every imported case, because the one case that reaches it is the
 // same case whose applied text cannot be compared, so the finding assertion alone could not see it.
 // This asserts what the finding OFFERS instead.
-func TestPreferObjectSpreadDeclinesOnARecoveredParse(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectSpreadDeclinesOnARecoveredParse(test *testing.T) {
+	test.Parallel()
 
 	const source = "const test = Object.assign({ ...bar }, {\n<!-- html comment\nfoo: 'bar'\n--> weird\n})"
 
-	result := rule_testing.RunTyped(t, PreferObjectSpread, preferObjectSpreadFile, source)
-	rule_testing.ExpectFindings(t, result, "useSpreadMessage")
+	result := rule_testing.RunTyped(test, PreferObjectSpread, preferObjectSpreadFile, source)
+	rule_testing.ExpectFindings(test, result, "useSpreadMessage")
 	for i, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
-			t.Errorf("finding %d proposes %d fixes on a recovered parse whose span does not end "+
+			test.Errorf("finding %d proposes %d fixes on a recovered parse whose span does not end "+
 				"at a parenthesis; the repair would write a brace over the wrong character",
 				i, len(diagnostic.Fixes))
 		}

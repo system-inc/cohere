@@ -21,17 +21,17 @@ import (
 // this test exercises the path production uses: bundled libs overlaid on osvfs, config resolution
 // through `extends`, and module resolution across files. A memory FS would prove a different code
 // path works.
-func writeProject(t testing.TB, files map[string]string) string {
-	t.Helper()
+func writeProject(test testing.TB, files map[string]string) string {
+	test.Helper()
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	for name, contents := range files {
 		full := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("creating %s: %v", filepath.Dir(full), err)
+			test.Fatalf("creating %s: %v", filepath.Dir(full), err)
 		}
 		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", full, err)
+			test.Fatalf("writing %s: %v", full, err)
 		}
 	}
 	return directory
@@ -50,34 +50,34 @@ const minimalConfig = `{
 
 // TestBuildProducesAProgramAndAChecker is the claim the whole tool rests on: a tsconfig on disk
 // becomes a program in this process, and the checker is a function call away.
-func TestBuildProducesAProgramAndAChecker(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestBuildProducesAProgramAndAChecker(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const greeting: string = 'hello';\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	// The program carries far more than our one file: every lib.*.d.ts the target pulls in. That is
 	// the population the checker needs, and its size is why building it once and reusing it is the
 	// point of this package.
 	if len(graph.SourceFiles()) < 2 {
-		t.Fatalf("expected the program to hold lib declarations plus our file, got %d", len(graph.SourceFiles()))
+		test.Fatalf("expected the program to hold lib declarations plus our file, got %d", len(graph.SourceFiles()))
 	}
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) != 1 {
-		t.Fatalf("expected exactly the one file the config named, got %d", len(projectFiles))
+		test.Fatalf("expected exactly the one file the config named, got %d", len(projectFiles))
 	}
 
 	fileChecker, release := graph.CheckerForFile(context.Background(), projectFiles[0])
 	defer release()
 	if fileChecker == nil {
-		t.Fatal("no checker for a file the program contains")
+		test.Fatal("no checker for a file the program contains")
 	}
 }
 
@@ -89,9 +89,9 @@ func TestBuildProducesAProgramAndAChecker(t *testing.T) {
 // two without canonicalizing matches nothing, and "nothing" is indistinguishable from a clean tree.
 // That is the exact shape of failure this project exists to refuse, so it is asserted rather than
 // assumed.
-func TestProjectFilesExcludesDeclarations(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestProjectFilesExcludesDeclarations(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
@@ -99,15 +99,15 @@ func TestProjectFilesExcludesDeclarations(t *testing.T) {
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) != 2 {
-		t.Fatalf("expected the 2 files the config named, got %d", len(projectFiles))
+		test.Fatalf("expected the 2 files the config named, got %d", len(projectFiles))
 	}
 	if len(projectFiles) >= len(graph.SourceFiles()) {
-		t.Fatalf("project files (%d) should be a strict subset of the program (%d)",
+		test.Fatalf("project files (%d) should be a strict subset of the program (%d)",
 			len(projectFiles), len(graph.SourceFiles()))
 	}
 }
@@ -117,16 +117,16 @@ func TestProjectFilesExcludesDeclarations(t *testing.T) {
 // The rule here does not inspect syntax. It asks the checker for the type of an initializer and
 // reports what it got back, which no amount of parsing can answer. A walk that dispatched rules but
 // handed them a nil or foreign checker would pass a syntax-only test and fail this one.
-func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\nconst named = 'ahra';\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	typeNames := []string{}
@@ -139,7 +139,7 @@ func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
 
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			if ctx.TypeChecker == nil {
-				t.Error("a rule was dispatched without a checker")
+				test.Error("a rule was dispatched without a checker")
 				return nil
 			}
 			return rule.Listeners{
@@ -161,11 +161,11 @@ func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{typeReporter})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("expected one finding per declaration, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding per declaration, got %d", len(result.Diagnostics))
 	}
 
 	// The type names are the proof, and the asymmetry between them is the interesting part. A parser
@@ -177,24 +177,24 @@ func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
 		saw[name] = true
 	}
 	if !saw["number"] {
-		t.Errorf("checker did not type the arithmetic initializer as number, saw %v", typeNames)
+		test.Errorf("checker did not type the arithmetic initializer as number, saw %v", typeNames)
 	}
 	if !saw["\"ahra\""] {
-		t.Errorf("checker did not keep the string initializer at its literal type, saw %v", typeNames)
+		test.Errorf("checker did not keep the string initializer at its literal type, saw %v", typeNames)
 	}
 }
 
 // TestWalkReportsCoverage asserts that a run says what it looked at, not only what it found.
-func TestWalkReportsCoverage(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestWalkReportsCoverage(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const value = 1;\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	listening := rule.Rule{
@@ -212,95 +212,95 @@ func TestWalkReportsCoverage(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening, declining})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	if result.Coverage.FilesWalked != 1 {
-		t.Errorf("expected 1 file walked, got %d", result.Coverage.FilesWalked)
+		test.Errorf("expected 1 file walked, got %d", result.Coverage.FilesWalked)
 	}
 	if result.Coverage.RulesRun != 2 {
-		t.Errorf("expected 2 rules run, got %d", result.Coverage.RulesRun)
+		test.Errorf("expected 2 rules run, got %d", result.Coverage.RulesRun)
 	}
 	if result.Coverage.NodesVisited == 0 {
-		t.Error("a walk that visited no nodes reported success")
+		test.Error("a walk that visited no nodes reported success")
 	}
 	if result.Coverage.FilesInProgram <= result.Coverage.FilesWalked {
-		t.Errorf("program (%d) should exceed the walked set (%d)",
+		test.Errorf("program (%d) should exceed the walked set (%d)",
 			result.Coverage.FilesInProgram, result.Coverage.FilesWalked)
 	}
 	if result.Coverage.RulesListening["test-listening"] != 1 {
-		t.Errorf("the listening rule should have listened to 1 file, got %d",
+		test.Errorf("the listening rule should have listened to 1 file, got %d",
 			result.Coverage.RulesListening["test-listening"])
 	}
 	if result.Coverage.RulesListening["test-declining"] != 0 {
-		t.Errorf("the declining rule should read as listening to 0 files, got %d",
+		test.Errorf("the declining rule should read as listening to 0 files, got %d",
 			result.Coverage.RulesListening["test-declining"])
 	}
 }
 
 // TestBuildFailsLoudly is the guard the whole package exists for: every way of ending up with no
 // files is an error, never an empty success.
-func TestBuildFailsLoudly(t *testing.T) {
-	t.Parallel()
-	t.Run("no config named", func(t *testing.T) {
-		t.Parallel()
-		if _, err := program.Build(program.Options{CurrentDirectory: t.TempDir()}); err == nil {
-			t.Fatal("building with no tsconfig returned no error")
+func TestBuildFailsLoudly(test *testing.T) {
+	test.Parallel()
+	test.Run("no config named", func(test *testing.T) {
+		test.Parallel()
+		if _, err := program.Build(program.Options{CurrentDirectory: test.TempDir()}); err == nil {
+			test.Fatal("building with no tsconfig returned no error")
 		}
 	})
 
-	t.Run("config does not exist", func(t *testing.T) {
-		t.Parallel()
+	test.Run("config does not exist", func(test *testing.T) {
+		test.Parallel()
 		_, err := program.Build(program.Options{
 			ConfigFileName:   "absent.json",
-			CurrentDirectory: t.TempDir(),
+			CurrentDirectory: test.TempDir(),
 		})
 		if err == nil {
-			t.Fatal("a missing tsconfig returned no error")
+			test.Fatal("a missing tsconfig returned no error")
 		}
 	})
 
-	t.Run("config matches no files", func(t *testing.T) {
-		t.Parallel()
-		directory := writeProject(t, map[string]string{
+	test.Run("config matches no files", func(test *testing.T) {
+		test.Parallel()
+		directory := writeProject(test, map[string]string{
 			"tsconfig.json": `{"include":["./nothing-here/**/*.ts"]}`,
 		})
 		_, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 		if err == nil {
-			t.Fatal("a config matching zero files built a program instead of failing")
+			test.Fatal("a config matching zero files built a program instead of failing")
 		}
 	})
 
-	t.Run("config does not parse", func(t *testing.T) {
-		t.Parallel()
-		directory := writeProject(t, map[string]string{
+	test.Run("config does not parse", func(test *testing.T) {
+		test.Parallel()
+		directory := writeProject(test, map[string]string{
 			"tsconfig.json": `{"compilerOptions": {"target": "ES2022",, "strict": true}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
 		if _, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory}); err == nil {
-			t.Fatal("a tsconfig with a JSON syntax error built a program instead of failing")
+			test.Fatal("a tsconfig with a JSON syntax error built a program instead of failing")
 		}
 	})
 
 	// An option's value outside the values it takes is not a refusal (#wvgxtey, ruled by @system_cohere): the
 	// graph builds and the diagnostic is the program's, so it is reported and fails the run instead of
 	// building against silently wrong options.
-	t.Run("an invalid option value builds and is reported", func(t *testing.T) {
-		t.Parallel()
-		directory := writeProject(t, map[string]string{
+	test.Run("an invalid option value builds and is reported", func(test *testing.T) {
+		test.Parallel()
+		directory := writeProject(test, map[string]string{
 			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
 		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 		if err != nil {
-			t.Fatalf("an invalid option value refused the build: %v", err)
+			test.Fatalf("an invalid option value refused the build: %v", err)
 		}
 		reported := false
 		for _, diagnostic := range graph.ConfigDiagnostics(context.Background()) {
 			reported = reported || (diagnostic.Code() == 6046 && graph.IsOptionsDiagnostic(diagnostic))
 		}
 		if !reported {
-			t.Fatal("the invalid option value was not reported as an options diagnostic (TS6046)")
+			test.Fatal("the invalid option value was not reported as an options diagnostic (TS6046)")
 		}
 	})
 }
@@ -309,45 +309,45 @@ func TestBuildFailsLoudly(t *testing.T) {
 //
 // A caller that filtered its file set down to nothing, or that forgot to register any rules, must
 // hear about it. Returning an empty Result with a nil error would render both as a passing run.
-func TestWalkRefusesAnEmptyRun(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestWalkRefusesAnEmptyRun(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const value = 1;\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	if _, err := graph.Walk(context.Background(), nil, []rule.Rule{{Name: "any"}}); err == nil {
-		t.Error("walking an empty file set returned a clean result")
+		test.Error("walking an empty file set returned a clean result")
 	}
 	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), nil); err == nil {
-		t.Error("walking with no rules returned a clean result")
+		test.Error("walking with no rules returned a clean result")
 	}
 }
 
 // TestDiagnosticsReportsRealTypeErrors proves the graph reports TypeScript's own findings, in both
 // directions: a broken file produces the error, and a correct one produces silence.
-func TestDiagnosticsReportsRealTypeErrors(t *testing.T) {
-	t.Parallel()
-	t.Run("reports a real error", func(t *testing.T) {
-		t.Parallel()
-		directory := writeProject(t, map[string]string{
+func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
+	test.Parallel()
+	test.Run("reports a real error", func(test *testing.T) {
+		test.Parallel()
+		directory := writeProject(test, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"main.ts":       "const value: number = 'not a number';\n",
 		})
 
 		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 		if err != nil {
-			t.Fatalf("building: %v", err)
+			test.Fatalf("building: %v", err)
 		}
 
 		diagnostics := graph.Diagnostics(context.Background(), graph.ProjectFiles()[0])
 		if len(diagnostics) == 0 {
-			t.Fatal("assigning a string to a number produced no diagnostic")
+			test.Fatal("assigning a string to a number produced no diagnostic")
 		}
 
 		foundAssignabilityError := false
@@ -357,36 +357,36 @@ func TestDiagnosticsReportsRealTypeErrors(t *testing.T) {
 			}
 		}
 		if !foundAssignabilityError {
-			t.Errorf("expected TS2322, got %v", codesOf(diagnostics))
+			test.Errorf("expected TS2322, got %v", codesOf(diagnostics))
 		}
 	})
 
 	// The half a violations-only corpus never has. A checker that reported errors everywhere would
 	// pass the case above and fail this one.
-	t.Run("stays silent on correct code", func(t *testing.T) {
-		t.Parallel()
-		directory := writeProject(t, map[string]string{
+	test.Run("stays silent on correct code", func(test *testing.T) {
+		test.Parallel()
+		directory := writeProject(test, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"main.ts":       "const value: number = 42;\nexport default value;\n",
 		})
 
 		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 		if err != nil {
-			t.Fatalf("building: %v", err)
+			test.Fatalf("building: %v", err)
 		}
 
 		diagnostics := graph.Diagnostics(context.Background(), graph.ProjectFiles()[0])
 		if len(diagnostics) != 0 {
-			t.Errorf("correct code reported %v", codesOf(diagnostics))
+			test.Errorf("correct code reported %v", codesOf(diagnostics))
 		}
 	})
 }
 
 // TestCheckerResolvesAcrossFiles proves the graph is one program rather than a set of isolated
 // parses: a type defined in one file is known when another file imports it.
-func TestCheckerResolvesAcrossFiles(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestCheckerResolvesAcrossFiles(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"Shape.ts":      "export interface Shape { sides: number; }\n",
 		"main.ts":       "import type { Shape } from './Shape.ts';\nconst square: Shape = { sides: 'four' };\nexport default square;\n",
@@ -394,7 +394,7 @@ func TestCheckerResolvesAcrossFiles(t *testing.T) {
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	found := false
@@ -406,7 +406,7 @@ func TestCheckerResolvesAcrossFiles(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("a cross-file type violation went unreported, so the files are not one program")
+		test.Error("a cross-file type violation went unreported, so the files are not one program")
 	}
 }
 
@@ -430,9 +430,9 @@ func codesOf(diagnostics []*ast.Diagnostic) []int32 {
 // ordinary-looking summary (#qa9nttp). The panicking rules here are type-aware, one crashing in a
 // listener after reading the checker and one crashing in Run, and the rule beside them must still
 // report on every file.
-func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 		"other.ts":      "const named = 'ahra';\n",
@@ -440,7 +440,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	panicsInAListener := rule.Rule{
@@ -450,7 +450,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Error("a type-aware rule ran without a checker, so this is not the typed path")
+						test.Error("a type-aware rule ran without a checker, so this is not the typed path")
 					}
 					panic("simulated accessor panic on an unhandled kind")
 				},
@@ -477,11 +477,11 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{panicsInAListener, panicsInRun, witness})
 	if err != nil {
-		t.Fatalf("a panic in one rule ended the whole walk: %v", err)
+		test.Fatalf("a panic in one rule ended the whole walk: %v", err)
 	}
 
 	if len(result.Coverage.FilesCrashed) != 0 {
-		t.Errorf("a rule's panic cost its file every rule's verdict: %v", result.Coverage.FilesCrashed)
+		test.Errorf("a rule's panic cost its file every rule's verdict: %v", result.Coverage.FilesCrashed)
 	}
 
 	reported := map[string]int{}
@@ -490,27 +490,27 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 	}
 	for _, file := range []string{"main.ts", "other.ts"} {
 		if reported[file] != 1 {
-			t.Errorf("the rule beside the panicking ones reported %d times on %s, want 1", reported[file], file)
+			test.Errorf("the rule beside the panicking ones reported %d times on %s, want 1", reported[file], file)
 		}
 	}
 
 	crashed := map[string]int{}
 	for _, crash := range result.Coverage.RulesCrashed {
 		if crash.FileName == "" {
-			t.Error("a rule crash was recorded without its file, so a reader cannot find it")
+			test.Error("a rule crash was recorded without its file, so a reader cannot find it")
 		}
 		if crash.Cause == nil || !strings.Contains(crash.Cause.Error(), "simulated") {
-			t.Errorf("rule %s crashed without its panic as the cause: %v", crash.RuleName, crash.Cause)
+			test.Errorf("rule %s crashed without its panic as the cause: %v", crash.RuleName, crash.Cause)
 		}
 		crashed[crash.RuleName]++
 	}
 	for _, name := range []string{panicsInAListener.Name, panicsInRun.Name} {
 		if crashed[name] != 2 {
-			t.Errorf("rule %s is named as crashing on %d files, want both", name, crashed[name])
+			test.Errorf("rule %s is named as crashing on %d files, want both", name, crashed[name])
 		}
 	}
 	if crashed[witness.Name] != 0 {
-		t.Errorf("the rule that never panicked is named as crashing")
+		test.Errorf("the rule that never panicked is named as crashing")
 	}
 }
 
@@ -518,9 +518,9 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 // (#9xfg09f), so it is good for its file only. A rule that keeps it past the file reads nothing through it:
 // every Program a rule kept is ended once the walk is over, and a read panics naming the rule. Reads made
 // during the file go through, which is the half that shows the view was live when the rule was given it.
-func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 		"other.ts":      "const other: number = 2;\n",
@@ -528,7 +528,7 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	var keptLock sync.Mutex
@@ -538,7 +538,7 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
 		ProgramReads: rule.ReadsCompilerOptions,
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			if ctx.Program.Options() == nil {
-				t.Error("the program view read no options during its own file")
+				test.Error("the program view read no options during its own file")
 			}
 			keptLock.Lock()
 			kept = append(kept, ctx.Program)
@@ -551,13 +551,13 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 	if len(result.Coverage.RulesCrashed) != 0 {
-		t.Fatalf("reading the program during its own file crashed the rule: %v", result.Coverage.RulesCrashed)
+		test.Fatalf("reading the program during its own file crashed the rule: %v", result.Coverage.RulesCrashed)
 	}
 	if len(kept) != 2 {
-		t.Fatalf("the rule kept %d programs, want one for each of the 2 files", len(kept))
+		test.Fatalf("the rule kept %d programs, want one for each of the 2 files", len(kept))
 	}
 
 	for index, view := range kept {
@@ -565,7 +565,7 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
 			defer func() {
 				message := fmt.Sprint(recover())
 				if !strings.Contains(message, "after the file it was given ended") || !strings.Contains(message, keeper.Name) {
-					t.Errorf("program %d, kept past its file, read without the ended refusal naming the rule: %s", index, message)
+					test.Errorf("program %d, kept past its file, read without the ended refusal naming the rule: %s", index, message)
 				}
 			}()
 			view.Options()
@@ -577,16 +577,16 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
 //
 // Without this, a boundary that recorded a crash for every file would pass the test above while
 // making the crash line meaningless, which is the same vacuous shape as a probe that cannot fail.
-func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	quiet := rule.Rule{
@@ -600,11 +600,11 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	if len(result.Coverage.FilesCrashed) != 0 || len(result.Coverage.RulesCrashed) != 0 {
-		t.Errorf("a clean walk reported %d crashed files and %d rule crashes", len(result.Coverage.FilesCrashed), len(result.Coverage.RulesCrashed))
+		test.Errorf("a clean walk reported %d crashed files and %d rule crashes", len(result.Coverage.FilesCrashed), len(result.Coverage.RulesCrashed))
 	}
 }
 
@@ -618,34 +618,34 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
 // This matters more than one format string, because types gate lint. A type error stops the run
 // before any rule looks at anything, so the sentence it prints is the entire output of a failing
 // verification.
-func TestACompilerDiagnosticRendersThroughLocalize(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestACompilerDiagnosticRendersThroughLocalize(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const counted: string = 41 + 1;\n",
 	})
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	diagnostics := graph.AllDiagnostics(context.Background())
 	if len(diagnostics) == 0 {
-		t.Fatal("the fixture produced no diagnostics, so this test proves nothing about rendering one")
+		test.Fatal("the fixture produced no diagnostics, so this test proves nothing about rendering one")
 	}
 
 	diagnostic := diagnostics[0]
 	if text := diagnostic.MessageText(); text != "" {
-		t.Errorf("MessageText is populated for a compiler diagnostic, which would make Localize "+
+		test.Errorf("MessageText is populated for a compiler diagnostic, which would make Localize "+
 			"unnecessary and this test stale: %q", text)
 	}
 
 	rendered := diagnostic.Localize(locale.Locale{})
 	if rendered == "" {
-		t.Fatal("a real compiler diagnostic rendered as the empty string")
+		test.Fatal("a real compiler diagnostic rendered as the empty string")
 	}
 	if !strings.Contains(rendered, "number") || !strings.Contains(rendered, "string") {
-		t.Errorf("the rendered message did not carry its arguments: %q", rendered)
+		test.Errorf("the rendered message did not carry its arguments: %q", rendered)
 	}
 }

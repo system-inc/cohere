@@ -27,8 +27,8 @@ func tspathName(program directoryProgram, path string) string {
 // fingerprint is only sound if the name is the same string either way: a different spelling of one file
 // would move every fingerprint and replay nothing, or worse, collide. So the slice is held to tspath's
 // answer over every file and directory of this repository, and over the shapes a prefix test gets wrong.
-func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
-	t.Parallel()
+func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
+	test.Parallel()
 
 	shapes := []struct {
 		name      string
@@ -51,7 +51,7 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 		for _, caseSensitive := range []bool{true, false} {
 			program := directoryProgram{directory: shape.directory, caseSensitive: caseSensitive}
 			if got, want := FingerprintPath(program, shape.path), tspathName(program, shape.path); got != want {
-				t.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", shape.name, caseSensitive, got, want)
+				test.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", shape.name, caseSensitive, got, want)
 			}
 		}
 	}
@@ -61,7 +61,7 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 	// root's own spelling on a case-insensitive one, which is macOS's and where the slice first never matched.
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	directory := tspath.NormalizePath(filepath.ToSlash(root))
 	sensitive := directoryProgram{directory: directory, caseSensitive: true}
@@ -82,7 +82,7 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 			path    string
 		}{{sensitive, name}, {insensitive, canonical}} {
 			if got, want := FingerprintPath(probe.program, probe.path), tspathName(probe.program, probe.path); got != want {
-				t.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", probe.path, probe.program.caseSensitive, got, want)
+				test.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", probe.path, probe.program.caseSensitive, got, want)
 			}
 			if _, under := fingerprintPathUnder(probe.program.directory, probe.path, probe.program.caseSensitive); under {
 				sliced++
@@ -92,14 +92,14 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(t *testing.T) {
 		return nil
 	})
 	if walkError != nil {
-		t.Fatal(walkError)
+		test.Fatal(walkError)
 	}
 	// A walk that compared nothing would pass everything.
 	if compared < 1000 {
-		t.Fatalf("compared %d paths, which is not this repository", compared)
+		test.Fatalf("compared %d paths, which is not this repository", compared)
 	}
 	// And the slice has to be what answered, both ways, or this proves tspath equal to itself.
 	if sliced < compared-4 {
-		t.Fatalf("the slice answered %d of %d paths, so the fast path is not the one being held", sliced, compared)
+		test.Fatalf("the slice answered %d of %d paths, so the fast path is not the one being held", sliced, compared)
 	}
 }

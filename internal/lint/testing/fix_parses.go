@@ -24,8 +24,8 @@ import (
 // One finding's edits are applied together, as the engine judges a fix alone (breaksParseAlone);
 // edits from different findings are not combined, since resolving their overlaps is the engine's job.
 // A source that did not parse to begin with proves nothing either way and is skipped.
-func expectEachFixParses(t *testing.T, subject *ast.SourceFile, diagnostics []rule.Diagnostic) {
-	t.Helper()
+func expectEachFixParses(test *testing.T, subject *ast.SourceFile, diagnostics []rule.Diagnostic) {
+	test.Helper()
 	for _, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes) == 0 {
 			continue
@@ -61,7 +61,7 @@ func expectEachFixParses(t *testing.T, subject *ast.SourceFile, diagnostics []ru
 			continue
 		}
 		if parses, reason := edit.Parses(fileName.AsString(), fixed); !parses {
-			t.Errorf("%s proposes a fix that does not parse (%s). The source after it:\n%s",
+			test.Errorf("%s proposes a fix that does not parse (%s). The source after it:\n%s",
 				diagnostic.RuleName, reason, fixed)
 		}
 	}

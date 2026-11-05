@@ -285,35 +285,35 @@ var classMethodsUseThisSilentCases = []classMethodsUseThisCase{
 }
 
 // decodedClassMethodsUseThis routes a row's raw JSON through the rule's own exported decoder.
-func decodedClassMethodsUseThis(t *testing.T, raw string) any {
-	t.Helper()
+func decodedClassMethodsUseThis(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeClassMethodsUseThisOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+		test.Fatalf("decoding options %q: %v", raw, err)
 	}
 	return decoded
 }
 
-func TestClassMethodsUseThisFires(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range classMethodsUseThisFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
-				decodedClassMethodsUseThis(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
+				decodedClassMethodsUseThis(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestClassMethodsUseThisStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range classMethodsUseThisSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
-				decodedClassMethodsUseThis(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
+				decodedClassMethodsUseThis(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -332,8 +332,8 @@ func TestClassMethodsUseThisStaysSilent(t *testing.T) {
 // reads as a duplicated finding rather than as a wrong verdict.
 //
 // After the fix the two agree on all 1,163 files with zero disagreements.
-func TestClassMethodsUseThisSkipsBodilessMembers(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisSkipsBodilessMembers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -362,15 +362,15 @@ func TestClassMethodsUseThisSkipsBodilessMembers(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile,
-				testCase.source, decodedClassMethodsUseThis(t, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile,
+				testCase.source, decodedClassMethodsUseThis(test, ""))
 			if !testCase.reports {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "missingThis")
+			rule_testing.ExpectFindings(test, result, "missingThis")
 		})
 	}
 }

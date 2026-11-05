@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-func unusedDisableRecords(t *testing.T, output string) ([]findingJSON, summaryJSON) {
-	t.Helper()
+func unusedDisableRecords(test *testing.T, output string) ([]findingJSON, summaryJSON) {
+	test.Helper()
 	var findings []findingJSON
 	var summary summaryJSON
 	for _, line := range strings.Split(output, "\n") {
@@ -24,17 +24,17 @@ func unusedDisableRecords(t *testing.T, output string) ([]findingJSON, summaryJS
 		case "finding":
 			var finding findingJSON
 			if err := json.Unmarshal([]byte(line), &finding); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			findings = append(findings, finding)
 		case "summary":
 			if err := json.Unmarshal([]byte(line), &summary); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 	}
 	if summary.Kind != "summary" {
-		t.Fatalf("no summary in %s", output)
+		test.Fatalf("no summary in %s", output)
 	}
 	return findings, summary
 }
@@ -42,9 +42,9 @@ func unusedDisableRecords(t *testing.T, output string) ([]findingJSON, summaryJS
 // The CLI is the contract: a dead directive fails lint and --no-fix by default (#9137dhp), and
 // --fix removes it. Warning-only directives fail neither, though --fix still removes them. Explicit
 // warn, error and off, and per-file overrides, are controls in both directions.
-func TestUnusedDisableSeverity(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestUnusedDisableSeverity(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 	for _, fixture := range []struct {
 		name, level, override, wantSeverity string
 		wantExit                            int
@@ -56,9 +56,9 @@ func TestUnusedDisableSeverity(t *testing.T) {
 		{"override off", "error", "off", "", 0},
 		{"override error", "off", "error", "error", 1},
 	} {
-		t.Run(fixture.name, func(t *testing.T) {
-			t.Parallel()
-			project := newRunCacheFixture(t, binary)
+		test.Run(fixture.name, func(test *testing.T) {
+			test.Parallel()
+			project := newRunCacheFixture(test, binary)
 			settings := map[string]any{"rules": map[string]string{"nexus/consistency-no-ambiguous-identifier": "off", "@typescript-eslint/no-inferrable-types": "off", "no-debugger": "error"}}
 			if fixture.level != "" {
 				settings["rules"].(map[string]string)["unused-disable"] = fixture.level
@@ -70,25 +70,25 @@ func TestUnusedDisableSeverity(t *testing.T) {
 			project.write("CohereSettings.json", string(encoded))
 			source := "// cohere-disable-next-line no-debugger -- stale\nexport const a: number = 1;\n"
 			project.write("source/a.ts", source)
-			output, exit := runCohere(t, binary, project.root, "--format-only", "--no-cache")
+			output, exit := runCohere(test, binary, project.root, "--format-only", "--no-cache")
 			if exit != 0 {
-				t.Fatalf("format fixture exit %d:\n%s", exit, output)
+				test.Fatalf("format fixture exit %d:\n%s", exit, output)
 			}
 			for _, mode := range []string{"--lint", "--no-fix"} {
-				output, exit := runCohere(t, binary, project.root, mode, "--no-cache", "--json")
-				findings, summary := unusedDisableRecords(t, output)
+				output, exit := runCohere(test, binary, project.root, mode, "--no-cache", "--json")
+				findings, summary := unusedDisableRecords(test, output)
 				if exit != fixture.wantExit || (summary.Verdict == "fail") != (fixture.wantExit != 0) {
-					t.Fatalf("%s exit=%d verdict=%s, want exit %d:\n%s", mode, exit, summary.Verdict, fixture.wantExit, output)
+					test.Fatalf("%s exit=%d verdict=%s, want exit %d:\n%s", mode, exit, summary.Verdict, fixture.wantExit, output)
 				}
 				count := 0
 				for _, finding := range findings {
 					if finding.Rule == "unused-disable" {
 						count++
 						if finding.Severity != fixture.wantSeverity {
-							t.Fatalf("%s severity=%s, want %s", mode, finding.Severity, fixture.wantSeverity)
+							test.Fatalf("%s severity=%s, want %s", mode, finding.Severity, fixture.wantSeverity)
 						}
 					} else if fixture.wantExit == 0 {
-						t.Fatalf("unexpected finding: %+v", finding)
+						test.Fatalf("unexpected finding: %+v", finding)
 					}
 				}
 				want := 0
@@ -96,7 +96,7 @@ func TestUnusedDisableSeverity(t *testing.T) {
 					want = 1
 				}
 				if count != want {
-					t.Fatalf("%s reported %d unused directives, want %d", mode, count, want)
+					test.Fatalf("%s reported %d unused directives, want %d", mode, count, want)
 				}
 				// At error the check does not withhold the repair: --no-fix names the file --fix would
 				// rewrite. At warn it does, which the unexpected-finding test above already holds.
@@ -106,37 +106,37 @@ func TestUnusedDisableSeverity(t *testing.T) {
 						wouldChange = wouldChange || finding.Rule == "fix" && strings.HasSuffix(finding.Path, "source/a.ts")
 					}
 					if !wouldChange {
-						t.Fatalf("--no-fix withheld the repair at error:\n%s", output)
+						test.Fatalf("--no-fix withheld the repair at error:\n%s", output)
 					}
 				}
 				bytes, err := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
 				if err != nil {
-					t.Fatal(err)
+					test.Fatal(err)
 				}
 				if string(bytes) != source {
-					t.Fatal("read-only run rewrote the comment")
+					test.Fatal("read-only run rewrote the comment")
 				}
 			}
 			for pass := 0; pass < 2; pass++ {
-				output, exit := runCohere(t, binary, project.root, "--no-fix", "--json")
-				_, summary := unusedDisableRecords(t, output)
+				output, exit := runCohere(test, binary, project.root, "--no-fix", "--json")
+				_, summary := unusedDisableRecords(test, output)
 				if exit != fixture.wantExit || (summary.Verdict == "fail") != (fixture.wantExit != 0) {
-					t.Fatalf("cached check exit=%d verdict=%s, want %d:\n%s", exit, summary.Verdict, fixture.wantExit, output)
+					test.Fatalf("cached check exit=%d verdict=%s, want %d:\n%s", exit, summary.Verdict, fixture.wantExit, output)
 				}
 				if pass == 1 && !summary.Cache.Replayed {
-					t.Fatalf("second check did not replay:\n%s", output)
+					test.Fatalf("second check did not replay:\n%s", output)
 				}
 			}
-			verbose, _ := runCohere(t, binary, project.root, "--lint", "--coverage", "--verbose", "--no-cache")
+			verbose, _ := runCohere(test, binary, project.root, "--lint", "--coverage", "--verbose", "--no-cache")
 			if !strings.Contains(verbose, "1 disable comments silenced nothing while their rule ran") {
-				t.Fatalf("coverage lost the dead count:\n%s", verbose)
+				test.Fatalf("coverage lost the dead count:\n%s", verbose)
 			}
 			if strings.Contains(verbose, `key "unused-disable" matches no registered rule`) || strings.Contains(verbose, "parity:") {
-				t.Fatalf("engine setting was treated as unported:\n%s", verbose)
+				test.Fatalf("engine setting was treated as unported:\n%s", verbose)
 			}
-			output, exit = runCohere(t, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
+			output, exit = runCohere(test, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
 			if exit != 0 {
-				t.Fatalf("--fix exit %d:\n%s", exit, output)
+				test.Fatalf("--fix exit %d:\n%s", exit, output)
 			}
 			bytes, _ := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
 			want := strings.TrimPrefix(source, "// cohere-disable-next-line no-debugger -- stale")
@@ -144,14 +144,14 @@ func TestUnusedDisableSeverity(t *testing.T) {
 				want = source
 			}
 			if string(bytes) != want {
-				t.Fatalf("--fix wrote %q, want %q", bytes, want)
+				test.Fatalf("--fix wrote %q, want %q", bytes, want)
 			}
 			if fixture.wantSeverity == "" {
 				project.write("source/a.ts", source+"debugger;\n")
-				_, exit = runCohere(t, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
+				_, exit = runCohere(test, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
 				bytes, _ = os.ReadFile(filepath.Join(project.root, "source/a.ts"))
 				if exit != 0 || !strings.HasPrefix(string(bytes), source) || strings.Contains(string(bytes), "debugger;") {
-					t.Fatalf("off did not survive relint: exit=%d text=%q", exit, bytes)
+					test.Fatalf("off did not survive relint: exit=%d text=%q", exit, bytes)
 				}
 			}
 		})
@@ -159,23 +159,23 @@ func TestUnusedDisableSeverity(t *testing.T) {
 }
 
 // SeverityWarn's report-without-failing contract applies to ordinary lint diagnostics too.
-func TestLintWarningVerdict(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestLintWarningVerdict(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 	for _, level := range []string{"warn", "error"} {
-		t.Run(level, func(t *testing.T) {
-			t.Parallel()
-			project := newRunCacheFixture(t, binary)
+		test.Run(level, func(test *testing.T) {
+			test.Parallel()
+			project := newRunCacheFixture(test, binary)
 			project.write("CohereSettings.json", fmt.Sprintf(`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":%q}}`, level))
 			project.write("source/a.ts", "export const a: number = 1;\ndebugger;\n")
-			output, exit := runCohere(t, binary, project.root, "--lint", "--no-cache", "--json")
-			findings, summary := unusedDisableRecords(t, output)
+			output, exit := runCohere(test, binary, project.root, "--lint", "--no-cache", "--json")
+			findings, summary := unusedDisableRecords(test, output)
 			wantExit := 0
 			if level == "error" {
 				wantExit = 1
 			}
 			if exit != wantExit || len(findings) != 1 || findings[0].Severity != level || (summary.Verdict == "fail") != (wantExit == 1) {
-				t.Fatalf("%s exit=%d findings=%+v verdict=%s", level, exit, findings, summary.Verdict)
+				test.Fatalf("%s exit=%d findings=%+v verdict=%s", level, exit, findings, summary.Verdict)
 			}
 		})
 	}

@@ -138,26 +138,26 @@ func generatedInputs(count int) []string {
 	return inputs
 }
 
-func TestParseMatchesUpstream(t *testing.T) {
-	t.Parallel()
-	failures, errored := compareAll(t, "fixture", nil, fixtures, 40)
-	t.Logf("%d of %d fixtures match upstream (%d of them errors)", len(fixtures)-failures, len(fixtures), errored)
+func TestParseMatchesUpstream(test *testing.T) {
+	test.Parallel()
+	failures, errored := compareAll(test, "fixture", nil, fixtures, 40)
+	test.Logf("%d of %d fixtures match upstream (%d of them errors)", len(fixtures)-failures, len(fixtures), errored)
 }
 
-func TestGeneratedParseMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestGeneratedParseMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	count := 20000
 	if testing.Short() {
 		count = 2000
 	}
-	failures, errored := compareAll(t, "generated", nil, generatedInputs(count), 30)
-	t.Logf("%d of %d generated inputs match upstream (%d of them errors)", count-failures, count, errored)
+	failures, errored := compareAll(test, "generated", nil, generatedInputs(count), 30)
+	test.Logf("%d of %d generated inputs match upstream (%d of them errors)", count-failures, count, errored)
 }
 
 // TestOracleCanFail proves the comparison sees a difference: the port's tree for one text against
 // upstream's for another, where the trees differ in a single position, value, comment slot or error.
-func TestOracleCanFail(t *testing.T) {
-	t.Parallel()
+func TestOracleCanFail(test *testing.T) {
+	test.Parallel()
 	cases := []struct{ mine, theirs string }{
 		{"a:  b", "a: b"},         // a position
 		{"a: c", "a: b"},          // a value
@@ -169,10 +169,10 @@ func TestOracleCanFail(t *testing.T) {
 	for index, each := range cases {
 		theirs[index] = each.theirs
 	}
-	expected := oracleParse(t, theirs)
+	expected := oracleParse(test, theirs)
 	for index, each := range cases {
 		if differences := compareParse(each.mine, expected[index]); len(differences) == 0 {
-			t.Errorf("the comparison found no difference between %q and %q", each.mine, each.theirs)
+			test.Errorf("the comparison found no difference between %q and %q", each.mine, each.theirs)
 		}
 	}
 }
@@ -191,25 +191,25 @@ process.stdout.write(JSON.stringify(inputs));
 
 // TestYamlTestSuiteParseMatchesUpstream compares every input of the yaml-test-suite in the fork, and each
 // case's canonical dump.
-func TestYamlTestSuiteParseMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestYamlTestSuiteParseMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed")
+		test.Skip("node is not installed")
 	}
-	script := filepath.Join(t.TempDir(), "suite.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(t))), 0o644); err != nil {
-		t.Fatal(err)
+	script := filepath.Join(test.TempDir(), "suite.mjs")
+	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); err != nil {
+		test.Fatal(err)
 	}
 	output, err := exec.Command("node", script).Output()
 	if err != nil {
-		t.Skipf("the yaml-test-suite is not loadable: %v", err)
+		test.Skipf("the yaml-test-suite is not loadable: %v", err)
 	}
 	var texts []string
 	if err := json.Unmarshal(output, &texts); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	failures, errored := compareAll(t, "suite", nil, texts, 30)
-	t.Logf("%d of %d yaml-test-suite inputs match upstream (%d of them errors)", len(texts)-failures, len(texts), errored)
+	failures, errored := compareAll(test, "suite", nil, texts, 30)
+	test.Logf("%d of %d yaml-test-suite inputs match upstream (%d of them errors)", len(texts)-failures, len(texts), errored)
 }
 
 // javaScriptSpaceText is the set String.prototype.trim removes, for markdown's front matter value.
@@ -221,15 +221,15 @@ const corpusSizeLimit = 1 << 20
 // TestCorpusParseMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, and the
 // YAML front matter value of every .md file there, enumerated as the printer's corpus test enumerates
 // them: through the engine's ignore layers, into nested repositories. A measuring run.
-func TestCorpusParseMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestCorpusParseMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_YAML_CORPUS")
 	if roots == "" {
-		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
 	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var names, texts []string
 	yamlFiles, frontMatters, tooLarge := 0, 0, 0
@@ -252,7 +252,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
 		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
 		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+			test.Fatalf("finding the repositories nested in %s: %v", root, err)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -260,11 +260,11 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 
 		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+			test.Fatalf("enumerating %s: %v", root, err)
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", root, len(enumeration.Files)))
 		for _, file := range enumeration.Files {
@@ -277,7 +277,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			}
 			source, err := os.ReadFile(file)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if len(source) > corpusSizeLimit {
 				tooLarge++
@@ -305,24 +305,24 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			texts = append(texts, text)
 		}
 	}
-	t.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
-	failures, errored := compareAll(t, "corpus", names, texts, 30)
-	t.Logf("%d of %d inputs match upstream (%d yaml files, %d front matter values; %d of them errors); %d files over %d bytes not measured",
+	test.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
+	failures, errored := compareAll(test, "corpus", names, texts, 30)
+	test.Logf("%d of %d inputs match upstream (%d yaml files, %d front matter values; %d of them errors); %d files over %d bytes not measured",
 		len(texts)-failures, len(texts), yamlFiles, frontMatters, errored, tooLarge, corpusSizeLimit)
 }
 
 // TestComparisonSeesEveryField corrupts upstream's correct tree one field at a time and checks that the
 // comparison reports each corruption: every field the comparison reads, positions, identities and
 // parents, and null told apart from an empty array.
-func TestComparisonSeesEveryField(t *testing.T) {
-	t.Parallel()
+func TestComparisonSeesEveryField(test *testing.T) {
+	test.Parallel()
 	text := "%YAML 1.2 # d\n---\n- &a !t |2- # i\n   x\n- *a # t\n- ? k\n  : v\n  # e\n# l\n- [b, {c: d}]\n"
-	expected := oracleParse(t, []string{text})[0]
+	expected := oracleParse(test, []string{text})[0]
 	if expected.Error != nil {
-		t.Fatalf("the fixture does not parse: %s", expected.Error.Message)
+		test.Fatalf("the fixture does not parse: %s", expected.Error.Message)
 	}
 	if differences := compareParse(text, expected); len(differences) != 0 {
-		t.Fatalf("the uncorrupted tree differs: %v", differences)
+		test.Fatalf("the uncorrupted tree differs: %v", differences)
 	}
 	// find returns the first object, depth first, of the type.
 	var find func(node any, nodeType string) map[string]any
@@ -402,7 +402,7 @@ func TestComparisonSeesEveryField(t *testing.T) {
 				return false
 			}
 			if !corrupt(root) {
-				t.Error("the fixture has no end comment to corrupt")
+				test.Error("the fixture has no end comment to corrupt")
 			}
 		},
 		"root comments": func(root map[string]any) { root["comments"] = root["comments"].([]any)[1:] },
@@ -415,20 +415,20 @@ func TestComparisonSeesEveryField(t *testing.T) {
 	for name, corrupt := range corruptions {
 		var root map[string]any
 		if err := json.Unmarshal(expected.Root, &root); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		corrupt(root)
 		encoded, err := json.Marshal(root)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if differences := compareParse(text, oracleResult{Root: encoded}); len(differences) == 0 {
-			t.Errorf("corrupting the %s went unnoticed", name)
+			test.Errorf("corrupting the %s went unnoticed", name)
 		}
 	}
 	// And the errors: a different message, name or position.
 	errorText := "a: [b"
-	expectedError := oracleParse(t, []string{errorText})[0]
+	expectedError := oracleParse(test, []string{errorText})[0]
 	for name, corrupt := range map[string]func(*jsonError){
 		"message":  func(e *jsonError) { e.Message += "." },
 		"name":     func(e *jsonError) { e.Name = "TypeError" },
@@ -439,7 +439,7 @@ func TestComparisonSeesEveryField(t *testing.T) {
 		copied.Position = &position
 		corrupt(&copied)
 		if differences := compareParse(errorText, oracleResult{Error: &copied}); len(differences) == 0 {
-			t.Errorf("corrupting the error's %s went unnoticed", name)
+			test.Errorf("corrupting the error's %s went unnoticed", name)
 		}
 	}
 }

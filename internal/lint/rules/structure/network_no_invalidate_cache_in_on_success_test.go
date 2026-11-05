@@ -13,8 +13,8 @@ const cacheDeclarations = "declare const networkService: { cache: { invalidate(k
 	"declare const apiService: { cache: { invalidate(key: string): void } };\n" +
 	"declare function useMutation(options: unknown): void;\n"
 
-func TestNetworkNoInvalidateCacheInOnSuccessFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheInOnSuccessFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -46,16 +46,16 @@ func TestNetworkNoInvalidateCacheInOnSuccessFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoInvalidateCacheInOnSuccess, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoInvalidateCacheInOnSuccess, cacheFile,
 				cacheDeclarations+testCase.sourceText), "noInvalidateCacheInOnSuccess")
 		})
 	}
 }
 
-func TestNetworkNoInvalidateCacheInOnSuccessStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheInOnSuccessStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -98,9 +98,9 @@ func TestNetworkNoInvalidateCacheInOnSuccessStaysSilent(t *testing.T) {
 		{"no mutation at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoInvalidateCacheInOnSuccess, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoInvalidateCacheInOnSuccess, cacheFile,
 				cacheDeclarations+testCase.sourceText))
 		})
 	}

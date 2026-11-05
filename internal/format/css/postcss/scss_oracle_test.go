@@ -238,9 +238,9 @@ var scssParseFixtures = []parseFixture{
 // or be refused by both with the same error. Off unless COHERE_PRETTIER_FORK names the fork.
 //
 // A .scss file postcss-scss refuses is counted, and the test fails if that passes a tenth of them.
-func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
 		Name string `json:"name"`
@@ -269,10 +269,10 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(corpusFiles) == 0 {
-		t.Fatalf("no .scss files under %s/tests/format/scss", root)
+		test.Fatalf("no .scss files under %s/tests/format/scss", root)
 	}
 	javaScriptFiles := []string{}
 	for _, pattern := range []string{"tests/format/js/multiparser-css/*.js", "tests/format/js/template-literals/*.js"} {
@@ -294,7 +294,7 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	for _, each := range inputs {
 		encoded, err := json.Marshal(each)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -305,7 +305,7 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var records []map[string]any
 	seen := map[string]bool{}
@@ -315,14 +315,14 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 		}
 		var record map[string]any
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		records = append(records, record)
 		seen[record["name"].(string)] = true
 	}
 	for _, each := range inputs {
 		if each.Js == "" && !seen[each.Name] {
-			t.Fatalf("the oracle printed nothing for %s", each.Name)
+			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
 	}
 
@@ -330,7 +330,7 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, want := range records {
@@ -367,13 +367,13 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 			identical++
 		}
 	}
-	t.Logf("%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
+	test.Logf("%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
 		len(records), len(corpusFiles), templates, len(javaScriptFiles), len(scssParseFixtures), identical, refusedByBoth, different, corpusRefused)
 	if corpusRefused > len(corpusFiles)/10 {
-		t.Errorf("postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks", corpusRefused, len(corpusFiles))
+		test.Errorf("postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks", corpusRefused, len(corpusFiles))
 	}
 	if templates == 0 {
-		t.Errorf("no css-in-js templates came out of %d JavaScript files", len(javaScriptFiles))
+		test.Errorf("no css-in-js templates came out of %d JavaScript files", len(javaScriptFiles))
 	}
 
 	// What postcss-scss adds must be in the trees compared, or agreement says nothing about it.
@@ -385,10 +385,10 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 			features["TypeError refusal"]++
 		}
 	}
-	t.Logf("postcss-scss features compared: %v", features)
+	test.Logf("postcss-scss features compared: %v", features)
 	for _, feature := range []string{"inline comment", "inline comment raws.text", "nested declaration", "raws.selector.scss", "raws.value.scss", "raws.params.scss", "TypeError refusal"} {
 		if features[feature] == 0 {
-			t.Errorf("no input exercises %s", feature)
+			test.Errorf("no input exercises %s", feature)
 		}
 	}
 }

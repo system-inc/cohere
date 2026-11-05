@@ -110,15 +110,15 @@ const noDeprecatedSharedFixture = "" +
 	"};\n"
 
 // runNoDeprecatedCases runs a block of rows.
-func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
-	t.Helper()
+func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
+	test.Helper()
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(test *testing.T) {
 			if testCase.harnessBound != "" {
-				t.Skip(testCase.harnessBound)
+				test.Skip(testCase.harnessBound)
 			}
 			if testCase.environmentDependent {
-				t.Skip("depends on the installed @types packages rather than on the rule; " +
+				test.Skip("depends on the installed @types packages rather than on the rule; " +
 					"upstream's declared expectation is recorded above")
 			}
 
@@ -135,7 +135,7 @@ func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
 			if testCase.options != "" {
 				parsed, err := DecodeNoDeprecatedOptions(json.RawMessage(testCase.options))
 				if err != nil {
-					t.Fatalf("the decoder refused %s: %v", testCase.options, err)
+					test.Fatalf("the decoder refused %s: %v", testCase.options, err)
 				}
 				decoded = parsed
 			}
@@ -143,19 +143,19 @@ func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
 			var result rule_testing.Result
 			if testCase.withInstalledTypes {
 				result = rule_testing.RunTypedFilesWithSetupAndOptions(
-					t, NoDeprecated, files, subjectName, decoded, linkInstalledTypesForNoDeprecated(t))
+					test, NoDeprecated, files, subjectName, decoded, linkInstalledTypesForNoDeprecated(test))
 			} else {
-				result = rule_testing.RunTypedFilesWithOptions(t, NoDeprecated, files, subjectName, decoded)
+				result = rule_testing.RunTypedFilesWithOptions(test, NoDeprecated, files, subjectName, decoded)
 			}
 
 			if len(result.Diagnostics) != len(testCase.expected) {
-				t.Fatalf("wanted %d findings, got %d: %s",
+				test.Fatalf("wanted %d findings, got %d: %s",
 					len(testCase.expected), len(result.Diagnostics), describeNoDeprecated(result))
 			}
 			for index, want := range testCase.expected {
 				got := result.Diagnostics[index]
 				if got.Message.Id != want.messageId {
-					t.Errorf("finding %d: wanted message %s, got %s",
+					test.Errorf("finding %d: wanted message %s, got %s",
 						index, want.messageId, got.Message.Id)
 				}
 				// The name is interpolated into the description between backticks, and the reason
@@ -166,7 +166,7 @@ func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
 					wantText += " " + want.reason
 				}
 				if got.Message.Description != wantText {
-					t.Errorf("finding %d: wanted %q, got %q", index, wantText, got.Message.Description)
+					test.Errorf("finding %d: wanted %q, got %q", index, wantText, got.Message.Description)
 				}
 			}
 		})
@@ -184,16 +184,16 @@ func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
 // The packages are ahra's installed ones, so the case skips where the ahra corpus is not set, and the gate
 // names it as not covered (#sycrdr6). Where it is set, a missing @types/react fails: the corpus is there and
 // the case would otherwise read nothing.
-func linkInstalledTypesForNoDeprecated(t *testing.T) func(string) {
-	t.Helper()
+func linkInstalledTypesForNoDeprecated(test *testing.T) func(string) {
+	test.Helper()
 	return func(directory string) {
-		source := corpus.Ahra.Path(t, "node_modules")
+		source := corpus.Ahra.Path(test, "node_modules")
 		if _, err := os.Stat(filepath.Join(source, "@types", "react")); err != nil {
-			t.Fatalf("this case reads its deprecation from @types/react, which the ahra corpus at %s does "+
+			test.Fatalf("this case reads its deprecation from @types/react, which the ahra corpus at %s does "+
 				"not have installed: %v", source, err)
 		}
 		if err := os.Symlink(source, filepath.Join(directory, "node_modules")); err != nil {
-			t.Fatalf("linking node_modules into the fixture: %v", err)
+			test.Fatalf("linking node_modules into the fixture: %v", err)
 		}
 	}
 }
@@ -221,8 +221,8 @@ func describeNoDeprecated(result rule_testing.Result) string {
 // a real type checker, one program per case so no two cases share an interned type, then checked
 // against upstream's own declared expectations. 259 of the 264 agreed; the five that did not are
 // marked environmentDependent where they appear and carry upstream's declaration instead.
-func TestNoDeprecatedAgainstUpstreamOrdinaryCases(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedAgainstUpstreamOrdinaryCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []noDeprecatedCase{
 		{
@@ -2715,7 +2715,7 @@ func TestNoDeprecatedAgainstUpstreamOrdinaryCases(t *testing.T) {
 			},
 		},
 	}
-	runNoDeprecatedCases(t, cases)
+	runNoDeprecatedCases(test, cases)
 }
 
 // TestNoDeprecatedAcrossFiles is the part of the corpus that imports from another file.
@@ -2725,8 +2725,8 @@ func TestNoDeprecatedAgainstUpstreamOrdinaryCases(t *testing.T) {
 // declaration, on an export specifier that re-exports an UNTAGGED declaration, and on one overload
 // of a function whose other overloads are clean. The middle position is invisible to a resolve,
 // which jumps to the declaration and finds nothing, and is why deprecationInAliasChain walks.
-func TestNoDeprecatedAcrossFiles(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedAcrossFiles(test *testing.T) {
+	test.Parallel()
 
 	cases := []noDeprecatedCase{
 		{
@@ -3326,7 +3326,7 @@ func TestNoDeprecatedAcrossFiles(t *testing.T) {
 			},
 		},
 	}
-	runNoDeprecatedCases(t, cases)
+	runNoDeprecatedCases(test, cases)
 }
 
 // TestNoDeprecatedInJsx covers the two JSX arms: a deprecated component and a deprecated prop.
@@ -3334,8 +3334,8 @@ func TestNoDeprecatedAcrossFiles(t *testing.T) {
 // A prop's tag is on a property of the element name's CONTEXTUAL type rather than on anything the
 // attribute itself resolves to, so this arm shares no code with the identifier arm and would be
 // silent if only that one worked.
-func TestNoDeprecatedInJsx(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedInJsx(test *testing.T) {
+	test.Parallel()
 
 	cases := []noDeprecatedCase{
 		{
@@ -3556,7 +3556,7 @@ func TestNoDeprecatedInJsx(t *testing.T) {
 			},
 		},
 	}
-	runNoDeprecatedCases(t, cases)
+	runNoDeprecatedCases(test, cases)
 }
 
 // TestNoDeprecatedAgainstNodeTypes covers deprecation that comes from a @types package.
@@ -3565,8 +3565,8 @@ func TestNoDeprecatedInJsx(t *testing.T) {
 // deprecated is a property of the installed @types/node, which is not the version upstream pins.
 // They carry upstream's declared expectations and are skipped rather than asserted, because a
 // machine with different types would fail them for a reason that says nothing about the rule.
-func TestNoDeprecatedAgainstNodeTypes(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
+	test.Parallel()
 
 	cases := []noDeprecatedCase{
 		{
@@ -3613,7 +3613,7 @@ func TestNoDeprecatedAgainstNodeTypes(t *testing.T) {
 			},
 		},
 	}
-	runNoDeprecatedCases(t, cases)
+	runNoDeprecatedCases(test, cases)
 }
 
 // TestNoDeprecatedOnIntrinsicJsxAttributes covers the arm upstream's corpus cannot reach here.
@@ -3627,8 +3627,8 @@ func TestNoDeprecatedAgainstNodeTypes(t *testing.T) {
 // namespace declared global in the fixture. The second row is the control that matters: a rule
 // reaching the intrinsic attribute type but reporting unconditionally would pass the first row and
 // fail only this one.
-func TestNoDeprecatedOnIntrinsicJsxAttributes(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedOnIntrinsicJsxAttributes(test *testing.T) {
+	test.Parallel()
 
 	const intrinsicElements = "declare global {\n" +
 		"  namespace JSX {\n" +
@@ -3642,7 +3642,7 @@ func TestNoDeprecatedOnIntrinsicJsxAttributes(t *testing.T) {
 		"  }\n" +
 		"}\n"
 
-	runNoDeprecatedCases(t, []noDeprecatedCase{
+	runNoDeprecatedCases(test, []noDeprecatedCase{
 		{
 			name:       "a deprecated attribute on an intrinsic element",
 			sourceText: intrinsicElements + "export const a = <foo-bar deprecatedProp=\"x\" />;\n",
@@ -3670,41 +3670,41 @@ func TestNoDeprecatedOnIntrinsicJsxAttributes(t *testing.T) {
 // The two rows are the same declaration used two ways, so a rule that reported on everything would
 // fail the second and a rule that reported on nothing would fail the first. Neither can be passed by
 // accident.
-func TestNoDeprecatedFiresAndStaysQuiet(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedFiresAndStaysQuiet(test *testing.T) {
+	test.Parallel()
 
 	const source = "/** @deprecated Use b instead. */\n" +
 		"declare function a(): void;\n" +
 		"declare function b(): void;\n"
 
-	t.Run("fires on a use of the deprecated declaration", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts",
+	test.Run("fires on a use of the deprecated declaration", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDeprecated, "/repository/source/Subject.ts",
 			source+"a();\n")
-		rule_testing.ExpectFindings(t, result, "deprecatedWithReason")
+		rule_testing.ExpectFindings(test, result, "deprecatedWithReason")
 	})
 
-	t.Run("stays quiet on a use of the undeprecated one", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts",
+	test.Run("stays quiet on a use of the undeprecated one", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDeprecated, "/repository/source/Subject.ts",
 			source+"b();\n")
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("stays quiet on the declaration itself", func(t *testing.T) {
-		t.Parallel()
+	test.Run("stays quiet on the declaration itself", func(test *testing.T) {
+		test.Parallel()
 		// The declaration site is not a use, so a rule keyed on the tag rather than on the
 		// reference would report here and this is what catches it.
-		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, NoDeprecated, "/repository/source/Subject.ts", source)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("declines a file with no type checker", func(t *testing.T) {
-		t.Parallel()
+	test.Run("declines a file with no type checker", func(test *testing.T) {
+		test.Parallel()
 		// NeedsTypeChecker keeps this unreachable through registration, but the harness path and
 		// the registry's crash corpus both build a Context by hand. The rule panicked on exactly
 		// this before the guard in Run was written, so the decline is pinned here.
-		result := rule_testing.Run(t, NoDeprecated, "/repository/source/Subject.ts", source+"a();\n")
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoDeprecated, "/repository/source/Subject.ts", source+"a();\n")
+		rule_testing.ExpectClean(test, result)
 	})
 }

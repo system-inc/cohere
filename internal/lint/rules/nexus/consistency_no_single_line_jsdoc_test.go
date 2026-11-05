@@ -8,8 +8,8 @@ import (
 
 const jsDocFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoSingleLineJsDocFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,16 +27,16 @@ func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
 		{"inside a body", "export function thing() {\n    /** Does the thing. */\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "useSimpleComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "useSimpleComment")
 		})
 	}
 }
 
-func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoSingleLineJsDocStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -61,10 +61,10 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 		{"no comments", "export const value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -73,34 +73,34 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 // than no fix: the finding disappears and the damage is committed.
 // TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter keeps the repair for a comment that
 // trailing spaces follow, which a line comment swallows harmlessly.
-func TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */  \t\nexport const value = 1;\n")
-	rule_testing.ExpectFindings(t, result, "useSimpleComment")
-	rule_testing.ExpectFixedSource(t, result, "// Does the thing.  \t\nexport const value = 1;\n")
+	result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */  \t\nexport const value = 1;\n")
+	rule_testing.ExpectFindings(test, result, "useSimpleComment")
+	rule_testing.ExpectFixedSource(test, result, "// Does the thing.  \t\nexport const value = 1;\n")
 }
 
-func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoSingleLineJsDocFixes(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
-	rule_testing.ExpectFindings(t, result, "useSimpleComment")
+	result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
+	rule_testing.ExpectFindings(test, result, "useSimpleComment")
 
 	fixes := result.Diagnostics[0].Fixes
 	if len(fixes) != 1 {
-		t.Fatalf("expected 1 fix, got %d", len(fixes))
+		test.Fatalf("expected 1 fix, got %d", len(fixes))
 	}
 	if fixes[0].Text != "// Does the thing." {
-		t.Fatalf("expected %q, got %q", "// Does the thing.", fixes[0].Text)
+		test.Fatalf("expected %q, got %q", "// Does the thing.", fixes[0].Text)
 	}
 }
 
 // TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes covers the cases where the rule reports but
 // must not repair. Each would produce a file that no longer says what the author wrote, and the last
 // two, trpc's (#kq9vtva), a file that does not parse.
-func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -117,12 +117,12 @@ func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
 		{"code follows inside a pattern", "declare const values: number[];\nconst [a, b /**, c */] = values;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "useSimpleComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "useSimpleComment")
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
 			}
 		})
 	}

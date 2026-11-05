@@ -9,8 +9,8 @@ import (
 // through the real config layer: refused now, by upstream's schema, naming the element and the path.
 // The controls beside them are the nearest shape ESLint accepts, so a refusal is about the shape and
 // not about the rule refusing everything.
-func TestTheConfigLayerRefusesWhatUpstreamsSchemaRefuses(t *testing.T) {
-	t.Parallel()
+func TestTheConfigLayerRefusesWhatUpstreamsSchemaRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		rule, refused, accepted, mustName string
@@ -26,14 +26,14 @@ func TestTheConfigLayerRefusesWhatUpstreamsSchemaRefuses(t *testing.T) {
 		// An empty list where upstream says minItems 1.
 		{"no-warning-comments", `["error", {"decoration": []}]`, `["error", {"decoration": ["*"]}]`, "element 1 at decoration"},
 	} {
-		_, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.refused)
+		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
 		if err == nil {
-			t.Errorf("%s %s loaded, and ESLint refuses it", testCase.rule, testCase.refused)
+			test.Errorf("%s %s loaded, and ESLint refuses it", testCase.rule, testCase.refused)
 		} else if !strings.Contains(err.Error(), testCase.mustName) || !strings.Contains(err.Error(), "upstream's schema") {
-			t.Errorf("%s: the refusal does not name %q and upstream's schema: %v", testCase.rule, testCase.mustName, err)
+			test.Errorf("%s: the refusal does not name %q and upstream's schema: %v", testCase.rule, testCase.mustName, err)
 		}
-		if _, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.accepted); err != nil {
-			t.Errorf("%s refused %s, which ESLint accepts: %v", testCase.rule, testCase.accepted, err)
+		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
+			test.Errorf("%s refused %s, which ESLint accepts: %v", testCase.rule, testCase.accepted, err)
 		}
 	}
 }

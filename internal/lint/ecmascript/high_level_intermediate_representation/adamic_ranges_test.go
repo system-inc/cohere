@@ -44,13 +44,13 @@ var exportRanges = flag.String("export-ranges", "", "write the functions React C
 // closure, which the cases replay. And each function carries the ranges cohere's own pass gave it, as
 // `expect` records, so the side of Adamic's test that runs the module in Go can show the cases
 // reproduce what cohere computes before it holds the port to them.
-func TestExportRangesForAdamic(t *testing.T) {
-	t.Parallel()
+func TestExportRangesForAdamic(test *testing.T) {
+	test.Parallel()
 	if *exportRanges == "" {
-		t.Skip("writes Adamic's corpus only when -export-ranges names a directory")
+		test.Skip("writes Adamic's corpus only when -export-ranges names a directory")
 	}
 	if err := os.MkdirAll(*exportRanges, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	pipelines := []struct {
@@ -65,7 +65,7 @@ func TestExportRangesForAdamic(t *testing.T) {
 	}
 
 	fixtures, functions, closures := 0, 0, 0
-	for _, fixture := range reactCompilerFixtures(t) {
+	for _, fixture := range reactCompilerFixtures(test) {
 		var out strings.Builder
 		for _, pipeline := range pipelines {
 			if !pipeline.applies(fixture.source) {
@@ -81,7 +81,7 @@ func TestExportRangesForAdamic(t *testing.T) {
 					write(nested)
 				}
 			}
-			for _, function := range lowerReactCompilerFixture(t, fixture.source, pipeline.lower) {
+			for _, function := range lowerReactCompilerFixture(test, fixture.source, pipeline.lower) {
 				write(function)
 			}
 		}
@@ -89,13 +89,13 @@ func TestExportRangesForAdamic(t *testing.T) {
 			continue
 		}
 		if err := os.WriteFile(filepath.Join(*exportRanges, fixture.name+".txt"), []byte(out.String()), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		fixtures++
 	}
-	t.Logf("%d fixtures, %d functions, %d closure answers, written to %s", fixtures, functions, closures, *exportRanges)
+	test.Logf("%d fixtures, %d functions, %d closure answers, written to %s", fixtures, functions, closures, *exportRanges)
 	if fixtures == 0 {
-		t.Fatal("no fixture lowered to anything, so the export holds nothing")
+		test.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
 }
 

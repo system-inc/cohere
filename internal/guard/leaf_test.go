@@ -91,8 +91,8 @@ var allowedRuleImportPrefixes = []string{
 // not depend on anything." Those came apart the first time a rule package legitimately needed
 // vendored upstream: the simpler rule would have rejected an import that costs nothing, which is
 // how a guard stops being trusted and starts being worked around.
-func TestRulePackagesStayLeaves(t *testing.T) {
-	t.Parallel()
+func TestRulePackagesStayLeaves(test *testing.T) {
+	test.Parallel()
 
 	/*
 	 * A rule package is one that REGISTERS rules, not merely one that lives under `rules/`.
@@ -107,15 +107,15 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 	 * `registry` imports every registering package, so a deep import inside one is on the rebuild
 	 * path for all of them. A package that registers nothing is not.
 	 */
-	rulePackages := registeringPackages(t, listPackages(t, "./internal/lint/rules/..."))
+	rulePackages := registeringPackages(test, listPackages(test, "./internal/lint/rules/..."))
 	if len(rulePackages) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
-		t.Fatal("found no rule packages, so this test proved nothing")
+		test.Fatal("found no rule packages, so this test proved nothing")
 	}
 
 	for _, rulePackage := range rulePackages {
-		for _, imported := range listImports(t, rulePackage) {
+		for _, imported := range listImports(test, rulePackage) {
 			if !strings.HasPrefix(imported, "github.com/system-inc/cohere/") {
 				// Third-party and standard-library imports are not what this guards: the compiler
 				// shim is most of what a rule touches, and it is not ours to be deep in.
@@ -125,7 +125,7 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 				continue
 			}
 
-			t.Errorf(
+			test.Errorf(
 				"rule package %s imports %s, which pushes rules off the leaf — a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
 				rulePackage, imported,
 			)
@@ -144,20 +144,20 @@ func hasAllowedPrefix(imported string) bool {
 }
 
 // listPackages returns the import paths matching a pattern.
-func listPackages(t *testing.T, pattern string) []string {
-	t.Helper()
-	return runGoList(t, "-f", "{{.ImportPath}}", pattern)
+func listPackages(test *testing.T, pattern string) []string {
+	test.Helper()
+	return runGoList(test, "-f", "{{.ImportPath}}", pattern)
 }
 
 // listImports returns everything a package imports directly.
-func listImports(t *testing.T, packagePath string) []string {
-	t.Helper()
-	return runGoList(t, "-f", `{{range .Imports}}{{.}}{{"\n"}}{{end}}`, packagePath)
+func listImports(test *testing.T, packagePath string) []string {
+	test.Helper()
+	return runGoList(test, "-f", `{{range .Imports}}{{.}}{{"\n"}}{{end}}`, packagePath)
 }
 
 // runGoList runs `go list` from the module root and returns its non-empty lines.
-func runGoList(t *testing.T, arguments ...string) []string {
-	t.Helper()
+func runGoList(test *testing.T, arguments ...string) []string {
+	test.Helper()
 
 	command := exec.Command("go", append([]string{"list"}, arguments...)...)
 	// Tests run in their own package directory, and the patterns here are written relative to the
@@ -166,7 +166,7 @@ func runGoList(t *testing.T, arguments ...string) []string {
 
 	output, err := command.Output()
 	if err != nil {
-		t.Fatalf("go list %s: %v", strings.Join(arguments, " "), err)
+		test.Fatalf("go list %s: %v", strings.Join(arguments, " "), err)
 	}
 
 	lines := []string{}
@@ -182,8 +182,8 @@ func runGoList(t *testing.T, arguments ...string) []string {
 //
 // Measured by the presence of a `*_register.go` file, which is the convention every rule in this
 // tree follows and which `TestEveryRuleIsRegistered` independently holds to.
-func registeringPackages(t *testing.T, packages []string) []string {
-	t.Helper()
+func registeringPackages(test *testing.T, packages []string) []string {
+	test.Helper()
 
 	const modulePrefix = "github.com/system-inc/cohere/"
 	registering := make([]string, 0, len(packages))
@@ -191,7 +191,7 @@ func registeringPackages(t *testing.T, packages []string) []string {
 		directory := strings.TrimPrefix(importPath, modulePrefix)
 		matches, err := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
 		if err != nil {
-			t.Fatalf("looking for registrations in %s: %v", importPath, err)
+			test.Fatalf("looking for registrations in %s: %v", importPath, err)
 		}
 		if len(matches) > 0 {
 			registering = append(registering, importPath)

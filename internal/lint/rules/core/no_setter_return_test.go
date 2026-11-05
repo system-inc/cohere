@@ -26,8 +26,8 @@ const setterReturnFile = "/repository/source/SetterReturn.js"
 // catches a bug is the one nobody would think to write. The pass list is where that pays: it holds
 // forty cases about `Object.defineProperty` descriptors that exist only to pin a gap upstream
 // deliberately leaves open (see the rule's doc comment).
-func TestNoSetterReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoSetterReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -70,14 +70,14 @@ func TestNoSetterReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "noSetterReturn"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoSetterReturn, setterReturnFile, testCase.sourceText), wantIds...)
 		})
 	}
 }
@@ -97,8 +97,8 @@ func TestNoSetterReturnFires(t *testing.T) {
 // corresponding fail cases are commented out in the Rust source. They are here as clean fixtures
 // because that is what upstream asserts, and reproducing a stated gap is the instruction rather
 // than improving on it silently.
-func TestNoSetterReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSetterReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function foo() { return 1; }",
@@ -212,10 +212,10 @@ func TestNoSetterReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoSetterReturn, setterReturnFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoSetterReturn, setterReturnFile, sourceText))
 		})
 	}
 }
@@ -233,8 +233,8 @@ func TestNoSetterReturnStaysSilent(t *testing.T) {
 // expression inside it. The third case is the one input that reports three times, and the last of
 // its three has no semicolon in the source, so the statement ends at the expression and the span
 // shortens with it. A rule spanning the expression would drop the leading `return ` from all six.
-func TestNoSetterReturnSpansTheWholeStatement(t *testing.T) {
-	t.Parallel()
+func TestNoSetterReturnSpansTheWholeStatement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -248,18 +248,18 @@ func TestNoSetterReturnSpansTheWholeStatement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetterReturn, setterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d diagnostics, got %d",
+				test.Fatalf("wanted %d diagnostics, got %d",
 					len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, wantSpan := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[index]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != wantSpan {
-					t.Fatalf("finding %d spanned %q, wanted %q", index, gotSpan, wantSpan)
+					test.Fatalf("finding %d spanned %q, wanted %q", index, gotSpan, wantSpan)
 				}
 			}
 		})

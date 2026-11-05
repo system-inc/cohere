@@ -15,8 +15,8 @@ const variablesDeclarations = "import { networkService } from './NetworkService.
 
 const variablesFile = "/repository/source/api/UserRequest.ts"
 
-func TestNetworkRequireHookVariablesTypeFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookVariablesTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,16 +83,16 @@ func TestNetworkRequireHookVariablesTypeFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookVariablesType, variablesFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkRequireHookVariablesType, variablesFile,
 				variablesDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkRequireHookVariablesTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookVariablesTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -200,9 +200,9 @@ func TestNetworkRequireHookVariablesTypeStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookVariablesType, variablesFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkRequireHookVariablesType, variablesFile,
 				variablesDeclarations+testCase.sourceText))
 		})
 	}

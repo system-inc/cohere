@@ -27,22 +27,22 @@ import (
 //
 // A case marked pending names the unit that will read it; until then it must disagree, so a unit that
 // lands without unmarking its cases fails here.
-func TestClassLiteralsAgreeWithUpstream(t *testing.T) {
-	t.Parallel()
-	cases := readClassLiteralCases(t)
-	oracle := readClassLiteralOracle(t)
+func TestClassLiteralsAgreeWithUpstream(test *testing.T) {
+	test.Parallel()
+	cases := readClassLiteralCases(test)
+	oracle := readClassLiteralOracle(test)
 	if len(oracle.Cases) != len(cases) {
-		t.Fatalf("upstream.json holds %d cases and cases.json %d: run tools/generate_class_literals", len(oracle.Cases), len(cases))
+		test.Fatalf("upstream.json holds %d cases and cases.json %d: run tools/generate_class_literals", len(oracle.Cases), len(cases))
 	}
-	decode := tailwindDecoders(t)[NoDuplicateClasses.Name]
+	decode := tailwindDecoders(test)[NoDuplicateClasses.Name]
 
 	for index, testCase := range cases {
 		expected := oracle.Cases[index]
 		if expected.Name != testCase.Name {
-			t.Fatalf("case %d is %q in cases.json and %q in upstream.json: run tools/generate_class_literals", index, testCase.Name, expected.Name)
+			test.Fatalf("case %d is %q in cases.json and %q in upstream.json: run tools/generate_class_literals", index, testCase.Name, expected.Name)
 		}
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
 			var raw []byte
 			if testCase.Options != nil {
 				raw = testCase.Options
@@ -53,12 +53,12 @@ func TestClassLiteralsAgreeWithUpstream(t *testing.T) {
 			}
 			decoded, err := decode(raw, base)
 			if err != nil {
-				t.Fatalf("decoding the case's options: %v", err)
+				test.Fatalf("decoding the case's options: %v", err)
 			}
-			reader := surfacesOf(t, decoded).compiled
+			reader := surfacesOf(test, decoded).compiled
 
 			code := strings.Join(testCase.Code, "\n")
-			got := readEveryClassLiteral(t, reader, code)
+			got := readEveryClassLiteral(test, reader, code)
 			want := make([]string, 0, len(expected.Literals))
 			for _, literal := range expected.Literals {
 				want = append(want, upstreamLiteral{literal.Start, literal.End, literal.ConcatenatedLeft, literal.ConcatenatedRight}.describe(code))
@@ -67,12 +67,12 @@ func TestClassLiteralsAgreeWithUpstream(t *testing.T) {
 			agrees := slices.Equal(got, want)
 			if testCase.Pending != "" {
 				if agrees {
-					t.Fatalf("pending on %s, yet the reader now agrees with upstream: unmark the case", testCase.Pending)
+					test.Fatalf("pending on %s, yet the reader now agrees with upstream: unmark the case", testCase.Pending)
 				}
 				return
 			}
 			if !agrees {
-				t.Errorf("the reader disagrees with better-tailwindcss %s\n%s", oracle.Plugin, diffLines(want, got))
+				test.Errorf("the reader disagrees with better-tailwindcss %s\n%s", oracle.Plugin, diffLines(want, got))
 			}
 		})
 	}
@@ -101,28 +101,28 @@ type classLiteralOracle struct {
 	} `json:"cases"`
 }
 
-func readClassLiteralCases(t *testing.T) []classLiteralCase {
-	t.Helper()
+func readClassLiteralCases(test *testing.T) []classLiteralCase {
+	test.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "class_literals", "cases.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var cases []classLiteralCase
 	if err := json.Unmarshal(raw, &cases); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return cases
 }
 
-func readClassLiteralOracle(t *testing.T) classLiteralOracle {
-	t.Helper()
+func readClassLiteralOracle(test *testing.T) classLiteralOracle {
+	test.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "class_literals", "upstream.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var oracle classLiteralOracle
 	if err := json.Unmarshal(raw, &oracle); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return oracle
 }
@@ -149,14 +149,14 @@ func (literal upstreamLiteral) describe(code string) string {
 
 // readEveryClassLiteral parses the code and asks the reader about every node, returning what it read
 // as upstream would report it, in source order.
-func readEveryClassLiteral(t *testing.T, reader *ClassLiteralReader, code string) []string {
-	t.Helper()
+func readEveryClassLiteral(test *testing.T, reader *ClassLiteralReader, code string) []string {
+	test.Helper()
 	fileName := tspath.NormalizePath("/Case.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, code, core.ScriptKindTSX)
 	if sourceFile == nil {
-		t.Fatal("could not parse the case")
+		test.Fatal("could not parse the case")
 	}
 
 	seen := map[[2]int]upstreamLiteral{}

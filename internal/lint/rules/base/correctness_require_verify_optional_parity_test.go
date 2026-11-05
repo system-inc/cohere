@@ -28,8 +28,8 @@ const verifyDecoratorPreamble = "declare function VerifyIsOptional(): PropertyDe
 // upstream corpus. That inverts the usual risk: an invented fixture encodes the same belief as the
 // port, so each case below states which half of the rule it exercises, and the whole set was
 // checked against the existing ESLint rule running over api-phi-health.
-func TestVerifyOptionalParityFires(t *testing.T) {
-	t.Parallel()
+func TestVerifyOptionalParityFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name      string
@@ -111,11 +111,11 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 			reported:  "name",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := verifyDecoratorPreamble + testCase.source
-			result := rule_testing.RunTyped(t, CorrectnessRequireVerifyOptionalParity, correctnessRequireVerifyOptionalParityFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.messageId)
+			result := rule_testing.RunTyped(test, CorrectnessRequireVerifyOptionalParity, correctnessRequireVerifyOptionalParityFile, source)
+			rule_testing.ExpectFindings(test, result, testCase.messageId)
 
 			// The span. Upstream reports the property's KEY rather than the whole property, so a
 			// port pointing at the declaration would pass every message-id assertion while sending
@@ -126,7 +126,7 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 			onDisk := strings.TrimSpace(source) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding should point at %q, got %q", testCase.reported, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.reported, reported)
 			}
 
 			// The rendered text, asserted as an exact prefix rather than with a substring test:
@@ -134,7 +134,7 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 			// misplaced interpolation.
 			if testCase.message != "" {
 				if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, testCase.message) {
-					t.Errorf("message should begin %q, got %q", testCase.message, got)
+					test.Errorf("message should begin %q, got %q", testCase.message, got)
 				}
 			}
 		})
@@ -145,8 +145,8 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 //
 // These are the false positives the rule has to avoid, and several encode a distinction nothing
 // else would suggest.
-func TestVerifyOptionalParityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVerifyOptionalParityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -217,9 +217,9 @@ func TestVerifyOptionalParityStaysSilent(t *testing.T) {
 			reason: "The rule anchors on property declarations and parameters, not on methods.",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyOptionalParity,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireVerifyOptionalParity,
 				correctnessRequireVerifyOptionalParityFile, verifyDecoratorPreamble+testCase.source))
 		})
 	}
@@ -230,14 +230,14 @@ func TestVerifyOptionalParityStaysSilent(t *testing.T) {
 // A typed rule handed the plain harness goes silent rather than crashing, which makes every
 // StaysSilent case pass vacuously and every Fires case look like a rule defect. The control below
 // is what separates "correctly guarded" from "cannot fire at all".
-func TestVerifyOptionalParityRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestVerifyOptionalParityRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "class Entity { @VerifyIsOptional() name: string; }"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireVerifyOptionalParity,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireVerifyOptionalParity,
 		correctnessRequireVerifyOptionalParityFile, verifyDecoratorPreamble+source))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyOptionalParity,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireVerifyOptionalParity,
 		correctnessRequireVerifyOptionalParityFile, verifyDecoratorPreamble+source), "optionalButTypeNot")
 }

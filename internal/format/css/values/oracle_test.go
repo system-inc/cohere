@@ -249,13 +249,13 @@ line"`},
 // A corpus value the library refuses under { loose: true } is counted, and the test fails if that
 // count passes a tenth of the corpus values: an oracle that rejects everything would otherwise read as
 // perfect agreement.
-func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
-	t.Parallel()
+func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
+		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 
 	type request struct {
 		Name string  `json:"name"`
@@ -291,12 +291,12 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+			test.Fatalf("walking %s: %v", corpus, err)
 		}
 	}
 	corpusFiles := len(requests)
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s", corpora)
+		test.Fatalf("no .css files under %s", corpora)
 	}
 	for index := range valuesFixtures {
 		name := "fixture: " + valuesFixtures[index].name
@@ -308,7 +308,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	for _, each := range requests {
 		encoded, err := json.Marshal(each)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -319,7 +319,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 
 	type record struct {
@@ -338,7 +338,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 		}
 		var each record
 		if err := json.Unmarshal([]byte(line), &each); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if each.Done {
 			answered[each.Name] = true
@@ -348,7 +348,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	}
 	for _, each := range requests {
 		if !answered[each.Name] {
-			t.Fatalf("the oracle did not finish %s", each.Name)
+			test.Fatalf("the oracle did not finish %s", each.Name)
 		}
 	}
 
@@ -357,7 +357,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 25 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, each := range records {
@@ -406,13 +406,13 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
+	test.Logf("%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
 		corpusFiles, corpusValues, corpusRefused, extraValues, len(valuesFixtures), compared, identical, refusedByBoth, different)
 	if corpusValues == 0 {
-		t.Errorf("the corpus yielded no values")
+		test.Errorf("the corpus yielded no values")
 	}
 	if corpusRefused > corpusValues/10 {
-		t.Errorf("the library refused %d of %d corpus values; the comparison is thinner than it looks", corpusRefused, corpusValues)
+		test.Errorf("the library refused %d of %d corpus values; the comparison is thinner than it looks", corpusRefused, corpusValues)
 	}
 }
 

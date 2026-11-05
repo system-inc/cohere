@@ -10,8 +10,8 @@ import (
 
 const abbreviatedFile = "/repository/source/Thing.tsx"
 
-func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -139,16 +139,16 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 		{"a rest beside a plain args", "function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	// The exemptions are the rule. Without them it demands renames the author cannot perform, which
 	// is how a naming rule gets switched off.
@@ -229,10 +229,10 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 		{"a destructured ref forwarded onward", "export const Thing = ({ ref }) => <Child ref={ref} />;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -240,8 +240,8 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 // The framework exemptions are the half that needs options, and a rule that reads options has a
 // failure mode an unconfigured one does not: it can guard everything or nothing. Both directions
 // belong in fixtures.
-func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(test *testing.T) {
+	test.Parallel()
 
 	options := ConsistencyNoAbbreviatedIdentifierOptions{
 		FrameworkParameterFilePatterns:  []string{"/app/"},
@@ -334,11 +334,11 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistencyNoAbbreviatedIdentifier,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistencyNoAbbreviatedIdentifier,
 				testCase.fileName, testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -346,18 +346,18 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 // Without options the framework exemptions cannot apply, and the rule must still run rather than
 // guard everything. `boundary-no-project-import` was enabled and inert for months because a missing
 // option made it decline every file, which looks exactly like a clean run.
-func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier,
+	result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier,
 		"/repository/app/blog/page.tsx", "export default function Page({ params }) {\n    return params;\n}\n")
-	rule_testing.ExpectFindings(t, result, "abbreviatedIdentifier", "abbreviatedIdentifier")
+	rule_testing.ExpectFindings(test, result, "abbreviatedIdentifier", "abbreviatedIdentifier")
 }
 
 // The suggested name travels in the message, since there is no fix to carry it. A message naming
 // the wrong replacement is worse than no message, so the text is asserted rather than just the id.
-func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -382,15 +382,15 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 		{"Fn asks for a role rather than an expansion", "const compareFn = () => 1;\n", `like "Handler"`},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding for %q", testCase.sourceText)
+				test.Fatalf("expected a finding for %q", testCase.sourceText)
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, testCase.wantText) {
-				t.Fatalf("expected the message to contain %q, got %q", testCase.wantText, description)
+				test.Fatalf("expected the message to contain %q, got %q", testCase.wantText, description)
 			}
 		})
 	}
@@ -399,8 +399,8 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 // The candidate gate is the speed story: it decides whether a name is worth spending the rest of the
 // rule on. It must stay a superset of the branches, because a false negative here silently stops the
 // rule firing and looks exactly like a clean run.
-func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(test *testing.T) {
+	test.Parallel()
 
 	// Every name any branch below the gate can report, one per branch family.
 	reportable := []string{
@@ -420,7 +420,7 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 	}
 	for _, name := range reportable {
 		if !isAbbreviationCandidate(name) {
-			t.Errorf("the gate rejects %q, which a branch below would have reported", name)
+			test.Errorf("the gate rejects %q, which a branch below would have reported", name)
 		}
 	}
 
@@ -429,7 +429,7 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 		"renderNodeOrComponent", "identifier", "sourceFile", "handleSubmit", "useMediaQuery",
 	} {
 		if isAbbreviationCandidate(name) {
-			t.Errorf("the gate accepts %q, which no branch would report", name)
+			test.Errorf("the gate accepts %q, which no branch would report", name)
 		}
 	}
 }
@@ -449,8 +449,8 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 //
 // The column is asserted alongside the line because trivia swallowed within a single line moves only
 // the column, and a line-only assertion cannot see it.
-func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -492,16 +492,16 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding, got none")
+				test.Fatalf("expected a finding, got none")
 			}
 
 			line, column := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 			if line+1 != testCase.wantLine || column+1 != testCase.wantColumn {
-				t.Fatalf("expected the finding at %d:%d, got %d:%d",
+				test.Fatalf("expected the finding at %d:%d, got %d:%d",
 					testCase.wantLine, testCase.wantColumn, line+1, column+1)
 			}
 		})
@@ -519,8 +519,8 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 // where a full eslint run reports five findings this port reported zero of. A method signature is
 // included because the original walks `Identifier` without distinguishing the two member kinds, and
 // a nested type literal because the skip was keyed on the parent node rather than on depth.
-func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -549,10 +549,10 @@ func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -562,8 +562,8 @@ func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
 // The narrowing above subtracts exactly one member from `IsForeignName`'s set. Without this test a
 // mutation widening it to "never skip a foreign name" would pass every assertion in the file, since
 // nothing else asserts the remaining exemptions survive.
-func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"a property read", "const value = thing.maxAgentsBytes;\n"},
@@ -571,10 +571,10 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 		{"a namespace import", "import * as maxAgentsBytes from 'external';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -583,8 +583,8 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 // api-phi-health's parity sweep (#dx1vrfm): the rule judges names the code declares, never names it
 // reads from elsewhere or renames away from. Each silent row is one of the six reported sites in
 // shape; each reporting row is the nearest shape the rule must still catch.
-func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct{ name, sourceText string }{
 		// ModuleTestDiscovery.ts: tsconfig-paths' loadConfig, read in a type query and a call.
@@ -598,9 +598,9 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 		{"an external key renamed away", "declare const entry: Record<string, unknown>;\nconst { maxBitrate: maximumBitrate } = entry;\nexport { maximumBitrate };\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText))
 		})
 	}
 
@@ -613,14 +613,14 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 		{"a local that shadows an import", "import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n", "abbreviatedIdentifier"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding, got none")
+				test.Fatalf("expected a finding, got none")
 			}
 			if result.Diagnostics[0].Message.Id != testCase.id {
-				t.Fatalf("expected %s first, got %v", testCase.id, result.MessageIds())
+				test.Fatalf("expected %s first, got %v", testCase.id, result.MessageIds())
 			}
 		})
 	}
@@ -633,8 +633,8 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 // told route authors to write `maximumDuration`, which Next then silently ignores. Each silent case is
 // paired with the same text in a file Next does not read, which must still report, so the exemption
 // is shown to come from the route file rather than from the name.
-func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(test *testing.T) {
+	test.Parallel()
 
 	const routeFile = "/repository/app/api/report/route.ts"
 	const pageFile = "/repository/app/blog/[slug]/page.tsx"
@@ -663,14 +663,14 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, testCase.fileName, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, testCase.fileName, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -683,8 +683,8 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 // Exact spans ensure a contextual literal is silent while its declaration reports once.
 // The setup path preserves our tsconfig: the cached harness forces every source file into a
 // module, which would prevent the global interface-merging fixture from actually merging.
-func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name, source string
 		want         int
@@ -757,13 +757,13 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(t *testing.T) {
 		{"full names", `interface Session { durationInMilliseconds: number } class Timer { durationInMilliseconds = 500 } const session = { durationInMilliseconds: 500 };`, 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			fileName := "subject.tsx"
 			if testCase.name == "own ref property" {
 				fileName = "app/page.tsx"
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistencyNoAbbreviatedIdentifier, map[string]string{
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, ConsistencyNoAbbreviatedIdentifier, map[string]string{
 				fileName:                            testCase.source,
 				"tsconfig.json":                     `{ "compilerOptions": { "strict": true, "target": "ES2022", "lib": ["ES2022"], "types": [] }, "include": ["**/*.ts", "**/*.tsx"] }`,
 				"node_modules/wire/index.d.ts":      `export interface ComputedOptions { ['durationMs']: number } export interface Options { durationMs: number } export interface Worker { durationMs(): number } export class StaticBase { static durationMs: number } export class Base { durationMs: number } export const external: Options; export const durationMs: number; export function accept(options: Options): void;`,
@@ -775,17 +775,17 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(t *testing.T) {
 				FrameworkConstantFilePatterns:  []string{"app/page.tsx"},
 			}, func(string) {})
 			if len(result.Diagnostics) != testCase.want {
-				t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+				test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 			}
 			for _, diagnostic := range result.Diagnostics {
 				text := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if text != "durationMs" && text != `"durationMs"` && text != "ref" && text != "queryFn" && text != "'durationMs'" && text != "#durationMs" && text != "#idx" && text != "params" && text != "config" && text != "args" && text != "maxDuration" {
-					t.Errorf("finding at %q instead of the property declaration", text)
+					test.Errorf("finding at %q instead of the property declaration", text)
 				}
 			}
 			if strings.HasPrefix(testCase.name, "own ") && strings.Contains(testCase.name, "key") && strings.Contains(testCase.source, "const session") && len(result.Diagnostics) == 1 {
 				if result.Diagnostics[0].Range.Pos() >= strings.Index(result.SourceFile.Text(), "const session") {
-					t.Fatal("reported at literal instead of declaration")
+					test.Fatal("reported at literal instead of declaration")
 				}
 			}
 		})
@@ -829,8 +829,8 @@ func abbreviatedReactDependencyFiles(source string) map[string]string {
 // fails 10/56 cases on 356201b8 and when the composition guard is removed. Dropping the
 // existing contextual type for spread/branch literals fails 20/56. A maxAgentsBytes plant
 // appended to every subject fails all 56/56, including every reporting control.
-func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name, source string
 		want         int
@@ -856,11 +856,11 @@ func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(t *testi
 		{"page properties unchanged", `type PageProperties = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> };`, 2},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
 			if len(result.Diagnostics) != testCase.want {
-				t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+				test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 			}
 		})
 	}
@@ -869,8 +869,8 @@ func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(t *testi
 // The checked-in checker already propagates context through these value-preserving expressions.
 // All twenty typed cases are quiet on 356201b8; the seventeen owned/boundary cases report there.
 // These pin that behavior without adding an unproven fallback walk.
-func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(test *testing.T) {
+	test.Parallel()
 	expressions := []struct{ name, source string }{
 		{"direct spread", `{ maxWidth: 'x' }`},
 		{"and", `condition && { maxWidth: 'x' }`},
@@ -884,8 +884,8 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing
 		{"nested spreads", `{ ...(condition && { maxWidth: 'x' }) }`},
 	}
 	for _, expression := range expressions {
-		t.Run(expression.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(expression.name, func(test *testing.T) {
+			test.Parallel()
 			cases := []struct {
 				name, source string
 				want         int
@@ -895,11 +895,11 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing
 				{"own shape", "const style = { ...(" + expression.source + ") };", 1},
 			}
 			for _, testCase := range cases {
-				t.Run(testCase.name, func(t *testing.T) {
-					t.Parallel()
-					result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+				test.Run(testCase.name, func(test *testing.T) {
+					test.Parallel()
+					result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
 					if len(result.Diagnostics) != testCase.want {
-						t.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+						test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 					}
 				})
 			}
@@ -915,17 +915,17 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(t *testing
 		{"untyped ESLint configuration unchanged", `export default { maxWarnings: 1 };`},
 	}
 	for _, testCase := range boundaries {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
-			rule_testing.ExpectFindings(t, result, "abbreviatedIdentifier")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+			rule_testing.ExpectFindings(test, result, "abbreviatedIdentifier")
 		})
 	}
 }
 
 // An unavailable type contract cannot establish that a member spelling is ours.
-func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name, source, dependency string
 		want                     int
@@ -940,19 +940,19 @@ func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(t *testing.T)
 		{name: "dependency contextual declaration", source: "const page: PageProps = { durationMs: 500 };", dependency: "interface PageProps { durationMs: number }"},
 	}
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(tc.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{"subject.ts": tc.source}
 			if tc.dependency != "" {
 				files["contract.d.ts"] = "export {}; declare global { " + tc.dependency + " }"
 			}
-			result := rule_testing.RunTypedFiles(t, ConsistencyNoAbbreviatedIdentifier, files, "subject.ts")
+			result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, files, "subject.ts")
 			if len(result.Diagnostics) != tc.want {
-				t.Fatalf("got %d findings, want %d: %v", len(result.Diagnostics), tc.want, result.MessageIds())
+				test.Fatalf("got %d findings, want %d: %v", len(result.Diagnostics), tc.want, result.MessageIds())
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatal("abbreviation rule must not fix names")
+					test.Fatal("abbreviation rule must not fix names")
 				}
 			}
 		})

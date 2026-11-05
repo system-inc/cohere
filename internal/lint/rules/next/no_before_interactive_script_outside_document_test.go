@@ -10,8 +10,8 @@ import (
 // The seven passing cases from oxc's corpus, copied byte for byte out of the extractor's dump rather
 // than transcribed, and pinned by file name because on this rule the file name is most of the
 // judgment. Ten of the thirteen upstream cases vary only the path over near-identical source.
-func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -55,18 +55,18 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(t *
 		}}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The six failing cases from oxc's corpus. The snapshot carries exactly six diagnostics against six
 // inputs, so one finding each, with no discrepancy for the extractor to warn about.
-func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -105,10 +105,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *tes
 		}}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}
 }
@@ -119,52 +119,52 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *tes
 // `strategy="beforeInteractive"`, so the span is asserted by slicing the source with the finding's
 // own range and comparing the text. A message id assertion cannot see where a finding points, and
 // this rule carries no fix, so the span is the only thing that can.
-func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script src=\"/a.js\" strategy=\"beforeInteractive\" />;\n}\n"
 
-	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+	result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 	// Compared against a literal typed here rather than against the rule's own constant, so the
 	// assertion cannot move together with the thing it guards.
 	if reported != "strategy=\"beforeInteractive\"" {
-		t.Fatalf("reported range: want %q, got %q", "strategy=\"beforeInteractive\"", reported)
+		test.Fatalf("reported range: want %q, got %q", "strategy=\"beforeInteractive\"", reported)
 	}
 	if length := diagnostic.Range.End() - diagnostic.Range.Pos(); length != 28 {
-		t.Fatalf("span length: want 28 as the snapshot's caret shows, got %d", length)
+		test.Fatalf("span length: want 28 as the snapshot's caret shows, got %d", length)
 	}
 }
 
 // The rendered message is asserted whole rather than by substring, because a predicate weaker than
 // the property it guards is not a guard: a `strings.Contains` on an interpolated value stays green
 // while the text around the needle is wrong.
-func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\" />;\n}\n"
 
-	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+	result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 
 	got := result.Diagnostics[0].Message
 	if got.Id != "noBeforeInteractiveScriptOutsideDocument" {
-		t.Fatalf("message id: want %q, got %q", "noBeforeInteractiveScriptOutsideDocument", got.Id)
+		test.Fatalf("message id: want %q, got %q", "noBeforeInteractiveScriptOutsideDocument", got.Id)
 	}
 	// The description is built by concatenating string fragments, which is exactly where a missing
 	// or doubled space hides, so both ends are asserted against literals typed here.
 	const wantPrefix = "This loads a script with next/script's beforeInteractive strategy outside of pages/_document.js."
 	if !strings.HasPrefix(got.Description, wantPrefix) {
-		t.Fatalf("description: want the prefix %q, got %q", wantPrefix, got.Description)
+		test.Fatalf("description: want the prefix %q, got %q", wantPrefix, got.Description)
 	}
 	if !strings.HasSuffix(got.Description, "or pick a strategy that does not promise to run first.") {
-		t.Fatalf("description: unexpected ending in %q", got.Description)
+		test.Fatalf("description: unexpected ending in %q", got.Description)
 	}
 	if strings.Contains(got.Description, "  ") {
-		t.Fatalf("description has a doubled space, which is how a concatenated string goes wrong: %q", got.Description)
+		test.Fatalf("description has a doubled space, which is how a concatenated string goes wrong: %q", got.Description)
 	}
 }
 
@@ -175,8 +175,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(t *testing.T)
 // `beforeInteractive` strategy sits in `pages/_document.tsx`, where the path gate has already
 // exempted the file, so deleting the strategy comparison entirely would leave every upstream fixture
 // green. The first four cases here close that.
-func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -322,17 +322,17 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The reporting half of the invented cases, measured the same way.
-func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -407,10 +407,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}
 }
@@ -418,13 +418,13 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 // Two elements in one file report twice, which is our own tree's real shape: the single file in
 // these checkouts that trips this rule writes a self closing Script and a paired one, and upstream
 // reports both. Measured on the binary at two findings.
-func TestNoBeforeInteractiveScriptOutsideDocumentReportsEveryElement(t *testing.T) {
-	t.Parallel()
+func TestNoBeforeInteractiveScriptOutsideDocumentReportsEveryElement(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return (\n    <>\n      <Script src=\"/a.js\" strategy=\"beforeInteractive\" />\n      <Script id=\"b\" strategy=\"beforeInteractive\"></Script>\n    </>\n  );\n}\n"
 
-	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result,
+	result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result,
 		"noBeforeInteractiveScriptOutsideDocument",
 		"noBeforeInteractiveScriptOutsideDocument")
 }

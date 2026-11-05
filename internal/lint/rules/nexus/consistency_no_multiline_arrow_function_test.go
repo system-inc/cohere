@@ -11,8 +11,8 @@ const arrowFile = "/repository/source/Thing.tsx"
 // A `.ts` file, where `<T>(value: T) =>` is a generic arrow rather than the opening of a JSX element.
 const arrowPlainFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,16 +48,16 @@ func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -86,18 +86,18 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
 		{"single-line arrow as a multi-line call argument", "register(\n    'name',\n    () => {},\n);\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // One arrow must never produce two findings. The general case has to skip what the call-expression
 // case already claimed, and a fixture is the only thing that keeps that true.
-func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -108,10 +108,10 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 		{"addEventListener", "element.addEventListener('click', (event) => {\n    run(event);\n});\n", "addEventListenerArrow"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
@@ -120,8 +120,8 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 // original (`ConsistencyNoMultilineArrowFunctionRule.ts`, driven through ESLint's `verifyAndFix`
 // on 2026-10-01) and is byte-identical to it, except where a case says otherwise. The first four are
 // the real ahra sites the rule review named.
-func TestConsistencyNoMultilineArrowFunctionFixes(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -226,13 +226,13 @@ func TestConsistencyNoMultilineArrowFunctionFixes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, testCase.fileName, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %v", result.MessageIds())
+				test.Fatalf("expected one finding, got %v", result.MessageIds())
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }
@@ -242,8 +242,8 @@ func TestConsistencyNoMultilineArrowFunctionFixes(t *testing.T) {
 // is not legal in a function expression at all. The original rewrites the first two on a hook or
 // listener argument (verified: `React.useEffect(() => { this.run(); })` becomes a function reading
 // its own `this`), which is the one place this fix declines what the original performs.
-func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -259,12 +259,12 @@ func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(t *testing.T
 		{"this in a parameter default", "React.useCallback((value = this.fallback) => {\n    run(value);\n}, []);\n", "reactHookArrow"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix, got %q", result.Diagnostics[0].Fixes[0].Text)
+				test.Fatalf("expected no fix, got %q", result.Diagnostics[0].Fixes[0].Text)
 			}
 		})
 	}
@@ -272,8 +272,8 @@ func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(t *testing.T
 
 // The other direction of the same walk: a binding that only looks inherited still converts. A
 // nested function binds its own `arguments`, and a property named `arguments` is not the binding.
-func TestConsistencyNoMultilineArrowFunctionFixesWhatOnlyLooksInherited(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoMultilineArrowFunctionFixesWhatOnlyLooksInherited(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -292,10 +292,10 @@ func TestConsistencyNoMultilineArrowFunctionFixesWhatOnlyLooksInherited(t *testi
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }

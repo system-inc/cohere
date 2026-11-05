@@ -16,8 +16,8 @@ import (
 // it ESLint matches no configuration for a TypeScript file and reports nothing, and the first run
 // of 400 real files came back clean for exactly that reason. The control that caught it was the
 // tree's own fixture, which is a known violation and must report.
-func TestConsistencyOrganizeImportsFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsFires(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name   string
@@ -94,22 +94,22 @@ func TestConsistencyOrganizeImportsFires(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "importsNotOrganized")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "importsNotOrganized")
 
 			span := result.Diagnostics[0].Range
 			got := testCase.source[span.Pos():span.End()]
 			if got != testCase.reported {
-				t.Fatalf("finding spans %q, want %q", got, testCase.reported)
+				test.Fatalf("finding spans %q, want %q", got, testCase.reported)
 			}
 		})
 	}
 }
 
-func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name string
@@ -187,14 +187,14 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			fileName := testCase.fileName
 			if fileName == "" {
 				fileName = "/repository/app/Thing.tsx"
 			}
-			result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -202,11 +202,11 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 // Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
 // the generator writes the house form, so a finding here is a defect in the generator. The rule used to
 // decline these files, and both spellings of generated output are reported now.
-func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(test *testing.T) {
+	test.Parallel()
 	for _, fileName := range []string{"/repository/app/generated/Thing.tsx", "/repository/app/Thing.generated.ts"} {
-		result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, fileName, "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n")
-		rule_testing.ExpectFindings(t, result, "importsNotOrganized")
+		result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, fileName, "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n")
+		rule_testing.ExpectFindings(test, result, "importsNotOrganized")
 	}
 }
 
@@ -227,12 +227,12 @@ func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(t *testing.T) {
 // is safer than deleting it and still not right.
 //
 // Each case below was run against the original for comparison, and the divergences are the point.
-func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsFixesTheSection(test *testing.T) {
+	test.Parallel()
 
 	// The ordinary case, which is every one of the 109 files this landed for.
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ConsistencyRequireOrganizedImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.Run(test, ConsistencyRequireOrganizedImports, "Component.tsx",
 			"import alpha from 'alpha';\nimport React from 'react';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport alpha from 'alpha';\n")
 
@@ -241,14 +241,14 @@ func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
 	 * import sorts next, because a trailing comment is syntactically the leading trivia of the
 	 * following statement, so the note ends up describing a module it was never about.
 	 */
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ConsistencyRequireOrganizedImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.Run(test, ConsistencyRequireOrganizedImports, "Component.tsx",
 			"import zebra from 'zebra'; // note about zebra\nimport React from 'react';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport zebra from 'zebra'; // note about zebra\n")
 
 	// A comment above a non-first import travels with it and keeps suppressing what it suppressed.
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ConsistencyRequireOrganizedImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.Run(test, ConsistencyRequireOrganizedImports, "Component.tsx",
 			"import React from 'react';\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n")
 }
@@ -258,8 +258,8 @@ func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
 // Both still report. The finding is unchanged and a reader reorders the section by hand, which is
 // what the rule did for every file before it could fix anything. What changed is only that the
 // fixer says nothing rather than guessing.
-func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(test *testing.T) {
+	test.Parallel()
 
 	/*
 	 * A statement between two imports runs before the imports below it. The rendering appends it
@@ -267,11 +267,11 @@ func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
 	 * correct alternative: the canonical form has no place to put a statement mid-section when the
 	 * imports around it are being reordered.
 	 */
-	interleaved := rule_testing.Run(t, ConsistencyRequireOrganizedImports, "Component.tsx",
+	interleaved := rule_testing.Run(test, ConsistencyRequireOrganizedImports, "Component.tsx",
 		"import alpha from 'alpha';\nconsole.info('between');\nimport React from 'react';\n")
-	rule_testing.ExpectFindings(t, interleaved, "importsNotOrganized")
+	rule_testing.ExpectFindings(test, interleaved, "importsNotOrganized")
 	if len(interleaved.Diagnostics) > 0 && len(interleaved.Diagnostics[0].Fixes) > 0 {
-		t.Error("a file with an interleaved statement must not be fixed")
+		test.Error("a file with an interleaved statement must not be fixed")
 	}
 
 	/*
@@ -280,10 +280,10 @@ func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
 	 * written for. The original deletes it outright, which is worse and is the defect this refusal
 	 * exists to avoid inheriting.
 	 */
-	suppressed := rule_testing.Run(t, ConsistencyRequireOrganizedImports, "Component.tsx",
+	suppressed := rule_testing.Run(test, ConsistencyRequireOrganizedImports, "Component.tsx",
 		"// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\nimport React from 'react';\n")
-	rule_testing.ExpectFindings(t, suppressed, "importsNotOrganized")
+	rule_testing.ExpectFindings(test, suppressed, "importsNotOrganized")
 	if len(suppressed.Diagnostics) > 0 && len(suppressed.Diagnostics[0].Fixes) > 0 {
-		t.Error("a file whose suppression precedes the section must not be fixed")
+		test.Error("a file whose suppression precedes the section must not be fixed")
 	}
 }

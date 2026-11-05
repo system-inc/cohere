@@ -63,13 +63,13 @@ type globalsCase struct {
 	count  int
 }
 
-func TestGlobalsFires(t *testing.T) {
-	t.Parallel()
+func TestGlobalsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range globalsFiresCases() {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Globals, "Subject.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				// A literal rather than the rule's own message constant. Comparing against the
@@ -78,19 +78,19 @@ func TestGlobalsFires(t *testing.T) {
 				// suite.
 				expected[index] = "globalReassignment"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestGlobalsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGlobalsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range globalsSilentCases() {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Globals, "Subject.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -273,8 +273,8 @@ func globalsSilentCases() []globalsCase {
 // The expected text was read off React's own output for the same input rather than derived from the
 // source, and the parenthesized pair is here because it is where the two spans visibly disagree
 // about the parentheses: `(g) = 1` reports inside them and `(g) += 1` reports from the open paren.
-func TestGlobalsSpans(t *testing.T) {
-	t.Parallel()
+func TestGlobalsSpans(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name     string
@@ -322,15 +322,15 @@ func TestGlobalsSpans(t *testing.T) {
 			reported: "q = 5",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Globals, "Subject.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding points at %q, wanted %q", reported, testCase.reported)
+				test.Errorf("finding points at %q, wanted %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -342,21 +342,21 @@ func TestGlobalsSpans(t *testing.T) {
 // format string does. The port brief records two survivors that were exactly this: a finding count
 // and id both correct while the per-finding text moved. Equality rather than `strings.Contains`,
 // because a weaker predicate than the property it guards is not a guard.
-func TestGlobalsMessageNamesTheBinding(t *testing.T) {
-	t.Parallel()
+func TestGlobalsMessageNamesTheBinding(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, Globals, "Subject.tsx",
+	result := rule_testing.RunTyped(test, Globals, "Subject.tsx",
 		"let renderCount = 0;\nfunction Component() {\n  renderCount = 1;\n  return <div />;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message.Description
 	wantedPrefix := "This writes to `renderCount`, which is declared outside the component or hook, while the component is rendering."
 	if !strings.HasPrefix(message, wantedPrefix) {
-		t.Errorf("message is %q, wanted it to start with %q", message, wantedPrefix)
+		test.Errorf("message is %q, wanted it to start with %q", message, wantedPrefix)
 	}
 	if strings.Contains(message, "``") {
-		t.Errorf("message has a doubled backtick, which means the name was interpolated twice: %q", message)
+		test.Errorf("message has a doubled backtick, which means the name was interpolated twice: %q", message)
 	}
 }
 
@@ -367,19 +367,19 @@ func TestGlobalsMessageNamesTheBinding(t *testing.T) {
 // failing loudly. Every silent fixture above would pass for the wrong reason if the harness were
 // ever changed, so this asserts the difference directly: the same input reports under `RunTyped`
 // and is silent under `Run`.
-func TestGlobalsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestGlobalsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "let g = 0;\nfunction Component() {\n  g = 1;\n  return <div />;\n}\n"
 
-	typed := rule_testing.RunTyped(t, Globals, "Subject.tsx", source)
+	typed := rule_testing.RunTyped(test, Globals, "Subject.tsx", source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness should report once, got %d", len(typed.Diagnostics))
+		test.Fatalf("the typed harness should report once, got %d", len(typed.Diagnostics))
 	}
 
-	untyped := rule_testing.Run(t, Globals, "Subject.tsx", source)
+	untyped := rule_testing.Run(test, Globals, "Subject.tsx", source)
 	if len(untyped.Diagnostics) != 0 {
-		t.Errorf("the untyped harness should be silent, got %d findings", len(untyped.Diagnostics))
+		test.Errorf("the untyped harness should be silent, got %d findings", len(untyped.Diagnostics))
 	}
 }
 
@@ -394,8 +394,8 @@ func TestGlobalsRequiresTheTypedHarness(t *testing.T) {
 // Each case below is one React REPORTS and this rule does not. They are pinned as silent so that a
 // later widening has to come here and change them deliberately, and so the next reader can see
 // exactly what the subset costs rather than having to rediscover it.
-func TestGlobalsBoundary(t *testing.T) {
-	t.Parallel()
+func TestGlobalsBoundary(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -426,10 +426,10 @@ func TestGlobalsBoundary(t *testing.T) {
 			source: "import {useMemo} from 'react';\nlet g = 0;\nfunction Component() {\n  useMemo(() => { g = 1; }, []);\n  return <div />;\n}\n",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Globals, "Subject.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

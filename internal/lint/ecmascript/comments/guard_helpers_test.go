@@ -20,11 +20,11 @@ type realSourceFile struct {
 
 // realSourceFiles parses actual tree files, so the differential test runs on the comment shapes that
 // exist rather than on the ones somebody thought to write.
-func realSourceFiles(t *testing.T, limit int) []realSourceFile {
-	t.Helper()
+func realSourceFiles(test *testing.T, limit int) []realSourceFile {
+	test.Helper()
 
 	var files []realSourceFile
-	root := corpus.Structure.Path(t, "source")
+	root := corpus.Structure.Path(test, "source")
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || len(files) >= limit {
 			return nil
@@ -52,20 +52,20 @@ func realSourceFiles(t *testing.T, limit int) []realSourceFile {
 
 	// A corpus that failed to load would make every assertion pass over nothing.
 	if len(files) < 100 {
-		t.Fatalf("the structure corpus gave only %d source files, too few to be a corpus", len(files))
+		test.Fatalf("the structure corpus gave only %d source files, too few to be a corpus", len(files))
 	}
 	return files
 }
 
 // parseSourceForTest parses one hand-written case.
-func parseSourceForTest(t *testing.T, sourceText string) *ast.SourceFile {
-	t.Helper()
+func parseSourceForTest(test *testing.T, sourceText string) *ast.SourceFile {
+	test.Helper()
 
 	name := tspath.NormalizePath("/repository/source/Thing.ts")
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(name), PathKey: tspath.PathKey(name)}, sourceText, core.ScriptKindTS)
 	if sourceFile == nil {
-		t.Fatalf("could not parse the fixture")
+		test.Fatalf("could not parse the fixture")
 	}
 	return sourceFile
 }

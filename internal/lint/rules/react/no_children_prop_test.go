@@ -23,8 +23,8 @@ const childrenPropFile = "/repository/source/Children.tsx"
 // by hand, so no transcription step existed that could cook an escape. One Tester block, 38 pass
 // and 15 fail, and the snapshot records 15 diagnostics from those 15 inputs, so one finding per
 // input is measured here rather than assumed.
-func TestNoChildrenPropFires(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"<div children />;",
@@ -45,10 +45,10 @@ func TestNoChildrenPropFires(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 }
@@ -62,8 +62,8 @@ func TestNoChildrenPropFires(t *testing.T) {
 // children: "Children"})` is the sharpest: it writes the offending property exactly, and is clean
 // only because the callee is not a createElement call, so a port that forgot the callee gate would
 // report it while every other clean case still passed.
-func TestNoChildrenPropStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"<div />;",
@@ -107,9 +107,9 @@ func TestNoChildrenPropStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -125,8 +125,8 @@ func TestNoChildrenPropStaysSilent(t *testing.T) {
 //
 // The wanted text is `children` in every row, which is the point: it should never widen to
 // `children="Children"` or to the call.
-func TestNoChildrenPropPointsAtTheName(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropPointsAtTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -142,18 +142,18 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0].Range
 			if reported.Pos() != testCase.wantOffset {
-				t.Errorf("finding starts at %d, want %d", reported.Pos(), testCase.wantOffset)
+				test.Errorf("finding starts at %d, want %d", reported.Pos(), testCase.wantOffset)
 			}
 			if got := testCase.sourceText[reported.Pos():reported.End()]; got != "children" {
-				t.Errorf("finding underlines %q, want %q", got, "children")
+				test.Errorf("finding underlines %q, want %q", got, "children")
 			}
 		})
 	}
@@ -165,18 +165,18 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 // check on a message that had grown a duplicated fragment would still pass. This message carries no
 // interpolation at all, which is itself the thing being pinned, since a later edit adding a `%s`
 // without a value would render a stray verb and every other test here would stay green.
-func TestNoChildrenPropRendersItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropRendersItsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, `<div children />;`)
+	result := rule_testing.Run(test, NoChildrenProp, childrenPropFile, `<div children />;`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoChildrenProp.Description {
-		t.Errorf("rendered %q, want %q", got, messageNoChildrenProp.Description)
+		test.Errorf("rendered %q, want %q", got, messageNoChildrenProp.Description)
 	}
 	if strings.Contains(messageNoChildrenProp.Description, "%") {
-		t.Errorf("message carries a format verb but is reported without arguments: %q",
+		test.Errorf("message carries a format verb but is reported without arguments: %q",
 			messageNoChildrenProp.Description)
 	}
 }
@@ -192,8 +192,8 @@ func TestNoChildrenPropRendersItsMessage(t *testing.T) {
 // its test run, which reports a pass case that produced a diagnostic, named exactly these as
 // reporting. `{[children]: 1}` and `{2: 1}` stayed silent in the same run and are the clean side
 // below.
-func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropCoversEveryPropertyKind(test *testing.T) {
+	test.Parallel()
 
 	reports := []string{
 		`React.createElement("div", {children});`,
@@ -211,10 +211,10 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 		"React.createElement(\"div\", {[`children`]: 1});",
 	}
 	for _, sourceText := range reports {
-		t.Run("reports "+sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+		test.Run("reports "+sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -234,9 +234,9 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 		`React.createElement("div", {[someKey]: 1});`,
 	}
 	for _, sourceText := range silent {
-		t.Run("silent on "+sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+		test.Run("silent on "+sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -248,10 +248,10 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 // reading any text. This pins the order: a refactor that reads the text first and filters by kind
 // afterwards takes down every file in the tree containing a computed key, and no imported fixture
 // covers one.
-func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropSurvivesAComputedKey(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
 		"declare const key: string;\nReact.createElement(\"div\", {[key]: 1});\n"))
 }
 
@@ -261,10 +261,10 @@ func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
 // template returns None there. `staticKeyName` declines it by kind for the same reason: its text is
 // not the property name, and reading the cooked text of the first chunk would report on a property
 // that is actually called something else at runtime.
-func TestNoChildrenPropDeclinesASubstitutingTemplateKey(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropDeclinesASubstitutingTemplateKey(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
 		"declare const part: string;\nReact.createElement(\"div\", {[`children${part}`]: 1});\n"))
 }
 
@@ -275,8 +275,8 @@ func TestNoChildrenPropDeclinesASubstitutingTemplateKey(t *testing.T) {
 // and the imported corpus tests none of them: a bare `createElement` is the modern spelling and
 // must report, `document.createElement` shares the property name and constructs a DOM node so must
 // not, and a computed member is the same call written differently and must report.
-func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(test *testing.T) {
+	test.Parallel()
 
 	reports := []string{
 		`createElement("div", {children: 1});`,
@@ -285,10 +285,10 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 		`(React).createElement("div", {children: 1});`,
 	}
 	for _, sourceText := range reports {
-		t.Run("reports "+sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+		test.Run("reports "+sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -297,9 +297,9 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 		`React.createFragment("div", {children: 1});`,
 	}
 	for _, sourceText := range silent {
-		t.Run("silent on "+sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+		test.Run("silent on "+sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -310,10 +310,10 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 // `jsx.AttributeName` returns not-named for it. oxc reaches the same answer by destructuring
 // `JSXAttributeName::Identifier` and returning early on anything else, so the silence is upstream's
 // judgment rather than a gap in ours.
-func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropDeclinesANamespacedAttributeName(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
 		`<svg xlink:children="x" />;`))
 }
 
@@ -322,10 +322,10 @@ func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
 // Upstream stops at the first match and emits one diagnostic per call expression. Reporting both
 // would be a divergence nothing asked for, and the imported corpus never writes a duplicate key so
 // it cannot say which behavior was ported.
-func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropReportsOncePerCall(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
 		`React.createElement("div", {children: 1, "children": 2});`), "noChildrenProp")
 }
 
@@ -335,10 +335,10 @@ func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
 // produces two findings. Upstream does the same, listening on `JSXAttribute`. The pair of tests
 // exists because "reports once" and "reports per occurrence" are both defensible and only one of
 // them is upstream's, per surface.
-func TestNoChildrenPropReportsPerJsxAttribute(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropReportsPerJsxAttribute(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
 		`<div children="a" children="b" />;`), "noChildrenProp", "noChildrenProp")
 }
 
@@ -353,8 +353,8 @@ func TestNoChildrenPropReportsPerJsxAttribute(t *testing.T) {
 // own object literal, which is genuinely invisible to both tools. Neither reports it, because the
 // JSX side listens per attribute and a spread is not one, and the call side never runs on JSX at
 // all. It is here so the silence is a recorded decision rather than an unexamined gap.
-func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropSurvivesDegenerateInput(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		`React.createElement("div", {});`,
@@ -363,14 +363,14 @@ func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
 		`React.createElement(...args);`,
 		`<div {...{children: 1}} />;`,
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					t.Fatalf("panicked rather than reporting: %v", recovered)
+					test.Fatalf("panicked rather than reporting: %v", recovered)
 				}
 			}()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -382,12 +382,12 @@ func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
 // function spellings. Eight reporting: the same functions passed the other way, nested as the only
 // child or as createElement's third argument. Upstream's messages for those are `nestFunction` and
 // `passFunctionAsArgs`, and they point at the whole element and the whole call.
-func TestNoChildrenPropAllowFunctions(t *testing.T) {
-	t.Parallel()
+func TestNoChildrenPropAllowFunctions(test *testing.T) {
+	test.Parallel()
 
 	allowed, err := rule.DecodeOptionsInto[NoChildrenPropOptions]()([]byte(`{"allowFunctions": true}`))
 	if err != nil {
-		t.Fatalf("decoding allowFunctions: %v", err)
+		test.Fatalf("decoding allowFunctions: %v", err)
 	}
 	functions := []string{"() => {}", "function() {}", "async function() {}", "function* () {}"}
 
@@ -397,12 +397,12 @@ func TestNoChildrenPropAllowFunctions(t *testing.T) {
 			"React.createElement(MyComponent, {children: " + function + "});",
 		}
 		for _, sourceText := range clean {
-			t.Run(sourceText, func(t *testing.T) {
-				t.Parallel()
-				rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed))
+			test.Run(sourceText, func(test *testing.T) {
+				test.Parallel()
+				rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed))
 				// The control: without the option the same source reports, so the option is what
 				// made it clean.
-				rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+				rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 			})
 		}
 
@@ -415,16 +415,16 @@ func TestNoChildrenPropAllowFunctions(t *testing.T) {
 			{"React.createElement(MyComponent, {}, " + function + ");", "passFunctionAsArgs", "React.createElement(MyComponent, {}, " + function + ")"},
 		}
 		for _, testCase := range reporting {
-			t.Run(testCase.sourceText, func(t *testing.T) {
-				t.Parallel()
-				result := rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, testCase.sourceText, allowed)
-				rule_testing.ExpectFindings(t, result, testCase.wantId)
+			test.Run(testCase.sourceText, func(test *testing.T) {
+				test.Parallel()
+				result := rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, testCase.sourceText, allowed)
+				rule_testing.ExpectFindings(test, result, testCase.wantId)
 				diagnostic := result.Diagnostics[0]
 				if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
-					t.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
+					test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 				}
 				// Without the option, a function passed this way is ordinary children.
-				rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText))
+				rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText))
 			})
 		}
 	}
@@ -436,16 +436,16 @@ func TestNoChildrenPropAllowFunctions(t *testing.T) {
 		`React.createElement(MyComponent, {children: "Children"});`,
 	}
 	for _, sourceText := range stillReporting {
-		t.Run(sourceText+" under allowFunctions", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed), "noChildrenProp")
+		test.Run(sourceText+" under allowFunctions", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed), "noChildrenProp")
 		})
 	}
 	// Measured against the installed build under the option, beyond upstream's rows: parentheses,
 	// which ESTree does not materialize, and a method or getter, whose ESTree value is a function.
-	t.Run("a parenthesized function nested as the only child under allowFunctions", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile,
+	test.Run("a parenthesized function nested as the only child under allowFunctions", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile,
 			"<MyComponent>{(() => {})}</MyComponent>;", allowed), "nestFunction")
 	})
 	for _, sourceText := range []string{
@@ -456,9 +456,9 @@ func TestNoChildrenPropAllowFunctions(t *testing.T) {
 		"React.createElement(MyComponent, {children() {}});",
 		"React.createElement(MyComponent, {get children() { return 1 }});",
 	} {
-		t.Run(sourceText+" under allowFunctions", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoChildrenProp, childrenPropFile, sourceText, allowed))
+		test.Run(sourceText+" under allowFunctions", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed))
 		})
 	}
 }

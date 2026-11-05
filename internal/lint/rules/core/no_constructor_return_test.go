@@ -31,8 +31,8 @@ const constructorReturnFile = "/repository/source/ConstructorReturn.ts"
 // The corpus is small and it is silent on almost everything TypeScript adds, so the added cases
 // carry their own reasoning and every one of them was measured against the installed ESLint 10.8.1
 // rule through the Linter API, under both the default parser and `@typescript-eslint/parser`.
-func TestNoConstructorReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoConstructorReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -86,14 +86,14 @@ func TestNoConstructorReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "noConstructorReturn"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoConstructorReturn, constructorReturnFile, testCase.sourceText), wantIds...)
 		})
 	}
 }
@@ -108,8 +108,8 @@ func TestNoConstructorReturnFires(t *testing.T) {
 // And a rule translating `MethodDefinition` with `kind === "constructor"` straight into
 // `IsConstructorDeclaration` reports `static constructor`, which our parser calls a constructor and
 // upstream does not.
-func TestNoConstructorReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConstructorReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// upstream, valid
@@ -160,10 +160,10 @@ func TestNoConstructorReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoConstructorReturn, constructorReturnFile, sourceText))
 		})
 	}
 }
@@ -181,8 +181,8 @@ func TestNoConstructorReturnStaysSilent(t *testing.T) {
 // The message is asserted against a literal typed here rather than against the rule's own constant,
 // because comparing a diagnostic to the constant it was built from is an equality that moves on both
 // sides under mutation and cannot fail.
-func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
-	t.Parallel()
+func TestNoConstructorReturnSpansTheWholeStatement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -194,18 +194,18 @@ func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConstructorReturn, constructorReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d diagnostics, got %d",
+				test.Fatalf("wanted %d diagnostics, got %d",
 					len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, wantSpan := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[index]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != wantSpan {
-					t.Fatalf("finding %d spanned %q, wanted %q", index, gotSpan, wantSpan)
+					test.Fatalf("finding %d spanned %q, wanted %q", index, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -217,16 +217,16 @@ func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
 // A rule reporting the right span under the wrong id is a real defect that every span assertion
 // above passes, and an id assertion comparing against the constant the rule reports with is an
 // equality whose two sides move together under mutation. Both are typed out here.
-func TestNoConstructorReturnReportsItsOwnMessage(t *testing.T) {
-	t.Parallel()
+func TestNoConstructorReturnReportsItsOwnMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoConstructorReturn, constructorReturnFile,
+	result := rule_testing.Run(test, NoConstructorReturn, constructorReturnFile,
 		"class C { constructor() { return 1 } }")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "noConstructorReturn" {
-		t.Fatalf("reported under %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("reported under %q", result.Diagnostics[0].Message.Id)
 	}
 	wantDescription := "This returns a value from a constructor, where it is either discarded or " +
 		"worse. `new C()` evaluates to the new instance and throws the returned value away, " +
@@ -234,6 +234,6 @@ func TestNoConstructorReturnReportsItsOwnMessage(t *testing.T) {
 		"instance and every field this constructor assigned is lost. Neither outcome is one a " +
 		"reader expects from a `new`, so return nothing and assign to `this` instead."
 	if result.Diagnostics[0].Message.Description != wantDescription {
-		t.Fatalf("described as %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("described as %q", result.Diagnostics[0].Message.Description)
 	}
 }

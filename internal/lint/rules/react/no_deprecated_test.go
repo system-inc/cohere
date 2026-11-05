@@ -52,8 +52,8 @@ const noDeprecatedFile = "/repository/source/NoDeprecated.tsx"
 // separates nothing: every finding in this file carries `deprecated`. A mutation that moved a slot,
 // dropped the `, use X instead` clause, or printed the wrong version would leave the id and the
 // count fixed and be invisible to `ExpectFindings`. The whole string is compared for that reason.
-func TestNoDeprecatedFires(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -175,19 +175,19 @@ func TestNoDeprecatedFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.descriptions) {
-				t.Fatalf("want %d findings, got %d: %v", len(testCase.descriptions),
+				test.Fatalf("want %d findings, got %d: %v", len(testCase.descriptions),
 					len(result.Diagnostics), result.MessageIds())
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Id != "deprecated" {
-					t.Errorf("finding %d: want id deprecated, got %q", index, diagnostic.Message.Id)
+					test.Errorf("finding %d: want id deprecated, got %q", index, diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != testCase.descriptions[index] {
-					t.Errorf("finding %d description:\n got %q\nwant %q", index,
+					test.Errorf("finding %d description:\n got %q\nwant %q", index,
 						diagnostic.Message.Description, testCase.descriptions[index])
 				}
 			}
@@ -195,8 +195,8 @@ func TestNoDeprecatedFires(t *testing.T) {
 	}
 }
 
-func TestNoDeprecatedStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -275,10 +275,10 @@ func TestNoDeprecatedStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -293,8 +293,8 @@ func TestNoDeprecatedStaysSilent(t *testing.T) {
 //
 // Every want below is the slice upstream underlines, taken from the installed build's reported
 // columns rather than from reading the source.
-func TestNoDeprecatedSpans(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -329,11 +329,11 @@ func TestNoDeprecatedSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			// The harness does not trim for `rule_testing.Run`, so the source on disk is the literal
 			// above and slicing it directly is sound here. `RunTyped` would need the trim applied
@@ -342,7 +342,7 @@ func TestNoDeprecatedSpans(t *testing.T) {
 			for index, diagnostic := range result.Diagnostics {
 				reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.want[index] {
-					t.Errorf("finding %d span: got %q, want %q", index, reported, testCase.want[index])
+					test.Errorf("finding %d span: got %q, want %q", index, reported, testCase.want[index])
 				}
 			}
 		})
@@ -355,8 +355,8 @@ func TestNoDeprecatedSpans(t *testing.T) {
 // `.tsx`-only gate inherited from an oxc port that upstream does not have anywhere (task
 // `#2abaqvt`). Writing this test is how a later reader learns the `.tsx` in `noDeprecatedFile` is
 // a parser choice rather than a rule one.
-func TestNoDeprecatedHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "React.renderComponent()"
 	for _, fileName := range []string{
@@ -365,10 +365,10 @@ func TestNoDeprecatedHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 		"/repository/source/Probe.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecated, fileName, source)
-			rule_testing.ExpectFindings(t, result, "deprecated")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecated, fileName, source)
+			rule_testing.ExpectFindings(test, result, "deprecated")
 		})
 	}
 }

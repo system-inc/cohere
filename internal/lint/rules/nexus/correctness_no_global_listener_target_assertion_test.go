@@ -24,20 +24,20 @@ func correctnessNoGlobalListenerTargetAssertionSource(lines ...string) string {
 	return correctnessNoGlobalListenerTargetAssertionPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoGlobalListenerTargetAssertionRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoGlobalListenerTargetAssertion, map[string]string{
+func correctnessNoGlobalListenerTargetAssertionRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoGlobalListenerTargetAssertion, map[string]string{
 		correctnessNoGlobalListenerTargetAssertionFile: sourceText,
 	}, correctnessNoGlobalListenerTargetAssertionFile)
 }
 
 // correctnessNoGlobalListenerTargetAssertionExpect asserts the findings in source order by the text
 // each points at, and that none carries a fix.
-func correctnessNoGlobalListenerTargetAssertionExpect(t *testing.T, result rule_testing.Result, want []string) {
-	t.Helper()
+func correctnessNoGlobalListenerTargetAssertionExpect(test *testing.T, result rule_testing.Result, want []string) {
+	test.Helper()
 	// A silent case goes through the shared assertion that the rule stays quiet.
 	if len(want) == 0 {
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 		return
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
@@ -48,14 +48,14 @@ func correctnessNoGlobalListenerTargetAssertionExpect(t *testing.T, result rule_
 	for index := range want {
 		wantIds[index] = correctnessNoGlobalListenerTargetAssertionId
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
 		if span := text[diagnostic.Range.Pos():diagnostic.Range.End()]; span != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, span, want[index])
+			test.Fatalf("finding %d is %q, want %q", index, span, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 }
@@ -90,27 +90,27 @@ func correctnessNoGlobalListenerTargetAssertionCode(fixed bool) string {
 }
 
 // The real site, before the fix.
-func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnCode(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnCode(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionCode(false))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, []string{"event.target as HTMLTextAreaElement"})
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionCode(false))
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, []string{"event.target as HTMLTextAreaElement"})
 }
 
 // The real site, after the fix: the listener is on the textarea.
-func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnFixedCode(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnFixedCode(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionCode(true))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, nil)
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionCode(true))
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, nil)
 }
 
 // Every handler form, both receivers, both assertion spellings, the wrappers around the read, a
 // nested callback, and a union of specific types.
-func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnEveryHandlerForm(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnEveryHandlerForm(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionSource(
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionSource(
 		"window.addEventListener('click', (event) => { (event.target as HTMLInputElement).select(); });",
 		"document.addEventListener('input', function(event) { use((<HTMLInputElement>event.target).value); });",
 		"const handleChange = function(event: Event) { use((event.target! as HTMLSelectElement).value); };",
@@ -122,7 +122,7 @@ func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnEveryHandlerForm(t *te
 		"});",
 		"window.addEventListener('pointerdown', function(event) { use((event.target as SVGPathElement).getTotalLength()); });",
 	))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, []string{
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, []string{
 		"event.target as HTMLInputElement",
 		"<HTMLInputElement>event.target",
 		"event.target! as HTMLSelectElement",
@@ -135,10 +135,10 @@ func TestCorrectnessNoGlobalListenerTargetAssertionFiresOnEveryHandlerForm(t *te
 // The nearest legitimate shapes: general element types, an `instanceof` guard the checker sees,
 // another listener receiver, a local named `document`, `currentTarget`, a nested handler's own event,
 // and a non-element assertion.
-func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnOtherShapes(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnOtherShapes(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionSource(
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionSource(
 		"document.addEventListener('click', function(event) { const target = event.target as HTMLElement; use(target.closest('[data-menu]')); });",
 		"document.addEventListener('click', function(event) { use((event.target as Element).tagName); use(event.target as Node); use(event.target as SVGElement); });",
 		"document.addEventListener('keydown', function(event) {",
@@ -165,14 +165,14 @@ func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnOtherShapes(t *t
 		"document.addEventListener('click', function(event: { target: unknown }) { use((event.target as HTMLInputElement).value); });",
 		"window.addEventListener('resize', use);",
 	))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, nil)
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, nil)
 }
 
 // A project declaration of `document` or of an element type is not lib.dom's.
-func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnLocalDeclarations(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnLocalDeclarations(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionSource(
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionSource(
 		"interface CodeEditorElement extends HTMLElement { caret: number }",
 		"document.addEventListener('keydown', function(event) { use((event.target as CodeEditorElement).caret); });",
 		"function local() {",
@@ -180,19 +180,19 @@ func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnLocalDeclaration
 		"    window.addEventListener('click', function(event) { use((event.target as HTMLInputElement).value); });",
 		"}",
 	))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, nil)
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, nil)
 }
 
 // A project declaration merged into lib.dom's `addEventListener` makes it something the rule has not
 // read, so the whole file's `document` listeners are declined.
-func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnAMergedAddEventListener(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoGlobalListenerTargetAssertionStaysSilentOnAMergedAddEventListener(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoGlobalListenerTargetAssertionRun(t, correctnessNoGlobalListenerTargetAssertionSource(
+	result := correctnessNoGlobalListenerTargetAssertionRun(test, correctnessNoGlobalListenerTargetAssertionSource(
 		"declare global {",
 		"    interface Document { addEventListener(type: 'editor-ready', listener: (event: CustomEvent) => void): void }",
 		"}",
 		"document.addEventListener('keydown', function(event) { use((event.target as HTMLTextAreaElement).selectionStart); });",
 	))
-	correctnessNoGlobalListenerTargetAssertionExpect(t, result, nil)
+	correctnessNoGlobalListenerTargetAssertionExpect(test, result, nil)
 }

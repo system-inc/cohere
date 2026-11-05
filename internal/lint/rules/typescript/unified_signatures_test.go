@@ -57,8 +57,8 @@ type unifiedSignaturesCase struct {
 	wantStarts []string
 }
 
-func TestUnifiedSignaturesValid(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesValid(test *testing.T) {
+	test.Parallel()
 
 	cases := []unifiedSignaturesCase{
 		{
@@ -331,14 +331,14 @@ func TestUnifiedSignaturesValid(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
+		result := rule_testing.RunWithOptions(test, UnifiedSignatures,
 			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
-func TestUnifiedSignaturesInvalid(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesInvalid(test *testing.T) {
+	test.Parallel()
 
 	cases := []unifiedSignaturesCase{
 		{
@@ -876,12 +876,12 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
+		result := rule_testing.RunWithOptions(test, UnifiedSignatures,
 			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 		if len(result.Diagnostics) != len(testCase.wantSpans) {
-			t.Fatalf("wanted %d findings, got %d, on %q",
+			test.Fatalf("wanted %d findings, got %d, on %q",
 				len(testCase.wantSpans), len(result.Diagnostics), testCase.sourceText)
 		}
 		written := asTheHarnessWroteIt(testCase.sourceText)
@@ -889,7 +889,7 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			reported := result.Diagnostics[findingIndex]
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != wantSpan {
-				t.Errorf("finding %d points at %q, wanted %q, on %q",
+				test.Errorf("finding %d points at %q, wanted %q, on %q",
 					findingIndex, gotSpan, wantSpan, testCase.sourceText)
 			}
 			// The WHOLE rendered message, not merely the id. Two halves carry real judgment: the
@@ -899,7 +899,7 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			// noticing.
 			if want := testCase.wantStarts[findingIndex]; want != "" &&
 				reported.Message.Description != want {
-				t.Errorf("finding %d message is %q, wanted %q",
+				test.Errorf("finding %d message is %q, wanted %q",
 					findingIndex, reported.Message.Description, want)
 			}
 		}
@@ -913,8 +913,8 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 // asserted a pointer and the decoder returned a value: both options read false for every
 // configuration, and nothing in this file could see it. These rows pair each option's default with
 // its configured value on the same source, so a rule that ignores the option fails one of the pair.
-func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
+	test.Parallel()
 
 	var decode func(raw []byte) (any, error)
 	for _, registration := range rule.Registered() {
@@ -923,7 +923,7 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
 		}
 	}
 	if decode == nil {
-		t.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
+		test.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
 	}
 
 	cases := []struct {
@@ -943,22 +943,22 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			for _, value := range []string{"false", "true"} {
 				raw := `{"` + testCase.option + `": ` + value + `}`
 				decoded, err := decode([]byte(raw))
 				if err != nil {
-					t.Fatalf("decoding %s: %v", raw, err)
+					test.Fatalf("decoding %s: %v", raw, err)
 				}
-				result := rule_testing.RunWithOptions(t, UnifiedSignatures, "file.ts", testCase.sourceText, decoded)
+				result := rule_testing.RunWithOptions(test, UnifiedSignatures, "file.ts", testCase.sourceText, decoded)
 				if value == "false" {
 					// The baseline: without the option this source reports, so the true row below
 					// can only go quiet because the option reached the rule.
-					rule_testing.ExpectFindings(t, result, "singleParameterDifference")
+					rule_testing.ExpectFindings(test, result, "singleParameterDifference")
 				} else {
-					rule_testing.ExpectClean(t, result)
+					rule_testing.ExpectClean(test, result)
 				}
 			}
 		})

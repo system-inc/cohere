@@ -110,28 +110,28 @@ var gapRootResolutionCases = map[string]bool{
 // The two are independent claims: the descriptions were read from `utilities.ts` at the v4.3.3 tag
 // and the expectations were measured through `candidatesToCss`, so an agreement is evidence rather
 // than a restatement. That is the same discipline the three emitter slices were held to.
-func TestGapRootDescriptionsResolveWhatTheEngineCompiles(t *testing.T) {
-	t.Parallel()
+func TestGapRootDescriptionsResolveWhatTheEngineCompiles(test *testing.T) {
+	test.Parallel()
 	for _, gapSystem := range []struct {
 		name string
-		load func(t *testing.T) *LoadedDesignSystem
+		load func(test *testing.T) *LoadedDesignSystem
 	}{
 		{name: "public", load: publicThemeSystem},
-		{name: "ahra", load: func(t *testing.T) *LoadedDesignSystem {
-			system, _ := liveTableFor(t, corpusRepositories[0].spelling)
+		{name: "ahra", load: func(test *testing.T) *LoadedDesignSystem {
+			system, _ := liveTableFor(test, corpusRepositories[0].spelling)
 			return system
 		}},
 	} {
-		t.Run(gapSystem.name, func(t *testing.T) {
-			t.Parallel()
-			expectGapRootDescriptionsResolve(t, gapSystem.load(t))
+		test.Run(gapSystem.name, func(test *testing.T) {
+			test.Parallel()
+			expectGapRootDescriptionsResolve(test, gapSystem.load(test))
 		})
 	}
 }
 
 // expectGapRootDescriptionsResolve compares every case with what the descriptions resolve on one system.
-func expectGapRootDescriptionsResolve(t *testing.T, system *LoadedDesignSystem) {
-	t.Helper()
+func expectGapRootDescriptionsResolve(test *testing.T, system *LoadedDesignSystem) {
+	test.Helper()
 
 	var agreed, unparsed, undescribed int
 	var disagreements []string
@@ -140,7 +140,7 @@ func expectGapRootDescriptionsResolve(t *testing.T, system *LoadedDesignSystem) 
 		candidates := ParseCandidate(className, system)
 		if len(candidates) == 0 {
 			unparsed++
-			t.Errorf("%s does not parse, so this case measures nothing", className)
+			test.Errorf("%s does not parse, so this case measures nothing", className)
 			continue
 		}
 
@@ -148,7 +148,7 @@ func expectGapRootDescriptionsResolve(t *testing.T, system *LoadedDesignSystem) 
 		description, described := GapRootDescriptions[strings.TrimPrefix(candidate.Root, "-")]
 		if !described {
 			undescribed++
-			t.Errorf("%s reads as root %q and no description covers it", className, candidate.Root)
+			test.Errorf("%s reads as root %q and no description covers it", className, candidate.Root)
 			continue
 		}
 
@@ -162,13 +162,13 @@ func expectGapRootDescriptionsResolve(t *testing.T, system *LoadedDesignSystem) 
 	}
 
 	sort.Strings(disagreements)
-	t.Logf("gap root resolution: %d cases, %d agreed, %d disagreed", len(gapRootResolutionCases), agreed, len(disagreements))
+	test.Logf("gap root resolution: %d cases, %d agreed, %d disagreed", len(gapRootResolutionCases), agreed, len(disagreements))
 
 	for _, disagreement := range disagreements {
-		t.Errorf("%s", disagreement)
+		test.Errorf("%s", disagreement)
 	}
 	if agreed == 0 {
-		t.Fatal("no case was compared, so this test measured nothing")
+		test.Fatal("no case was compared, so this test measured nothing")
 	}
 }
 
@@ -184,8 +184,8 @@ func compiledWord(compiles bool) string {
 // The two maps answer different halves of one root and drift is what leaves a class unanswerable: a
 // root with an emitter and no description cannot be asked whether its value resolves, and a
 // description with no emitter describes something this port does not otherwise know about.
-func TestEveryGapRootIsDescribed(t *testing.T) {
-	t.Parallel()
+func TestEveryGapRootIsDescribed(test *testing.T) {
+	test.Parallel()
 	var missingDescription, missingEmitter []string
 
 	for root := range gapEmitters {
@@ -201,14 +201,14 @@ func TestEveryGapRootIsDescribed(t *testing.T) {
 
 	sort.Strings(missingDescription)
 	sort.Strings(missingEmitter)
-	t.Logf("gap roots: %d emitters, %d descriptions", len(gapEmitters), len(GapRootDescriptions))
+	test.Logf("gap roots: %d emitters, %d descriptions", len(gapEmitters), len(GapRootDescriptions))
 
 	if len(missingDescription) > 0 {
-		t.Errorf("%d gap roots emit and have no description: %s",
+		test.Errorf("%d gap roots emit and have no description: %s",
 			len(missingDescription), strings.Join(missingDescription, ", "))
 	}
 	if len(missingEmitter) > 0 {
-		t.Errorf("%d descriptions name a root with no emitter: %s",
+		test.Errorf("%d descriptions name a root with no emitter: %s",
 			len(missingEmitter), strings.Join(missingEmitter, ", "))
 	}
 }
@@ -226,9 +226,9 @@ func TestEveryGapRootIsDescribed(t *testing.T) {
 //
 // The population is every gap root with a colour arm rather than a list, so a root gaining one joins
 // this test.
-func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
+func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 
 		var checked int
 		for root, description := range GapRootDescriptions {
@@ -249,13 +249,13 @@ func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(t *testing.T) {
 			checked++
 
 			if !ClassValueResolvesIn(&candidates[0], system) {
-				t.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
+				test.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
 			}
 		}
 
-		t.Logf("colour roots checked with an arbitrary value and an alpha: %d", checked)
+		test.Logf("colour roots checked with an arbitrary value and an alpha: %d", checked)
 		if checked == 0 {
-			t.Fatal("no colour root was checked, so this test measured nothing")
+			test.Fatal("no colour root was checked, so this test measured nothing")
 		}
 	})
 }

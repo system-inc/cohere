@@ -13,8 +13,8 @@ import (
 // TestFindPathRecursiveIsUpstreamsSearch pins the port of async-utils/fs.js: the path against start,
 // then the same file name a directory up, stopping at the filesystem root or once the directory
 // searched is cwd.
-func TestFindPathRecursiveIsUpstreamsSearch(t *testing.T) {
-	t.Parallel()
+func TestFindPathRecursiveIsUpstreamsSearch(test *testing.T) {
+	test.Parallel()
 	present := map[string]bool{
 		"/repo/styles/theme.css":   true,
 		"/repo/theme.css":          true,
@@ -33,7 +33,7 @@ func TestFindPathRecursiveIsUpstreamsSearch(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		if got := findPathRecursive(testCase.cwd, testCase.cwd, testCase.entry, exists); got != testCase.want {
-			t.Errorf("%s: found %q, want %q", testCase.name, got, testCase.want)
+			test.Errorf("%s: found %q, want %q", testCase.name, got, testCase.want)
 		}
 	}
 }
@@ -42,40 +42,40 @@ func TestFindPathRecursiveIsUpstreamsSearch(t *testing.T) {
 // one of FindEntryPoint's candidates) declares nothing of its own, and which holds a second stylesheet
 // declaring `brand-glow` under packages/web/design/brand.css. Which one the rule reads decides whether
 // `brand-glow` is known.
-func runLocationFixture(t *testing.T, options NoUnknownClassesOptions) rule_testing.Result {
-	t.Helper()
+func runLocationFixture(test *testing.T, options NoUnknownClassesOptions) rule_testing.Result {
+	test.Helper()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so there is no design system to read")
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to read")
 	}
 	files := map[string]string{
 		"Component.tsx":                 `export const element = <div className="brand-glow flex" />;`,
 		"app/globals.css":               `@import "tailwindcss";`,
 		"packages/web/design/brand.css": "@import \"tailwindcss\";\n@utility brand-glow { color: red; }",
 	}
-	return rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
 		modules := filepath.Join(root, "node_modules")
 		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating node_modules: %v", err)
+			test.Fatalf("creating node_modules: %v", err)
 		}
 		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking tailwindcss: %v", err)
+			test.Fatalf("linking tailwindcss: %v", err)
 		}
 	})
 }
 
 // TestTailwindLocationOptions is upstream's entryPoint, tailwindConfig and cwd, each changing which
 // stylesheet the rule reads. With none, the project's own stylesheet is read and brand-glow is unknown.
-func TestTailwindLocationOptions(t *testing.T) {
-	t.Parallel()
+func TestTailwindLocationOptions(test *testing.T) {
+	test.Parallel()
 	known := func(name string, options NoUnknownClassesOptions) {
-		t.Helper()
-		rule_testing.ExpectClean(t, runLocationFixture(t, options))
+		test.Helper()
+		rule_testing.ExpectClean(test, runLocationFixture(test, options))
 	}
 	unknown := func(name string, options NoUnknownClassesOptions) {
-		t.Helper()
-		if result := runLocationFixture(t, options); len(result.Diagnostics) != 1 {
-			t.Errorf("%s: want brand-glow reported once, got %d findings", name, len(result.Diagnostics))
+		test.Helper()
+		if result := runLocationFixture(test, options); len(result.Diagnostics) != 1 {
+			test.Errorf("%s: want brand-glow reported once, got %d findings", name, len(result.Diagnostics))
 		}
 	}
 	location := func(entryPoint, tailwindConfig, cwd string) NoUnknownClassesOptions {
@@ -95,11 +95,11 @@ func TestTailwindLocationOptions(t *testing.T) {
 
 // TestDesignSystemIsCachedPerLocation asks one program for two locations and requires two stylesheets.
 // A cache keyed on the program alone would hand the second rule the first rule's design system.
-func TestDesignSystemIsCachedPerLocation(t *testing.T) {
-	t.Parallel()
+func TestDesignSystemIsCachedPerLocation(test *testing.T) {
+	test.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so there is no design system to read")
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to read")
 	}
 	var entryPoints []string
 	probe := rule.Rule{
@@ -118,16 +118,16 @@ func TestDesignSystemIsCachedPerLocation(t *testing.T) {
 		"app/globals.css":               `@import "tailwindcss";`,
 		"packages/web/design/brand.css": `@import "tailwindcss";`,
 	}
-	rule_testing.RunTypedFilesWithSetup(t, probe, files, "Component.tsx", func(root string) {
+	rule_testing.RunTypedFilesWithSetup(test, probe, files, "Component.tsx", func(root string) {
 		modules := filepath.Join(root, "node_modules")
 		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating node_modules: %v", err)
+			test.Fatalf("creating node_modules: %v", err)
 		}
 		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking tailwindcss: %v", err)
+			test.Fatalf("linking tailwindcss: %v", err)
 		}
 	})
 	if want := []string{"globals.css", "brand.css", "globals.css"}; !slices.Equal(entryPoints, want) {
-		t.Fatalf("entry points per location %v, want %v", entryPoints, want)
+		test.Fatalf("entry points per location %v, want %v", entryPoints, want)
 	}
 }

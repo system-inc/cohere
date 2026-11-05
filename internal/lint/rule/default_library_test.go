@@ -22,9 +22,9 @@ func (p metadataLibraryProgram) Options() *core.CompilerOptions {
 }
 func (p metadataLibraryProgram) UseCaseSensitiveFileNames() bool { return true }
 
-func TestDefaultLibraryReadersPreserveAnyAndVacuousAll(t *testing.T) {
-	t.Parallel()
-	shared, first, _, global := declarationsProbe(t)
+func TestDefaultLibraryReadersPreserveAnyAndVacuousAll(test *testing.T) {
+	test.Parallel()
+	shared, first, _, global := declarationsProbe(test)
 	source := rule.DeclarationsIn(first, shared)[0]
 	library := global.Declarations[0]
 	program := metadataLibraryProgram{library: ast.GetSourceFileOfNode(library).PathKey()}
@@ -45,16 +45,16 @@ func TestDefaultLibraryReadersPreserveAnyAndVacuousAll(t *testing.T) {
 		// its input contract while testing the all reader's deliberate missing-file exemption.
 		if tc.name != "missing file" {
 			if got := rule.IsSymbolFromDefaultLibrary(program, tc.symbol); got != tc.any {
-				t.Errorf("%s any: got %v, want %v", tc.name, got, tc.any)
+				test.Errorf("%s any: got %v, want %v", tc.name, got, tc.any)
 			}
 		}
 		if got := rule.IsDeclaredOnlyInDefaultLibraries(program, tc.symbol); got != tc.all {
-			t.Errorf("%s all: got %v, want %v", tc.name, got, tc.all)
+			test.Errorf("%s all: got %v, want %v", tc.name, got, tc.all)
 		}
 	}
 	// An arbitrary declaration file is neither the default library nor an installed dependency test.
 	first.IsDeclarationFile = true
 	if rule.IsSymbolFromDefaultLibrary(program, shared) || rule.IsDeclaredOnlyInDefaultLibraries(program, shared) {
-		t.Error("non-library declaration file accepted")
+		test.Error("non-library declaration file accepted")
 	}
 }

@@ -35,8 +35,8 @@ type preserveCaughtErrorFinding struct {
 	suggestion string
 }
 
-func TestPreserveCaughtErrorAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin   string
@@ -208,45 +208,45 @@ func TestPreserveCaughtErrorAgreesWithESLint(t *testing.T) {
 		if testCase.options != "" {
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
-				t.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
+				test.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
 			}
 			options = decoded
 		}
-		result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", testCase.code, options)
+		result := rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", testCase.code, options)
 		source := result.SourceFile.Text()
 		if source != testCase.code {
-			t.Fatalf("case %d: the harness changed the text, so the spans below would be read off different bytes", index)
+			test.Fatalf("case %d: the harness changed the text, so the spans below would be read off different bytes", index)
 		}
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("case %d (%s): %d findings, ESLint reports %d\n%s", index, testCase.origin, len(result.Diagnostics), len(testCase.findings), testCase.code)
+			test.Errorf("case %d (%s): %d findings, ESLint reports %d\n%s", index, testCase.origin, len(result.Diagnostics), len(testCase.findings), testCase.code)
 			continue
 		}
 		for position, diagnostic := range result.Diagnostics {
 			want := testCase.findings[position]
 			text := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if diagnostic.Message.Id != want.id || text != want.text {
-				t.Errorf("case %d (%s): finding %d is %s at %q, ESLint reports %s at %q\n%s",
+				test.Errorf("case %d (%s): finding %d is %s at %q, ESLint reports %s at %q\n%s",
 					index, testCase.origin, position, diagnostic.Message.Id, text, want.id, want.text, testCase.code)
 				continue
 			}
 			if len(diagnostic.Fixes) != 0 {
-				t.Errorf("case %d: finding %d carries an autofix, and every repair here is a suggestion", index, position)
+				test.Errorf("case %d: finding %d carries an autofix, and every repair here is a suggestion", index, position)
 			}
 			if want.suggestion == "" {
 				if len(diagnostic.Suggestions) != 0 {
-					t.Errorf("case %d (%s): finding %d offers a suggestion where ESLint offers none\n%s", index, testCase.origin, position, testCase.code)
+					test.Errorf("case %d (%s): finding %d offers a suggestion where ESLint offers none\n%s", index, testCase.origin, position, testCase.code)
 				}
 				continue
 			}
 			if len(diagnostic.Suggestions) != 1 {
-				t.Errorf("case %d (%s): finding %d offers %d suggestions, ESLint offers one\n%s", index, testCase.origin, position, len(diagnostic.Suggestions), testCase.code)
+				test.Errorf("case %d (%s): finding %d offers %d suggestions, ESLint offers one\n%s", index, testCase.origin, position, len(diagnostic.Suggestions), testCase.code)
 				continue
 			}
 			if diagnostic.Suggestions[0].Message.Id != "includeCause" {
-				t.Errorf("case %d: the suggestion is %s, ESLint's is includeCause", index, diagnostic.Suggestions[0].Message.Id)
+				test.Errorf("case %d: the suggestion is %s, ESLint's is includeCause", index, diagnostic.Suggestions[0].Message.Id)
 			}
-			if applied := applySuggestion(t, source, diagnostic.Suggestions[0]); applied != want.suggestion {
-				t.Errorf("case %d (%s): the suggestion writes\n  %q\nESLint writes\n  %q", index, testCase.origin, applied, want.suggestion)
+			if applied := applySuggestion(test, source, diagnostic.Suggestions[0]); applied != want.suggestion {
+				test.Errorf("case %d (%s): the suggestion writes\n  %q\nESLint writes\n  %q", index, testCase.origin, applied, want.suggestion)
 			}
 		}
 	}

@@ -8,8 +8,8 @@ import (
 
 const networkFile = "/repository/source/api/Thing.ts"
 
-func TestNetworkNoDirectFetchFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoDirectFetchFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -25,23 +25,23 @@ func TestNetworkNoDirectFetchFires(t *testing.T) {
 		{"inside a callback", "declare function later(callback: () => void): void;\nexport function load(url: string) {\n    later(() => { void fetch(url); });\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoDirectFetch, networkFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoDirectFetch, networkFile, testCase.sourceText),
 				"noDirectFetch")
 		})
 	}
 
 	// NetworkService is exempt by where it lives, so a file elsewhere named after it is not.
-	t.Run("in a file merely named after NetworkService", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoDirectFetch, "/repository/app/_services/MyNetworkService.ts",
+	test.Run("in a file merely named after NetworkService", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoDirectFetch, "/repository/app/_services/MyNetworkService.ts",
 			"export async function load(url: string) {\n    return fetch(url);\n}\n"), "noDirectFetch")
 	})
 }
 
-func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoDirectFetchStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -79,9 +79,9 @@ func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
 		{"no calls at all", networkFile, "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoDirectFetch, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoDirectFetch, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

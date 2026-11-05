@@ -12,8 +12,8 @@ const resultNamingDeclarations = "declare function useAccountQuery(): unknown;\n
 	"declare function useWatch(): unknown;\n" +
 	"declare function useSprings(): unknown;\n"
 
-func TestReactHookRequireResultNamingFires(t *testing.T) {
-	t.Parallel()
+func TestReactHookRequireResultNamingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -55,16 +55,16 @@ func TestReactHookRequireResultNamingFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactHookRequireResultNaming, resultNamingFile,
 				resultNamingDeclarations+testCase.sourceText), testCase.wantId)
 		})
 	}
 }
 
-func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactHookRequireResultNamingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -145,9 +145,9 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookRequireResultNaming, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactHookRequireResultNaming, testCase.fileName,
 				resultNamingDeclarations+testCase.sourceText))
 		})
 	}
@@ -158,11 +158,11 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 // A name can be both generic and badly suffixed. The suffix check runs first because it names a
 // concrete edit, where the generic message only says the name is thin. Pinned so the order is a
 // decision rather than an accident of how the conditions were written.
-func TestReactHookRequireResultNamingPicksOneComplaint(t *testing.T) {
-	t.Parallel()
+func TestReactHookRequireResultNamingPicksOneComplaint(test *testing.T) {
+	test.Parallel()
 
 	// `dataResult` is generic-adjacent and badly suffixed. The suffix wins.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactHookRequireResultNaming, resultNamingFile,
 		resultNamingDeclarations+
 			"export function Panel() {\n    const dataResult = useAccountQuery();\n    return dataResult;\n}\n"),
 		"hookResultNamingBadSuffix")

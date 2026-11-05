@@ -8,14 +8,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
 
-func firstImport(t *testing.T, sourceText string) *ast.Node {
-	t.Helper()
+func firstImport(test *testing.T, sourceText string) *ast.Node {
+	test.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
 		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil || file.Statements == nil || len(file.Statements.Nodes) == 0 {
-		t.Fatalf("no statement in %q", sourceText)
+		test.Fatalf("no statement in %q", sourceText)
 	}
 	return file.Statements.Nodes[0]
 }
@@ -23,8 +23,8 @@ func firstImport(t *testing.T, sourceText string) *ast.Node {
 // Three binding kinds live in three places in this AST rather than one flat list, and a reader that
 // checks one field pins half the forms while looking complete. That mistake was made and corrected
 // once in this tree already.
-func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
-	t.Parallel()
+func TestBindingsOfSeesAllThreeKinds(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name          string
 		sourceText    string
@@ -42,17 +42,17 @@ func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
 		{"a side-effect import", "import 'm';\n", false, false, 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			bindings := BindingsOf(firstImport(t, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			bindings := BindingsOf(firstImport(test, testCase.sourceText))
 			if (bindings.Default != nil) != testCase.wantDefault {
-				t.Fatalf("default: want %v, got %v", testCase.wantDefault, bindings.Default != nil)
+				test.Fatalf("default: want %v, got %v", testCase.wantDefault, bindings.Default != nil)
 			}
 			if (bindings.Namespace != nil) != testCase.wantNamespace {
-				t.Fatalf("namespace: want %v, got %v", testCase.wantNamespace, bindings.Namespace != nil)
+				test.Fatalf("namespace: want %v, got %v", testCase.wantNamespace, bindings.Namespace != nil)
 			}
 			if len(bindings.Named) != testCase.wantNamed {
-				t.Fatalf("named: want %d, got %d", testCase.wantNamed, len(bindings.Named))
+				test.Fatalf("named: want %d, got %d", testCase.wantNamed, len(bindings.Named))
 			}
 		})
 	}
@@ -61,8 +61,8 @@ func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
 // The specifier is compared exactly, which is stricter than the upstream that motivated this and
 // deliberately so: oxc never resolves the module at all and string-matches the element name, so it
 // fires on any local component sharing that name.
-func TestLocalNameOfDefaultImport(t *testing.T) {
-	t.Parallel()
+func TestLocalNameOfDefaultImport(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -80,14 +80,14 @@ func TestLocalNameOfDefaultImport(t *testing.T) {
 		{"a side-effect import", "import 'next/head';\n", "next/head", "", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			got, found := LocalNameOfDefaultImport(firstImport(t, testCase.sourceText), testCase.specifier)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			got, found := LocalNameOfDefaultImport(firstImport(test, testCase.sourceText), testCase.specifier)
 			if found != testCase.wantFound {
-				t.Fatalf("found: want %v, got %v", testCase.wantFound, found)
+				test.Fatalf("found: want %v, got %v", testCase.wantFound, found)
 			}
 			if got != testCase.want {
-				t.Fatalf("want %q, got %q", testCase.want, got)
+				test.Fatalf("want %q, got %q", testCase.want, got)
 			}
 		})
 	}
@@ -95,17 +95,17 @@ func TestLocalNameOfDefaultImport(t *testing.T) {
 
 // A non-import node and a nil answer rather than panic, since a rule reaching a shared helper with a
 // node it did not check is a bug in the rule and should not take the run down.
-func TestBindingHelpersSurviveWrongInput(t *testing.T) {
-	t.Parallel()
+func TestBindingHelpersSurviveWrongInput(test *testing.T) {
+	test.Parallel()
 	if bindings := BindingsOf(nil); bindings.Default != nil || bindings.Namespace != nil || bindings.Named != nil {
-		t.Fatal("want nil to answer with empty bindings")
+		test.Fatal("want nil to answer with empty bindings")
 	}
-	notAnImport := firstImport(t, "const value = 1;\n")
+	notAnImport := firstImport(test, "const value = 1;\n")
 	if bindings := BindingsOf(notAnImport); bindings.Default != nil {
-		t.Fatal("want a non-import to answer with empty bindings")
+		test.Fatal("want a non-import to answer with empty bindings")
 	}
 	if _, found := LocalNameOfDefaultImport(nil, "next/head"); found {
-		t.Fatal("want nil to report nothing found")
+		test.Fatal("want nil to report nothing found")
 	}
 }
 
@@ -115,8 +115,8 @@ func TestBindingHelpersSurviveWrongInput(t *testing.T) {
 // Every fixture upstream writes is unaliased, which means a broken implementation that reads the
 // local name instead of the imported one passes every corpus case and fails only in a real codebase.
 // That asymmetry is why the alias case leads here.
-func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
-	t.Parallel()
+func TestLocalNameOfNamedImportSeesThroughAnAlias(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -190,22 +190,22 @@ func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			found := LocalNameOfNamedImport(
-				firstImport(t, testCase.sourceText), testCase.specifier, testCase.imported)
+				firstImport(test, testCase.sourceText), testCase.specifier, testCase.imported)
 
 			if testCase.wantLocal == "" {
 				if found != nil {
-					t.Fatalf("wanted no binding, got %q", found.Text())
+					test.Fatalf("wanted no binding, got %q", found.Text())
 				}
 				return
 			}
 			if found == nil {
-				t.Fatalf("wanted local name %q, got no binding", testCase.wantLocal)
+				test.Fatalf("wanted local name %q, got no binding", testCase.wantLocal)
 			}
 			if found.Text() != testCase.wantLocal {
-				t.Fatalf("wanted local name %q, got %q", testCase.wantLocal, found.Text())
+				test.Fatalf("wanted local name %q, got %q", testCase.wantLocal, found.Text())
 			}
 		})
 	}
@@ -215,20 +215,20 @@ func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
 //
 // A rule reaches these off a listener that fires for one kind, so the nil and wrong-kind paths are
 // unreachable from correct callers and are exactly the ones a refactor breaks silently.
-func TestNamedImportHelpersSurviveWrongInput(t *testing.T) {
-	t.Parallel()
+func TestNamedImportHelpersSurviveWrongInput(test *testing.T) {
+	test.Parallel()
 	if local := LocalNameOfNamedImport(nil, "m", "X"); local != nil {
-		t.Fatalf("a nil node answered %v", local)
+		test.Fatalf("a nil node answered %v", local)
 	}
 	if imported := ImportedNameOf(nil); imported != "" {
-		t.Fatalf("a nil specifier answered %q", imported)
+		test.Fatalf("a nil specifier answered %q", imported)
 	}
 
-	statement := firstImport(t, "const value = 1;\n")
+	statement := firstImport(test, "const value = 1;\n")
 	if local := LocalNameOfNamedImport(statement, "m", "X"); local != nil {
-		t.Fatalf("a non-import statement answered %v", local)
+		test.Fatalf("a non-import statement answered %v", local)
 	}
 	if imported := ImportedNameOf(statement); imported != "" {
-		t.Fatalf("a non-specifier node answered %q", imported)
+		test.Fatalf("a non-specifier node answered %q", imported)
 	}
 }

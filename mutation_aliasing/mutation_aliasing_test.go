@@ -172,10 +172,10 @@ func ranges(f *testFunction, options Options) *MutableRanges {
 	return InferMutableRanges(testGraph{}, f, options)
 }
 
-func expectRange(t *testing.T, table *MutableRanges, id ssa.IdentifierId, want MutableRange, why string) {
-	t.Helper()
+func expectRange(test *testing.T, table *MutableRanges, id ssa.IdentifierId, want MutableRange, why string) {
+	test.Helper()
 	if got := table.Get(id); got != want {
-		t.Errorf("value %d has range [%d,%d), want [%d,%d): %s", id, got.Start, got.End, want.Start, want.End, why)
+		test.Errorf("value %d has range [%d,%d), want [%d,%d): %s", id, got.Start, got.End, want.Start, want.End, why)
 	}
 }
 
@@ -191,8 +191,8 @@ func expectRange(t *testing.T, table *MutableRanges, id ssa.IdentifierId, want M
 //     2, where the operand loop opens its start: [2,4). The mutation at 1 is outside it.
 //   - With it, p is defined on entry: [1,4), and the mutation at 1 is inside. r, a parameter nothing
 //     touches, is unset without the option and is the first instruction alone with it, [1,2).
-func TestParametersDefinedOnEntryBothWays(t *testing.T) {
-	t.Parallel()
+func TestParametersDefinedOnEntryBothWays(test *testing.T) {
+	test.Parallel()
 	build := func() (*testFunction, ssa.IdentifierId, ssa.IdentifierId, ssa.IdentifierId) {
 		f := newTestFunction()
 		p, q, r := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
@@ -209,30 +209,30 @@ func TestParametersDefinedOnEntryBothWays(t *testing.T) {
 	f, p, q, r := build()
 	without := ranges(f, Options{})
 	if order := f.blocks[0].instructions[0].order; order != 1 {
-		t.Fatalf("the first instruction is at order %d, so the ranges below would not mean what they say", order)
+		test.Fatalf("the first instruction is at order %d, so the ranges below would not mean what they say", order)
 	}
-	expectRange(t, without, p, MutableRange{Start: 2, End: 4},
+	expectRange(test, without, p, MutableRange{Start: 2, End: 4},
 		"React's rule opens a parameter's range at its first read, after the mutation at order 1")
 	if without.Contains(p, 1) {
-		t.Error("without the option, the mutation at order 1 must fall outside p's range: that is the hole the option closes")
+		test.Error("without the option, the mutation at order 1 must fall outside p's range: that is the hole the option closes")
 	}
-	expectRange(t, without, q, MutableRange{}, "q is read and never mutated")
-	expectRange(t, without, r, MutableRange{}, "r is never touched")
+	expectRange(test, without, q, MutableRange{}, "q is read and never mutated")
+	expectRange(test, without, r, MutableRange{}, "r is never touched")
 
 	f, p, q, r = build()
 	with := ranges(f, Options{ParametersDefinedOnEntry: true})
-	expectRange(t, with, p, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
+	expectRange(test, with, p, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
 	if !with.Contains(p, 1) {
-		t.Error("with the option, the mutation at order 1 must be inside p's range")
+		test.Error("with the option, the mutation at order 1 must be inside p's range")
 	}
-	expectRange(t, with, q, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
-	expectRange(t, with, r, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
+	expectRange(test, with, q, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
+	expectRange(test, with, r, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
 }
 
 // TestAMutationReachesWhatItIsAnAliasOf: Alias is "mutating Into implies mutating From", so mutating
 // the alias widens the source to the mutation.
-func TestAMutationReachesWhatItIsAnAliasOf(t *testing.T) {
-	t.Parallel()
+func TestAMutationReachesWhatItIsAnAliasOf(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
 	entry := f.block()
@@ -247,14 +247,14 @@ func TestAMutationReachesWhatItIsAnAliasOf(t *testing.T) {
 		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(alias))}})
 
 	table := ranges(f, Options{})
-	expectRange(t, table, source, MutableRange{Start: 1, End: 4}, "the alias's mutation at 3 reaches its source")
-	expectRange(t, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
+	expectRange(test, table, source, MutableRange{Start: 1, End: 4}, "the alias's mutation at 3 reaches its source")
+	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
 }
 
 // TestAnAliasMadeAfterAMutationDoesNotWiden is the model of time: a mutation flows only through edges
 // that existed when it happened, so an alias made later does not reach back.
-func TestAnAliasMadeAfterAMutationDoesNotWiden(t *testing.T) {
-	t.Parallel()
+func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
 	entry := f.block()
@@ -268,15 +268,15 @@ func TestAnAliasMadeAfterAMutationDoesNotWiden(t *testing.T) {
 		effects: []AliasingEffect[testPlace]{FlowEffect(AliasingEffectAlias, place(source), place(alias))}})
 
 	table := ranges(f, Options{})
-	expectRange(t, table, source, MutableRange{Start: 1, End: 2}, "the alias came after the mutation, so the source is untouched")
-	expectRange(t, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
+	expectRange(test, table, source, MutableRange{Start: 1, End: 2}, "the alias came after the mutation, so the source is untouched")
+	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
 }
 
 // TestFrozenParametersDropAConditionalMutation pins Graph.ParametersFrozen: React's component
 // parameters are Frozen, and a conditional mutation of a value that is not Mutable is dropped. The
 // same function with mutable parameters widens.
-func TestFrozenParametersDropAConditionalMutation(t *testing.T) {
-	t.Parallel()
+func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
+	test.Parallel()
 	for _, frozen := range []bool{true, false} {
 		f := newTestFunction()
 		f.parametersFrozen = frozen
@@ -292,14 +292,14 @@ func TestFrozenParametersDropAConditionalMutation(t *testing.T) {
 		if frozen {
 			want = MutableRange{}
 		}
-		expectRange(t, table, p, want, map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen])
+		expectRange(test, table, p, want, map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen])
 	}
 }
 
 // TestAStoreIntoACapturedBindingWidensFromItsShape pins Graph.StoredContextValue: the stored value's
 // range reaches past the store with no effect consulted.
-func TestAStoreIntoACapturedBindingWidensFromItsShape(t *testing.T) {
-	t.Parallel()
+func TestAStoreIntoACapturedBindingWidensFromItsShape(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	value := ssa.IdentifierId(1)
 	entry := f.block()
@@ -309,13 +309,13 @@ func TestAStoreIntoACapturedBindingWidensFromItsShape(t *testing.T) {
 	entry.add(&testInstruction{uses: []testPlace{place(value)}, storedContext: &stored})
 
 	table := ranges(f, Options{})
-	expectRange(t, table, value, MutableRange{Start: 1, End: 4}, "the store at 3 keeps it live past 3")
+	expectRange(test, table, value, MutableRange{Start: 1, End: 4}, "the store at 3 keeps it live past 3")
 }
 
 // TestMutatingAReturnedValueReachesTheReturnsPlace pins Graph.ReturnValue: a return aliases its value
 // into the Returns place, and an IR without one skips both the node and the edge.
-func TestMutatingAReturnedValueReachesTheReturnsPlace(t *testing.T) {
-	t.Parallel()
+func TestMutatingAReturnedValueReachesTheReturnsPlace(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	value, returned := ssa.IdentifierId(1), ssa.IdentifierId(2)
 	returns := place(returned)
@@ -328,20 +328,20 @@ func TestMutatingAReturnedValueReachesTheReturnsPlace(t *testing.T) {
 	finalize(f)
 	graph := BuildAliasingGraph(testGraph{}, f, Options{})
 	if node := graph.state.nodes[returned]; node == nil || len(node.aliasesOrder) != 1 || node.aliasesOrder[0] != value {
-		t.Fatalf("the Returns place should alias the returned value, got %+v", node)
+		test.Fatalf("the Returns place should alias the returned value, got %+v", node)
 	}
 
 	f.returns = nil
 	graph = BuildAliasingGraph(testGraph{}, f, Options{})
 	if _, ok := graph.state.nodes[returned]; ok {
-		t.Error("an IR with no Returns place has no Returns node")
+		test.Error("an IR with no Returns place has no Returns node")
 	}
 }
 
 // TestAMutationOfAPhiReachesItsOperands: a phi aliases each operand, so mutating the merge mutates
 // whichever value it may be. Operands are walked in ascending predecessor order.
-func TestAMutationOfAPhiReachesItsOperands(t *testing.T) {
-	t.Parallel()
+func TestAMutationOfAPhiReachesItsOperands(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	left, right, merged := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
 	entry, leftBlock, rightBlock, join := f.block(), f.block(), f.block(), f.block()
@@ -363,11 +363,11 @@ func TestAMutationOfAPhiReachesItsOperands(t *testing.T) {
 	mutation := join.instructions[0].order
 	for _, operand := range []ssa.IdentifierId{left, right} {
 		if got := table.Get(operand); got.End != mutation+1 {
-			t.Errorf("operand %d ends at %d, want %d, past the phi's mutation", operand, got.End, mutation+1)
+			test.Errorf("operand %d ends at %d, want %d, past the phi's mutation", operand, got.End, mutation+1)
 		}
 	}
 	if invalid := ValidateMutableRanges(table); len(invalid) != 0 {
-		t.Errorf("invalid ranges: %v", invalid)
+		test.Errorf("invalid ranges: %v", invalid)
 	}
 }
 
@@ -378,22 +378,22 @@ func TestAMutationOfAPhiReachesItsOperands(t *testing.T) {
 // `AliasingState.mutate` writes. The branch is kept live rather than deleted, so it needs a test
 // that does not depend on the missing input. Seeding the range by hand is what separates "this
 // branch is correct and waiting" from "this branch is untested".
-func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
-	t.Parallel()
+func TestRangesPhiOpensBeforeItsBlockWhenWidened(test *testing.T) {
+	test.Parallel()
 
 	if phiOpensBefore(MutableRange{}, 10) {
-		t.Error("an unset range must not open a phi early")
+		test.Error("an unset range must not open a phi early")
 	}
 	if phiOpensBefore(MutableRange{Start: 5, End: 10}, 10) {
-		t.Error("a range ending exactly at the block's first instruction is not mutated AFTER it; " +
+		test.Error("a range ending exactly at the block's first instruction is not mutated AFTER it; " +
 			"upstream's test is strictly greater")
 	}
 	if !phiOpensBefore(MutableRange{Start: 5, End: 11}, 10) {
-		t.Error("a range ending past the block's first instruction means the phi is mutated after " +
+		test.Error("a range ending past the block's first instruction means the phi is mutated after " +
 			"creation, so it must open early. This is the branch Stage 1 will make reachable")
 	}
 	if phiOpensBefore(MutableRange{Start: 1, End: 99}, 0) {
-		t.Error("a block with no assigned order must not open a phi at a negative position")
+		test.Error("a block with no assigned order must not open a phi at a negative position")
 	}
 }
 
@@ -407,32 +407,32 @@ func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
 // Tested on the helper rather than through lowered source, because the branch only runs on a range
 // whose end Stage 1 widened. A mutation dropping the minus one survived every fixture over real
 // code for exactly that reason.
-func TestPhiOpensOneBeforeItsBlock(t *testing.T) {
-	t.Parallel()
+func TestPhiOpensOneBeforeItsBlock(test *testing.T) {
+	test.Parallel()
 
 	widened := MutableRange{Start: 0, End: 20}
 	opened, moved := phiOpenedRange(widened, 10)
 	if !moved {
-		t.Fatal("a phi whose end is past its block's first instruction must open early")
+		test.Fatal("a phi whose end is past its block's first instruction must open early")
 	}
 	if opened.Start != 9 {
-		t.Errorf("the phi opened at %d; upstream opens at the block's first instruction MINUS ONE, "+
+		test.Errorf("the phi opened at %d; upstream opens at the block's first instruction MINUS ONE, "+
 			"which is 9 here, so that the merge point itself is inside the range", opened.Start)
 	}
 	if !opened.Contains(9) || !opened.Contains(10) {
-		t.Error("both the merge point and the block's first instruction must be inside the range")
+		test.Error("both the merge point and the block's first instruction must be inside the range")
 	}
 
 	if _, moved := phiOpenedRange(MutableRange{Start: 5, End: 20}, 10); moved {
-		t.Error("a phi whose start is already set must not be reopened")
+		test.Error("a phi whose start is already set must not be reopened")
 	}
 	if _, moved := phiOpenedRange(MutableRange{}, 10); moved {
-		t.Error("an unset range must not open a phi early")
+		test.Error("an unset range must not open a phi early")
 	}
 }
 
-func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
-	t.Parallel()
+func TestPhiValueKindsPreserveMixedFrozenValues(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name        string
 		left, right EffectValueKind
@@ -451,8 +451,8 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 		{"primitive mutable", EffectValuePrimitive, EffectValueMutable, EffectValueMutable, false},
 		{"unvisited predecessor", EffectValueFrozen, EffectValueMutable, EffectValueMutable, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			state := newAliasingState()
 			for index, kind := range []EffectValueKind{testCase.left, testCase.right} {
 				id := ssa.IdentifierId(index + 1)
@@ -466,23 +466,23 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 			}}
 			derivePhiImmutable(state, testGraph{}, phi, map[ssa.BlockId]bool{1: true, 2: !testCase.unseen})
 			if got := state.immutable[3]; got != testCase.want {
-				t.Fatalf("phi kind=%s, want %s", got, testCase.want)
+				test.Fatalf("phi kind=%s, want %s", got, testCase.want)
 			}
 		})
 	}
 }
 
-func TestFreezeRetainsAlreadyImmutableKinds(t *testing.T) {
-	t.Parallel()
+func TestFreezeRetainsAlreadyImmutableKinds(test *testing.T) {
+	test.Parallel()
 	for _, kind := range []EffectValueKind{EffectValuePrimitive, EffectValueGlobal, EffectValueFrozen} {
-		t.Run(kind.String(), func(t *testing.T) {
-			t.Parallel()
+		test.Run(kind.String(), func(test *testing.T) {
+			test.Parallel()
 			state := newAliasingState()
 			id := ssa.IdentifierId(1)
 			state.create(id, aliasingNodeObject)
 			state.markImmutable(id, kind)
 			if state.freeze(id) || state.immutable[id] != kind {
-				t.Fatalf("freeze changed %s to %s", kind, state.immutable[id])
+				test.Fatalf("freeze changed %s to %s", kind, state.immutable[id])
 			}
 		})
 	}
@@ -490,14 +490,14 @@ func TestFreezeRetainsAlreadyImmutableKinds(t *testing.T) {
 
 // TestTheVocabularyNamesEveryKind keeps the String methods total, since a kind printing "<unknown>"
 // in a test failure hides which effect was meant.
-func TestTheVocabularyNamesEveryKind(t *testing.T) {
-	t.Parallel()
+func TestTheVocabularyNamesEveryKind(test *testing.T) {
+	test.Parallel()
 	for kind := AliasingEffectCreate; kind <= AliasingEffectApply; kind++ {
 		if name := kind.String(); name == "<unknown>" || strings.TrimSpace(name) == "" {
-			t.Errorf("effect kind %d has no name", kind)
+			test.Errorf("effect kind %d has no name", kind)
 		}
 	}
 	if AliasingEffectKind(AliasingEffectApply+1).String() != "<unknown>" {
-		t.Error("a kind past the last should print <unknown>")
+		test.Error("a kind past the last should print <unknown>")
 	}
 }

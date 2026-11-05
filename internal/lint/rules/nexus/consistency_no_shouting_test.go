@@ -9,8 +9,8 @@ import (
 
 const shoutingFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoShoutingFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -26,16 +26,16 @@ func TestConsistencyNoShoutingFires(t *testing.T) {
 		{"unclosed backtick does not mask the rest", "// `code and then NEVER do this\nexport const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "shoutingInComment")
 		})
 	}
 }
 
-func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	// These are the discriminating cases. A rule that only detects capitals would fire on every
 	// one of them, and a rule that fires on ordinary technical prose is a rule people disable.
@@ -60,10 +60,10 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 		{"no comments at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -72,8 +72,8 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 // misread as raised voice, and those lines are here verbatim as must-stay-silent cases. The
 // true positives from the same review sit beside them, verbatim, so the safe list growing can never
 // quietly swallow a real shout or a code constant that still owes its backticks.
-func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -95,10 +95,10 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
 			"// FHIR interpretation code: \"N\" = Normal, \"A\"/\"AA\"/\"H\"/\"HH\"/\"L\"/\"LL\" = abnormal.\nexport const Value = 1;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -129,12 +129,12 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
 			"LOUD"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
-				t.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
+				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
 	}
@@ -145,8 +145,8 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
 // single-quoted phrase was not, because an apostrophe is the same character as an opening quote and
 // a naive pair-match swallows the rest of a sentence. These pin the narrow version: the opening quote
 // follows no letter or digit, the closing one is followed by none, and nothing inside is lowercase.
-func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -157,10 +157,10 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 		{"quoted phrase before punctuation", "// the pragma reads 'SYNCHRONOUS FULL', then commits\nexport const Value = 1;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -184,12 +184,12 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 		{"shout outside a quoted phrase", "// 'NOT NULL' is ALWAYS enforced\nexport const Value = 1;\n", "ALWAYS"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
-				t.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
+				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
 	}
@@ -199,8 +199,8 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 // not a raised voice. The blank line before it is what makes it a block; an indented line straight
 // after prose continues the paragraph and is still read. A block comment's own indentation is set
 // aside first, so only a block indented past the gutter counts. Mirrors nexus's Shouting.test.ts.
-func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -211,10 +211,10 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
 		{"fenced block, the control", "/**\n * Run it:\n * ```\n * TMPDIR=$HOME/tmp node run.mjs\n * ```\n */\nexport const Value = 1;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -228,12 +228,12 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
 		{"a deeply indented comment line is prose", "export function run() {\n    /**\n     * You must NEVER do this.\n     */\n    return 1;\n}\n", "NEVER"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
-				t.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
+				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
 	}
@@ -244,8 +244,8 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
 // the quote opens on one line and closes behind the next line's gutter. The reporting rows pin the
 // edges: capitals after the closing quote, a stray inch mark with nothing on the next line to close
 // it, and a quote that only closes two lines later (one wrap is the limit).
-func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name       string
@@ -257,10 +257,10 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(t *testing.T) {
 			"/*\n * \"ok\" then \"a phrase that\n * says NEVER\" here\n */\nexport const Value = 1;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -277,43 +277,43 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(t *testing.T) {
 			"/*\n * the \"first\n * line is NEVER\n * closed\" here\n */\nexport const Value = 1;\n", "NEVER"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
-				t.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
+				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
 	}
 }
 
-func TestConsistencyNoShoutingRespectsTheAllowOption(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingRespectsTheAllowOption(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// the WIDGET subsystem owns this\nexport const Value = 1;\n"
 
-	withoutOption := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, sourceText)
-	rule_testing.ExpectFindings(t, withoutOption, "shoutingInComment")
+	withoutOption := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, sourceText)
+	rule_testing.ExpectFindings(test, withoutOption, "shoutingInComment")
 
-	withOption := rule_testing.RunWithOptions(t, ConsistencyNoShouting, shoutingFile, sourceText,
+	withOption := rule_testing.RunWithOptions(test, ConsistencyNoShouting, shoutingFile, sourceText,
 		ConsistencyNoShoutingOptions{Allow: []string{"WIDGET"}})
-	rule_testing.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(test, withOption)
 }
 
 // The message has to name what it saw. A finding that says only "this comment shouts" makes the
 // reader rescan a paragraph to find the word that tripped it.
-func TestConsistencyNoShoutingNamesTheTokens(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoShoutingNamesTheTokens(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile,
+	result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile,
 		"// NEVER cache this, it is REALLY bad\nexport const Value = 1;\n")
-	rule_testing.ExpectFindings(t, result, "shoutingInComment")
+	rule_testing.ExpectFindings(test, result, "shoutingInComment")
 
 	description := result.Diagnostics[0].Message.Description
 	for _, want := range []string{`"NEVER"`, `"REALLY"`} {
 		if !strings.Contains(description, want) {
-			t.Fatalf("expected the message to name %s, got: %s", want, description)
+			test.Fatalf("expected the message to name %s, got: %s", want, description)
 		}
 	}
 }

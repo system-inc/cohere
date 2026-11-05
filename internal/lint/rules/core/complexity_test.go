@@ -34,8 +34,8 @@ func complexityOf(optionJson string) any {
 // languageOptions, and ZERO cases change verdict between that configuration and cohere's.
 //
 //	96 reporting cases, 69 clean cases.
-func TestComplexityFires(t *testing.T) {
-	t.Parallel()
+func TestComplexityFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -141,9 +141,9 @@ func TestComplexityFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, Complexity, complexityFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -152,14 +152,14 @@ func TestComplexityFires(t *testing.T) {
 		for range testCase.findings {
 			expected = append(expected, messageComplexityComplex.Id)
 		}
-		rule_testing.ExpectFindings(t, result, expected...)
+		rule_testing.ExpectFindings(test, result, expected...)
 	}
 }
 
 // TestComplexityStaysSilent carries upstream's clean cases, which are the false positives it
 // already thought about.
-func TestComplexityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestComplexityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -237,13 +237,13 @@ func TestComplexityStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, Complexity, complexityFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("%q with %+v: expected no findings, got %d: %v",
+			test.Errorf("%q with %+v: expected no findings, got %d: %v",
 				testCase.source, testCase.settings, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -265,8 +265,8 @@ func TestComplexityStaysSilent(t *testing.T) {
 //
 // The first two are upstream naming a function by what it is ASSIGNED to rather than by its own
 // syntax, and the third is the modifier and the name being the same word.
-func TestComplexityNamesAndSpans(t *testing.T) {
-	t.Parallel()
+func TestComplexityNamesAndSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -334,19 +334,19 @@ func TestComplexityNamesAndSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, Complexity, complexityFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%q: expected exactly 1 finding, got %d %v",
+			test.Errorf("%q: expected exactly 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
 		diagnostic := result.Diagnostics[0]
 		reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != testCase.span {
-			t.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
+			test.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
 		}
 		if !strings.HasPrefix(diagnostic.Message.Description, testCase.message) {
-			t.Errorf("%q: expected the message to open with %q, got %q",
+			test.Errorf("%q: expected the message to open with %q, got %q",
 				testCase.source, testCase.message, diagnostic.Message.Description)
 		}
 	}
@@ -368,8 +368,8 @@ func TestComplexityNamesAndSpans(t *testing.T) {
 //
 // The third row is the control, and it is the one that makes the first two mean something: it says
 // the rule is reporting at all on this input, and that `f` does NOT inherit the top-level `if`.
-func TestComplexityNeverReportsTheProgram(t *testing.T) {
-	t.Parallel()
+func TestComplexityNeverReportsTheProgram(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -386,9 +386,9 @@ func TestComplexityNeverReportsTheProgram(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, Complexity, complexityFile, testCase.source, complexityOf("1"))
+		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, complexityOf("1"))
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, testCase.findings, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -396,7 +396,7 @@ func TestComplexityNeverReportsTheProgram(t *testing.T) {
 			continue
 		}
 		if !strings.HasPrefix(result.Diagnostics[0].Message.Description, testCase.message) {
-			t.Errorf("%q: expected the message to open with %q, got %q",
+			test.Errorf("%q: expected the message to open with %q, got %q",
 				testCase.source, testCase.message, result.Diagnostics[0].Message.Description)
 		}
 	}
@@ -419,8 +419,8 @@ func TestComplexityNeverReportsTheProgram(t *testing.T) {
 //
 // Every expected name and span is what the installed ESLint 10.8.1 rule produced at a threshold
 // of 1.
-func TestComplexityNamesModifiersTheCorpusNeverCrosses(t *testing.T) {
-	t.Parallel()
+func TestComplexityNamesModifiersTheCorpusNeverCrosses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source  string
@@ -459,19 +459,19 @@ func TestComplexityNamesModifiersTheCorpusNeverCrosses(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, Complexity, complexityFile, testCase.source, complexityOf("1"))
+		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, complexityOf("1"))
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%q: expected exactly 1 finding, got %d %v",
+			test.Errorf("%q: expected exactly 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
 		diagnostic := result.Diagnostics[0]
 		reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != testCase.span {
-			t.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
+			test.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
 		}
 		if !strings.HasPrefix(diagnostic.Message.Description, testCase.message) {
-			t.Errorf("%q: expected the message to open with %q, got %q",
+			test.Errorf("%q: expected the message to open with %q, got %q",
 				testCase.source, testCase.message, diagnostic.Message.Description)
 		}
 	}
@@ -484,8 +484,8 @@ func TestComplexityNamesModifiersTheCorpusNeverCrosses(t *testing.T) {
 // the two disagree exactly when a zero is written, so the two zero spellings do opposite things.
 // The table below is the same one `DecodeMaxDepthOptions` carries, verified against the installed
 // complexity rule rather than assumed to transfer.
-func TestComplexityDecoderReadsEveryOptionShape(t *testing.T) {
-	t.Parallel()
+func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		// optionJson is exactly the bytes the config layer hands the decoder.
@@ -515,27 +515,27 @@ func TestComplexityDecoderReadsEveryOptionShape(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := DecodeComplexityOptions([]byte(testCase.optionJson))
 		if err != nil {
-			t.Errorf("decoding %s: %v", testCase.optionJson, err)
+			test.Errorf("decoding %s: %v", testCase.optionJson, err)
 			continue
 		}
 		settings, ok := decoded.(ComplexitySettings)
 		if !ok {
-			t.Errorf("decoding %s: expected ComplexitySettings, got %T", testCase.optionJson, decoded)
+			test.Errorf("decoding %s: expected ComplexitySettings, got %T", testCase.optionJson, decoded)
 			continue
 		}
 		if settings.Variant != testCase.variant {
-			t.Errorf("decoding %s: expected variant %q, got %q",
+			test.Errorf("decoding %s: expected variant %q, got %q",
 				testCase.optionJson, testCase.variant, settings.Variant)
 		}
 		if testCase.silent {
 			if settings.Maximum != complexityNeverReports {
-				t.Errorf("decoding %s: expected the silencing threshold, got %d",
+				test.Errorf("decoding %s: expected the silencing threshold, got %d",
 					testCase.optionJson, settings.Maximum)
 			}
 			continue
 		}
 		if settings.Maximum != testCase.maximum {
-			t.Errorf("decoding %s: expected a threshold of %d, got %d",
+			test.Errorf("decoding %s: expected a threshold of %d, got %d",
 				testCase.optionJson, testCase.maximum, settings.Maximum)
 		}
 	}
@@ -543,31 +543,31 @@ func TestComplexityDecoderReadsEveryOptionShape(t *testing.T) {
 	// End to end, because a decoder row is not a verdict. The silencing shape must report NOTHING
 	// on source that a threshold of 0 reports on.
 	branchy := "function f() { if (a) {} if (b) {} }"
-	result := rule_testing.RunWithOptions(t, Complexity, complexityFile, branchy, complexityOf(`{"maximum": 0}`))
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunWithOptions(test, Complexity, complexityFile, branchy, complexityOf(`{"maximum": 0}`))
+	rule_testing.ExpectClean(test, result)
 
 	// The control: the sibling zero spelling reports, so the silence above is the option rather
 	// than a rule that cannot fire on this input.
-	result = rule_testing.RunWithOptions(t, Complexity, complexityFile, branchy, complexityOf(`{"max": 0}`))
+	result = rule_testing.RunWithOptions(test, Complexity, complexityFile, branchy, complexityOf(`{"max": 0}`))
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the control to report, got %d: %v",
+		test.Errorf("expected the control to report, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 
 	// A rule handed nil options enforces upstream's default of 20 rather than doing nothing, so a
 	// two-branch function is clean and a deliberately deep one is not.
-	result = rule_testing.RunWithOptions(t, Complexity, complexityFile, branchy, nil)
-	rule_testing.ExpectClean(t, result)
+	result = rule_testing.RunWithOptions(test, Complexity, complexityFile, branchy, nil)
+	rule_testing.ExpectClean(test, result)
 
 	// The variant, end to end: a switch with three cases is complexity 4 classic and 2 modified.
 	switchy := "function f() { switch (a) { case 1: break; case 2: break; case 3: break; } }"
-	result = rule_testing.RunWithOptions(t, Complexity, complexityFile, switchy, complexityOf("3"))
+	result = rule_testing.RunWithOptions(test, Complexity, complexityFile, switchy, complexityOf("3"))
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected classic counting to report at threshold 3, got %d", len(result.Diagnostics))
+		test.Errorf("expected classic counting to report at threshold 3, got %d", len(result.Diagnostics))
 	}
-	result = rule_testing.RunWithOptions(t, Complexity, complexityFile, switchy,
+	result = rule_testing.RunWithOptions(test, Complexity, complexityFile, switchy,
 		complexityOf(`{"max": 3, "variant": "modified"}`))
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestComplexityNameBuilderBranches tests `complexityNameOf` DIRECTLY rather than through the
@@ -581,8 +581,8 @@ func TestComplexityDecoderReadsEveryOptionShape(t *testing.T) {
 // Each row is one branch of the builder, and the expected string is what the installed
 // ESLint 10.8.1 rule rendered for that shape. The `find` field locates the node to name, so a row
 // tests one branch rather than whatever the walk reached first.
-func TestComplexityNameBuilderBranches(t *testing.T) {
-	t.Parallel()
+func TestComplexityNameBuilderBranches(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -720,7 +720,7 @@ func TestComplexityNameBuilderBranches(t *testing.T) {
 						walk(file)
 						if located != nil {
 							if got := complexityNameOf(ctx, located); got != testCase.want {
-								t.Errorf("%q: expected the name builder to render %q, got %q",
+								test.Errorf("%q: expected the name builder to render %q, got %q",
 									testCase.source, testCase.want, got)
 							}
 						}
@@ -728,9 +728,9 @@ func TestComplexityNameBuilderBranches(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.Run(t, probe, complexityFile, testCase.source)
+		rule_testing.Run(test, probe, complexityFile, testCase.source)
 		if located == nil {
-			t.Errorf("%q: the probe found no node to name, so this row proved nothing", testCase.source)
+			test.Errorf("%q: the probe found no node to name, so this row proved nothing", testCase.source)
 		}
 	}
 }

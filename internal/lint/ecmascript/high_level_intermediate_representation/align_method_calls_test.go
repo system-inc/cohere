@@ -14,8 +14,8 @@ import (
 // After it runs, a `MethodCall` has either both sides scoped together or neither side scoped. The
 // before assertion keeps that result from passing vacuously, and the call count distinguishes a
 // lowering failure from a fixture that simply no longer reaches the in-between state.
-func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
-	t.Parallel()
+func TestAlignMethodCallScopesRemovesTheInBetweenState(test *testing.T) {
+	test.Parallel()
 
 	// A known primitive-returning method is the live shape after call-result allocation became
 	// faithful. Its result does not allocate, while its PropertyLoad result is scoped, so alignment
@@ -29,20 +29,20 @@ func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
 			return items.includes(selected);
 		}
 	`
-	before, after, calls := methodCallScopeStates(t, source)
+	before, after, calls := methodCallScopeStates(test, source)
 	if calls == 0 {
-		t.Fatal("no method call was reached, so this test asserts nothing about the pass; the " +
+		test.Fatal("no method call was reached, so this test asserts nothing about the pass; the " +
 			"fixture stopped exercising it rather than the pass being correct")
 	}
 	if before == 0 {
-		t.Fatal("no method call was in the in-between state before the pass, so a clean result " +
+		test.Fatal("no method call was in the in-between state before the pass, so a clean result " +
 			"after it proves nothing")
 	}
 	if after != 0 {
-		t.Errorf("%d method call(s) still have one side scoped and the other not, down from %d; "+
+		test.Errorf("%d method call(s) still have one side scoped and the other not, down from %d; "+
 			"the pass exists to make that count zero", after, before)
 	}
-	t.Logf("method calls: %d reached, %d in the in-between state before, %d after", calls, before, after)
+	test.Logf("method calls: %d reached, %d in the in-between state before, %d after", calls, before, after)
 }
 
 // TestAlignMethodCallScopesReachesTheCorpus is the population check.
@@ -50,11 +50,11 @@ func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
 // A pass that fires on nothing passes every assertion above by never being exercised. This is the
 // control for that, and the count is asserted rather than logged because a drop to zero would mean
 // the pass stopped being reachable rather than stopped being needed.
-func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestAlignMethodCallScopesReachesTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	functions, changed := 0, 0
-	forEachCorpusFunctionWithChecker(t, 400, func(function *Function, checker *shimchecker.Checker) {
+	forEachCorpusFunctionWithChecker(test, 400, func(function *Function, checker *shimchecker.Checker) {
 		InferReactive(function, checker)
 		DropManualMemoization(function)
 		ranges := InferMutableRanges(function)
@@ -66,7 +66,7 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 		}
 	})
 	if functions < 100 {
-		t.Fatalf("only %d functions reached; the corpus walk is not finding real source and the "+
+		test.Fatalf("only %d functions reached; the corpus walk is not finding real source and the "+
 			"count below would be a fact about the harness", functions)
 	}
 	// Measured. A move here is the corpus changing or the pass changing what it touches; both are
@@ -102,14 +102,14 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// functions left with edits to the live directory before the input was frozen.
 	const knownChanged = 109
 	if changed != knownChanged {
-		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
+		test.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}
-	t.Logf("the pass rewrote scopes in %d of %d corpus functions", changed, functions)
+	test.Logf("the pass rewrote scopes in %d of %d corpus functions", changed, functions)
 }
 
 // methodCallScopeStates counts method calls whose two sides disagree about scopes.
-func methodCallScopeStates(t *testing.T, source string) (before, after, calls int) {
-	t.Helper()
+func methodCallScopeStates(test *testing.T, source string) (before, after, calls int) {
+	test.Helper()
 	probe := rule.Rule{
 		Name:             "method-call-scope-states",
 		NeedsTypeChecker: true,
@@ -165,7 +165,7 @@ func methodCallScopeStates(t *testing.T, source string) (before, after, calls in
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")

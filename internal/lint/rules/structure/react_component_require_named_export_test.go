@@ -8,8 +8,8 @@ import (
 
 const requireNamedExportFile = "/repository/source/components/Button.tsx"
 
-func TestReactComponentRequireNamedExportFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequireNamedExportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -93,17 +93,17 @@ func TestReactComponentRequireNamedExportFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText),
 				"componentRequiresNamedExport")
 		})
 	}
 }
 
-func TestReactComponentRequireNamedExportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequireNamedExportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -236,10 +236,10 @@ func TestReactComponentRequireNamedExportStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

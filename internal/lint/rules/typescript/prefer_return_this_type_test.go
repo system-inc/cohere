@@ -22,8 +22,8 @@ func preferReturnThisTypeCaseName(index int) string {
 // make identity fail and hand back a clean verdict for a case that really reports. RunTyped is one
 // file per call, so the fixtures are safe by construction; the oracle used to measure them had to
 // be built that way deliberately.
-func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// Upstream's valid list, byte for byte.
@@ -111,9 +111,9 @@ func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
 		"class Foo {\n  f = this as Foo;\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferReturnThisTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferReturnThisType,
+		test.Run(preferReturnThisTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferReturnThisType,
 				preferReturnThisTypeFile, sourceText))
 		})
 	}
@@ -125,8 +125,8 @@ func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
 //
 // Every case reports exactly once, which is asserted by passing a single id: a port that reported
 // an overload signature as well as its implementation would fail on the count alone.
-func TestPreferReturnThisTypeFires(t *testing.T) {
-	t.Parallel()
+func TestPreferReturnThisTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -321,12 +321,12 @@ func TestPreferReturnThisTypeFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferReturnThisTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferReturnThisType, preferReturnThisTypeFile,
+		test.Run(preferReturnThisTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferReturnThisType, preferReturnThisTypeFile,
 				testCase.sourceText)
 
-			rule_testing.ExpectFindings(t, result, "useThisType")
+			rule_testing.ExpectFindings(test, result, "useThisType")
 
 			// The harness writes the fixture trimmed, so both the span slice and the expected
 			// rewrite are taken against that text rather than against the Go literal above.
@@ -335,21 +335,21 @@ func TestPreferReturnThisTypeFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
 			// Asserted against a literal typed here rather than against the rule's own message
 			// constant, because comparing a finding to the constant it was built from moves both
 			// sides together under mutation and proves nothing.
 			if diagnostic.Message.Description != "Use `this` type instead." {
-				t.Fatalf("message: expected %q, got %q", "Use `this` type instead.",
+				test.Fatalf("message: expected %q, got %q", "Use `this` type instead.",
 					diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "useThisType" {
-				t.Fatalf("message id: expected %q, got %q", "useThisType", diagnostic.Message.Id)
+				test.Fatalf("message id: expected %q, got %q", "useThisType", diagnostic.Message.Id)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
@@ -365,20 +365,20 @@ func TestPreferReturnThisTypeFires(t *testing.T) {
 //
 // The case used here REPORTS under RunTyped and is asserted clean here, so a revert that dropped
 // NeedsTypeChecker would fail rather than pass vacuously.
-func TestPreferReturnThisTypeRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferReturnThisTypeRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !PreferReturnThisType.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: every judgment it makes is a type identity question")
+		test.Fatal("the rule must declare NeedsTypeChecker: every judgment it makes is a type identity question")
 	}
 
 	sourceText := "class Foo {\n  f(): Foo {\n    return this;\n  }\n}\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferReturnThisType,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferReturnThisType,
 		preferReturnThisTypeFile, sourceText))
 
 	// The control: the same source under the typed harness reports, so the silence above is the
 	// guard declining rather than the rule being unable to see this shape at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferReturnThisType,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferReturnThisType,
 		preferReturnThisTypeFile, sourceText), "useThisType")
 }

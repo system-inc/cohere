@@ -14,8 +14,8 @@ import (
 // reading either implementation. That matters more than usual for this rule: three separate
 // hypotheses formed from reading were wrong, and each would have shipped as a confident fixture.
 // They are recorded at their cases.
-func TestImmutabilityFires(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -283,10 +283,10 @@ function Component(props) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Immutability, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -297,8 +297,8 @@ function Component(props) {
 // `s_before_jsx` mutate exactly the value that `f_hook_arg` and `f_jsx_captured` mutate, and differ
 // only in whether the mutation comes before or after the freeze. A rule keyed on where a value came
 // from rather than on what has happened to it passes the fires table and fails both of these.
-func TestImmutabilityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -497,10 +497,10 @@ function Component(props) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Immutability, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -512,8 +512,8 @@ function Component(props) {
 // guess was that a write underlines the assignment; React underlines the OBJECT BEING MUTATED, so
 // `props.a = 1` underlines `props` and `props.a.q = 1` underlines `props.a`. Every one of those six
 // was green under `ExpectFindings`, which is exactly the failure this step exists to catch.
-func TestImmutabilitySpans(t *testing.T) {
-	t.Parallel()
+func TestImmutabilitySpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -562,11 +562,11 @@ func TestImmutabilitySpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != len(testCase.expected) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.expected), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.expected), len(result.Diagnostics))
 			}
 			// The harness writes `strings.TrimSpace(contents)+"\n"`, so the file on disk is offset
 			// from the Go literal above whenever the literal has leading whitespace. These literals
@@ -576,7 +576,7 @@ func TestImmutabilitySpans(t *testing.T) {
 			for index, diagnostic := range result.Diagnostics {
 				got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.expected[index] {
-					t.Errorf("finding %d: expected span %q, got %q", index, testCase.expected[index], got)
+					test.Errorf("finding %d: expected span %q, got %q", index, testCase.expected[index], got)
 				}
 			}
 		})
@@ -588,20 +588,20 @@ func TestImmutabilitySpans(t *testing.T) {
 // Asserted against literal strings typed here rather than against the rule's own constants: the
 // brief records a porter whose message-id mutant and message-text mutant BOTH survived a test
 // written the other way, because equality against the constant moves with the constant.
-func TestImmutabilityMessagesAreDistinct(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityMessagesAreDistinct(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
-	result := rule_testing.RunTyped(t, Immutability, "component.tsx", source)
+	result := rule_testing.RunTyped(test, Immutability, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "immutableValue" {
-		t.Errorf("expected id %q, got %q", "immutableValue", got)
+		test.Errorf("expected id %q, got %q", "immutableValue", got)
 	}
 	wantPrefix := "This value is a prop or a hook argument, so it belongs to the caller."
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-		t.Errorf("expected description to begin %q, got %q", wantPrefix, got)
+		test.Errorf("expected description to begin %q, got %q", wantPrefix, got)
 	}
 }
 
@@ -611,8 +611,8 @@ func TestImmutabilityMessagesAreDistinct(t *testing.T) {
 // verdict has ten different explanations and a reader who conflates the two ships a rule that is
 // right about every verdict and wrong about every sentence. Each expectation is React's own wording
 // for the same input, matched on the distinguishing clause rather than on the whole sentence.
-func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityReasonSelectsTheMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -630,14 +630,14 @@ func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; !strings.Contains(got, testCase.clause) {
-				t.Errorf("expected description to contain %q, got %q", testCase.clause, got)
+				test.Errorf("expected description to contain %q, got %q", testCase.clause, got)
 			}
 		})
 	}
@@ -650,20 +650,20 @@ func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
 // until the bound ran out. `immutabilityMergeValues` merges both halves; only the KIND is allowed to
 // vote on termination, and this asserts that directly rather than through a fixture, because a
 // fixture can only observe the symptom as slowness.
-func TestImmutabilityConvergenceEqualityIgnoresReasons(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityConvergenceEqualityIgnoresReasons(test *testing.T) {
+	test.Parallel()
 
 	first := immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: immutabilityReasonState}
 	second := immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: immutabilityReasonJsxCaptured}
 	merged := immutabilityMergeValues(first, second)
 	if merged.Kind != first.Kind {
-		t.Fatalf("merging two frozen values moved the kind to %v", merged.Kind)
+		test.Fatalf("merging two frozen values moved the kind to %v", merged.Kind)
 	}
 	if merged == first {
-		t.Fatal("the merged value is identical to the first, so this test cannot see the hazard")
+		test.Fatal("the merged value is identical to the first, so this test cannot see the hazard")
 	}
 	if merged.Reasons != (immutabilityReasonState | immutabilityReasonJsxCaptured) {
-		t.Errorf("expected both reasons to survive the merge, got %b", merged.Reasons)
+		test.Errorf("expected both reasons to survive the merge, got %b", merged.Reasons)
 	}
 }
 
@@ -673,8 +673,8 @@ func TestImmutabilityConvergenceEqualityIgnoresReasons(t *testing.T) {
 // is "take the larger constant" is self-consistent, passes its own tests, and is wrong, because
 // `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is NEITHER operand. Every row
 // here was measured against React's executable with the compilation gate held constant.
-func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -692,10 +692,10 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := immutabilityMergeKinds(testCase.a, testCase.b); got != testCase.expected {
-				t.Errorf("expected %v, got %v", testCase.expected, got)
+				test.Errorf("expected %v, got %v", testCase.expected, got)
 			}
 		})
 	}
@@ -704,13 +704,13 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 	// an equality against Frozen, and a rule built from that reading is silent on every joined
 	// value while passing every straight-line fixture.
 	if immutabilityMutate(immutabilityMaybeFrozen) != immutabilityMutationFrozen {
-		t.Error("a maybe-frozen value must report on mutation")
+		test.Error("a maybe-frozen value must report on mutation")
 	}
 	if immutabilityMutate(immutabilityGlobal) != immutabilityMutationGlobal {
-		t.Error("a global must report on mutation")
+		test.Error("a global must report on mutation")
 	}
 	if immutabilityMutate(immutabilityPrimitive) != immutabilityMutationNone {
-		t.Error("writing through a primitive is silent")
+		test.Error("writing through a primitive is silent")
 	}
 }
 
@@ -719,15 +719,15 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 // The plain harness hands a rule a nil checker. This rule guards, so it goes completely silent
 // rather than panicking, which is the more dangerous of the two failure modes: every silent fixture
 // would pass vacuously.
-func TestImmutabilityRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
-	if result := rule_testing.RunTyped(t, Immutability, "component.tsx", source); len(result.Diagnostics) == 0 {
-		t.Fatal("the typed harness reported nothing, so this test cannot see a regression")
+	if result := rule_testing.RunTyped(test, Immutability, "component.tsx", source); len(result.Diagnostics) == 0 {
+		test.Fatal("the typed harness reported nothing, so this test cannot see a regression")
 	}
-	if result := rule_testing.Run(t, Immutability, "component.tsx", source); len(result.Diagnostics) != 0 {
-		t.Errorf("expected silence without a checker, got %d findings", len(result.Diagnostics))
+	if result := rule_testing.Run(test, Immutability, "component.tsx", source); len(result.Diagnostics) != 0 {
+		test.Errorf("expected silence without a checker, got %d findings", len(result.Diagnostics))
 	}
 }
 
@@ -742,8 +742,8 @@ func TestImmutabilityRequiresTheTypedHarness(t *testing.T) {
 //
 // The control is the component writing its OWN local after render, which the compiler reports at
 // the same line nested or not, so the nested component is still analyzed, as itself.
-func TestImmutabilityAnalyzesANestedComponentAsItsOwnUnit(t *testing.T) {
-	t.Parallel()
+func TestImmutabilityAnalyzesANestedComponentAsItsOwnUnit(test *testing.T) {
+	test.Parallel()
 
 	testVariables := `import {useEffect, useCallback} from 'react';
 declare function it(name: string, body: () => void): void;
@@ -764,9 +764,9 @@ it('counts', () => {
   return [Page, isRefetch, result, selectCalled];
 });
 `
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Immutability, "component.tsx", testVariables))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, Immutability, "component.tsx", testVariables))
 
-	nested := rule_testing.RunTyped(t, Immutability, "component.tsx", `declare function it(name: string, body: () => void): void;
+	nested := rule_testing.RunTyped(test, Immutability, "component.tsx", `declare function it(name: string, body: () => void): void;
 it('own local', () => {
   function Page() {
     let local = 0;
@@ -775,13 +775,13 @@ it('own local', () => {
   return Page;
 });
 `)
-	topLevel := rule_testing.RunTyped(t, Immutability, "component.tsx", `export function Page() {
+	topLevel := rule_testing.RunTyped(test, Immutability, "component.tsx", `export function Page() {
   let local = 0;
   return <button onClick={() => { local = 1; }}>{local}</button>;
 }
 `)
 	if len(topLevel.Diagnostics) == 0 {
-		t.Fatal("the top-level control reports nothing, so the comparison proves nothing")
+		test.Fatal("the top-level control reports nothing, so the comparison proves nothing")
 	}
-	rule_testing.ExpectFindings(t, nested, topLevel.MessageIds()...)
+	rule_testing.ExpectFindings(test, nested, topLevel.MessageIds()...)
 }

@@ -38,18 +38,18 @@ var exportGraphs = flag.String("export-graphs", "", "write the functions React C
 // named value is named for its declaration, and every place carries one tag. Nothing the passes read is
 // lost: which values share a binding, which bindings a closure captures, every edge and its kind, and
 // every place with its role.
-func TestExportGraphsForAdamic(t *testing.T) {
-	t.Parallel()
+func TestExportGraphsForAdamic(test *testing.T) {
+	test.Parallel()
 	if *exportGraphs == "" {
-		t.Skip("writes Adamic's corpus only when -export-graphs names a directory")
+		test.Skip("writes Adamic's corpus only when -export-graphs names a directory")
 	}
 	if err := os.MkdirAll(*exportGraphs, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	fixtures, functions := 0, 0
-	for _, fixture := range reactCompilerFixtures(t) {
-		lowered := lowerReactCompilerFixture(t, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
+	for _, fixture := range reactCompilerFixtures(test) {
+		lowered := lowerReactCompilerFixture(test, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
 			return Lower(node, ctx.TypeChecker)
 		})
 		name := fixture.name
@@ -72,13 +72,13 @@ func TestExportGraphsForAdamic(t *testing.T) {
 			continue
 		}
 		if err := os.WriteFile(filepath.Join(*exportGraphs, name+".txt"), []byte(out.String()), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		fixtures++
 	}
-	t.Logf("%d fixtures, %d functions, written to %s", fixtures, functions, *exportGraphs)
+	test.Logf("%d fixtures, %d functions, written to %s", fixtures, functions, *exportGraphs)
 	if fixtures == 0 {
-		t.Fatal("no fixture lowered to anything, so the export holds nothing")
+		test.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
 }
 
@@ -90,8 +90,8 @@ type reactCompilerFixture struct {
 
 // reactCompilerFixtures are React Compiler's vendored fixtures in path order, Flow left out, as the
 // conformance corpus leaves them out: the parser can't read them.
-func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
-	t.Helper()
+func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
+	test.Helper()
 	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
 	var paths []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
@@ -104,14 +104,14 @@ func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	sort.Strings(paths)
 	var fixtures []reactCompilerFixture
 	for _, path := range paths {
 		contents, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		source := string(contents)
 		if strings.Contains(source, "@flow") {
@@ -119,7 +119,7 @@ func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
 		}
 		name, err := filepath.Rel(root, path)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		fixtures = append(fixtures, reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source})
 	}
@@ -128,8 +128,8 @@ func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
 
 // lowerReactCompilerFixture lowers every outermost function in a fixture's source through lower, with a
 // real type checker.
-func lowerReactCompilerFixture(t *testing.T, source string, lower func(rule.Context, *ast.Node) *Function) []*Function {
-	t.Helper()
+func lowerReactCompilerFixture(test *testing.T, source string, lower func(rule.Context, *ast.Node) *Function) []*Function {
+	test.Helper()
 	var lowered []*Function
 	probe := rule.Rule{
 		Name:             "adamic-graphs-export",
@@ -138,7 +138,7 @@ func lowerReactCompilerFixture(t *testing.T, source string, lower func(rule.Cont
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Fatal("the harness produced no type checker, so every reference would lower as a global")
+						test.Fatal("the harness produced no type checker, so every reference would lower as a global")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
 						if fn := lower(ctx, function); fn != nil {
@@ -149,7 +149,7 @@ func lowerReactCompilerFixture(t *testing.T, source string, lower func(rule.Cont
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "fixture.tsx", source)
+	rule_testing.RunTyped(test, probe, "fixture.tsx", source)
 	return lowered
 }
 

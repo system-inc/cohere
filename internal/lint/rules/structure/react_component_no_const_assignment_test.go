@@ -11,8 +11,8 @@ const constAssignmentFile = "/repository/source/components/Thing.tsx"
 // The tree contains zero instances of this construct, so it cannot cohere this rule at all: a clean
 // run proves only that the rule does not fire on code containing none of the shape. These fixtures
 // are the entire specification, which raises rather than lowers the bar on where the clean cases sit.
-func TestReactComponentNoConstAssignmentFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoConstAssignmentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -49,20 +49,20 @@ func TestReactComponentNoConstAssignmentFires(t *testing.T) {
 		{"an arrow inside a function body", "export function Outer() {\n    const Inner = () => <div />;\n    return <Inner />;\n}\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ReactComponentNoConstAssignment, constAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ReactComponentNoConstAssignment, constAssignmentFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noConstAssignment"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestReactComponentNoConstAssignmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoConstAssignmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -90,10 +90,10 @@ func TestReactComponentNoConstAssignmentStaysSilent(t *testing.T) {
 		{"a plain typescript file", "/repository/source/Thing.ts", "export const Thing = () => 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ReactComponentNoConstAssignment, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ReactComponentNoConstAssignment, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

@@ -36,9 +36,9 @@ func correctnessNoUnclearedRaceTimeoutSource(lines ...string) string {
 	return correctnessNoUnclearedRaceTimeoutPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoUnclearedRaceTimeoutRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoUnclearedRaceTimeout, map[string]string{
+func correctnessNoUnclearedRaceTimeoutRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoUnclearedRaceTimeout, map[string]string{
 		correctnessNoUnclearedRaceTimeoutFile:            sourceText,
 		"/repository/types/node/web-globals/timers.d.ts": correctnessNoUnclearedRaceTimeoutNodeTimers,
 	}, correctnessNoUnclearedRaceTimeoutFile)
@@ -46,8 +46,8 @@ func correctnessNoUnclearedRaceTimeoutRun(t *testing.T, sourceText string) rule_
 
 // correctnessNoUnclearedRaceTimeoutExpect asserts the reported spans in source order, and that no
 // finding carries a fix.
-func correctnessNoUnclearedRaceTimeoutExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoUnclearedRaceTimeoutExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold
 	// each finding's exact text.
 	if len(want) > 0 {
@@ -55,7 +55,7 @@ func correctnessNoUnclearedRaceTimeoutExpect(t *testing.T, result rule_testing.R
 		for index := range wantIds {
 			wantIds[index] = correctnessNoUnclearedRaceTimeoutId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -65,19 +65,19 @@ func correctnessNoUnclearedRaceTimeoutExpect(t *testing.T, result rule_testing.R
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoUnclearedRaceTimeoutId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
 		}
 	}
 }
@@ -120,11 +120,11 @@ func correctnessNoUnclearedRaceTimeoutPhiSocial(fixed bool) string {
 }
 
 // The real render bound, before the fix: the ten-minute timer is reported.
-func TestCorrectnessNoUnclearedRaceTimeoutFiresOnPhiSocialGenerator(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoUnclearedRaceTimeoutFiresOnPhiSocialGenerator(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoUnclearedRaceTimeoutRun(t, correctnessNoUnclearedRaceTimeoutPhiSocial(false))
-	correctnessNoUnclearedRaceTimeoutExpect(t, result, strings.Join([]string{
+	result := correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutPhiSocial(false))
+	correctnessNoUnclearedRaceTimeoutExpect(test, result, strings.Join([]string{
 		"setTimeout(function fireTimeout() {",
 		"                    reject(new Error(`image-render-timeout after ${Math.round(imageTimeoutInMilliseconds / 1000)}s`));",
 		"                }, imageTimeoutInMilliseconds)",
@@ -132,14 +132,14 @@ func TestCorrectnessNoUnclearedRaceTimeoutFiresOnPhiSocialGenerator(t *testing.T
 }
 
 // After the fix: the handle is kept and cleared whichever side wins, and nothing fires.
-func TestCorrectnessNoUnclearedRaceTimeoutStaysSilentOnFixedPhiSocialGenerator(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoUnclearedRaceTimeoutStaysSilentOnFixedPhiSocialGenerator(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoUnclearedRaceTimeoutRun(t, correctnessNoUnclearedRaceTimeoutPhiSocial(true)))
+	rule_testing.ExpectClean(test, correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutPhiSocial(true)))
 }
 
-func TestCorrectnessNoUnclearedRaceTimeoutFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoUnclearedRaceTimeoutFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -195,17 +195,17 @@ func TestCorrectnessNoUnclearedRaceTimeoutFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoUnclearedRaceTimeoutRun(t, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...))
-			correctnessNoUnclearedRaceTimeoutExpect(t, result, testCase.want...)
+			result := correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...))
+			correctnessNoUnclearedRaceTimeoutExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoUnclearedRaceTimeoutStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoUnclearedRaceTimeoutStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -281,17 +281,17 @@ func TestCorrectnessNoUnclearedRaceTimeoutStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoUnclearedRaceTimeoutRun(t, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...)))
 		})
 	}
 }
 
 // `setTimeout` as lib.dom declares it, a global function in a global script, is the platform's too.
-func TestCorrectnessNoUnclearedRaceTimeoutRecognizesTheDomDeclaration(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoUnclearedRaceTimeoutRecognizesTheDomDeclaration(test *testing.T) {
+	test.Parallel()
 
 	subject := strings.Join([]string{
 		`/// <reference lib="dom" />`,
@@ -300,8 +300,8 @@ func TestCorrectnessNoUnclearedRaceTimeoutRecognizesTheDomDeclaration(t *testing
 		"    return Promise.race([work(), new Promise<never>((_resolve, reject) => { window.setTimeout(reject, milliseconds); })]);",
 		"}",
 	}, "\n")
-	result := rule_testing.RunTypedFiles(t, CorrectnessNoUnclearedRaceTimeout, map[string]string{
+	result := rule_testing.RunTypedFiles(test, CorrectnessNoUnclearedRaceTimeout, map[string]string{
 		"/repository/source/Load.ts": subject,
 	}, "/repository/source/Load.ts")
-	correctnessNoUnclearedRaceTimeoutExpect(t, result, "window.setTimeout(reject, milliseconds)")
+	correctnessNoUnclearedRaceTimeoutExpect(test, result, "window.setTimeout(reject, milliseconds)")
 }

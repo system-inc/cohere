@@ -48,14 +48,14 @@ export const elements = [
 // Every rule must report at least once, so the comparison cannot pass by everyone declining: the
 // design-system rules decline without a stylesheet, so the fixture links the installed package in as
 // a repository has it.
-func TestSharedReaderFindsWhatEachRuleFindsAlone(t *testing.T) {
-	t.Parallel()
+func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
+	test.Parallel()
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
 	}
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	for name, contents := range map[string]string{
 		"Component.tsx":                 sharedReaderWalkSource,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
@@ -63,29 +63,29 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(t *testing.T) {
 	} {
 		path := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatalf("creating the directory for %s: %v", name, err)
+			test.Fatalf("creating the directory for %s: %v", name, err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", name, err)
+			test.Fatalf("writing %s: %v", name, err)
 		}
 	}
 	if err := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); err != nil {
-		t.Fatalf("creating node_modules: %v", err)
+		test.Fatalf("creating node_modules: %v", err)
 	}
 	if err := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); err != nil {
-		t.Fatalf("linking the installed tailwindcss: %v", err)
+		test.Fatalf("linking the installed tailwindcss: %v", err)
 	}
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building the program: %v", err)
+		test.Fatalf("building the program: %v", err)
 	}
 	files := graph.ProjectFiles()
 
 	findings := func(rules []rule.Rule) []string {
 		result, err := graph.Walk(context.Background(), files, rules)
 		if err != nil {
-			t.Fatalf("walking: %v", err)
+			test.Fatalf("walking: %v", err)
 		}
 		var lines []string
 		for _, diagnostic := range result.Diagnostics {
@@ -106,11 +106,11 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(t *testing.T) {
 	for _, subject := range sharedReaderRules {
 		reported := slices.ContainsFunc(alone, func(line string) bool { return strings.HasPrefix(line, subject.Name+" ") })
 		if !reported {
-			t.Errorf("%s reported nothing on the fixture, so the comparison cannot speak for it", subject.Name)
+			test.Errorf("%s reported nothing on the fixture, so the comparison cannot speak for it", subject.Name)
 		}
 	}
 	if !slices.Equal(shared, alone) {
-		t.Fatalf("the rules sharing a reader found something other than what each finds alone:\n  shared:\n    %s\n  alone:\n    %s",
+		test.Fatalf("the rules sharing a reader found something other than what each finds alone:\n  shared:\n    %s\n  alone:\n    %s",
 			strings.Join(shared, "\n    "), strings.Join(alone, "\n    "))
 	}
 }

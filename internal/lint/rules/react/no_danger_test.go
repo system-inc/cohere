@@ -26,23 +26,23 @@ const noDangerFile = "/repository/source/Danger.tsx"
 // The raw JSON here is the BARE object, not upstream's [{...}] array. cohere's config layer unwraps
 // the [severity, options] tuple before dispatch, so copying ESLint's spelling into a fixture fails
 // on every row.
-func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
+func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
 	var decoded any
 	if rawOptions == "" {
 		var err error
 		decoded, err = DecodeNoDangerOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding absent options: %v", err)
+			test.Fatalf("decoding absent options: %v", err)
 		}
 	} else {
 		var err error
 		decoded, err = DecodeNoDangerOptions(json.RawMessage(rawOptions))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", rawOptions, err)
+			test.Fatalf("decoding %s: %v", rawOptions, err)
 		}
 	}
-	return rule_testing.RunWithOptions(t, NoDanger, noDangerFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, NoDanger, noDangerFile, sourceText, decoded)
 }
 
 // The corpus is eslint-plugin-react's own, imported verbatim from tests/lib/rules/no-danger.js by
@@ -56,8 +56,8 @@ func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testin
 //
 // The last invalid case names THREE entries in its errors array, so its finding count is upstream's
 // statement rather than my inference.
-func TestNoDangerFires(t *testing.T) {
-	t.Parallel()
+func TestNoDangerFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -73,16 +73,16 @@ func TestNoDangerFires(t *testing.T) {
 		{"\n        import type { ComponentProps } from \"react\";\n\n        const Comp = \"div\";\n        const Component = () => <></>;\n\n        const NestedComponent = (_props: ComponentProps<\"div\">) => <></>;\n\n        Component.NestedComponent = NestedComponent;\n\n        function App() {\n          return (\n            <>\n              <div dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n              <Comp dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n\n              <Component.NestedComponent\n                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}\n              />\n            </>\n          );\n        }\n      ", "{\"customComponentNames\":[\"*\"]}", []string{"dangerousProp", "dangerousProp", "dangerousProp"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-func TestNoDangerStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDangerStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -96,10 +96,10 @@ func TestNoDangerStaysSilent(t *testing.T) {
 		{"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"MUI*\"]}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -114,8 +114,8 @@ func TestNoDangerStaysSilent(t *testing.T) {
 // test on a rendered name rather than a check for an intrinsic element. The dotted and namespaced
 // lines are the ones that look wrong and are not: a port testing "is the tag a lowercase Identifier"
 // would be silent on both and pass every imported fixture, because the corpus writes neither.
-func TestNoDangerElementNameBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoDangerElementNameBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,10 +131,10 @@ func TestNoDangerElementNameBoundary(t *testing.T) {
 		{"a paired tag reports on the attribute of the opening element", "<div dangerouslySetInnerHTML={{__html:''}}></div>;", []string{"dangerousProp"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -145,8 +145,8 @@ func TestNoDangerElementNameBoundary(t *testing.T) {
 // two lines matter for a reason no fixture makes obvious: reaching for the attribute's expression
 // would be the natural way to write this rule and would panic on the string-valued form, which the
 // port brief names as a crash class that costs a whole file.
-func TestNoDangerAttributeNameBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoDangerAttributeNameBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,10 +164,10 @@ func TestNoDangerAttributeNameBoundary(t *testing.T) {
 		{"written twice reports twice, because the loop does not stop at the first", "<div dangerouslySetInnerHTML={{__html:''}} dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp", "dangerousProp"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -181,8 +181,8 @@ func TestNoDangerAttributeNameBoundary(t *testing.T) {
 // The last three rows are DELIBERATE DIVERGENCES, not measurements of agreement, and each is stated
 // at the line. Upstream compares against a name it builds with a shallow expression that is not the
 // one it renders elsewhere, and the two shapes below are where that expression breaks.
-func TestNoDangerCustomComponentNames(t *testing.T) {
-	t.Parallel()
+func TestNoDangerCustomComponentNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -223,10 +223,10 @@ func TestNoDangerCustomComponentNames(t *testing.T) {
 		{"declining cleanly on a pattern that does not match, where upstream also throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Other"]}`, nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -237,49 +237,49 @@ func TestNoDangerCustomComponentNames(t *testing.T) {
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this is what covers the
 // nil input and the JSON tag, neither of which has an upstream counterpart.
-func TestNoDangerDecodesOptions(t *testing.T) {
-	t.Parallel()
+func TestNoDangerDecodesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("absent options give the documented default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("absent options give the documented default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoDangerOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding nil: %v", err)
+			test.Fatalf("decoding nil: %v", err)
 		}
 		settings, ok := decoded.(NoDangerOptions)
 		if !ok {
-			t.Fatalf("decoded to %T", decoded)
+			test.Fatalf("decoded to %T", decoded)
 		}
 		if len(settings.CustomComponentNames) != 0 {
-			t.Fatalf("default custom names were %v, wanted none", settings.CustomComponentNames)
+			test.Fatalf("default custom names were %v, wanted none", settings.CustomComponentNames)
 		}
 	})
 
-	t.Run("the wire name is customComponentNames", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the wire name is customComponentNames", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		settings := decoded.(NoDangerOptions)
 		if len(settings.CustomComponentNames) != 2 || settings.CustomComponentNames[0] != "A" || settings.CustomComponentNames[1] != "B*" {
-			t.Fatalf("decoded to %v", settings.CustomComponentNames)
+			test.Fatalf("decoded to %v", settings.CustomComponentNames)
 		}
 	})
 
-	t.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		if len(decoded.(NoDangerOptions).CustomComponentNames) != 0 {
-			t.Fatal("unknown key changed the options")
+			test.Fatal("unknown key changed the options")
 		}
 	})
 
-	t.Run("the rule falls back to the default when handed nil rather than the struct", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the rule falls back to the default when handed nil rather than the struct", func(test *testing.T) {
+		test.Parallel()
 		// This bypasses the decoder entirely, which is the one path every other fixture misses.
 		//
 		// The COMPONENT is the case that measures anything, and a first version of this used a
@@ -290,11 +290,11 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
 		// produce different OUTPUT rather than merely take different internal paths.
-		component := rule_testing.RunWithOptions(t, NoDanger, noDangerFile, "<App dangerouslySetInnerHTML={{__html:''}} />;", nil)
-		rule_testing.ExpectClean(t, component)
+		component := rule_testing.RunWithOptions(test, NoDanger, noDangerFile, "<App dangerouslySetInnerHTML={{__html:''}} />;", nil)
+		rule_testing.ExpectClean(test, component)
 
-		element := rule_testing.RunWithOptions(t, NoDanger, noDangerFile, "<div dangerouslySetInnerHTML={{__html:''}} />;", nil)
-		rule_testing.ExpectFindings(t, element, "dangerousProp")
+		element := rule_testing.RunWithOptions(test, NoDanger, noDangerFile, "<div dangerouslySetInnerHTML={{__html:''}} />;", nil)
+		rule_testing.ExpectFindings(test, element, "dangerousProp")
 	})
 }
 
@@ -304,36 +304,36 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 // <div dangerouslySetInnerHTML={{__html:'}} /> runs columns 6 to 43, which is the attribute alone.
 // ExpectFindings cannot see any of this, so a rule anchoring on the element would pass every fixture
 // above while pointing somewhere the reader was never shown.
-func TestNoDangerSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoDangerSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the finding points at the attribute, not the element", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the finding points at the attribute, not the element", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML={{__html:''}} />;"
 		const want = "dangerouslySetInnerHTML={{__html:''}}"
-		result := runNoDanger(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+		result := runNoDanger(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != want {
-			t.Fatalf("reported on %q, wanted %q", reported, want)
+			test.Fatalf("reported on %q, wanted %q", reported, want)
 		}
 	})
 
-	t.Run("a bare attribute spans just the name", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare attribute spans just the name", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML />;"
-		result := runNoDanger(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+		result := runNoDanger(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "dangerouslySetInnerHTML" {
-			t.Fatalf("reported on %q", reported)
+			test.Fatalf("reported on %q", reported)
 		}
 	})
 
-	t.Run("the message names the property and explains the defect", func(t *testing.T) {
-		t.Parallel()
-		result := runNoDanger(t, "<div dangerouslySetInnerHTML={{__html:''}} />;", "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+	test.Run("the message names the property and explains the defect", func(test *testing.T) {
+		test.Parallel()
+		result := runNoDanger(test, "<div dangerouslySetInnerHTML={{__html:''}} />;", "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		got := result.Diagnostics[0].Message.Description
 		// Compared against a literal typed here rather than against the rule's own format string,
 		// because a comparison to the rule's own constant moves with it under mutation. Asserted as
@@ -341,10 +341,10 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 		// is not a guard.
 		const wantPrefix = "This element sets dangerouslySetInnerHTML, which hands React a raw string"
 		if !strings.HasPrefix(got, wantPrefix) {
-			t.Fatalf("message was %q, wanted it to start %q", got, wantPrefix)
+			test.Fatalf("message was %q, wanted it to start %q", got, wantPrefix)
 		}
 		if result.Diagnostics[0].Message.Id != "dangerousProp" {
-			t.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
+			test.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
 		}
 	})
 }
@@ -355,8 +355,8 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 // arbitrary tag name through it would take the whole FILE down for all of this package's rules. No
 // ExpectFindings fixture can see a panic, so the sweep reports SURVIVED identically whether the
 // part-by-part rendering matters or not. This names what it prevents.
-func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
-	t.Parallel()
+func TestNoDangerDoesNotPanicOnUnusualTagNames(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"<a.b.c.d dangerouslySetInnerHTML={{__html:''}} />;",
@@ -365,11 +365,11 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 		"<ns:tag className=\"x\" />;",
 		"<a.b></a.b>;",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
 			// The verdict is not the point; surviving the render is. Both verdicts are pinned in
 			// the boundary tables above for the shapes that have one.
-			runNoDanger(t, sourceText, `{"customComponentNames":["*"]}`)
+			runNoDanger(test, sourceText, `{"customComponentNames":["*"]}`)
 		})
 	}
 }
@@ -383,22 +383,22 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 // A .ts file cannot hold JSX, so only the two JSX-capable suffixes can carry this rule's subject.
 // That is a fact about the language rather than about the rule, and it is stated here rather than
 // left as an unexplained narrowing.
-func TestNoDangerHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoDangerHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "<div dangerouslySetInnerHTML={{__html:''}} />;"
 	for _, fileName := range []string{
 		"/repository/source/Danger.tsx",
 		"/repository/source/Danger.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoDangerOptions(nil)
 			if err != nil {
-				t.Fatalf("decoding: %v", err)
+				test.Fatalf("decoding: %v", err)
 			}
-			result := rule_testing.RunWithOptions(t, NoDanger, fileName, sourceText, decoded)
-			rule_testing.ExpectFindings(t, result, "dangerousProp")
+			result := rule_testing.RunWithOptions(test, NoDanger, fileName, sourceText, decoded)
+			rule_testing.ExpectFindings(test, result, "dangerousProp")
 		})
 	}
 }

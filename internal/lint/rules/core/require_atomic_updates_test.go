@@ -35,14 +35,14 @@ const requireAtomicUpdatesCorpusProvenance = "eslint/tests/lib/rules/require-ato
 // hit it. They are the half of the corpus that can catch a port being too eager, which is the
 // direction this rule fails in: the flow reasoning is easy to make coarser than upstream's and every
 // reporting case stays green while it happens.
-func TestRequireAtomicUpdatesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range requireAtomicUpdatesCleanCases {
 		result := rule_testing.RunTypedWithOptions(
-			t, RequireAtomicUpdates, "clean.ts", testCase.source, testCase.options)
+			test, RequireAtomicUpdates, "clean.ts", testCase.source, testCase.options)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("reported %v on a clean case\n%s",
+			test.Errorf("reported %v on a clean case\n%s",
 				result.MessageIds(), testCase.source)
 		}
 	}
@@ -50,8 +50,8 @@ func TestRequireAtomicUpdatesStaysSilent(t *testing.T) {
 
 // TestRequireAtomicUpdatesFires runs every reporting case upstream ships, asserting the message ids
 // in order and their count.
-func TestRequireAtomicUpdatesFires(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range requireAtomicUpdatesReportingCases {
 		if requireAtomicUpdatesNeedsDeclaredGlobals(testCase.source) {
@@ -67,15 +67,15 @@ func TestRequireAtomicUpdatesFires(t *testing.T) {
 			continue
 		}
 		result := rule_testing.RunTypedWithOptions(
-			t, RequireAtomicUpdates, "fires.ts", testCase.source, testCase.options)
+			test, RequireAtomicUpdates, "fires.ts", testCase.source, testCase.options)
 		got := result.MessageIds()
 		if len(got) != len(testCase.wantIds) {
-			t.Errorf("reported %v, want %v\n%s", got, testCase.wantIds, testCase.source)
+			test.Errorf("reported %v, want %v\n%s", got, testCase.wantIds, testCase.source)
 			continue
 		}
 		for index, want := range testCase.wantIds {
 			if got[index] != want {
-				t.Errorf("finding %d was %q, want %q\n%s",
+				test.Errorf("finding %d was %q, want %q\n%s",
 					index, got[index], want, testCase.source)
 			}
 		}
@@ -89,8 +89,8 @@ func TestRequireAtomicUpdatesFires(t *testing.T) {
 // pointing at the left side, at the right side, or at the enclosing statement passes every id
 // fixture in this file while being wrong, and a reader following the finding would be sent to the
 // wrong place. The expectation is the exact source text of the assignment.
-func TestRequireAtomicUpdatesSpan(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -120,11 +120,11 @@ func TestRequireAtomicUpdatesSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "span.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RequireAtomicUpdates, "span.ts", testCase.source)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("reported %d findings, want %d: %v",
+				test.Fatalf("reported %d findings, want %d: %v",
 					len(result.Diagnostics), len(testCase.want), result.MessageIds())
 			}
 			// The harness writes `strings.TrimSpace(contents)+"\n"`, so the file on disk can be one
@@ -135,7 +135,7 @@ func TestRequireAtomicUpdatesSpan(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d spans %q, want %q", index, got, want)
+					test.Errorf("finding %d spans %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -149,47 +149,47 @@ func TestRequireAtomicUpdatesSpan(t *testing.T) {
 // the count fixed, so every other fixture in this file stays green over it. The assertions are
 // equality against a literal typed here rather than against the rule's own message constant, because
 // comparing against the constant moves both sides together under mutation.
-func TestRequireAtomicUpdatesMessageText(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesMessageText(test *testing.T) {
+	test.Parallel()
 
-	t.Run("variable arm names the binding", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "text.ts",
+	test.Run("variable arm names the binding", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "text.ts",
 			`let counter; async function x() { counter += await amount; }`)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+			test.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
 		}
 		got := result.Diagnostics[0].Message.Description
 		if !strings.HasSuffix(got, " Here the variable is counter.") {
-			t.Errorf("description does not name the binding: %q", got)
+			test.Errorf("description does not name the binding: %q", got)
 		}
 		if strings.Count(got, "counter") != 1 {
-			t.Errorf("binding name appears %d times, want 1: %q",
+			test.Errorf("binding name appears %d times, want 1: %q",
 				strings.Count(got, "counter"), got)
 		}
 	})
 
-	t.Run("property arm names the target text and the object", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "text.ts",
+	test.Run("property arm names the target text and the object", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "text.ts",
 			`const holder = []; async function x() { holder[key].slot += await result; }`)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+			test.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
 		}
 		got := result.Diagnostics[0].Message.Description
 		want := " Here the assignment writes holder[key].slot and the object holder was read before the suspension."
 		if !strings.HasSuffix(got, want) {
-			t.Errorf("description tail is wrong\n got %q\nwant suffix %q", got, want)
+			test.Errorf("description tail is wrong\n got %q\nwant suffix %q", got, want)
 		}
 	})
 
-	t.Run("message ids are the two upstream names", func(t *testing.T) {
-		t.Parallel()
+	test.Run("message ids are the two upstream names", func(test *testing.T) {
+		test.Parallel()
 		if messageRequireAtomicUpdatesVariable.Id != "nonAtomicUpdate" {
-			t.Errorf("variable arm id is %q", messageRequireAtomicUpdatesVariable.Id)
+			test.Errorf("variable arm id is %q", messageRequireAtomicUpdatesVariable.Id)
 		}
 		if messageRequireAtomicUpdatesProperty.Id != "nonAtomicObjectUpdate" {
-			t.Errorf("property arm id is %q", messageRequireAtomicUpdatesProperty.Id)
+			test.Errorf("property arm id is %q", messageRequireAtomicUpdatesProperty.Id)
 		}
 	})
 }
@@ -200,60 +200,60 @@ func TestRequireAtomicUpdatesMessageText(t *testing.T) {
 // are the two lines with no upstream counterpart. The nil case is the one that has shipped a broken
 // rule in this tree before: a rule configured as a bare severity is handed nil, and a port relying
 // on the zero value arriving by accident cannot tell that from a decoder that never ran.
-func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[RequireAtomicUpdatesOptions]()
 
-	t.Run("allowProperties true suppresses only the property arm", func(t *testing.T) {
-		t.Parallel()
+	test.Run("allowProperties true suppresses only the property arm", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := decode(json.RawMessage(`{"allowProperties": true}`))
 		if err != nil {
-			t.Fatalf("decode: %v", err)
+			test.Fatalf("decode: %v", err)
 		}
 		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != true {
-			t.Fatalf("decoded %#v", decoded)
+			test.Fatalf("decoded %#v", decoded)
 		}
 
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
-		result := rule_testing.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, decoded)
+		result := rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", property, decoded)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("property arm still reported under allowProperties: %v", result.MessageIds())
+			test.Errorf("property arm still reported under allowProperties: %v", result.MessageIds())
 		}
 
 		variable := `let foo; async function a() { if (foo) { foo = await something; } }`
-		result = rule_testing.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", variable, decoded)
-		rule_testing.ExpectFindings(t, result, "nonAtomicUpdate")
+		result = rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", variable, decoded)
+		rule_testing.ExpectFindings(test, result, "nonAtomicUpdate")
 	})
 
-	t.Run("allowProperties false keeps both arms", func(t *testing.T) {
-		t.Parallel()
+	test.Run("allowProperties false keeps both arms", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := decode(json.RawMessage(`{"allowProperties": false}`))
 		if err != nil {
-			t.Fatalf("decode: %v", err)
+			test.Fatalf("decode: %v", err)
 		}
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
-		result := rule_testing.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, decoded)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+		result := rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", property, decoded)
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	})
 
-	t.Run("nil options bypass the decoder and keep both arms", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil options bypass the decoder and keep both arms", func(test *testing.T) {
+		test.Parallel()
 		// This is the shape a bare `"error"` produces. It reaches the rule without ever passing
 		// through the decoder above, so no fixture routed through `decode` can see it.
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
-		result := rule_testing.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, nil)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+		result := rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", property, nil)
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	})
 
-	t.Run("an empty object decodes to the permissive-off default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty object decodes to the permissive-off default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := decode(json.RawMessage(`{}`))
 		if err != nil {
-			t.Fatalf("decode: %v", err)
+			test.Fatalf("decode: %v", err)
 		}
 		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != false {
-			t.Fatalf("empty object did not default AllowProperties to false: %#v", decoded)
+			test.Fatalf("empty object did not default AllowProperties to false: %#v", decoded)
 		}
 	})
 }
@@ -266,26 +266,26 @@ func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
 // recorded reads without ordering them against it, gets one of these wrong while the other stays
 // green. Both are upstream cases, kept here as a named pair because the corpus tables cannot say
 // that these two are each other's control.
-func TestRequireAtomicUpdatesSuspensionOrder(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesSuspensionOrder(test *testing.T) {
+	test.Parallel()
 
-	stale := rule_testing.RunTyped(t, RequireAtomicUpdates, "order.ts",
+	stale := rule_testing.RunTyped(test, RequireAtomicUpdates, "order.ts",
 		`let foo; async function x() { foo = foo + await amount; }`)
-	rule_testing.ExpectFindings(t, stale, "nonAtomicUpdate")
+	rule_testing.ExpectFindings(test, stale, "nonAtomicUpdate")
 
-	fresh := rule_testing.RunTyped(t, RequireAtomicUpdates, "order.ts",
+	fresh := rule_testing.RunTyped(test, RequireAtomicUpdates, "order.ts",
 		`let foo; async function x() { foo = await bar + foo; }`)
-	rule_testing.ExpectClean(t, fresh)
+	rule_testing.ExpectClean(test, fresh)
 }
 
 // TestRequireAtomicUpdatesMessageSkipsLeadingComments pins the real-tree shape where a comment
 // belongs to the assignment target's leading trivia. The finding was emitted at the right line,
 // but the target interpolated the comment and newlines into its message. Line-oriented parity
 // checks then saw no rule name on the diagnostic's first line and counted a false negative.
-func TestRequireAtomicUpdatesMessageSkipsLeadingComments(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesMessageSkipsLeadingComments(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, RequireAtomicUpdates, "property-floor.ts", `
+	result := rule_testing.RunTyped(test, RequireAtomicUpdates, "property-floor.ts", `
 let state = { guard: false, first: 0 };
 declare function pause(): Promise<void>;
 async function run() {
@@ -295,13 +295,13 @@ async function run() {
     state.first = Date.now();
 }`)
 
-	rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	message := result.Diagnostics[0].Message.Description
 	if strings.Contains(message, "Advance only") || strings.Contains(message, "\n") {
-		t.Fatalf("message contains the assignment's leading trivia: %q", message)
+		test.Fatalf("message contains the assignment's leading trivia: %q", message)
 	}
 	if !strings.Contains(message, "assignment writes state.first") {
-		t.Fatalf("message does not name the assignment target: %q", message)
+		test.Fatalf("message does not name the assignment target: %q", message)
 	}
 }
 
@@ -311,8 +311,8 @@ async function run() {
 // The rows are not interchangeable and the pairs matter more than the rows: each clean case is the
 // control for the reporting case beside it, differing in exactly the property under test. Without
 // the control, a rule that reported on everything would pass the reporting rows.
-func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesEscapeTable(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -361,14 +361,14 @@ func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "escape.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RequireAtomicUpdates, "escape.ts", testCase.source)
 			if len(testCase.want) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
@@ -389,30 +389,30 @@ func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
 // This test pins the behaviour we ship rather than upstream's, deliberately, so a later reader sees
 // which one was chosen. Both halves are asserted: the resolvable binding reports, and a genuinely
 // unresolvable one stays silent, which is the control that proves resolution is what decides it.
-func TestRequireAtomicUpdatesResolutionDivergence(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesResolutionDivergence(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a resolvable binding is judged", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
+	test.Run("a resolvable binding is judged", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "divergence.ts",
 			`let holder: any; async function f() { const q = holder.a; try { const r = await run(); holder.b = r; } catch (e) { holder.b = 1; } }`)
 		if len(result.Diagnostics) == 0 {
-			t.Fatal("a resolvable binding was not judged")
+			test.Fatal("a resolvable binding was not judged")
 		}
 		for _, diagnostic := range result.Diagnostics {
 			if diagnostic.Message.Id != "nonAtomicObjectUpdate" {
-				t.Errorf("unexpected id %q", diagnostic.Message.Id)
+				test.Errorf("unexpected id %q", diagnostic.Message.Id)
 			}
 		}
 	})
 
-	t.Run("an unresolvable name is skipped", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unresolvable name is skipped", func(test *testing.T) {
+		test.Parallel()
 		// The control. Same shape, and nothing declares the binding, so the checker gives no symbol
 		// and the reference is skipped exactly as upstream skips an unresolved one.
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "divergence.ts",
 			`async function f() { const q = neverDeclaredAnywhere.a; await run(); neverDeclaredAnywhere.b = 1; }`)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -434,8 +434,8 @@ func requireAtomicUpdatesNeedsDeclaredGlobals(source string) bool {
 //
 // This is what makes the divergence a resolution difference rather than a rule difference, and it is
 // the reason the skip above is a stated scope note instead of a defect.
-func TestRequireAtomicUpdatesProcessCaseWithDeclaration(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesProcessCaseWithDeclaration(test *testing.T) {
+	test.Parallel()
 
 	source := `declare const process: any;
 declare function run(options: any): Promise<any>;
@@ -449,8 +449,8 @@ async function main() {
         process.exitCode = 1;
     }
 }`
-	result := rule_testing.RunTyped(t, RequireAtomicUpdates, "process.ts", source)
-	rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+	result := rule_testing.RunTyped(test, RequireAtomicUpdates, "process.ts", source)
+	rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
 }
 
 // TestRequireAtomicUpdatesFinallyReportsOnce pins the duplicate-layout defect the real tree found.
@@ -467,8 +467,8 @@ async function main() {
 // Measured against the installed eslint 10.8.1: one finding, at the `g = false` in the `finally`.
 // The three controls beside it are what prove the shape is reported for the right reason, since each
 // removes exactly one element and upstream goes silent for two of them.
-func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesFinallyReportsOnce(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -498,20 +498,20 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "finally.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RequireAtomicUpdates, "finally.ts", testCase.source)
 			if len(testCase.want) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 			// The span is asserted too, because the defect this pins was two findings over ONE
 			// span, which a count assertion alone would pass once the count was fixed by any means.
 			written := result.SourceFile.Text()
 			got := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != "g = false" {
-				t.Errorf("finding spans %q, want %q", got, "g = false")
+				test.Errorf("finding spans %q, want %q", got, "g = false")
 			}
 		})
 	}
@@ -536,30 +536,30 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
 //
 // This is `modules/kingdom/KingdomShadeController.ts:203` on the real tree, and it is one of the 8
 // findings cohere reports there that ESLint does not. See the rule's doc comment.
-func TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh(test *testing.T) {
+	test.Parallel()
 
 	const declarations = `declare function a(): Promise<void>;
 declare function b(): Promise<number>;
 declare function use(value: unknown): void;
 `
 
-	t.Run("both linters report when the try block ends at the await", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+	test.Run("both linters report when the try block ends at the await", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "catch.ts", declarations+
 			`async function f(entry: any) { if (entry.status !== 1) return;
     try { await a(); entry.position = await b(); } catch (error) { entry.error = 1; } }`)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
 	})
 
-	t.Run("a read at the end of the try does not refresh the catch", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a read at the end of the try does not refresh the catch", func(test *testing.T) {
+		test.Parallel()
 		// ESLint reports only `entry.position` here. Cohere reports both, because the fork to the
 		// handler is a real successor edge and the read on the normal path is not on it.
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "catch.ts", declarations+
 			`async function f(entry: any) { if (entry.status !== 1) return;
     try { await a(); entry.position = await b(); use(entry.position); } catch (error) { entry.error = 1; } }`)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
 
 		// The span is asserted so the catch-block write is named specifically rather than the count
 		// being satisfied by two findings on the try-block one.
@@ -571,19 +571,19 @@ declare function use(value: unknown): void;
 			}
 		}
 		if !sawCatchWrite {
-			t.Error("the catch-block write was not among the findings")
+			test.Error("the catch-block write was not among the findings")
 		}
 	})
 
-	t.Run("a guard read is still what makes the object outdated", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a guard read is still what makes the object outdated", func(test *testing.T) {
+		test.Parallel()
 		// The control for the whole test. With no read before the suspension there is nothing stale,
 		// and both linters are silent, which is what keeps the two rows above from passing on a rule
 		// that reports every property write in a catch.
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "catch.ts", declarations+
 			`async function f(entry: any) {
     try { await a(); } catch (error) { entry.error = 1; } }`)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -606,12 +606,12 @@ declare function use(value: unknown): void;
 // This mirrors the control seeded into `ArtTerminal.ts` itself: two structurally identical writes in
 // one `finally`, one over a locally declared object and one over `console`, produced exactly one
 // ESLint finding, the local one. Same file, same run, opposite verdicts.
-func TestRequireAtomicUpdatesRestoreInFinallyIsJudged(t *testing.T) {
-	t.Parallel()
+func TestRequireAtomicUpdatesRestoreInFinallyIsJudged(test *testing.T) {
+	test.Parallel()
 
-	t.Run("restoring a local object's property is judged", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+	test.Run("restoring a local object's property is judged", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "restore.ts",
 			`declare function callback(): Promise<void>;
 const holder = { slot: 0 };
 async function withRestore() {
@@ -619,14 +619,14 @@ async function withRestore() {
     try { await callback(); }
     finally { holder.slot = saved; }
 }`)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	})
 
-	t.Run("restoring through an ambient declaration is judged the same way", func(t *testing.T) {
-		t.Parallel()
+	test.Run("restoring through an ambient declaration is judged the same way", func(test *testing.T) {
+		test.Parallel()
 		// The binding is declared rather than local, which is the only thing that changes. Both
 		// report here, so the shape is not what separates cohere from ESLint on the real tree.
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "restore.ts",
 			`declare function callback(): Promise<void>;
 declare const ambientHolder: { slot: number };
 async function withRestore() {
@@ -634,21 +634,21 @@ async function withRestore() {
     try { await callback(); }
     finally { ambientHolder.slot = saved; }
 }`)
-		rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	})
 
-	t.Run("with no read before the suspension there is nothing stale", func(t *testing.T) {
-		t.Parallel()
+	test.Run("with no read before the suspension there is nothing stale", func(test *testing.T) {
+		test.Parallel()
 		// The control. Without the saved read there is no pre-suspension value for the restore to be
 		// built from, and this is silent, which keeps the two rows above from passing on a rule that
 		// reports every property write in a finally.
-		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "restore.ts",
 			`declare function callback(): Promise<void>;
 const holder = { slot: 0 };
 async function withRestore() {
     try { await callback(); }
     finally { holder.slot = 0; }
 }`)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }

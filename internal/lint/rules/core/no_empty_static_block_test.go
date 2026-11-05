@@ -8,8 +8,8 @@ import (
 
 const staticBlockFile = "/repository/source/Thing.ts"
 
-func TestNoEmptyStaticBlockFires(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyStaticBlockFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -20,16 +20,16 @@ func TestNoEmptyStaticBlockFires(t *testing.T) {
 		{"one of two blocks empty", "export class Thing {\n    static { Thing.ready = true; }\n    static {}\n    static ready = false;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyStaticBlock, staticBlockFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyStaticBlock, staticBlockFile, testCase.sourceText),
 				"unexpectedEmptyStaticBlock")
 		})
 	}
 }
 
-func TestNoEmptyStaticBlockStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyStaticBlockStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,9 +48,9 @@ func TestNoEmptyStaticBlockStaysSilent(t *testing.T) {
 		{"an empty class", "export class Thing {}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyStaticBlock, staticBlockFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyStaticBlock, staticBlockFile, testCase.sourceText))
 		})
 	}
 }

@@ -8,8 +8,8 @@ import (
 
 const nexusFile = "/repository/libraries/nexus/code-quality/Thing.ts"
 
-func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportFires(test *testing.T) {
+	test.Parallel()
 
 	// All three import shapes, because a boundary that only guards the static form is a boundary
 	// with a documented way around it.
@@ -24,16 +24,16 @@ func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
 		{"require", "const thing = require('@base/source/Thing');\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "forbiddenOutsideImport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "forbiddenOutsideImport")
 		})
 	}
 }
 
-func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -65,10 +65,10 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 		{"method named require", nexusFile, "declare const loader: { require(name: string): unknown };\nconst thing = loader.require('@base/source/Thing');\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -90,8 +90,8 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 // landed on line 1 and an `eslint-disable-next-line` written above the specifier could not reach
 // it. A `-next-line` directive matches the line after itself, so the finding was unreachable by any
 // suppression the author could write, and it read as a real finding in every count.
-func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -121,15 +121,15 @@ func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
 			"'@structure/source/Thing'",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding covers %q, want %q", reported, testCase.want)
+				test.Errorf("finding covers %q, want %q", reported, testCase.want)
 			}
 		})
 	}

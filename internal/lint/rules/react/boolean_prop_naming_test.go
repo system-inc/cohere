@@ -14,8 +14,8 @@ import (
 // see TestBooleanPropNamingCasesThisPortCannotExpress for the reasons and the counts.
 const booleanPropNamingFile = "/repository/source/BooleanPropNaming.tsx"
 
-func TestBooleanPropNamingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -60,10 +60,10 @@ func TestBooleanPropNamingStaysSilent(t *testing.T) {
 		{"a lookbehind pattern passes a matching name", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "(?<=^is)[A-Z]", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -71,8 +71,8 @@ func TestBooleanPropNamingStaysSilent(t *testing.T) {
 // TestBooleanPropNamingFires asserts the count AND the rendered message of every finding. The
 // message interpolates the prop name and the pattern, so a message-id assertion could not see
 // an interpolation defect at all.
-func TestBooleanPropNamingFires(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -184,15 +184,15 @@ func TestBooleanPropNamingFires(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q", index, diagnostic.Message.Description, testCase.wantMessages[index])
+					test.Errorf("finding %d renders\n  got  %q\n  want %q", index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}
 		})
@@ -216,8 +216,8 @@ func TestBooleanPropNamingFires(t *testing.T) {
 //	                          upstream tests only that the value is a CALL, so `arrayOf` too
 //	the type shapes           an interface, an inline literal, a type alias, an intersection, a
 //	                          union, and a PARENTHESIZED intersection all reach their members
-func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -263,17 +263,17 @@ func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("installed build reports %d findings, this rule reports %d",
+				test.Fatalf("installed build reports %d findings, this rule reports %d",
 					len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q",
+					test.Errorf("finding %d renders\n  got  %q\n  want %q",
 						index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}
@@ -291,8 +291,8 @@ func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t
 // The empty-pattern row is the reason the `rule` fallback cannot be skipped: Go's zero value for a
 // string is "", and an empty pattern matches every name, so a rule decoded that way reports nothing
 // while looking configured.
-func TestDecodeBooleanPropNamingOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeBooleanPropNamingOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name              string
@@ -353,38 +353,38 @@ func TestDecodeBooleanPropNamingOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeBooleanPropNamingOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("want an error, got %#v", decoded)
+					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			options, isOptions := decoded.(BooleanPropNamingOptions)
 			if !isOptions {
-				t.Fatalf("decoder returned %T, want BooleanPropNamingOptions", decoded)
+				test.Fatalf("decoder returned %T, want BooleanPropNamingOptions", decoded)
 			}
 			if options.Rule != testCase.wantRule {
-				t.Errorf("Rule is %q, want %q", options.Rule, testCase.wantRule)
+				test.Errorf("Rule is %q, want %q", options.Rule, testCase.wantRule)
 			}
 			if len(options.PropTypeNames) != len(testCase.wantPropTypeNames) {
-				t.Fatalf("PropTypeNames is %v, want %v", options.PropTypeNames, testCase.wantPropTypeNames)
+				test.Fatalf("PropTypeNames is %v, want %v", options.PropTypeNames, testCase.wantPropTypeNames)
 			}
 			for index, wanted := range testCase.wantPropTypeNames {
 				if options.PropTypeNames[index] != wanted {
-					t.Errorf("PropTypeNames[%d] is %q, want %q", index, options.PropTypeNames[index], wanted)
+					test.Errorf("PropTypeNames[%d] is %q, want %q", index, options.PropTypeNames[index], wanted)
 				}
 			}
 			if options.ValidateNested != testCase.wantNested {
-				t.Errorf("ValidateNested is %v, want %v", options.ValidateNested, testCase.wantNested)
+				test.Errorf("ValidateNested is %v, want %v", options.ValidateNested, testCase.wantNested)
 			}
 			if options.Message != testCase.wantMessage {
-				t.Errorf("Message is %q, want %q", options.Message, testCase.wantMessage)
+				test.Errorf("Message is %q, want %q", options.Message, testCase.wantMessage)
 			}
 		})
 	}
@@ -400,20 +400,20 @@ func TestDecodeBooleanPropNamingOptions(t *testing.T) {
 // This rule is registered with `RequiresOptions` so the config layer refuses that state rather than
 // reproducing it. The harness can still reach `Run` with nil, and declining there is what keeps the
 // rule from inventing a default nobody configured.
-func TestBooleanPropNamingDeclinesWithoutOptions(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingDeclinesWithoutOptions(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
 
 	// The control. With options this input reports, so the zero below means the decline fired
 	// rather than that the input was uninteresting.
-	configured := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+	configured := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, DefaultBooleanPropNamingOptions())
-	rule_testing.ExpectFindings(t, configured, "patternMismatch")
+	rule_testing.ExpectFindings(test, configured, "patternMismatch")
 
-	unconfigured := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+	unconfigured := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, nil)
-	rule_testing.ExpectClean(t, unconfigured)
+	rule_testing.ExpectClean(test, unconfigured)
 }
 
 // TestBooleanPropNamingRequiresTheTypedHarness asserts the rule declines rather than reports with
@@ -422,18 +422,18 @@ func TestBooleanPropNamingDeclinesWithoutOptions(t *testing.T) {
 // `NeedsTypeChecker` governs the registration path only; a rule.Context can be built by hand with a
 // nil checker, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does exactly that. The guard
 // lives in Run rather than in the listener so the file is declined once instead of once per node.
-func TestBooleanPropNamingRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
 
-	typed := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+	typed := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, DefaultBooleanPropNamingOptions())
-	rule_testing.ExpectFindings(t, typed, "patternMismatch")
+	rule_testing.ExpectFindings(test, typed, "patternMismatch")
 
-	untyped := rule_testing.RunWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+	untyped := rule_testing.RunWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, DefaultBooleanPropNamingOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestBooleanPropNamingAnchorsOnTheWholeProperty pins where each finding points.
@@ -441,8 +441,8 @@ func TestBooleanPropNamingRequiresTheTypedHarness(t *testing.T) {
 // `ExpectFindings` asserts ids and counts and can see none of this. Upstream reports on the
 // property node, so the span covers the name, the colon and the declared type rather than the name
 // alone. Measured against the installed build on 2026-08-28 by slicing its reported range.
-func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingAnchorsOnTheWholeProperty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -467,17 +467,17 @@ func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 				testCase.sourceText, DefaultBooleanPropNamingOptions())
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Errorf("finding %d points at %q, want %q",
+					test.Errorf("finding %d points at %q, want %q",
 						index, reported, testCase.wantSpans[index])
 				}
 			}
@@ -494,22 +494,22 @@ func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
 //
 // Asserted against a literal built here from the same escape rather than against the rule's own
 // constant, because a message-text mutation would move both together.
-func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
-	result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+	result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, DefaultBooleanPropNamingOptions())
-	rule_testing.ExpectFindings(t, result, "patternMismatch")
+	rule_testing.ExpectFindings(test, result, "patternMismatch")
 
 	want := "Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"
 	if result.Diagnostics[0].Message.Description != want {
-		t.Errorf("renders\n  got  %q\n  want %q", result.Diagnostics[0].Message.Description, want)
+		test.Errorf("renders\n  got  %q\n  want %q", result.Diagnostics[0].Message.Description, want)
 	}
 	// A straight apostrophe would be a different string, and this is the assertion that says so.
 	straight := "Prop name `enabled` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"
 	if result.Diagnostics[0].Message.Description == straight {
-		t.Error("rendered a straight apostrophe, which diverges from upstream's own message")
+		test.Error("rendered a straight apostrophe, which diverges from upstream's own message")
 	}
 }
 
@@ -525,8 +525,8 @@ func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(t *testing.T) {
 //
 // The row set was checked against a control: making the rule read a raw name without a kind guard
 // makes the destructured-parameter rows fail, so these are not passing vacuously.
-func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(t *testing.T) {
-	t.Parallel()
+func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		// A destructured parameter, whose name node is a binding pattern.
@@ -550,10 +550,10 @@ func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(t *testing.T)
 	}
 
 	for _, sourceText := range sources {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
 			// Reaching the next line without a panic is the assertion.
-			rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
+			rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
 				sourceText, DefaultBooleanPropNamingOptions())
 		})
 	}

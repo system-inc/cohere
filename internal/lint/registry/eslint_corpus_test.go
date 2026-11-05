@@ -116,7 +116,7 @@ func utf16ToByteOffsets(code string) []int {
 }
 
 // corpusVerdict replays one row through the rule and says how cohere's answer compares with ESLint's
-func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpusRow) string {
+func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCorpusRow) string {
 	decoded, problem := decodeCorpusOptions(registration, row.Options)
 	if problem != "" {
 		return "options"
@@ -124,8 +124,8 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 
 	var result rule_testing.Result
 	ran := false
-	t.Run(row.key(), func(t *testing.T) {
-		result = rule_testing.RunTypedVerbatimWithOptions(t, registration.Rule, "Case.ts", row.Code, decoded)
+	test.Run(row.key(), func(test *testing.T) {
+		result = rule_testing.RunTypedVerbatimWithOptions(test, registration.Rule, "Case.ts", row.Code, decoded)
 		ran = true
 	})
 	if !ran {
@@ -220,8 +220,8 @@ func corpusPlace(start int, end int) string {
 	return fmt.Sprintf("%d-%d", start, end)
 }
 
-func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
-	t.Parallel()
+func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
+	test.Parallel()
 
 	registrations := map[string]rule.Registration{}
 	coreRules := []string{}
@@ -234,11 +234,11 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 
 	gapsText, err := os.ReadFile(eslintCorpusGapsFile)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	knownGaps := map[string]map[string]string{}
 	if err := json.Unmarshal(gapsText, &knownGaps); err != nil {
-		t.Fatalf("reading %s: %v", eslintCorpusGapsFile, err)
+		test.Fatalf("reading %s: %v", eslintCorpusGapsFile, err)
 	}
 
 	corpus := map[string][]eslintCorpusRow{}
@@ -246,23 +246,23 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 	for _, name := range coreRules {
 		text, readError := os.ReadFile(filepath.Join(eslintCorpusDirectory, name+".json"))
 		if readError != nil {
-			t.Errorf("%s has no vendored ESLint rows: re-extract with internal/lint/tools/eslint_corpus", name)
+			test.Errorf("%s has no vendored ESLint rows: re-extract with internal/lint/tools/eslint_corpus", name)
 			continue
 		}
 		var rows []eslintCorpusRow
 		if err := json.Unmarshal(text, &rows); err != nil {
-			t.Fatalf("reading %s's rows: %v", name, err)
+			test.Fatalf("reading %s's rows: %v", name, err)
 		}
 		corpus[name] = rows
 		rowCount += len(rows)
 	}
 	if rowCount != eslintCorpusRowCount {
-		t.Fatalf("%d vendored rows, and ESLint 10.8.1 has %d for these rules: a re-extract lost or gained rows",
+		test.Fatalf("%d vendored rows, and ESLint 10.8.1 has %d for these rules: a re-extract lost or gained rows",
 			rowCount, eslintCorpusRowCount)
 	}
 	for name := range knownGaps {
 		if _, isCore := corpus[name]; !isCore {
-			t.Errorf("known-gaps.json lists %s, which has no vendored rows", name)
+			test.Errorf("known-gaps.json lists %s, which has no vendored rows", name)
 		}
 	}
 
@@ -270,20 +270,20 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 	found := map[string]map[string]string{}
 	// Not parallel: this group holds its parallel per-rule subtests until they finish, so the test can
 	// read found after it returns.
-	t.Run("rules", func(t *testing.T) {
+	test.Run("rules", func(test *testing.T) {
 		for _, name := range coreRules {
 			rows, hasRows := corpus[name]
 			if !hasRows {
 				continue
 			}
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
+			test.Run(name, func(test *testing.T) {
+				test.Parallel()
 				gaps := map[string]string{}
 				for _, row := range rows {
 					if row.Skipped != "" {
 						continue
 					}
-					if verdict := corpusVerdict(t, registrations[name], row); verdict != "agree" {
+					if verdict := corpusVerdict(test, registrations[name], row); verdict != "agree" {
 						gaps[row.key()] = verdict
 					}
 				}
@@ -295,14 +295,14 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 				for key, verdict := range gaps {
 					switch listedVerdict, isListed := listed[key]; {
 					case !isListed:
-						t.Errorf("row %s disagrees with ESLint (%s) and is not a known gap", key, verdict)
+						test.Errorf("row %s disagrees with ESLint (%s) and is not a known gap", key, verdict)
 					case listedVerdict != verdict:
-						t.Errorf("row %s is a known %s gap and now disagrees as %s", key, listedVerdict, verdict)
+						test.Errorf("row %s is a known %s gap and now disagrees as %s", key, listedVerdict, verdict)
 					}
 				}
 				for key := range listed {
 					if _, stillDisagrees := gaps[key]; !stillDisagrees {
-						t.Errorf("row %s now agrees with ESLint: take it off known-gaps.json", key)
+						test.Errorf("row %s now agrees with ESLint: take it off known-gaps.json", key)
 					}
 				}
 			})
@@ -317,24 +317,24 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 		}
 		encoded, _ := json.MarshalIndent(found, "", "    ")
 		if err := os.WriteFile(eslintCorpusGapsFile, append(encoded, '\n'), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 }
 
 // ESLint counts UTF-16 units: é is one unit and two bytes, 😀 is two units and four bytes.
-func TestUTF16OffsetsBecomeByteOffsets(t *testing.T) {
-	t.Parallel()
+func TestUTF16OffsetsBecomeByteOffsets(test *testing.T) {
+	test.Parallel()
 
 	code := "é😀x"
 	offsets := utf16ToByteOffsets(code)
 	// Units: é at 0, 😀 at 1 and 2, x at 3, the end at 4
 	want := []int{0, 2, 2, 6, 7}
 	if fmt.Sprint(offsets) != fmt.Sprint(want) {
-		t.Fatalf("offsets %v, want %v", offsets, want)
+		test.Fatalf("offsets %v, want %v", offsets, want)
 	}
 	if got := code[offsets[3]:offsets[4]]; got != "x" {
-		t.Fatalf("unit 3 slices to %q, want x", got)
+		test.Fatalf("unit 3 slices to %q, want x", got)
 	}
 }
 
@@ -346,8 +346,8 @@ func TestUTF16OffsetsBecomeByteOffsets(t *testing.T) {
 // the same `x` and must agree. Behind a leading blank line, which the corpus no longer trims, both
 // still hold. Behind a byte order mark, which the compiler's reader drops, ESLint's offset on the first
 // line is already past the mark and one on a later line is not, so both lines are planted.
-func TestCorpusVerdictComparesPlaces(t *testing.T) {
-	t.Parallel()
+func TestCorpusVerdictComparesPlaces(test *testing.T) {
+	test.Parallel()
 
 	probe := func(occurrence int) rule.Registration {
 		return rule.Registration{Rule: rule.Rule{
@@ -387,8 +387,8 @@ func TestCorpusVerdictComparesPlaces(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		row := eslintCorpusRow{Code: testCase.code, ESLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
-		if verdict := corpusVerdict(t, probe(testCase.occurrence), row); verdict != testCase.want {
-			t.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
+		if verdict := corpusVerdict(test, probe(testCase.occurrence), row); verdict != testCase.want {
+			test.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
 		}
 	}
 }

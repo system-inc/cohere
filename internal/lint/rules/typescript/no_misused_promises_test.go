@@ -43,8 +43,8 @@ const noMisusedPromisesTsxFile = "noMisusedPromises.tsx"
 // reporting, differing only in which flag was set. A port that ignored options would fail both tables
 // rather than neither, but a port that read the wrong flag for a given position would pass one and
 // fail the other, which is the failure this split is shaped to catch.
-func TestNoMisusedPromisesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1559,10 +1559,10 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1578,8 +1578,8 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 // The one exclusion is upstream's own: `invalid` case 31 is marked `Skip: true` there, so upstream
 // does not run it either. TestNoMisusedPromisesExclusionsAreStated names it rather than leaving the
 // count unexplained.
-func TestNoMisusedPromisesFires(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -2876,10 +2876,10 @@ const obj: O = {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -2898,8 +2898,8 @@ const obj: O = {
 // must produce no findings on an input the typed harness reports, so the guard is proven to fire
 // rather than merely to exist. And the typed harness must still report that input, so the first
 // assertion is not passing because the rule is broken in some other way.
-func TestNoMisusedPromisesRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 const p = Promise.resolve();
@@ -2908,16 +2908,16 @@ if (p) {
 `
 
 	if !NoMisusedPromises.NeedsTypeChecker {
-		t.Fatal("the rule reads ctx.TypeChecker in every listener, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule reads ctx.TypeChecker in every listener, so it must declare NeedsTypeChecker")
 	}
 
-	untyped := rule_testing.Run(t, NoMisusedPromises, noMisusedPromisesFile, source)
+	untyped := rule_testing.Run(test, NoMisusedPromises, noMisusedPromisesFile, source)
 	if len(untyped.Diagnostics) != 0 {
-		t.Fatalf("the untyped harness hands the rule a nil checker, so the guard should decline it; got %d findings", len(untyped.Diagnostics))
+		test.Fatalf("the untyped harness hands the rule a nil checker, so the guard should decline it; got %d findings", len(untyped.Diagnostics))
 	}
 
-	typed := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, source)
-	rule_testing.ExpectFindings(t, typed, "conditional")
+	typed := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, source)
+	rule_testing.ExpectFindings(test, typed, "conditional")
 }
 
 // TestNoMisusedPromisesDoesNotReadTheProgram pins ProgramReads as a per-rule measurement.
@@ -2929,11 +2929,11 @@ if (p) {
 //
 // The test runs the rule with a Context whose Program is nil and asserts it still reports. A rule
 // that reached for the program would panic here, which is the loud direction.
-func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesDoesNotReadTheProgram(test *testing.T) {
+	test.Parallel()
 
 	if NoMisusedPromises.ProgramReads != 0 {
-		t.Fatalf("the rule body never names ctx.Program, so it must declare no ProgramReads; declares %s", NoMisusedPromises.ProgramReads)
+		test.Fatalf("the rule body never names ctx.Program, so it must declare no ProgramReads; declares %s", NoMisusedPromises.ProgramReads)
 	}
 }
 
@@ -2948,23 +2948,23 @@ func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
 // could drift off upstream silently, and upstream could fix it without us noticing. The expected
 // string is typed here as a literal rather than compared against the rule's own message constant,
 // because a comparison against the constant moves with the constant and asserts nothing.
-func TestNoMisusedPromisesRendersTheSpreadTypoUpstreamShips(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesRendersTheSpreadTypoUpstreamShips(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, `
+	result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, `
 const promise = Promise.resolve({ a: 1 });
 const obj = { ...promise };
 `)
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding to read the message from, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding to read the message from, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "spread" {
-		t.Fatalf("message id: got %q, want %q", got, "spread")
+		test.Fatalf("message id: got %q, want %q", got, "spread")
 	}
 	const want = "Expected a non-Promise value to be spreaded in an object."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Fatalf("message text: got %q, want %q\n(if upstream fixed the typo, this is the sync signal)", got, want)
+		test.Fatalf("message text: got %q, want %q\n(if upstream fixed the typo, this is the sync signal)", got, want)
 	}
 }
 
@@ -2977,8 +2977,8 @@ const obj = { ...promise };
 // no id assertion can tell those apart.
 //
 // One case per message id the rule can emit, so every arm's anchor is pinned.
-func TestNoMisusedPromisesReportsTheRightSpans(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesReportsTheRightSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -3077,20 +3077,20 @@ class Derived implements Base {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisusedPromises, testCase.fileName, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisusedPromises, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding to slice, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding to slice, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Fatalf("message id: got %q, want %q", diagnostic.Message.Id, testCase.wantId)
+				test.Fatalf("message id: got %q, want %q", diagnostic.Message.Id, testCase.wantId)
 			}
 			source := result.SourceFile.Text()
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.wantText {
-				t.Fatalf("reported span: got %q, want %q", reported, testCase.wantText)
+				test.Fatalf("reported span: got %q, want %q", reported, testCase.wantText)
 			}
 		})
 	}
@@ -3109,37 +3109,37 @@ class Derived implements Base {
 // The nested case matters most: checksVoidReturn is spelled in JSON as either a boolean OR an object
 // of sub-flags, while the Go struct splits those into two separate fields. This asserts what our
 // decoder actually does with each spelling rather than what the shape suggests.
-func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
 
 	cases := []struct {
 		name   string
 		config string
-		assert func(t *testing.T, decoded NoMisusedPromisesOptions)
+		assert func(test *testing.T, decoded NoMisusedPromisesOptions)
 	}{
 		{
 			name:   "an explicit false on a check that defaults to true survives decoding",
 			config: `{"checksConditionals": false}`,
-			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksConditionals == nil {
-					t.Fatal("checksConditionals decoded to nil, so an explicit false is indistinguishable from silence")
+					test.Fatal("checksConditionals decoded to nil, so an explicit false is indistinguishable from silence")
 				}
 				if *decoded.ChecksConditionals {
-					t.Fatal("checksConditionals decoded to true from an explicit false")
+					test.Fatal("checksConditionals decoded to true from an explicit false")
 				}
 			},
 		},
 		{
 			name:   "an omitted check decodes to nil so Run can apply the true default",
 			config: `{"checksSpreads": false}`,
-			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksConditionals != nil {
-					t.Fatal("an omitted checksConditionals should stay nil for Run to default")
+					test.Fatal("an omitted checksConditionals should stay nil for Run to default")
 				}
 				if decoded.ChecksSpreads == nil || *decoded.ChecksSpreads {
-					t.Fatal("checksSpreads should have decoded to an explicit false")
+					test.Fatal("checksSpreads should have decoded to an explicit false")
 				}
 			},
 		},
@@ -3149,50 +3149,50 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 			// own spelling failed to decode into a boolean.
 			name:   "the sub-flag object under checksVoidReturn turns the check on and binds onto ChecksVoidReturnOpts",
 			config: `{"checksVoidReturn": {"arguments": false, "attributes": true}}`,
-			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksVoidReturn == nil || !*decoded.ChecksVoidReturn {
-					t.Fatal("the object form should turn checksVoidReturn on, as upstream's parseChecksVoidReturn does")
+					test.Fatal("the object form should turn checksVoidReturn on, as upstream's parseChecksVoidReturn does")
 				}
 				if decoded.ChecksVoidReturnOpts == nil {
-					t.Fatal("the nested object did not bind at all")
+					test.Fatal("the nested object did not bind at all")
 				}
 				if decoded.ChecksVoidReturnOpts.Arguments == nil || *decoded.ChecksVoidReturnOpts.Arguments {
-					t.Fatal("arguments should have decoded to an explicit false")
+					test.Fatal("arguments should have decoded to an explicit false")
 				}
 				if decoded.ChecksVoidReturnOpts.Attributes == nil || !*decoded.ChecksVoidReturnOpts.Attributes {
-					t.Fatal("attributes should have decoded to an explicit true")
+					test.Fatal("attributes should have decoded to an explicit true")
 				}
 				if decoded.ChecksVoidReturnOpts.Properties != nil {
-					t.Fatal("an omitted sub-flag should stay nil for Run to default")
+					test.Fatal("an omitted sub-flag should stay nil for Run to default")
 				}
 			},
 		},
 		{
 			name:   "the boolean form of checksVoidReturn binds onto ChecksVoidReturn alone",
 			config: `{"checksVoidReturn": false}`,
-			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksVoidReturn == nil || *decoded.ChecksVoidReturn {
-					t.Fatal("checksVoidReturn should have decoded to an explicit false")
+					test.Fatal("checksVoidReturn should have decoded to an explicit false")
 				}
 				if decoded.ChecksVoidReturnOpts != nil {
-					t.Fatal("the boolean form carries no sub-flags, so ChecksVoidReturnOpts should stay nil")
+					test.Fatal("the boolean form carries no sub-flags, so ChecksVoidReturnOpts should stay nil")
 				}
 			},
 		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decodedAny, err := decode([]byte(testCase.config))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.config, err)
+				test.Fatalf("decoding %s: %v", testCase.config, err)
 			}
 			decoded, ok := decodedAny.(NoMisusedPromisesOptions)
 			if !ok {
-				t.Fatalf("the decoder produced %T rather than NoMisusedPromisesOptions", decodedAny)
+				test.Fatalf("the decoder produced %T rather than NoMisusedPromisesOptions", decodedAny)
 			}
-			testCase.assert(t, decoded)
+			testCase.assert(test, decoded)
 		})
 	}
 }
@@ -3204,8 +3204,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 // rule whose nine options ALL default to true, getting that wrong would turn the entire rule off for
 // the most common way anyone configures it, while every fixture above — each of which reaches the
 // rule through an explicit options value — stayed green. This bypasses the decoder deliberately.
-func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -3219,10 +3219,10 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
@@ -3237,8 +3237,8 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
 // Stated as a test rather than as a comment so the count is checkable rather than assertable. If a
 // later sync unskips it upstream, the case comes back through the extractor and this test's own
 // arithmetic is what says so.
-func TestNoMisusedPromisesExclusionsAreStated(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesExclusionsAreStated(test *testing.T) {
+	test.Parallel()
 
 	const upstreamValidCases = 123
 	const upstreamInvalidCases = 90
@@ -3248,13 +3248,13 @@ func TestNoMisusedPromisesExclusionsAreStated(t *testing.T) {
 	}
 
 	// Counted by re-reading this file's own tables, so the arithmetic cannot drift from the fixtures.
-	silentCases, firesCases := noMisusedPromisesTableSizes(t)
+	silentCases, firesCases := noMisusedPromisesTableSizes(test)
 
 	if silentCases != upstreamValidCases {
-		t.Fatalf("the silent table carries %d cases against upstream's %d valid", silentCases, upstreamValidCases)
+		test.Fatalf("the silent table carries %d cases against upstream's %d valid", silentCases, upstreamValidCases)
 	}
 	if firesCases != upstreamInvalidCases-len(exclusions) {
-		t.Fatalf(
+		test.Fatalf(
 			"the fires table carries %d cases against upstream's %d invalid minus %d stated exclusions",
 			firesCases, upstreamInvalidCases, len(exclusions),
 		)
@@ -3269,12 +3269,12 @@ var noMisusedPromisesCaseNamePattern = regexp.MustCompile(`^\s*name:\s+"upstream
 // Counting by parsing rather than by a hand-maintained constant, so that a case added or dropped from
 // either table moves the number the exclusion test checks. A constant would simply be a second place
 // to write the same wrong answer.
-func noMisusedPromisesTableSizes(t *testing.T) (silent int, fires int) {
-	t.Helper()
+func noMisusedPromisesTableSizes(test *testing.T) (silent int, fires int) {
+	test.Helper()
 
 	source, err := os.ReadFile("no_misused_promises_test.go")
 	if err != nil {
-		t.Fatalf("reading this test file to count its own tables: %v", err)
+		test.Fatalf("reading this test file to count its own tables: %v", err)
 	}
 
 	// Matched with a regexp rather than a prefix, because gofmt aligns the values in a struct
@@ -3294,7 +3294,7 @@ func noMisusedPromisesTableSizes(t *testing.T) (silent int, fires int) {
 	}
 
 	if silent == 0 || fires == 0 {
-		t.Fatal("counted zero cases in one of the tables, so this measurement proved nothing")
+		test.Fatal("counted zero cases in one of the tables, so this measurement proved nothing")
 	}
 	return silent, fires
 }
@@ -3317,8 +3317,8 @@ func noMisusedPromisesTableSizes(t *testing.T) (silent int, fires int) {
 // The array case is the interesting silence: three async callbacks inside an array literal passed to
 // an `Array<() => void>` parameter reports NOTHING, because the void-return argument check inspects
 // the argument itself, and the argument is one array rather than three functions.
-func TestNoMisusedPromisesReportsPerElementRatherThanPerSite(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesReportsPerElementRatherThanPerSite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -3394,16 +3394,16 @@ f([async () => {}, async () => {}, async () => {}]);
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			source := result.SourceFile.Text()
 			for index, wantSpan := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[index]
 				if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != wantSpan {
-					t.Fatalf("finding %d span: got %q, want %q", index, got, wantSpan)
+					test.Fatalf("finding %d span: got %q, want %q", index, got, wantSpan)
 				}
 			}
 		})
@@ -3428,8 +3428,8 @@ f([async () => {}, async () => {}, async () => {}]);
 // The controls are what make this a measurement: a real Promise conditional and an async callback to
 // a locally declared void parameter report identically with and without the extra file, so the moved
 // verdicts are about resolution rather than about the second file's presence.
-func TestNoMisusedPromisesDependsOnGlobalsTheFixtureLibraryOmits(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesDependsOnGlobalsTheFixtureLibraryOmits(test *testing.T) {
+	test.Parallel()
 
 	const globals = `
 declare global {
@@ -3465,16 +3465,16 @@ export {};
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			bare := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, bare, testCase.wantWithoutTheGlobals...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			bare := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, bare, testCase.wantWithoutTheGlobals...)
 
-			withGlobals := rule_testing.RunTypedFiles(t, NoMisusedPromises, map[string]string{
+			withGlobals := rule_testing.RunTypedFiles(test, NoMisusedPromises, map[string]string{
 				noMisusedPromisesFile: testCase.sourceText,
 				"globals.ts":          globals,
 			}, noMisusedPromisesFile)
-			rule_testing.ExpectFindings(t, withGlobals, testCase.wantWithTheGlobals...)
+			rule_testing.ExpectFindings(test, withGlobals, testCase.wantWithTheGlobals...)
 		})
 	}
 }
@@ -3496,8 +3496,8 @@ export {};
 // The last case is the control for the whole set. A Promise-returning parameter FIRST and a void
 // parameter second still reports once, which proves the single finding above is about which position
 // was selected and not about the rule reporting at most once per call.
-func TestNoMisusedPromisesChecksOnlyTheVoidPositions(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesChecksOnlyTheVoidPositions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -3527,10 +3527,10 @@ f(async () => {}, async () => {});
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidReturnArgument")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidReturnArgument")
 		})
 	}
 }
@@ -3546,8 +3546,8 @@ f(async () => {}, async () => {});
 //
 // Four shapes, because the choice turns on two independent things (is the initializer function-like,
 // does it carry an annotation) and the corpus writes only some of the combinations.
-func TestNoMisusedPromisesReportsThePropertyReturnAnnotationWhenThereIsOne(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesReportsThePropertyReturnAnnotationWhenThereIsOne(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -3608,15 +3608,15 @@ const obj: O = {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidReturnProperty")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidReturnProperty")
 
 			source := result.SourceFile.Text()
 			diagnostic := result.Diagnostics[0]
 			if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
-				t.Fatalf("reported span: got %q, want %q", got, testCase.wantSpan)
+				test.Fatalf("reported span: got %q, want %q", got, testCase.wantSpan)
 			}
 		})
 	}
@@ -3636,37 +3636,37 @@ const obj: O = {
 //
 // The control matters here more than usual: without a case that DOES report on the same file shape,
 // a suite of three clean assertions would pass just as well against a rule that had stopped running.
-func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a string-valued attribute beside a reporting one does not crash the rule", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+	test.Run("a string-valued attribute beside a reporting one does not crash the rule", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void; label: string };
 declare function Component(props: Props): null;
 const element = <Component onEvent={async () => {}} label="hello" />;
 `)
-		rule_testing.ExpectFindings(t, result, "voidReturnAttribute")
+		rule_testing.ExpectFindings(test, result, "voidReturnAttribute")
 	})
 
-	t.Run("a string-valued attribute on a void-function prop is silent rather than fatal", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+	test.Run("a string-valued attribute on a void-function prop is silent rather than fatal", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void };
 declare function Component(props: Props): null;
 const element = <Component onEvent="hello" />;
 `)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("a shorthand attribute with no initializer at all is silent rather than fatal", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+	test.Run("a shorthand attribute with no initializer at all is silent rather than fatal", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent?: () => void };
 declare function Component(props: Props): null;
 const element = <Component onEvent />;
 `)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -3685,8 +3685,8 @@ const element = <Component onEvent />;
 // The two cases separate the interpolation from the surrounding sentence: an `implements` clause and
 // an `extends` clause name different types, so a mutant that hardcoded either one is caught by the
 // other.
-func TestNoMisusedPromisesNamesTheHeritageTypeInTheMessage(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesNamesTheHeritageTypeInTheMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -3720,13 +3720,13 @@ interface Child extends Parent {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidReturnInheritedMethod")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidReturnInheritedMethod")
 
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantMessage {
-				t.Fatalf("rendered message:\n got  %q\n want %q", got, testCase.wantMessage)
+				test.Fatalf("rendered message:\n got  %q\n want %q", got, testCase.wantMessage)
 			}
 		})
 	}

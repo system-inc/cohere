@@ -88,7 +88,7 @@ var headingAtxFixtures = []string{
 	"# a\nb\n# c",
 }
 
-func TestHeadingAtxEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, headingAtxFixtures)
+func TestHeadingAtxEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, headingAtxFixtures)
 }

@@ -11,8 +11,8 @@ import (
 
 const nonNullAssertionFile = "/repository/source/Thing.ts"
 
-func TestNoNonNullAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -39,20 +39,20 @@ func TestNoNonNullAssertionFires(t *testing.T) {
 		{"an assertion under increment", "declare const foo: any;\nfoo!.bar++;\nexport const r = foo;\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noNonNull"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoNonNullAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -82,9 +82,9 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 		{"a graphql non-null marker", "export const query = 'mutation M($input: Thing!) { m(input: $input) { id } }';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText))
 		})
 	}
 }
@@ -94,8 +94,8 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 // The finding is unconditional, so a defect in the suggestion logic is invisible to the fixture pair
 // above: every case there passes whether or not a suggestion is attached, and whether or not the
 // suggestion would parse. This is the guard for the half that ships silently.
-func TestNoNonNullAssertionSuggestions(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -112,19 +112,19 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 		{"a comment between the tokens", "declare const foo: any;\nexport const r = foo!\n    // why\n    .bar;\n", "foo\n    // why\n    ?.bar"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 {
-				t.Fatalf("want 1 suggestion, got %d", len(suggestions))
+				test.Fatalf("want 1 suggestion, got %d", len(suggestions))
 			}
 			got := applyFixes(testCase.sourceText, suggestions[0].Fixes)
 			if !containsLine(got, testCase.want) {
-				t.Fatalf("want repaired source to contain %q, got:\n%s", testCase.want, got)
+				test.Fatalf("want repaired source to contain %q, got:\n%s", testCase.want, got)
 			}
 		})
 	}
@@ -138,8 +138,8 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 // parse, which is worse than offering nothing because the suggestion reads as checked.
 //
 // The reference implementation consulted for this port recognizes only the first of these.
-func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -157,16 +157,16 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 		{"a target behind a further assertion", "declare const foo: any;\n[...foo!.bar!] = [0];\nexport const r = foo;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("want a finding, got none")
+				test.Fatalf("want a finding, got none")
 			}
 			// The assertion nearest the target is the one whose suggestion would not parse. Later
 			// assertions in the same statement are a different position and may carry one.
 			if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-				t.Fatalf("want no suggestion on an assignment target, got %d", len(suggestions))
+				test.Fatalf("want no suggestion on an assignment target, got %d", len(suggestions))
 			}
 		})
 	}
@@ -180,8 +180,8 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 // `foo[k!]` does not become `foo?.[k]`, it becomes a different expression that indexes something
 // else. Mutation testing found this check unpinned by every other fixture here, which is why it has
 // its own.
-func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -197,14 +197,14 @@ func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testi
 		{"an assertion in a return position", "declare const foo: any;\nexport function get() {\n    return foo!;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("want a finding, got none")
+				test.Fatalf("want a finding, got none")
 			}
 			if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-				t.Fatalf("want no suggestion outside the object position, got %d", len(suggestions))
+				test.Fatalf("want no suggestion outside the object position, got %d", len(suggestions))
 			}
 		})
 	}
@@ -230,27 +230,27 @@ func containsLine(haystack string, needle string) bool {
 // word: the finding names the four repairs in the order the house's migration waves ranked them, and
 // the suggestion offers `?.` only with its condition attached. Upstream's text recommended `?.` as a
 // repair outright, and a reworded message that drifted back to that would pass an id-only test.
-func TestNoNonNullAssertionMessageGivesTheRepairsInOrder(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionMessageGivesTheRepairsInOrder(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, "declare const foo: any;\nexport const r = foo!.bar;\n")
+	result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, "declare const foo: any;\nexport const r = foo!.bar;\n")
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-		t.Fatalf("want 1 finding with 1 suggestion, got %d findings", len(result.Diagnostics))
+		test.Fatalf("want 1 finding with 1 suggestion, got %d findings", len(result.Diagnostics))
 	}
-	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Message.Description,
+	noNonNullAssertionExpectInOrder(test, result.Diagnostics[0].Message.Description,
 		"guard it", "fix the type", "restructure so the index goes away", "`required(value, 'why it holds')` from `@nexus/source/errors/Assert`")
-	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Suggestions[0].Message.Description,
+	noNonNullAssertionExpectInOrder(test, result.Diagnostics[0].Suggestions[0].Message.Description,
 		"`?.`", "only where a missing value is really possible")
 }
 
 // noNonNullAssertionExpectInOrder fails unless each part appears in text after the one before it.
-func noNonNullAssertionExpectInOrder(t *testing.T, text string, parts ...string) {
-	t.Helper()
+func noNonNullAssertionExpectInOrder(test *testing.T, text string, parts ...string) {
+	test.Helper()
 	rest := text
 	for _, part := range parts {
 		index := strings.Index(rest, part)
 		if index < 0 {
-			t.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
+			test.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
 		}
 		rest = rest[index+len(part):]
 	}

@@ -176,42 +176,42 @@ func formatOptionSets() map[string]formatoptions.Options {
 	}
 }
 
-func TestFormatMatchesTheFork(t *testing.T) {
-	t.Parallel()
+func TestFormatMatchesTheFork(test *testing.T) {
+	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format("Probe.css", testCase.source)
 			if err != nil {
-				t.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				t.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
 			}
 			if optionsName == "defaults" {
 				for _, substring := range testCase.contains {
 					if !strings.Contains(expected, substring) {
-						t.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+						test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
 					}
 				}
 			}
 			actual, err := Format(testCase.source, options)
 			if err != nil {
-				t.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
 				continue
 			}
 			if actual != expected {
-				t.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
 			}
 		}
 	}
 }
 
 // The option sets have to change the output somewhere, or running under them proves nothing.
-func TestOptionSetsChangeTheOutput(t *testing.T) {
-	t.Parallel()
+func TestOptionSetsChangeTheOutput(test *testing.T) {
+	test.Parallel()
 	for optionsName, options := range formatOptionSets() {
 		if optionsName == "defaults" {
 			continue
@@ -226,42 +226,42 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 			}
 		}
 		if !changed {
-			t.Errorf("%s printed every case as the defaults do", optionsName)
+			test.Errorf("%s printed every case as the defaults do", optionsName)
 		}
 	}
 }
 
 // What the fork refuses, Format refuses, as a syntax error.
-func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
-	t.Parallel()
+func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
+	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
+	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
 		if _, err := oracle.Format("Probe.css", source); err == nil {
-			t.Fatalf("the oracle accepted %q", source)
+			test.Fatalf("the oracle accepted %q", source)
 		}
 		if formatted, err := Format(source, formatoptions.Default()); err == nil {
-			t.Errorf("%q was printed instead of refused:\n%s", source, formatted)
+			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
 }
 
 // PrintToDoc is the same doc without its trailing hardline, which an embedding printer lays out.
-func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
-	t.Parallel()
+func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
+	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		document, err := PrintToDoc(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
 		if printed != strings.TrimSuffix(formatted, "\n") {
-			t.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
+			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}
 	}
 }
@@ -271,11 +271,11 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
 // separated by the path list separator, and fails when that finds nothing. Each file runs as written and
 // with every line's indentation stripped: the files are already formatted, so only the stripped copy
 // makes the oracle rewrite anything.
-func TestCorpusMatchesTheFork(t *testing.T) {
-	t.Parallel()
+func TestCorpusMatchesTheFork(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_CSS_CORPUS")
 	if roots == "" {
-		t.Skip("COHERE_CSS_CORPUS is not set")
+		test.Skip("COHERE_CSS_CORPUS is not set")
 	}
 	var files []string
 	for _, root := range filepath.SplitList(roots) {
@@ -294,7 +294,7 @@ func TestCorpusMatchesTheFork(t *testing.T) {
 		})
 	}
 	if len(files) == 0 {
-		t.Fatalf("no corpus files under %s", roots)
+		test.Fatalf("no corpus files under %s", roots)
 	}
 	rewritten := 0
 	// The live oracle, not a golden (see oracletest): the corpus is the projects' own CSS as it stands
@@ -302,36 +302,36 @@ func TestCorpusMatchesTheFork(t *testing.T) {
 	for optionsName, options := range formatOptionSets() {
 		oracle, err := prettier.New(options)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		for _, file := range files {
 			source, err := os.ReadFile(file)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			for _, variant := range []string{string(source), stripIndentation(string(source))} {
 				expected, err := oracle.Format("Probe.css", variant)
 				if err != nil {
-					t.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, err)
+					test.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, err)
 				}
 				if expected != variant {
 					rewritten++
 				}
 				actual, err := Format(variant, options)
 				if err != nil {
-					t.Errorf("%s (%s): %v", file, optionsName, err)
+					test.Errorf("%s (%s): %v", file, optionsName, err)
 					continue
 				}
 				if actual != expected {
-					t.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
 				}
 			}
 		}
 	}
 	if rewritten < len(files)*len(formatOptionSets()) {
-		t.Errorf("the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer", rewritten, 2*len(files)*len(formatOptionSets()))
+		test.Errorf("the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer", rewritten, 2*len(files)*len(formatOptionSets()))
 	}
-	t.Logf("%d corpus files, two variants each, under %d option sets; the oracle rewrote %d", len(files), len(formatOptionSets()), rewritten)
+	test.Logf("%d corpus files, two variants each, under %d option sets; the oracle rewrote %d", len(files), len(formatOptionSets()), rewritten)
 }
 
 // stripIndentation removes every line's leading spaces and tabs.
@@ -347,8 +347,8 @@ func stripIndentation(source string) string {
 // 157 files written to exercise the printer and parser, vendored in testdata/prettier/css (#sycrdr6), so
 // the test runs on any machine. Two kinds of file are set aside by name, each for a stated reason, and
 // must still behave as described; everything else must match the fork byte for byte.
-func TestPrettierFixturesMatchTheFork(t *testing.T) {
-	t.Parallel()
+func TestPrettierFixturesMatchTheFork(test *testing.T) {
+	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "css")
 	var files []string
 	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
@@ -359,14 +359,14 @@ func TestPrettierFixturesMatchTheFork(t *testing.T) {
 	})
 
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		compared, refusedByBoth := 0, 0
 		for _, file := range files {
 			source, err := os.ReadFile(file)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			text := string(source)
 			actual, nativeErr := Format(text, options)
@@ -381,7 +381,7 @@ func TestPrettierFixturesMatchTheFork(t *testing.T) {
 					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
 					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
 					if nativeErr == nil {
-						t.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
+						test.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
 					}
 					continue
 				}
@@ -392,21 +392,21 @@ func TestPrettierFixturesMatchTheFork(t *testing.T) {
 			case oracleErr != nil && nativeErr != nil:
 				refusedByBoth++
 			case oracleErr != nil:
-				t.Errorf("%s (%s): the fork refused it (%v) and Format printed it", file, optionsName, oracleErr)
+				test.Errorf("%s (%s): the fork refused it (%v) and Format printed it", file, optionsName, oracleErr)
 			case nativeErr != nil:
-				t.Errorf("%s (%s): %v", file, optionsName, nativeErr)
+				test.Errorf("%s (%s): %v", file, optionsName, nativeErr)
 			default:
 				compared++
 				if actual != expected {
-					t.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
 				}
 			}
 		}
 		// The refusal threshold: an oracle or a printer that refuses everything cannot read as agreement.
 		if compared < 130 {
-			t.Errorf("%s: only %d fixtures were compared (%d refused by both)", optionsName, compared, refusedByBoth)
+			test.Errorf("%s: only %d fixtures were compared (%d refused by both)", optionsName, compared, refusedByBoth)
 		}
-		t.Logf("%s: %d fixtures compared, %d refused by both", optionsName, compared, refusedByBoth)
+		test.Logf("%s: %d fixtures compared, %d refused by both", optionsName, compared, refusedByBoth)
 	}
 }
 
@@ -518,34 +518,34 @@ var scssFormatCases = []formatCase{
 	},
 }
 
-func TestFormatSCSSMatchesTheFork(t *testing.T) {
-	t.Parallel()
+func TestFormatSCSSMatchesTheFork(test *testing.T) {
+	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range scssFormatCases {
 			expected, err := oracle.Format("Probe.scss", testCase.source)
 			if err != nil {
-				t.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				t.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
 			}
 			if optionsName == "defaults" {
 				for _, substring := range testCase.contains {
 					if !strings.Contains(expected, substring) {
-						t.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+						test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
 					}
 				}
 			}
 			actual, err := FormatSCSS(testCase.source, options)
 			if err != nil {
-				t.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
 				continue
 			}
 			if actual != expected {
-				t.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
 			}
 		}
 	}
@@ -553,10 +553,10 @@ func TestFormatSCSSMatchesTheFork(t *testing.T) {
 
 // The scss parser is not the css one: the same text formats differently under each, so FormatSCSS is
 // not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
-func TestFormatSCSSIsNotFormat(t *testing.T) {
-	t.Parallel()
+func TestFormatSCSSIsNotFormat(test *testing.T) {
+	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
+	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
 	for _, source := range []string{
 		"a{\n// comment\ncolor:red;\n}",
 		"$map:(key1:value1,key2:value2);",
@@ -565,38 +565,38 @@ func TestFormatSCSSIsNotFormat(t *testing.T) {
 		asCSS, cssErr := oracle.Format("Probe.css", source)
 		asSCSS, scssErr := oracle.Format("Probe.scss", source)
 		if scssErr != nil {
-			t.Fatalf("%q: the oracle refused it as scss: %v", source, scssErr)
+			test.Fatalf("%q: the oracle refused it as scss: %v", source, scssErr)
 		}
 		if cssErr == nil && asCSS == asSCSS {
-			t.Fatalf("%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing", source)
+			test.Fatalf("%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing", source)
 		}
 		actualSCSS, err := FormatSCSS(source, formatoptions.Default())
 		if err != nil || actualSCSS != asSCSS {
-			t.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, err, actualSCSS)
+			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, err, actualSCSS)
 		}
 		actualCSS, err := Format(source, formatoptions.Default())
 		if (err == nil) != (cssErr == nil) || actualCSS != asCSS {
-			t.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssErr, asCSS, err, actualCSS)
+			test.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssErr, asCSS, err, actualCSS)
 		}
 	}
 }
 
 // PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
-func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
-	t.Parallel()
+func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(test *testing.T) {
+	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range scssFormatCases {
 		formatted, err := FormatSCSS(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		document, err := PrintToDocSCSS(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
 		if printed != strings.TrimSuffix(formatted, "\n") {
-			t.Errorf("%s:\n--- FormatSCSS\n%s--- PrintToDocSCSS\n%s", testCase.name, formatted, printed)
+			test.Errorf("%s:\n--- FormatSCSS\n%s--- PrintToDocSCSS\n%s", testCase.name, formatted, printed)
 		}
 	}
 }
@@ -605,8 +605,8 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
 // printer, vendored beside the CSS ones in testdata/prettier/scss. Every file the fork formats must match
 // byte for byte, and a file the fork refuses must be refused here too. The one kind set aside is yaml
 // front matter, which FormatSCSS refuses as Format does.
-func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
-	t.Parallel()
+func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
+	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "scss")
 	var files []string
 	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
@@ -617,14 +617,14 @@ func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 	})
 
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0
 		for _, file := range files {
 			source, err := os.ReadFile(file)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
 			text := strings.ReplaceAll(string(source), "\r\n", "\n")
@@ -636,7 +636,7 @@ func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
 					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
 					if nativeErr == nil {
-						t.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
+						test.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
 					}
 					skipped++
 					continue
@@ -648,9 +648,9 @@ func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 			case oracleErr != nil && nativeErr != nil:
 				refusedByBoth++
 			case oracleErr != nil:
-				t.Errorf("%s (%s): the fork refused it (%v) and FormatSCSS printed it", file, optionsName, oracleErr)
+				test.Errorf("%s (%s): the fork refused it (%v) and FormatSCSS printed it", file, optionsName, oracleErr)
 			case nativeErr != nil:
-				t.Errorf("%s (%s): %v", file, optionsName, nativeErr)
+				test.Errorf("%s (%s): %v", file, optionsName, nativeErr)
 			default:
 				compared++
 				if expected != text {
@@ -659,17 +659,17 @@ func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 				if actual == expected {
 					matched++
 				} else {
-					t.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
 				}
 			}
 		}
 		// The refusal threshold: an oracle or a printer that refuses everything cannot read as agreement,
 		// and fixtures the oracle leaves as written would let an identity printer through.
 		if compared < 80 || rewritten < 60 {
-			t.Errorf("%s: only %d fixtures were compared, %d rewritten by the fork (%d refused by both, %d set aside)",
+			test.Errorf("%s: only %d fixtures were compared, %d rewritten by the fork (%d refused by both, %d set aside)",
 				optionsName, compared, rewritten, refusedByBoth, skipped)
 		}
-		t.Logf("%s: %d of %d fixtures compared match the fork, %d of them rewritten (%d refused by both, %d set aside for yaml front matter)",
+		test.Logf("%s: %d of %d fixtures compared match the fork, %d of them rewritten (%d refused by both, %d set aside for yaml front matter)",
 			optionsName, matched, compared, rewritten, refusedByBoth, skipped)
 	}
 }

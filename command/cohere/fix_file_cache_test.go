@@ -26,8 +26,8 @@ import (
 
 // TestTheFixPathsReLintComputesEachDerivationOncePerText: every rule re-linting a text shares one cache, so a
 // derivation asked for at every node by two rules is computed once.
-func TestTheFixPathsReLintComputesEachDerivationOncePerText(t *testing.T) {
-	t.Parallel()
+func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
+	test.Parallel()
 	computed := 0
 	asking := func(name string) rule.Rule {
 		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -41,10 +41,10 @@ func TestTheFixPathsReLintComputesEachDerivationOncePerText(t *testing.T) {
 	}
 	text := "const first = second;\nconst third = first + second;\n"
 	if _, err := proposalsForText("/Probe.ts", text, &program.Graph{}, []rule.Rule{asking("probe-a"), asking("probe-b")}); err != nil {
-		t.Fatalf("proposalsForText: %v", err)
+		test.Fatalf("proposalsForText: %v", err)
 	}
 	if computed != 1 {
-		t.Errorf("the derivation was computed %d times for one text asked at every identifier by two rules, want once", computed)
+		test.Errorf("the derivation was computed %d times for one text asked at every identifier by two rules, want once", computed)
 	}
 }
 
@@ -65,19 +65,19 @@ func bundle(count int) string {
 //
 // Not parallel: testing.AllocsPerRun reads the process's allocation count, which a parallel test would add to,
 // and it refuses to run inside one.
-func TestTheFixPathsReLintGrowsLinearlyOnABundle(t *testing.T) {
+func TestTheFixPathsReLintGrowsLinearlyOnABundle(test *testing.T) {
 	rules := []rule.Rule{typescript.NoInvalidThis}
 	allocations := func(count int) float64 {
 		text := bundle(count)
 		return testing.AllocsPerRun(3, func() {
 			if _, err := proposalsForText("/main.js", text, &program.Graph{}, rules); err != nil {
-				t.Fatalf("proposalsForText: %v", err)
+				test.Fatalf("proposalsForText: %v", err)
 			}
 		})
 	}
 	small, large := allocations(100), allocations(400)
 	if ratio := large / small; ratio > 6 {
-		t.Errorf("four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
+		test.Errorf("four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
 			ratio, large, small)
 	}
 }
@@ -103,8 +103,8 @@ func (b *lockedBuffer) String() string {
 // TestAFileStillInTheFixPhaseIsNamedWhileItRuns: a file that outlasts the notice is named, with where to
 // report it, while it is still running, and a file that finishes first says nothing (#xn1k1gz). The runaway
 // that found this sat 26 minutes on one core with nothing on screen.
-func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(t *testing.T) {
-	t.Parallel()
+func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(test *testing.T) {
+	test.Parallel()
 	for name, testCase := range map[string]struct {
 		after, takes time.Duration
 		named        bool
@@ -112,8 +112,8 @@ func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(t *testing.T) {
 		"a file that outlasts the notice is named": {after: time.Millisecond, takes: 200 * time.Millisecond, named: true},
 		"a file that finishes first says nothing":  {after: time.Minute, takes: 0, named: false},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			out := &lockedBuffer{}
 			seenWhileRunning := false
 			result, err := watchedFile(out, testCase.after, "/bundle/main.js", func() (edit.FileResult, error) {
@@ -122,13 +122,13 @@ func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(t *testing.T) {
 				return edit.FileResult{FileName: "/bundle/main.js"}, nil
 			})
 			if err != nil || result.FileName != "/bundle/main.js" {
-				t.Fatalf("the file's own result did not come back: %+v, %v", result, err)
+				test.Fatalf("the file's own result did not come back: %+v, %v", result, err)
 			}
 			if seenWhileRunning != testCase.named {
-				t.Errorf("named while running %t, want %t: %q", seenWhileRunning, testCase.named, out.String())
+				test.Errorf("named while running %t, want %t: %q", seenWhileRunning, testCase.named, out.String())
 			}
 			if testCase.named && !strings.Contains(out.String(), reportBugsAt) {
-				t.Errorf("the notice does not say where to report it: %q", out.String())
+				test.Errorf("the notice does not say where to report it: %q", out.String())
 			}
 		})
 	}

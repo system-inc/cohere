@@ -12,25 +12,25 @@ import (
 
 // contractFixture reads one of the fixtures swift/Contract.md defines, from the same files the Swift
 // encoder's tests read, so neither side can drift without the other's test failing.
-func contractFixture(t *testing.T, name string) []string {
-	t.Helper()
+func contractFixture(test *testing.T, name string) []string {
+	test.Helper()
 	contents, err := os.ReadFile(filepath.Join("..", "..", "swift", "Contract", name))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	lines := []string{}
 	for _, line := range strings.Split(strings.TrimRight(string(contents), "\n"), "\n") {
 		lines = append(lines, line)
 	}
 	if len(lines) < 2 {
-		t.Fatalf("%s holds %d records, which cannot be a contract fixture", name, len(lines))
+		test.Fatalf("%s holds %d records, which cannot be a contract fixture", name, len(lines))
 	}
 	return lines
 }
 
 // renderRecords feeds records through a fresh renderer and ends the run the way the engine would.
-func renderRecords(t *testing.T, mode swiftMode, lines []string, engineExit int) (string, int, error) {
-	t.Helper()
+func renderRecords(test *testing.T, mode swiftMode, lines []string, engineExit int) (string, int, error) {
+	test.Helper()
 	var out bytes.Buffer
 	run := newSwiftRun(&out, mode, "", time.Now())
 	for index, line := range lines {
@@ -51,34 +51,34 @@ type recordError struct {
 
 func (e *recordError) Error() string { return e.err.Error() }
 
-func requireLines(t *testing.T, output string, wanted ...string) {
-	t.Helper()
+func requireLines(test *testing.T, output string, wanted ...string) {
+	test.Helper()
 	for _, line := range wanted {
 		if !strings.Contains(output, line) {
-			t.Errorf("missing %q from:\n%s", line, output)
+			test.Errorf("missing %q from:\n%s", line, output)
 		}
 	}
 }
 
-func forbidLines(t *testing.T, output string, unwanted ...string) {
-	t.Helper()
+func forbidLines(test *testing.T, output string, unwanted ...string) {
+	test.Helper()
 	for _, line := range unwanted {
 		if strings.Contains(output, line) {
-			t.Errorf("printed %q, which it must not:\n%s", line, output)
+			test.Errorf("printed %q, which it must not:\n%s", line, output)
 		}
 	}
 }
 
 // Not parallel: its subtests render check runs through swiftRun, whose record acceptors set the package-level
 // activeSummary
-func TestSwiftRunRendersEachContractFixture(t *testing.T) {
+func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("Clean", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+	test.Run("Clean", func(test *testing.T) {
+		output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Clean.jsonl"), 0)
 		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"package described in 412ms — 3 Swift files in the package, 2 of them ours\n",
 			"fix: 0 of 2 files rewritten, 0 fixes applied, 0 refused\n",
 			"format scope: changed files (working tree against HEAD): 0\n",
@@ -91,16 +91,16 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
 			"— package 412ms",
 		)
-		forbidLines(t, output, "did not check everything", "modified tree", "in scope (")
+		forbidLines(test, output, "did not check everything", "modified tree", "in scope (")
 	})
 
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("Findings", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Findings.jsonl"), 1)
+	test.Run("Findings", func(test *testing.T) {
+		output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Findings.jsonl"), 1)
 		if err != nil || exitCode != 1 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"fix: 1 of 2 files rewritten, 1 fixes applied, 0 refused, 1 reformatted\n",
 			"/project/Sources/Example/Warning.swift:2:9 - warning: variable 'neverMutated' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]\n",
 			// The message's newline is collapsed, so the rule tag stays on the line with the position.
@@ -109,59 +109,59 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"  this binary was built from a modified tree, so no commit reproduces these findings\n",
 		)
 		// The silent rule is counted by default and named behind --coverage, as a TypeScript run does.
-		forbidLines(t, output, "did not check everything", "cohere-swift/force-cast")
+		forbidLines(test, output, "did not check everything", "cohere-swift/force-cast")
 	})
 
 	// --coverage names each rule the record names exactly once, under its category, and counts the
 	// ones the record only counts.
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("FindingsWithCoverage", func(t *testing.T) {
+	test.Run("FindingsWithCoverage", func(test *testing.T) {
 		var out bytes.Buffer
 		run := newSwiftRun(&out, swiftModeCheck, "", time.Now())
 		run.details = true
-		for _, line := range contractFixture(t, "Findings.jsonl") {
+		for _, line := range contractFixture(test, "Findings.jsonl") {
 			if err := run.accept([]byte(line)); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 		output := out.String()
-		requireLines(t, output,
+		requireLines(test, output,
 			"  listened to no files (1): nothing gave it a file, or it declined every one",
 			"    cohere-swift/force-cast\n",
 			"  ran and found nothing (2): ",
 			"    2 the engine's record counts and does not name\n",
 		)
 		if count := strings.Count(output, "cohere-swift/force-cast\n"); count != 1 {
-			t.Errorf("the silent rule is named %d times, want 1:\n%s", count, output)
+			test.Errorf("the silent rule is named %d times, want 1:\n%s", count, output)
 		}
-		forbidLines(t, output, "details: cohere --coverage")
+		forbidLines(test, output, "details: cohere --coverage")
 	})
 
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("TypesBail", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "TypesBail.jsonl"), 1)
+	test.Run("TypesBail", func(test *testing.T) {
+		output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "TypesBail.jsonl"), 1)
 		if err != nil || exitCode != 1 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"/project/Sources/Example/Broken.swift:3:23 - error: cannot convert value of type 'String' to specified type 'Int'\n",
 			"fix skipped (--no-fix)",
 			"lint did not run (types bailed: 1 type errors — lint findings against wrong semantics are noise)",
 			"  this run did not check everything — the phases above say what was not checked\n",
 		)
 		// A compiler finding with no group has no bracket.
-		forbidLines(t, output, "Int' [#")
+		forbidLines(test, output, "Int' [#")
 	})
 
 	// Contract 2: the file the engine could not read is named with the excluded files, and the run is
 	// incomplete with exit 1 though every phase ran and nothing was found.
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("Unreadable", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
+	test.Run("Unreadable", func(test *testing.T) {
+		output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
 		if err != nil || exitCode != 1 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 			"  this run did not check everything — the notes above name the files nothing checked\n",
@@ -171,12 +171,12 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 	// The --unused report renders after lint and is not a gate: two items, and the summary still counts no
 	// findings and exits 0. Were the renderer to count them, the summary check would refuse the stream.
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("Unused", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Unused.jsonl"), 0)
+	test.Run("Unused", func(test *testing.T) {
+		output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Unused.jsonl"), 0)
 		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"\nunused: a report, not a gate — nothing here fails a build\n",
 			"\n  imports nothing uses — 3\n",
 			// Two items on one line arrive out of column order and print in it.
@@ -197,55 +197,55 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"  never reported: 175 declarations (an override or a protocol witness, reached through what it overrides)\n",
 			"  never reported: 23 declarations (reached by the Objective-C runtime (@objc, @IBAction, @IBOutlet, @NSManaged, dynamic))\n",
 		)
-		forbidLines(t, output, "did not check everything", "Main.swift:1:1 - ", "deepestAt - ")
+		forbidLines(test, output, "did not check everything", "Main.swift:1:1 - ", "deepestAt - ")
 		if strings.Index(output, "imports nothing uses") < strings.Index(output, "lint: ") {
-			t.Errorf("the unused report printed before the lint line:\n%s", output)
+			test.Errorf("the unused report printed before the lint line:\n%s", output)
 		}
 		// Each rule's section in the order the engine wrote them, and every skip reason printed: ten for
 		// declarations, counted rather than listed so a dropped one cannot hide among the pinned three.
 		if strings.Index(output, "declarations nothing uses") < strings.Index(output, "never reported: 1 imports") {
-			t.Errorf("the declarations section printed before the imports section ended:\n%s", output)
+			test.Errorf("the declarations section printed before the imports section ended:\n%s", output)
 		}
 		if got := strings.Count(output, "never reported: "); got != 11 {
-			t.Errorf("%d never-reported lines, the fixture holds 1 for imports and 10 for declarations:\n%s", got, output)
+			test.Errorf("%d never-reported lines, the fixture holds 1 for imports and 10 for declarations:\n%s", got, output)
 		}
 	})
 
 	// A rule the front door has no words for prints under its own id and counts items, never under
 	// another rule's heading.
 	// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-	t.Run("UnusedUnknownRule", func(t *testing.T) {
+	test.Run("UnusedUnknownRule", func(test *testing.T) {
 		lines := []string{}
-		for _, line := range contractFixture(t, "Unused.jsonl") {
+		for _, line := range contractFixture(test, "Unused.jsonl") {
 			lines = append(lines, strings.ReplaceAll(line, "cohere-swift/correctness-no-unused-import", "cohere-swift/unused-parameter"))
 		}
-		output, exitCode, err := renderRecords(t, swiftModeCheck, lines, 0)
+		output, exitCode, err := renderRecords(test, swiftModeCheck, lines, 0)
 		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+			test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 		}
-		requireLines(t, output,
+		requireLines(test, output,
 			"\n  cohere-swift/unused-parameter — 3\n",
 			"  looked at 2 files and 6 items (cohere-swift/unused-parameter)\n",
 			"  not checked for unused items: 1 files (the build has not compiled it as it stands)\n",
 			// The known rule beside it keeps its own words.
 			"\n  declarations nothing uses — 2\n",
 		)
-		forbidLines(t, output, "imports nothing uses")
+		forbidLines(test, output, "imports nothing uses")
 	})
 
 	// The contract's crash: the stream stops after the fix phase. Exit 0 or 1 without a summary is a
 	// crash whatever the code says, so both are asserted.
 	for _, engineExit := range []int{0, 1} {
 		// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-		t.Run("CrashWithoutSummary", func(t *testing.T) {
-			output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "CrashWithoutSummary.jsonl"), engineExit)
+		test.Run("CrashWithoutSummary", func(test *testing.T) {
+			output, exitCode, err := renderRecords(test, swiftModeCheck, contractFixture(test, "CrashWithoutSummary.jsonl"), engineExit)
 			if err == nil || exitCode != 1 {
-				t.Fatalf("a stream with no summary exited %d with err %v\n%s", exitCode, err, output)
+				test.Fatalf("a stream with no summary exited %d with err %v\n%s", exitCode, err, output)
 			}
 			if !strings.Contains(err.Error(), "without a summary, so nothing was checked") {
-				t.Errorf("the crash did not say nothing was checked: %v", err)
+				test.Errorf("the crash did not say nothing was checked: %v", err)
 			}
-			requireLines(t, output,
+			requireLines(test, output,
 				"types did not run (the Swift engine exited",
 				"  this run did not check everything",
 			)
@@ -257,12 +257,12 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 // real fixture. Every one must exit 1 with an error, and none may print a clean bill of health.
 // Not parallel: its subtests render check runs through swiftRun, whose record acceptors set the package-level
 // activeSummary
-func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
-	findings := contractFixture(t, "Findings.jsonl")
-	clean := contractFixture(t, "Clean.jsonl")
-	bail := contractFixture(t, "TypesBail.jsonl")
-	unreadable := contractFixture(t, "Unreadable.jsonl")
-	unused := contractFixture(t, "Unused.jsonl")
+func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
+	findings := contractFixture(test, "Findings.jsonl")
+	clean := contractFixture(test, "Clean.jsonl")
+	bail := contractFixture(test, "TypesBail.jsonl")
+	unreadable := contractFixture(test, "Unreadable.jsonl")
+	unused := contractFixture(test, "Unused.jsonl")
 	last := len(findings) - 1
 
 	replace := func(lines []string, index int, line string) []string {
@@ -320,13 +320,13 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 
 	for _, testCase := range cases {
 		// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-		t.Run(testCase.name, func(t *testing.T) {
-			output, exitCode, err := renderRecords(t, swiftModeCheck, testCase.lines, testCase.engineExit)
+		test.Run(testCase.name, func(test *testing.T) {
+			output, exitCode, err := renderRecords(test, swiftModeCheck, testCase.lines, testCase.engineExit)
 			if err == nil || exitCode != 1 {
-				t.Fatalf("accepted a broken stream: exit %d, err %v\n%s", exitCode, err, output)
+				test.Fatalf("accepted a broken stream: exit %d, err %v\n%s", exitCode, err, output)
 			}
 			if !strings.Contains(err.Error(), testCase.reason) {
-				t.Errorf("refused for the wrong reason: %v, want one naming %q", err, testCase.reason)
+				test.Errorf("refused for the wrong reason: %v, want one naming %q", err, testCase.reason)
 			}
 		})
 	}
@@ -335,95 +335,95 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 // TestSwiftRunGroupsExcludedFiles holds both sides of the limit: a reason with many files is one
 // counted line, and a reason with few still names each file.
 // Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-func TestSwiftRunGroupsExcludedFiles(t *testing.T) {
-	clean := contractFixture(t, "Clean.jsonl")
+func TestSwiftRunGroupsExcludedFiles(test *testing.T) {
+	clean := contractFixture(test, "Clean.jsonl")
 	vendored := []string{}
 	for index := range excludedNamedLimit + 1 {
 		vendored = append(vendored, `{"file":"/project/Vendor/F`+string(rune('a'+index))+`.swift","reason":"vendored under Vendor/"}`)
 	}
 	clean[1] = strings.Replace(clean[1], `"excluded":[`, `"excluded":[`+strings.Join(vendored, ",")+",", 1)
 
-	output, exitCode, err := renderRecords(t, swiftModeCheck, clean, 0)
+	output, exitCode, err := renderRecords(test, swiftModeCheck, clean, 0)
 	if err != nil || exitCode != 0 {
-		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+		test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 	}
-	requireLines(t, output,
+	requireLines(test, output,
 		"  not checked: 6 files (vendored under Vendor/)\n",
 		"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 	)
-	forbidLines(t, output, "/project/Vendor/Fa.swift")
+	forbidLines(test, output, "/project/Vendor/Fa.swift")
 }
 
 // TestSwiftRunBelievesAnEngineThatFellShort holds the allowed direction of the completeness check: an
 // engine that says it did not check everything is believed even when its records show no gap, because
 // it can see gaps no record carries, such as a file it could not read.
 // Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
-func TestSwiftRunBelievesAnEngineThatFellShort(t *testing.T) {
-	clean := contractFixture(t, "Clean.jsonl")
+func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
+	clean := contractFixture(test, "Clean.jsonl")
 	last := len(clean) - 1
 	clean[last] = strings.Replace(strings.Replace(clean[last], `"complete":true`, `"complete":false`, 1), `"exitCode":0`, `"exitCode":1`, 1)
 
-	output, exitCode, err := renderRecords(t, swiftModeCheck, clean, 1)
+	output, exitCode, err := renderRecords(test, swiftModeCheck, clean, 1)
 	if err != nil || exitCode != 1 {
-		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+		test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 	}
-	requireLines(t, output, "  this run did not check everything — the Swift engine reported that it fell short without a record saying where\n")
+	requireLines(test, output, "  this run did not check everything — the Swift engine reported that it fell short without a record saying where\n")
 }
 
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
-func TestSwiftRunListingModes(t *testing.T) {
-	t.Parallel()
-	provenance := contractFixture(t, "Clean.jsonl")[0]
+func TestSwiftRunListingModes(test *testing.T) {
+	test.Parallel()
+	provenance := contractFixture(test, "Clean.jsonl")[0]
 
-	t.Run("version", func(t *testing.T) {
-		t.Parallel()
-		output, exitCode, err := renderRecords(t, swiftModeVersion, []string{provenance}, 0)
+	test.Run("version", func(test *testing.T) {
+		test.Parallel()
+		output, exitCode, err := renderRecords(test, swiftModeVersion, []string{provenance}, 0)
 		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v", exitCode, err)
+			test.Fatalf("exit %d, err %v", exitCode, err)
 		}
-		requireLines(t, output, "swift engine: cohere-swift 0.1.0 (commit dev, swiftlang-6.4.0.34.1, swift-syntax 604.0.0, swift-format 604.0.0)\n")
+		requireLines(test, output, "swift engine: cohere-swift 0.1.0 (commit dev, swiftlang-6.4.0.34.1, swift-syntax 604.0.0, swift-format 604.0.0)\n")
 	})
 
-	t.Run("rules, sorted", func(t *testing.T) {
-		t.Parallel()
+	test.Run("rules, sorted", func(test *testing.T) {
+		test.Parallel()
 		lines := []string{
 			provenance,
 			`{"kind":"rule","name":"cohere-swift/no-try-bang","severity":"error"}`,
 			`{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"warning"}`,
 		}
-		output, exitCode, err := renderRecords(t, swiftModeRules, lines, 0)
+		output, exitCode, err := renderRecords(test, swiftModeRules, lines, 0)
 		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v", exitCode, err)
+			test.Fatalf("exit %d, err %v", exitCode, err)
 		}
 		if output != "cohere-swift/force-unwrapping\ncohere-swift/no-try-bang\n" {
-			t.Errorf("rules printed as %q", output)
+			test.Errorf("rules printed as %q", output)
 		}
-		enabled, _, err := renderRecords(t, swiftModeRulesEnabled, lines, 0)
+		enabled, _, err := renderRecords(test, swiftModeRulesEnabled, lines, 0)
 		if err != nil || enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
-			t.Errorf("rules-enabled printed as %q (err %v)", enabled, err)
+			test.Errorf("rules-enabled printed as %q (err %v)", enabled, err)
 		}
 	})
 
-	t.Run("a finding in a listing is refused", func(t *testing.T) {
-		t.Parallel()
-		findings := contractFixture(t, "Findings.jsonl")
-		_, exitCode, err := renderRecords(t, swiftModeRules, []string{provenance, findings[4]}, 0)
+	test.Run("a finding in a listing is refused", func(test *testing.T) {
+		test.Parallel()
+		findings := contractFixture(test, "Findings.jsonl")
+		_, exitCode, err := renderRecords(test, swiftModeRules, []string{provenance, findings[4]}, 0)
 		if err == nil || exitCode != 1 {
-			t.Fatalf("a finding in a rules listing was accepted")
+			test.Fatalf("a finding in a rules listing was accepted")
 		}
 	})
 
-	t.Run("an engine that could not run", func(t *testing.T) {
-		t.Parallel()
-		_, exitCode, err := renderRecords(t, swiftModeCheck, []string{provenance}, 2)
+	test.Run("an engine that could not run", func(test *testing.T) {
+		test.Parallel()
+		_, exitCode, err := renderRecords(test, swiftModeCheck, []string{provenance}, 2)
 		if err == nil || exitCode != 1 || !strings.Contains(err.Error(), "did not run, so nothing was checked") {
-			t.Fatalf("exit 2 was rendered as exit %d, err %v", exitCode, err)
+			test.Fatalf("exit 2 was rendered as exit %d, err %v", exitCode, err)
 		}
 	})
 }
 
-func TestSwiftEngineArguments(t *testing.T) {
-	t.Parallel()
+func TestSwiftEngineArguments(test *testing.T) {
+	test.Parallel()
 	location := projectLocation{
 		Root:               "/work/macos",
 		Engine:             engineSwift,
@@ -437,21 +437,21 @@ func TestSwiftEngineArguments(t *testing.T) {
 		map[string]bool{"no-fix": true, "single-threaded": true, "fix-passes": true, "lint-config": true},
 		value, []string{"Thing.swift", "/abs/Other.swift"})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	want := "--contract 3 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
 	if strings.Join(arguments, " ") != want || mode != swiftModeCheck {
 		// `--single-threaded=false` was typed and is false, so it is not forwarded as a switch.
-		t.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
+		test.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 
 	_, mode, _ = swiftEngineArguments(location, map[string]bool{"rules": true}, value, nil)
 	if mode != swiftModeRules {
-		t.Errorf("--rules ran in mode %s", mode)
+		test.Errorf("--rules ran in mode %s", mode)
 	}
 
 	if _, _, err := swiftEngineArguments(location, map[string]bool{"explain": true}, value, nil); err == nil || !strings.Contains(err.Error(), "--explain") {
-		t.Errorf("--explain was not refused by name: %v", err)
+		test.Errorf("--explain was not refused by name: %v", err)
 	}
 }
 
@@ -459,8 +459,8 @@ func TestSwiftEngineArguments(t *testing.T) {
 // dropped --format-only made a format gate type-check and lint the whole package (#nqb3mjv). A switch typed
 // as false asks for nothing and passes, and the flags the front door answers itself pass too. --format-only
 // and --no-format reach the engine, which reads them with TypeScript's meaning since c024df4b.
-func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
-	t.Parallel()
+func TestSwiftEngineArgumentsRefuseWhatNothingHonors(test *testing.T) {
+	test.Parallel()
 	location := projectLocation{Root: "/work/macos", Engine: engineSwift, ArgumentBase: "/work/macos"}
 	values := map[string]string{"no-format": "false", "verbose": "true", "phases": "true", "coverage": "true"}
 	value := func(name string) string {
@@ -478,7 +478,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	} {
 		if _, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil); err == nil ||
 			!strings.Contains(err.Error(), says) || !strings.Contains(err.Error(), "nothing was checked") {
-			t.Errorf("--%s was not refused by name: %v", flag, err)
+			test.Errorf("--%s was not refused by name: %v", flag, err)
 		}
 	}
 
@@ -486,7 +486,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 		values[flag] = "true"
 		arguments, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil)
 		if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {
-			t.Errorf("--%s did not reach the engine: %q (%v)", flag, strings.Join(arguments, " "), err)
+			test.Errorf("--%s did not reach the engine: %q (%v)", flag, strings.Join(arguments, " "), err)
 		}
 	}
 	values["no-format"] = "false"
@@ -494,7 +494,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	given := map[string]bool{"no-fix": true, "no-format": true, "verbose": true, "phases": true, "coverage": true, "directory": true}
 	arguments, _, err := swiftEngineArguments(location, given, value, nil)
 	if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
-		t.Errorf("the flags the front door answers were not passed over: %q (%v)", strings.Join(arguments, " "), err)
+		test.Errorf("the flags the front door answers were not passed over: %q (%v)", strings.Join(arguments, " "), err)
 	}
 }
 
@@ -503,26 +503,26 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 // has none, and the summary is left unlisted, never set to no files, so the footer prints no cohered count.
 // Not parallel: it assigns the package-level activeSummary and reads back what the Swift record acceptors set
 // there
-func TestSwiftRunListsTheFilesItRewrote(t *testing.T) {
+func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
 	activeSummary = runSummary{}
-	if _, _, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Findings.jsonl"), 1); err != nil {
-		t.Fatal(err)
+	if _, _, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Findings.jsonl"), 1); err != nil {
+		test.Fatal(err)
 	}
 	want := []changedFile{{Path: "Sources/Example/ByteRing.swift", Fixed: true, Formatted: true, FixedBy: map[string]int{"cohere-swift/legacy-constructors": 1}}}
 	if !reflect.DeepEqual(activeSummary.Changed, want) {
-		t.Errorf("the summary lists %+v, expected %+v", activeSummary.Changed, want)
+		test.Errorf("the summary lists %+v, expected %+v", activeSummary.Changed, want)
 	}
 	if activeSummary.cohered() != 1 {
-		t.Errorf("cohered %d, expected the one file listed", activeSummary.cohered())
+		test.Errorf("cohered %d, expected the one file listed", activeSummary.cohered())
 	}
 
 	activeSummary = runSummary{}
-	output, _, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+	output, _, err := renderRecords(test, swiftModeCheck, contractFixture(test, "Clean.jsonl"), 0)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if activeSummary.Changed != nil {
-		t.Errorf("a stream with no list set the summary to %+v; it is not listed, not empty", activeSummary.Changed)
+		test.Errorf("a stream with no list set the summary to %+v; it is not listed, not empty", activeSummary.Changed)
 	}
-	forbidLines(t, output, "cohered")
+	forbidLines(test, output, "cohered")
 }

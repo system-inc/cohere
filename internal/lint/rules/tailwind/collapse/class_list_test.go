@@ -36,13 +36,13 @@ var classListOracles = []struct {
 
 // TestClassListAgreesWithTailwind holds BuildClassList to Tailwind's own class list, class for class,
 // with each class's modifiers compared as a set.
-func TestClassListAgreesWithTailwind(t *testing.T) {
-	t.Parallel()
+func TestClassListAgreesWithTailwind(test *testing.T) {
+	test.Parallel()
 	for _, oracle := range classListOracles {
-		t.Run(oracle.name, func(t *testing.T) {
-			t.Parallel()
-			entryPoint, expected := readClassListOracle(t, oracle.file)
-			system := oracleSystem(t, entryPoint)
+		test.Run(oracle.name, func(test *testing.T) {
+			test.Parallel()
+			entryPoint, expected := readClassListOracle(test, oracle.file)
+			system := oracleSystem(test, entryPoint)
 
 			actual := map[string]string{}
 			for _, entry := range BuildClassList(system) {
@@ -65,26 +65,26 @@ func TestClassListAgreesWithTailwind(t *testing.T) {
 					extra = append(extra, name)
 				}
 			}
-			reportClassListDifference(t, "listed by Tailwind and missing here", missing)
-			reportClassListDifference(t, "listed here and not by Tailwind", extra)
-			reportClassListDifference(t, "listed by both with different modifiers", modifierDifferences)
-			t.Logf("%d classes, %d listed alike", len(expected), len(expected)-len(missing)-len(modifierDifferences))
+			reportClassListDifference(test, "listed by Tailwind and missing here", missing)
+			reportClassListDifference(test, "listed here and not by Tailwind", extra)
+			reportClassListDifference(test, "listed by both with different modifiers", modifierDifferences)
+			test.Logf("%d classes, %d listed alike", len(expected), len(expected)-len(missing)-len(modifierDifferences))
 		})
 	}
 }
 
 // readClassListOracle reads one capture: the entry point its header names and every class with its
 // modifiers, space-joined and sorted.
-func readClassListOracle(t *testing.T, name string) (string, map[string]string) {
-	t.Helper()
+func readClassListOracle(test *testing.T, name string) (string, map[string]string) {
+	test.Helper()
 	file, err := os.Open(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("open %s: %v", name, err)
+		test.Fatalf("open %s: %v", name, err)
 	}
 	defer file.Close()
 	reader, err := gzip.NewReader(file)
 	if err != nil {
-		t.Fatalf("%s is not gzip: %v", name, err)
+		test.Fatalf("%s is not gzip: %v", name, err)
 	}
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -103,10 +103,10 @@ func readClassListOracle(t *testing.T, name string) (string, map[string]string) 
 		classes[className] = modifiers
 	}
 	if err := scanner.Err(); err != nil {
-		t.Fatalf("read %s: %v", name, err)
+		test.Fatalf("read %s: %v", name, err)
 	}
 	if len(classes) == 0 {
-		t.Fatalf("%s holds no classes", name)
+		test.Fatalf("%s holds no classes", name)
 	}
 	return entryPoint, classes
 }
@@ -118,8 +118,8 @@ func sortedModifiers(modifiers []string) string {
 }
 
 // reportClassListDifference fails with the first few of one kind of difference and how many there are.
-func reportClassListDifference(t *testing.T, kind string, names []string) {
-	t.Helper()
+func reportClassListDifference(test *testing.T, kind string, names []string) {
+	test.Helper()
 	if len(names) == 0 {
 		return
 	}
@@ -128,5 +128,5 @@ func reportClassListDifference(t *testing.T, kind string, names []string) {
 	if len(shown) > 20 {
 		shown = shown[:20]
 	}
-	t.Errorf("%d classes %s, starting with:\n  %s", len(names), kind, strings.Join(shown, "\n  "))
+	test.Errorf("%d classes %s, starting with:\n  %s", len(names), kind, strings.Join(shown, "\n  "))
 }

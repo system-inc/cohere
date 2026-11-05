@@ -32,23 +32,23 @@ func asTheTypedNoBaseToStringHarnessWroteIt(text string) string {
 // ignoredTypeNames defaults to four builtin type names, so a decoder that returned an empty slice
 // for an absent key would silently start reporting on Error, RegExp, URL and URLSearchParams. Only
 // a fixture routed through the decoder can see that.
-func decodeNoBaseToStringOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeNoBaseToStringOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoBaseToStringOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
 
 // runNoBaseToString runs one case, with or without options.
-func runNoBaseToString(t *testing.T, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runNoBaseToString(test *testing.T, sourceText string, options string) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.RunTyped(t, NoBaseToString, noBaseToStringFile, sourceText)
+		return rule_testing.RunTyped(test, NoBaseToString, noBaseToStringFile, sourceText)
 	}
-	return rule_testing.RunTypedWithOptions(t, NoBaseToString, noBaseToStringFile, sourceText,
-		decodeNoBaseToStringOptionsForTest(t, options))
+	return rule_testing.RunTypedWithOptions(test, NoBaseToString, noBaseToStringFile, sourceText,
+		decodeNoBaseToStringOptionsForTest(test, options))
 }
 
 // TestNoBaseToStringStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -63,8 +63,8 @@ func runNoBaseToString(t *testing.T, sourceText string, options string) rule_tes
 // down a type parameter to its constraint, and finally asking whether any of three coercion methods
 // is declared somewhere other than on Object itself. Every one of those steps has a passing case
 // here that a wrong answer would turn into a false positive on ordinary code.
-func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -295,9 +295,9 @@ func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\ndeclare const x: any;\n'' += x;\n    ", options: ""},
 	}
 	for index, testCase := range cases {
-		t.Run(noBaseToStringCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoBaseToString(t, testCase.sourceText, testCase.options))
+		test.Run(noBaseToStringCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoBaseToString(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -313,8 +313,8 @@ func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
 //
 // Both ids are represented, seventy-seven for a plain stringification and seventeen for an array
 // join, because joining an array of objects has the same defect through a different door.
-func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -983,22 +983,22 @@ func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noBaseToStringCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runNoBaseToString(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(noBaseToStringCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runNoBaseToString(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			written := asTheTypedNoBaseToStringHarnessWroteIt(testCase.sourceText)
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
@@ -1020,8 +1020,8 @@ func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
 // the globals a rule like this must recognize. Upstream shadows String nowhere in its corpus.
 //
 // Measured against the installed 8.x build, one program per case, with controls in the same runs.
-func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1055,12 +1055,12 @@ func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoBaseToString(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoBaseToString(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantIds) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantIds), len(result.Diagnostics), testCase.why)
 			}
 		})
@@ -1072,12 +1072,12 @@ func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 // All three listeners start with a nil check, and the shim answers nil from a type query on a nil
 // checker rather than panicking, so a rule missing those guards goes silent rather than crashing. A
 // vacuous green is the more dangerous of the two failures because nothing announces it.
-func TestNoBaseToStringRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const o: {};\n`${o}`;\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoBaseToString, noBaseToStringFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoBaseToString, noBaseToStringFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoBaseToString, noBaseToStringFile, sourceText))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoBaseToString, noBaseToStringFile,
 		sourceText), "baseToString")
 }
 
@@ -1088,8 +1088,8 @@ func TestNoBaseToStringRequiresTheTypedHarness(t *testing.T) {
 // absent key would start reporting on every Error, RegExp, URL and URLSearchParams in the tree. An
 // explicitly empty list means the opposite and must be honored, which is why the wire field is a
 // pointer: absent and empty are different configurations here.
-func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw              string
@@ -1106,24 +1106,24 @@ func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
 		{raw: `{"ignoredTypeNames": []}`, wantIgnored: []string{}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodeNoBaseToStringOptionsForTest(t, testCase.raw)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodeNoBaseToStringOptionsForTest(test, testCase.raw)
 			settings, isSettings := decoded.(NoBaseToStringOptions)
 			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
+				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
 			}
 			if settings.CheckUnknown != testCase.wantCheckUnknown {
-				t.Errorf("checkUnknown decoded to %v, wanted %v",
+				test.Errorf("checkUnknown decoded to %v, wanted %v",
 					settings.CheckUnknown, testCase.wantCheckUnknown)
 			}
 			if len(settings.IgnoredTypeNames) != len(testCase.wantIgnored) {
-				t.Fatalf("ignoredTypeNames decoded to %v, wanted %v",
+				test.Fatalf("ignoredTypeNames decoded to %v, wanted %v",
 					settings.IgnoredTypeNames, testCase.wantIgnored)
 			}
 			for index, wanted := range testCase.wantIgnored {
 				if settings.IgnoredTypeNames[index] != wanted {
-					t.Errorf("ignoredTypeNames[%d] is %q, wanted %q",
+					test.Errorf("ignoredTypeNames[%d] is %q, wanted %q",
 						index, settings.IgnoredTypeNames[index], wanted)
 				}
 			}
@@ -1137,13 +1137,13 @@ func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
 // A rule named as "error" with no object is handed nil, which the type assertion in Run cannot
 // satisfy, so the fallback is the only thing between that configuration and an empty ignored list.
 // Every other fixture reaches the rule through the decoder and none can see this line.
-func TestNoBaseToStringFallsBackWhenHandedNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoBaseToStringFallsBackWhenHandedNilOptions(test *testing.T) {
+	test.Parallel()
 
 	// An Error is ignored by default, so a fallback that lost the builtin names would report here.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoBaseToString,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoBaseToString,
 		noBaseToStringFile, "declare const e: Error;\n`${e}`;\n", nil))
 	// And the control, so the silence above is a verdict rather than an inert rule.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoBaseToString,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoBaseToString,
 		noBaseToStringFile, "declare const o: {};\n`${o}`;\n", nil), "baseToString")
 }

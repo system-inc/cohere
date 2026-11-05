@@ -8,8 +8,8 @@ import (
 
 const assignModuleFile = "/repository/source/Thing.ts"
 
-func TestNoAssignModuleVariableFires(t *testing.T) {
-	t.Parallel()
+func TestNoAssignModuleVariableFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,16 +27,16 @@ func TestNoAssignModuleVariableFires(t *testing.T) {
 		{"inside a function body", "export function run() {\n    let module = {};\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
 				"noAssignModuleVariable")
 		})
 	}
 }
 
-func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAssignModuleVariableStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -56,9 +56,9 @@ func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
 		{"a function parameter named module", "export function run(module: unknown) {\n    return module;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoAssignModuleVariable, assignModuleFile, testCase.sourceText))
 		})
 	}
 }

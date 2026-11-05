@@ -25,8 +25,8 @@ const throwLiteralFile = "/repository/source/ThrowLiteral.ts"
 // This rule reads the checker for one question only, whether a bare `undefined` is the global, so
 // its fixtures use `RunTyped`. Handed the plain harness it guards and goes silent, which would make
 // every clean case here pass for the wrong reason.
-func TestNoThrowLiteralStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -59,17 +59,17 @@ func TestNoThrowLiteralStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile, testCase.sourceText))
 		})
 	}
 }
 
 // The sixteen cases upstream reports as `object`.
-func TestNoThrowLiteralFiresObject(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralFiresObject(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -93,10 +93,10 @@ func TestNoThrowLiteralFiresObject(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "object")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "object")
 		})
 	}
 }
@@ -106,8 +106,8 @@ func TestNoThrowLiteralFiresObject(t *testing.T) {
 // `throw undefined` reaches the second test rather than the first, because an identifier always
 // "could be an Error" as far as the syntax knows. A port collapsing the two messages into one
 // passes an id assertion that names either, which is why they are separated here.
-func TestNoThrowLiteralFiresUndef(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralFiresUndef(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -116,10 +116,10 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "undef")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "undef")
 		})
 	}
 }
@@ -134,32 +134,32 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 // and the rule never sees it, while ours recovers and hands back a throw with no argument, which a
 // port dereferencing it would crash on. No `ExpectFindings` fixture can see a panic, so this is
 // pinned by asserting the run completes at all.
-func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralHandlesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
-	t.Run("?? yields either operand, so an Error on the left is clean", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	test.Run("?? yields either operand, so an Error on the left is clean", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow new Error() ?? 'literal';\n"))
 	})
 
-	t.Run("?? with literals on both sides reports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	test.Run("?? with literals on both sides reports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow 'a' ?? 'b';\n"), "object")
 	})
 
-	t.Run("??= yields either operand", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	test.Run("??= yields either operand", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile,
 			"declare let foo: unknown;\nthrow foo ??= 'literal';\n"))
 	})
 
-	t.Run("a throw with no argument does not crash", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a throw with no argument does not crash", func(test *testing.T) {
+		test.Parallel()
 		// Reporting or not is beside the point; not panicking is the assertion. The parser recovers
 		// from this and hands back a ThrowStatement whose Expression is nil.
-		rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, "function f() { throw; }")
+		rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile, "function f() { throw; }")
 	})
 }
 
@@ -168,18 +168,18 @@ func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
 // Upstream passes `node`, the ThrowStatement, rather than its argument. A port anchoring on the
 // argument satisfies every assertion above and points a reader past the keyword that makes the line
 // worth reading.
-func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralReportsTheWholeStatement(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "throw 'error';"
-	result := rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, sourceText)
+	result := rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	written := result.SourceFile.Text()
 	reported := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "throw 'error';" {
-		t.Fatalf("reported %q, wanted the whole throw statement", reported)
+		test.Fatalf("reported %q, wanted the whole throw statement", reported)
 	}
 }
 
@@ -189,21 +189,21 @@ func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
 // is the other half. A port dropping the shadow test reports that case; a port dropping the
 // `undefined` name test reports `throw a`. Both halves are asserted here, with the reporting form as
 // the control.
-func TestNoThrowLiteralUndefOnlyForTheGlobal(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralUndefOnlyForTheGlobal(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile,
 		"function foo(undefined) { throw undefined; }"))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoThrowLiteral, throwLiteralFile,
 		"function foo() { throw undefined; }"), "undef")
 }
 
 // The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
-func TestNoThrowLiteralNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoThrowLiteralNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoThrowLiteral.NeedsTypeChecker {
-		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
+		test.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoThrowLiteral, throwLiteralFile, "throw 'error';"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoThrowLiteral, throwLiteralFile, "throw 'error';"))
 }

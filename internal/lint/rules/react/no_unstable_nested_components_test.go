@@ -17,8 +17,8 @@ import (
 // deliberate exemption. Those are reproduced as silent because that is what upstream does,
 // and the comment is preserved at the case so the next reader does not read the silence as a
 // judgment we made.
-func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -648,8 +648,8 @@ func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			options := DefaultNoUnstableNestedComponentsOptions()
 			if testCase.options != nil {
 				options = *testCase.options
@@ -657,16 +657,16 @@ func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
 					options.PropNamePattern = "render*"
 				}
 			}
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestNoUnstableNestedComponentsFires holds every failing case upstream ships, imported
 // verbatim, with the finding count upstream asserts for each.
-func TestNoUnstableNestedComponentsFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -1383,8 +1383,8 @@ func TestNoUnstableNestedComponentsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			options := DefaultNoUnstableNestedComponentsOptions()
 			if testCase.options != nil {
 				options = *testCase.options
@@ -1392,12 +1392,12 @@ func TestNoUnstableNestedComponentsFires(t *testing.T) {
 					options.PropNamePattern = "render*"
 				}
 			}
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "unstableNestedComponent"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -1427,8 +1427,8 @@ func upstreamMessage(parentName string, asProps bool) string {
 // the real rule over these exact sources through the ESLint Linter API. Upstream reports columns;
 // the reported text is sliced out of the source here, which is the same claim in the form this
 // harness can check.
-func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -1495,11 +1495,11 @@ func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
-			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
+			rule_testing.ExpectFindings(test, result, "unstableNestedComponent")
 
 			// RunTyped writes strings.TrimSpace(source)+"\n" to disk, so slice what the harness
 			// actually wrote rather than the literal above.
@@ -1507,10 +1507,10 @@ func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
 			diagnostic := result.Diagnostics[0]
 			reported := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding spans %q, want %q", reported, testCase.reported)
+				test.Errorf("finding spans %q, want %q", reported, testCase.reported)
 			}
 			if diagnostic.Message.Description != testCase.message {
-				t.Errorf("message\n got %q\nwant %q", diagnostic.Message.Description, testCase.message)
+				test.Errorf("message\n got %q\nwant %q", diagnostic.Message.Description, testCase.message)
 			}
 		})
 	}
@@ -1523,8 +1523,8 @@ func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
 // stripping, so `_ParentComponent` is a lowercase parent and nothing inside it reports. Measured
 // silent against the installed build on 2026-08-27. `no-multi-comp` counts `_Foo` AS a component
 // through the other predicate, so the two look interchangeable and are not.
-func TestNoUnstableNestedComponentsLowercaseParentIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsLowercaseParentIsSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		`function _ParentComponent() {
@@ -1536,9 +1536,9 @@ func TestNoUnstableNestedComponentsLowercaseParentIsSilent(t *testing.T) {
   return <div><Nested /></div>;
 }`,
 	} {
-		result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 			"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -1548,8 +1548,8 @@ func TestNoUnstableNestedComponentsLowercaseParentIsSilent(t *testing.T) {
 //
 // Written as a structural assertion over the kinds this rule validates rather than as a findings
 // check, because a findings check would pass whether the claim held or not.
-func TestNoUnstableNestedComponentsRenderMethodGuard(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsRenderMethodGuard(test *testing.T) {
+	test.Parallel()
 
 	source := `class ParentComponent extends React.Component {
   render() {
@@ -1589,10 +1589,10 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(t *testing.T) {
 
 					// The control: if the walk found nothing, the zero below would be meaningless.
 					if validated == 0 {
-						t.Error("no validated nodes found, so the offender count proves nothing")
+						test.Error("no validated nodes found, so the offender count proves nothing")
 					}
 					if offenders != 0 {
-						t.Errorf("%d of %d validated nodes have a method declaration as their "+
+						test.Errorf("%d of %d validated nodes have a method declaration as their "+
 							"semantic parent, so the render-method guard is reachable after all",
 							offenders, validated)
 					}
@@ -1600,55 +1600,55 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(t *testing.T) {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "Component.tsx", source)
+	rule_testing.RunTyped(test, probe, "Component.tsx", source)
 }
 
 // TestDecodeNoUnstableNestedComponentsOptions routes configuration through the rule's own decoder,
 // which is where a default inversion would live. The pattern defaults to a NON-EMPTY string, so a
 // zero-value struct is a different rule rather than the documented one.
-func TestDecodeNoUnstableNestedComponentsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
+	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
 	decoded, err := DecodeNoUnstableNestedComponentsOptions(nil)
 	if err != nil {
-		t.Fatalf("decoding empty input: %v", err)
+		test.Fatalf("decoding empty input: %v", err)
 	}
 	options, ok := decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {
-		t.Fatalf("decoder returned %T", decoded)
+		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "render*" {
-		t.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
+		test.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
 	}
 	if options.AllowAsProps {
-		t.Error("empty input enabled allowAsProps")
+		test.Error("empty input enabled allowAsProps")
 	}
 
 	// An explicit pattern replaces the default.
 	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
 	if err != nil {
-		t.Fatalf("decoding a pattern: %v", err)
+		test.Fatalf("decoding a pattern: %v", err)
 	}
 	if pattern := decoded.(NoUnstableNestedComponentsOptions).PropNamePattern; pattern != "*Renderer" {
-		t.Errorf("pattern %q, want *Renderer", pattern)
+		test.Errorf("pattern %q, want *Renderer", pattern)
 	}
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
 	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
 	if err != nil {
-		t.Fatalf("decoding an empty pattern: %v", err)
+		test.Fatalf("decoding an empty pattern: %v", err)
 	}
 	if pattern := decoded.(NoUnstableNestedComponentsOptions).PropNamePattern; pattern != "render*" {
-		t.Errorf("empty pattern gave %q, want render*", pattern)
+		test.Errorf("empty pattern gave %q, want render*", pattern)
 	}
 
 	// customValidators is in upstream's schema and unread by this rule. It must decode rather than
 	// error, or a configuration carrying it would fail to load.
 	if _, err := DecodeNoUnstableNestedComponentsOptions(
 		[]byte(`{"customValidators":["./x"],"allowAsProps":true}`)); err != nil {
-		t.Fatalf("decoding customValidators: %v", err)
+		test.Fatalf("decoding customValidators: %v", err)
 	}
 }
 
@@ -1656,36 +1656,36 @@ func TestDecodeNoUnstableNestedComponentsOptions(t *testing.T) {
 // bypasses the decoder entirely: config.OptionsRegistry hands a non-required rule nil, and a type
 // assertion on nil yields the zero value. Without the fallback in Run the empty pattern would match
 // no prop name and every render prop would start reporting.
-func TestNoUnstableNestedComponentsNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsNilOptions(test *testing.T) {
+	test.Parallel()
 
 	source := `function ParentComponent() {
   return <SomeComponent renderFooter={() => <div />} />;
 }`
-	result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, nil)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestNoUnstableNestedComponentsAllowAsProps pins the option against the same source with it off,
 // so the case cannot pass by the rule being silent for an unrelated reason.
-func TestNoUnstableNestedComponentsAllowAsProps(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsAllowAsProps(test *testing.T) {
+	test.Parallel()
 
 	source := `function ParentComponent() {
   return <SomeComponent footer={() => <div />} />;
 }`
 
-	reporting := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	reporting := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-	rule_testing.ExpectFindings(t, reporting, "unstableNestedComponent")
+	rule_testing.ExpectFindings(test, reporting, "unstableNestedComponent")
 
-	allowed := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	allowed := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, NoUnstableNestedComponentsOptions{
 			AllowAsProps:    true,
 			PropNamePattern: "render*",
 		})
-	rule_testing.ExpectClean(t, allowed)
+	rule_testing.ExpectClean(test, allowed)
 }
 
 // TestNoUnstableNestedComponentsHasNoFileSuffixGate pins the absence of a `.tsx` gate.
@@ -1693,8 +1693,8 @@ func TestNoUnstableNestedComponentsAllowAsProps(t *testing.T) {
 // Upstream has no filename condition anywhere, and three rules in this package carried one
 // inherited from an oxc port. A React component in a `.ts` file is ordinary and legal, so a gate
 // here would cost every finding in every `.ts` file. The two runs differ only in the extension.
-func TestNoUnstableNestedComponentsHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := `function ParentComponent() {
   const Nested = () => React.createElement("div", null);
@@ -1702,10 +1702,10 @@ func TestNoUnstableNestedComponentsHasNoFileSuffixGate(t *testing.T) {
 }`
 
 	for _, fileName := range []string{"Component.tsx", "Component.ts"} {
-		result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 			fileName, source, DefaultNoUnstableNestedComponentsOptions())
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%s reported %d findings, want 1", fileName, len(result.Diagnostics))
+			test.Errorf("%s reported %d findings, want 1", fileName, len(result.Diagnostics))
 		}
 	}
 }
@@ -1720,8 +1720,8 @@ func TestNoUnstableNestedComponentsHasNoFileSuffixGate(t *testing.T) {
 // The rest are shapes whose names cannot be read with Node.Text(): a destructured parameter, a JSX
 // attribute whose value is a string rather than an expression container, a spread attribute with no
 // name at all, a computed object key, and a namespaced JSX attribute.
-func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		`function ParentComponent() {
@@ -1752,9 +1752,9 @@ func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(t *testing.T) {
 
 	for index, source := range sources {
 		// A panic here fails the test rather than being recovered, which is the assertion.
-		result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 			"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-		t.Logf("shape %d produced %d findings", index, len(result.Diagnostics))
+		test.Logf("shape %d produced %d findings", index, len(result.Diagnostics))
 	}
 }
 
@@ -1767,8 +1767,8 @@ func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(t *testing.T) {
 //
 // Every row measured against the installed 7.37.5 build on 2026-08-27. Note `use` alone reports:
 // the pattern requires a capital or a digit AFTER `use`, so the bare name does not match.
-func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsHookNamePattern(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		calleeName string
@@ -1783,18 +1783,18 @@ func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.calleeName, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.calleeName, func(test *testing.T) {
+			test.Parallel()
 			source := `function ParentComponent() {
   const X = ` + testCase.calleeName + `(() => {
     return () => <div />;
   });
   return <div><X /></div>;
 }`
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 				"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
 			if len(result.Diagnostics) != testCase.findings {
-				t.Errorf("%s gave %d findings, want %d",
+				test.Errorf("%s gave %d findings, want %d",
 					testCase.calleeName, len(result.Diagnostics), testCase.findings)
 			}
 		})
@@ -1806,22 +1806,22 @@ func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
 //
 // The corpus configures propNamePattern exactly once, on a passing case, so nothing imported can
 // see the pattern being consulted rather than ignored.
-func TestNoUnstableNestedComponentsPropNamePattern(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsPropNamePattern(test *testing.T) {
+	test.Parallel()
 
 	source := `function ParentComponent() {
   return <SomeComponent someRenderer={() => <div />} />;
 }`
 
 	// Under the default `render*`, `someRenderer` is not a render prop, so it reports.
-	def := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	def := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-	rule_testing.ExpectFindings(t, def, "unstableNestedComponent")
+	rule_testing.ExpectFindings(test, def, "unstableNestedComponent")
 
 	// Under `*Renderer` it is one, so it is silent. This is upstream's own valid case 39's option.
-	configured := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	configured := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, NoUnstableNestedComponentsOptions{PropNamePattern: "*Renderer"})
-	rule_testing.ExpectClean(t, configured)
+	rule_testing.ExpectClean(test, configured)
 }
 
 // TestNoUnstableNestedComponentsAttributeValueKinds covers JSX attribute values that are not
@@ -1848,8 +1848,8 @@ func TestNoUnstableNestedComponentsPropNamePattern(t *testing.T) {
 // Both of the shapes that would exercise the climb are silent upstream for a different reason, so
 // no fixture built from them can separate the two versions either. The mutation stays a live
 // survivor and is recorded as such in the rule's own comment rather than papered over here.
-func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsAttributeValueKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1872,13 +1872,13 @@ func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
-			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
+			rule_testing.ExpectFindings(test, result, "unstableNestedComponent")
 			if strings.Contains(result.Diagnostics[0].Message.Description, "allowAsProps") {
-				t.Errorf("a component declared in the parent body must not be read as a prop, but "+
+				test.Errorf("a component declared in the parent body must not be read as a prop, but "+
 					"the finding carried the as-props note: %q",
 					result.Diagnostics[0].Message.Description)
 			}
@@ -1892,15 +1892,15 @@ func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
 // build. Held together in one test because the contrast is the content: the only difference between
 // the first and the rest is whether an element with a string attribute sits between the component
 // and the attribute that would exempt it.
-func TestNoUnstableNestedComponentsAttributeClimbIsBounded(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsAttributeClimbIsBounded(test *testing.T) {
+	test.Parallel()
 
 	reporting := `function ParentComponent() {
   return <Outer footer={() => <div />} />;
 }`
-	result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", reporting, DefaultNoUnstableNestedComponentsOptions())
-	rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
+	rule_testing.ExpectFindings(test, result, "unstableNestedComponent")
 
 	for _, source := range []string{
 		`function ParentComponent() {
@@ -1910,9 +1910,9 @@ func TestNoUnstableNestedComponentsAttributeClimbIsBounded(t *testing.T) {
   return <Outer footer={<Inner title="x">{() => <div />}</Inner>} />;
 }`,
 	} {
-		silent := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		silent := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 			"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-		rule_testing.ExpectClean(t, silent)
+		rule_testing.ExpectClean(test, silent)
 	}
 }
 
@@ -1922,8 +1922,8 @@ func TestNoUnstableNestedComponentsAttributeClimbIsBounded(t *testing.T) {
 // Both rows measured against the installed 7.37.5 build on 2026-08-27, and the second is the one
 // worth having: upstream does NOT confine the recovery to `render`, so a component built in an
 // ordinary method reports too.
-func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsInsideClassComponents(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1951,11 +1951,11 @@ func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
-			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
+			rule_testing.ExpectFindings(test, result, "unstableNestedComponent")
 		})
 	}
 }
@@ -1974,17 +1974,17 @@ func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
 // first. A distinguishing input needs a DETECTED component inside a props object that is not itself
 // a direct property value, and I could not construct one upstream also detects. Recorded as
 // unresolved rather than as an equivalence verdict.
-func TestNoUnstableNestedComponentsCreateElementPropsPosition(t *testing.T) {
-	t.Parallel()
+func TestNoUnstableNestedComponentsCreateElementPropsPosition(test *testing.T) {
+	test.Parallel()
 
 	source := `function ParentComponent() {
   return React.createElement(Some, { footer: () => React.createElement("div", null) });
 }`
-	result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
+	result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, DefaultNoUnstableNestedComponentsOptions())
-	rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
+	rule_testing.ExpectFindings(test, result, "unstableNestedComponent")
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "allowAsProps") {
-		t.Errorf("a component in a createElement props object must carry the as-props note, got %q",
+		test.Errorf("a component in a createElement props object must carry the as-props note, got %q",
 			result.Diagnostics[0].Message.Description)
 	}
 }
@@ -1995,22 +1995,22 @@ func TestNoUnstableNestedComponentsCreateElementPropsPosition(t *testing.T) {
 //
 // Not parallel: testing.AllocsPerRun reads the process-wide allocation count, so a test running
 // beside it would add its allocations to this one's.
-func TestPropNamePatternIsCompiledOncePerPattern(t *testing.T) {
+func TestPropNamePatternIsCompiledOncePerPattern(test *testing.T) {
 	compiled := testing.AllocsPerRun(10, func() {
 		buildPropNamePattern("render*")
 	})
 	if compiled < 1 {
-		t.Fatalf("compiling a pattern allocated %.0f times; the comparison below cannot fail", compiled)
+		test.Fatalf("compiling a pattern allocated %.0f times; the comparison below cannot fail", compiled)
 	}
 	compilePropNamePattern("cached*")
 	repeated := testing.AllocsPerRun(10, func() {
 		compilePropNamePattern("cached*")
 	})
 	if repeated != 0 {
-		t.Errorf("asking again for a pattern already seen allocated %.0f times, want 0", repeated)
+		test.Errorf("asking again for a pattern already seen allocated %.0f times, want 0", repeated)
 	}
 	matches := compilePropNamePattern("cached*")
 	if !matches("cachedValue") || matches("renderValue") {
-		t.Error("the kept matcher does not match its own pattern")
+		test.Error("the kept matcher does not match its own pattern")
 	}
 }

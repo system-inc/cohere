@@ -41,13 +41,13 @@ func htmlLinkRowsSource(rows []htmlLinkRow) string {
 
 // expectHtmlLinkRows checks every row's findings by line: how many, and that each carries the message
 // for the href it names.
-func expectHtmlLinkRows(t *testing.T, result rule_testing.Result, rows []htmlLinkRow) {
-	t.Helper()
+func expectHtmlLinkRows(test *testing.T, result rule_testing.Result, rows []htmlLinkRow) {
+	test.Helper()
 	text := result.SourceFile.Text()
 	got := make(map[int][]string, len(rows))
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.Message.Id != messageNoHtmlLinkForPages.Id {
-			t.Errorf("a finding carries message id %q, want %q", diagnostic.Message.Id, messageNoHtmlLinkForPages.Id)
+			test.Errorf("a finding carries message id %q, want %q", diagnostic.Message.Id, messageNoHtmlLinkForPages.Id)
 		}
 		line := strings.Count(text[:diagnostic.Range.Pos()], "\n") - 2
 		got[line] = append(got[line], diagnostic.Message.Description)
@@ -58,12 +58,12 @@ func expectHtmlLinkRows(t *testing.T, result rule_testing.Result, rows []htmlLin
 			want = append(want, noHtmlLinkForPagesMessage(hrefPath).Description)
 		}
 		if !slices.Equal(got[index], want) {
-			t.Errorf("%s: reports %q, want %q", row.element, got[index], want)
+			test.Errorf("%s: reports %q, want %q", row.element, got[index], want)
 		}
 		delete(got, index)
 	}
 	for line, descriptions := range got {
-		t.Errorf("findings on line %d, which holds no row: %q", line, descriptions)
+		test.Errorf("findings on line %d, which holds no row: %q", line, descriptions)
 	}
 }
 
@@ -77,27 +77,27 @@ func htmlLinkTree(rows []htmlLinkRow, paths ...string) map[string]string {
 }
 
 // runHtmlLinkTree runs the rule on a tree with no option set.
-func runHtmlLinkTree(t *testing.T, rows []htmlLinkRow, paths ...string) {
-	t.Helper()
-	result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx")
-	expectHtmlLinkRows(t, result, rows)
+func runHtmlLinkTree(test *testing.T, rows []htmlLinkRow, paths ...string) {
+	test.Helper()
+	result := rule_testing.RunTypedFiles(test, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx")
+	expectHtmlLinkRows(test, result, rows)
 }
 
 // runHtmlLinkTreeWithOption runs the rule on a tree on disk, with its option decoded as a config at the
 // tree's root would decode it. option is the JSON written, with `{root}` standing for the tree's
 // absolute directory.
-func runHtmlLinkTreeWithOption(t *testing.T, rows []htmlLinkRow, option string, paths ...string) {
-	t.Helper()
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx", func(directory string) any {
+func runHtmlLinkTreeWithOption(test *testing.T, rows []htmlLinkRow, option string, paths ...string) {
+	test.Helper()
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx", func(directory string) any {
 		quoted, _ := json.Marshal(directory)
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
 		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		return decoded
 	})
-	expectHtmlLinkRows(t, result, rows)
+	expectHtmlLinkRows(test, result, rows)
 }
 
 // upstreamRows are the anchors @next's own test file writes, with the hrefs its rows assert and three
@@ -142,25 +142,25 @@ var (
 	withoutPagesDirectory = []string{"index.jsx"}
 )
 
-func TestNoHtmlLinkForPagesReplaysUpstreamRows(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesReplaysUpstreamRows(test *testing.T) {
+	test.Parallel()
 
 	two, three := []string{"x", "x"}, []string{"x", "x", "x"}
 
 	// 'valid link element', 'valid anchor element', ..., 'invalid static route' and 'invalid dynamic
 	// route', with the custom pages directory written absolute, as upstream writes it. `/list/foo/`
 	// matches both `[profile]/` and `list/[foo]/[id]`, so it reports twice.
-	t.Run("custom pages directory", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, upstreamRows([]string{"/"}, two, two, []string{"/profile/"}, []string{"/list/"}, []string{"/photo/1/"}),
+	test.Run("custom pages directory", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, upstreamRows([]string{"/"}, two, two, []string{"/profile/"}, []string{"/list/"}, []string{"/photo/1/"}),
 			`"{root}/custom-pages"`, withCustomPagesDirectory...)
 	})
 
 	// 'valid link element with multiple directories'. The second directory sits inside the first and
 	// is walked again from its own root, so `list/[foo]/[id]` is also the route `/[foo]/[id]`.
-	t.Run("multiple custom pages directories", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, upstreamRows([]string{"/"}, three, three, prefix("/profile/", two), prefix("/list/", two), prefix("/photo/1/", two)),
+	test.Run("multiple custom pages directories", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, upstreamRows([]string{"/"}, three, three, prefix("/profile/", two), prefix("/list/", two), prefix("/photo/1/", two)),
 			`["{root}/custom-pages", "{root}/custom-pages/list"]`, withCustomPagesDirectory...)
 	})
 
@@ -168,18 +168,18 @@ func TestNoHtmlLinkForPagesReplaysUpstreamRows(t *testing.T) {
 	// `^/$`, and `[profile]/page.tsx` is `/[profile]`, whose wildcard matches the empty segment. A
 	// static app route never matches, because app routes have no trailing slash and hrefs gain one;
 	// `/list` reports only through `[profile]`.
-	t.Run("app directory", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, upstreamRows(prefix("/", two), two, two, []string{"/profile/"}, prefix("/list/", two), prefix("/photo/1/", two)),
+	test.Run("app directory", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, upstreamRows(prefix("/", two), two, two, []string{"/profile/"}, prefix("/list/", two), prefix("/photo/1/", two)),
 			withAppDirectory...)
 	})
 
 	// 'prints warning when there are no "pages" or "app" directories': upstream warns once and
 	// returns an empty visitor, so nothing reports. cohere has no warning channel for a rule; see
 	// the ruling on #d21war2.
-	t.Run("no pages or app directory", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, upstreamRows(nil, nil, nil, nil, nil, nil), withoutPagesDirectory...)
+	test.Run("no pages or app directory", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, upstreamRows(nil, nil, nil, nil, nil, nil), withoutPagesDirectory...)
 	})
 }
 
@@ -187,8 +187,8 @@ func TestNoHtmlLinkForPagesReplaysUpstreamRows(t *testing.T) {
 // sets `settings.next.rootDir`, and cohere carries no shared settings. The root here is the project
 // root, which is the row's own default.
 
-func TestNoHtmlLinkForPagesReadsThePagesDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesReadsThePagesDirectory(test *testing.T) {
+	test.Parallel()
 
 	rows := []htmlLinkRow{
 		{`<a href="/">x</a>`, []string{"/"}},
@@ -231,31 +231,31 @@ func TestNoHtmlLinkForPagesReadsThePagesDirectory(t *testing.T) {
 		{`<a href="/nothing">x</a>`, nil},
 		{`<a href="/About">x</a>`, nil},
 	}
-	runHtmlLinkTree(t, rows,
+	runHtmlLinkTree(test, rows,
 		"pages/index.tsx", "pages/about.tsx", "pages/blog/index.tsx", "pages/blog/[slug].tsx", "pages/docs/[...all].tsx",
 		"pages/a.d.ts", "pages/_app.tsx", "pages/api/x.ts", "pages/readme.md", "pages/x.mjs", "pages/q.jsx", "pages/r.js", "pages/s.ts")
 }
 
-func TestNoHtmlLinkForPagesReadsTheAppDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesReadsTheAppDirectory(test *testing.T) {
+	test.Parallel()
 
 	// Only `/` matches a static app route. The rest are app routes with no trailing slash, against
 	// hrefs that always gain one, and they hold upstream's other app quirks unobservable: a nested
 	// `layout` and `index` are routes, a group and a slot drop out, a top-level `layout` does not.
-	t.Run("static routes", func(t *testing.T) {
-		t.Parallel()
+	test.Run("static routes", func(test *testing.T) {
+		test.Parallel()
 		rows := []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}
 		for _, href := range []string{"/about", "/about/", "/about/layout", "/about/index", "/layout", "/loading", "/g", "/(group)/g", "/s", "/@slot/s", "/r", "/x/thing", "/x"} {
 			rows = append(rows, htmlLinkRow{`<a href="` + href + `">x</a>`, nil})
 		}
-		runHtmlLinkTree(t, rows,
+		runHtmlLinkTree(test, rows,
 			"app/page.tsx", "app/layout.tsx", "app/loading.tsx", "app/about/page.tsx", "app/about/layout.tsx", "app/about/index.tsx",
 			"app/(group)/g/page.tsx", "app/@slot/s/page.tsx", "app/r/route.ts", "app/x/thing.tsx")
 	})
 
-	t.Run("a dynamic route", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{
+	test.Run("a dynamic route", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{
 			{`<a href="/">x</a>`, []string{"/"}},
 			{`<a href="/about">x</a>`, []string{"/about/"}},
 			{`<a href="/a/b">x</a>`, []string{"/a/b/"}},
@@ -266,32 +266,32 @@ func TestNoHtmlLinkForPagesReadsTheAppDirectory(t *testing.T) {
 	})
 }
 
-func TestNoHtmlLinkForPagesReportsOncePerRoute(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesReportsOncePerRoute(test *testing.T) {
+	test.Parallel()
 
-	t.Run("pages and app both define the root", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/", "/"}}}, "app/page.tsx", "pages/index.tsx")
+	test.Run("pages and app both define the root", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/", "/"}}}, "app/page.tsx", "pages/index.tsx")
 	})
 
 	// The two pages directories' routes are de-duplicated together, so `/` from both is one route;
 	// `src/app` adds the second.
-	t.Run("root and src directories", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{
+	test.Run("root and src directories", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{
 			{`<a href="/">x</a>`, []string{"/", "/"}},
 			{`<a href="/only">x</a>`, []string{"/only/"}},
 		}, "pages/index.tsx", "src/pages/index.tsx", "src/pages/only.tsx", "src/app/page.tsx")
 	})
 }
 
-func TestNoHtmlLinkForPagesCompilesRouteNamesAsUpstreamDoes(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesCompilesRouteNamesAsUpstreamDoes(test *testing.T) {
+	test.Parallel()
 
 	// One greedy wildcard from the first `[` to the last `]`.
-	t.Run("two dynamic segments", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{
+	test.Run("two dynamic segments", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{
 			{`<a href="/list/a/b">x</a>`, []string{"/list/a/b/"}},
 			{`<a href="/list/a">x</a>`, []string{"/list/a/"}},
 			{`<a href="/list/">x</a>`, nil},
@@ -302,9 +302,9 @@ func TestNoHtmlLinkForPagesCompilesRouteNamesAsUpstreamDoes(t *testing.T) {
 	})
 
 	// A page name is a pattern, not a literal.
-	t.Run("pattern characters in a page name", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{
+	test.Run("pattern characters in a page name", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{
 			{`<a href="/a+b">x</a>`, nil},
 			{`<a href="/aab">x</a>`, []string{"/aab/"}},
 			{`<a href="/ab">x</a>`, []string{"/ab/"}},
@@ -316,68 +316,68 @@ func TestNoHtmlLinkForPagesCompilesRouteNamesAsUpstreamDoes(t *testing.T) {
 
 	// Divergence, kept: upstream's `new RegExp` throws on `^/c(d/$`, so ESLint fails to load the
 	// rule and reports nothing in any file. Here the one route that cannot compile is dropped.
-	t.Run("a page name that is not a pattern", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/ok">x</a>`, []string{"/ok/"}}}, "pages/c(d.tsx", "pages/ok.tsx")
+	test.Run("a page name that is not a pattern", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{{`<a href="/ok">x</a>`, []string{"/ok/"}}}, "pages/c(d.tsx", "pages/ok.tsx")
 	})
 
 	// An entry is judged by its name before its kind.
-	t.Run("a directory named like a page", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{
+	test.Run("a directory named like a page", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{
 			{`<a href="/x">x</a>`, []string{"/x/"}},
 			{`<a href="/x.tsx/inner">x</a>`, nil},
 		}, "pages/x.tsx/inner.tsx")
 	})
 }
 
-func TestNoHtmlLinkForPagesFindsNoDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesFindsNoDirectory(test *testing.T) {
+	test.Parallel()
 
-	t.Run("no pages or app directory", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, "lib/a.tsx")
+	test.Run("no pages or app directory", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, "lib/a.tsx")
 	})
 
 	// Divergence, kept: a file named `pages` passes upstream's existsSync and then readdirSync throws
 	// ENOTDIR, so the rule fails to load. Here it is not a directory and is not found.
-	t.Run("a file named pages", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTree(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, "pages", "app/page.tsx")
+	test.Run("a file named pages", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTree(test, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, "pages", "app/page.tsx")
 	})
 
 	// A harness with no program has no disk to read, which is the no-directory case. Checked by row
 	// rather than with ExpectClean, which would offer the site this source as the rule's clean
 	// example, silent only because nothing was read.
-	t.Run("no program", func(t *testing.T) {
-		t.Parallel()
+	test.Run("no program", func(test *testing.T) {
+		test.Parallel()
 		rows := []htmlLinkRow{{`<a href="/">x</a>`, nil}}
-		expectHtmlLinkRows(t, rule_testing.Run(t, NoHtmlLinkForPages, "pages/index.tsx", htmlLinkRowsSource(rows)), rows)
+		expectHtmlLinkRows(test, rule_testing.Run(test, NoHtmlLinkForPages, "pages/index.tsx", htmlLinkRowsSource(rows)), rows)
 	})
 }
 
 // The clean examples the site shows, each beside the page it would otherwise name.
-func TestNoHtmlLinkForPagesIsSilentBesideAPage(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesIsSilentBesideAPage(test *testing.T) {
+	test.Parallel()
 
 	for _, element := range []string{
 		`<a href="/about" target="_blank">About</a>`,
 		`<a href="/contact">Contact</a>`,
 		`<Link href="/about">About</Link>`,
 	} {
-		t.Run(element, func(t *testing.T) {
-			t.Parallel()
+		test.Run(element, func(test *testing.T) {
+			test.Parallel()
 			source := "export const C = () => (" + element + ");"
-			result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.RunTypedFiles(test, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestNoHtmlLinkForPagesReadsTheAnchorAsUpstreamDoes(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesReadsTheAnchorAsUpstreamDoes(test *testing.T) {
+	test.Parallel()
 
-	runHtmlLinkTree(t, []htmlLinkRow{
+	runHtmlLinkTree(test, []htmlLinkRow{
 		{`<a href="/about">x</a>`, []string{"/about/"}},
 		{`<a href="/about" />`, []string{"/about/"}},
 		{`<Link href="/about">x</Link>`, nil},
@@ -410,8 +410,8 @@ func TestNoHtmlLinkForPagesReadsTheAnchorAsUpstreamDoes(t *testing.T) {
 	}, "pages/about.tsx")
 }
 
-func TestNoHtmlLinkForPagesFollowsSymbolicLinksAsNodeLists(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesFollowsSymbolicLinksAsNodeLists(test *testing.T) {
+	test.Parallel()
 
 	// A link to a page file is a page, judged by its name. A link to a directory is not walked,
 	// because Node's dirent reports the link and not the directory.
@@ -419,46 +419,46 @@ func TestNoHtmlLinkForPagesFollowsSymbolicLinksAsNodeLists(t *testing.T) {
 		{`<a href="/link">x</a>`, []string{"/link/"}},
 		{`<a href="/dirlink/deep">x</a>`, nil},
 	}
-	result := rule_testing.RunTypedFilesWithSetup(t, NoHtmlLinkForPages, htmlLinkTree(rows, "real/linked.tsx", "pages/index.tsx", "realdir/deep.tsx"), "foo.tsx", func(directory string) {
+	result := rule_testing.RunTypedFilesWithSetup(test, NoHtmlLinkForPages, htmlLinkTree(rows, "real/linked.tsx", "pages/index.tsx", "realdir/deep.tsx"), "foo.tsx", func(directory string) {
 		if err := os.Symlink(filepath.Join("..", "real", "linked.tsx"), filepath.Join(directory, "pages", "link.tsx")); err != nil {
-			t.Fatalf("linking the page file: %v", err)
+			test.Fatalf("linking the page file: %v", err)
 		}
 		if err := os.Symlink(filepath.Join("..", "realdir"), filepath.Join(directory, "pages", "dirlink")); err != nil {
-			t.Fatalf("linking the directory: %v", err)
+			test.Fatalf("linking the directory: %v", err)
 		}
 	})
-	expectHtmlLinkRows(t, result, rows)
+	expectHtmlLinkRows(test, result, rows)
 }
 
-func TestNoHtmlLinkForPagesTakesPagesDirectories(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesTakesPagesDirectories(test *testing.T) {
+	test.Parallel()
 
 	// An empty list is truthy upstream, so it names no pages directory, and the app directory still
 	// counts.
-	t.Run("an empty list with an app directory", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `[]`, "pages/index.tsx", "app/page.tsx")
+	test.Run("an empty list with an app directory", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `[]`, "pages/index.tsx", "app/page.tsx")
 	})
-	t.Run("an empty list alone", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `[]`, "pages/index.tsx")
+	test.Run("an empty list alone", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `[]`, "pages/index.tsx")
 	})
 
 	// An empty string is falsy upstream, so it is the default.
-	t.Run("an empty string", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `""`, "pages/index.tsx")
+	test.Run("an empty string", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, `""`, "pages/index.tsx")
 	})
 
-	t.Run("a directory that does not exist", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `"nope"`, "pages/index.tsx")
+	test.Run("a directory that does not exist", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, []htmlLinkRow{{`<a href="/">x</a>`, nil}}, `"nope"`, "pages/index.tsx")
 	})
 
 	// The option replaces the pages directories and never the app directories.
-	t.Run("a custom directory beside pages and app", func(t *testing.T) {
-		t.Parallel()
-		runHtmlLinkTreeWithOption(t, []htmlLinkRow{
+	test.Run("a custom directory beside pages and app", func(test *testing.T) {
+		test.Parallel()
+		runHtmlLinkTreeWithOption(test, []htmlLinkRow{
 			{`<a href="/">x</a>`, []string{"/"}},
 			{`<a href="/about">x</a>`, []string{"/about/"}},
 		}, `"custom"`, "custom/about.tsx", "pages/index.tsx", "app/page.tsx")
@@ -469,26 +469,26 @@ func TestNoHtmlLinkForPagesTakesPagesDirectories(t *testing.T) {
 // file's directory, where upstream resolves it against the process's working directory. Pinned with
 // the config one level below the root, the only place the two readings part: `custom` there is
 // `sub/custom`, where ESLint started at the root would read the root's `custom`.
-func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(test *testing.T) {
+	test.Parallel()
 
 	rows := []htmlLinkRow{
 		{`<a href="/sub-page">x</a>`, []string{"/sub-page/"}},
 		{`<a href="/root-page">x</a>`, nil},
 	}
 	files := htmlLinkTree(rows, "sub/custom/sub-page.tsx", "custom/root-page.tsx")
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, NoHtmlLinkForPages, files, "foo.tsx", func(directory string) any {
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, files, "foo.tsx", func(directory string) any {
 		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(`"custom"`), rule.OptionsBase{ConfigDirectory: filepath.Join(directory, "sub"), ProjectRoot: directory})
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		return decoded
 	})
-	expectHtmlLinkRows(t, result, rows)
+	expectHtmlLinkRows(test, result, rows)
 }
 
-func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(test *testing.T) {
+	test.Parallel()
 
 	base := rule.OptionsBase{ConfigDirectory: "/project/config", ProjectRoot: "/project"}
 	accepted := []struct {
@@ -503,19 +503,19 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(t *testing.T) {
 		{`["a", "../b", ""]`, NoHtmlLinkForPagesOptions{Configured: true, PagesDirectories: []string{"/project/config/a", "/project/b", ""}}},
 	}
 	for _, testCase := range accepted {
-		t.Run("accepts "+testCase.raw, func(t *testing.T) {
-			t.Parallel()
+		test.Run("accepts "+testCase.raw, func(test *testing.T) {
+			test.Parallel()
 			var raw []byte
 			if testCase.raw != "" {
 				raw = []byte(testCase.raw)
 			}
 			decoded, err := decodeNoHtmlLinkForPagesOptions(raw, base)
 			if err != nil {
-				t.Fatalf("refused: %v", err)
+				test.Fatalf("refused: %v", err)
 			}
 			got := decoded.(NoHtmlLinkForPagesOptions)
 			if got.Configured != testCase.want.Configured || !slices.Equal(got.PagesDirectories, testCase.want.PagesDirectories) {
-				t.Errorf("decoded %+v, want %+v", got, testCase.want)
+				test.Errorf("decoded %+v, want %+v", got, testCase.want)
 			}
 		})
 	}
@@ -534,11 +534,11 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(t *testing.T) {
 		{`"pages"`, rule.OptionsBase{}, "is relative and the config's directory is not known"},
 	}
 	for _, testCase := range refused {
-		t.Run("refuses "+testCase.raw, func(t *testing.T) {
-			t.Parallel()
+		test.Run("refuses "+testCase.raw, func(test *testing.T) {
+			test.Parallel()
 			_, err := decodeNoHtmlLinkForPagesOptions([]byte(testCase.raw), testCase.base)
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
-				t.Errorf("error %v, want one containing %q", err, testCase.want)
+				test.Errorf("error %v, want one containing %q", err, testCase.want)
 			}
 		})
 	}
@@ -546,21 +546,21 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(t *testing.T) {
 
 // The finding points at the opening element, which is what upstream reports: column 25 to the end
 // of `<a href='/about'>` in a measured row, and the whole element when it closes itself.
-func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct{ element, reported string }{
 		{`<a href='/about'>About</a>`, `<a href='/about'>`},
 		{`<a href='/about' />`, `<a href='/about' />`},
 	} {
-		t.Run(testCase.element, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.element, func(test *testing.T) {
+			test.Parallel()
 			source := "export const C = () => (" + testCase.element + ");"
-			result := rule_testing.RunTypedFiles(t, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
-			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+			result := rule_testing.RunTypedFiles(test, NoHtmlLinkForPages, map[string]string{"foo.tsx": source, "pages/about.tsx": "export {};"}, "foo.tsx")
+			rule_testing.ExpectFindings(test, result, messageNoHtmlLinkForPages.Id)
 			diagnostic := result.Diagnostics[0]
 			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != testCase.reported {
-				t.Errorf("finding points at %q, want %q", reported, testCase.reported)
+				test.Errorf("finding points at %q, want %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -569,15 +569,15 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 // htmlLinkFingerprintOf is the rule's program fingerprint over a fixture tree on disk, read through the
 // Program the walk hands the rule, under option written as runHtmlLinkTreeWithOption writes it, or under
 // no option at all when it is "".
-func htmlLinkFingerprintOf(t *testing.T, files map[string]string, option string) [sha256.Size]byte {
-	t.Helper()
+func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option string) [sha256.Size]byte {
+	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := NoHtmlLinkForPages
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
 		fingerprint = NoHtmlLinkForPages.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFilesWithOptionsFor(t, probe, files, "foo.tsx", func(directory string) any {
+	rule_testing.RunTypedFilesWithOptionsFor(test, probe, files, "foo.tsx", func(directory string) any {
 		if option == "" {
 			return nil
 		}
@@ -585,12 +585,12 @@ func htmlLinkFingerprintOf(t *testing.T, files map[string]string, option string)
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
 		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		return decoded
 	})
 	if fingerprint == ([sha256.Size]byte{}) {
-		t.Fatal("the probe never ran, so no fingerprint was read")
+		test.Fatal("the probe never ran, so no fingerprint was read")
 	}
 	return fingerprint
 }
@@ -605,8 +605,8 @@ type htmlLinkFingerprintCase struct {
 
 // expectHtmlLinkFingerprint checks each case against the base tree's fingerprint: every case in moves must
 // change it and every case in holds must leave it.
-func expectHtmlLinkFingerprint(t *testing.T, base []string, option string, moves, holds map[string]htmlLinkFingerprintCase) {
-	t.Helper()
+func expectHtmlLinkFingerprint(test *testing.T, base []string, option string, moves, holds map[string]htmlLinkFingerprintCase) {
+	test.Helper()
 	tree := func(change htmlLinkFingerprintCase) map[string]string {
 		files := htmlLinkTree([]htmlLinkRow{{`<a href="/about">x</a>`, nil}}, base...)
 		for _, path := range change.add {
@@ -620,15 +620,15 @@ func expectHtmlLinkFingerprint(t *testing.T, base []string, option string, moves
 		}
 		return files
 	}
-	original := htmlLinkFingerprintOf(t, tree(htmlLinkFingerprintCase{}), option)
+	original := htmlLinkFingerprintOf(test, tree(htmlLinkFingerprintCase{}), option)
 	for name, change := range moves {
-		if htmlLinkFingerprintOf(t, tree(change), option) == original {
-			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		if htmlLinkFingerprintOf(test, tree(change), option) == original {
+			test.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
 		}
 	}
 	for name, change := range holds {
-		if htmlLinkFingerprintOf(t, tree(change), option) != original {
-			t.Errorf("%s moved the fingerprint, so files whose records cannot change were walked again", name)
+		if htmlLinkFingerprintOf(test, tree(change), option) != original {
+			test.Errorf("%s moved the fingerprint, so files whose records cannot change were walked again", name)
 		}
 	}
 }
@@ -637,11 +637,11 @@ func expectHtmlLinkFingerprint(t *testing.T, base []string, option string, moves
 // every change to the routes moves it, a route found a second way included, since it reports a second
 // time, and so does a directory appearing, since that is the difference between listening and not; and
 // every change the routes cannot see leaves it, so the findings cache replays across it.
-func TestNoHtmlLinkForPagesFingerprintsExactlyTheRoutes(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesFingerprintsExactlyTheRoutes(test *testing.T) {
+	test.Parallel()
 
 	base := []string{"pages/index.tsx", "pages/about.tsx", "pages/blog/[slug].tsx", "app/shop/[id]/page.tsx", "lib/util.ts"}
-	expectHtmlLinkFingerprint(t, base, "", map[string]htmlLinkFingerprintCase{
+	expectHtmlLinkFingerprint(test, base, "", map[string]htmlLinkFingerprintCase{
 		"a page added":                     {add: []string{"pages/contact.tsx"}},
 		"a page removed":                   {remove: []string{"pages/about.tsx"}},
 		"a page renamed":                   {add: []string{"pages/team.tsx"}, remove: []string{"pages/about.tsx"}},
@@ -667,7 +667,7 @@ func TestNoHtmlLinkForPagesFingerprintsExactlyTheRoutes(t *testing.T) {
 	// With no pages or app directory the rule attaches no listener; with an empty one it listens and
 	// reports nothing. The cache replays coverage with findings, so the first page-less directory moves it,
 	// and the routes alone could not tell.
-	expectHtmlLinkFingerprint(t, []string{"lib/util.ts"}, "", map[string]htmlLinkFingerprintCase{
+	expectHtmlLinkFingerprint(test, []string{"lib/util.ts"}, "", map[string]htmlLinkFingerprintCase{
 		"a pages directory with no page in it": {add: []string{"pages/readme.md"}},
 		"the first page":                       {add: []string{"pages/index.tsx"}},
 	}, map[string]htmlLinkFingerprintCase{
@@ -677,11 +677,11 @@ func TestNoHtmlLinkForPagesFingerprintsExactlyTheRoutes(t *testing.T) {
 
 // Under a configured pages directory the fingerprint is that directory's routes (#s9k38p3): a page added
 // there moves it, and a page added to the default `pages/`, which the setting replaced, does not.
-func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(test *testing.T) {
+	test.Parallel()
 
 	base := []string{"custom/about.tsx", "pages/index.tsx", "lib/util.ts"}
-	expectHtmlLinkFingerprint(t, base, `"custom"`, map[string]htmlLinkFingerprintCase{
+	expectHtmlLinkFingerprint(test, base, `"custom"`, map[string]htmlLinkFingerprintCase{
 		"a page added under it":   {add: []string{"custom/team.tsx"}},
 		"a page removed under it": {remove: []string{"custom/about.tsx"}},
 		"an app page added":       {add: []string{"app/page.tsx"}},
@@ -694,9 +694,9 @@ func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(t *testing.T)
 	files := htmlLinkTree(nil, "custom/about.tsx", "other/team.tsx", "pages/index.tsx")
 	fingerprints := map[[sha256.Size]byte]string{}
 	for _, option := range []string{"", `"custom"`, `"other"`, `["custom", "other"]`} {
-		fingerprint := htmlLinkFingerprintOf(t, files, option)
+		fingerprint := htmlLinkFingerprintOf(test, files, option)
 		if earlier, seen := fingerprints[fingerprint]; seen {
-			t.Errorf("the settings %q and %q fingerprint one tree alike, though they read different pages", earlier, option)
+			test.Errorf("the settings %q and %q fingerprint one tree alike, though they read different pages", earlier, option)
 		}
 		fingerprints[fingerprint] = option
 	}
@@ -732,7 +732,7 @@ func (fileSystem *countingFileSystem) DirectoryExists(path tspath.RootedDirector
 // The walk takes a rule's program fingerprint on every worker that serves a selection, so several
 // workers ask at once (#s9k38p3). They must all get one answer from one build of the route model, which
 // reads the disk: sixteen goroutines asking together build it once.
-func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(t *testing.T) {
+func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testing.T) {
 	const workers = 16
 	var fingerprints [workers][sha256.Size]byte
 	var fileSystem *countingFileSystem
@@ -751,10 +751,10 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(t *testing.T
 		wait.Wait()
 		return nil
 	}
-	rule_testing.RunTypedFiles(t, probe, htmlLinkTree(nil, "pages/index.tsx", "pages/about.tsx", "app/page.tsx"), "foo.tsx")
+	rule_testing.RunTypedFiles(test, probe, htmlLinkTree(nil, "pages/index.tsx", "pages/about.tsx", "app/page.tsx"), "foo.tsx")
 
 	if fileSystem == nil {
-		t.Fatal("the probe never ran, so nothing was asked")
+		test.Fatal("the probe never ran, so nothing was asked")
 	}
 	builds := 0
 	for path, count := range fileSystem.checks {
@@ -763,27 +763,27 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(t *testing.T
 		}
 	}
 	if builds != 1 {
-		t.Errorf("%d workers asking at once built the route model %d times, want once (existence checks %v)", workers, builds, fileSystem.checks)
+		test.Errorf("%d workers asking at once built the route model %d times, want once (existence checks %v)", workers, builds, fileSystem.checks)
 	}
 	for worker := 1; worker < workers; worker++ {
 		if fingerprints[worker] != fingerprints[0] {
-			t.Fatalf("worker %d got a different fingerprint from worker 0 for one program", worker)
+			test.Fatalf("worker %d got a different fingerprint from worker 0 for one program", worker)
 		}
 	}
 	if fingerprints[0] == ([sha256.Size]byte{}) {
-		t.Fatal("no fingerprint was read")
+		test.Fatal("no fingerprint was read")
 	}
 }
 
 // The message is asserted whole, with the href interpolated as upstream interpolates it, normalized.
-func TestNoHtmlLinkForPagesNamesTheRouteInItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoHtmlLinkForPagesNamesTheRouteInItsMessage(test *testing.T) {
+	test.Parallel()
 
 	want := "This is a raw <a> element navigating to `/about/`, a route this project's pages or app " +
 		"directory defines. Use `Link` from `next/link`, which navigates on the client and prefetches " +
 		"the destination. A plain <a> does a full document load instead, so the application is torn " +
 		"down and rebuilt and every piece of in-memory state goes with it."
 	if got := noHtmlLinkForPagesMessage("/about/").Description; got != want {
-		t.Errorf("description is %q, want %q", got, want)
+		test.Errorf("description is %q, want %q", got, want)
 	}
 }

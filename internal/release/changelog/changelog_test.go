@@ -10,8 +10,8 @@ import (
 )
 
 // Each kind of change is named under its own heading, with the smallest version it allows.
-func TestDiffSetNamesEachKindOfChange(t *testing.T) {
-	t.Parallel()
+func TestDiffSetNamesEachKindOfChange(test *testing.T) {
+	test.Parallel()
 	before := []byte(`{
 		"format": {"printWidth": 120},
 		"rules": {
@@ -37,7 +37,7 @@ func TestDiffSetNamesEachKindOfChange(t *testing.T) {
 	}`)
 	changes, err := DiffSet(before, after)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for label, pair := range map[string][2][]string{
 		"on":       {changes.TurnedOn, {"new-rule (warn)"}},
@@ -47,18 +47,18 @@ func TestDiffSetNamesEachKindOfChange(t *testing.T) {
 		"settings": {changes.Settings, {"format"}},
 	} {
 		if !slices.Equal(pair[0], pair[1]) {
-			t.Errorf("%s: %q, want %q", label, pair[0], pair[1])
+			test.Errorf("%s: %q, want %q", label, pair[0], pair[1])
 		}
 	}
 	if changes.Bump != Minor {
-		t.Errorf("bump %s, want minor", changes.Bump)
+		test.Errorf("bump %s, want minor", changes.Bump)
 	}
 }
 
 // What can only relax a set is a patch; each way a set can fail a project that passed is at least a
 // minor, and a removed set, which breaks every configuration extending it, is a major.
-func TestEachChangeAllowsTheSmallestVersionThePolicySays(t *testing.T) {
-	t.Parallel()
+func TestEachChangeAllowsTheSmallestVersionThePolicySays(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		before []byte
@@ -78,24 +78,24 @@ func TestEachChangeAllowsTheSmallestVersionThePolicySays(t *testing.T) {
 	} {
 		changes, err := DiffSet(testCase.before, testCase.after)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		if changes.Bump != testCase.want {
-			t.Errorf("%s: bump %s, want %s", testCase.name, changes.Bump, testCase.want)
+			test.Errorf("%s: bump %s, want %s", testCase.name, changes.Bump, testCase.want)
 		}
 	}
 }
 
-func TestASeverityThatIsNotOneIsRefused(t *testing.T) {
-	t.Parallel()
+func TestASeverityThatIsNotOneIsRefused(test *testing.T) {
+	test.Parallel()
 	if _, err := DiffSet([]byte(`{"rules":{"a":"error"}}`), []byte(`{"rules":{"a":"fatal"}}`)); err == nil {
-		t.Fatal("a severity of \"fatal\" was read as one")
+		test.Fatal("a severity of \"fatal\" was read as one")
 	}
 }
 
 // A version moves at least as far as the change allows, and always forward.
-func TestRequireBump(t *testing.T) {
-	t.Parallel()
+func TestRequireBump(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		previous, next string
 		bump           Bump
@@ -125,73 +125,73 @@ func TestRequireBump(t *testing.T) {
 	} {
 		err := RequireBump(testCase.previous, testCase.next, testCase.bump)
 		if (err == nil) != testCase.allowed {
-			t.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, err == nil, err)
+			test.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, err == nil, err)
 		}
 	}
 }
 
 // Below 1.0.0 a refused patch names the next minor as the fix, never a major: a major would leave 0.x
 // over a change semver puts in the minor.
-func TestRequireBumpBelowOneNamesTheMinor(t *testing.T) {
-	t.Parallel()
+func TestRequireBumpBelowOneNamesTheMinor(test *testing.T) {
+	test.Parallel()
 	for _, bump := range []Bump{Minor, Major} {
 		err := RequireBump("0.1.0", "0.1.1", bump)
 		if err == nil {
-			t.Fatalf("0.1.0 -> 0.1.1 at %s was allowed", bump)
+			test.Fatalf("0.1.0 -> 0.1.1 at %s was allowed", bump)
 		}
 		if !strings.Contains(err.Error(), "next minor") || strings.Contains(err.Error(), "needs a major") {
-			t.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, err)
+			test.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, err)
 		}
 	}
 }
 
-func TestRenderNamesEverySetThatChanged(t *testing.T) {
-	t.Parallel()
+func TestRenderNamesEverySetThatChanged(test *testing.T) {
+	test.Parallel()
 	changed, bump, err := Diff(
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error","c":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
 	)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	section := Render("1.1.0", "2026-10-03", changed, nil)
 	want := "## 1.1.0 (2026-10-03)\n\n### `cohere:typescript`\n\n- On: `c (error)`\n"
 	if section != want || bump != Minor {
-		t.Fatalf("rendered (bump %s):\n%s\nwant:\n%s", bump, section, want)
+		test.Fatalf("rendered (bump %s):\n%s\nwant:\n%s", bump, section, want)
 	}
 	if strings.Contains(section, "react") {
-		t.Fatal("a set that did not change was listed")
+		test.Fatal("a set that did not change was listed")
 	}
 }
 
 // The sets read from a commit are the sets the working tree holds when nothing is uncommitted: the same
 // names and the same bytes, so a diff between HEAD and the tree is empty.
-func TestSetsAtACommitMatchTheTree(t *testing.T) {
-	t.Parallel()
+func TestSetsAtACommitMatchTheTree(test *testing.T) {
+	test.Parallel()
 	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if status, err := exec.Command("git", "-C", module, "status", "--porcelain", "--", SetDirectory).Output(); err != nil || len(status) > 0 {
-		t.Skipf("NOT MEASURED: the sets have uncommitted changes, so HEAD and the tree differ by design (%s)", bytes.TrimSpace(status))
+		test.Skipf("NOT MEASURED: the sets have uncommitted changes, so HEAD and the tree differ by design (%s)", bytes.TrimSpace(status))
 	}
 	committed, err := SetsAt(module, "HEAD")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	tree, err := SetsAt(module, "")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(committed) < 2 || len(committed) != len(tree) {
-		t.Fatalf("read %d sets at HEAD and %d in the tree", len(committed), len(tree))
+		test.Fatalf("read %d sets at HEAD and %d in the tree", len(committed), len(tree))
 	}
 	for name, contents := range committed {
 		if !bytes.Equal(contents, tree[name]) {
-			t.Errorf("cohere:%s differs between HEAD and the tree", name)
+			test.Errorf("cohere:%s differs between HEAD and the tree", name)
 		}
 	}
 	if _, ok := committed["system-inc/structure"]; !ok {
-		t.Error("a nested set was not named by its path under the set directory")
+		test.Error("a nested set was not named by its path under the set directory")
 	}
 }

@@ -7,8 +7,8 @@ import (
 
 // TestUnitsMatchEncoding checks firstUnit, lastUnit and utf16Length against the text encoded whole, as
 // they were written before #vbjv3d6, on ASCII, astral characters at either end, and invalid UTF-8.
-func TestUnitsMatchEncoding(t *testing.T) {
-	t.Parallel()
+func TestUnitsMatchEncoding(test *testing.T) {
+	test.Parallel()
 	texts := []string{
 		"", "a", "ab", "é", "日本", "😀", "a😀", "😀a", "😀😀", "\U0010FFFF", "�", "a�",
 		"\xff", "a\xff", "\xffa", "\xe2\x82", "a\xe2\x82", "\xe2\x82\xac", "\xe2\xe2\x82\xac", "\xf0\x9f\x98",
@@ -21,13 +21,13 @@ func TestUnitsMatchEncoding(t *testing.T) {
 			first, last = rune(units[0]), rune(units[len(units)-1])
 		}
 		if actual := firstUnit(text); actual != first {
-			t.Errorf("firstUnit(%q) = %U, encoding says %U", text, actual, first)
+			test.Errorf("firstUnit(%q) = %U, encoding says %U", text, actual, first)
 		}
 		if actual := lastUnit(text); actual != last {
-			t.Errorf("lastUnit(%q) = %U, encoding says %U", text, actual, last)
+			test.Errorf("lastUnit(%q) = %U, encoding says %U", text, actual, last)
 		}
 		if actual := utf16Length(text); actual != len(units) {
-			t.Errorf("utf16Length(%q) = %d, encoding says %d", text, actual, len(units))
+			test.Errorf("utf16Length(%q) = %d, encoding says %d", text, actual, len(units))
 		}
 	}
 }

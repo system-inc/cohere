@@ -26,8 +26,8 @@ import (
 //
 // Mutation check, run when this was written: putting `no-unnecessary-whitespace` back to rewriting
 // its whole segment turns this red with overlap refusals against `no-duplicate-classes`.
-func TestTailwindFixersComposeInOnePass(t *testing.T) {
-	t.Parallel()
+func TestTailwindFixersComposeInOnePass(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -60,25 +60,25 @@ func TestTailwindFixersComposeInOnePass(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result, err := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(t), edit.DefaultMaxPasses)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result, err := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(test), edit.DefaultMaxPasses)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			for _, rejection := range result.Rejected {
-				t.Errorf("refused %s (conflicts with %s): %s",
+				test.Errorf("refused %s (conflicts with %s): %s",
 					rejection.Proposal.RuleName, rejection.ConflictsWith, rejection.Reason)
 			}
-			t.Logf("%d passes, %d fixes applied by %v", result.Passes, len(result.Applied), appliedRuleNames(result.Applied))
+			test.Logf("%d passes, %d fixes applied by %v", result.Passes, len(result.Applied), appliedRuleNames(result.Applied))
 			if !result.Converged {
-				t.Fatalf("did not converge in %d passes", result.Passes)
+				test.Fatalf("did not converge in %d passes", result.Passes)
 			}
 			if result.Text != testCase.want {
-				t.Fatalf("the fixers produced\n  %q\nwant the plugin's\n  %q", result.Text, testCase.want)
+				test.Fatalf("the fixers produced\n  %q\nwant the plugin's\n  %q", result.Text, testCase.want)
 			}
 			if result.Passes > 4 {
-				t.Errorf("took %d passes; the rename, the repeat and the padding land together, then the order", result.Passes)
+				test.Errorf("took %d passes; the rename, the repeat and the padding land together, then the order", result.Passes)
 			}
 		})
 	}
@@ -89,24 +89,24 @@ func TestTailwindFixersComposeInOnePass(t *testing.T) {
 // The order rule reads the design system off a real program, so its pass goes through the same
 // fixture runner its own tests use, rebuilt on every pass because the text changed. The other three
 // are syntactic and run on a parse.
-func proposeFromTailwindFixers(t *testing.T) edit.Propose {
-	t.Helper()
+func proposeFromTailwindFixers(test *testing.T) edit.Propose {
+	test.Helper()
 	return func(fileName string, text string) ([]edit.Proposal, error) {
 		baseName := filepath.Base(fileName)
 		diagnostics := []rule.Diagnostic{}
 
-		ordered := runClassOrderFixture(t, baseName, text)
+		ordered := runClassOrderFixture(test, baseName, text)
 		diagnostics = append(diagnostics, ordered.Diagnostics...)
 
 		for _, subject := range []rule.Rule{NoDuplicateClasses, NoUnnecessaryWhitespace, NoDeprecatedClasses} {
-			diagnostics = append(diagnostics, rule_testing.Run(t, subject, baseName, text).Diagnostics...)
+			diagnostics = append(diagnostics, rule_testing.Run(test, subject, baseName, text).Diagnostics...)
 		}
 
 		// The typed fixture writes the file trimmed, with one newline after it, so its offsets are the
 		// engine's only while the text has no leading whitespace. Asserted rather than assumed: a
 		// mismatch would move every order fix.
 		if ordered.SourceFile == nil || !strings.HasPrefix(ordered.SourceFile.Text(), text) {
-			t.Fatalf("the order rule read different text from the engine's")
+			test.Fatalf("the order rule read different text from the engine's")
 		}
 		return edit.ProposalsFrom(diagnostics), nil
 	}

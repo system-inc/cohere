@@ -7,8 +7,8 @@ import (
 )
 
 // TestNoEmptyReportsEmptyBlocks is the fixture that must fire.
-func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyReportsEmptyBlocks(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -25,8 +25,8 @@ func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
 		{"label: {}", "unexpectedBlock"},
 		{"switch (foo) {}", "unexpectedSwitch"},
 	} {
-		result := rule_testing.Run(t, NoEmpty, "empty.ts", testCase.source)
-		rule_testing.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(test, NoEmpty, "empty.ts", testCase.source)
+		rule_testing.ExpectFindings(test, result, testCase.wantId)
 	}
 }
 
@@ -34,22 +34,22 @@ func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
 //
 // A try statement has up to three blocks and each is its own claim about what happens there, so an
 // empty try, catch, and finally are three findings rather than one.
-func TestNoEmptyReportsEachEmptyBlockOfATryStatement(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyReportsEachEmptyBlockOfATryStatement(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoEmpty, "try.ts", "try { work(); } catch (error) {} finally {}")
-	rule_testing.ExpectFindings(t, result, "unexpectedBlock", "unexpectedBlock")
+	result := rule_testing.Run(test, NoEmpty, "try.ts", "try { work(); } catch (error) {} finally {}")
+	rule_testing.ExpectFindings(test, result, "unexpectedBlock", "unexpectedBlock")
 
-	all := rule_testing.Run(t, NoEmpty, "all.ts", "try {} catch (error) {} finally {}")
-	rule_testing.ExpectFindings(t, all, "unexpectedBlock", "unexpectedBlock", "unexpectedBlock")
+	all := rule_testing.Run(test, NoEmpty, "all.ts", "try {} catch (error) {} finally {}")
+	rule_testing.ExpectFindings(test, all, "unexpectedBlock", "unexpectedBlock", "unexpectedBlock")
 }
 
 // TestNoEmptyAcceptsAnyCommentAsIntent pins the escape hatch.
 //
 // A comment is what turns an empty block from ambiguous into deliberate, so both comment forms count
 // and both stay silent wherever a block would otherwise report.
-func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyAcceptsAnyCommentAsIntent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"if (foo) { // nothing to do\n}",
@@ -61,8 +61,8 @@ func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
 		"if (foo) {\n\t/* multi\n\t   line */\n}",
 		"if (foo) { /* one */ /* two */ }",
 	} {
-		result := rule_testing.Run(t, NoEmpty, "commented.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoEmpty, "commented.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -75,8 +75,8 @@ func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
 // node spans only its own braces, so a substring search would not see the discriminant either. The
 // test pins the behavior at the surface where a reader checks it, and stays correct whichever way
 // the check is implemented underneath.
-func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyIsNotFooledByCommentMarkersInStrings(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		`switch (path.replace('/*', '')) {}`,
@@ -84,9 +84,9 @@ func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
 		"switch (/[/*]/.test(input) ? 1 : 2) {}",
 		`if (label === '/* empty */') {}`,
 	} {
-		result := rule_testing.Run(t, NoEmpty, "strings.ts", source)
+		result := rule_testing.Run(test, NoEmpty, "strings.ts", source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("expected 1 finding for %q, got %d: %v", source, len(result.Diagnostics), result.MessageIds())
+			test.Fatalf("expected 1 finding for %q, got %d: %v", source, len(result.Diagnostics), result.MessageIds())
 		}
 	}
 }
@@ -96,8 +96,8 @@ func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
 // An empty function is a real thing to write, and it is the concern of `no-empty-function`. Every
 // function-like form is here because each reaches the block through a different parent kind, and a
 // check that named only some of them would report on the rest.
-func TestNoEmptyExemptsFunctionBodies(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyExemptsFunctionBodies(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"function noop() {}",
@@ -116,14 +116,14 @@ func TestNoEmptyExemptsFunctionBodies(t *testing.T) {
 		"const obj = { method() {} };",
 		"class C { private handle = () => {}; }",
 	} {
-		result := rule_testing.Run(t, NoEmpty, "functions.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoEmpty, "functions.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
 // TestNoEmptyStaysSilentOnBlocksWithContent is the half that catches a rule firing on correct code.
-func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyStaysSilentOnBlocksWithContent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"if (foo) { bar(); }",
@@ -138,8 +138,8 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
 		"interface Empty {}",
 		"enum Empty {}",
 	} {
-		result := rule_testing.Run(t, NoEmpty, "content.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoEmpty, "content.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -147,11 +147,11 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
 //
 // The option defaults off, so a registry that forgets to wire it must produce the strict rule rather
 // than a silent one.
-func TestNoEmptyWithoutOptionsReportsEmptyCatch(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyWithoutOptionsReportsEmptyCatch(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
-	rule_testing.ExpectFindings(t, result, "unexpectedBlock")
+	result := rule_testing.RunWithOptions(test, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
+	rule_testing.ExpectFindings(test, result, "unexpectedBlock")
 }
 
 // TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch pins the option's exact reach.
@@ -159,8 +159,8 @@ func TestNoEmptyWithoutOptionsReportsEmptyCatch(t *testing.T) {
 // It names the catch clause and nothing else, so an empty try or finally in the same statement still
 // reports. That boundary is the whole option: a codebase that has decided a bare catch is idiomatic
 // has said nothing about an empty finally.
-func TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch(test *testing.T) {
+	test.Parallel()
 
 	options := NoEmptyOptions{AllowEmptyCatch: true}
 
@@ -169,18 +169,18 @@ func TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch(t *testing.T) {
 		"try { work(); } catch {}",
 		"try { work(); } catch (error) {} finally { cleanup(); }",
 	} {
-		result := rule_testing.RunWithOptions(t, NoEmpty, "allowed.ts", source, options)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(test, NoEmpty, "allowed.ts", source, options)
+		rule_testing.ExpectClean(test, result)
 	}
 
-	finallyStillReports := rule_testing.RunWithOptions(t, NoEmpty, "finally.ts",
+	finallyStillReports := rule_testing.RunWithOptions(test, NoEmpty, "finally.ts",
 		"try { work(); } catch (error) {} finally {}", options)
-	rule_testing.ExpectFindings(t, finallyStillReports, "unexpectedBlock")
+	rule_testing.ExpectFindings(test, finallyStillReports, "unexpectedBlock")
 
-	tryStillReports := rule_testing.RunWithOptions(t, NoEmpty, "try.ts",
+	tryStillReports := rule_testing.RunWithOptions(test, NoEmpty, "try.ts",
 		"try {} catch (error) {}", options)
-	rule_testing.ExpectFindings(t, tryStillReports, "unexpectedBlock")
+	rule_testing.ExpectFindings(test, tryStillReports, "unexpectedBlock")
 
-	otherBlocksStillReport := rule_testing.RunWithOptions(t, NoEmpty, "other.ts", "if (foo) {}", options)
-	rule_testing.ExpectFindings(t, otherBlocksStillReport, "unexpectedBlock")
+	otherBlocksStillReport := rule_testing.RunWithOptions(test, NoEmpty, "other.ts", "if (foo) {}", options)
+	rule_testing.ExpectFindings(test, otherBlocksStillReport, "unexpectedBlock")
 }

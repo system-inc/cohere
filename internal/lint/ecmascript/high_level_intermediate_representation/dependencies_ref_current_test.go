@@ -27,8 +27,8 @@ import (
 // parameter is deliberately untyped -- "maybe" a ref. Upstream compiles it with no error and a bare
 // `maybeRef` dependency; before this, our nested-function walk produced `maybeRef.current` and the
 // comparison reported a `RefAccessDifference` against the source's `[maybeRef]`.
-func TestRefCurrentReadsTruncateToTheirRoot(t *testing.T) {
-	t.Parallel()
+func TestRefCurrentReadsTruncateToTheirRoot(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -75,15 +75,15 @@ func TestRefCurrentReadsTruncateToTheirRoot(t *testing.T) {
 			want: "props.a.b",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			deps, ok := inferredDependencyStrings(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			deps, ok := inferredDependencyStrings(test, testCase.source)
 			if !ok {
-				t.Fatal("the fixture did not lower, so this test asserts nothing about the " +
+				test.Fatal("the fixture did not lower, so this test asserts nothing about the " +
 					"dependency it claims to check")
 			}
 			if len(deps) == 0 {
-				t.Fatal("no dependency was collected; the fixture stopped exercising the collector")
+				test.Fatal("no dependency was collected; the fixture stopped exercising the collector")
 			}
 			found := false
 			for _, dependency := range deps {
@@ -91,12 +91,12 @@ func TestRefCurrentReadsTruncateToTheirRoot(t *testing.T) {
 					found = true
 				}
 				if testCase.mustNotSee != "" && dependency == testCase.mustNotSee {
-					t.Errorf("collected %q, which reads through a ref's mutable slot; the scope "+
+					test.Errorf("collected %q, which reads through a ref's mutable slot; the scope "+
 						"must depend on the ref object instead", dependency)
 				}
 			}
 			if !found {
-				t.Errorf("collected %v, which does not contain %q", deps, testCase.want)
+				test.Errorf("collected %v, which does not contain %q", deps, testCase.want)
 			}
 		})
 	}

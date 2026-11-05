@@ -21,11 +21,11 @@ const trimCaller = "command/cohere-dev"
 // One trim, one path, under the pool's lock (#cpxc2d7). The launcher also trimmed the default cache, holding
 // nothing, and on 2026-10-06 a trim holding the wrong pool deleted 83 GB from under running gates
 // (#d0x1fhp). So no code outside cohere-dev calls Trim. Tests are exempt: they trim caches of their own.
-func TestOnlyCohereDevTrims(t *testing.T) {
-	t.Parallel()
+func TestOnlyCohereDevTrims(test *testing.T) {
+	test.Parallel()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	callers := []string{}
 	files := token.NewFileSet()
@@ -76,10 +76,10 @@ func TestOnlyCohereDevTrims(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, caller := range callers {
-		t.Errorf("%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
+		test.Errorf("%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
 			"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds", caller, trimCaller)
 	}
 }

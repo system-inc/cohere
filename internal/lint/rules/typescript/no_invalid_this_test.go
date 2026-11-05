@@ -20,8 +20,8 @@ const invalidThisFile = "/repository/source/InvalidThis.ts"
 // file's annotations. The two agree on all 91. See the rule's doc
 // comment for why they were run under sourceType module, and for the two cases whose declared
 // `globalReturn` turns out not to be what makes them report.
-func TestNoInvalidThisFires(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -75,22 +75,22 @@ func TestNoInvalidThisFires(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 			_ = index
 		})
 	}
 }
 
-func TestNoInvalidThisStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -146,9 +146,9 @@ func TestNoInvalidThisStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings))
 		})
 	}
@@ -170,8 +170,8 @@ func firstLineOf(source string) string {
 // each covers a decision the corpus leaves unpinned. The JSDoc block is the largest group because
 // the tag lookup is the biggest piece of borrowed machinery in this rule and the corpus exercises
 // exactly one of its shapes.
-func TestNoInvalidThisJsDocAttachment(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisJsDocAttachment(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name   string
@@ -216,9 +216,9 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
 	}
@@ -253,15 +253,15 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 	}
 
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -269,8 +269,8 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 // typescript-go keeps parentheses as nodes and the parser upstream ports from does not, so every
 // arm of the outward walk is reachable through a parenthesized form that upstream never sees. The
 // corpus covers three of these; the rest would be silent divergences.
-func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisSeesThroughParentheses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -303,9 +303,9 @@ func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
 	}
@@ -314,8 +314,8 @@ func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
 // The option defaults to TRUE, so a decoder filling a zero-value struct inverts it. Routed through
 // the exported decoder rather than by building the struct, because the inversion is exactly what a
 // struct-built fixture cannot see.
-func TestDecodeNoInvalidThisOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoInvalidThisOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -332,18 +332,18 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoInvalidThisOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decode returned %v", err)
+				test.Fatalf("decode returned %v", err)
 			}
 			settings, ok := decoded.(noInvalidThisSettings)
 			if !ok {
-				t.Fatalf("decode returned %T", decoded)
+				test.Fatalf("decode returned %T", decoded)
 			}
 			if settings.CapIsConstructor != testCase.want {
-				t.Fatalf("capIsConstructor was %v, want %v",
+				test.Fatalf("capIsConstructor was %v, want %v",
 					settings.CapIsConstructor, testCase.want)
 			}
 		})
@@ -352,9 +352,9 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 	// A rule configured as a bare "error" is handed nil, which never reaches the decoder at all.
 	// The fallback has to produce the documented default rather than the zero value, and a rule
 	// that got this wrong would report every capitalized constructor function in the tree.
-	t.Run("nil options fall back to the default", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	test.Run("nil options fall back to the default", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 			"function Foo() {\n  this.x = 1;\n}", nil))
 	})
 }
@@ -362,47 +362,47 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 // The span is the four characters of `this` and nothing else, which no message-id assertion can see.
 // Asserted against a literal rather than against the rule's own constant, because a constant
 // compared to itself moves under mutation.
-func TestNoInvalidThisSpansTheKeyword(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisSpansTheKeyword(test *testing.T) {
+	test.Parallel()
 
 	const source = "function foo() {\n  console.log(this);\n}\n"
-	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile, source,
+	result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile, source,
 		DefaultNoInvalidThisSettings())
-	rule_testing.ExpectFindings(t, result, "unexpectedThis")
+	rule_testing.ExpectFindings(test, result, "unexpectedThis")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "this" {
-		t.Fatalf("reported span was %q", reported)
+		test.Fatalf("reported span was %q", reported)
 	}
 }
 
 // The message carries no format verbs, so there is nothing to render and the assertion is on the
 // value itself.
-func TestNoInvalidThisMessage(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnexpectedThis.Id != "unexpectedThis" {
-		t.Fatalf("message id was %q", messageUnexpectedThis.Id)
+		test.Fatalf("message id was %q", messageUnexpectedThis.Id)
 	}
 	if !strings.HasPrefix(messageUnexpectedThis.Description,
 		"This function is called rather than constructed") {
-		t.Fatalf("message description was %q", messageUnexpectedThis.Description)
+		test.Fatalf("message description was %q", messageUnexpectedThis.Description)
 	}
 }
 
 // An arrow inherits the enclosing binding rather than introducing one, which is why the walk pushes
 // nothing for it. Both `this` reads below resolve against the same enclosing function, so a port
 // that pushed for arrows would report the outer one and silently exempt the inner.
-func TestNoInvalidThisArrowsInheritTheBinding(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisArrowsInheritTheBinding(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}",
 		DefaultNoInvalidThisSettings())
-	rule_testing.ExpectFindings(t, result, "unexpectedThis", "unexpectedThis")
+	rule_testing.ExpectFindings(test, result, "unexpectedThis", "unexpectedThis")
 
 	// And the same two reads inside a bound function are both silent, for the same reason.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"class A {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}",
 		DefaultNoInvalidThisSettings()))
 }
@@ -411,8 +411,8 @@ func TestNoInvalidThisArrowsInheritTheBinding(t *testing.T) {
 // the argument is present in the right position. The corpus writes only real receivers, so all three
 // nullish checks were surviving mutants until these landed; each pair below was measured against the
 // installed rule at 8.67.0 before it was written.
-func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisNullishReceiversDoNotBind(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -468,15 +468,15 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -490,28 +490,28 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 // constructor name and stays silent, while unicode.IsUpper answers false, so the IsUpper spelling
 // reports. Measured against the installed rule at 8.67.0, which is silent on both shapes below.
 // Written as an escape so this file stays pure ASCII on disk.
-func TestNoInvalidThisTitlecaseNamesReadAsConstructors(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisTitlecaseNamesReadAsConstructors(test *testing.T) {
+	test.Parallel()
 
 	const titlecase = "\u01C5"
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"function "+titlecase+"oo() {\n  this.x;\n}", DefaultNoInvalidThisSettings()))
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"var "+titlecase+"oo = function () {\n  this.x;\n};", DefaultNoInvalidThisSettings()))
 
 	// The controls: a lowercase name reports in both positions, so the silence above is the name
 	// test answering rather than the fixture failing to reach the rule.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"function foo() {\n  this.x;\n}", DefaultNoInvalidThisSettings()), "unexpectedThis")
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 		"var foo = function () {\n  this.x;\n};", DefaultNoInvalidThisSettings()), "unexpectedThis")
 }
 
 // The three survivors that the corpus could not see, each pinned by the input that separates the
 // rule from the mutation. All measured against the installed rule at 8.67.0.
-func TestNoInvalidThisBindingShapesBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidThisBindingShapesBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -566,15 +566,15 @@ func TestNoInvalidThisBindingShapesBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }

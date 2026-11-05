@@ -189,9 +189,9 @@ func showDoc(document Doc) string {
 }
 
 // TestUtilitiesAgreeWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestUtilitiesAgreeWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestUtilitiesAgreeWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 3000
 	random := rand.New(rand.NewSource(20261002))
 	cases := make([]printCase, count)
@@ -201,7 +201,7 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 	}
 	encoded, err := json.Marshal(cases)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", utilitiesScript)
 	command.Dir = root
@@ -209,11 +209,11 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var upstream []utilitiesOutcome
 	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	print := func(document Doc) (result string) {
@@ -230,7 +230,7 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 		mismatches++
 		if mismatches <= 8 {
 			specJSON, _ := json.Marshal(cases[index].Spec)
-			t.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJSON, want, got)
+			test.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJSON, want, got)
 		}
 	}
 	for index, testCase := range cases {
@@ -269,8 +269,8 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 			report(index, "removeLines", want.Removed, got)
 		}
 	}
-	t.Logf("%d docs, %d upstream refused, %d mismatches", len(cases), upstreamErrors, mismatches)
+	test.Logf("%d docs, %d upstream refused, %d mismatches", len(cases), upstreamErrors, mismatches)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d docs; the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf("upstream refused %d of %d docs; the comparison is thinner than it looks", upstreamErrors, count)
 	}
 }

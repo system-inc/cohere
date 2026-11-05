@@ -23,11 +23,11 @@ type packFixture struct {
 	cache string
 }
 
-func newPackFixture(t *testing.T) *packFixture {
-	root := t.TempDir()
-	fixture := &packFixture{t: t, files: filepath.Join(root, "files"), cache: filepath.Join(root, "cache")}
+func newPackFixture(test *testing.T) *packFixture {
+	root := test.TempDir()
+	fixture := &packFixture{t: test, files: filepath.Join(root, "files"), cache: filepath.Join(root, "cache")}
 	if err := os.MkdirAll(fixture.files, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return fixture
 }
@@ -74,28 +74,28 @@ func (f *packFixture) dataFile() string {
 }
 
 // A file read once is served from the pack the next time, unopened, and with the same bytes.
-func TestTheContentPackServesAnUnchangedFile(t *testing.T) {
-	t.Parallel()
-	fixture := newPackFixture(t)
+func TestTheContentPackServesAnUnchangedFile(test *testing.T) {
+	test.Parallel()
+	fixture := newPackFixture(test)
 	fixture.write("a.ts", "export const a = 1;\n")
 	fixture.write("b.ts", "export const b = 2;\n")
 	if _, hits, misses, _ := fixture.run("a.ts", "b.ts"); hits != 0 || misses != 2 {
-		t.Fatalf("an empty pack served %d and read %d, want 0 and 2", hits, misses)
+		test.Fatalf("an empty pack served %d and read %d, want 0 and 2", hits, misses)
 	}
 	read, hits, misses, damaged := fixture.run("a.ts", "b.ts")
 	if hits != 2 || misses != 0 || damaged != 0 {
-		t.Fatalf("the second run served %d, read %d and found %d damaged, want 2, 0 and 0", hits, misses, damaged)
+		test.Fatalf("the second run served %d, read %d and found %d damaged, want 2, 0 and 0", hits, misses, damaged)
 	}
 	if read["a.ts"] != "export const a = 1;\n" || read["b.ts"] != "export const b = 2;\n" {
-		t.Fatalf("the pack served %q", read)
+		test.Fatalf("the pack served %q", read)
 	}
 }
 
 // Every way a file's bytes can change is a read from disk, the change time catching the one the
 // modification time cannot: different bytes of the same size with the modification time put back, as
 // cp -p, rsync -t and touch -r all do. A replace by rename is a new inode.
-func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
-	t.Parallel()
+func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
+	test.Parallel()
 	for _, change := range []struct {
 		name   string
 		change func(f *packFixture)
@@ -129,10 +129,10 @@ func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
 			}
 		}},
 	} {
-		t.Run(change.name, func(t *testing.T) {
-			t.Parallel()
-			fixture := newPackFixture(t)
-			fixture.t = t
+		test.Run(change.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newPackFixture(test)
+			fixture.t = test
 			fixture.write("a.ts", "export const a = 1;\n")
 			fixture.run("a.ts")
 			// Change times move in nanoseconds, but a filesystem may store coarser ones.
@@ -141,19 +141,19 @@ func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
 			read, hits, _, _ := fixture.run("a.ts")
 			want, _ := os.ReadFile(fixture.path("a.ts"))
 			if read["a.ts"] != string(want) || hits != 0 {
-				t.Fatalf("after %s the pack served %q (%d hits), and the disk holds %q", change.name, read["a.ts"], hits, want)
+				test.Fatalf("after %s the pack served %q (%d hits), and the disk holds %q", change.name, read["a.ts"], hits, want)
 			}
 			// And the new bytes are what the next run is served.
 			if read, hits, _, _ := fixture.run("a.ts"); read["a.ts"] != string(want) || hits != 1 {
-				t.Fatalf("the run after the change was served %q (%d hits), want %q from the pack", read["a.ts"], hits, want)
+				test.Fatalf("the run after the change was served %q (%d hits), want %q from the pack", read["a.ts"], hits, want)
 			}
 		})
 	}
 }
 
 // A damaged pack costs reads from disk and never a wrong byte, and the next write leaves a sound pack.
-func TestADamagedContentPackIsReadAround(t *testing.T) {
-	t.Parallel()
+func TestADamagedContentPackIsReadAround(test *testing.T) {
+	test.Parallel()
 	for _, damage := range []struct {
 		name        string
 		damage      func(f *packFixture)
@@ -176,23 +176,23 @@ func TestADamagedContentPackIsReadAround(t *testing.T) {
 		}, false},
 		{"a data file deleted", func(f *packFixture) { os.Remove(f.dataFile()) }, false},
 	} {
-		t.Run(damage.name, func(t *testing.T) {
-			t.Parallel()
-			fixture := newPackFixture(t)
-			fixture.t = t
+		test.Run(damage.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newPackFixture(test)
+			fixture.t = test
 			fixture.write("a.ts", "export const a = 1;\n")
 			fixture.write("b.ts", "export const b = 2;\n")
 			fixture.run("a.ts", "b.ts")
 			damage.damage(fixture)
 			read, hits, _, damaged := fixture.run("a.ts", "b.ts")
 			if read["a.ts"] != "export const a = 1;\n" || read["b.ts"] != "export const b = 2;\n" {
-				t.Fatalf("a damaged pack served %q", read)
+				test.Fatalf("a damaged pack served %q", read)
 			}
 			if damage.damagedRead && damaged == 0 {
-				t.Errorf("the damage was read around without being counted, so the pack would not be rewritten")
+				test.Errorf("the damage was read around without being counted, so the pack would not be rewritten")
 			}
 			if read, hits, _, damaged := fixture.run("a.ts", "b.ts"); hits+damaged == 0 || damaged != 0 || read["b.ts"] != "export const b = 2;\n" {
-				t.Fatalf("the run after the damage was served %d, found %d damaged: the pack was not rewritten sound", hits, damaged)
+				test.Fatalf("the run after the damage was served %d, found %d damaged: the pack was not rewritten sound", hits, damaged)
 			}
 			_ = hits
 		})
@@ -201,32 +201,32 @@ func TestADamagedContentPackIsReadAround(t *testing.T) {
 
 // A pack truncated in place while a run has it mapped faults on the copy. The fault is a read from disk,
 // not the end of the process.
-func TestAContentPackTruncatedUnderItsMappingIsReadAround(t *testing.T) {
-	t.Parallel()
-	fixture := newPackFixture(t)
+func TestAContentPackTruncatedUnderItsMappingIsReadAround(test *testing.T) {
+	test.Parallel()
+	fixture := newPackFixture(test)
 	fixture.write("a.ts", strings.Repeat("export const a = 1;\n", 4096))
 	fixture.run("a.ts")
 	pack, err := OpenContentPack(fixture.cache)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.Truncate(fixture.dataFile(), 0); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	contents, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok || contents != strings.Repeat("export const a = 1;\n", 4096) {
-		t.Fatalf("a pack truncated under its mapping served %d bytes", len(contents))
+		test.Fatalf("a pack truncated under its mapping served %d bytes", len(contents))
 	}
 	if _, _, damaged := pack.Counts(); damaged != 1 {
-		t.Errorf("the fault was read around without being counted (%d damaged)", damaged)
+		test.Errorf("the fault was read around without being counted (%d damaged)", damaged)
 	}
 }
 
 // A run that reads one new file appends it rather than rewriting the pack, and a pack mostly dead is
 // compacted into a new data file, the old one removed.
-func TestTheContentPackAppendsAndCompacts(t *testing.T) {
-	t.Parallel()
-	fixture := newPackFixture(t)
+func TestTheContentPackAppendsAndCompacts(test *testing.T) {
+	test.Parallel()
+	fixture := newPackFixture(test)
 	fixture.write("a.ts", strings.Repeat("a", 1000))
 	fixture.write("b.ts", strings.Repeat("b", 1000))
 	fixture.run("a.ts", "b.ts")
@@ -234,13 +234,13 @@ func TestTheContentPackAppendsAndCompacts(t *testing.T) {
 
 	fixture.write("c.ts", "export const c = 3;\n")
 	if _, hits, misses, _ := fixture.run("a.ts", "b.ts", "c.ts"); hits != 2 || misses != 1 {
-		t.Fatalf("served %d and read %d, want 2 and 1", hits, misses)
+		test.Fatalf("served %d and read %d, want 2 and 1", hits, misses)
 	}
 	if fixture.dataFile() != first {
-		t.Fatal("one new file rewrote the data file instead of appending to it")
+		test.Fatal("one new file rewrote the data file instead of appending to it")
 	}
 	if read, hits, _, _ := fixture.run("a.ts", "b.ts", "c.ts"); hits != 3 || read["c.ts"] != "export const c = 3;\n" {
-		t.Fatalf("the appended file was not served: %d hits, %q", hits, read["c.ts"])
+		test.Fatalf("the appended file was not served: %d hits, %q", hits, read["c.ts"])
 	}
 
 	// Rewriting a and b three times over leaves their first copies dead, more than what is live.
@@ -250,41 +250,41 @@ func TestTheContentPackAppendsAndCompacts(t *testing.T) {
 		fixture.run("a.ts", "b.ts", "c.ts")
 	}
 	if fixture.dataFile() == first {
-		t.Fatal("a pack mostly dead was never compacted")
+		test.Fatal("a pack mostly dead was never compacted")
 	}
 	if read, hits, _, _ := fixture.run("a.ts", "b.ts", "c.ts"); hits != 3 || read["a.ts"] != strings.Repeat("f", 1000) {
-		t.Fatalf("after compacting, served %d with a.ts %q...", hits, read["a.ts"][:5])
+		test.Fatalf("after compacting, served %d with a.ts %q...", hits, read["a.ts"][:5])
 	}
 }
 
 // A served file is a string over the pack's mapping, not a copy, and it stays whole after the pack that served
 // it is dropped and collected (#kdee854, 1b). The compiler keeps source text and substrings of it for the whole
 // run, so a view that died with its pack would hand the checker freed memory.
-func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(t *testing.T) {
-	t.Parallel()
-	fixture := newPackFixture(t)
+func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(test *testing.T) {
+	test.Parallel()
+	fixture := newPackFixture(test)
 	want := strings.Repeat("export const a = 1;\n", 4096)
 	fixture.write("a.ts", want)
 	fixture.run("a.ts")
 
 	pack, err := OpenContentPack(fixture.cache)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	served, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok {
-		t.Fatal("the pack served nothing, so nothing below is about a served file")
+		test.Fatal("the pack served nothing, so nothing below is about a served file")
 	}
 	start := uintptr(unsafe.Pointer(unsafe.StringData(served)))
 	mapped := uintptr(unsafe.Pointer(&pack.mapped[0]))
 	if start < mapped || start+uintptr(len(served)) > mapped+uintptr(len(pack.mapped)) {
-		t.Errorf("the served file lies outside the pack's mapping, so it was copied")
+		test.Errorf("the served file lies outside the pack's mapping, so it was copied")
 	}
 
 	pack = nil
 	runtime.GC()
 	runtime.GC()
 	if served != want {
-		t.Fatalf("a served file read after its pack was collected holds %d bytes that differ from the file's", len(served))
+		test.Fatalf("a served file read after its pack was collected holds %d bytes that differ from the file's", len(served))
 	}
 }

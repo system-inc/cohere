@@ -16,12 +16,12 @@ import (
 // A declaration read at orders 3, 9 and 5 must answer 9. Getting max wrong in the direction of
 // "last write wins" produces 5 here, which is lower than the true last usage -- and a value that
 // looks settled earlier than it is gets its scope merged forward past a read that is still live.
-func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
-	t.Parallel()
+func TestFindLastUsageRecordsTheHighestOrder(test *testing.T) {
+	test.Parallel()
 
 	// `total` is read in the loop body and again in the return, so its last usage must be the
 	// return rather than the loop.
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 		function f(items) {
 			let total = 0;
 			for (const item of items) {
@@ -31,16 +31,16 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 		}
 	`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
-		t.Fatal("no tree was built")
+		test.Fatal("no tree was built")
 	}
 
 	usage := FindLastUsage(tree, function)
 	if usage.Len() == 0 {
-		t.Fatal("no declaration was recorded, so every assertion below is vacuous")
+		test.Fatal("no declaration was recorded, so every assertion below is vacuous")
 	}
 
 	// Asserted against an independent walk rather than against the builder: the maximum order any
@@ -61,10 +61,10 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 		}
 	}
 	if highestSeen == 0 {
-		t.Fatal("the walk saw no place at a nonzero order; this fixture cannot discriminate")
+		test.Fatal("the walk saw no place at a nonzero order; this fixture cannot discriminate")
 	}
 	if highestRecorded != highestSeen {
-		t.Errorf("the highest order any place carries is %d and the table's highest is %d; the "+
+		test.Errorf("the highest order any place carries is %d and the table's highest is %d; the "+
 			"table is not recording the last usage", highestSeen, highestRecorded)
 	}
 }
@@ -75,22 +75,22 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 // throw, and the two callers treat a miss differently, so a miss must be distinguishable from a
 // real order of zero. Collapsing the two would make an unread declaration look like one last used
 // at the very start of the function, which is exactly the answer that permits a merge.
-func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
-	t.Parallel()
+func TestLastUsedAtReportsMissesRatherThanZero(test *testing.T) {
+	test.Parallel()
 
 	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{7: 0}}
 
 	if order, found := usage.LastUsedAt(7); !found || order != 0 {
-		t.Errorf("a declaration recorded at order zero answered (%d, %t), want (0, true)", order, found)
+		test.Errorf("a declaration recorded at order zero answered (%d, %t), want (0, true)", order, found)
 	}
 	if _, found := usage.LastUsedAt(99); found {
-		t.Error("an unrecorded declaration answered found; a miss must be distinguishable from a " +
+		test.Error("an unrecorded declaration answered found; a miss must be distinguishable from a " +
 			"real order of zero, because zero is the answer that permits a merge")
 	}
 
 	var nilUsage *LastUsage
 	if _, found := nilUsage.LastUsedAt(7); found {
-		t.Error("a nil table answered found")
+		test.Error("a nil table answered found")
 	}
 }
 
@@ -98,8 +98,8 @@ func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
 //
 // Order must not matter -- it is an artifact of collection -- and the optional flag must, because
 // `a?.b` and `a.b` invalidate under different conditions.
-func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
-	t.Parallel()
+func TestAreEqualDependenciesIsSetEquality(test *testing.T) {
+	test.Parallel()
 
 	plain := func(identifier static_single_assignment.IdentifierId, property string, optional bool) ReactiveScopeDependency {
 		return ReactiveScopeDependency{
@@ -150,15 +150,15 @@ func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 			want: true,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := AreEqualDependencies(testCase.a, testCase.b); got != testCase.want {
-				t.Errorf("got %t, want %t", got, testCase.want)
+				test.Errorf("got %t, want %t", got, testCase.want)
 			}
 			// Symmetry is asserted rather than assumed: the implementation walks one side looking
 			// into the other, and a length check is the only thing making that symmetric.
 			if got := AreEqualDependencies(testCase.b, testCase.a); got != testCase.want {
-				t.Errorf("reversed: got %t, want %t", got, testCase.want)
+				test.Errorf("reversed: got %t, want %t", got, testCase.want)
 			}
 		})
 	}
@@ -169,8 +169,8 @@ func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 // A declaration with no recorded usage is not a declaration proven safe to merge, it is one this
 // pass knows nothing about. Upstream would throw; answering true instead would permit a merge on
 // absent information, which is the wrong direction for a pass whose true answer relaxes a guard.
-func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
-	t.Parallel()
+func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(test *testing.T) {
+	test.Parallel()
 
 	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{
 		1: 5,
@@ -178,25 +178,25 @@ func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
 	}}
 
 	if !AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{1}, usage) {
-		t.Error("a declaration last used at 5 before a scope ending at 10 should be mergeable")
+		test.Error("a declaration last used at 5 before a scope ending at 10 should be mergeable")
 	}
 	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{2}, usage) {
-		t.Error("a declaration last used at 12 is read after a scope ending at 10, so the merge " +
+		test.Error("a declaration last used at 12 is read after a scope ending at 10, so the merge " +
 			"must be declined")
 	}
 	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{1, 2}, usage) {
-		t.Error("one unmergeable lvalue must decline the whole set")
+		test.Error("one unmergeable lvalue must decline the whole set")
 	}
 	if AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{99}, usage) {
-		t.Error("an unrecorded declaration answered true; missing information must decline")
+		test.Error("an unrecorded declaration answered true; missing information must decline")
 	}
 	if !AreLValuesLastUsedByScope(10, nil, usage) {
-		t.Error("an empty lvalue set has nothing blocking the merge and should answer true")
+		test.Error("an empty lvalue set has nothing blocking the merge and should answer true")
 	}
 	// The boundary: upstream's test is `lastUsedAt >= scope.range.end`, so a usage exactly at the
 	// end is a usage after the scope.
 	if AreLValuesLastUsedByScope(5, []static_single_assignment.DeclarationId{1}, usage) {
-		t.Error("a declaration last used exactly at the scope end must decline; upstream's test " +
+		test.Error("a declaration last used exactly at the scope end must decline; upstream's test " +
 			"is >= rather than >")
 	}
 }
@@ -206,8 +206,8 @@ func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
 // The property asserted is total coverage: every declaration any place names must appear in the
 // table, because a missing entry makes `AreLValuesLastUsedByScope` decline a merge that should have
 // been allowed, and that failure is silent -- the output is merely more granular.
-func TestFindLastUsageCorpus(t *testing.T) {
-	t.Parallel()
+func TestFindLastUsageCorpus(test *testing.T) {
+	test.Parallel()
 
 	functions, declarationsSeen, missing, outOfOrder := 0, 0, 0, 0
 	// Accumulated across the whole corpus rather than per function, because a DeclarationId is only
@@ -217,7 +217,7 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	highestPerDeclaration := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 	recordedTable := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 
-	forEachCorpusFunction(t, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 
@@ -261,13 +261,13 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	})
 
 	if functions < 50 {
-		t.Fatalf("only %d functions converted; the corpus walk is not reaching real source", functions)
+		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source", functions)
 	}
 	if declarationsSeen == 0 {
-		t.Fatal("the walk saw no places, so a zero miss count proves nothing")
+		test.Fatal("the walk saw no places, so a zero miss count proves nothing")
 	}
 	if missing != 0 {
-		t.Errorf("%d of %d place visits named a declaration absent from the table; the walk that "+
+		test.Errorf("%d of %d place visits named a declaration absent from the table; the walk that "+
 			"builds it and the walk that reads it disagree", missing, declarationsSeen)
 	}
 
@@ -288,20 +288,20 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	// discriminates. A number hardcoded beside the code that computes it drifts, and this is the one
 	// place where a phantom discrepancy would cost the most. The live values are interpolated below.
 	if outOfOrder == 0 {
-		t.Fatalf("no place visit arrived out of order across %d visits in %d functions, so a "+
+		test.Fatalf("no place visit arrived out of order across %d visits in %d functions, so a "+
 			"last-write table would be identical to a max table here and this assertion cannot "+
 			"discriminate", declarationsSeen, functions)
 	}
 	for declaration, recorded := range highestPerDeclaration {
 		if held, found := recordedTable[declaration]; !found || held != recorded {
-			t.Errorf("declaration %d was seen at a highest order of %d and the table holds %d; "+
+			test.Errorf("declaration %d was seen at a highest order of %d and the table holds %d; "+
 				"the table is recording the last usage rather than the greatest",
 				declaration, recorded, held)
 			break
 		}
 	}
 
-	t.Logf("functions=%d placeVisits=%d missing=%d outOfOrder=%d",
+	test.Logf("functions=%d placeVisits=%d missing=%d outOfOrder=%d",
 		functions, declarationsSeen, missing, outOfOrder)
 }
 
@@ -315,17 +315,17 @@ func TestFindLastUsageCorpus(t *testing.T) {
 // Both directions are asserted with a nil checker, which forces `IsAlwaysInvalidatingType` to
 // answer false: that isolates the no-dependencies arm from the type arm, so a test passing here
 // cannot be passing because the type lookup happened to say yes.
-func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
-	t.Parallel()
+func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	function, _ := rangesFor(test, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 
 	empty := &ScopeDependencies{}
 	if !ScopeIsEligibleForMerging(function, 1, empty, nil) {
-		t.Error("a scope with no dependencies must be eligible; its output can never change")
+		test.Error("a scope with no dependencies must be eligible; its output can never change")
 	}
 
 	withDependency := &ScopeDependencies{
@@ -334,12 +334,12 @@ func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
 		},
 	}
 	if ScopeIsEligibleForMerging(function, 1, withDependency, nil) {
-		t.Error("a scope with dependencies and no always-invalidating declaration must not be " +
+		test.Error("a scope with dependencies and no always-invalidating declaration must not be " +
 			"eligible; keeping it separate lets a later scope compare and skip")
 	}
 
 	if ScopeIsEligibleForMerging(function, 1, nil, nil) {
-		t.Error("a nil dependency table answered eligible")
+		test.Error("a nil dependency table answered eligible")
 	}
 }
 
@@ -347,12 +347,12 @@ func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
 //
 // Only 2 of 1,576 corpus scopes carry a reassignment, so corpus coverage says almost nothing about
 // this branch. It gets its own fixture for that reason rather than being trusted to the sweep.
-func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
-	t.Parallel()
+func TestCanMergeScopesDeclinesReassignments(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	function, _ := rangesFor(test, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 
 	// Identical dependencies, which would otherwise merge on condition two.
@@ -361,7 +361,7 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 		dependencies: map[ScopeId][]ReactiveScopeDependency{1: shared, 2: shared},
 	}
 	if !CanMergeScopes(function, 1, 2, table, nil, nil) {
-		t.Fatal("two scopes with identical dependencies and no reassignments must merge; the rest " +
+		test.Fatal("two scopes with identical dependencies and no reassignments must merge; the rest " +
 			"of this test assumes that baseline")
 	}
 
@@ -373,14 +373,14 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 		{name: "next reassigns", reassignments: map[ScopeId][]static_single_assignment.IdentifierId{2: {5}}},
 		{name: "both reassign", reassignments: map[ScopeId][]static_single_assignment.IdentifierId{1: {5}, 2: {6}}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			withReassignment := &ScopeDependencies{
 				dependencies:  map[ScopeId][]ReactiveScopeDependency{1: shared, 2: shared},
 				reassignments: testCase.reassignments,
 			}
 			if CanMergeScopes(function, 1, 2, withReassignment, nil, nil) {
-				t.Error("a scope carrying a reassignment must decline; its output depends on " +
+				test.Error("a scope carrying a reassignment must decline; its output depends on " +
 					"control flow rather than on its dependencies alone")
 			}
 		})
@@ -393,12 +393,12 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 // type be always-invalidating. Dropping either turns "these always change together" into "these
 // happen to be connected", which merges scopes that do not invalidate together -- and the resulting
 // program recomputes more than it should while every fixture still passes.
-func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
-	t.Parallel()
+func TestCanMergeScopesRequiresRootedInvalidatingFlow(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	function, _ := rangesFor(test, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
-		t.Fatal("the source did not lower")
+		test.Fatal("the source did not lower")
 	}
 
 	// A pathed dependency, with a nil checker so the type arm cannot rescue it either. The point is
@@ -411,7 +411,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9}},
 	}
 	if CanMergeScopes(function, 1, 2, pathed, nil, nil) {
-		t.Error("a dependency read through a property path must decline; a property off an " +
+		test.Error("a dependency read through a property path must decline; a property off an " +
 			"invalidating value is not itself guaranteed to change")
 	}
 
@@ -430,7 +430,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9, 11}},
 	}
 	if CanMergeScopes(function, 1, 2, rooted, nil, nil) {
-		t.Error("a rooted dependency whose type is not always-invalidating must decline; the " +
+		test.Error("a rooted dependency whose type is not always-invalidating must decline; the " +
 			"earlier scope's output may not change when its input does")
 	}
 
@@ -443,7 +443,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 		declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {9}},
 	}
 	if !CanMergeScopes(function, 1, 2, declarationsMatch, nil, nil) {
-		t.Error("when the earlier scope's declarations are exactly the later scope's dependencies, " +
+		test.Error("when the earlier scope's declarations are exactly the later scope's dependencies, " +
 			"the scopes merge without consulting types")
 	}
 }
@@ -457,10 +457,10 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 //
 // Each case here is therefore built to pass every guard except the one it targets, with a real
 // checker so the type arm genuinely answers true rather than falling through on a nil.
-func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
-	t.Parallel()
+func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(test *testing.T) {
+	test.Parallel()
 
-	withInvalidatingScopes(t, func(function *Function, checker *shimchecker.Checker,
+	withInvalidatingScopes(test, func(function *Function, checker *shimchecker.Checker,
 		invalidating static_single_assignment.IdentifierId) {
 		// The baseline: rooted, always-invalidating, flowing from the earlier scope's declarations,
 		// and the two dependency sets deliberately unequal so conditions one and two cannot fire.
@@ -473,7 +473,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating}},
 		}
 		if !CanMergeScopes(function, 1, 2, baseline, nil, checker) {
-			t.Fatal("the baseline did not merge, so every case below is rejected for the wrong " +
+			test.Fatal("the baseline did not merge, so every case below is rejected for the wrong " +
 				"reason and this test asserts nothing about individual guards")
 		}
 
@@ -486,7 +486,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating}},
 		}
 		if CanMergeScopes(function, 1, 2, pathed, nil, checker) {
-			t.Error("a pathed dependency merged; a property read off an invalidating value is not " +
+			test.Error("a pathed dependency merged; a property read off an invalidating value is not " +
 				"itself guaranteed to change, so the rooted check must reject it")
 		}
 
@@ -499,7 +499,7 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 			declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {invalidating + 2}},
 		}
 		if CanMergeScopes(function, 1, 2, unflowed, nil, checker) {
-			t.Error("a dependency the earlier scope does not declare merged; without the flow " +
+			test.Error("a dependency the earlier scope does not declare merged; without the flow " +
 				"check this is two unrelated scopes that happen to read invalidating values")
 		}
 	})
@@ -510,8 +510,8 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
 //
 // The identifier is found rather than assumed: a hardcoded id would silently stop being an array
 // the day lowering changes, and the test would keep passing while asserting nothing.
-func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Checker, static_single_assignment.IdentifierId)) {
-	t.Helper()
+func withInvalidatingScopes(test *testing.T, visit func(*Function, *shimchecker.Checker, static_single_assignment.IdentifierId)) {
+	test.Helper()
 
 	ran := false
 	probe := rule.Rule{
@@ -521,7 +521,7 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so the type " +
+						test.Fatal("the typed harness handed this probe a nil checker, so the type " +
 							"arm would answer false and the baseline could never merge")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -545,12 +545,12 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/merge.ts": `function f(a) { const first = [a]; const second = [first]; return second; }`,
 	}, "/merge.ts")
 
 	if !ran {
-		t.Fatal("no always-invalidating identifier was found in the fixture, so the callback " +
+		test.Fatal("no always-invalidating identifier was found in the fixture, so the callback " +
 			"never ran and this test asserted nothing")
 	}
 }
@@ -564,13 +564,13 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 // Run over the corpus rather than a fixture because the merge fires on real code and rarely on
 // invented code, and a conservation test that never sees a merge asserts nothing. The merge count is
 // therefore asserted nonzero first.
-func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
-	t.Parallel()
+func TestMergeReactiveScopesPreservesEveryStatement(test *testing.T) {
+	test.Parallel()
 
 	functions, totalMerges, lost := 0, 0, 0
 	pruneCalls, declarationsPruned := 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
+	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
 		ranges := InferMutableRanges(function)
 		set := FindDisjointMutableValuesWithRanges(function, ranges)
 		scopes := AssignReactiveScopesWithSets(function, ranges, set)
@@ -599,18 +599,18 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 	})
 
 	if functions < 50 {
-		t.Fatalf("only %d functions reached the merge; the corpus walk is not reaching real source",
+		test.Fatalf("only %d functions reached the merge; the corpus walk is not reaching real source",
 			functions)
 	}
 	// The baseline. Every rejection-shaped assertion below is meaningless if the pass never fires,
 	// and a merge pass that silently does nothing is exactly what this file's earlier fixtures kept
 	// producing.
 	if totalMerges == 0 {
-		t.Fatalf("no scope merged across %d functions, so the conservation assertion below is "+
+		test.Fatalf("no scope merged across %d functions, so the conservation assertion below is "+
 			"vacuous; either the pass is a no-op or the corpus holds no mergeable pair", functions)
 	}
 	if lost != 0 {
-		t.Errorf("%d of %d functions changed instruction count across the merge; a merge moves "+
+		test.Errorf("%d of %d functions changed instruction count across the merge; a merge moves "+
 			"statements between scopes and must never lose one", lost, functions)
 	}
 
@@ -629,12 +629,12 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 	// A refactor that drops the call, or moves it behind a guard that stops firing, breaks this
 	// equality. Without it every test still passes and the pruning silently stops happening.
 	if pruneCalls != totalMerges {
-		t.Errorf("the declaration pruning ran %d times across %d merges; upstream runs it once per "+
+		test.Errorf("the declaration pruning ran %d times across %d merges; upstream runs it once per "+
 			"merge, so an inequality means the call was dropped or guarded and the zero below "+
 			"stops meaning anything", pruneCalls, totalMerges)
 	}
 
-	t.Logf("functions=%d merges=%d functionsLosingStatements=%d pruneCalls=%d declarationsPruned=%d",
+	test.Logf("functions=%d merges=%d functionsLosingStatements=%d pruneCalls=%d declarationsPruned=%d",
 		functions, totalMerges, lost, pruneCalls, declarationsPruned)
 }
 
@@ -647,12 +647,12 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 // The self-reference case is asserted directly because it is the specific failure a missing
 // `to > from + 1` guard produces: every scope "merges" with itself, `Merged` fills with its own id,
 // and the pass reports work it did not do.
-func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
-	t.Parallel()
+func TestMergeReactiveScopesRecordsAbsorbedIds(test *testing.T) {
+	test.Parallel()
 
 	functions, merges, recorded, selfReferences := 0, 0, 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
+	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
 		ranges := InferMutableRanges(function)
 		set := FindDisjointMutableValuesWithRanges(function, ranges)
 		scopes := AssignReactiveScopesWithSets(function, ranges, set)
@@ -682,18 +682,18 @@ func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
 	})
 
 	if merges == 0 {
-		t.Fatalf("no scope merged across %d functions, so the assertions below are vacuous", functions)
+		test.Fatalf("no scope merged across %d functions, so the assertions below are vacuous", functions)
 	}
 	if recorded != merges {
-		t.Errorf("the pass reported %d merges and the tree records %d absorbed ids; the rule reads "+
+		test.Errorf("the pass reported %d merges and the tree records %d absorbed ids; the rule reads "+
 			"that field and would track fewer scopes than exist", merges, recorded)
 	}
 	if selfReferences != 0 {
-		t.Errorf("%d scope(s) list their own id as absorbed; a candidate spanning one scope must "+
+		test.Errorf("%d scope(s) list their own id as absorbed; a candidate spanning one scope must "+
 			"not commit, and this is what its absence looks like", selfReferences)
 	}
 
-	t.Logf("functions=%d merges=%d recordedIds=%d selfReferences=%d",
+	test.Logf("functions=%d merges=%d recordedIds=%d selfReferences=%d",
 		functions, merges, recorded, selfReferences)
 }
 
@@ -707,8 +707,8 @@ func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
 // This drives the rewrite directly with a constructed block instead, which is the only way to reach
 // the arm at all. A synthetic tree is a weaker test than real source and it is used here for a
 // stated reason rather than convenience: the alternative is an arm with no coverage whatsoever.
-func TestMergeReactiveScopesFoldsInterleavedStatements(t *testing.T) {
-	t.Parallel()
+func TestMergeReactiveScopesFoldsInterleavedStatements(test *testing.T) {
+	test.Parallel()
 
 	first := &ReactiveScopeBlock{Scope: 1}
 	between := &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{Order: 5}}
@@ -722,18 +722,18 @@ func TestMergeReactiveScopesFoldsInterleavedStatements(t *testing.T) {
 	rebuilt := merger.rewrite(block, []mergeCandidate{{scope: first, from: 0, to: 3}})
 
 	if merger.merges != 1 {
-		t.Fatalf("the rewrite folded %d scopes, want 1; the rest of this test assumes it ran",
+		test.Fatalf("the rewrite folded %d scopes, want 1; the rest of this test assumes it ran",
 			merger.merges)
 	}
 	if len(rebuilt) != 2 {
-		t.Fatalf("the rebuilt block holds %d statements, want 2 (the survivor and the trailing "+
+		test.Fatalf("the rebuilt block holds %d statements, want 2 (the survivor and the trailing "+
 			"statement outside the run)", len(rebuilt))
 	}
 	if rebuilt[0] != ReactiveStatement(first) {
-		t.Error("the survivor is not the first statement of the rebuilt block")
+		test.Error("the survivor is not the first statement of the rebuilt block")
 	}
 	if rebuilt[1] != ReactiveStatement(trailing) {
-		t.Error("the statement after the run was not copied through; the tail is being dropped")
+		test.Error("the statement after the run was not copied through; the tail is being dropped")
 	}
 
 	// The load-bearing assertion: the interleaved statement is inside the survivor, not discarded.
@@ -748,14 +748,14 @@ func TestMergeReactiveScopesFoldsInterleavedStatements(t *testing.T) {
 		foundAbsorbed = true
 	}
 	if !foundBetween {
-		t.Error("the statement between the two scopes was dropped rather than folded into the " +
+		test.Error("the statement between the two scopes was dropped rather than folded into the " +
 			"survivor; the allowlist permits it to be there, so losing it loses real work")
 	}
 	if !foundAbsorbed {
-		t.Fatal("the absorbed scope had no statements, so this fixture cannot tell whether its " +
+		test.Fatal("the absorbed scope had no statements, so this fixture cannot tell whether its " +
 			"body was folded")
 	}
 	if len(first.Merged) != 1 || first.Merged[0] != 2 {
-		t.Errorf("the survivor records %v as absorbed, want [2]", first.Merged)
+		test.Errorf("the survivor records %v as absorbed, want [2]", first.Merged)
 	}
 }

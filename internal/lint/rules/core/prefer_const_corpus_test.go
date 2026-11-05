@@ -32,8 +32,8 @@ import (
  * Each finding is its text and byte offset. The fixed column is the whole file after ESLint's fixes,
  * or empty where ESLint offers none.
  */
-func TestPreferConstAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestPreferConstAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreferConstOptions]()
 	cases := []struct {
@@ -243,11 +243,11 @@ func TestPreferConstAgreesWithESLint(t *testing.T) {
 		if testCase.options != "" {
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
-				t.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
+				test.Fatalf("case %d (%s): ESLint accepts %s and the decoder refused it: %v", index, testCase.origin, testCase.options, err)
 			}
 			options = decoded
 		}
-		result := rule_testing.RunTypedVerbatimWithOptions(t, PreferConst, "input.ts", testCase.code, options)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferConst, "input.ts", testCase.code, options)
 		source := result.SourceFile.Text()
 		got := []string{}
 		type pending struct {
@@ -265,7 +265,7 @@ func TestPreferConstAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
+			test.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
 			continue
 		}
 
@@ -278,7 +278,7 @@ func TestPreferConstAgreesWithESLint(t *testing.T) {
 			}
 		}
 		if fixed != testCase.fixed {
-			t.Errorf("case %d (%s, %s): %q\nfixed to: %q\n  ESLint: %q", index, testCase.origin, testCase.options, testCase.code, fixed, testCase.fixed)
+			test.Errorf("case %d (%s, %s): %q\nfixed to: %q\n  ESLint: %q", index, testCase.origin, testCase.options, testCase.code, fixed, testCase.fixed)
 		}
 	}
 }

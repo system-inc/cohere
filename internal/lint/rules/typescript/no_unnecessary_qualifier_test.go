@@ -22,8 +22,8 @@ func noUnnecessaryQualifierCaseName(index int) string {
 // scope. `namespace X { const z = X.y }` passes because `y` does not exist, so the accessed symbol
 // is nil. The two `Foo` cases where an enum and a namespace merge pass because the scope lookup for
 // the accessed symbol's flags returns an empty scope.
-func TestNoUnnecessaryQualifierStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryQualifierStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"namespace X {\n  export type T = number;\n}\n\nnamespace Y {\n  export const x: X.T = 3;\n}\n",
@@ -65,9 +65,9 @@ func TestNoUnnecessaryQualifierStaysSilent(t *testing.T) {
 		"function F() {}\nnamespace F {\n  export const x = 3;\n}\nconst y = F.x;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnnecessaryQualifierCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnnecessaryQualifier,
+		test.Run(noUnnecessaryQualifierCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnnecessaryQualifier,
 				noUnnecessaryQualifierFile, sourceText))
 		})
 	}
@@ -107,8 +107,8 @@ type noUnnecessaryQualifierFinding struct {
 // rather than the whole access, which is upstream's `node: qualifier`, and on a nested chain like
 // `A.B.C.D` it is `A.B.C` rather than `A`. Asserting only the message id would leave both the span
 // and the nesting suppression free to be wrong.
-func TestNoUnnecessaryQualifierFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryQualifierFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -278,16 +278,16 @@ func TestNoUnnecessaryQualifierFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryQualifierCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryQualifier, noUnnecessaryQualifierFile,
+		test.Run(noUnnecessaryQualifierCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryQualifier, noUnnecessaryQualifierFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range testCase.wantFindings {
 				wantIds[position] = "unnecessaryQualifier"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so both the span slice and the expected
 			// repaired source are against that text rather than the Go literal above.
@@ -296,11 +296,11 @@ func TestNoUnnecessaryQualifierFires(t *testing.T) {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				wantMessage := "Qualifier is unnecessary since '" + want.wantName + "' is in scope."
 				if diagnostic.Message.Description != wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, wantMessage,
 						diagnostic.Message.Description)
 				}
 
@@ -312,7 +312,7 @@ func TestNoUnnecessaryQualifierFires(t *testing.T) {
 					wantFixes = 0
 				}
 				if len(diagnostic.Fixes) != wantFixes {
-					t.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
+					test.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
 						len(diagnostic.Fixes))
 				}
 			}
@@ -327,9 +327,9 @@ func TestNoUnnecessaryQualifierFires(t *testing.T) {
 				}
 			}
 			if anyFixExpected {
-				rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantOutput)+"\n")
+				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantOutput)+"\n")
 			} else if strings.TrimSpace(testCase.wantOutput)+"\n" != strings.TrimSpace(testCase.sourceText)+"\n" {
-				t.Fatalf("a row expecting no fix must expect the source unchanged")
+				test.Fatalf("a row expecting no fix must expect the source unchanged")
 			}
 		})
 	}

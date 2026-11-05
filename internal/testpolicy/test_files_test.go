@@ -11,11 +11,11 @@ import (
 // eachTestFile calls visit with every _test.go file of this module and its source, and returns the module
 // root and how many files it read. It fails the test when it read fewer than 100, since a walk that read
 // nothing would let every policy pass.
-func eachTestFile(t *testing.T, visit func(path string, source []byte) error) (string, int) {
-	t.Helper()
+func eachTestFile(test *testing.T, visit func(path string, source []byte) error) (string, int) {
+	test.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	files := 0
 	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
@@ -47,10 +47,10 @@ func eachTestFile(t *testing.T, visit func(path string, source []byte) error) (s
 		return visit(path, source)
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if files < 100 {
-		t.Fatalf("read only %d test files under %s", files, root)
+		test.Fatalf("read only %d test files under %s", files, root)
 	}
 	return root, files
 }

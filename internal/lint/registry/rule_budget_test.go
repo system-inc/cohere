@@ -112,26 +112,26 @@ func ruleBudgetCorpus() map[string]string {
 	return files
 }
 
-func buildBudgetGraph(t *testing.T, files map[string]string) *program.Graph {
-	t.Helper()
-	directory := t.TempDir()
+func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
+	test.Helper()
+	directory := test.TempDir()
 	for name, source := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(typedCorpusConfig), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(graph.ProjectFiles()) != len(files) {
-		t.Fatalf("built %d files, want %d", len(graph.ProjectFiles()), len(files))
+		test.Fatalf("built %d files, want %d", len(graph.ProjectFiles()), len(files))
 	}
 	if diagnostics := graph.Program.GetSyntacticDiagnostics(context.Background(), nil); len(diagnostics) != 0 {
-		t.Fatalf("generated corpus has %d syntax errors", len(diagnostics))
+		test.Fatalf("generated corpus has %d syntax errors", len(diagnostics))
 	}
 	graph.CollectTimings = true
 	return graph
@@ -163,8 +163,8 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 	}
 }
 
-func checkRuleBudget(t *testing.T, graph *program.Graph, rules []rule.Rule, budget time.Duration) ([]program.RuleTiming, error) {
-	t.Helper()
+func checkRuleBudget(test *testing.T, graph *program.Graph, rules []rule.Rule, budget time.Duration) ([]program.RuleTiming, error) {
+	test.Helper()
 	started := time.Now()
 	var rows []program.RuleTiming
 	nodes := 0
@@ -178,7 +178,7 @@ func checkRuleBudget(t *testing.T, graph *program.Graph, rules []rule.Rule, budg
 	}
 	// Coverage precedes every verdict, including a deadline or an incomplete walk.
 	defer func() {
-		t.Logf("rule CPU coverage: rules run=%d registered=%d corpus nodes=%d files=%d wall=%s", len(rows), len(rules), nodes, len(graph.ProjectFiles()), time.Since(started))
+		test.Logf("rule CPU coverage: rules run=%d registered=%d corpus nodes=%d files=%d wall=%s", len(rows), len(rules), nodes, len(graph.ProjectFiles()), time.Since(started))
 	}()
 	for _, subject := range rules {
 		result, err := measureOne(graph, subject, budget*3)
@@ -205,24 +205,24 @@ func checkRuleBudget(t *testing.T, graph *program.Graph, rules []rule.Rule, budg
 
 // Invoked separately by cohere-dev land with -count=1: a cached test verdict must
 // never answer a performance question on a busy landing machine.
-func TestRegisteredRuleCPUBudget(t *testing.T) {
-	t.Parallel()
+func TestRegisteredRuleCPUBudget(test *testing.T) {
+	test.Parallel()
 	started := time.Now()
 	rules := All()
 	if len(rules) == 0 {
-		t.Fatal("empty registry")
+		test.Fatal("empty registry")
 	}
-	graph := buildBudgetGraph(t, ruleBudgetCorpus())
-	rows, err := checkRuleBudget(t, graph, rules, ruleCPUBudget)
+	graph := buildBudgetGraph(test, ruleBudgetCorpus())
+	rows, err := checkRuleBudget(test, graph, rules, ruleCPUBudget)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].TotalCPU() > rows[j].TotalCPU() })
 	for i, row := range rows {
 		if i == 10 {
 			break
 		}
-		t.Logf("rule CPU: %s %.3fms", row.Name, float64(row.TotalCPU())/float64(time.Millisecond))
+		test.Logf("rule CPU: %s %.3fms", row.Name, float64(row.TotalCPU())/float64(time.Millisecond))
 	}
-	t.Logf("rule CPU budget check elapsed: %s", time.Since(started))
+	test.Logf("rule CPU budget check elapsed: %s", time.Since(started))
 }

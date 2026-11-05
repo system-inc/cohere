@@ -16,14 +16,14 @@ const operatorAssignmentFile = "/repository/source/OperatorAssignment.ts"
 // The default is `always`, so a struct built by hand would carry a non-nil setting and every case
 // would pass while the live config's bare "error" still handed the rule a nil it read as silence.
 // An empty string here means that bare configuration.
-func decodedOperatorAssignmentOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedOperatorAssignmentOptions(test *testing.T, raw string) any {
+	test.Helper()
 	if raw == "" {
 		return nil
 	}
 	options, err := DecodeOperatorAssignmentOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return options
 }
@@ -40,8 +40,8 @@ func decodedOperatorAssignmentOptions(t *testing.T, raw string) any {
 // 24 of the 69 carry `output: null`, meaning upstream reports and deliberately withholds the
 // repair. Those are asserted as declines rather than dropped, because a fixer that repairs a case
 // upstream refuses to touch is a defect no message-id fixture can see.
-func TestOperatorAssignmentFires(t *testing.T) {
-	t.Parallel()
+func TestOperatorAssignmentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -123,11 +123,11 @@ func TestOperatorAssignmentFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
-				testCase.name, decodedOperatorAssignmentOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+				testCase.name, decodedOperatorAssignmentOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			// The rendered text, not only the id. Both messages interpolate the operator, and a
 			// rule naming the wrong one renders a sentence that reads perfectly.
@@ -140,7 +140,7 @@ func TestOperatorAssignmentFires(t *testing.T) {
 					want = operatorAssignmentUnexpectedMessage(testCase.wantOperator[index]).Description
 				}
 				if got := diagnostic.Message.Description; got != want {
-					t.Fatalf("finding %d message:\n got %q\nwant %q", index, got, want)
+					test.Fatalf("finding %d message:\n got %q\nwant %q", index, got, want)
 				}
 			}
 
@@ -151,20 +151,20 @@ func TestOperatorAssignmentFires(t *testing.T) {
 
 			if !testCase.fixable {
 				if fixCount != 0 {
-					t.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
+					test.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
 				}
 				return
 			}
 			if fixCount == 0 {
-				t.Fatalf("upstream fixes this case and the rule proposed no repair")
+				test.Fatalf("upstream fixes this case and the rule proposed no repair")
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
 
-func TestOperatorAssignmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestOperatorAssignmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -223,11 +223,11 @@ func TestOperatorAssignmentStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
-				testCase.name, decodedOperatorAssignmentOptions(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+				testCase.name, decodedOperatorAssignmentOptions(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -249,8 +249,8 @@ func TestOperatorAssignmentStaysSilent(t *testing.T) {
 // they were ranked tightest and the expansion silently re-associated: `x += 1 as number` became
 // `x = x + 1 as number`, which asserts the type of the SUM rather than of the addend. The two
 // parses were compared directly to establish that, rather than read off the grammar.
-func TestOperatorAssignmentTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestOperatorAssignmentTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -268,11 +268,11 @@ func TestOperatorAssignmentTypeScriptShapes(t *testing.T) {
 		{"a satisfies expression needs them too", "x += 1 satisfies number", "\"never\"", "unexpected", "x = x + (1 satisfies number)", true},
 		{"a non-null assertion on the target reports without a repair", "x! += 1", "\"never\"", "unexpected", "", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
-				testCase.sourceText, decodedOperatorAssignmentOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+				testCase.sourceText, decodedOperatorAssignmentOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			fixCount := 0
 			for _, diagnostic := range result.Diagnostics {
@@ -280,11 +280,11 @@ func TestOperatorAssignmentTypeScriptShapes(t *testing.T) {
 			}
 			if !testCase.fixable {
 				if fixCount != 0 {
-					t.Fatalf("expected no repair, got %d", fixCount)
+					test.Fatalf("expected no repair, got %d", fixCount)
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }

@@ -36,14 +36,14 @@ type noBitwiseCase struct {
 //
 // Not a hand-built options struct. A fixture constructing the options directly never exercises the
 // decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
-func decodeNoBitwiseOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeNoBitwiseOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeNoBitwiseOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -51,62 +51,62 @@ func decodeNoBitwiseOptionsForTest(t *testing.T, optionsJson string) any {
 // noBitwiseOffsetOf converts a 1-based line and column into a byte offset.
 //
 // `rule_testing.Run` does not trim its input, so no rebasing is needed.
-func noBitwiseOffsetOf(t *testing.T, source string, line int, column int) int {
-	t.Helper()
+func noBitwiseOffsetOf(test *testing.T, source string, line int, column int) int {
+	test.Helper()
 	offset := 0
 	for current := 1; current < line; current++ {
 		next := strings.IndexByte(source[offset:], '\n')
 		if next < 0 {
-			t.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", line)
 		}
 		offset += next + 1
 	}
 	return offset + column - 1
 }
 
-func runNoBitwise(t *testing.T, testCase noBitwiseCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunWithOptions(t, NoBitwise, noBitwiseFile, testCase.source,
-		decodeNoBitwiseOptionsForTest(t, testCase.optionsJson))
+func runNoBitwise(test *testing.T, testCase noBitwiseCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunWithOptions(test, NoBitwise, noBitwiseFile, testCase.source,
+		decodeNoBitwiseOptionsForTest(test, testCase.optionsJson))
 }
 
 // TestNoBitwiseStaysSilent runs upstream's whole `valid` list.
-func TestNoBitwiseStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noBitwiseCleanCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoBitwise(t, testCase))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoBitwise(test, testCase))
 		})
 	}
 }
 
 // TestNoBitwiseFires runs upstream's whole `invalid` list, asserting the span and the operator.
-func TestNoBitwiseFires(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noBitwiseReportingCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoBitwise(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoBitwise(test, testCase)
 
 			wantIds := make([]string, 0, len(testCase.findings))
 			for range testCase.findings {
 				wantIds = append(wantIds, messageNoBitwise.Id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := noBitwiseOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := noBitwiseOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
+				wantPos := noBitwiseOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := noBitwiseOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
 				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
+					test.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
 						index, wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
 						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 				want := "Unexpected use of '" + expected.operator + "'."
 				if !strings.HasPrefix(diagnostic.Message.Description, want) {
-					t.Errorf("finding %d: expected the message to name %q, got %q",
+					test.Errorf("finding %d: expected the message to name %q, got %q",
 						index, expected.operator, diagnostic.Message.Description)
 				}
 			}
@@ -118,8 +118,8 @@ func TestNoBitwiseFires(t *testing.T) {
 //
 // The corpus writes exactly two `int32Hint` cases, `a|0` on and `a|0` with allow, so nothing in it
 // separates "the right operand is the literal zero" from any looser reading. These do.
-func TestNoBitwiseInt32HintEdges(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseInt32HintEdges(test *testing.T) {
+	test.Parallel()
 	const hintOn = `{"int32Hint":true}`
 	cases := []noBitwiseCase{
 		{name: "x|0 is the idiom", source: `x|0`, optionsJson: hintOn, reason: "the corpus case"},
@@ -133,11 +133,11 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 		{name: "x|0e0 is exempt", source: `x|0e0`, optionsJson: hintOn, reason: "same canonicalisation"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoBitwise(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoBitwise(test, testCase)
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
+				test.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
 			}
 		})
 	}
@@ -171,11 +171,11 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 		},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoBitwise(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoBitwise(test, testCase)
 			if len(result.Diagnostics) == 0 {
-				t.Errorf("expected a finding and got none. %s", testCase.reason)
+				test.Errorf("expected a finding and got none. %s", testCase.reason)
 			}
 		})
 	}
@@ -193,10 +193,10 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 // the alternative is silently widening an exemption. The sibling `no-negated-condition` in this
 // batch unwraps for the opposite reason: there the parens sit on a finding rather than on an
 // exemption, and declining costs findings.
-func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(t *testing.T) {
-	t.Parallel()
-	result := runNoBitwise(t, noBitwiseCase{source: `x|(0)`, optionsJson: `{"int32Hint":true}`})
-	rule_testing.ExpectFindings(t, result, messageNoBitwise.Id)
+func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(test *testing.T) {
+	test.Parallel()
+	result := runNoBitwise(test, noBitwiseCase{source: `x|(0)`, optionsJson: `{"int32Hint":true}`})
+	rule_testing.ExpectFindings(test, result, messageNoBitwise.Id)
 }
 
 // TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
@@ -204,8 +204,8 @@ func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(t *testing.T) {
 // Every fixture above reaches the decoder with bytes this test file built; the config layer builds
 // different bytes. `meta.schema` declares ONE element here, so the cohere spelling and upstream's
 // coincide, and that is the fact being pinned rather than assumed.
-func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name      string
 		raw       string
@@ -244,27 +244,27 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoBitwiseOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
+					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
 			}
 			options, ok := decoded.(NoBitwiseOptions)
 			if !ok {
-				t.Fatalf("the decoder returned %T rather than NoBitwiseOptions", decoded)
+				test.Fatalf("the decoder returned %T rather than NoBitwiseOptions", decoded)
 			}
 			if options.Int32Hint != testCase.wantHint {
-				t.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, options.Int32Hint)
+				test.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, options.Int32Hint)
 			}
 			if strings.Join(options.Allow, ",") != strings.Join(testCase.wantAllow, ",") {
-				t.Errorf("allow: expected %v, got %v", testCase.wantAllow, options.Allow)
+				test.Errorf("allow: expected %v, got %v", testCase.wantAllow, options.Allow)
 			}
 		})
 	}
@@ -274,20 +274,20 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
 //
 // A decoder that round-trips and a rule that ignores what it decoded look identical from the test
 // above. One source, two configurations, opposite verdicts.
-func TestNoBitwiseAllowActuallyReachesTheRule(t *testing.T) {
-	t.Parallel()
-	allowed := runNoBitwise(t, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["~"]}`})
+func TestNoBitwiseAllowActuallyReachesTheRule(test *testing.T) {
+	test.Parallel()
+	allowed := runNoBitwise(test, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["~"]}`})
 	if len(allowed.Diagnostics) != 0 {
-		t.Errorf("with `~` allowed the rule must be silent, got %v", allowed.MessageIds())
+		test.Errorf("with `~` allowed the rule must be silent, got %v", allowed.MessageIds())
 	}
 
 	// The control, and it is the load-bearing half: an allow list for a DIFFERENT operator must not
 	// exempt this one, which separates "the list was read" from "the list was read correctly".
-	other := runNoBitwise(t, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["|"]}`})
-	rule_testing.ExpectFindings(t, other, messageNoBitwise.Id)
+	other := runNoBitwise(test, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["|"]}`})
+	rule_testing.ExpectFindings(test, other, messageNoBitwise.Id)
 
-	none := runNoBitwise(t, noBitwiseCase{source: `~a`})
-	rule_testing.ExpectFindings(t, none, messageNoBitwise.Id)
+	none := runNoBitwise(test, noBitwiseCase{source: `~a`})
+	rule_testing.ExpectFindings(test, none, messageNoBitwise.Id)
 }
 
 // TestNoBitwiseLogicalOperatorsStayClean pins the omissions from upstream's list.
@@ -295,18 +295,18 @@ func TestNoBitwiseAllowActuallyReachesTheRule(t *testing.T) {
 // The list is thirteen bitwise operators, and the four a reader most expects to see in it are
 // absent: `&&`, `||`, `??` and `!`. The corpus asserts the assignment forms; the plain forms and the
 // remaining arithmetic operators are stated here so a mutation adding a kind to the map fails.
-func TestNoBitwiseLogicalOperatorsStayClean(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseLogicalOperatorsStayClean(test *testing.T) {
+	test.Parallel()
 	sources := []string{
 		`a && b`, `a || b`, `a ?? b`, `!a`, `a + b`, `a - b`, `a * b`, `a / b`, `a % b`,
 		`a ** b`, `a += b`, `a -= b`, `a &&= b`, `a ||= b`, `a ??= b`, `a === b`, `a < b`, `a > b`,
 	}
 	for _, source := range sources {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := runNoBitwise(t, noBitwiseCase{source: source})
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := runNoBitwise(test, noBitwiseCase{source: source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v: this operator is not bitwise", result.MessageIds())
+				test.Errorf("expected silence, got %v: this operator is not bitwise", result.MessageIds())
 			}
 		})
 	}
@@ -435,8 +435,8 @@ var noBitwiseReportingCases = []noBitwiseCase{
 // This walks every spelling the decoder accepts and requires it to actually exempt its own operator,
 // which is the only assertion that fails when the two drift. The count is asserted too, so removing
 // an entry from either side fails here rather than quietly testing less.
-func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(t *testing.T) {
-	t.Parallel()
+func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(test *testing.T) {
+	test.Parallel()
 	// One source per operator, chosen so the operator under test is the only one present.
 	sourceFor := map[string]string{
 		"^": `a ^ b`, "|": `a | b`, "&": `a & b`,
@@ -448,30 +448,30 @@ func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(t *testing.T) {
 
 	accepted := noBitwiseAllowedSpellings()
 	if len(accepted) != 13 {
-		t.Fatalf("expected upstream's thirteen operators, got %d: %v", len(accepted), accepted)
+		test.Fatalf("expected upstream's thirteen operators, got %d: %v", len(accepted), accepted)
 	}
 
 	for _, spelling := range accepted {
 		source, known := sourceFor[spelling]
 		if !known {
-			t.Errorf("the decoder accepts %q but this test has no source exercising it, so nothing "+
+			test.Errorf("the decoder accepts %q but this test has no source exercising it, so nothing "+
 				"proves the rule can act on it", spelling)
 			continue
 		}
-		t.Run(spelling, func(t *testing.T) {
-			t.Parallel()
+		test.Run(spelling, func(test *testing.T) {
+			test.Parallel()
 			// It reports with no options...
-			rule_testing.ExpectFindings(t,
-				runNoBitwise(t, noBitwiseCase{source: source}), messageNoBitwise.Id)
+			rule_testing.ExpectFindings(test,
+				runNoBitwise(test, noBitwiseCase{source: source}), messageNoBitwise.Id)
 
 			// ...and allowing this exact spelling silences it. A spelling the decoder accepts that
 			// the map does not carry fails right here.
-			allowed := runNoBitwise(t, noBitwiseCase{
+			allowed := runNoBitwise(test, noBitwiseCase{
 				source:      source,
-				optionsJson: `{"allow":[` + string(mustJson(t, spelling)) + `]}`,
+				optionsJson: `{"allow":[` + string(mustJson(test, spelling)) + `]}`,
 			})
 			if len(allowed.Diagnostics) != 0 {
-				t.Errorf("allowing %q did not exempt %q: the decoder accepts a spelling the "+
+				test.Errorf("allowing %q did not exempt %q: the decoder accepts a spelling the "+
 					"operator map does not carry", spelling, source)
 			}
 		})
@@ -479,11 +479,11 @@ func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(t *testing.T) {
 }
 
 // mustJson quotes a string the way the config would, so the option text is built rather than typed.
-func mustJson(t *testing.T, value string) []byte {
-	t.Helper()
+func mustJson(test *testing.T, value string) []byte {
+	test.Helper()
 	encoded, err := json.Marshal(value)
 	if err != nil {
-		t.Fatalf("encoding %q: %v", value, err)
+		test.Fatalf("encoding %q: %v", value, err)
 	}
 	return encoded
 }

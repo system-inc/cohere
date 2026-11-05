@@ -21,22 +21,22 @@ var (
 // Building the settings struct directly would leave the decoder untested, and this rule's
 // default is TRUE, which is the one shape a generic decoder gets wrong: a zero-value struct
 // sets allowElseIf false, and false is not a no-op here but a different judgment.
-func elseReturnOptions(t *testing.T, allowElseIf *bool) any {
-	t.Helper()
+func elseReturnOptions(test *testing.T, allowElseIf *bool) any {
+	test.Helper()
 	if allowElseIf == nil {
 		decoded, err := DecodeNoElseReturnOptions(nil)
 		if err != nil {
-			t.Fatalf("the decoder refused an absent option: %v", err)
+			test.Fatalf("the decoder refused an absent option: %v", err)
 		}
 		return decoded
 	}
 	raw, err := json.Marshal(map[string]bool{"allowElseIf": *allowElseIf})
 	if err != nil {
-		t.Fatalf("could not marshal the option: %v", err)
+		test.Fatalf("could not marshal the option: %v", err)
 	}
 	decoded, err := DecodeNoElseReturnOptions(raw)
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
@@ -55,8 +55,8 @@ func elseReturnOptions(t *testing.T, allowElseIf *bool) any {
 //
 // The typed harness is used throughout because the collision check asks resolution what is in
 // scope. The rule reports without a checker and declines to repair, which a fixture asserts.
-func TestNoElseReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -140,22 +140,22 @@ func TestNoElseReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
 				elseReturnFile, testCase.sourceText,
-				elseReturnOptions(t, testCase.allowElseIf)), expected...)
+				elseReturnOptions(test, testCase.allowElseIf)), expected...)
 		})
 	}
 }
 
 // The clean cases.
-func TestNoElseReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -177,10 +177,10 @@ func TestNoElseReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
-				elseReturnFile, testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf)))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
+				elseReturnFile, testCase.sourceText, elseReturnOptions(test, testCase.allowElseIf)))
 		})
 	}
 }
@@ -203,8 +203,8 @@ func TestNoElseReturnStaysSilent(t *testing.T) {
 //
 // The typed harness writes strings.TrimSpace(source)+newline, so the expectation is transformed
 // the same way the input was rather than the rule being padded to match.
-func TestNoElseReturnFixes(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -236,10 +236,10 @@ func TestNoElseReturnFixes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
-				elseReturnFile, testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf)),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
+				elseReturnFile, testCase.sourceText, elseReturnOptions(test, testCase.allowElseIf)),
 				trailingNewlineOn(testCase.wantSource))
 		})
 	}
@@ -264,8 +264,8 @@ func trailingNewlineOn(want string) string {
 //
 // Asserted as the ABSENCE of a proposal rather than through ExpectFixedSource, which refuses a
 // result carrying no fixes rather than treating it as an unchanged rewrite.
-func TestNoElseReturnDeclinesToFix(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnDeclinesToFix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -319,18 +319,18 @@ func TestNoElseReturnDeclinesToFix(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
-				testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoElseReturn, elseReturnFile,
+				testCase.sourceText, elseReturnOptions(test, testCase.allowElseIf))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("expected no repair to be offered, got %d", len(diagnostic.Fixes))
+					test.Errorf("expected no repair to be offered, got %d", len(diagnostic.Fixes))
 				}
 			}
 		})
@@ -350,8 +350,8 @@ func TestNoElseReturnDeclinesToFix(t *testing.T) {
 //
 // Recorded as reporting-without-a-fix rather than deleted, so the gap is legible and a later
 // scope-depth answer turns these five green rather than leaving no trace they existed.
-func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnDivergesOnScopeDepth(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText     string
@@ -365,14 +365,14 @@ func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
-				testCase.sourceText, elseReturnOptions(t, nil))
-			rule_testing.ExpectFindings(t, result, "unexpected")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoElseReturn, elseReturnFile,
+				testCase.sourceText, elseReturnOptions(test, nil))
+			rule_testing.ExpectFindings(test, result, "unexpected")
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("this case is recorded as a scope-depth divergence and should carry "+
+					test.Errorf("this case is recorded as a scope-depth divergence and should carry "+
 						"no repair; if it now repairs, the divergence is closed and it belongs in "+
 						"TestNoElseReturnFixes with upstream's output %q", testCase.upstreamOutput)
 				}
@@ -394,8 +394,8 @@ func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
 // reconstructed from the tree. These cases assert that on an annotated declaration, a generic call,
 // a satisfies expression, a type assertion, a definite-assignment marker and a decorator, and the
 // guard was mutated to confirm they fail without it.
-func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnFixPreservesTypeScript(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -423,12 +423,12 @@ func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
-				testCase.sourceText, elseReturnOptions(t, nil))
-			rule_testing.ExpectFindings(t, result, "unexpected")
-			rule_testing.ExpectFixedSource(t, result, trailingNewlineOn(testCase.wantSource))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoElseReturn, elseReturnFile,
+				testCase.sourceText, elseReturnOptions(test, nil))
+			rule_testing.ExpectFindings(test, result, "unexpected")
+			rule_testing.ExpectFixedSource(test, result, trailingNewlineOn(testCase.wantSource))
 		})
 	}
 }
@@ -439,24 +439,24 @@ func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
 // the rule able to judge but unable to prove a repair safe. Withholding rather than guessing is the
 // right direction: a repair that lifts a binding into a scope where the name is taken parses and
 // means something else, which the edit engine's parse check structurally cannot refuse.
-func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(test *testing.T) {
+	test.Parallel()
 
 	source := "function f() { if (a) { return 1; } else { let b = 2; g(b); } }"
 
-	typed := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile, source,
-		elseReturnOptions(t, nil))
-	rule_testing.ExpectFindings(t, typed, "unexpected")
+	typed := rule_testing.RunTypedWithOptions(test, NoElseReturn, elseReturnFile, source,
+		elseReturnOptions(test, nil))
+	rule_testing.ExpectFindings(test, typed, "unexpected")
 	if len(typed.Diagnostics[0].Fixes) == 0 {
-		t.Error("expected the typed harness to offer a repair")
+		test.Error("expected the typed harness to offer a repair")
 	}
 
-	untyped := rule_testing.RunWithOptions(t, NoElseReturn, elseReturnFile, source,
-		elseReturnOptions(t, nil))
-	rule_testing.ExpectFindings(t, untyped, "unexpected")
+	untyped := rule_testing.RunWithOptions(test, NoElseReturn, elseReturnFile, source,
+		elseReturnOptions(test, nil))
+	rule_testing.ExpectFindings(test, untyped, "unexpected")
 	for _, diagnostic := range untyped.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
-			t.Errorf("expected no repair without a checker, got %d", len(diagnostic.Fixes))
+			test.Errorf("expected no repair without a checker, got %d", len(diagnostic.Fixes))
 		}
 	}
 }
@@ -466,17 +466,17 @@ func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(t *testing.T) {
 // Upstream reports the alternate. Every ExpectFindings assertion above is satisfied by a rule
 // reporting the whole if statement instead, and on a fixable rule the span is what says the repair
 // lands where the reader was shown.
-func TestNoElseReturnPointsAtTheElse(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnPointsAtTheElse(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
-		"function f() { if (a) { return 1; } else { return 2; } }", elseReturnOptions(t, nil))
-	rule_testing.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.RunTypedWithOptions(test, NoElseReturn, elseReturnFile,
+		"function f() { if (a) { return 1; } else { return 2; } }", elseReturnOptions(test, nil))
+	rule_testing.ExpectFindings(test, result, "unexpected")
 
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "{ return 2; }" {
-		t.Errorf("expected the finding on the else block, pointed at %q", reported)
+		test.Errorf("expected the finding on the else block, pointed at %q", reported)
 	}
 }
 
@@ -487,51 +487,51 @@ func TestNoElseReturnPointsAtTheElse(t *testing.T) {
 // returning branch, which the default deliberately allows. Upstream's corpus proves the two are
 // distinct by carrying the same source in its valid list under true and its invalid list under
 // false.
-func TestDecodeNoElseReturnOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoElseReturnOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent option allows else if", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an absent option allows else if", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(nil)
 		if err != nil {
-			t.Fatalf("the decoder refused an absent option: %v", err)
+			test.Fatalf("the decoder refused an absent option: %v", err)
 		}
 		if !decoded.(NoElseReturnSettings).AllowElseIf {
-			t.Error("expected allowElseIf to default to true")
+			test.Error("expected allowElseIf to default to true")
 		}
 	})
 
-	t.Run("an empty object keeps the default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty object keeps the default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{}`))
 		if err != nil {
-			t.Fatalf("the decoder refused an empty object: %v", err)
+			test.Fatalf("the decoder refused an empty object: %v", err)
 		}
 		if !decoded.(NoElseReturnSettings).AllowElseIf {
-			t.Error("expected allowElseIf to stay true")
+			test.Error("expected allowElseIf to stay true")
 		}
 	})
 
-	t.Run("an explicit false is distinguishable from absent", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an explicit false is distinguishable from absent", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{"allowElseIf":false}`))
 		if err != nil {
-			t.Fatalf("the decoder refused an explicit false: %v", err)
+			test.Fatalf("the decoder refused an explicit false: %v", err)
 		}
 		if decoded.(NoElseReturnSettings).AllowElseIf {
-			t.Error("expected allowElseIf to be false")
+			test.Error("expected allowElseIf to be false")
 		}
 	})
 
-	t.Run("a bare severity leaves the rule allowing else if", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare severity leaves the rule allowing else if", func(test *testing.T) {
+		test.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. This covers the fallback inside Run, which no decoder test
 		// can reach, and it is the case the config actually uses.
 		chain := "function f() { if (a) { return 1; } else if (b) { return 2; } }"
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
 			elseReturnFile, chain, nil))
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
 			elseReturnFile, "function f() { if (a) { return 1; } else { return 2; } }", nil),
 			"unexpected")
 	})
@@ -548,8 +548,8 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 // because upstream's corpus never writes a nested if whose branch returns and then continues. The
 // counts here were measured against the installed rule: the first two report ONCE and the control
 // reports twice.
-func TestNoElseReturnLooksAtTheLastStatementOnly(t *testing.T) {
-	t.Parallel()
+func TestNoElseReturnLooksAtTheLastStatementOnly(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -565,14 +565,14 @@ func TestNoElseReturnLooksAtTheLastStatementOnly(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
-				elseReturnFile, testCase.sourceText, elseReturnOptions(t, nil)), expected...)
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
+				elseReturnFile, testCase.sourceText, elseReturnOptions(test, nil)), expected...)
 		})
 	}
 }

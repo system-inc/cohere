@@ -9,8 +9,8 @@ import (
 // TestCorrectnessNoLoadTimeImportMetaPathFires pins each shape that reads a path while the module
 // loads, with the exact text reported, so a finding on the wrong node fails rather than passing on its
 // id alone.
-func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLoadTimeImportMetaPathFires(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]struct {
 		source  string
@@ -66,26 +66,26 @@ func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
 		},
 	}
 	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", testCase.source)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", testCase.source)
 			wantIds := make([]string, len(testCase.reports))
 			for index := range wantIds {
 				wantIds[index] = "loadTimeImportMetaPath"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 			for index, diagnostic := range result.Diagnostics {
 				reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.reports[index] {
-					t.Errorf("finding %d reported %q, want %q", index, reported, testCase.reports[index])
+					test.Errorf("finding %d reported %q, want %q", index, reported, testCase.reports[index])
 				}
 			}
 		})
 	}
 }
 
-func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		// The repair: resolved when called (ahra 36b7fe07, f43214af).
@@ -117,10 +117,10 @@ func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(t *testing.T) {
 		"the words in a string":       "const message = 'import.meta.dirname at module scope';\n",
 	}
 	for name, source := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

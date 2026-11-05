@@ -5,8 +5,8 @@ import "testing"
 // The cases where upstream's four spellings disagree are the ones worth pinning, because they are
 // the reason this package exists. Each row records which upstream spellings would have said what,
 // so a reader can see the drift this replaced rather than take the collapse on faith.
-func TestIsDocumentFile(t *testing.T) {
-	t.Parallel()
+func TestIsDocumentFile(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -40,10 +40,10 @@ func TestIsDocumentFile(t *testing.T) {
 		{"an empty path", "", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := IsDocumentFile(testCase.filePath); got != testCase.want {
-				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
+				test.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
 		})
 	}
@@ -51,8 +51,8 @@ func TestIsDocumentFile(t *testing.T) {
 
 // Every upstream predicate handles both separators, so a path in the Windows shape must answer the
 // same as its POSIX twin. A port handling one would be silent on half the platforms upstream lints.
-func TestIsDocumentFileHandlesBothSeparators(t *testing.T) {
-	t.Parallel()
+func TestIsDocumentFileHandlesBothSeparators(test *testing.T) {
+	test.Parallel()
 	pairs := [][2]string{
 		{"pages/_document.tsx", `pages\_document.tsx`},
 		{"src/pages/_document.tsx", `src\pages\_document.tsx`},
@@ -62,7 +62,7 @@ func TestIsDocumentFileHandlesBothSeparators(t *testing.T) {
 	for _, pair := range pairs {
 		posix, windows := pair[0], pair[1]
 		if IsDocumentFile(posix) != IsDocumentFile(windows) {
-			t.Fatalf("%q and %q disagree: %v against %v",
+			test.Fatalf("%q and %q disagree: %v against %v",
 				posix, windows, IsDocumentFile(posix), IsDocumentFile(windows))
 		}
 	}
@@ -71,8 +71,8 @@ func TestIsDocumentFileHandlesBothSeparators(t *testing.T) {
 // A substring test rather than a segment test, matching upstream. The looseness is reproduced rather
 // than tightened, and the case that shows it is asserted so nobody "fixes" it later without seeing
 // what they are changing.
-func TestIsInApplicationDirectory(t *testing.T) {
-	t.Parallel()
+func TestIsInApplicationDirectory(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -95,10 +95,10 @@ func TestIsInApplicationDirectory(t *testing.T) {
 		{"an empty path", "", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := IsInApplicationDirectory(testCase.filePath); got != testCase.want {
-				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
+				test.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
 		})
 	}
@@ -108,15 +108,15 @@ func TestIsInApplicationDirectory(t *testing.T) {
 // a PascalCase component convention plus one holding translations. None of them is a document, and
 // a predicate that answered otherwise would put a false-positive surface under every rule that
 // gates this way.
-func TestOurOwnPagesConventionIsNotADocument(t *testing.T) {
-	t.Parallel()
+func TestOurOwnPagesConventionIsNotADocument(test *testing.T) {
+	test.Parallel()
 	for _, filePath := range []string{
 		"libraries/structure/source/modules/account/pages/AccountPage.tsx",
 		"libraries/structure/source/modules/account/pages/index.tsx",
 		"modules/finance/pages/FinanceOverviewPage.tsx",
 	} {
 		if IsDocumentFile(filePath) {
-			t.Fatalf("%q is our own pages convention and must not read as a Next document", filePath)
+			test.Fatalf("%q is our own pages convention and must not read as a Next document", filePath)
 		}
 	}
 }
@@ -125,8 +125,8 @@ func TestOurOwnPagesConventionIsNotADocument(t *testing.T) {
 // names is asserted here as well as in the rule. The three rows where this and IsDocumentFile
 // disagree are the reason both exist, and each was confirmed against the release oxlint binary
 // rather than modelled from the Rust.
-func TestIsDocumentPage(t *testing.T) {
-	t.Parallel()
+func TestIsDocumentPage(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -174,10 +174,10 @@ func TestIsDocumentPage(t *testing.T) {
 		{"an empty path", "", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := IsDocumentPage(testCase.filePath); got != testCase.want {
-				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
+				test.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
 		})
 	}
@@ -186,8 +186,8 @@ func TestIsDocumentPage(t *testing.T) {
 // The two predicates are not interchangeable and a reader who assumes they are would break a
 // corpus. Asserted rather than left to the doc comments, so a later tidy-up that collapses them
 // fails loudly instead of silently changing which files a rule runs on.
-func TestTheTwoDocumentPredicatesDisagreeOnPurpose(t *testing.T) {
-	t.Parallel()
+func TestTheTwoDocumentPredicatesDisagreeOnPurpose(test *testing.T) {
+	test.Parallel()
 	disagreements := []struct {
 		filePath     string
 		wantPage     bool
@@ -203,11 +203,11 @@ func TestTheTwoDocumentPredicatesDisagreeOnPurpose(t *testing.T) {
 	}
 	for _, disagreement := range disagreements {
 		if got := IsDocumentPage(disagreement.filePath); got != disagreement.wantPage {
-			t.Fatalf("IsDocumentPage(%q): want %v, got %v (%s)",
+			test.Fatalf("IsDocumentPage(%q): want %v, got %v (%s)",
 				disagreement.filePath, disagreement.wantPage, got, disagreement.whyItMatters)
 		}
 		if got := IsDocumentFile(disagreement.filePath); got != disagreement.wantFile {
-			t.Fatalf("IsDocumentFile(%q): want %v, got %v (%s)",
+			test.Fatalf("IsDocumentFile(%q): want %v, got %v (%s)",
 				disagreement.filePath, disagreement.wantFile, got, disagreement.whyItMatters)
 		}
 	}
@@ -216,8 +216,8 @@ func TestTheTwoDocumentPredicatesDisagreeOnPurpose(t *testing.T) {
 // The four rows separating oxc's component walk from the ESLint original's string surgery are the
 // reason this is a segment test, and each was pinned against the release oxlint binary rather than
 // reasoned about. ESLint would answer the opposite on all four.
-func TestIsInPagesDirectory(t *testing.T) {
-	t.Parallel()
+func TestIsInPagesDirectory(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -260,10 +260,10 @@ func TestIsInPagesDirectory(t *testing.T) {
 		{"an empty path", "", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := IsInPagesDirectory(testCase.filePath); got != testCase.want {
-				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
+				test.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
 		})
 	}
@@ -274,8 +274,8 @@ func TestIsInPagesDirectory(t *testing.T) {
 // should not have to know which layer normalizes, and because upstream's own corpus ships a
 // backslash path whose verdict on a non-Windows host is an accident of PathBuf rather than a
 // decision.
-func TestIsInPagesDirectoryHandlesBothSeparators(t *testing.T) {
-	t.Parallel()
+func TestIsInPagesDirectoryHandlesBothSeparators(test *testing.T) {
+	test.Parallel()
 	pairs := [][2]string{
 		{"pages/index.tsx", `pages\index.tsx`},
 		{"pages/api/user.ts", `pages\api\user.ts`},
@@ -285,7 +285,7 @@ func TestIsInPagesDirectoryHandlesBothSeparators(t *testing.T) {
 	for _, pair := range pairs {
 		posix, windows := pair[0], pair[1]
 		if IsInPagesDirectory(posix) != IsInPagesDirectory(windows) {
-			t.Fatalf("%q and %q disagree: %v against %v",
+			test.Fatalf("%q and %q disagree: %v against %v",
 				posix, windows, IsInPagesDirectory(posix), IsInPagesDirectory(windows))
 		}
 	}

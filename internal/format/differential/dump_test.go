@@ -34,11 +34,11 @@ import (
 //
 // The candidate is always native. It reads the cache TestCorpora warms under the same identity, so a
 // dump costs the candidate's time once the corpus has been measured.
-func TestDumpDifferences(t *testing.T) {
-	t.Parallel()
+func TestDumpDifferences(test *testing.T) {
+	test.Parallel()
 	roots, output := os.Getenv("COHERE_FORMAT_CORPORA"), os.Getenv("COHERE_FORMAT_DUMP")
 	if roots == "" || output == "" {
-		t.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")
+		test.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")
 	}
 	extensions := map[string]bool{}
 	for _, extension := range strings.Split(os.Getenv("COHERE_FORMAT_EXTENSIONS"), ",") {
@@ -49,23 +49,23 @@ func TestDumpDifferences(t *testing.T) {
 
 	bundles, err := prettier.Bundles()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	digest, err := prettier.DigestBundles(bundles.Files)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
 		base, err := os.UserCacheDir()
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
 	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	pending := strings.Split(roots, ":")
@@ -82,7 +82,7 @@ func TestDumpDifferences(t *testing.T) {
 		// TestCorpora finds them (#k6vebep).
 		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
 		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+			test.Fatalf("finding the repositories nested in %s: %v", root, err)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -92,20 +92,20 @@ func TestDumpDifferences(t *testing.T) {
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+			test.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 
 		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+			test.Fatalf("enumerating %s: %v", root, err)
 		}
 		files := enumeration.Files
 		if len(extensions) > 0 {
@@ -120,7 +120,7 @@ func TestDumpDifferences(t *testing.T) {
 		options := resolution.Options
 		if width := os.Getenv("COHERE_FORMAT_PRINT_WIDTH"); width != "" {
 			if _, err := fmt.Sscan(width, &options.PrintWidth); err != nil {
-				t.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, err)
+				test.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, err)
 			}
 		}
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
@@ -133,9 +133,9 @@ func TestDumpDifferences(t *testing.T) {
 
 		report, err := Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
 		if err != nil {
-			t.Fatalf("comparing %s: %v", root, err)
+			test.Fatalf("comparing %s: %v", root, err)
 		}
-		t.Log(report.Summary())
+		test.Log(report.Summary())
 
 		// The whole root names the directory, because nested corpora share basenames (three are nexus).
 		corpus := filepath.Join(output, strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"))
@@ -145,7 +145,7 @@ func TestDumpDifferences(t *testing.T) {
 		sort.Slice(results, func(left, right int) bool { return results[left].Path < results[right].Path })
 		oracle, err := newOracle()
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		for _, result := range results {
 			if result.Outcome != Different && result.Outcome != CandidateRefused {
@@ -158,32 +158,32 @@ func TestDumpDifferences(t *testing.T) {
 			}
 			source, err := os.ReadFile(result.Path)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			expected, err := cache.format(oracle, result.Path, string(source))
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			actual, err := native.Formatter{Options: options}.Format(result.Path, string(source))
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			base := filepath.Join(corpus, "files", relative)
 			if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if err := os.WriteFile(base+".expected", []byte(expected), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if err := os.WriteFile(base+".actual", []byte(actual), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 		if err := os.MkdirAll(corpus, 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(corpus, "summary.txt"), []byte(summary.String()), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 }

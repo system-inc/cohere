@@ -7,23 +7,23 @@ import "testing"
 // The option column in the three set-state rules' tables is upstream's spelling: "" for a bare
 // severity, and otherwise the single string upstream passes. Routing it through the decoder rather
 // than building the struct is what keeps the decoder under every fixture.
-func noMethodSetStateOptions(t *testing.T, option string) any {
-	t.Helper()
+func noMethodSetStateOptions(test *testing.T, option string) any {
+	test.Helper()
 	raw := []byte(nil)
 	if option != "" {
 		raw = []byte(`"` + option + `"`)
 	}
 	decoded, err := DecodeNoMethodSetStateOptions(raw)
 	if err != nil {
-		t.Fatalf("decoding option %q: %v", option, err)
+		test.Fatalf("decoding option %q: %v", option, err)
 	}
 	return decoded
 }
 
 // TestDecodeNoMethodSetStateOptions pins the decoder against upstream's schema,
 // `[{ enum: ["disallow-in-func"] }]`.
-func TestDecodeNoMethodSetStateOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoMethodSetStateOptions(test *testing.T) {
+	test.Parallel()
 
 	accepted := []struct {
 		name string
@@ -34,14 +34,14 @@ func TestDecodeNoMethodSetStateOptions(t *testing.T) {
 		{"upstream's disallow-in-func", `"disallow-in-func"`, true},
 	}
 	for _, testCase := range accepted {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoMethodSetStateOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			if decoded.(NoMethodSetStateOptions).DisallowInFunc != testCase.want {
-				t.Errorf("DisallowInFunc = %v, wanted %v", decoded.(NoMethodSetStateOptions).DisallowInFunc, testCase.want)
+				test.Errorf("DisallowInFunc = %v, wanted %v", decoded.(NoMethodSetStateOptions).DisallowInFunc, testCase.want)
 			}
 		})
 	}
@@ -62,10 +62,10 @@ func TestDecodeNoMethodSetStateOptions(t *testing.T) {
 		{"null", `null`},
 	}
 	for _, testCase := range refused {
-		t.Run(testCase.name+" is refused", func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name+" is refused", func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeNoMethodSetStateOptions([]byte(testCase.raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
+				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})
 	}

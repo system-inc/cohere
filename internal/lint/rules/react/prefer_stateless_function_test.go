@@ -22,8 +22,8 @@ const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 // That is what puts the decoder under test, and it is the line with no upstream counterpart. The
 // raw json is the BARE object, not upstream's [{...}] array: cohere's config layer unwraps the
 // [severity, options] tuple before dispatch, so copying ESLint's spelling fails on every row.
-func runPreferStatelessFunction(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
+func runPreferStatelessFunction(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
 	var decoded any
 	var err error
 	if rawOptions == "" {
@@ -32,9 +32,9 @@ func runPreferStatelessFunction(t *testing.T, sourceText string, rawOptions stri
 		decoded, err = DecodePreferStatelessFunctionOptions(json.RawMessage(rawOptions))
 	}
 	if err != nil {
-		t.Fatalf("decoding %q: %v", rawOptions, err)
+		test.Fatalf("decoding %q: %v", rawOptions, err)
 	}
-	return rule_testing.RunWithOptions(t, PreferStatelessFunction, preferStatelessFunctionFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, PreferStatelessFunction, preferStatelessFunctionFile, sourceText, decoded)
 }
 
 // The corpus is eslint-plugin-react's own, imported verbatim from
@@ -45,8 +45,8 @@ func runPreferStatelessFunction(t *testing.T, sourceText string, rawOptions stri
 //
 // Seven valid cases carry ignorePureComponents, and cases 2 and 3 are the same shape as invalid
 // cases 2 and 3 with only the option flipped, which is what pins the option rather than the rule.
-func TestPreferStatelessFunctionFires(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -75,10 +75,10 @@ func TestPreferStatelessFunctionFires(t *testing.T) {
 		{"\n        class Foo extends React.Component {\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n        Foo.contextTypes = {\n          foo: PropTypes.boolean\n        };\n      ", "", []string{"componentShouldBePure"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -103,8 +103,8 @@ func TestPreferStatelessFunctionFires(t *testing.T) {
 // The extractor originally dropped `settings`, which is what surfaced this: three silent cases
 // failed, and the failure read like a rule defect until the corpus was re-read with that field
 // rendered.
-func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -139,10 +139,10 @@ func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
 		{"\n        /**\n         * @param a.\n         */\n        function Comp() {\n          return <a></a>\n        }\n      ", ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -157,8 +157,8 @@ func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
 // whether a plain function is a component. None of that half can produce a finding here, because the
 // final filter is isES5Component or isES6Component. If that is wrong, this port is wrong in a way no
 // other fixture would show, so it is pinned directly.
-func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -176,10 +176,10 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
 		{"nor one extending something else", "class Foo extends Bar { render() { return <div/>; } }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -189,8 +189,8 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
 // Upstream asks whether ANY member is something other than the five React reads as configuration, so
 // this list is the allowed set and anything outside it exempts. Read by NAME rather than by member
 // kind, which is why a getter and a static field with the same name give the same answer.
-func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionMemberBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -208,10 +208,10 @@ func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
 		{"a bare props member exempts, having no type annotation", "class Foo extends React.Component { props; render() { return <div/>; } }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -221,8 +221,8 @@ func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
 // The subscript rows are the ones nobody would guess and none of them appears in the corpus in both
 // directions. Upstream reads `property.name || property.value`, so an identifier and a string
 // subscript both answer with a name while a computed key answers undefined, which is not props.
-func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionThisBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -239,10 +239,10 @@ func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
 		{"one stray name disqualifies the whole pattern", "class Foo extends React.Component { render() { let {props:{foo}, bar} = this; return <div/>; } }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -252,8 +252,8 @@ func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
 // I wrote this off as needing a scope query and documented it as a divergence. An imported clean
 // case caught that, which is exactly why step 5 exists. The branch turns out to be a name
 // comparison, and these four rows are the measurements that bound it.
-func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionChildContextTypes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -266,10 +266,10 @@ func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
 		{"a read rather than a declaration on another object does not", "declare const y: any;\nclass Foo extends React.Component { render() { return <div/>; } }\nconst x = y.childContextTypes;", []string{"componentShouldBePure"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -279,8 +279,8 @@ func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
 // React 15 and later allow a stateless component to return null, and this tree is on React 19, so
 // the null branch is live. Three of upstream's corpus cases exist twice with opposite verdicts on
 // exactly this axis; see the note above the silent table.
-func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionReturnBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -297,10 +297,10 @@ func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
 		{"a bare return has no argument at all", "class Foo extends React.Component { render() { return; } }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferStatelessFunction(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferStatelessFunction(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -312,55 +312,55 @@ func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this covers the nil
 // input and the wire name.
-func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("absent options give the documented default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("absent options give the documented default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodePreferStatelessFunctionOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding nil: %v", err)
+			test.Fatalf("decoding nil: %v", err)
 		}
 		if decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
-			t.Fatal("ignorePureComponents defaulted to true, upstream defaults it to false")
+			test.Fatal("ignorePureComponents defaulted to true, upstream defaults it to false")
 		}
 	})
 
-	t.Run("the wire name is ignorePureComponents", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the wire name is ignorePureComponents", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodePreferStatelessFunctionOptions(json.RawMessage(`{"ignorePureComponents":true}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		if !decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
-			t.Fatal("the option did not decode")
+			test.Fatal("the option did not decode")
 		}
 	})
 
-	t.Run("the option is what separates these, not the rule", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the option is what separates these, not the rule", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "class Foo extends React.PureComponent { render() { return <div>{this.props.foo}</div>; } }"
-		rule_testing.ExpectFindings(t, runPreferStatelessFunction(t, sourceText, ""), "componentShouldBePure")
-		rule_testing.ExpectClean(t, runPreferStatelessFunction(t, sourceText, `{"ignorePureComponents":true}`))
+		rule_testing.ExpectFindings(test, runPreferStatelessFunction(test, sourceText, ""), "componentShouldBePure")
+		rule_testing.ExpectClean(test, runPreferStatelessFunction(test, sourceText, `{"ignorePureComponents":true}`))
 	})
 
-	t.Run("ignorePureComponents does not exempt a plain Component", func(t *testing.T) {
-		t.Parallel()
+	test.Run("ignorePureComponents does not exempt a plain Component", func(test *testing.T) {
+		test.Parallel()
 		// The distinguishing case for the option's predicate. react.IsEs6ComponentClass accepts
 		// Component and PureComponent alike and is the RIGHT predicate for the outer gate and the
 		// WRONG one here; routing the option through it would exempt every class component.
 		const sourceText = "class Foo extends React.Component { render() { return <div>{this.props.foo}</div>; } }"
-		rule_testing.ExpectFindings(t, runPreferStatelessFunction(t, sourceText, `{"ignorePureComponents":true}`), "componentShouldBePure")
+		rule_testing.ExpectFindings(test, runPreferStatelessFunction(test, sourceText, `{"ignorePureComponents":true}`), "componentShouldBePure")
 	})
 
-	t.Run("the rule falls back to the default when handed nil rather than the struct", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the rule falls back to the default when handed nil rather than the struct", func(test *testing.T) {
+		test.Parallel()
 		// Bypasses the decoder entirely, which is the path every other fixture misses. A
 		// PureComponent is the case that measures anything: it reports under the real default and
 		// would be clean under a wrong fallback of ignorePureComponents true.
-		result := rule_testing.RunWithOptions(t, PreferStatelessFunction, preferStatelessFunctionFile,
+		result := rule_testing.RunWithOptions(test, PreferStatelessFunction, preferStatelessFunctionFile,
 			"class Foo extends React.PureComponent { render() { return <div/>; } }", nil)
-		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
+		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 	})
 }
 
@@ -369,44 +369,44 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 // Upstream reports on the component node, which for a factory is the CALL rather than the variable
 // and for a class expression is the expression rather than the declaration. ExpectFindings cannot
 // see any of this.
-func TestPreferStatelessFunctionSpan(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionSpan(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a class declaration reports on the whole class", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a class declaration reports on the whole class", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "class Foo extends React.Component { render() { return <div/>; } }"
-		result := runPreferStatelessFunction(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
+		result := runPreferStatelessFunction(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 		got := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if got != sourceText {
-			t.Fatalf("reported on %q", got)
+			test.Fatalf("reported on %q", got)
 		}
 	})
 
-	t.Run("a factory reports on the call, not the declaration", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a factory reports on the call, not the declaration", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "var Foo = createReactClass({ render: function() { return <div/>; } });"
 		const want = "createReactClass({ render: function() { return <div/>; } })"
-		result := runPreferStatelessFunction(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
+		result := runPreferStatelessFunction(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 		got := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if got != want {
-			t.Fatalf("reported on %q, wanted %q", got, want)
+			test.Fatalf("reported on %q, wanted %q", got, want)
 		}
 	})
 
-	t.Run("the message identifies the rule and explains the defect", func(t *testing.T) {
-		t.Parallel()
-		result := runPreferStatelessFunction(t, "class Foo extends React.Component { render() { return <div/>; } }", "")
-		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
+	test.Run("the message identifies the rule and explains the defect", func(test *testing.T) {
+		test.Parallel()
+		result := runPreferStatelessFunction(test, "class Foo extends React.Component { render() { return <div/>; } }", "")
+		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 		if result.Diagnostics[0].Message.Id != "componentShouldBePure" {
-			t.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
+			test.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
 		}
 		// Compared against a literal typed here rather than against the rule's own constant,
 		// because a comparison to the constant moves with it under mutation.
 		const wantPrefix = "This class component uses nothing a class provides."
 		if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wantPrefix) {
-			t.Fatalf("message was %q", result.Diagnostics[0].Message.Description)
+			test.Fatalf("message was %q", result.Diagnostics[0].Message.Description)
 		}
 	})
 }
@@ -420,8 +420,8 @@ func TestPreferStatelessFunctionSpan(t *testing.T) {
 // A .ts file cannot hold JSX, so the JSX-carrying shapes are unreachable there. This uses a render
 // returning null, which is legal TypeScript and which upstream reports, so all four suffixes are
 // genuinely exercised rather than passing vacuously.
-func TestPreferStatelessFunctionHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestPreferStatelessFunctionHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "class Foo extends React.Component { render() { return null; } }"
 	for _, fileName := range []string{
@@ -430,14 +430,14 @@ func TestPreferStatelessFunctionHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Pure.js",
 		"/repository/source/Pure.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodePreferStatelessFunctionOptions(nil)
 			if err != nil {
-				t.Fatalf("decoding: %v", err)
+				test.Fatalf("decoding: %v", err)
 			}
-			result := rule_testing.RunWithOptions(t, PreferStatelessFunction, fileName, sourceText, decoded)
-			rule_testing.ExpectFindings(t, result, "componentShouldBePure")
+			result := rule_testing.RunWithOptions(test, PreferStatelessFunction, fileName, sourceText, decoded)
+			rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 		})
 	}
 }

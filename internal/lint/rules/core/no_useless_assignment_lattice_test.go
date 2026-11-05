@@ -14,8 +14,8 @@ import (
 // nothing writes into a live set it did not just make. Two neighbours handing over one shared value
 // are met, the result is transferred through a block that kills a symbol and reads another, and two
 // sets neither of which holds the other are met. Every input must read as it did before.
-func TestDeadStoreLiveSetsAreNeverWrittenInPlace(t *testing.T) {
-	t.Parallel()
+func TestDeadStoreLiveSetsAreNeverWrittenInPlace(test *testing.T) {
+	test.Parallel()
 	lattice := deadStoreLiveness{reachable: map[int]bool{}, words: 1}
 
 	shared := liveSymbols{0b011}
@@ -41,7 +41,7 @@ func TestDeadStoreLiveSetsAreNeverWrittenInPlace(t *testing.T) {
 		{"their meet", merged, liveSymbols{0b011}},
 	} {
 		if !slices.Equal(check.got, check.want) {
-			t.Errorf("%s is %b, want %b", check.name, check.got, check.want)
+			test.Errorf("%s is %b, want %b", check.name, check.got, check.want)
 		}
 	}
 }
@@ -92,8 +92,8 @@ func (referenceLiveness) Equal(left, right map[*ast.Symbol]bool) bool {
 // try with a finally, a switch that falls through and a closure, once with the bitset lattice and
 // once with the map lattice it replaced, and requires the same number of rounds and the same live
 // set on exit from every reachable block.
-func TestDeadStoreBitsetSolvesAsTheMapDid(t *testing.T) {
-	t.Parallel()
+func TestDeadStoreBitsetSolvesAsTheMapDid(test *testing.T) {
+	test.Parallel()
 	source := "export function f(items: number[], flag: boolean) {\n" +
 		"  let total = 0; let last = -1; let seen = 0;\n" +
 		"  for (const item of items) {\n" +
@@ -132,17 +132,17 @@ func TestDeadStoreBitsetSolvesAsTheMapDid(t *testing.T) {
 				reference := control_flow_graph.Solve[map[*ast.Symbol]bool, deadStoreEvent](graph,
 					control_flow_graph.Backward, referenceLiveness{})
 				if bitset.Rounds() != reference.Rounds() {
-					t.Errorf("%v: the bitset converged in %d rounds, the map in %d", root.Node.Kind, bitset.Rounds(), reference.Rounds())
+					test.Errorf("%v: the bitset converged in %d rounds, the map in %d", root.Node.Kind, bitset.Rounds(), reference.Rounds())
 				}
 				for _, block := range graph.Blocks {
 					bits, ok := bitset.In(block)
 					set, referenceOk := reference.In(block)
 					if ok != referenceOk {
-						t.Fatalf("block %d is reachable to one solution and not the other", block.Index())
+						test.Fatalf("block %d is reachable to one solution and not the other", block.Index())
 					}
 					for symbol, number := range numbers {
 						if bits.has(number) != set[symbol] {
-							t.Errorf("%v block %d: %s live %t in the bitset, %t in the map", root.Node.Kind, block.Index(),
+							test.Errorf("%v block %d: %s live %t in the bitset, %t in the map", root.Node.Kind, block.Index(),
 								symbol.Name, bits.has(number), set[symbol])
 						}
 					}
@@ -151,8 +151,8 @@ func TestDeadStoreBitsetSolvesAsTheMapDid(t *testing.T) {
 			}
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
 	if solved < 2 {
-		t.Fatalf("solved %d roots, want the function and its closure", solved)
+		test.Fatalf("solved %d roots, want the function and its closure", solved)
 	}
 }

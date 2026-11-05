@@ -17,18 +17,18 @@ import "testing"
 //
 // The name is the durable half: it is synthesized from the function id, nothing rewrites it, and it
 // survives renumbering. Pinning the round trip here keeps the two halves from drifting apart.
-func TestOutlinedFunctionNameRoundTrip(t *testing.T) {
-	t.Parallel()
+func TestOutlinedFunctionNameRoundTrip(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Functions: make([]*Function, 8)}
 	for id := FunctionId(0); int(id) < len(function.Functions); id++ {
 		name := outlinedFunctionName(id)
 		resolved, found := outlinedFunctionByName(function, name)
 		if !found {
-			t.Fatalf("outlinedFunctionName(%d) = %q did not resolve", id, name)
+			test.Fatalf("outlinedFunctionName(%d) = %q did not resolve", id, name)
 		}
 		if resolved != id {
-			t.Fatalf("outlinedFunctionName(%d) = %q resolved to %d", id, name, resolved)
+			test.Fatalf("outlinedFunctionName(%d) = %q resolved to %d", id, name, resolved)
 		}
 	}
 }
@@ -38,14 +38,14 @@ func TestOutlinedFunctionNameRoundTrip(t *testing.T) {
 // The resolver runs over every `LoadGlobal` in the function, and most of them name real globals:
 // `Object`, `Stringify`, `useMemo`. Answering for one of those would attribute a callback's effects
 // to whatever function happened to sit at that index.
-func TestOutlinedFunctionByNameDeclinesOrdinaryGlobals(t *testing.T) {
-	t.Parallel()
+func TestOutlinedFunctionByNameDeclinesOrdinaryGlobals(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Functions: make([]*Function, 4)}
 	for _, name := range []string{"Object", "Stringify", "useMemo", "", "_tempest", "_temp0",
 		"_temp-1", "_temp99"} {
 		if _, found := outlinedFunctionByName(function, name); found {
-			t.Errorf("outlinedFunctionByName(%q) resolved, want declined", name)
+			test.Errorf("outlinedFunctionByName(%q) resolved, want declined", name)
 		}
 	}
 }

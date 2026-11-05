@@ -8,8 +8,8 @@ import (
 
 const dupeElseIfFile = "/repository/source/Branch.ts"
 
-func TestNoDupeElseIfFires(t *testing.T) {
-	t.Parallel()
+func TestNoDupeElseIfFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -90,16 +90,16 @@ func TestNoDupeElseIfFires(t *testing.T) {
 		{"a comment between does not matter", "declare const a: boolean;\nexport function run() { if(a) {} else if(/* same */ a) {} }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDupeElseIf, dupeElseIfFile, testCase.sourceText),
 				"unexpected")
 		})
 	}
 }
 
-func TestNoDupeElseIfStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDupeElseIfStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -146,9 +146,9 @@ func TestNoDupeElseIfStaysSilent(t *testing.T) {
 		{"no if at all", "export const value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDupeElseIf, dupeElseIfFile, testCase.sourceText))
 		})
 	}
 }
@@ -158,10 +158,10 @@ func TestNoDupeElseIfStaysSilent(t *testing.T) {
 // A branch covered by three earlier ones is still one dead branch and one edit. Worth pinning
 // because the walk continues up the chain after a match unless it returns, and a missing return
 // would produce a finding per ancestor.
-func TestNoDupeElseIfReportsOncePerBranch(t *testing.T) {
-	t.Parallel()
+func TestNoDupeElseIfReportsOncePerBranch(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDupeElseIf, dupeElseIfFile,
 		"declare const a: boolean;\nexport function run() { if(a) {} else if(a) {} else if(a) {} }\n"),
 		"unexpected", "unexpected")
 }

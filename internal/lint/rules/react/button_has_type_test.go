@@ -61,8 +61,8 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 // calls. An empty string means a bare severity, which is what hands a real rule nil options.
 
 // TestButtonHasTypeFires asserts ids, count, order, and rendered text.
-func TestButtonHasTypeFires(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -101,12 +101,12 @@ func TestButtonHasTypeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runButtonHasType(t, testCase.sourceText, testCase.rawOptions)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runButtonHasType(test, testCase.sourceText, testCase.rawOptions)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				// Only the two interpolating ids keep upstream's wording as a prefix; see the note
@@ -116,7 +116,7 @@ func TestButtonHasTypeFires(t *testing.T) {
 					continue
 				}
 				if !strings.HasPrefix(diagnostic.Message.Description, testCase.wantTexts[index]) {
-					t.Errorf("finding %d reads %q, want it to begin %q",
+					test.Errorf("finding %d reads %q, want it to begin %q",
 						index, diagnostic.Message.Description, testCase.wantTexts[index])
 				}
 			}
@@ -125,8 +125,8 @@ func TestButtonHasTypeFires(t *testing.T) {
 }
 
 // TestButtonHasTypeStaysSilent runs upstream's clean cases.
-func TestButtonHasTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,9 +164,9 @@ func TestButtonHasTypeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runButtonHasType(test, testCase.sourceText, testCase.rawOptions))
 		})
 	}
 }
@@ -175,13 +175,13 @@ func TestButtonHasTypeStaysSilent(t *testing.T) {
 //
 // `RunTyped` because the rule declares `NeedsTypeChecker` for its bare-`createElement` arm, which is
 // the same resolution `checked-requires-onchange-or-readonly` needs and the same helper.
-func runButtonHasType(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
+func runButtonHasType(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
 	decoded, err := DecodeButtonHasTypeOptions([]byte(rawOptions))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", rawOptions, err)
+		test.Fatalf("decoding %q: %v", rawOptions, err)
 	}
-	return rule_testing.RunTypedWithOptions(t, ButtonHasType, buttonHasTypeFile, sourceText, decoded)
+	return rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile, sourceText, decoded)
 }
 
 // TestButtonHasTypeAcceptsTheTypedUpstreamCase carries the one corpus case needing React types.
@@ -194,11 +194,11 @@ func runButtonHasType(t *testing.T, sourceText string, rawOptions string) rule_t
 // It is worth its own test rather than a row in the silent table because it is the only multi-line
 // case, the only one whose `<button>` sits inside a fragment inside a map callback, and the only one
 // where a spread follows a valid `type`.
-func TestButtonHasTypeAcceptsTheTypedUpstreamCase(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeAcceptsTheTypedUpstreamCase(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare type ReactElement = unknown;\ndeclare type Attributes = { key?: string };\ndeclare type ButtonHTMLAttributes<T> = { children?: unknown; onClick?: () => void };\n\n        function MyComponent(): ReactElement {\n          const buttonProps: (Required<Attributes> & ButtonHTMLAttributes<HTMLButtonElement>)[] = [\n            {\n              children: 'test',\n              key: 'test',\n              onClick: (): void => {\n                return;\n              },\n            },\n          ];\n\n          return <>\n            {\n              buttonProps.map(\n                ({ key, ...props }: Required<Attributes> & ButtonHTMLAttributes<HTMLButtonElement>): ReactElement =>\n                  <button key={key} type=\"button\" {...props} />\n              )\n            }\n          </>;\n        }\n      "
-	rule_testing.ExpectClean(t, runButtonHasType(t, source, ""))
+	rule_testing.ExpectClean(test, runButtonHasType(test, source, ""))
 }
 
 // TestButtonHasTypePragmaIsFixedAtReact records the two cases a settings surface would change.
@@ -211,8 +211,8 @@ func TestButtonHasTypeAcceptsTheTypedUpstreamCase(t *testing.T) {
 // Measured on the installed build: with `{react: {pragma: 'Foo'}}` the second reports `missingType`;
 // with settings removed it goes clean, and clean is what this port produces. The first is clean
 // either way and is here as the control, so a reader can see the pair rather than one row.
-func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypePragmaIsFixedAtReact(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -223,9 +223,9 @@ func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runButtonHasType(test, testCase.sourceText, ""))
 		})
 	}
 }
@@ -240,8 +240,8 @@ func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
 // The numeric rows are also a check on OUR parser: `.Text()` on a NumericLiteral is already the
 // canonical rendering of the double, so `0x10` is `16` and `1.50` is `1.5` without any arithmetic.
 // A BigInt is the one place the two disagree, keeping its `n` suffix here, and the rule trims it.
-func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -275,16 +275,16 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runButtonHasType(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runButtonHasType(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantValue == "" {
 				return
 			}
 			want := testCase.wantValue + " is an invalid value for button type attribute."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, want) {
-				t.Errorf("message reads %q, want it to begin %q",
+				test.Errorf("message reads %q, want it to begin %q",
 					result.Diagnostics[0].Message.Description, want)
 			}
 		})
@@ -297,8 +297,8 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
 // a nested ternary is walked to its full depth. The corpus writes no ternary with two bad branches
 // and no nested ternary at all, so a rule that reported once per element would pass every imported
 // case. Both verdicts measured on the installed build.
-func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeRecursesThroughTernaries(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -348,9 +348,9 @@ func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runButtonHasType(test, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
 }
@@ -365,8 +365,8 @@ func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
 //
 // The text is sliced from the source the harness WROTE rather than from the literal above, because
 // `RunTyped` trims the fixture and a span sliced from an untrimmed literal is off by one.
-func TestButtonHasTypeSpans(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -426,17 +426,17 @@ func TestButtonHasTypeSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runButtonHasType(t, testCase.sourceText, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runButtonHasType(test, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				got := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -450,8 +450,8 @@ func TestButtonHasTypeSpans(t *testing.T) {
 // are invisible and the call reports `missingType` rather than `invalidValue`. The property is
 // unmistakably `type` to a reader and the rule cannot see it, and that is reproduced rather than
 // improved, because widening it would report where upstream is quiet.
-func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -518,9 +518,9 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runButtonHasType(test, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
 }
@@ -532,8 +532,8 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 // built from a struct rather than routed through the decoder passes anyway. The empty-input and
 // empty-object rows are the ones that catch it, and the explicit-false rows are what prove the
 // pointer wire type is doing its job rather than the defaults simply always winning.
-func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeDecodesItsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name                        string
@@ -550,19 +550,19 @@ func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeButtonHasTypeOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+				test.Fatalf("decoding %q: %v", testCase.raw, err)
 			}
 			settings, ok := decoded.(ButtonHasTypeOptions)
 			if !ok {
-				t.Fatalf("decoded to %T", decoded)
+				test.Fatalf("decoded to %T", decoded)
 			}
 			if settings.Button != testCase.button || settings.Submit != testCase.submit ||
 				settings.Reset != testCase.resetButton {
-				t.Errorf("decoded to %+v, want button=%v submit=%v reset=%v",
+				test.Errorf("decoded to %+v, want button=%v submit=%v reset=%v",
 					settings, testCase.button, testCase.submit, testCase.resetButton)
 			}
 		})
@@ -570,14 +570,14 @@ func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
 }
 
 // TestButtonHasTypeRejectsMalformedOptions asserts the decoder surfaces bad input.
-func TestButtonHasTypeRejectsMalformedOptions(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
+	test.Parallel()
 
 	if _, err := DecodeButtonHasTypeOptions([]byte(`{"button":`)); err == nil {
-		t.Fatal("truncated JSON decoded without error")
+		test.Fatal("truncated JSON decoded without error")
 	}
 	if _, err := DecodeButtonHasTypeOptions([]byte(`"error"`)); err == nil {
-		t.Fatal("a string decoded into the options struct without error")
+		test.Fatal("a string decoded into the options struct without error")
 	}
 }
 
@@ -587,16 +587,16 @@ func TestButtonHasTypeRejectsMalformedOptions(t *testing.T) {
 // yields the ZERO value, which for this rule forbids all three types and would report
 // `forbiddenValue` on `<button type="button"/>`. The rule restores the defaults explicitly on that
 // path and this asserts it, because no fixture routed through the decoder can ever see it.
-func TestButtonHasTypeHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	clean := rule_testing.RunTypedWithOptions(t, ButtonHasType, buttonHasTypeFile,
+	clean := rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile,
 		"const a = <button type=\"button\"/>;\n", nil)
-	rule_testing.ExpectClean(t, clean)
+	rule_testing.ExpectClean(test, clean)
 
-	reporting := rule_testing.RunTypedWithOptions(t, ButtonHasType, buttonHasTypeFile,
+	reporting := rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile,
 		"const a = <button/>;\n", nil)
-	rule_testing.ExpectFindings(t, reporting, "missingType")
+	rule_testing.ExpectFindings(test, reporting, "missingType")
 }
 
 // TestButtonHasTypeSeparatesInvalidFromForbidden pins the two ids that share their text.
@@ -606,14 +606,14 @@ func TestButtonHasTypeHandlesNilOptions(t *testing.T) {
 // file. They answer different questions: the first means the value is not an HTML button type at
 // all, the second means it is one and this configuration turned it off. The pair below is the same
 // element under two configurations, which is the only way to see the difference.
-func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeSeparatesInvalidFromForbidden(test *testing.T) {
+	test.Parallel()
 
 	const element = "const a = <button type=\"reset\"/>;\n"
 
-	rule_testing.ExpectClean(t, runButtonHasType(t, element, ""))
-	rule_testing.ExpectFindings(t, runButtonHasType(t, element, `{"reset":false}`), "forbiddenValue")
-	rule_testing.ExpectFindings(t, runButtonHasType(t, "const a = <button type=\"nope\"/>;\n", `{"reset":false}`), "invalidValue")
+	rule_testing.ExpectClean(test, runButtonHasType(test, element, ""))
+	rule_testing.ExpectFindings(test, runButtonHasType(test, element, `{"reset":false}`), "forbiddenValue")
+	rule_testing.ExpectFindings(test, runButtonHasType(test, "const a = <button type=\"nope\"/>;\n", `{"reset":false}`), "invalidValue")
 
 	// Each flag is then exercised against its OWN type, with the other two left on. Upstream's
 	// corpus only ever switches `reset` off, so a rule whose `submit` arm read the `button` flag
@@ -634,15 +634,15 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
 		{"reset off leaves button alone", "const a = <button type=\"button\"/>;\n", `{"reset":false}`, nil},
 		{"reset off leaves submit alone", "const a = <button type=\"submit\"/>;\n", `{"reset":false}`, nil},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runButtonHasType(t, row.sourceText, row.rawOptions), row.wantIds...)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runButtonHasType(test, row.sourceText, row.rawOptions), row.wantIds...)
 		})
 	}
 
 	// A value outside the three can never be forbidden, however the rule is configured, because
 	// upstream tests membership in the configuration object before testing the flag.
-	rule_testing.ExpectFindings(t, runButtonHasType(t, "const a = <button type=\"nope\"/>;\n",
+	rule_testing.ExpectFindings(test, runButtonHasType(test, "const a = <button type=\"nope\"/>;\n",
 		`{"button":false,"submit":false,"reset":false}`), "invalidValue")
 }
 
@@ -651,17 +651,17 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
 // Only the bare-`createElement` arm needs the checker, so the assertion is one source that reports
 // under `RunTyped` and is silent under `Run`, with the JSX arm as the control that must report under
 // both. Without the control this would pass against a broken harness.
-func TestButtonHasTypeNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const bareCall = "import { createElement } from 'react';\ncreateElement('button');\n"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, ButtonHasType,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, ButtonHasType,
 		buttonHasTypeFile, bareCall, DefaultButtonHasTypeOptions()), "missingType")
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ButtonHasType,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ButtonHasType,
 		buttonHasTypeFile, bareCall, DefaultButtonHasTypeOptions()))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ButtonHasType,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, ButtonHasType,
 		buttonHasTypeFile, "const a = <button/>;\n", DefaultButtonHasTypeOptions()), "missingType")
 }
 
@@ -673,19 +673,19 @@ func TestButtonHasTypeNeedsTheTypedHarness(t *testing.T) {
 // `createElement` arm is used because JSX in a `.ts` file is a syntax error, so it is the arm that
 // can actually distinguish the two extensions, and `.jsx` is unavailable because the typed harness
 // writes a tsconfig including only `**/*.ts` and `**/*.tsx`.
-func TestButtonHasTypeHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nReact.createElement('button');\n"
 	for _, fileName := range []string{
 		"/repository/source/ButtonHasType.tsx",
 		"/repository/source/ButtonHasType.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ButtonHasType, fileName, source,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ButtonHasType, fileName, source,
 				DefaultButtonHasTypeOptions())
-			rule_testing.ExpectFindings(t, result, "missingType")
+			rule_testing.ExpectFindings(test, result, "missingType")
 		})
 	}
 }
@@ -696,8 +696,8 @@ func TestButtonHasTypeHasNoFileGate(t *testing.T) {
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic. These are ordinary
 // code: a `super()` whose callee is a bare keyword, a dynamic `import()`, an optional call, and a
 // JSX element with a malformed attribute list.
-func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeSurvivesShapesThatWouldPanic(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"(()=>{})();\n",
@@ -712,9 +712,9 @@ func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
 	}
 
 	for index, sourceText := range sources {
-		t.Run(string(rune('a'+index)), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runButtonHasType(t, sourceText, ""))
+		test.Run(string(rune('a'+index)), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runButtonHasType(test, sourceText, ""))
 		})
 	}
 }
@@ -729,45 +729,45 @@ func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
 // The two interpolating ids are asserted here too, in the one form the imported table cannot reach:
 // their upstream wording is identical, so this pins that the port keeps them identical and that the
 // value is the only thing that differs between two findings on one element.
-func TestButtonHasTypeMessagesReadAsWritten(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeMessagesReadAsWritten(test *testing.T) {
+	test.Parallel()
 
-	missing := runButtonHasType(t, "const a = <button/>;\n", "")
+	missing := runButtonHasType(test, "const a = <button/>;\n", "")
 	if len(missing.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(missing.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(missing.Diagnostics))
 	}
 	if missing.Diagnostics[0].Message.Id != "missingType" {
-		t.Errorf("id is %q", missing.Diagnostics[0].Message.Id)
+		test.Errorf("id is %q", missing.Diagnostics[0].Message.Id)
 	}
 	if !strings.HasPrefix(missing.Diagnostics[0].Message.Description, "This `button` has no `type`.") {
-		t.Errorf("missingType reads %q", missing.Diagnostics[0].Message.Description)
+		test.Errorf("missingType reads %q", missing.Diagnostics[0].Message.Description)
 	}
 
-	complex := runButtonHasType(t, "declare const foo: string;\nconst a = <button type={foo}/>;\n", "")
+	complex := runButtonHasType(test, "declare const foo: string;\nconst a = <button type={foo}/>;\n", "")
 	if len(complex.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(complex.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(complex.Diagnostics))
 	}
 	if complex.Diagnostics[0].Message.Id != "complexType" {
-		t.Errorf("id is %q", complex.Diagnostics[0].Message.Id)
+		test.Errorf("id is %q", complex.Diagnostics[0].Message.Id)
 	}
 	if !strings.HasPrefix(complex.Diagnostics[0].Message.Description, "This `button` computes its `type`,") {
-		t.Errorf("complexType reads %q", complex.Diagnostics[0].Message.Description)
+		test.Errorf("complexType reads %q", complex.Diagnostics[0].Message.Description)
 	}
 
 	// Two findings on one element, differing only in the interpolated value. A format string that
 	// dropped the value, or interpolated the same one twice, passes every id assertion in this file
 	// and fails here.
-	both := runButtonHasType(t,
+	both := runButtonHasType(test,
 		"declare const condition: boolean;\nconst a = <button type={condition ? 'foo' : 'bar'}/>;\n", "")
 	if len(both.Diagnostics) != 2 {
-		t.Fatalf("got %d findings, want 2", len(both.Diagnostics))
+		test.Fatalf("got %d findings, want 2", len(both.Diagnostics))
 	}
 	const suffix = " is an invalid value for button type attribute."
 	if !strings.HasPrefix(both.Diagnostics[0].Message.Description, `"foo"`+suffix) {
-		t.Errorf("first reads %q", both.Diagnostics[0].Message.Description)
+		test.Errorf("first reads %q", both.Diagnostics[0].Message.Description)
 	}
 	if !strings.HasPrefix(both.Diagnostics[1].Message.Description, `"bar"`+suffix) {
-		t.Errorf("second reads %q", both.Diagnostics[1].Message.Description)
+		test.Errorf("second reads %q", both.Diagnostics[1].Message.Description)
 	}
 }
 
@@ -784,8 +784,8 @@ func TestButtonHasTypeMessagesReadAsWritten(t *testing.T) {
 // prop WITHOUT the default (so `undefined` is a constituent and HTML's `submit` default can apply), a
 // `string`, a union with one bad member, `any`, and a fully valid union under a config that forbids
 // one of its members, where "permitted" rather than "known" is the test.
-func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
-	t.Parallel()
+func TestButtonHasTypeTrustsAProvenType(test *testing.T) {
+	test.Parallel()
 
 	const properties = "interface ButtonProperties { type?: 'button' | 'submit' | 'reset'; }\n"
 
@@ -809,9 +809,9 @@ func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
 			"const a = <button type={`bu${''}tton`}/>;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runButtonHasType(test, testCase.sourceText, ""))
 		})
 	}
 
@@ -837,9 +837,9 @@ func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
 			"declare const React: { createElement(...a: unknown[]): unknown };\ndeclare const type: string;\nReact.createElement('button', { type });\n", ""},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, testCase.rawOptions), "complexType")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runButtonHasType(test, testCase.sourceText, testCase.rawOptions), "complexType")
 		})
 	}
 }

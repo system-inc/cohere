@@ -7,8 +7,8 @@ import (
 	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
-func TestManualMemoizationPreservesMixedCaptureConditionalCall(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationPreservesMixedCaptureConditionalCall(test *testing.T) {
+	test.Parallel()
 	const source = `import {useCallback} from 'react'; function Component(props) {
 const item=props.item??{};
 const value=item.value;
@@ -26,18 +26,18 @@ return <div onClick={callback}>{props.flag ? (()=>{consume(item);return null;})(
 		{"mutable", strings.Replace(source, "props.item??{}", "getItem(props.item)??{}", 1), 2},
 		{"missing dependency", strings.Replace(source, "[value]);", "[]);", 1), 1},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
-				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
+				test.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
 			}
 		})
 	}
 }
 
-func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
-	t.Parallel()
+func TestMixedCaptureClosureRefinementRetainsEffectGuards(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, body string
 		frozen     bool
@@ -52,9 +52,9 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
 		{"local mutation", "const result=[]; result.push(item); return result;", false},
 		{"constructor", "return new Factory(item);", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, effects := effectsFor(t, "function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, effects := effectsFor(test, "function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }")
 			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
 			closures := 0
 			for _, instruction := range function.Instructions {
@@ -66,11 +66,11 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
 				}
 				closures++
 				if got := aliasingGraph.Kind(instruction.LValue.Identifier) == mutation_aliasing.EffectValueFrozen; got != testCase.frozen {
-					t.Errorf("closure frozen=%t, want %t", got, testCase.frozen)
+					test.Errorf("closure frozen=%t, want %t", got, testCase.frozen)
 				}
 			}
 			if closures != 1 {
-				t.Fatalf("closures=%d, want one", closures)
+				test.Fatalf("closures=%d, want one", closures)
 			}
 		})
 	}

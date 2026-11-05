@@ -9,8 +9,8 @@ import (
 // Typed fixtures resolve their imports against real source declarations.
 const typeSuffixFile = "source/components/Button.tsx"
 
-func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -55,16 +55,16 @@ func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runTypeSuffix(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runTypeSuffix(test,
 				typeSuffixFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -137,9 +137,9 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runTypeSuffix(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runTypeSuffix(test,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -167,11 +167,11 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 // the finding was not the thing at stake.
 //
 // The fix derives the corrected name rather than appending to the wrong one.
-func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFixedSource(t,
-		runTypeSuffix(t, typeSuffixFile,
+	rule_testing.ExpectFixedSource(test,
+		runTypeSuffix(test, typeSuffixFile,
 			"import type { ButtonProps } from './Types';\n"+
 				"export function Button(properties: ButtonProps) {\n    return <button />;\n}\n"),
 		"import type { ButtonProps } from './Types';\n"+
@@ -179,16 +179,16 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 
 	// An Interface suffix is replaced rather than appended to, which is the case that separates a
 	// derived rename from a blind one: appending gives ButtonInterfaceProperties.
-	rule_testing.ExpectFixedSource(t,
-		runTypeSuffix(t, typeSuffixFile,
+	rule_testing.ExpectFixedSource(test,
+		runTypeSuffix(test, typeSuffixFile,
 			"import type { ButtonInterface } from './Types';\n"+
 				"export function Button(properties: ButtonInterface) {\n    return <button />;\n}\n"),
 		"import type { ButtonInterface } from './Types';\n"+
 			"export function Button(properties: ButtonProperties) {\n    return <button />;\n}\n")
 
 	// A name with no known suffix gets one appended.
-	rule_testing.ExpectFixedSource(t,
-		runTypeSuffix(t, typeSuffixFile,
+	rule_testing.ExpectFixedSource(test,
+		runTypeSuffix(test, typeSuffixFile,
 			"import type { ButtonBag } from './Types';\n"+
 				"export function Button(properties: ButtonBag) {\n    return <button />;\n}\n"),
 		"import type { ButtonBag } from './Types';\n"+
@@ -210,8 +210,8 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 // and the existing fixtures passed because on that ordering the rule emits one finding rather than
 // two. `ExpectFindings` asserts a count and cannot tell a missing second finding from correct
 // behavior.
-func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -230,15 +230,15 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runTypeSuffix(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runTypeSuffix(test,
 				typeSuffixFile, testCase.sourceText)
 
 			// Both halves have to be renamed or the file stops compiling, so the count is the
 			// assertion rather than a detail of it.
 			if len(result.Diagnostics) != 2 {
-				t.Fatalf("wanted two findings, one for the usage and one for the declaration, got %d",
+				test.Fatalf("wanted two findings, one for the usage and one for the declaration, got %d",
 					len(result.Diagnostics))
 			}
 
@@ -246,7 +246,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 			// behind while looking like the rule saw it.
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 1 {
-					t.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
+					test.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
 				}
 			}
 		})
@@ -273,20 +273,20 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 //
 // The finding is kept and only the fix is withheld. The name still violates the convention, and
 // which of the two declarations survives is a decision only the author can make.
-func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(test *testing.T) {
+	test.Parallel()
 
 	source := "export interface MenuItemProperties { a: string }\n" +
 		"export type MenuItemInterface = MenuItemProperties;\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := runTypeSuffix(t, typeSuffixFile, source)
+	result := runTypeSuffix(test, typeSuffixFile, source)
 	if len(result.Diagnostics) == 0 {
-		t.Fatal("wanted the convention violation still reported, got no findings")
+		test.Fatal("wanted the convention violation still reported, got no findings")
 	}
 	for index, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
-			t.Fatalf("finding %d proposes %d fixes onto a name the file already declares, wanted none",
+			test.Fatalf("finding %d proposes %d fixes onto a name the file already declares, wanted none",
 				index, len(diagnostic.Fixes))
 		}
 	}
@@ -296,19 +296,19 @@ func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T
 //
 // Without this, disabling every fix in the rule passes the test above, and a rule that proposes
 // nothing is indistinguishable from one that correctly refuses one collision.
-func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(test *testing.T) {
+	test.Parallel()
 
 	source := "export interface MenuItemInterface { a: string }\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := runTypeSuffix(t, typeSuffixFile, source)
+	result := runTypeSuffix(test, typeSuffixFile, source)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
 	}
 	for index, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 1 {
-			t.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
+			test.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
 		}
 	}
 }
@@ -334,21 +334,21 @@ var dependencyFiles = map[string]string{
 }
 
 // runWithDependencies runs the rule on subject, written at fileName beside dependencyFiles.
-func runWithDependencies(t *testing.T, fileName string, subject string) rule_testing.Result {
-	t.Helper()
+func runWithDependencies(test *testing.T, fileName string, subject string) rule_testing.Result {
+	test.Helper()
 	files := map[string]string{fileName: subject}
 	for name, contents := range dependencyFiles {
 		files[name] = contents
 	}
-	return rule_testing.RunTypedFiles(t, ReactComponentRequirePropertiesTypeSuffix, files, fileName)
+	return rule_testing.RunTypedFiles(test, ReactComponentRequirePropertiesTypeSuffix, files, fileName)
 }
 
 // A type a dependency declares keeps the dependency's name (#kk5kk04). Ownership is decided by where the
 // type is declared, so Next's globals, React's types and a package's own TypeScript all pass, each
 // through the path that can tell it apart: a declaration file, a node_modules path, and an import
 // followed to what it names.
-func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -385,9 +385,9 @@ func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(t 
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runWithDependencies(t, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runWithDependencies(test, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
@@ -398,29 +398,29 @@ func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(t 
 // parse guard had nothing to refuse. The rule now reports nothing there, so there is no fix to apply,
 // while a component of ours in the same file keeps both its findings and both its fixes: skipping the
 // dependency's type is not a silencer for the file.
-func TestReactComponentRequirePropertiesTypeSuffixNeverRenamesADependencysType(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixNeverRenamesADependencysType(test *testing.T) {
+	test.Parallel()
 
-	result := runWithDependencies(t, "app/x/page.tsx",
+	result := runWithDependencies(test, "app/x/page.tsx",
 		"function Card(properties: CardProps) {\n    return <p>{properties.label}</p>;\n}\n"+
 			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
 			"interface CardProps { label: string }\n")
-	rule_testing.ExpectFixedSource(t, result,
+	rule_testing.ExpectFixedSource(test, result,
 		"function Card(properties: CardProperties) {\n    return <p>{properties.label}</p>;\n}\n"+
 			"export default function Page(properties: PageProps<'/x'>) {\n    return <Card label={String(properties)} />;\n}\n"+
 			"interface CardProperties { label: string }\n")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted the two findings for CardProps and none for PageProps, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted the two findings for CardProps and none for PageProps, got %d", len(result.Diagnostics))
 	}
 }
 
 // A dependency's name is not collected for the declaration findings, so a declaration of ours that
 // happens to share it, in a scope of its own, is not renamed on its account. Collecting it reported the
 // helper's interface and renamed it to `KitProperties`, a rename nothing asked for.
-func TestReactComponentRequirePropertiesTypeSuffixDoesNotCollectADependencysName(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixDoesNotCollectADependencysName(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, runWithDependencies(t, typeSuffixFile,
+	rule_testing.ExpectClean(test, runWithDependencies(test, typeSuffixFile,
 		"import type { KitProps } from 'kit';\n"+
 			"export function Button(properties: KitProps) {\n    return <button>{properties.label}</button>;\n}\n"+
 			"export function describe() {\n    interface KitProps { label: string }\n"+
@@ -429,11 +429,11 @@ func TestReactComponentRequirePropertiesTypeSuffixDoesNotCollectADependencysName
 
 // Our own interface without the suffix still fails, at the use and at the declaration, each with its fix,
 // in a program that also holds the dependencies: the predicate keeps what our source declares.
-func TestReactComponentRequirePropertiesTypeSuffixStillFixesOurOwnTypeBesideDependencies(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixStillFixesOurOwnTypeBesideDependencies(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFixedSource(t,
-		runWithDependencies(t, typeSuffixFile,
+	rule_testing.ExpectFixedSource(test,
+		runWithDependencies(test, typeSuffixFile,
 			"export function Button(properties: ButtonProps) {\n    return <button>{properties.label}</button>;\n}\n"+
 				"export interface ButtonProps { label: string }\n"),
 		"export function Button(properties: ButtonProperties) {\n    return <button>{properties.label}</button>;\n}\n"+
@@ -441,15 +441,15 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesOurOwnTypeBesideDepe
 }
 
 // Without a checker no declaration can be established, so no rename is offered.
-func TestReactComponentRequirePropertiesTypeSuffixWithoutACheckerIsSilent(t *testing.T) {
-	t.Parallel()
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, "/repository/app/x/page.tsx",
+func TestReactComponentRequirePropertiesTypeSuffixWithoutACheckerIsSilent(test *testing.T) {
+	test.Parallel()
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ReactComponentRequirePropertiesTypeSuffix, "/repository/app/x/page.tsx",
 		"export default function Page(properties: PageProps<'/x'>) { return null; }"))
 }
 
 // Missing generated types are compiler errors, not names this rule may invent.
-func TestReactComponentRequirePropertiesTypeSuffixRequiresADeclaration(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesTypeSuffixRequiresADeclaration(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name, source, dependency, fixed string
 		findings                        int
@@ -462,22 +462,22 @@ func TestReactComponentRequirePropertiesTypeSuffixRequiresADeclaration(t *testin
 		{name: "dependency declaration", source: "export function Page(properties: PageProps) { return null; }", dependency: "interface PageProps { label: string }"},
 	}
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(tc.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{"app/page.tsx": tc.source}
 			if tc.dependency != "" {
 				files["routes.d.ts"] = tc.dependency
 			}
-			result := rule_testing.RunTypedFiles(t, ReactComponentRequirePropertiesTypeSuffix, files, "app/page.tsx")
+			result := rule_testing.RunTypedFiles(test, ReactComponentRequirePropertiesTypeSuffix, files, "app/page.tsx")
 			if len(result.Diagnostics) != tc.findings {
-				t.Fatalf("got %d findings, want %d: %v", len(result.Diagnostics), tc.findings, result.MessageIds())
+				test.Fatalf("got %d findings, want %d: %v", len(result.Diagnostics), tc.findings, result.MessageIds())
 			}
 			if tc.fixed != "" {
-				rule_testing.ExpectFixedSource(t, result, tc.fixed+"\n")
+				rule_testing.ExpectFixedSource(test, result, tc.fixed+"\n")
 			} else {
 				for _, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Fatal("unexpected fix")
+						test.Fatal("unexpected fix")
 					}
 				}
 			}
@@ -486,9 +486,9 @@ func TestReactComponentRequirePropertiesTypeSuffixRequiresADeclaration(t *testin
 }
 
 // Imports used by the positive fixtures must resolve, not merely look like imports.
-func runTypeSuffix(t *testing.T, fileName, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, ReactComponentRequirePropertiesTypeSuffix, map[string]string{
+func runTypeSuffix(test *testing.T, fileName, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, ReactComponentRequirePropertiesTypeSuffix, map[string]string{
 		fileName:                     source,
 		"source/components/Types.ts": "export interface ButtonProps { label: string } export interface ButtonInterface { label: string } export interface ButtonPropertiesBag { label: string } export interface ButtonBag { label: string }",
 	}, fileName)

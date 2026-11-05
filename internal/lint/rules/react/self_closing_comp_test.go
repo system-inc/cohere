@@ -12,8 +12,8 @@ import (
 // source against each case's own `output`, and every one reproduced.
 const selfClosingCompFile = "/repository/source/SelfClosingComp.tsx"
 
-func TestSelfClosingCompStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -56,10 +56,10 @@ func TestSelfClosingCompStaysSilent(t *testing.T) {
 		{"upstream valid 34", "\n        <div>\n          <div className=\"content\" />\n        </div>\n      ", SelfClosingCompOptions{Component: true, Html: true}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -68,8 +68,8 @@ func TestSelfClosingCompStaysSilent(t *testing.T) {
 // carries an `output`, which is the exact text its fixer must write, and those are the highest
 // value artifact in a fixable rule's corpus: a fixer that repairs the right span with the wrong
 // text passes any message-id assertion.
-func TestSelfClosingCompFires(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, wantFixed string
@@ -89,11 +89,11 @@ func TestSelfClosingCompFires(t *testing.T) {
 		{"upstream invalid 11", "var contentContainer = <div className=\"content\">\n</div>;", "var contentContainer = <div className=\"content\" />;", SelfClosingCompOptions{Component: true, Html: true}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, "notSelfClosing")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, "notSelfClosing")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -117,8 +117,8 @@ func TestSelfClosingCompFires(t *testing.T) {
 // The non-breaking space rows were constructed by code point rather than typed, after a shell path
 // silently cooked one into a plain space and produced a confident wrong measurement that disagreed
 // with a Go probe of the same input.
-func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -171,12 +171,12 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Fatalf("installed build reports %d findings, this rule reports %d",
+				test.Fatalf("installed build reports %d findings, this rule reports %d",
 					testCase.wantFindings, len(result.Diagnostics))
 			}
 			// The repair is asserted on every REPORTING row. `ExpectFixedSource` refuses a result
@@ -184,7 +184,7 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *
 			// assert their zero count above and nothing more; their `wantFixed` is the input, which
 			// is what an unapplied fix would leave.
 			if testCase.wantFindings > 0 {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}
 		})
 	}
@@ -202,8 +202,8 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *
 //
 // Every shape below reaches the text-reading path. A findings assertion would pass vacuously if the
 // rule crashed, so this asserts by running at all.
-func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompDoesNotPanicOnJsxText(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"var a = <div>\n</div>;",
@@ -214,10 +214,10 @@ func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
 		"var a = <Foo>\n</Foo>;",
 	}
 	for _, sourceText := range sources {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
 			// Reaching the next line at all is the assertion.
-			rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, sourceText,
+			rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, sourceText,
 				DefaultSelfClosingCompOptions())
 		})
 	}
@@ -234,8 +234,8 @@ func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
 //
 // The empty-input row is the one that matters most: a rule configured as a bare `"error"` reaches
 // the decoder with no bytes at all.
-func TestDecodeSelfClosingCompOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeSelfClosingCompOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -254,27 +254,27 @@ func TestDecodeSelfClosingCompOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeSelfClosingCompOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("want an error, got %#v", decoded)
+					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			options, isOptions := decoded.(SelfClosingCompOptions)
 			if !isOptions {
-				t.Fatalf("decoder returned %T, want SelfClosingCompOptions", decoded)
+				test.Fatalf("decoder returned %T, want SelfClosingCompOptions", decoded)
 			}
 			if options.Component != testCase.wantComponent {
-				t.Errorf("Component is %v, want %v", options.Component, testCase.wantComponent)
+				test.Errorf("Component is %v, want %v", options.Component, testCase.wantComponent)
 			}
 			if options.Html != testCase.wantHtml {
-				t.Errorf("Html is %v, want %v", options.Html, testCase.wantHtml)
+				test.Errorf("Html is %v, want %v", options.Html, testCase.wantHtml)
 			}
 		})
 	}
@@ -286,14 +286,14 @@ func TestDecodeSelfClosingCompOptions(t *testing.T) {
 // struct, and `options.(T)` on nil yields the ZERO value, which for this rule means both halves off
 // and a rule that reports nothing. The explicit fallback is what prevents that, and nothing else in
 // this file would notice if it were removed.
-func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{"var a = <div></div>;", "var a = <Foo></Foo>;"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "notSelfClosing")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, sourceText, nil)
+			rule_testing.ExpectFindings(test, result, "notSelfClosing")
 		})
 	}
 }
@@ -315,8 +315,8 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
 //
 // This distinction matters because the two zeros look identical from a findings assertion, and
 // asserting a finding on `.ts` would be asserting something false about the parser.
-func TestSelfClosingCompHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestSelfClosingCompHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "var a = <div></div>;\n"
 	for _, fileName := range []string{
@@ -324,11 +324,11 @@ func TestSelfClosingCompHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.jsx",
 		"/repository/source/Suffix.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SelfClosingComp, fileName, sourceText,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SelfClosingComp, fileName, sourceText,
 				DefaultSelfClosingCompOptions())
-			rule_testing.ExpectFindings(t, result, "notSelfClosing")
+			rule_testing.ExpectFindings(test, result, "notSelfClosing")
 		})
 	}
 }

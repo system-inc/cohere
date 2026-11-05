@@ -10,8 +10,8 @@ import (
 // The corpus is ESLint's own, 34 valid and 27 invalid cases, extracted by loading its test file
 // with a stubbed rule tester so nothing was retyped, then verified byte against byte.
 
-func TestVarsOnTopStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -53,15 +53,15 @@ func TestVarsOnTopStaysSilent(t *testing.T) {
 		{name: "valid33", source: "class C {\n    static {\n        foo();\n        let x;\n    }\n}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", testCase.source))
 		})
 	}
 }
 
-func TestVarsOnTopFires(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -97,22 +97,22 @@ func TestVarsOnTopFires(t *testing.T) {
 		{name: "invalid26", source: "class C {\n    static {\n        if (foo)\n            var x;\n    }\n}", wantCount: 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VarsOnTop, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "top"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
 // The span and the message, neither of which ExpectFindings can see. Upstream reports the whole
 // variable declaration statement rather than the declarator or the keyword.
-func TestVarsOnTopSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -125,22 +125,22 @@ func TestVarsOnTopSpanAndMessage(t *testing.T) {
 		{"exportedAfterAFunction", "export function f() {}\nvar x;", "var x;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VarsOnTop, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != "top" {
-				t.Errorf("message id: got %q", finding.Message.Id)
+				test.Errorf("message id: got %q", finding.Message.Id)
 			}
 			wantPrefix := "All 'var' declarations must be at the top of the function scope. "
 			if got := finding.Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
+				test.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
 			}
 		})
 	}
@@ -152,60 +152,60 @@ func TestVarsOnTopSpanAndMessage(t *testing.T) {
 // Upstream's own pair is `'use strict'; 'directive'; var x; var y; f();` clean against
 // `'use strict'; var x; 'directive'; var y; f();` reporting. A filter that removed every
 // directive-looking statement wherever it sat would call the second one clean too.
-func TestVarsOnTopDirectiveScanIsAPrefix(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopDirectiveScanIsAPrefix(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"'use strict'; 'directive'; var x; var y; f();"))
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"'use strict'; var x; 'directive'; var y; f();"), "top")
 
 	// And a non-string statement closes the prologue immediately.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"'use strict'; 0; var x; f();"), "top")
 }
 
 // A class static block has no directive prologue and no imports, so upstream turns the skip off
 // there and a string statement is an ordinary expression. This is the only place the two container
 // kinds behave differently, and unifying them by accident would make the reporting case clean.
-func TestVarsOnTopStaticBlockHasNoPrologue(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopStaticBlockHasNoPrologue(test *testing.T) {
+	test.Parallel()
 
 	// The same shape that is CLEAN at the top of a program.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"class C { static { 'use strict'; var x; } }"), "top")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", "'use strict'; var x;"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", "'use strict'; var x;"))
 
 	// And a var really is allowed at the top of a static block, so the verdict above is about the
 	// prologue rather than about static blocks being rejected outright.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"class C { static { var x; foo(); } }"))
 }
 
 // `export var` needs no wrapper handling here because our parser makes the export a modifier
 // rather than a node. These three are upstream's exported cases and they pin that the run scan
 // still sees the declaration.
-func TestVarsOnTopExportedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopExportedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"export var x;\nvar y;\nvar z;",
 		"var x;\nexport var y;\nvar z;",
 		"var x;\nvar y;\nexport var z;",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", source))
 	}
 
 	// An exported FUNCTION is not a declaration and closes the run, which is the discrimination
 	// the three clean cases above cannot make on their own.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"export function f() {}\nvar x;"), "top")
 }
 
 // Only `var`. Everything else is scoped to its block already, so the rule has nothing to say about
 // it wherever it is written.
-func TestVarsOnTopIgnoresBlockScopedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopIgnoresBlockScopedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"function foo() { foo(); let x = 1; }",
@@ -213,11 +213,11 @@ func TestVarsOnTopIgnoresBlockScopedDeclarations(t *testing.T) {
 		"function foo() { if (a) { let x = 1; } }",
 		"class C { static { foo(); let x; } }",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", source))
 	}
 
 	// A control, so four clean verdicts are not vacuous.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"function foo() { foo(); var x = 1; }"), "top")
 }
 
@@ -227,12 +227,12 @@ func TestVarsOnTopIgnoresBlockScopedDeclarations(t *testing.T) {
 // The tempting reading is that a template with no substitutions is a string and should count. It
 // does not, in the rule or in any engine, so accepting it would silently make a reporting input
 // clean. The pair below differs only in the quote character.
-func TestVarsOnTopTemplateIsNotADirective(t *testing.T) {
-	t.Parallel()
+func TestVarsOnTopTemplateIsNotADirective(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", `"use strict"; var x; f();`))
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.Run(test, VarsOnTop, "file.ts", `"use strict"; var x; f();`))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"`use strict`; var x; f();"), "top")
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, VarsOnTop, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, VarsOnTop, "file.ts",
 		"`hello`; var x;"), "top")
 }

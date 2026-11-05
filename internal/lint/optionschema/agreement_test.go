@@ -30,19 +30,19 @@ const corpusDirectory = "../registry/testdata/eslint-corpus/eslint-10.8.1"
 // The gate is two counts, each required to be zero (#pd2chkx condition 5): refusing a list ajv accepts,
 // which would stop a run on a config ESLint loads, and accepting a list ajv refuses, which is the hole
 // this package closes. Reported separately, because the first is the costly direction.
-func TestValidatorAgreesWithAjv(t *testing.T) {
-	t.Parallel()
+func TestValidatorAgreesWithAjv(test *testing.T) {
+	test.Parallel()
 
 	data, err := os.ReadFile(filepath.Join("testdata", "samples.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var samples samplesFile
 	if err := json.Unmarshal(data, &samples); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if !equalVersions(samples.GeneratedFrom, GeneratedFrom()) {
-		t.Fatalf("the samples were drawn from %v and the embedded schemas from %v; regenerate both together", samples.GeneratedFrom, GeneratedFrom())
+		test.Fatalf("the samples were drawn from %v and the embedded schemas from %v; regenerate both together", samples.GeneratedFrom, GeneratedFrom())
 	}
 
 	var falseRefusals, falseAccepts []string
@@ -50,10 +50,10 @@ func TestValidatorAgreesWithAjv(t *testing.T) {
 	for _, sample := range samples.Samples {
 		schema, found, err := For(sample.Rule)
 		if err != nil {
-			t.Fatalf("%s: %v", sample.Rule, err)
+			test.Fatalf("%s: %v", sample.Rule, err)
 		}
 		if !found {
-			t.Fatalf("%s has a sample and no schema", sample.Rule)
+			test.Fatalf("%s has a sample and no schema", sample.Rule)
 		}
 		violation := schema.Validate(sample.Elements)
 		encoded, _ := json.Marshal(sample.Elements)
@@ -69,14 +69,14 @@ func TestValidatorAgreesWithAjv(t *testing.T) {
 				falseAccepts = append(falseAccepts, fmt.Sprintf("%s %s (%s at %s)", sample.Rule, encoded, sample.Keyword, sample.Path))
 			}
 		default:
-			t.Fatalf("%s: unknown verdict %q", sample.Rule, sample.ESLint)
+			test.Fatalf("%s: unknown verdict %q", sample.Rule, sample.ESLint)
 		}
 	}
 
 	corpusRows := 0
 	entries, err := os.ReadDir(corpusDirectory)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, entry := range entries {
 		ruleName, isRows := strings.CutSuffix(entry.Name(), ".json")
@@ -85,17 +85,17 @@ func TestValidatorAgreesWithAjv(t *testing.T) {
 		}
 		data, err := os.ReadFile(filepath.Join(corpusDirectory, entry.Name()))
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		var rows []struct {
 			Options []json.RawMessage `json:"options"`
 		}
 		if err := json.Unmarshal(data, &rows); err != nil {
-			t.Fatalf("%s: %v", entry.Name(), err)
+			test.Fatalf("%s: %v", entry.Name(), err)
 		}
 		schema, found, err := For(ruleName)
 		if err != nil {
-			t.Fatalf("%s: %v", ruleName, err)
+			test.Fatalf("%s: %v", ruleName, err)
 		}
 		for _, row := range rows {
 			if len(row.Options) == 0 {
@@ -112,7 +112,7 @@ func TestValidatorAgreesWithAjv(t *testing.T) {
 		}
 	}
 
-	t.Logf("samples: ajv accepts %d and refuses %d; corpus option rows: %d", accepted, refused, corpusRows)
+	test.Logf("samples: ajv accepts %d and refuses %d; corpus option rows: %d", accepted, refused, corpusRows)
 	report := func(label string, failures []string) {
 		if len(failures) == 0 {
 			return
@@ -122,28 +122,28 @@ func TestValidatorAgreesWithAjv(t *testing.T) {
 		if len(shown) > 40 {
 			shown = shown[:40]
 		}
-		t.Errorf("%s: %d\n  %s", label, len(failures), strings.Join(shown, "\n  "))
+		test.Errorf("%s: %d\n  %s", label, len(failures), strings.Join(shown, "\n  "))
 	}
 	report("refuses what ajv accepts", falseRefusals)
 	report("accepts what ajv refuses", falseAccepts)
 
 	// The counts are part of the gate: a sample file that shrank would read as agreement.
 	if accepted < 1900 || refused < 8000 || corpusRows != 6641 {
-		t.Errorf("the gate ran on %d accepted samples, %d refused and %d corpus rows, fewer than it was built on", accepted, refused, corpusRows)
+		test.Errorf("the gate ran on %d accepted samples, %d refused and %d corpus rows, fewer than it was built on", accepted, refused, corpusRows)
 	}
 }
 
 // Every embedded schema compiles, so a rule's first config load can never be the place a schema fails.
-func TestEveryEmbeddedSchemaCompiles(t *testing.T) {
-	t.Parallel()
+func TestEveryEmbeddedSchemaCompiles(test *testing.T) {
+	test.Parallel()
 
 	for _, name := range RuleNames() {
 		if _, _, err := For(name); err != nil {
-			t.Errorf("%s: %v", name, err)
+			test.Errorf("%s: %v", name, err)
 		}
 	}
 	if count := len(RuleNames()); count != 384 {
-		t.Errorf("the embedded schemas cover %d rules, want 384", count)
+		test.Errorf("the embedded schemas cover %d rules, want 384", count)
 	}
 }
 
@@ -169,12 +169,12 @@ var pluginOrigins = map[string]bool{
 // The embedded schemas cover exactly the rules cohere ports from ESLint, as docs/data/rules.json lists
 // them (which docsdata's own check keeps current with the registry). A port added without regenerating
 // has no schema and would be checked by nothing, and a schema for a rule cohere dropped is dead weight.
-func TestSchemasCoverEveryPortedRule(t *testing.T) {
-	t.Parallel()
+func TestSchemasCoverEveryPortedRule(test *testing.T) {
+	test.Parallel()
 
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "data", "rules.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var rules struct {
 		Rules []struct {
@@ -183,7 +183,7 @@ func TestSchemasCoverEveryPortedRule(t *testing.T) {
 		} `json:"rules"`
 	}
 	if err := json.Unmarshal(data, &rules); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	ported := map[string]bool{}
 	for _, row := range rules.Rules {
@@ -195,29 +195,29 @@ func TestSchemasCoverEveryPortedRule(t *testing.T) {
 	for _, name := range RuleNames() {
 		embedded[name] = true
 		if !ported[name] {
-			t.Errorf("%s has an embedded schema and is not a ported rule; regenerate with extract.mjs", name)
+			test.Errorf("%s has an embedded schema and is not a ported rule; regenerate with extract.mjs", name)
 		}
 	}
 	for name := range ported {
 		if !embedded[name] {
-			t.Errorf("%s is ported and has no embedded schema; regenerate with extract.mjs", name)
+			test.Errorf("%s is ported and has no embedded schema; regenerate with extract.mjs", name)
 		}
 	}
 }
 
 // A bare severity is an empty option list, which the config layer does not check because no upstream
 // schema refuses it. This holds that true for every embedded schema.
-func TestEverySchemaAcceptsTheBareSeverity(t *testing.T) {
-	t.Parallel()
+func TestEverySchemaAcceptsTheBareSeverity(test *testing.T) {
+	test.Parallel()
 
 	for _, name := range RuleNames() {
 		schema, found, err := For(name)
 		if err != nil {
-			t.Fatalf("%s: %v", name, err)
+			test.Fatalf("%s: %v", name, err)
 		}
 		if found {
 			if violation := schema.Validate(nil); violation != nil {
-				t.Errorf("%s refuses the bare severity: %v", name, violation)
+				test.Errorf("%s refuses the bare severity: %v", name, violation)
 			}
 		}
 	}
@@ -225,53 +225,53 @@ func TestEverySchemaAcceptsTheBareSeverity(t *testing.T) {
 
 // The extension list is a set of decisions, so its size is a bare equality: adding one is a change to
 // this number, made on purpose (#pd2chkx condition 6).
-func TestExtensionsAreExactlyTheDeclaredOnes(t *testing.T) {
-	t.Parallel()
+func TestExtensionsAreExactlyTheDeclaredOnes(test *testing.T) {
+	test.Parallel()
 
 	if len(Extensions) != 1 {
-		t.Fatalf("there are %d extensions, and exactly 1 is declared", len(Extensions))
+		test.Fatalf("there are %d extensions, and exactly 1 is declared", len(Extensions))
 	}
 	for _, extension := range Extensions {
 		if extension.Reason == "" {
-			t.Errorf("%s's extension %q carries no reason", extension.Rule, extension.Key)
+			test.Errorf("%s's extension %q carries no reason", extension.Rule, extension.Key)
 		}
 		if _, found, _ := For(extension.Rule); !found {
-			t.Errorf("%s has an extension and no schema", extension.Rule)
+			test.Errorf("%s has an extension and no schema", extension.Rule)
 		}
 	}
 }
 
 // boundaries/dependencies' elements load through its extension, are refused without it, and the rest of
 // the element is still checked.
-func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(t *testing.T) {
-	t.Parallel()
+func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
+	test.Parallel()
 
 	withElements := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[{"type":"api","pattern":"api/**"}]}`)}
 	if err := Check("boundaries/dependencies", withElements); err != nil {
-		t.Errorf("elements are refused: %v", err)
+		test.Errorf("elements are refused: %v", err)
 	}
 	schema, _, _ := For("boundaries/dependencies")
 	if err := schema.Validate(withElements); err == nil {
-		t.Errorf("upstream's schema accepts elements without the extension, so the extension is not needed")
+		test.Errorf("upstream's schema accepts elements without the extension, so the extension is not needed")
 	}
 	otherKey := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[],"notAnUpstreamKey":true}`)}
 	if err := Check("boundaries/dependencies", otherKey); err == nil {
-		t.Errorf("a key outside the extension is accepted")
+		test.Errorf("a key outside the extension is accepted")
 	}
 }
 
 // A refusal names the element as a config author counts it, the path inside it, and what upstream
 // expected (#pd2chkx condition 8).
-func TestARefusalNamesTheElementThePathAndTheExpectation(t *testing.T) {
-	t.Parallel()
+func TestARefusalNamesTheElementThePathAndTheExpectation(test *testing.T) {
+	test.Parallel()
 
 	err := Check("@typescript-eslint/no-deprecated", []json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)})
 	if err == nil {
-		t.Fatal("a mis-cased from is accepted")
+		test.Fatal("a mis-cased from is accepted")
 	}
 	for _, want := range []string{"element 1 at allow[0]", "upstream's schema, which ESLint validates against, expects"} {
 		if !strings.Contains(err.Error(), want) {
-			t.Errorf("the refusal %q does not say %q", err, want)
+			test.Errorf("the refusal %q does not say %q", err, want)
 		}
 	}
 }

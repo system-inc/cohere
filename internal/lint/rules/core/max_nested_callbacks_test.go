@@ -21,17 +21,17 @@ import (
 // decodeMaxNestedCallbacksForTest turns a fixture's JSON into options the way the config layer does.
 // An empty string stands for a rule configured as a bare severity, which reaches the decoder as
 // empty input.
-func decodeMaxNestedCallbacksForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeMaxNestedCallbacksForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	decoded, err := DecodeMaxNestedCallbacksOptions([]byte(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", optionsJson, err)
+		test.Fatalf("decoding %q: %v", optionsJson, err)
 	}
 	return decoded
 }
 
-func TestMaxNestedCallbacksStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestMaxNestedCallbacksStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -53,10 +53,10 @@ func TestMaxNestedCallbacksStaysSilent(t *testing.T) {
 		{name: "valid12", source: "new Promise(() => {});", optionsJson: "{\"max\": 1, \"checkConstructorCallCallbacks\": true}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks,
-				"file.ts", testCase.source, decodeMaxNestedCallbacksForTest(t, testCase.optionsJson)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks,
+				"file.ts", testCase.source, decodeMaxNestedCallbacksForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -71,8 +71,8 @@ type wantSpan struct {
 // Each invalid case asserts the finding count, every span, the text each span covers, and the
 // rendered message. ExpectFindings would see none of those: the message interpolates two integers
 // that both move, and passing them in the wrong order renders a grammatical sentence.
-func TestMaxNestedCallbacksFires(t *testing.T) {
-	t.Parallel()
+func TestMaxNestedCallbacksFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -216,31 +216,31 @@ func TestMaxNestedCallbacksFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
-				testCase.source, decodeMaxNestedCallbacksForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",
+				testCase.source, decodeMaxNestedCallbacksForTest(test, testCase.optionsJson))
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, finding := range result.Diagnostics {
 				want := testCase.wantSpans[index]
 				if finding.Range.Pos() != want.pos || finding.Range.End() != want.end {
-					t.Errorf("finding %d span: got [%d,%d), want [%d,%d)",
+					test.Errorf("finding %d span: got [%d,%d), want [%d,%d)",
 						index, finding.Range.Pos(), finding.Range.End(), want.pos, want.end)
 				}
 				if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != want.text {
-					t.Errorf("finding %d text: got %q, want %q", index, got, want.text)
+					test.Errorf("finding %d text: got %q, want %q", index, got, want.text)
 				}
 				if finding.Message.Id != "exceed" {
-					t.Errorf("finding %d id: got %q, want %q", index, finding.Message.Id, "exceed")
+					test.Errorf("finding %d id: got %q, want %q", index, finding.Message.Id, "exceed")
 				}
 				// The prefix is upstream's whole rendered sentence; our description continues past
 				// it with the reasoning, so the assertion is on the part upstream specifies.
 				wantPrefix := fmt.Sprintf("Too many nested callbacks (%d). Maximum allowed is %d. ",
 					testCase.wantCounts[index][0], testCase.wantCounts[index][1])
 				if got := finding.Message.Description; len(got) < len(wantPrefix) || got[:len(wantPrefix)] != wantPrefix {
-					t.Errorf("finding %d message:\n got %q\nwant prefix %q", index, got, wantPrefix)
+					test.Errorf("finding %d message:\n got %q\nwant prefix %q", index, got, wantPrefix)
 				}
 			}
 		})
@@ -250,8 +250,8 @@ func TestMaxNestedCallbacksFires(t *testing.T) {
 // The decoder's own decisions, each measured against the installed build at 10.8.1 before being
 // written here. None of these has a counterpart in upstream's corpus, and each is a line that would
 // pass every imported case while being wrong.
-func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeMaxNestedCallbacksOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name                              string
@@ -276,25 +276,25 @@ func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
 		{"flagOn", `{"max": 0, "checkConstructorCallCallbacks": true}`, 0, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeMaxNestedCallbacksOptions([]byte(testCase.optionsJson))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
 			}
 			settings, isSettings := decoded.(MaxNestedCallbacksOptions)
 			if !isSettings {
-				t.Fatalf("decoded to %T, want MaxNestedCallbacksOptions", decoded)
+				test.Fatalf("decoded to %T, want MaxNestedCallbacksOptions", decoded)
 			}
 			if settings.Maximum == nil {
-				t.Fatalf("maximum is nil, which would leave the rule inert")
+				test.Fatalf("maximum is nil, which would leave the rule inert")
 			}
 			if *settings.Maximum != testCase.wantMaximum {
-				t.Errorf("maximum: got %d, want %d", *settings.Maximum, testCase.wantMaximum)
+				test.Errorf("maximum: got %d, want %d", *settings.Maximum, testCase.wantMaximum)
 			}
 			got := settings.CheckConstructorCallCallbacks != nil && *settings.CheckConstructorCallCallbacks
 			if got != testCase.wantCheckConstructorCallCallbacks {
-				t.Errorf("checkConstructorCallCallbacks: got %v, want %v", got,
+				test.Errorf("checkConstructorCallCallbacks: got %v, want %v", got,
 					testCase.wantCheckConstructorCallCallbacks)
 			}
 		})
@@ -305,8 +305,8 @@ func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
 // zero-value struct there carries a nil Maximum. Without the fallback the rule reads the limit as
 // zero and reports every callback in the tree, or reads it as nil and reports nothing; either way
 // every fixture above still passes, because all of them route through the decoder.
-func TestMaxNestedCallbacksHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestMaxNestedCallbacksHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	deepEnoughForTheDefault := "foo(function(){"
 	for depth := 0; depth < 10; depth++ {
@@ -315,23 +315,23 @@ func TestMaxNestedCallbacksHandlesNilOptions(t *testing.T) {
 	for depth := 0; depth < 11; depth++ {
 		deepEnoughForTheDefault += "})"
 	}
-	result := rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", deepEnoughForTheDefault, nil)
+	result := rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", deepEnoughForTheDefault, nil)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected the default limit of 10 to report once on an 11-deep nest, got %d findings",
+		test.Fatalf("expected the default limit of 10 to report once on an 11-deep nest, got %d findings",
 			len(result.Diagnostics))
 	}
 	shallow := "foo(function(){ foo(function(){}) })"
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", shallow, nil))
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", shallow, nil))
 	// And the same input through the decoder, so the two paths are pinned to the same answer.
 	var throughDecoder any
 	decoded, err := DecodeMaxNestedCallbacksOptions([]byte(""))
 	if err != nil {
-		t.Fatalf("decoding empty: %v", err)
+		test.Fatalf("decoding empty: %v", err)
 	}
 	throughDecoder = decoded
-	if len(rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
+	if len(rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",
 		deepEnoughForTheDefault, throughDecoder).Diagnostics) != 1 {
-		t.Errorf("the decoder path and the nil path disagree about the default")
+		test.Errorf("the decoder path and the nil path disagree about the default")
 	}
 }
 
@@ -347,10 +347,10 @@ func TestMaxNestedCallbacksHandlesNilOptions(t *testing.T) {
 //
 // The shape that separates them is an immediately invoked function reached through a unary or
 // binary operator instead of parens, where the function really is the direct callee here too.
-func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
-	t.Parallel()
+func TestMaxNestedCallbacksDirectCalleeIsNotACallback(test *testing.T) {
+	test.Parallel()
 
-	zero := decodeMaxNestedCallbacksForTest(t, "0")
+	zero := decodeMaxNestedCallbacksForTest(test, "0")
 
 	silent := []struct {
 		name   string
@@ -364,27 +364,27 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 		{"parenthesizedArrowImmediatelyInvoked", "(() => {})();"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", testCase.source, zero))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", testCase.source, zero))
 		})
 	}
 
 	// The callee is still not counted while its own argument is, so this reports exactly once and
 	// points at the argument. A rule counting the callee would report twice.
-	t.Run("theArgumentOfADirectCalleeStillCounts", func(t *testing.T) {
-		t.Parallel()
+	test.Run("theArgumentOfADirectCalleeStillCounts", func(test *testing.T) {
+		test.Parallel()
 		source := "!function(){}(function(){});"
-		result := rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", source, zero)
+		result := rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", source, zero)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+			test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 		}
 		if got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != "function" {
-			t.Errorf("reported text: got %q, want %q", got, "function")
+			test.Errorf("reported text: got %q, want %q", got, "function")
 		}
 		if result.Diagnostics[0].Range.Pos() != 14 {
-			t.Errorf("span points at %d, want 14, which is the argument rather than the callee",
+			test.Errorf("span points at %d, want 14, which is the argument rather than the callee",
 				result.Diagnostics[0].Range.Pos())
 		}
 	})
@@ -397,15 +397,15 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 // through rule_testing.ExpectFindings, and the guard that checks a rule can be shown to fire reads
 // the test file textually. It is a real assertion rather than a formality: an id typo would render
 // a correct sentence and every span assertion above would still pass.
-func TestMaxNestedCallbacksReportsTheExceedId(t *testing.T) {
-	t.Parallel()
+func TestMaxNestedCallbacksReportsTheExceedId(test *testing.T) {
+	test.Parallel()
 
 	source := "foo(function() { bar(thing, function(data) { baz(function() {}); }); });"
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
-		source, decodeMaxNestedCallbacksForTest(t, "2")), "exceed")
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",
+		source, decodeMaxNestedCallbacksForTest(test, "2")), "exceed")
 
 	// Two findings from one input, so the helper is exercised on a count other than one.
 	nested := "foo(function() { bar(function() { baz(function() { qux(function() {}); }); }); });"
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
-		nested, decodeMaxNestedCallbacksForTest(t, "2")), "exceed", "exceed")
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",
+		nested, decodeMaxNestedCallbacksForTest(test, "2")), "exceed", "exceed")
 }

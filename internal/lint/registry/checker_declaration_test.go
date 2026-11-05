@@ -30,12 +30,12 @@ import (
 // So the declaration is only as good as something checking it, which is the same argument as the
 // fixture-pair guard. This reads each rule's source for a `ctx.TypeChecker` reference and requires
 // the declaration to match.
-func TestRulesDeclareTheirCheckerUse(t *testing.T) {
-	t.Parallel()
-	declarations := checkerDeclarationsOnDisk(t)
+func TestRulesDeclareTheirCheckerUse(test *testing.T) {
+	test.Parallel()
+	declarations := checkerDeclarationsOnDisk(test)
 	if len(declarations) == 0 {
 		// A sweep with nothing to check passes for the wrong reason, which is the defect it guards.
-		t.Fatal("found no rule declarations, so this test proved nothing")
+		test.Fatal("found no rule declarations, so this test proved nothing")
 	}
 
 	registered := make(map[string]bool, len(All()))
@@ -62,7 +62,7 @@ func TestRulesDeclareTheirCheckerUse(t *testing.T) {
 
 		switch {
 		case declaration.readsChecker && !needs:
-			t.Errorf("rule %q reads ctx.TypeChecker in %s and declares NeedsTypeChecker false, so it "+
+			test.Errorf("rule %q reads ctx.TypeChecker in %s and declares NeedsTypeChecker false, so it "+
 				"will be handed nil; a nil checker does not announce itself, it either panics into a "+
 				"lost file or takes a nil-guarded path and answers wrongly in silence",
 				declaration.ruleName, declaration.file)
@@ -77,7 +77,7 @@ func TestRulesDeclareTheirCheckerUse(t *testing.T) {
 			// so the per-file answer was a false positive that two porters reported independently
 			// before it was fixed. Reporting a correct declaration as an over-declaration is worse
 			// than missing one: it teaches the next porter that the guard is noise.
-			t.Errorf("rule %q declares NeedsTypeChecker and no file in %s reads ctx.TypeChecker, so "+
+			test.Errorf("rule %q declares NeedsTypeChecker and no file in %s reads ctx.TypeChecker, so "+
 				"every file it applies to takes the exclusive lock for nothing",
 				declaration.ruleName, filepath.Dir(declaration.file))
 		}
@@ -113,12 +113,12 @@ type checkerDeclaration struct {
 //
 // Parsing rather than grepping, because `ctx.TypeChecker` appears in comments discussing the checker
 // in several files here, and a text match would report those as reads.
-func checkerDeclarationsOnDisk(t *testing.T) []checkerDeclaration {
-	t.Helper()
+func checkerDeclarationsOnDisk(test *testing.T) []checkerDeclaration {
+	test.Helper()
 
 	paths, err := filepath.Glob("../rules/*/*.go")
 	if err != nil {
-		t.Fatalf("globbing rule files: %v", err)
+		test.Fatalf("globbing rule files: %v", err)
 	}
 
 	var found []checkerDeclaration
@@ -130,7 +130,7 @@ func checkerDeclarationsOnDisk(t *testing.T) []checkerDeclaration {
 
 		parsed, parseErr := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 		if parseErr != nil {
-			t.Fatalf("parsing %s: %v", path, parseErr)
+			test.Fatalf("parsing %s: %v", path, parseErr)
 		}
 
 		name, named := ruleNameDeclaredIn(parsed)
@@ -233,8 +233,8 @@ func fileReadsTypeChecker(parsed *ast.File) bool {
 // So the band is on the ratio, wide enough that ordinary porting cannot trip it and narrow enough
 // that a real shift does. When it fails, the fix is not to widen the band: it is to read both
 // comments and decide whether what they conclude still follows.
-func TestCheckerDeclarationShareStillSupportsTheConclusion(t *testing.T) {
-	t.Parallel()
+func TestCheckerDeclarationShareStillSupportsTheConclusion(test *testing.T) {
+	test.Parallel()
 	// The share at which the conclusion was measured, and the range over which it still holds.
 	// Below the floor, the acquisition is skipped on nearly every file and the blanket claim these
 	// comments replaced would be honest again. Above the ceiling, it is skipped so seldom that the
@@ -253,12 +253,12 @@ func TestCheckerDeclarationShareStillSupportsTheConclusion(t *testing.T) {
 		}
 	}
 	if len(rules) == 0 {
-		t.Fatal("no rules registered, so this measures nothing")
+		test.Fatal("no rules registered, so this measures nothing")
 	}
 
 	share := float64(needsChecker) / float64(len(rules))
 	if share < floorShare || share > ceilingShare {
-		t.Errorf("%d of %d registered rules declare NeedsTypeChecker (%.0f%%), outside the %.0f%%..%.0f%% "+
+		test.Errorf("%d of %d registered rules declare NeedsTypeChecker (%.0f%%), outside the %.0f%%..%.0f%% "+
 			"band the comments here and in `internal/rule/rule.go` draw their conclusion from; that "+
 			"conclusion was measured at %.0f%%. Read both comments and decide whether what they say "+
 			"about the checker lock still follows, then move the band deliberately rather than to "+

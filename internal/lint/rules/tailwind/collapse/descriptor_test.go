@@ -50,18 +50,18 @@ type descriptorFixtures struct {
 	Cases []descriptorFixtureCase `json:"cases"`
 }
 
-func loadDescriptorFixtures(t *testing.T, name string) *descriptorFixtures {
-	t.Helper()
+func loadDescriptorFixtures(test *testing.T, name string) *descriptorFixtures {
+	test.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("reading fixtures: %v", err)
+		test.Fatalf("reading fixtures: %v", err)
 	}
 	fixtures := &descriptorFixtures{}
 	if err := json.Unmarshal(raw, fixtures); err != nil {
-		t.Fatalf("parsing fixtures: %v", err)
+		test.Fatalf("parsing fixtures: %v", err)
 	}
 	if len(fixtures.Cases) == 0 {
-		t.Fatal("fixture corpus is empty")
+		test.Fatal("fixture corpus is empty")
 	}
 	return fixtures
 }
@@ -113,13 +113,13 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 	return candidate
 }
 
-func TestDescriptorLookupMatchesEngine(t *testing.T) {
-	t.Parallel()
-	fixtures := loadDescriptorFixtures(t, "descriptor_fixtures.json")
-	table := testTable(t)
+func TestDescriptorLookupMatchesEngine(test *testing.T) {
+	test.Parallel()
+	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures.json")
+	table := testTable(test)
 
 	if table.TailwindVersion != fixtures.TailwindVersion {
-		t.Fatalf("table is Tailwind %s and fixtures are Tailwind %s", table.TailwindVersion, fixtures.TailwindVersion)
+		test.Fatalf("table is Tailwind %s and fixtures are Tailwind %s", table.TailwindVersion, fixtures.TailwindVersion)
 	}
 
 	agreed, declined, mismatched, withoutReading := 0, 0, 0, 0
@@ -148,7 +148,7 @@ func TestDescriptorLookupMatchesEngine(t *testing.T) {
 				if !found || !descriptor.PerDeclaration {
 					mismatched++
 					if mismatched <= 20 {
-						t.Errorf("%s: lookup declined but engine read %v#%d",
+						test.Errorf("%s: lookup declined but engine read %v#%d",
 							one.ClassName, one.Reading.Order, one.Reading.Count)
 					}
 				}
@@ -176,7 +176,7 @@ func TestDescriptorLookupMatchesEngine(t *testing.T) {
 		if !got.Equal(want) {
 			mismatched++
 			if mismatched <= 20 {
-				t.Errorf("%s (root %q, %s %q, modifier %s %q): read %v#%d, engine said %v#%d",
+				test.Errorf("%s (root %q, %s %q, modifier %s %q): read %v#%d, engine said %v#%d",
 					one.ClassName, one.Root, one.ValueKind, one.Value, one.ModifierKind, one.ModifierValue,
 					got.Order, got.Count, want.Order, want.Count)
 			}
@@ -186,24 +186,24 @@ func TestDescriptorLookupMatchesEngine(t *testing.T) {
 	}
 
 	if mismatched > 0 {
-		t.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
+		test.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
 	}
 	scored := agreed + mismatched
-	t.Logf("agreed on %d of %d scored cases over %d roots, reduced from %d classes", agreed, scored, fixtures.Counts.Roots, fixtures.Counts.ClassesConsidered)
-	t.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
-	t.Logf("  %d lookups declined, of which %d on the %d per-declaration roots", declined, perDeclarationDeclined, countPerDeclaration(table))
-	t.Logf("  %d arbitrary properties", arbitraryProperties)
+	test.Logf("agreed on %d of %d scored cases over %d roots, reduced from %d classes", agreed, scored, fixtures.Counts.Roots, fixtures.Counts.ClassesConsidered)
+	test.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
+	test.Logf("  %d lookups declined, of which %d on the %d per-declaration roots", declined, perDeclarationDeclined, countPerDeclaration(table))
+	test.Logf("  %d arbitrary properties", arbitraryProperties)
 
 	// Volume assertions, in the spirit of the extractor's: a suite that agreed on everything because
 	// it tested almost nothing reports the same green line as one that did the work.
 	if withoutReading > len(fixtures.Cases)/2 {
-		t.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
+		test.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
 	}
 	if agreed < 5000 {
-		t.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
+		test.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
 	}
 	if fixtures.Counts.Roots < 300 {
-		t.Errorf("only %d roots in the corpus", fixtures.Counts.Roots)
+		test.Errorf("only %d roots in the corpus", fixtures.Counts.Roots)
 	}
 }
 
@@ -219,10 +219,10 @@ func countPerDeclaration(table *Table) int {
 
 // TestDescriptorLookupCoversEveryRoot asserts the table answers for every root the engine has,
 // rather than for the ones the corpus happened to reach.
-func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
-	t.Parallel()
-	fixtures := loadDescriptorFixtures(t, "descriptor_fixtures.json")
-	table := testTable(t)
+func TestDescriptorLookupCoversEveryRoot(test *testing.T) {
+	test.Parallel()
+	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures.json")
+	table := testTable(test)
 
 	rootsInCorpus := map[string]bool{}
 	for _, one := range fixtures.Cases {
@@ -236,14 +236,14 @@ func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
 		if _, found := table.Descriptors[root]; !found {
 			missing++
 			if missing <= 10 {
-				t.Errorf("root %q appears in the corpus and has no descriptor", root)
+				test.Errorf("root %q appears in the corpus and has no descriptor", root)
 			}
 		}
 	}
 	if missing > 0 {
-		t.Errorf("%d roots in the corpus have no descriptor", missing)
+		test.Errorf("%d roots in the corpus have no descriptor", missing)
 	}
-	t.Logf("every one of %d corpus roots has a descriptor, out of %d in the table", len(rootsInCorpus), len(table.Descriptors))
+	test.Logf("every one of %d corpus roots has a descriptor, out of %d in the table", len(rootsInCorpus), len(table.Descriptors))
 }
 
 // TestPerDeclarationRootsDecline pins the boundary of the model.
@@ -252,9 +252,9 @@ func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
 // the table must say so rather than return the reading it would have guessed. This asserts the
 // decline is real, because a lookup that answered them plausibly would be wrong in exactly the place
 // the model knows it cannot answer, and nothing else in the suite would notice.
-func TestPerDeclarationRootsDecline(t *testing.T) {
-	t.Parallel()
-	table := testTable(t)
+func TestPerDeclarationRootsDecline(test *testing.T) {
+	test.Parallel()
+	table := testTable(test)
 
 	perDeclaration := 0
 	for root, descriptor := range table.Descriptors {
@@ -264,14 +264,14 @@ func TestPerDeclarationRootsDecline(t *testing.T) {
 		perDeclaration++
 		candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: root, Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "translate-full"}}
 		if _, answered := table.Lookup(candidate); answered {
-			t.Errorf("root %q is per-declaration and the lookup answered anyway", root)
+			test.Errorf("root %q is per-declaration and the lookup answered anyway", root)
 		}
 	}
 
 	if perDeclaration != 18 {
-		t.Errorf("expected 18 per-declaration roots, found %d", perDeclaration)
+		test.Errorf("expected 18 per-declaration roots, found %d", perDeclaration)
 	}
-	t.Logf("%d per-declaration roots, all declining", perDeclaration)
+	test.Logf("%d per-declaration roots, all declining", perDeclaration)
 }
 
 // TestTypeListOrderIsCarriedNotSorted pins the first refinement.
@@ -280,13 +280,13 @@ func TestPerDeclarationRootsDecline(t *testing.T) {
 // most likely to be silently dropped, because a sorted list looks tidier and passes any test that
 // only checks membership. `bg` is the canary: it puts `position` before `length`, so `bg-[3px]` is a
 // position. If this assertion ever fails because the table changed, the readings changed with it.
-func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
-	t.Parallel()
-	table := testTable(t)
+func TestTypeListOrderIsCarriedNotSorted(test *testing.T) {
+	test.Parallel()
+	table := testTable(test)
 
 	descriptor, found := table.Descriptors["bg"]
 	if !found {
-		t.Fatal("no descriptor for bg")
+		test.Fatal("no descriptor for bg")
 	}
 
 	positionAt, lengthAt := -1, -1
@@ -299,10 +299,10 @@ func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
 		}
 	}
 	if positionAt < 0 || lengthAt < 0 {
-		t.Fatalf("bg's type list lacks position or length: %v", descriptor.TypeList)
+		test.Fatalf("bg's type list lacks position or length: %v", descriptor.TypeList)
 	}
 	if positionAt > lengthAt {
-		t.Errorf("bg lists length before position (%v); bg-[3px] reads as a length rather than a position", descriptor.TypeList)
+		test.Errorf("bg lists length before position (%v); bg-[3px] reads as a length rather than a position", descriptor.TypeList)
 	}
 
 	// The observable consequence, asserted separately so a reordering that somehow kept the indices
@@ -310,10 +310,10 @@ func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
 	candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "bg", Value: &ParsedValue{Kind: ParsedValueKindArbitrary, Value: "3px"}}
 	got, answered := table.Lookup(candidate)
 	if !answered {
-		t.Fatal("bg-[3px] was declined")
+		test.Fatal("bg-[3px] was declined")
 	}
 	if inferred := InferDataType("3px", descriptor.TypeList); inferred != DataTypePosition {
-		t.Errorf("bg-[3px] inferred as %q rather than position; reading was %v#%d", inferred, got.Order, got.Count)
+		test.Errorf("bg-[3px] inferred as %q rather than position; reading was %v#%d", inferred, got.Order, got.Count)
 	}
 }
 
@@ -322,26 +322,26 @@ func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
 // `bold` is a `--font-weight` key that also satisfies `family-name`, which is in `font`'s type list.
 // Inferring before consulting the theme reads `font-bold` as a font family, and eight registry
 // classes separate the two orderings. This asserts the theme wins.
-func TestBareValueResolvesBeforeInference(t *testing.T) {
-	t.Parallel()
-	table := testTable(t)
+func TestBareValueResolvesBeforeInference(test *testing.T) {
+	test.Parallel()
+	table := testTable(test)
 
 	descriptor, found := table.Descriptors["font"]
 	if !found {
-		t.Skip("this design system has no font root")
+		test.Skip("this design system has no font root")
 	}
 
 	if !table.KeysByNamespace["--font-weight"]["bold"] {
-		t.Skip("this design system has no --font-weight-bold")
+		test.Skip("this design system has no --font-weight-bold")
 	}
 	if inferred := InferDataType("bold", descriptor.TypeList); inferred == "" {
-		t.Skip("bold does not infer in this design system, so the two orderings are not separable here")
+		test.Skip("bold does not infer in this design system, so the two orderings are not separable here")
 	}
 
 	candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "font", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "bold"}}
 	got, answered := table.Lookup(candidate)
 	if !answered {
-		t.Fatal("font-bold was declined")
+		test.Fatal("font-bold was declined")
 	}
 
 	viaTheme, hasTheme := descriptor.Absent.ByNamespace["--font-weight"]
@@ -350,7 +350,7 @@ func TestBareValueResolvesBeforeInference(t *testing.T) {
 	}
 	if !got.Equal(viaTheme) {
 		viaInference := descriptor.Absent.readingForType(InferDataType("bold", descriptor.TypeList))
-		t.Errorf("font-bold read %v#%d; theme says %v#%d and inference says %v#%d",
+		test.Errorf("font-bold read %v#%d; theme says %v#%d and inference says %v#%d",
 			got.Order, got.Count, viaTheme.Order, viaTheme.Count, viaInference.Order, viaInference.Count)
 	}
 }
@@ -360,13 +360,13 @@ func TestBareValueResolvesBeforeInference(t *testing.T) {
 // `/none` is a `--leading` key rather than an alpha, so it selects a different set of readings than
 // `/50` does, and both differ from no modifier at all. A port that treated the modifier as one bit
 // would pass every test written against `/50` alone.
-func TestModifierIsThreeStates(t *testing.T) {
-	t.Parallel()
+func TestModifierIsThreeStates(test *testing.T) {
+	test.Parallel()
 	if axis := ModifierAxisFor(nil); axis != ModifierAbsent {
-		t.Errorf("no modifier classified as %v", axis)
+		test.Errorf("no modifier classified as %v", axis)
 	}
 	if axis := ModifierAxisFor(&ParsedModifier{Kind: ParsedModifierKindNamed, Value: "none"}); axis != ModifierThemed {
-		t.Errorf("/none classified as %v rather than themed", axis)
+		test.Errorf("/none classified as %v rather than themed", axis)
 	}
 	for _, modifier := range []*ParsedModifier{
 		{Kind: ParsedModifierKindNamed, Value: "50"},
@@ -377,7 +377,7 @@ func TestModifierIsThreeStates(t *testing.T) {
 		{Kind: ParsedModifierKindArbitrary, Value: "none"},
 	} {
 		if axis := ModifierAxisFor(modifier); axis != ModifierAlpha {
-			t.Errorf("modifier %v classified as %v rather than alpha", modifier, axis)
+			test.Errorf("modifier %v classified as %v rather than alpha", modifier, axis)
 		}
 	}
 }

@@ -36,8 +36,8 @@ const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unkn
 // checked against it: the real ESLint rule was driven over api-phi-health and over a seeded file
 // carrying every shape below and in the fires list. Where a verdict here disagreed with that run,
 // the run won.
-func TestGraphQlNullableParityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGraphQlNullableParityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// Both directions in agreement, which is the whole point of the rule.
@@ -157,9 +157,9 @@ func TestGraphQlNullableParityStaysSilent(t *testing.T) {
 		"class C {\n  @GraphQlArgument('a', () => String, { nullable: true })\n  get g(): string {\n    return '';\n  }\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(graphQlNullableParityCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GraphQlNullableParity,
+		test.Run(graphQlNullableParityCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, GraphQlNullableParity,
 				graphQlNullableParityFile, graphQlNullableParityPreamble+sourceText))
 		})
 	}
@@ -169,8 +169,8 @@ func TestGraphQlNullableParityStaysSilent(t *testing.T) {
 //
 // Both messages interpolate the rendered type name, which is the part a reader uses to see which
 // side is wrong, so the text is asserted by equality rather than by a substring.
-func TestGraphQlNullableParityFires(t *testing.T) {
-	t.Parallel()
+func TestGraphQlNullableParityFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -291,25 +291,25 @@ func TestGraphQlNullableParityFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(graphQlNullableParityCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(graphQlNullableParityCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			sourceText := graphQlNullableParityPreamble + testCase.sourceText
-			result := rule_testing.RunTyped(t, GraphQlNullableParity, graphQlNullableParityFile,
+			result := rule_testing.RunTyped(test, GraphQlNullableParity, graphQlNullableParityFile,
 				sourceText)
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// RunTyped writes the fixture trimmed, so the span slice is against that text.
 			onDisk := strings.TrimSpace(sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 		})
 	}
@@ -317,20 +317,20 @@ func TestGraphQlNullableParityFires(t *testing.T) {
 
 // TestGraphQlNullableParityRequiresTheTypedHarness pins that the rule declines rather than crashing
 // without a checker, which no other test here can reach.
-func TestGraphQlNullableParityRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestGraphQlNullableParityRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !GraphQlNullableParity.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: one side of every comparison is a type")
+		test.Fatal("the rule must declare NeedsTypeChecker: one side of every comparison is a type")
 	}
 
 	sourceText := graphQlNullableParityPreamble +
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  a!: string;\n}\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, GraphQlNullableParity,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, GraphQlNullableParity,
 		graphQlNullableParityFile, sourceText))
 
 	// The control, so the silence above is the guard declining rather than the rule being blind.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GraphQlNullableParity,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, GraphQlNullableParity,
 		graphQlNullableParityFile, sourceText), "decoratorNullableButTypeNot")
 }

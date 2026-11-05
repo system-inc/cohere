@@ -25,8 +25,8 @@ const unusedLabelsFile = "/repository/source/UnusedLabels.ts"
 //	label: while (true) { (() => { label: while (false) {} })(); }   2
 //
 // 16 remaining inputs report once. 16 + 2 + 3 + 4 + 5 + 2 = 32, which is the snapshot's total.
-func TestNoUnusedLabelsFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -57,14 +57,14 @@ func TestNoUnusedLabelsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unusedLabel"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), expected...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), expected...)
 		})
 	}
 }
@@ -81,8 +81,8 @@ func TestNoUnusedLabelsFires(t *testing.T) {
 // function and arrow cases. Upstream's `label: while (true) { f = function() { ... } }` case pins
 // that a nested function's own `break label` does not reach the outer label of the same name, while
 // the outer one is separately used and so stays clean.
-func TestNoUnusedLabelsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -101,9 +101,9 @@ func TestNoUnusedLabelsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
 		})
 	}
 }
@@ -118,8 +118,8 @@ func TestNoUnusedLabelsStaysSilent(t *testing.T) {
 //
 // The nested case is the sharper one. The two findings for `A: B: 'foo'` must land on `A` and `B`
 // separately, so a rule reporting the outer LabeledStatement's own range twice is caught here.
-func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsPointsAtTheLabelOnly(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -134,11 +134,11 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			seen := make([]string, 0, len(result.Diagnostics))
@@ -154,7 +154,7 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("no finding pointed at %q; findings pointed at %q", want, seen)
+					test.Errorf("no finding pointed at %q; findings pointed at %q", want, seen)
 				}
 			}
 		})
@@ -165,8 +165,8 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 //
 // A fix writing the right string over the wrong span passes a text comparison, so these compare the
 // rewritten source. Every pair is verbatim from upstream's `expect_fix` table.
-func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFixRemovesTheLabel(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -197,10 +197,10 @@ func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -226,8 +226,8 @@ func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
 //	           programs. This is exactly the failure the parse guard structurally cannot catch.
 //
 // The finding still fires in all of these. Only the repair is withheld.
-func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsDeclinesUnsafeFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -242,15 +242,15 @@ func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected the label to still be reported, got no findings")
+				test.Fatalf("expected the label to still be reported, got no findings")
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("expected no fix, got %d proposing %q",
+					test.Errorf("expected no fix, got %d proposing %q",
 						len(diagnostic.Fixes), diagnostic.Fixes[0].Text)
 				}
 			}
@@ -281,8 +281,8 @@ func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
 // `A: B: C: "use strict"` to `C: "use strict"`, so the immediate body is the right question.
 //
 // The finding fires in every case below. Only the repair is withheld.
-func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -296,15 +296,15 @@ func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected the label to still be reported, got no findings")
+				test.Fatalf("expected the label to still be reported, got no findings")
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("expected no fix, got %d proposing %q",
+					test.Errorf("expected no fix, got %d proposing %q",
 						len(diagnostic.Fixes), diagnostic.Fixes[0].Text)
 				}
 			}
@@ -318,8 +318,8 @@ func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
 // comparing the source rather than by counting them. Both expectations were taken from ESLint's own
 // Linter rather than derived: it rewrites `A: B: C: "use strict"` to `C: "use strict"`, removing two
 // labels and refusing the third.
-func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFixesOuterLabelsOverADirective(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -336,10 +336,10 @@ func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -352,8 +352,8 @@ func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
 // covers the refusing side with `A: "use strict"` and never the permitting side, so these exist
 // because a rule refusing every string literal passes the whole imported corpus while withholding
 // repairs it should offer.
-func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -374,10 +374,10 @@ func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -393,8 +393,8 @@ func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
 // repair on all four, where the correct rule offers it. A comment anywhere above a label would have
 // suppressed every fix in the file, and the finding would still have fired, so the symptom is a rule
 // that quietly stops repairing rather than one that reports wrongly.
-func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -413,10 +413,10 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -427,13 +427,13 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 // construct. A label inside a namespace body is the shape most likely to break a port that decides
 // directive position by checking for a Program or function ancestor: a namespace body is neither,
 // so the fix applies, and the walk has to survive the extra node kind rather than assume it.
-func TestNoUnusedLabelsHandlesTypeScriptContainers(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsHandlesTypeScriptContainers(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
+	result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile,
 		"namespace Outer { A: { foo(); } }")
-	rule_testing.ExpectFindings(t, result, "unusedLabel")
-	rule_testing.ExpectFixedSource(t, result, "namespace Outer { { foo(); } }")
+	rule_testing.ExpectFindings(test, result, "unusedLabel")
+	rule_testing.ExpectFixedSource(test, result, "namespace Outer { { foo(); } }")
 }
 
 // A jump may not name a label outside the function holding it, and the rule has to agree.
@@ -450,8 +450,8 @@ func TestNoUnusedLabelsHandlesTypeScriptContainers(t *testing.T) {
 // misreads such a file reports the wrong thing rather than nothing. Here the outer label is genuinely
 // unused, because the jump naming it cannot reach it, and a rule without the boundary calls it used
 // and stays silent.
-func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -478,15 +478,15 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unusedLabel")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unusedLabel")
 
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != "outer" {
-				t.Errorf("expected the finding to point at the unreachable label, pointed at %q", reported)
+				test.Errorf("expected the finding to point at the unreachable label, pointed at %q", reported)
 			}
 		})
 	}
@@ -498,21 +498,21 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 // never this ordering. It pins that `markAsUsed` stops at the nearest enclosing label with a
 // matching name rather than marking every label of that name: a rule walking the whole stack and
 // setting each match would call the outer label used and report nothing.
-func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
+	result := rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile,
 		"A: { A: { break A; } }")
-	rule_testing.ExpectFindings(t, result, "unusedLabel")
+	rule_testing.ExpectFindings(test, result, "unusedLabel")
 
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "A" {
-		t.Fatalf("expected the finding to point at a label, pointed at %q", reported)
+		test.Fatalf("expected the finding to point at a label, pointed at %q", reported)
 	}
 	// The outer label is the one at offset zero, and it is the one that must report.
 	if result.Diagnostics[0].Range.Pos() != 0 {
-		t.Errorf("expected the outer label to be the unused one, reported at offset %d",
+		test.Errorf("expected the outer label to be the unused one, reported at offset %d",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -531,8 +531,8 @@ func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
 // Both expectations were taken from ESLint's own Linter rather than derived: cohereAndFix rewrites
 // `{ A: (foo) }` to `{ (foo) }` and `foo; A: (bar)` to `foo; (bar)`. Nothing can rejoin across a
 // `{`, a `;`, or a `:`, and at the start of the file there is no previous token to rejoin with.
-func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -546,10 +546,10 @@ func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }

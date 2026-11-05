@@ -28,15 +28,15 @@ import (
 // BundleDirectory's return value would have passed against the broken engine too, since the constant
 // was never the thing being consulted. So this goes through New and demands a real failure.
 //
-// Not parallel: it points ForkPathVariable at a missing fork with t.Setenv, which a parallel test may not
+// Not parallel: it points ForkPathVariable at a missing fork with test.Setenv, which a parallel test may not
 // call.
-func TestOverrideReachesTheLoader(t *testing.T) {
-	t.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
+func TestOverrideReachesTheLoader(test *testing.T) {
+	test.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
 	if _, err := New(formatoptions.Default()); err == nil {
-		t.Fatalf("New succeeded with %s pointed at a nonexistent path, so the loader is not reading it", ForkPathVariable)
+		test.Fatalf("New succeeded with %s pointed at a nonexistent path, so the loader is not reading it", ForkPathVariable)
 	} else if !strings.Contains(err.Error(), "/nonexistent/elsewhere") {
-		t.Fatalf("the failure does not name the overridden path, so something else failed: %v", err)
+		test.Fatalf("the failure does not name the overridden path, so something else failed: %v", err)
 	}
 }
 
@@ -48,20 +48,20 @@ func TestOverrideReachesTheLoader(t *testing.T) {
 // the binary, not from any path. That is the property the whole vendoring unit exists to produce, so
 // asserting Origin is asserting the point rather than an implementation detail.
 //
-// Not parallel: it clears ForkPathVariable with t.Setenv to pin the no-override default, which a parallel
+// Not parallel: it clears ForkPathVariable with test.Setenv to pin the no-override default, which a parallel
 // test may not call.
-func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
-	t.Setenv(ForkPathVariable, "")
+func TestOverrideIsTheOnlyKnobThatMoves(test *testing.T) {
+	test.Setenv(ForkPathVariable, "")
 
 	bundles, err := Bundles()
 	if err != nil {
-		t.Fatalf("with no override the embedded bundles failed to load: %v", err)
+		test.Fatalf("with no override the embedded bundles failed to load: %v", err)
 	}
 	if bundles.Origin != Embedded {
-		t.Fatalf("with no override the origin is %q, want %q", bundles.Origin, Embedded)
+		test.Fatalf("with no override the origin is %q, want %q", bundles.Origin, Embedded)
 	}
 	if bundles.Path != "" {
-		t.Fatalf("embedded bundles carry path %q, want empty so a forgotten branch cannot use it", bundles.Path)
+		test.Fatalf("embedded bundles carry path %q, want empty so a forgotten branch cannot use it", bundles.Path)
 	}
 }
 
@@ -72,13 +72,13 @@ func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
 // point the override at a path that does not exist, unset it, and the engine still builds. If this
 // fails, the binary is depending on a checkout again and the skip would come back with it.
 //
-// Not parallel: it clears ForkPathVariable with t.Setenv to pin the no-override default, which a parallel
+// Not parallel: it clears ForkPathVariable with test.Setenv to pin the no-override default, which a parallel
 // test may not call.
-func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
-	t.Setenv(ForkPathVariable, "")
+func TestEmbeddedBundlesNeedNoFork(test *testing.T) {
+	test.Setenv(ForkPathVariable, "")
 
 	if _, err := New(formatoptions.Default()); err != nil {
-		t.Fatalf("building an engine from the embedded bundles: %v", err)
+		test.Fatalf("building an engine from the embedded bundles: %v", err)
 	}
 }
 
@@ -90,21 +90,21 @@ func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
 // directive compiles fine and fails when someone formats that language. This is the guard for that,
 // and it is why the loader checks a map it was just handed.
 //
-// Not parallel: it clears ForkPathVariable with t.Setenv so the embed is what loads, which a parallel test
+// Not parallel: it clears ForkPathVariable with test.Setenv so the embed is what loads, which a parallel test
 // may not call.
-func TestEmbedMatchesBundleFiles(t *testing.T) {
-	t.Setenv(ForkPathVariable, "")
+func TestEmbedMatchesBundleFiles(test *testing.T) {
+	test.Setenv(ForkPathVariable, "")
 
 	bundles, err := Bundles()
 	if err != nil {
-		t.Fatalf("loading the embedded bundles: %v", err)
+		test.Fatalf("loading the embedded bundles: %v", err)
 	}
 	if len(bundles.Files) != len(BundleFiles) {
-		t.Fatalf("the embed carries %d bundles, BundleFiles names %d", len(bundles.Files), len(BundleFiles))
+		test.Fatalf("the embed carries %d bundles, BundleFiles names %d", len(bundles.Files), len(BundleFiles))
 	}
 	for _, name := range BundleFiles {
 		if len(bundles.Files[name]) == 0 {
-			t.Errorf("%s is absent or empty in the embed", name)
+			test.Errorf("%s is absent or empty in the embed", name)
 		}
 	}
 }
@@ -123,10 +123,10 @@ func TestEmbedMatchesBundleFiles(t *testing.T) {
 //
 // It lives here rather than in `release` because `prettier` imports nothing internal, so this
 // direction is the one that cannot create a cycle.
-func TestReleaseResolvesThroughTheEngine(t *testing.T) {
-	t.Parallel()
+func TestReleaseResolvesThroughTheEngine(test *testing.T) {
+	test.Parallel()
 
 	if ForkPathVariable != "COHERE_PRETTIER_FORK" {
-		t.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
+		test.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
 	}
 }

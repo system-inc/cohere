@@ -599,28 +599,28 @@ function join<T extends { hoge: string } | { hoge: number }>(els: T['hoge'][]) {
 // that catches a port over-reporting. The mapped-type rows among them are the ones this port is
 // most exposed on, because the walk cannot descend into a mapped type here; each is marked in the
 // divergence test below rather than deleted.
-func TestNoUnnecessaryTypeParametersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUnnecessaryTypeParametersValidCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestNoUnnecessaryTypeParametersFires runs upstream's invalid list, asserting one message id per
 // expected finding so a case reporting twice is distinguished from a case reporting once.
-func TestNoUnnecessaryTypeParametersFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUnnecessaryTypeParametersInvalidCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -644,8 +644,8 @@ func TestNoUnnecessaryTypeParametersFires(t *testing.T) {
 // The blast radius is four cases. Twelve of upstream's sixteen mapped-type cases pass here already,
 // including all four of its REPORTING ones, because the uses that decide them are visible before
 // the walk reaches the mapped type. The four below need what is inside it.
-func TestNoUnnecessaryTypeParametersMappedTypeDivergence(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersMappedTypeDivergence(test *testing.T) {
+	test.Parallel()
 
 	cases := []noUnnecessaryTypeParametersCase{
 		{name: "valid88", source: `
@@ -679,14 +679,14 @@ function inferredMappedReturnType<T extends string>(x: T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			// Upstream is SILENT on each of these. This port reports once. Asserting the divergence
 			// rather than the upstream verdict means closing the gap makes this test fail loudly,
 			// which is the point: a divergence nobody is told about becomes permanent.
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected the documented divergence of exactly 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected the documented divergence of exactly 1 finding, got %d", len(result.Diagnostics))
 			}
 		})
 	}
@@ -700,8 +700,8 @@ function inferredMappedReturnType<T extends string>(x: T) {
 // through them. The control below is the SAME shape with those two names declared locally: it is
 // clean, which is upstream's verdict, and that is what establishes the rule is right and the
 // instrument is what differs.
-func TestNoUnnecessaryTypeParametersUnresolvedImportIsAHarnessLimit(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersUnresolvedImportIsAHarnessLimit(test *testing.T) {
+	test.Parallel()
 
 	withUnresolvableImport := `
 
@@ -728,15 +728,15 @@ const isNodeOfType =
     node?.type === nodeType;
 `
 
-	unresolved := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withUnresolvableImport)
+	unresolved := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withUnresolvableImport)
 	if len(unresolved.Diagnostics) != 1 {
-		t.Fatalf("expected the documented harness divergence of exactly 1 finding, got %d", len(unresolved.Diagnostics))
+		test.Fatalf("expected the documented harness divergence of exactly 1 finding, got %d", len(unresolved.Diagnostics))
 	}
 
 	// The control. If this ever reports, the cause is the rule rather than the unresolved import,
 	// and the comment above is wrong.
-	resolved := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withLocalDeclarations)
-	rule_testing.ExpectClean(t, resolved)
+	resolved := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withLocalDeclarations)
+	rule_testing.ExpectClean(test, resolved)
 }
 
 // TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter asserts WHERE each finding points and
@@ -751,8 +751,8 @@ const isNodeOfType =
 // The message text is asserted by EQUALITY on a literal typed here, not against the rule's own
 // message constant: comparing a finding to the constant it was built from moves both sides together
 // under mutation and proves nothing.
-func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -783,11 +783,11 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 
 			// Slice the source the HARNESS wrote rather than the literal above: RunTyped trims the
@@ -798,12 +798,12 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				gotSpan := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d: expected span %q, got %q", index, wantSpan, gotSpan)
+					test.Errorf("finding %d: expected span %q, got %q", index, wantSpan, gotSpan)
 				}
 			}
 
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantMessage {
-				t.Errorf("expected message %q, got %q", testCase.wantMessage, got)
+				test.Errorf("expected message %q, got %q", testCase.wantMessage, got)
 			}
 		})
 	}
@@ -816,28 +816,28 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
 // and deleting the parameter changes what the signature means to callers, so a human chooses it and
 // the engine never applies it unattended. A rule that shipped this as a fix would pass every
 // message-id fixture while rewriting code upstream would only have offered to rewrite.
-func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile,
+	result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile,
 		"declare class C<V> {}\n")
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
 	diagnostic := result.Diagnostics[0]
 
 	if len(diagnostic.Fixes) != 0 {
-		t.Errorf("expected no unattended fixes, got %d", len(diagnostic.Fixes))
+		test.Errorf("expected no unattended fixes, got %d", len(diagnostic.Fixes))
 	}
 	if len(diagnostic.Suggestions) != 1 {
-		t.Fatalf("expected 1 suggestion, got %d", len(diagnostic.Suggestions))
+		test.Fatalf("expected 1 suggestion, got %d", len(diagnostic.Suggestions))
 	}
 	if got := diagnostic.Suggestions[0].Message.Id; got != "replaceUsagesWithConstraint" {
-		t.Errorf("expected suggestion id replaceUsagesWithConstraint, got %q", got)
+		test.Errorf("expected suggestion id replaceUsagesWithConstraint, got %q", got)
 	}
 	if got := diagnostic.Suggestions[0].Message.Description; got != "Replace all usages of type parameter with its constraint." {
-		t.Errorf("unexpected suggestion text %q", got)
+		test.Errorf("unexpected suggestion text %q", got)
 	}
 }
 
@@ -846,17 +846,17 @@ func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(t *testing.T) 
 // NeedsTypeChecker governs the REGISTRATION path only; the harness builds a rule.Context by hand,
 // which is how a typed rule panics with a nil receiver while its declaration reads as correct. The
 // assertion is here so a later revert fails loudly rather than going vacuously green.
-func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if !NoUnnecessaryTypeParameters.NeedsTypeChecker {
-		t.Fatal("the rule reads the checker, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule reads the checker, so it must declare NeedsTypeChecker")
 	}
 
 	// The untyped harness hands the rule a nil checker. Run must decline rather than panic.
-	result := rule_testing.Run(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile,
+	result := rule_testing.Run(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile,
 		"declare class C<V> {}\n")
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestNoUnnecessaryTypeParametersArrayCarveOut covers the one discrimination upstream's corpus
@@ -874,8 +874,8 @@ func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(t *testing.T) {
 // Every verdict below was measured against the installed 8.67.0 build rather than reasoned about,
 // with a harness that refuses to report unless a firing control fires and a clean control stays
 // clean.
-func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersArrayCarveOut(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -900,11 +900,11 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Fatalf("expected %d findings, got %d", testCase.wantFindings, len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", testCase.wantFindings, len(result.Diagnostics))
 			}
 		})
 	}
@@ -924,8 +924,8 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
 //
 // Every expectation below was measured against the installed 8.67.0 build, through a harness that
 // refuses to report unless a firing control fires and a clean control stays clean.
-func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersConstraintRecursion(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -966,15 +966,15 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, wantMessage := range testCase.wantMessages {
 				if got := result.Diagnostics[index].Message.Description; got != wantMessage {
-					t.Errorf("finding %d: expected %q, got %q", index, wantMessage, got)
+					test.Errorf("finding %d: expected %q, got %q", index, wantMessage, got)
 				}
 			}
 		})
@@ -996,8 +996,8 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
 //
 // The number-index and string-index visits are separate lines and were mutated separately, because
 // a mutation of one cannot see a defect in the other.
-func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1010,10 +1010,10 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1037,8 +1037,8 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
 // of its own, so the five rows after the first four, once controls that reported, are silent for the
 // same reason. The one reporting row is what still separates the idiom from a cast: the conditional
 // reached through a value parameter rather than the return.
-func TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name   string
@@ -1064,10 +1064,10 @@ type Equal<X, Y> =
 		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -1082,10 +1082,10 @@ type Equal<X, Y> =
 		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -1100,8 +1100,8 @@ type Equal<X, Y> =
 // silently changing a count. `declare function get<T>(): T` (invalid24) is upstream's canonical
 // return-only generic, and it is silent here by the same principle as `typeOnly`: syntax cannot tell
 // the two apart, which is why the ruling is a principle rather than a name.
-func TestNoUnnecessaryTypeParametersTypeWitnesses(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersTypeWitnesses(test *testing.T) {
+	test.Parallel()
 
 	silent := []noUnnecessaryTypeParametersCase{
 		{name: "ObjectTypes.ts:93, typeOnly", source: "export function typeOnly<Shape>(): Shape {\n    return null as unknown as Shape;\n}\n"},
@@ -1142,10 +1142,10 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
       `},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -1177,10 +1177,10 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 		{name: "one null return beside one real return", source: "export function maybe<Shape>(): Shape {\n    if(Math.random() > 0.5) {\n        return null as unknown as Shape;\n    }\n    return {} as Shape;\n}\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -1194,8 +1194,8 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 // rows are what keep the exemption from being "any class": an ordinary property is a real slot, an
 // ambient class's members carry no `declare` modifier of their own, and a brand that names something
 // else does not cover a parameter used once in a method.
-func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersPhantomBrands(test *testing.T) {
+	test.Parallel()
 
 	const typedBinding = "abstract class TypedBinding {\n  constructor(public readonly name: string) {}\n}\n"
 	silent := []noUnnecessaryTypeParametersCase{
@@ -1205,10 +1205,10 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 		{name: "a brand under a union", source: "export class UnionBrand<M> {\n  declare readonly brand: M | undefined;\n}\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
@@ -1221,10 +1221,10 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 		{name: "a brand naming another type", source: "export class BrandOther<M> {\n  declare readonly brand: Date;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -1238,10 +1238,10 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 // map to `Pick<RenderersType, Kind>`, so this fixture is the only place the shape still lives.
 // Both replayed through the installed typescript-eslint 8.67.0: the first reports `sole` at 7:29,
 // the second is silent.
-func TestNoUnnecessaryTypeParametersCountsAnObjectTypesPropertiesOnce(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeParametersCountsAnObjectTypesPropertiesOnce(test *testing.T) {
+	test.Parallel()
 
-	fires := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+	fires := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
 interface RatingInterface { type: 'Rating'; maximum: number }
 type ComponentType = ShortAnswerInterface | RatingInterface;
 type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
@@ -1260,12 +1260,12 @@ export function rendererFor<Kind extends ComponentType['type']>(
     };
 }
 `)
-	rule_testing.ExpectFindings(t, fires, "sole")
+	rule_testing.ExpectFindings(test, fires, "sole")
 	if !strings.HasPrefix(fires.Diagnostics[0].Message.Description, "Type parameter Kind is used only once in the function signature.") {
-		t.Errorf("expected upstream's sentence first, got %q", fires.Diagnostics[0].Message.Description)
+		test.Errorf("expected upstream's sentence first, got %q", fires.Diagnostics[0].Message.Description)
 	}
 
-	silent := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+	silent := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
 interface RatingInterface { type: 'Rating'; maximum: number }
 type ComponentType = ShortAnswerInterface | RatingInterface;
 type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
@@ -1284,5 +1284,5 @@ export function rendererFor<Kind extends ComponentType['type']>(
     };
 }
 `)
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 }

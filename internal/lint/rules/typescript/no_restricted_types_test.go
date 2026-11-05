@@ -22,11 +22,11 @@ func noRestrictedTypesCaseName(index int) string {
 // hand-built struct would leave every line of it untested. The options text below is the bare
 // object rather than upstream's one-element array, because cohere's config layer unwraps the
 // severity tuple before a decoder ever sees it.
-func noRestrictedTypesDecoded(t *testing.T, optionsJson string) any {
-	t.Helper()
+func noRestrictedTypesDecoded(test *testing.T, optionsJson string) any {
+	test.Helper()
 	decoded, err := DecodeNoRestrictedTypesOptions([]byte(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -36,8 +36,8 @@ func noRestrictedTypesDecoded(t *testing.T, optionsJson string) any {
 // Each is a different reason to decline: nothing configured at all, a type whose name does not match
 // the configured key, a non-empty literal where only the empty one is banned, and an entry written
 // as `false` which un-bans rather than bans.
-func TestNoRestrictedTypesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedTypesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -121,11 +121,11 @@ func TestNoRestrictedTypesStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noRestrictedTypesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedTypes,
+		test.Run(noRestrictedTypesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedTypes,
 				noRestrictedTypesFile, testCase.sourceText,
-				noRestrictedTypesDecoded(t, testCase.optionsJson)))
+				noRestrictedTypesDecoded(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -148,8 +148,8 @@ type noRestrictedTypesFinding struct {
 // TestNoRestrictedTypesFires is upstream's thirty-four reporting cases verbatim, with their options,
 // their repaired sources, and every finding's rendered text and span taken from the installed 8.67.0
 // build.
-func TestNoRestrictedTypesFires(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedTypesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -558,16 +558,16 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noRestrictedTypesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoRestrictedTypes, noRestrictedTypesFile,
-				testCase.sourceText, noRestrictedTypesDecoded(t, testCase.optionsJson))
+		test.Run(noRestrictedTypesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoRestrictedTypes, noRestrictedTypesFile,
+				testCase.sourceText, noRestrictedTypesDecoded(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range testCase.wantFindings {
 				wantIds[position] = "bannedTypeMessage"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			anyFixExpected := false
@@ -576,10 +576,10 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 
@@ -590,15 +590,15 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 					anyFixExpected = true
 				}
 				if len(diagnostic.Fixes) != wantFixes {
-					t.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
+					test.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
 						len(diagnostic.Fixes))
 				}
 			}
 
 			if anyFixExpected {
-				rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantOutput)+"\n")
+				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantOutput)+"\n")
 			} else if strings.TrimSpace(testCase.wantOutput)+"\n" != onDisk {
-				t.Fatalf("a case expecting no repair must expect the source unchanged")
+				test.Fatalf("a case expecting no repair must expect the source unchanged")
 			}
 		})
 	}
@@ -612,8 +612,8 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 // in the first version of this rule, both invisible to the imported cases: a fix and suggestions are
 // not exclusive and returning after the fix dropped the suggestions, and an empty `fixWith` is
 // FALSY upstream so it produces no repair rather than one deleting the type.
-func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedTypesOffersSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name            string
@@ -678,39 +678,39 @@ func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
 
 	const sourceText = "let value: Foo;\n"
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoRestrictedTypes, noRestrictedTypesFile,
-				sourceText, noRestrictedTypesDecoded(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, "bannedTypeMessage")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoRestrictedTypes, noRestrictedTypesFile,
+				sourceText, noRestrictedTypesDecoded(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, "bannedTypeMessage")
 
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 			if len(diagnostic.Fixes) != testCase.wantFixCount {
-				t.Fatalf("fixes: expected %d, got %d", testCase.wantFixCount, len(diagnostic.Fixes))
+				test.Fatalf("fixes: expected %d, got %d", testCase.wantFixCount, len(diagnostic.Fixes))
 			}
 			if len(diagnostic.Suggestions) != len(testCase.wantSuggestions) {
-				t.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
+				test.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
 					len(diagnostic.Suggestions))
 			}
 			for position, wantDescription := range testCase.wantSuggestions {
 				suggestion := diagnostic.Suggestions[position]
 				if suggestion.Message.Id != "bannedTypeReplacement" {
-					t.Fatalf("suggestion %d id: expected %q, got %q", position,
+					test.Fatalf("suggestion %d id: expected %q, got %q", position,
 						"bannedTypeReplacement", suggestion.Message.Id)
 				}
 				if suggestion.Message.Description != wantDescription {
-					t.Fatalf("suggestion %d: expected %q, got %q", position, wantDescription,
+					test.Fatalf("suggestion %d: expected %q, got %q", position, wantDescription,
 						suggestion.Message.Description)
 				}
 				// The harness applies fixes but not suggestions, so the replacement is checked by
 				// applying it here. Comparing the fix's TEXT alone would pass a suggestion writing
 				// the right string over the wrong span.
 				if len(suggestion.Fixes) != 1 {
-					t.Fatalf("suggestion %d: expected one fix, got %d", position, len(suggestion.Fixes))
+					test.Fatalf("suggestion %d: expected one fix, got %d", position, len(suggestion.Fixes))
 				}
 				fix := suggestion.Fixes[0]
 				rewritten := sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
@@ -718,13 +718,13 @@ func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
 					strings.TrimSuffix(strings.TrimPrefix(wantDescription, "Replace `Foo` with `"),
 						"`.") + ";\n"
 				if rewritten != wantRewritten {
-					t.Fatalf("suggestion %d applied: expected %q, got %q", position, wantRewritten,
+					test.Fatalf("suggestion %d applied: expected %q, got %q", position, wantRewritten,
 						rewritten)
 				}
 			}
 
 			if testCase.wantFixCount > 0 {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantOutput)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantOutput)
 			}
 		})
 	}
@@ -742,34 +742,34 @@ func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
 // decoder handed an empty slice, and the rule handed a nil options value. The last row is the
 // control, since a rule that is inert for the right reason and one that is inert for the wrong
 // reason are indistinguishable without something that fires.
-func TestNoRestrictedTypesSurvivesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedTypesSurvivesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range [][]byte{nil, []byte("")} {
 		decoded, err := DecodeNoRestrictedTypesOptions(raw)
 		if err != nil {
-			t.Fatalf("decoding %q: %v", raw, err)
+			test.Fatalf("decoding %q: %v", raw, err)
 		}
 		settings, ok := decoded.(NoRestrictedTypesOptions)
 		if !ok {
-			t.Fatalf("decoding %q produced %T rather than the options struct", raw, decoded)
+			test.Fatalf("decoding %q produced %T rather than the options struct", raw, decoded)
 		}
 		if settings.Types == nil {
-			t.Fatalf("decoding %q left the ban map nil, so every lookup would panic or miss", raw)
+			test.Fatalf("decoding %q left the ban map nil, so every lookup would panic or miss", raw)
 		}
 		if len(settings.Types) != 0 {
-			t.Fatalf("decoding %q banned %d types, expected none", raw, len(settings.Types))
+			test.Fatalf("decoding %q banned %d types, expected none", raw, len(settings.Types))
 		}
 	}
 
 	// A nil options value is what the rule is handed when the config names it with no options at
 	// all. It must decline rather than panic.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedTypes,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedTypes,
 		noRestrictedTypesFile, "let value: string;\n", nil))
 
 	// The control: the same source with `string` banned has to report, or the row above proves
 	// nothing about why the rule was silent.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoRestrictedTypes,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoRestrictedTypes,
 		noRestrictedTypesFile, "let value: string;\n",
-		noRestrictedTypesDecoded(t, `{"types":{"string":"no"}}`)), "bannedTypeMessage")
+		noRestrictedTypesDecoded(test, `{"types":{"string":"no"}}`)), "bannedTypeMessage")
 }

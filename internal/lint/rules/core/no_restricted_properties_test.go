@@ -24,24 +24,24 @@ type noRestrictedPropertiesCase struct {
 // schema constraints upstream expresses declaratively are actually checked. A fixture handing the
 // rule a struct would leave all three untested.
 func runNoRestrictedProperties(
-	t *testing.T,
+	test *testing.T,
 	testCase noRestrictedPropertiesCase,
 ) rule_testing.Result {
-	t.Helper()
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, NoRestrictedProperties, noRestrictedPropertiesFile,
+		return rule_testing.Run(test, NoRestrictedProperties, noRestrictedPropertiesFile,
 			testCase.sourceText)
 	}
 	// Written the way upstream's config writes it: each restriction its own element.
 	encoded, err := json.Marshal(testCase.options.(NoRestrictedPropertiesOptions).Restrictions)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeNoRestrictedPropertiesOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, NoRestrictedProperties, noRestrictedPropertiesFile,
+	return rule_testing.RunWithOptions(test, NoRestrictedProperties, noRestrictedPropertiesFile,
 		testCase.sourceText, decoded)
 }
 
@@ -153,25 +153,25 @@ func noRestrictedPropertiesSilentCases() []noRestrictedPropertiesCase {
 	}
 }
 
-func TestNoRestrictedPropertiesFires(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedPropertiesFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoRestrictedProperties(t, testCase),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoRestrictedProperties(test, testCase),
 				testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedPropertiesSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoRestrictedProperties(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoRestrictedProperties(test, testCase))
 		})
 	}
 }
@@ -185,11 +185,11 @@ func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
 //
 // Verified against the installed build the same way: `foo.bar; baz.qux;` with no options reports
 // nothing, on source that names exactly the shape a restriction would ban.
-func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.bar; baz.qux; var { bar } = foo;"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRestrictedProperties,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source))
 
 	// The control: the same source under a restriction reports, so the silence above is the empty
@@ -197,9 +197,9 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
 	decoded, err := DecodeNoRestrictedPropertiesOptions(
 		[]byte(`[{"object":"foo","property":"bar"}]`))
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoRestrictedProperties,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source, decoded),
 		"restrictedObjectProperty", "restrictedObjectProperty")
 }
@@ -214,8 +214,8 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
 // Backticks replace upstream's single quotes around identifiers, matching how every other message in
 // this tree renders code. The rest of each sentence is upstream's wording, including the ordering
 // of the two optional suffixes: the allowance first, then the project message.
-func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesRendersTheWholeMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -295,20 +295,20 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			// Equality against a literal typed here, never against the rule's own constant: a
 			// comparison to the constant moves with the code under mutation and asserts nothing.
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantText {
-				t.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
+				test.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
 			}
 			if got := result.Diagnostics[0].Message.Id; got != testCase.wantId {
-				t.Errorf("message id was %q, wanted %q", got, testCase.wantId)
+				test.Errorf("message id was %q, wanted %q", got, testCase.wantId)
 			}
 		})
 	}
@@ -319,8 +319,8 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 // A member access reports on the WHOLE access rather than on the property, and a destructuring
 // pattern reports on the whole pattern rather than on the property being read -- which is why one
 // pattern restricting two properties reports twice on the same span. Both are upstream's `node`.
-func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesPointsAtTheAccess(test *testing.T) {
+	test.Parallel()
 
 	restrictBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
@@ -341,18 +341,18 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 			"{ bar, bar: other }", "{ bar, bar: other }"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
 					len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantSpans {
 				span := result.Diagnostics[index].Range
 				if got := testCase.sourceText[span.Pos():span.End()]; got != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
 				}
 			}
 		})
@@ -370,8 +370,8 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 // binding pattern ships with a whole syntactic form silently exempt, and only the corpus says so.
 //
 // The last two rows are the controls that separate "is a pattern" from "is any object literal".
-func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesReadsAssignmentDestructuring(test *testing.T) {
+	test.Parallel()
 
 	restrictBad := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}},
@@ -390,14 +390,14 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 		{"x = { bad: 1 };", restrictBad, nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -416,8 +416,8 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 //
 // Three of those cost findings and one adds a false one. Widening the shelf helper would change four
 // other rules, so this rule carries its own predicate; these rows are what pin the difference.
-func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(test *testing.T) {
+	test.Parallel()
 
 	restrict := func(property string) NoRestrictedPropertiesOptions {
 		return NoRestrictedPropertiesOptions{
@@ -441,14 +441,14 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 		{"foo[bar];", restrict("bar"), nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -458,59 +458,59 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 // We have no schema layer, so an entry naming neither an object nor a property would sit in the
 // config matching nothing forever, and the two self-contradictory pairings would be accepted
 // silently. None of these is reachable from a fixture that builds the options struct directly.
-func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input yields an empty list", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input yields an empty list", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRestrictedPropertiesOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if len(decoded.(NoRestrictedPropertiesOptions).Restrictions) != 0 {
-			t.Error("nil input produced restrictions")
+			test.Error("nil input produced restrictions")
 		}
 	})
 
-	t.Run("an entry naming neither an object nor a property is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an entry naming neither an object nor a property is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"message":"nope"}]`)); err == nil {
-			t.Error("an entry that can never match anything decoded")
+			test.Error("an entry that can never match anything decoded")
 		}
 	})
 
-	t.Run("object paired with allowObjects is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("object paired with allowObjects is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); err == nil {
-			t.Error("a self-contradictory pairing decoded")
+			test.Error("a self-contradictory pairing decoded")
 		}
 	})
 
-	t.Run("property paired with allowProperties is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("property paired with allowProperties is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); err == nil {
-			t.Error("a self-contradictory pairing decoded")
+			test.Error("a self-contradictory pairing decoded")
 		}
 	})
 
-	t.Run("every element is a restriction, upstream's variadic spelling", func(t *testing.T) {
-		t.Parallel()
+	test.Run("every element is a restriction, upstream's variadic spelling", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","property":"bar"},{"property":"__proto__","message":"No."}]`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		restrictions := decoded.(NoRestrictedPropertiesOptions).Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
-			t.Errorf("the second element was not read as a restriction: %+v", restrictions)
+			test.Errorf("the second element was not read as a restriction: %+v", restrictions)
 		}
 	})
 
-	t.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(test *testing.T) {
+		test.Parallel()
 		for _, raw := range []string{
 			// The wrapper this decoder used to read.
 			`{"restrictions":[{"object":"foo"}]}`,
@@ -520,7 +520,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 			`["foo"]`,
 		} {
 			if decoded, err := DecodeNoRestrictedPropertiesOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}
 	})
@@ -539,19 +539,19 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 // reach a lookup that can never match.
 //
 // So the assertion is on the listener set rather than on any finding.
-func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesRegistersNothingUnconfigured(test *testing.T) {
+	test.Parallel()
 
 	listenersFor := func(options any) rule.Listeners {
 		return NoRestrictedProperties.Run(rule.Context{}, options)
 	}
 
 	if got := len(listenersFor(nil)); got != 0 {
-		t.Errorf("nil options registered %d listeners, wanted none: an unconfigured rule that "+
+		test.Errorf("nil options registered %d listeners, wanted none: an unconfigured rule that "+
 			"walks the tree costs every file for a lookup that cannot match", got)
 	}
 	if got := len(listenersFor(NoRestrictedPropertiesOptions{})); got != 0 {
-		t.Errorf("an empty restriction list registered %d listeners, wanted none", got)
+		test.Errorf("an empty restriction list registered %d listeners, wanted none", got)
 	}
 
 	// The control: one restriction registers the full set, so the zero above is the guard rather
@@ -560,7 +560,7 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
 	}
 	if got := len(listenersFor(configured)); got == 0 {
-		t.Error("a configured restriction registered no listeners")
+		test.Error("a configured restriction registered no listeners")
 	}
 }
 
@@ -576,8 +576,8 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
 //	                          `rest` would report on every rest destructuring in the tree.
 //
 // Both verdicts were measured against the installed rule before the rows were written.
-func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(test *testing.T) {
+	test.Parallel()
 
 	restrictFooBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
@@ -613,15 +613,15 @@ func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
 			[]string{"restrictedProperty"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

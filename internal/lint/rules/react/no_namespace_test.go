@@ -28,8 +28,8 @@ const noNamespaceFile = "/repository/source/Namespace.tsx"
 // naive colon test over a rendered tag name would be fine on them and a naive namespace test over
 // a member expression would not. Three more are React.createElement called with null, true and an
 // object literal, which pin that the first argument must be a string literal specifically.
-func TestNoNamespaceFires(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -53,16 +53,16 @@ func TestNoNamespaceFires(t *testing.T) {
 		{"React.createElement(\"Ns:TestComponent\")", []string{"noNamespace"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-func TestNoNamespaceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"<testcomponent />",
@@ -94,10 +94,10 @@ func TestNoNamespaceStaysSilent(t *testing.T) {
 		"React.createElement({})",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -115,8 +115,8 @@ func TestNoNamespaceStaysSilent(t *testing.T) {
 //
 // Not one case in the imported corpus writes any of these spellings, so all 43 of them stay green
 // under either predicate. Measured verdicts, all from the installed build.
-func TestNoNamespaceCreateElementBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceCreateElementBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -137,10 +137,10 @@ func TestNoNamespaceCreateElementBoundary(t *testing.T) {
 		{"a namespaced name past the first argument is still read from the first", "React.createElement(\"a:b\", {}, \"c\");", []string{"noNamespace"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -150,8 +150,8 @@ func TestNoNamespaceCreateElementBoundary(t *testing.T) {
 // Every JSX case upstream ships is self-closing, and our parser gives a self-closing element its own
 // kind with no opening element inside it. So a rule listening on only one of the two kinds passes
 // either the whole imported corpus or none of it, and this is what separates the two.
-func TestNoNamespaceReadsBothElementForms(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceReadsBothElementForms(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,10 +164,10 @@ func TestNoNamespaceReadsBothElementForms(t *testing.T) {
 		{"and neither does a this-rooted one", "<this.Foo />;", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -180,8 +180,8 @@ func TestNoNamespaceReadsBothElementForms(t *testing.T) {
 // this exists as its own test naming what it prevents rather than as another silent case above.
 //
 // A dotted tag name is ordinary code, so this is reachable rather than defensive.
-func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceDoesNotPanicOnDottedTagNames(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"<a.b />;",
@@ -189,10 +189,10 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
 		"<this.Foo />;",
 		"<a.b></a.b>;",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -210,51 +210,51 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
 // Every span is sliced from the source the HARNESS wrote rather than from the literal above:
 // RunTyped trims its input, so a slice taken from an untrimmed Go literal is off by one and reads
 // exactly like an off-by-one in the rule.
-func TestNoNamespaceSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a self closing element reports on the element", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a self closing element reports on the element", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <ns:x />;"
-		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noNamespace")
+		result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "noNamespace")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "<ns:x />" {
-			t.Fatalf("reported on %q, wanted %q", reported, "<ns:x />")
+			test.Fatalf("reported on %q, wanted %q", reported, "<ns:x />")
 		}
 	})
 
-	t.Run("an element with a closing tag reports on the opening element alone", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an element with a closing tag reports on the opening element alone", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <ns:x></ns:x>;"
-		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noNamespace")
+		result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "noNamespace")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "<ns:x>" {
-			t.Fatalf("reported on %q, wanted %q", reported, "<ns:x>")
+			test.Fatalf("reported on %q, wanted %q", reported, "<ns:x>")
 		}
 	})
 
-	t.Run("a call reports on the whole call expression", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a call reports on the whole call expression", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = React.createElement(\"ns:x\");"
-		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noNamespace")
+		result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "noNamespace")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "React.createElement(\"ns:x\")" {
-			t.Fatalf("reported on %q, wanted %q", reported, "React.createElement(\"ns:x\")")
+			test.Fatalf("reported on %q, wanted %q", reported, "React.createElement(\"ns:x\")")
 		}
 	})
 
-	t.Run("the message identifies the rule and explains the defect", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, "<ns:x />;")
-		rule_testing.ExpectFindings(t, result, "noNamespace")
+	test.Run("the message identifies the rule and explains the defect", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, "<ns:x />;")
+		rule_testing.ExpectFindings(test, result, "noNamespace")
 		if result.Diagnostics[0].Message.Id != "noNamespace" {
-			t.Fatalf("message id was %q", result.Diagnostics[0].Message.Id)
+			test.Fatalf("message id was %q", result.Diagnostics[0].Message.Id)
 		}
 		if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "This element names a namespace, and React has no notion of one.") {
-			t.Fatalf("message description was %q", result.Diagnostics[0].Message.Description)
+			test.Fatalf("message description was %q", result.Diagnostics[0].Message.Description)
 		}
 	})
 }
@@ -279,18 +279,18 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 //
 // The JavaScript half of the claim is covered by `TestNoNamespaceHasNoFileSuffixGateUntyped` below,
 // which reaches all four suffixes because the untyped harness needs no program.
-func TestNoNamespaceHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "React.createElement(\"ns:x\");"
 	for _, fileName := range []string{
 		"/repository/source/Namespace.ts",
 		"/repository/source/Namespace.tsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNamespace, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "noNamespace")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNamespace, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "noNamespace")
 		})
 	}
 }
@@ -300,18 +300,18 @@ func TestNoNamespaceHasNoFileSuffixGate(t *testing.T) {
 // The JSX arm needs no checker, so it is fully exercised under the plain harness and reaches all
 // four suffixes. This is what pins the absence of the gate on JavaScript files specifically, which
 // is the half the typed test above structurally cannot reach.
-func TestNoNamespaceHasNoFileSuffixGateUntyped(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceHasNoFileSuffixGateUntyped(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "<ns:x />;"
 	for _, fileName := range []string{
 		"/repository/source/Namespace.tsx",
 		"/repository/source/Namespace.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNamespace, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "noNamespace")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNamespace, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "noNamespace")
 		})
 	}
 }
@@ -326,16 +326,16 @@ func TestNoNamespaceHasNoFileSuffixGateUntyped(t *testing.T) {
 // The bare-call spelling is the only one that asks the checker anything. The JSX arm and the
 // `React.createElement` member arm both answer identically either way, which is deliberate: a nil
 // checker costs this rule one spelling rather than every finding.
-func TestNoNamespaceNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "import {createElement} from \"react\";\ncreateElement(\"ns:x\");"
 
-	typed := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
-	rule_testing.ExpectFindings(t, typed, "noNamespace")
+	typed := rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, sourceText)
+	rule_testing.ExpectFindings(test, typed, "noNamespace")
 
-	untyped := rule_testing.Run(t, NoNamespace, noNamespaceFile, sourceText)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoNamespace, noNamespaceFile, sourceText)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoNamespaceDoesNotPanicOnNonLiteralArguments is crash protection, not a behavioral fixture.
@@ -360,8 +360,8 @@ func TestNoNamespaceNeedsTheTypedHarness(t *testing.T) {
 // No `ExpectFindings` fixture can see a panic, which is why this is its own test naming what it
 // prevents rather than another silent row in a boundary table. Reaching this test at all is the
 // assertion; the verdicts are pinned elsewhere.
-func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(t *testing.T) {
-	t.Parallel()
+func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -381,11 +381,11 @@ func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(t *testing.T) {
 		{"a deeply dotted tag name", "declare const a: any;\nconst b = <a.b.c.d />;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Surviving the walk IS the assertion. The verdicts for shapes that have one are
 			// pinned in the boundary tables above.
-			rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
+			rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, testCase.sourceText)
 		})
 	}
 }

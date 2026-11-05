@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateCaseReportsRepeatedTest(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -29,14 +29,14 @@ func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
 		{"duplicate alongside a default clause", `switch (a) { case 1: break; case 1: break; default: break; }`, 1},
 		{"nested switch has its own duplicate", `switch (a) { case 1: switch (b) { case 2: break; case 2: break; } break; }`, 1},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateCase, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
 				wantIds[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -44,8 +44,8 @@ func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
 // The finding must land on the test expression itself. A range that started at the node's Pos would
 // begin inside the preceding trivia, which puts the finding on the comment above it and out of reach
 // of a disable comment on the offending line.
-func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(test *testing.T) {
+	test.Parallel()
 
 	const source = `switch (a) {
   case 1:
@@ -54,17 +54,17 @@ func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(t *testing.T) {
   case 1:
     break;
 }`
-	result := rule_testing.Run(t, NoDuplicateCase, "file.ts", source)
-	rule_testing.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(test, NoDuplicateCase, "file.ts", source)
+	rule_testing.ExpectFindings(test, result, "unexpected")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "1" {
-		t.Fatalf("reported range = %q, want %q", reported, "1")
+		test.Fatalf("reported range = %q, want %q", reported, "1")
 	}
 }
 
-func TestNoDuplicateCaseAcceptsDistinctTests(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateCaseAcceptsDistinctTests(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -94,9 +94,9 @@ func TestNoDuplicateCaseAcceptsDistinctTests(t *testing.T) {
 		{"same test in a nested switch", `switch (a) { case 1: switch (b) { case 1: break; } break; }`},
 		{"template literals with different substitutions", "switch (a) { case `t${x}`: break; case `t${y}`: break; }"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDuplicateCase, "file.ts", testCase.source))
 		})
 	}
 }

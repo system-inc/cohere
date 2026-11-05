@@ -16,12 +16,12 @@ import (
 // second compile of the registry (#6gct10n).
 //
 // The config is ahra's, which is private, so the benchmark skips where the ahra corpus is not set (#sycrdr6).
-func BenchmarkLoadForTheLiveConfig(b *testing.B) {
-	path := corpus.Ahra.Path(b, "CohereSettings.json")
+func BenchmarkLoadForTheLiveConfig(benchmark *testing.B) {
+	path := corpus.Ahra.Path(benchmark, "CohereSettings.json")
 	names := Names()
-	for b.Loop() {
+	for benchmark.Loop() {
 		if _, err := configuration.LoadFor(path, names); err != nil {
-			b.Fatal(err)
+			benchmark.Fatal(err)
 		}
 	}
 }

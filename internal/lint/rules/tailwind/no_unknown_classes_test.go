@@ -78,23 +78,23 @@ func unknownFixturePackageRoot() string {
 // `rule_testing.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
 // Pointing the `@import` at an absolute path instead does not work: the rule never resolves the
 // import itself, it walks up for `node_modules/tailwindcss` and declines when the walk fails.
-func runUnknownFixture(t *testing.T, fileName string, source string) rule_testing.Result {
-	t.Helper()
-	return runUnknownFixtureWithOptions(t, fileName, source, nil)
+func runUnknownFixture(test *testing.T, fileName string, source string) rule_testing.Result {
+	test.Helper()
+	return runUnknownFixtureWithOptions(test, fileName, source, nil)
 }
 
 // runUnknownFixtureWithOptions is runUnknownFixture for the cases that configure the ignore list.
 func runUnknownFixtureWithOptions(
-	t *testing.T,
+	test *testing.T,
 	fileName string,
 	source string,
 	options any,
 ) rule_testing.Result {
-	t.Helper()
+	test.Helper()
 
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an existence check")
 	}
 
@@ -105,22 +105,22 @@ func runUnknownFixtureWithOptions(
 	plantPackage := func(root string) {
 		modules := filepath.Join(root, "node_modules")
 		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating the fixture node_modules: %v", err)
+			test.Fatalf("creating the fixture node_modules: %v", err)
 		}
 		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
 		}
 	}
 
 	if options == nil {
-		return rule_testing.RunTypedFilesWithSetup(t, NoUnknownClasses, files, fileName, plantPackage)
+		return rule_testing.RunTypedFilesWithSetup(test, NoUnknownClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		t, NoUnknownClasses, files, fileName, options, plantPackage)
+		test, NoUnknownClasses, files, fileName, options, plantPackage)
 }
 
-func TestNoUnknownClassesReportsTypos(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownClassesReportsTypos(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -198,10 +198,10 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnknownFixture(t, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnknownFixture(test, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -210,8 +210,8 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 //
 // Answering existence from the property tables produced 12 findings on valid classes across the real
 // corpus. These are those shapes, pinned so the rule cannot regress into asking the wrong question.
-func TestNoUnknownClassesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownClassesStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -300,10 +300,10 @@ func TestNoUnknownClassesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnknownFixture(t, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnknownFixture(test, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -312,28 +312,28 @@ func TestNoUnknownClassesStaysSilent(t *testing.T) {
 //
 // Any project with hand-written CSS has class names Tailwind does not define. On the ahra tree those
 // are the five `ahralia-splash*` classes, and they are the entire real-world finding count.
-func TestUnknownIgnoreExemptsProjectClasses(t *testing.T) {
-	t.Parallel()
+func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
+	test.Parallel()
 	options := NoUnknownClassesOptions{Ignore: []string{`^ahralia-`}}
 
-	exempted := runUnknownFixtureWithOptions(t, "Component.tsx",
+	exempted := runUnknownFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="ahralia-splash flex" />;`, options)
 	if len(exempted.Diagnostics) != 0 {
-		t.Errorf("an ignored class should not be reported, got %d findings", len(exempted.Diagnostics))
+		test.Errorf("an ignored class should not be reported, got %d findings", len(exempted.Diagnostics))
 	}
 
 	// Without the exemption it reports, so the test above is not passing because the rule is inert.
-	unexempted := runUnknownFixture(t, "Component.tsx",
+	unexempted := runUnknownFixture(test, "Component.tsx",
 		`const element = <div className="ahralia-splash flex" />;`)
 	if len(unexempted.Diagnostics) == 0 {
-		t.Fatal("the rule stayed silent without an ignore option, so the exemption proves nothing")
+		test.Fatal("the rule stayed silent without an ignore option, so the exemption proves nothing")
 	}
 
 	// And the exemption must not swallow real typos alongside it.
-	stillReported := runUnknownFixtureWithOptions(t, "Component.tsx",
+	stillReported := runUnknownFixtureWithOptions(test, "Component.tsx",
 		`const element = <div className="ahralia-splash flx" />;`, options)
 	if len(stillReported.Diagnostics) != 1 {
-		t.Errorf("the ignore pattern should exempt only what it matches, got %d findings",
+		test.Errorf("the ignore pattern should exempt only what it matches, got %d findings",
 			len(stillReported.Diagnostics))
 	}
 }
@@ -347,9 +347,9 @@ func TestUnknownIgnoreExemptsProjectClasses(t *testing.T) {
 //
 // So the shortcut is implemented here and required to be wrong about classes the real rule gets
 // right.
-func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
-	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+func TestExistenceIsNotReadFromPropertyTables(test *testing.T) {
+	test.Parallel()
+	system := unknownFixtureLiveSystem(test)
 
 	// Classes that are real and absent from the property tables.
 	realButUndeclared := []string{
@@ -363,7 +363,7 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 	lostByShortcut := 0
 	for _, className := range realButUndeclared {
 		if !classExistsIn(className, system) {
-			t.Errorf("the real rule reports %q as unknown, and it is a valid class", className)
+			test.Errorf("the real rule reports %q as unknown, and it is a valid class", className)
 			continue
 		}
 
@@ -374,10 +374,10 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 	}
 
 	if lostByShortcut == 0 {
-		t.Fatal("the property-table shortcut resolved every one of these, so this control no longer " +
+		test.Fatal("the property-table shortcut resolved every one of these, so this control no longer " +
 			"demonstrates the defect it exists to demonstrate")
 	}
-	t.Logf("the property-table shortcut would report %d of %d valid classes as unknown",
+	test.Logf("the property-table shortcut would report %d of %d valid classes as unknown",
 		lostByShortcut, len(realButUndeclared))
 }
 
@@ -394,21 +394,21 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 //
 // The complement is asserted beside it, since a rule that reports everything would pass the first
 // half alone.
-func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestKnownRootWithUnknownValueIsReported(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		system := designSystem.System
 
 		if classExistsIn("text-huge", system) {
-			t.Error("`text-huge` has root `text` and compiles to nothing, so the rule must report it")
+			test.Error("`text-huge` has root `text` and compiles to nothing, so the rule must report it")
 		}
 		if !classExistsIn("text-lg", system) {
-			t.Error("`text-lg` compiles, so reporting it would be a false positive on working code")
+			test.Error("`text-lg` compiles, so reporting it would be a false positive on working code")
 		}
 
 		// An unknown root is still caught, which is the half that worked before this change.
 		if classExistsIn("txt-huge", system) {
-			t.Error("an unknown root must still be reported, or the rule catches nothing")
+			test.Error("an unknown root must still be reported, or the rule catches nothing")
 		}
 	})
 }
@@ -426,10 +426,10 @@ func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
 //
 // `flex` and `px-4` are asserted known on both. Without them the disagreement count would be
 // satisfiable by a rule that had simply stopped answering.
-func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
-	t.Parallel()
-	ahra := unknownFixtureLiveSystem(t)
-	independent := independentLiveSystem(t)
+func TestExistenceComesFromTheRepositoryRatherThanATable(test *testing.T) {
+	test.Parallel()
+	ahra := unknownFixtureLiveSystem(test)
+	independent := independentLiveSystem(test)
 
 	testCases := []struct {
 		className     string
@@ -469,11 +469,11 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
 		gotIndependent := classExistsIn(testCase.className, independent)
 
 		if gotAhra != testCase.onAhra {
-			t.Errorf("%s (%s): the ahra design system says exists=%v, want %v",
+			test.Errorf("%s (%s): the ahra design system says exists=%v, want %v",
 				testCase.className, testCase.why, gotAhra, testCase.onAhra)
 		}
 		if gotIndependent != testCase.onIndependent {
-			t.Errorf("%s (%s): the independent design system says exists=%v, want %v",
+			test.Errorf("%s (%s): the independent design system says exists=%v, want %v",
 				testCase.className, testCase.why, gotIndependent, testCase.onIndependent)
 		}
 		if testCase.onAhra != testCase.onIndependent {
@@ -485,14 +485,14 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
 	// everything, and a table-reading rule answers identically on both systems by construction. So
 	// the disagreement count is asserted directly: it is the one number no table can produce.
 	if disagreements < 2 {
-		t.Fatalf(
+		test.Fatalf(
 			"only %d of the classes answered differently on the two design systems; a rule reading a "+
 				"generated table produces zero disagreements by construction, so this count is the "+
 				"evidence that existence is being asked of the repository",
 			disagreements,
 		)
 	}
-	t.Logf("%d of %d classes answered differently on the two design systems",
+	test.Logf("%d of %d classes answered differently on the two design systems",
 		disagreements, len(testCases))
 }
 
@@ -521,10 +521,10 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
 // and the union of the wave tables and the descriptor rows for functional roots. The test that used
 // to measure the leak said to delete it and assert the corrected behaviour instead, so this is that
 // assertion.
-func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
-	t.Parallel()
-	ahra := unknownFixtureLiveSystem(t)
-	independent := independentLiveSystem(t)
+func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
+	test.Parallel()
+	ahra := unknownFixtureLiveSystem(test)
+	independent := independentLiveSystem(test)
 
 	// Names ahra declares and the independent system does not, measured rather than listed.
 	//
@@ -549,21 +549,21 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
 	}
 
 	if len(declaredByAhra) == 0 {
-		t.Fatal("ahra declares none of the sampled utilities, so this measurement compared nothing; " +
+		test.Fatal("ahra declares none of the sampled utilities, so this measurement compared nothing; " +
 			"either the fixture stopped loading the repository's blocks or the names changed")
 	}
 
 	for _, name := range declaredByAhra {
 		if classExistsIn(name, independent) {
-			t.Errorf("%q is declared by ahra and still vouched for on a design system that does not "+
+			test.Errorf("%q is declared by ahra and still vouched for on a design system that does not "+
 				"declare it, so a repository token is being carried as a framework fact", name)
 		}
 		if !classExistsIn(name, ahra) {
-			t.Errorf("%q is declared by ahra and no longer known there, so the fix removed more than "+
+			test.Errorf("%q is declared by ahra and no longer known there, so the fix removed more than "+
 				"the leak", name)
 		}
 	}
-	t.Logf("checked %d repository-declared utilities: known on ahra, unknown on an independent system", len(declaredByAhra))
+	test.Logf("checked %d repository-declared utilities: known on ahra, unknown on an independent system", len(declaredByAhra))
 }
 
 // TestUnknownClassFixturesActuallyRan is what stops this file from going green on nothing.
@@ -578,20 +578,20 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
 // precondition: the fixture stylesheet's own `@utility` block must read as known and a typo must
 // still report, in the same program. A design system that built but resolved nothing would fail the
 // first; a rule that had stopped answering would fail the second.
-func TestUnknownClassFixturesActuallyRan(t *testing.T) {
-	t.Parallel()
+func TestUnknownClassFixturesActuallyRan(test *testing.T) {
+	test.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
-		t.Fatalf(
+		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
 			vendored.TailwindPackageRoot(),
 		)
 	}
 
-	result := runUnknownFixture(t, "Component.tsx",
+	result := runUnknownFixture(test, "Component.tsx",
 		`const element = <div className="synthetic-static flx" />;`)
-	rule_testing.ExpectFindings(t, result, "unknownClass")
+	rule_testing.ExpectFindings(test, result, "unknownClass")
 }
 
 // unknownFixtureLiveSystem builds the corpus repository's design system, for the unit-level tests.
@@ -601,12 +601,12 @@ func TestUnknownClassFixturesActuallyRan(t *testing.T) {
 // it skips naming COHERE_CORPUS_AHRA where the corpus is not set, and fails where it is set and the
 // stylesheet is missing (#sycrdr6). The stylesheet's tailwindcss is the vendored snapshot, the same
 // version ahra installs.
-func unknownFixtureLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
-	t.Helper()
+func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
+	test.Helper()
 
-	entryPoint := corpus.Ahra.Path(t, "app", "_theme", "styles", "theme.css")
+	entryPoint := corpus.Ahra.Path(test, "app", "_theme", "styles", "theme.css")
 	if _, err := os.Stat(entryPoint); err != nil {
-		t.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
+		test.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
 	}
 	packageRoot := unknownFixturePackageRoot()
 
@@ -615,7 +615,7 @@ func unknownFixtureLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 		TailwindPackageRoot: packageRoot,
 	})
 	if err != nil {
-		t.Fatalf("loading the corpus design system: %v", err)
+		test.Fatalf("loading the corpus design system: %v", err)
 	}
 	return system
 }
@@ -625,8 +625,8 @@ func unknownFixtureLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 // The stylesheet is copied beside the corpus repository's `node_modules` rather than read in place,
 // because `@import "tailwindcss"` resolves through whichever `node_modules` is reachable from where
 // the file sits, and this checkout vendors none. Its own file comment says the same.
-func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
-	t.Helper()
+func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
+	test.Helper()
 
 	// The theme is this package's own testdata, under its generator, so it is read from the package
 	// directory and is never absent. It used to be read from five directories up, outside the repository,
@@ -634,32 +634,32 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 	source := filepath.Join("tools", "generate_descriptor_base", "testdata", "independent_theme.css")
 	contents, err := os.ReadFile(source)
 	if err != nil {
-		t.Fatalf("reading the independent theme: %v", err)
+		test.Fatalf("reading the independent theme: %v", err)
 	}
 
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine")
+		test.Skip("no installed tailwindcss on this machine")
 	}
 
 	// Beside the installed package's own tree, so the bare specifier resolves by the same upward
 	// walk a repository uses. Written into a directory this test owns and removed after, rather than
 	// into the corpus repository's working tree.
-	staging := t.TempDir()
+	staging := test.TempDir()
 	if err := os.Symlink(packageRoot, filepath.Join(staging, "node_modules_link")); err != nil {
-		t.Fatalf("linking the installed tailwindcss beside the independent stylesheet: %v", err)
+		test.Fatalf("linking the installed tailwindcss beside the independent stylesheet: %v", err)
 	}
 	modules := filepath.Join(staging, "node_modules")
 	if err := os.MkdirAll(modules, 0o755); err != nil {
-		t.Fatalf("creating the staging node_modules: %v", err)
+		test.Fatalf("creating the staging node_modules: %v", err)
 	}
 	if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-		t.Fatalf("linking the installed tailwindcss into the staging directory: %v", err)
+		test.Fatalf("linking the installed tailwindcss into the staging directory: %v", err)
 	}
 
 	entryPoint := filepath.Join(staging, "independent_theme.css")
 	if err := os.WriteFile(entryPoint, contents, 0o644); err != nil {
-		t.Fatalf("staging the independent stylesheet: %v", err)
+		test.Fatalf("staging the independent stylesheet: %v", err)
 	}
 
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
@@ -667,7 +667,7 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
 	if err != nil {
-		t.Fatalf("loading the independent design system: %v", err)
+		test.Fatalf("loading the independent design system: %v", err)
 	}
 	return system
 }
@@ -684,11 +684,11 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 //
 // Read from the design system rather than listed, so a repository adding an `@utility` block joins
 // this test rather than needing to be added to it.
-func TestRepositoryUtilityRootsAreNeverReported(t *testing.T) {
-	t.Parallel()
-	system := unknownFixtureLiveSystem(t)
+func TestRepositoryUtilityRootsAreNeverReported(test *testing.T) {
+	test.Parallel()
+	system := unknownFixtureLiveSystem(test)
 	if system == nil {
-		t.Skip("no design system loaded")
+		test.Skip("no design system loaded")
 	}
 
 	var checked int
@@ -702,13 +702,13 @@ func TestRepositoryUtilityRootsAreNeverReported(t *testing.T) {
 		}
 		checked++
 		if !classExistsIn(className, system) {
-			t.Errorf("%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
+			test.Errorf("%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
 				className, candidates[0].Root)
 		}
 	}
 
-	t.Logf("repository utility classes checked: %d", checked)
+	test.Logf("repository utility classes checked: %d", checked)
 	if checked == 0 {
-		t.Skip("this design system declares none of these roots")
+		test.Skip("this design system declares none of these roots")
 	}
 }

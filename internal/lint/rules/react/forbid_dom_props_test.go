@@ -32,18 +32,18 @@ const forbidDomPropsFile = "/repository/source/ForbidDomProps.tsx"
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the string-or-object union and the absent-versus-empty distinction under test. An empty body is
 // the nil-options case: an unconfigured rule declines everything.
-func forbidDomPropsOptions(t *testing.T, raw string) any {
-	t.Helper()
+func forbidDomPropsOptions(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeForbidDomPropsOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+		test.Fatalf("decoding %q: %v", raw, err)
 	}
 	return decoded
 }
 
 // TestForbidDomPropsFires runs every case this port reports on.
-func TestForbidDomPropsFires(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -163,22 +163,22 @@ func TestForbidDomPropsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := forbidDomPropsOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := forbidDomPropsOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "propIsForbidden"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
 // TestForbidDomPropsStaysSilent runs every case this port declines.
-func TestForbidDomPropsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -266,11 +266,11 @@ func TestForbidDomPropsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := forbidDomPropsOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := forbidDomPropsOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -280,18 +280,18 @@ func TestForbidDomPropsStaysSilent(t *testing.T) {
 // Upstream reports on the JSXAttribute, so the span covers the name and the value together rather
 // than either alone. A port anchoring on the name node, or on the element, would pass every
 // message-id fixture above while pointing somewhere the reader was never shown.
-func TestForbidDomPropsReportsOnTheWholeAttribute(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsReportsOnTheWholeAttribute(test *testing.T) {
+	test.Parallel()
 
 	const source = `<div className="foo" />`
 
-	result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, source, forbidDomPropsOptions(t, `{"forbid":["className"]}`))
-	rule_testing.ExpectFindings(t, result, "propIsForbidden")
+	result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, source, forbidDomPropsOptions(test, `{"forbid":["className"]}`))
+	rule_testing.ExpectFindings(test, result, "propIsForbidden")
 
 	span := result.Diagnostics[0].Range
 	reported := source[span.Pos():span.End()]
 	if reported != `className="foo"` {
-		t.Fatalf("finding spans %q, want the whole attribute", reported)
+		test.Fatalf("finding spans %q, want the whole attribute", reported)
 	}
 }
 
@@ -301,8 +301,8 @@ func TestForbidDomPropsReportsOnTheWholeAttribute(t *testing.T) {
 // string does. The custom-message branch replaces the text entirely, and an EMPTY custom message
 // falls back to the default rather than reporting an empty finding. All three are asserted against
 // literals typed here rather than against the rule's own constants, which would move under mutation.
-func TestForbidDomPropsMessageText(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -327,12 +327,12 @@ func TestForbidDomPropsMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, `<div className="foo" />`, forbidDomPropsOptions(t, testCase.rawOptions))
-			rule_testing.ExpectFindings(t, result, "propIsForbidden")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, `<div className="foo" />`, forbidDomPropsOptions(test, testCase.rawOptions))
+			rule_testing.ExpectFindings(test, result, "propIsForbidden")
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("message is %q, want %q", got, testCase.want)
+				test.Fatalf("message is %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -346,8 +346,8 @@ func TestForbidDomPropsMessageText(t *testing.T) {
 // `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see. Probed
 // with a control across all four extensions on a sibling rule with the same anchor.
-func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = `<div className="foo" />`
 
@@ -356,10 +356,10 @@ func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/ForbidDomProps.js",
 		"/repository/source/ForbidDomProps.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ForbidDomProps, fileName, source, forbidDomPropsOptions(t, `{"forbid":["className"]}`))
-			rule_testing.ExpectFindings(t, result, "propIsForbidden")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ForbidDomProps, fileName, source, forbidDomPropsOptions(test, `{"forbid":["className"]}`))
+			rule_testing.ExpectFindings(test, result, "propIsForbidden")
 		})
 	}
 }
@@ -369,83 +369,83 @@ func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
 // The list items are a union of a string and an object, which Go has no single shape for, so the
 // decoder tries the string first. `disallowedFor` needs a pointer on the wire, because an absent
 // key means every tag and an empty array means no tag, and a plain slice cannot tell them apart.
-func TestDecodeForbidDomPropsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeForbidDomPropsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body forbids nothing", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty body forbids nothing", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding an empty body: %v", err)
+			test.Fatalf("decoding an empty body: %v", err)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {
-			t.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
 		}
 		if len(options.Forbid) != 0 {
-			t.Fatalf("forbid list is %v, want empty", options.Forbid)
+			test.Fatalf("forbid list is %v, want empty", options.Forbid)
 		}
 	})
 
-	t.Run("the string arm", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the string arm", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":["id","style"]}`))
 		if err != nil {
-			t.Fatalf("decoding the string arm: %v", err)
+			test.Fatalf("decoding the string arm: %v", err)
 		}
 		options := decoded.(ForbidDomPropsOptions)
 		if len(options.Forbid) != 2 {
-			t.Fatalf("forbid list is %v, want two entries", options.Forbid)
+			test.Fatalf("forbid list is %v, want two entries", options.Forbid)
 		}
 		for _, entry := range options.Forbid {
 			if entry.DisallowedForWasGiven {
-				t.Fatalf("entry %q recorded a tag restriction it was never given", entry.PropName)
+				test.Fatalf("entry %q recorded a tag restriction it was never given", entry.PropName)
 			}
 		}
 	})
 
-	t.Run("an absent disallowedFor means every tag", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an absent disallowedFor means every tag", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className"}]}`))
 		if err != nil {
-			t.Fatalf("decoding an absent disallowedFor: %v", err)
+			test.Fatalf("decoding an absent disallowedFor: %v", err)
 		}
 		options := decoded.(ForbidDomPropsOptions)
 		if options.Forbid[0].DisallowedForWasGiven {
-			t.Fatal("an absent disallowedFor was recorded as given")
+			test.Fatal("an absent disallowedFor was recorded as given")
 		}
 		if !forbidDomPropsIsForbidden(options.Forbid[0], "div") {
-			t.Fatal("an absent disallowedFor declined a tag, want every tag forbidden")
+			test.Fatal("an absent disallowedFor declined a tag, want every tag forbidden")
 		}
 	})
 
-	t.Run("an empty disallowedFor means no tag", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty disallowedFor means no tag", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`))
 		if err != nil {
-			t.Fatalf("decoding an empty disallowedFor: %v", err)
+			test.Fatalf("decoding an empty disallowedFor: %v", err)
 		}
 		options := decoded.(ForbidDomPropsOptions)
 		if !options.Forbid[0].DisallowedForWasGiven {
-			t.Fatal("an empty disallowedFor was not recorded as given, so it reads as absent")
+			test.Fatal("an empty disallowedFor was not recorded as given, so it reads as absent")
 		}
 		if forbidDomPropsIsForbidden(options.Forbid[0], "div") {
-			t.Fatal("an empty disallowedFor matched a tag, want none")
+			test.Fatal("an empty disallowedFor matched a tag, want none")
 		}
 	})
 
-	t.Run("a named disallowedFor matches only those tags", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a named disallowedFor matches only those tags", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`))
 		if err != nil {
-			t.Fatalf("decoding a named disallowedFor: %v", err)
+			test.Fatalf("decoding a named disallowedFor: %v", err)
 		}
 		entry := decoded.(ForbidDomPropsOptions).Forbid[0]
 		if !forbidDomPropsIsForbidden(entry, "div") || !forbidDomPropsIsForbidden(entry, "span") {
-			t.Fatal("a named tag was declined")
+			test.Fatal("a named tag was declined")
 		}
 		if forbidDomPropsIsForbidden(entry, "input") {
-			t.Fatal("an unnamed tag matched")
+			test.Fatal("an unnamed tag matched")
 		}
 	})
 }
@@ -456,8 +456,8 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 // Upstream asks whether the first character CHANGES under upper-casing, not whether it is
 // lowercase, and the two disagree on every character with no case. Each expectation here was
 // measured by driving the installed rule on the corresponding tag.
-func TestForbidDomPropsIsDomNodeName(t *testing.T) {
-	t.Parallel()
+func TestForbidDomPropsIsDomNodeName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -476,7 +476,7 @@ func TestForbidDomPropsIsDomNodeName(t *testing.T) {
 
 	for _, testCase := range cases {
 		if got := forbidDomPropsIsDomNodeName(testCase.name); got != testCase.want {
-			t.Errorf("DOM-node test of %q is %v, want %v", testCase.name, got, testCase.want)
+			test.Errorf("DOM-node test of %q is %v, want %v", testCase.name, got, testCase.want)
 		}
 	}
 }

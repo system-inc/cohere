@@ -30,8 +30,8 @@ const switchExhaustivenessFile = "switchExhaustiveness.ts"
 // The set is more pointed than its size suggests, because the OPTIONS are half the corpus: the same
 // switch appears here as silent and in the invalid table as reporting, differing only in which
 // option was set. A port that ignored options entirely would fail both tables rather than neither.
-func TestSwitchExhaustivenessCheckStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -697,10 +697,10 @@ switch (value) {
 			SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true)}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
-				t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(
+				test, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
 			))
 		})
 	}
@@ -726,8 +726,8 @@ switch (value) {
 // dropped because an enum key that is a template literal, or one containing an escaped quote, is
 // exactly the shape a name-based implementation would mishandle and a type-identity-based one
 // handles for free.
-func TestSwitchExhaustivenessCheckFires(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1356,10 +1356,10 @@ switch (value) {
 			[]string{"switchIsNotExhaustive"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
-				t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(
+				test, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
 			), testCase.wantIds...)
 		})
 	}
@@ -1375,10 +1375,10 @@ switch (value) {
 //
 // Dropped instead, it would have been the quietest kind of loss: the file still parses, the switch
 // still looks like every other switch in the table, and nothing would have been red.
-func TestSwitchExhaustivenessCheckResolvesAnEnumAcrossAModuleBoundary(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckResolvesAnEnumAcrossAModuleBoundary(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFiles(t, SwitchExhaustivenessCheck, map[string]string{
+	result := rule_testing.RunTypedFiles(test, SwitchExhaustivenessCheck, map[string]string{
 		// Byte for byte tsgolint's own fixture module at
 		// internal/rules/fixtures/switch-exhaustiveness-check.ts, which its test file imports by
 		// that path.
@@ -1401,7 +1401,7 @@ export namespace A {
       `,
 	}, switchExhaustivenessFile)
 
-	rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
+	rule_testing.ExpectFindings(test, result, "switchIsNotExhaustive")
 }
 
 // TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment replays the comment that stands in for a
@@ -1413,8 +1413,8 @@ export namespace A {
 // upstream's v8.71.0 test file that carries a comment or the pattern, the six tsgolint skipped, and
 // the rest are edge rows for each shape the comment lookup has to get right. Each was run through the
 // installed rule on a typed scratch project and the findings written here, id and span.
-func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		options string
@@ -1467,26 +1467,26 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(t *testing.T) {
 		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\u00a0default\n}", nil},
 	}
 	if len(cases) != 35 {
-		t.Fatalf("%d rows, and 35 were written: 31 replayed through 8.71.0 and 4 pattern rows checked in Node", len(cases))
+		test.Fatalf("%d rows, and 35 were written: 31 replayed through 8.71.0 and 4 pattern rows checked in Node", len(cases))
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.options+" "+testCase.code, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.options+" "+testCase.code, func(test *testing.T) {
+			test.Parallel()
 
 			var options SwitchExhaustivenessCheckOptions
 			if err := rule.UnmarshalOptions([]byte(testCase.options), &options); err != nil {
-				t.Fatalf("decoding %s: %v", testCase.options, err)
+				test.Fatalf("decoding %s: %v", testCase.options, err)
 			}
 			// The harness writes the file trimmed, so positions are in the trimmed text.
 			source := strings.TrimSpace(testCase.code) + "\n"
-			result := rule_testing.RunTypedWithOptions(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, source, options)
+			result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source, options)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 			}
 			if strings.Join(got, " | ") != strings.Join(testCase.want, " | ") {
-				t.Fatalf("reported %q, typescript-eslint reports %q", got, testCase.want)
+				test.Fatalf("reported %q, typescript-eslint reports %q", got, testCase.want)
 			}
 		})
 	}
@@ -1505,11 +1505,11 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(t *testing.T) {
 // accident until a sync makes it false. If a later tsgolint implements them, a rule that suddenly
 // rewrites source would otherwise land here unannounced, and the whole imported corpus above would
 // stay green while it did — every case in it asserts message ids only.
-func TestSwitchExhaustivenessCheckShipsNoRepairs(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckShipsNoRepairs(test *testing.T) {
+	test.Parallel()
 
 	result := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
+		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
 declare const literal: 'a' | 'b' | 'c';
 switch (literal) {
   case 'a':
@@ -1517,14 +1517,14 @@ switch (literal) {
 }
 `, nil)
 
-	rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
+	rule_testing.ExpectFindings(test, result, "switchIsNotExhaustive")
 
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
-			t.Fatalf("tsgolint ships no fixes for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Fixes))
+			test.Fatalf("tsgolint ships no fixes for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Fixes))
 		}
 		if len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("tsgolint ships no suggestions for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Suggestions))
+			test.Fatalf("tsgolint ships no suggestions for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Suggestions))
 		}
 	}
 }
@@ -1541,8 +1541,8 @@ switch (literal) {
 // `node.Expression`, the DISCRIMINANT, not on the switch statement and not on the case clause. A
 // port that reported the statement would produce a finding spanning the entire switch body, which
 // no id assertion could see, so this pins the exact text.
-func TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = `
 declare const someDiscriminant: 'a' | 'b';
@@ -1554,8 +1554,8 @@ function run() {
 }
 `
 
-	result := rule_testing.RunTypedWithOptions(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText, nil)
-	rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
+	result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText, nil)
+	rule_testing.ExpectFindings(test, result, "switchIsNotExhaustive")
 
 	// The harness trims the source before writing it, so offsets are against the trimmed text.
 	trimmed := strings.TrimSpace(sourceText)
@@ -1563,7 +1563,7 @@ function run() {
 	reported := trimmed[finding.Range.Pos():finding.Range.End()]
 
 	if reported != "someDiscriminant" {
-		t.Fatalf("expected the finding to span the discriminant, got %q", reported)
+		test.Fatalf("expected the finding to span the discriminant, got %q", reported)
 	}
 }
 
@@ -1575,8 +1575,8 @@ function run() {
 //
 // The span is the clause including its body, not just the `default` keyword, because upstream
 // reports the whole `CaseOrDefaultClause` node.
-func TestSwitchExhaustivenessCheckReportsTheDefaultClauseForADangerousDefault(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckReportsTheDefaultClauseForADangerousDefault(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = `
 declare const literal: 'a' | 'b';
@@ -1591,20 +1591,20 @@ switch (literal) {
 `
 
 	result := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
+		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
 		SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false)},
 	)
-	rule_testing.ExpectFindings(t, result, "dangerousDefaultCase")
+	rule_testing.ExpectFindings(test, result, "dangerousDefaultCase")
 
 	trimmed := strings.TrimSpace(sourceText)
 	finding := result.Diagnostics[0]
 	reported := trimmed[finding.Range.Pos():finding.Range.End()]
 
 	if !strings.HasPrefix(reported, "default:") {
-		t.Fatalf("expected the finding to start at the default clause, got %q", reported)
+		test.Fatalf("expected the finding to start at the default clause, got %q", reported)
 	}
 	if strings.Contains(reported, "case 'a'") {
-		t.Fatalf("the finding span reached back over the earlier cases: %q", reported)
+		test.Fatalf("the finding span reached back over the earlier cases: %q", reported)
 	}
 }
 
@@ -1621,26 +1621,26 @@ switch (literal) {
 // ninety-seven imported cases in this file are CLEAN cases, which would all still pass. Half the
 // suite would keep proving something and half would be proving nothing, which reads as a healthy
 // suite.
-func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(test *testing.T) {
+	test.Parallel()
 
 	if !SwitchExhaustivenessCheck.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously")
+		test.Fatal("the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously")
 	}
 
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
 	// return before `getSwitchMetadata` reaches the checker, and this is the only path that reaches
 	// that branch, since registration always supplies one.
-	typed := rule_testing.RunTyped(t, SwitchExhaustivenessCheck, switchExhaustivenessFile,
+	typed := rule_testing.RunTyped(test, SwitchExhaustivenessCheck, switchExhaustivenessFile,
 		"declare const day: 'a' | 'b';\nswitch (day) {\n  case 'a':\n    break;\n}\n")
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
 	listeners := SwitchExhaustivenessCheck.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
 	listener, hasListener := listeners[ast.KindSwitchStatement]
 	if !hasListener {
-		t.Fatal("the rule stopped listening on switch statements")
+		test.Fatal("the rule stopped listening on switch statements")
 	}
 	for _, statement := range typed.SourceFile.Statements.Nodes {
 		if statement.Kind == ast.KindSwitchStatement {
@@ -1662,42 +1662,42 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
 // POINTERS: a plain `bool` could not separate "the user wrote false" from "the user wrote nothing",
 // and `allowDefaultCaseForExhaustiveSwitch` defaults to TRUE. Flattening them would silently invert
 // that option for every user who did not set it.
-func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[SwitchExhaustivenessCheckOptions]()
 
 	decoded, err := decode([]byte(`{"allowDefaultCaseForExhaustiveSwitch":false,"requireDefaultForNonUnion":true}`))
 	if err != nil {
-		t.Fatalf("decoding options: %v", err)
+		test.Fatalf("decoding options: %v", err)
 	}
 
 	options, isOptions := decoded.(SwitchExhaustivenessCheckOptions)
 	if !isOptions {
-		t.Fatalf("expected %T, got %T", SwitchExhaustivenessCheckOptions{}, decoded)
+		test.Fatalf("expected %T, got %T", SwitchExhaustivenessCheckOptions{}, decoded)
 	}
 
 	if options.AllowDefaultCaseForExhaustiveSwitch == nil || *options.AllowDefaultCaseForExhaustiveSwitch {
-		t.Fatal("allowDefaultCaseForExhaustiveSwitch did not bind to false")
+		test.Fatal("allowDefaultCaseForExhaustiveSwitch did not bind to false")
 	}
 	if options.RequireDefaultForNonUnion == nil || !*options.RequireDefaultForNonUnion {
-		t.Fatal("requireDefaultForNonUnion did not bind to true")
+		test.Fatal("requireDefaultForNonUnion did not bind to true")
 	}
 	// The unset option must stay nil rather than becoming false, because the rule's own defaulting
 	// block reads exactly that distinction and `considerDefaultExhaustiveForUnions` happens to
 	// default to false only by coincidence of it being the safer direction.
 	if options.ConsiderDefaultExhaustiveForUnions != nil {
-		t.Fatal("an option nobody configured must stay nil so the rule can apply its own default")
+		test.Fatal("an option nobody configured must stay nil so the rule can apply its own default")
 	}
 
 	// And the option that binds and then does nothing, which is the trap this rule carries. It must
 	// still decode cleanly, because refusing it would reject configs upstream accepts.
 	withPattern, err := decode([]byte(`{"defaultCaseCommentPattern":"^skip"}`))
 	if err != nil {
-		t.Fatalf("decoding the inert option: %v", err)
+		test.Fatalf("decoding the inert option: %v", err)
 	}
 	if patternOptions, _ := withPattern.(SwitchExhaustivenessCheckOptions); patternOptions.DefaultCaseCommentPattern == nil {
-		t.Fatal("defaultCaseCommentPattern did not bind")
+		test.Fatal("defaultCaseCommentPattern did not bind")
 	}
 }
 
@@ -1726,15 +1726,15 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
 // under our config is checkable rather than asserted. Each one is run below: upstream expects the
 // first two to be SILENT and the third to REPORT, and under our tsconfig the first two are silent
 // for the wrong reason and the third is silent outright.
-func TestSwitchExhaustivenessCheckExclusionsAreStated(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckExclusionsAreStated(test *testing.T) {
+	test.Parallel()
 
 	// Upstream's invalid case: with noUncheckedIndexedAccess, `x[0]` is `string | undefined`, the
 	// switch covers only `'hi'`, and `undefined` is a missing branch. Without the flag the
 	// discriminant is plain `string`, which contains a non-literal type and has no missing literal
 	// branches at all, so nothing reports.
 	reportsOnlyUnderNoUncheckedIndexedAccess := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
+		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
 function foo(x: string[]) {
   switch (x[0]) {
     case 'hi':
@@ -1743,7 +1743,7 @@ function foo(x: string[]) {
 }
 `, nil)
 
-	rule_testing.ExpectClean(t, reportsOnlyUnderNoUncheckedIndexedAccess)
+	rule_testing.ExpectClean(test, reportsOnlyUnderNoUncheckedIndexedAccess)
 
 	// Upstream's first valid case for the same flag passes here too, and that is the QUIET half of
 	// the danger: it is silent for a different reason than upstream's. With the flag, `x[0]` is
@@ -1751,8 +1751,8 @@ function foo(x: string[]) {
 	// `x[0]` is plain `string`, there is no undefined member to cover, and the `case undefined` arm
 	// is doing nothing. Carried into the table above it would have looked like one more imported
 	// case while proving nothing about the behavior it was written for.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(
+		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
 function foo(x: string[]) {
   switch (x[0]) {
     case 'hi':
@@ -1777,8 +1777,8 @@ function foo(x: string[]) {
 	// telling a true story badly; dropped into the invalid table it would have been a GREEN test
 	// encoding a behavior upstream does not have. Measured rather than reasoned about, and recorded
 	// here in the direction our harness actually produces.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(
+		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
 function foo(x: string[], y: string | undefined) {
   const a = x[0];
   if (typeof a === 'string') {
@@ -1797,8 +1797,8 @@ function foo(x: string[], y: string | undefined) {
 // TestSwitchExhaustivenessCheckNamesTheMissingBranches pins the message text against
 // typescript-eslint's, measured on the installed 8.67.0 build for every kind of member a switch can
 // miss (#21011kd). tsgolint rendered the bare sentence for all seven; the list is what a reader acts on.
-func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckNamesTheMissingBranches(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1814,13 +1814,13 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
 		{"an optional property", "declare const optional: { kind?: 'p' | 'q' };\nswitch (optional.kind) { case 'p': break; }\n", `undefined | "q"`},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "switchIsNotExhaustive")
 			want := "Switch is not exhaustive. Cases not matched: " + testCase.want
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message: expected %q, got %q", want, got)
+				test.Fatalf("message: expected %q, got %q", want, got)
 			}
 		})
 	}
@@ -1829,8 +1829,8 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
 // TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran: a user's pattern whose match overruns the time
 // bound (#7mztrdd) is no answer. It may spare a missing default, and must not be reported as the dangerous default
 // case it would be had it matched. `(a|aa)+$` against a long run of `a` backtracks past the bound.
-func TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran(t *testing.T) {
-	t.Parallel()
+func TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran(test *testing.T) {
+	test.Parallel()
 	source := `
 declare const myBoolean: boolean;
 
@@ -1842,7 +1842,7 @@ switch (myBoolean) {
   // ` + strings.Repeat("a", 64) + `b
 }
 `
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
 		SwitchExhaustivenessCheckOptions{
 			AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
 			RequireDefaultForNonUnion:           type_checking.Ref(false),

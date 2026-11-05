@@ -16,7 +16,7 @@ import (
 // enable rather than something the shim itself should own. What can fail silently here is the
 // shim drifting out of sync with upstream after a typescript-go bump, and that failure shows
 // up as a build error the moment these references stop resolving.
-func TestShimSurfaceIsReachable(t *testing.T) {
+func TestShimSurfaceIsReachable(test *testing.T) {
 	// Each assignment is a distinct way the shim can break: a renamed function, a moved type,
 	// a changed signature. Binding the function to a typed variable checks the signature
 	// without needing a live host, and it fails at COMPILE time rather than here — which is
@@ -34,10 +34,10 @@ func TestShimSurfaceIsReachable(t *testing.T) {
 	var program *incremental.Program
 	var buildInfo *incremental.BuildInfo
 	if program != nil || buildInfo != nil {
-		t.Fatal("unreachable; the declarations exist to force the aliases to resolve")
+		test.Fatal("unreachable; the declarations exist to force the aliases to resolve")
 	}
 
-	t.Log("shim surface resolves: three functions bound with upstream signatures, two type aliases")
+	test.Log("shim surface resolves: three functions bound with upstream signatures, two type aliases")
 }
 
 // TestBuildInfoNilContract records the one behaviour a caller is most likely to get wrong.
@@ -50,9 +50,9 @@ func TestShimSurfaceIsReachable(t *testing.T) {
 //
 // There is nothing to execute here, so this test documents the contract next to the code that
 // depends on it rather than asserting on a live read.
-func TestBuildInfoNilContract(t *testing.T) {
-	t.Log("ReadBuildInfoProgram returns nil for: absent build info, version mismatch, " +
+func TestBuildInfoNilContract(test *testing.T) {
+	test.Log("ReadBuildInfoProgram returns nil for: absent build info, version mismatch, " +
 		"or non-incremental build info. All three mean rebuild-everything, not error.")
-	t.Log("A returned *Program from this path has a nil `program` field; GetProgram panics " +
+	test.Log("A returned *Program from this path has a nil `program` field; GetProgram panics " +
 		"on it (program.go:110). It is change detection, not a warm graph.")
 }

@@ -30,32 +30,32 @@ var cycleProject = map[string]string{
 }
 
 // buildProject writes files to a directory of its own and builds cohere's program over it.
-func buildProject(t *testing.T, files map[string]string) *program.Graph {
-	t.Helper()
-	directory, err := filepath.EvalSymlinks(t.TempDir())
+func buildProject(test *testing.T, files map[string]string) *program.Graph {
+	test.Helper()
+	directory, err := filepath.EvalSymlinks(test.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for name, contents := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	return graph
 }
 
 // walkAndRun is subject's findings on files twice, through cohere's own walk and through RunRule, on one program,
 // each sorted by place. The walk is the reference because it is what every cohere run reports through.
-func walkAndRun(t *testing.T, files map[string]string, subject rule.Rule) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
-	t.Helper()
-	graph := buildProject(t, files)
+func walkAndRun(test *testing.T, files map[string]string, subject rule.Rule) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
+	test.Helper()
+	graph := buildProject(test, files)
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{subject})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 	for _, diagnostic := range result.Diagnostics {
 		fileName, line, column := diagnostic.Location()
@@ -65,7 +65,7 @@ func walkAndRun(t *testing.T, files map[string]string, subject rule.Rule) (walke
 	ran, err = rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
 	done()
 	if err != nil {
-		t.Fatalf("running: %v", err)
+		test.Fatalf("running: %v", err)
 	}
 	byPlace := func(left rule_runner.Finding, right rule_runner.Finding) int {
 		if left.File != right.File {
@@ -83,29 +83,29 @@ func walkAndRun(t *testing.T, files map[string]string, subject rule.Rule) (walke
 
 // What RunRule returns is what cohere's own walk reports, finding for finding, on the same program: the rule,
 // the file, the line, the column and the message, each compared whole.
-func TestRunRuleFindsWhatTheWalkFinds(t *testing.T) {
-	t.Parallel()
-	want, got := walkAndRun(t, cycleProject, nexus.CorrectnessNoImportCycleLoadTimeRead)
+func TestRunRuleFindsWhatTheWalkFinds(test *testing.T) {
+	test.Parallel()
+	want, got := walkAndRun(test, cycleProject, nexus.CorrectnessNoImportCycleLoadTimeRead)
 
 	// The fixture is built to fire, so an empty pair can't pass as agreement: both cycle files read the other's
 	// binding at load, and the consumer, in no cycle, reads nothing early.
 	if len(want) != 2 {
-		t.Fatalf("the walk found %d findings, want 2 (one in each file of the cycle): %+v", len(want), want)
+		test.Fatalf("the walk found %d findings, want 2 (one in each file of the cycle): %+v", len(want), want)
 	}
 	if !slices.Equal(got, want) {
-		t.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
+		test.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
 	}
 	for _, finding := range got {
 		if filepath.Base(finding.File) == "Consumer.ts" {
-			t.Errorf("a file in no cycle was reported: %+v", finding)
+			test.Errorf("a file in no cycle was reported: %+v", finding)
 		}
 	}
 }
 
 // The relation rules Adamic runs in place of its own copies (#xjdce2d step 4) find through RunRule what the walk
 // finds, each on a program built to fire once and a sound neighbour that must stay quiet.
-func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(t *testing.T) {
-	t.Parallel()
+func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(test *testing.T) {
+	test.Parallel()
 	const configuration = `{"compilerOptions":{"strict":true,"exactOptionalPropertyTypes":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["*.ts"]}`
 	for _, testCase := range []struct {
 		subject rule.Rule
@@ -136,35 +136,35 @@ func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(t *testing.T) {
 				"}\n",
 		},
 	} {
-		t.Run(testCase.subject.Name, func(t *testing.T) {
-			t.Parallel()
-			want, got := walkAndRun(t, map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source}, testCase.subject)
+		test.Run(testCase.subject.Name, func(test *testing.T) {
+			test.Parallel()
+			want, got := walkAndRun(test, map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source}, testCase.subject)
 			if len(want) != 1 {
-				t.Fatalf("the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v", len(want), want)
+				test.Fatalf("the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v", len(want), want)
 			}
 			if !slices.Equal(got, want) {
-				t.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
+				test.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
 			}
 		})
 	}
 }
 
 // A rule off the allowlist is refused by name, whether cohere has it or not, before anything runs.
-func TestRunRuleRefusesARuleOffTheAllowlist(t *testing.T) {
-	t.Parallel()
-	graph := buildProject(t, cycleProject)
+func TestRunRuleRefusesARuleOffTheAllowlist(test *testing.T) {
+	test.Parallel()
+	graph := buildProject(test, cycleProject)
 	typeChecker, done := graph.Program.GetTypeChecker(context.Background())
 	defer done()
 
 	// Allowed first: a refusal that refused everything would pass both cases below.
 	if _, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), nexus.CorrectnessNoImportCycleLoadTimeRead.Name); err != nil {
-		t.Fatalf("the allowed rule was refused: %v", err)
+		test.Fatalf("the allowed rule was refused: %v", err)
 	}
 	for _, name := range []string{"no-console", "nexus/correctness-no-such-rule"} {
 		findings, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
 		var notAllowed rule_runner.NotAllowedError
 		if !errors.As(err, &notAllowed) || notAllowed.Rule != name {
-			t.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, err)
+			test.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, err)
 		}
 	}
 }

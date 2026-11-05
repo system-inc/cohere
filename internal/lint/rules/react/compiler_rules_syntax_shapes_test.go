@@ -47,8 +47,8 @@ var compilerRuleSyntaxShapes = map[string]string{
 // and inside a hook, and requires that none panics. Findings are not asserted: some shapes are
 // reportable, and what each rule says about them is its own fixtures' business. The question here is
 // only whether the lowering can read the code at all.
-func TestCompilerRulesLowerEverySyntaxShape(t *testing.T) {
-	t.Parallel()
+func TestCompilerRulesLowerEverySyntaxShape(test *testing.T) {
+	test.Parallel()
 
 	for shapeName, shape := range compilerRuleSyntaxShapes {
 		sources := map[string]string{
@@ -57,14 +57,14 @@ func TestCompilerRulesLowerEverySyntaxShape(t *testing.T) {
 		}
 		for host, source := range sources {
 			for _, compilerRule := range compilerRulesLoweringEverySyntax {
-				t.Run(fmt.Sprintf("%s in a %s, %s", shapeName, host, compilerRule.Name), func(t *testing.T) {
-					t.Parallel()
+				test.Run(fmt.Sprintf("%s in a %s, %s", shapeName, host, compilerRule.Name), func(test *testing.T) {
+					test.Parallel()
 					defer func() {
 						if recovered := recover(); recovered != nil {
-							t.Errorf("%s panicked on %s:\n%s\n%v", compilerRule.Name, shapeName, source, recovered)
+							test.Errorf("%s panicked on %s:\n%s\n%v", compilerRule.Name, shapeName, source, recovered)
 						}
 					}()
-					rule_testing.RunTyped(t, compilerRule, "shape.tsx", source)
+					rule_testing.RunTyped(test, compilerRule, "shape.tsx", source)
 				})
 			}
 		}

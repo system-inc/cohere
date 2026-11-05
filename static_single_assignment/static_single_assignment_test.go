@@ -204,12 +204,12 @@ func finalize(f *testFunction) {
 	ssa.MarkEvaluationOrder(testGraph{}, f)
 }
 
-func construct(t *testing.T, f *testFunction) {
-	t.Helper()
+func construct(test *testing.T, f *testFunction) {
+	test.Helper()
 	finalize(f)
 	ssa.Construct(testGraph{}, f)
 	if violations := ssa.VerifySSA(testGraph{}, f); len(violations) != 0 {
-		t.Fatalf("not in single assignment form: %v", violations)
+		test.Fatalf("not in single assignment form: %v", violations)
 	}
 }
 
@@ -221,8 +221,8 @@ func goTo(from *testBlock, to ...*testBlock) {
 
 // TestDiamondPlacesOnePhiAtTheJoin: x is written before an if and on one arm, so the join merges two
 // values, and the read after it names the phi.
-func TestDiamondPlacesOnePhiAtTheJoin(t *testing.T) {
-	t.Parallel()
+func TestDiamondPlacesOnePhiAtTheJoin(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, left, right, join := f.block(), f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -233,29 +233,29 @@ func TestDiamondPlacesOnePhiAtTheJoin(t *testing.T) {
 	goTo(left, join)
 	goTo(right, join)
 
-	construct(t, f)
+	construct(test, f)
 
 	if len(join.phis) != 1 {
-		t.Fatalf("join has %d phis, want 1", len(join.phis))
+		test.Fatalf("join has %d phis, want 1", len(join.phis))
 	}
 	phi := join.phis[0]
 	if got := ssa.PhiOperandsInOrder(phi); !slices.Equal(got, []ssa.BlockId{left.id, right.id}) {
-		t.Errorf("operands from %v, want [%d %d]", got, left.id, right.id)
+		test.Errorf("operands from %v, want [%d %d]", got, left.id, right.id)
 	}
 	if read.uses[0].id != phi.Place.id {
-		t.Errorf("the read after the join names $%d, want the phi's $%d", read.uses[0].id, phi.Place.id)
+		test.Errorf("the read after the join names $%d, want the phi's $%d", read.uses[0].id, phi.Place.id)
 	}
 	if left.instructions[0].defines[0].id == entry.instructions[0].defines[0].id {
-		t.Errorf("the two writes of x share a value")
+		test.Errorf("the two writes of x share a value")
 	}
 	// The place's other fields ride along on the phi and its operands.
 	for _, operand := range phi.Operands {
 		if operand.Place.tag != "x" {
-			t.Errorf("operand from bb%d lost its tag: %+v", operand.Predecessor, operand.Place)
+			test.Errorf("operand from bb%d lost its tag: %+v", operand.Predecessor, operand.Place)
 		}
 	}
 	if phi.Place.tag != "x" {
-		t.Errorf("phi lost its tag: %+v", phi.Place)
+		test.Errorf("phi lost its tag: %+v", phi.Place)
 	}
 }
 
@@ -313,8 +313,8 @@ func TestLoopThatNeverWritesLeavesNoPhi(t *testing.T) {
 }
 
 // TestUnreachableBlockIsDropped: a block no edge reaches leaves the slice and the table.
-func TestUnreachableBlockIsDropped(t *testing.T) {
-	t.Parallel()
+func TestUnreachableBlockIsDropped(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, exit, orphan := f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -325,21 +325,21 @@ func TestUnreachableBlockIsDropped(t *testing.T) {
 
 	for _, block := range f.blocks {
 		if block.id == orphan.id {
-			t.Fatalf("the unreachable block is still in the slice")
+			test.Fatalf("the unreachable block is still in the slice")
 		}
 	}
 	if _, ok := (testGraph{}).Block(f, orphan.id); ok {
-		t.Errorf("the unreachable block is still in the table")
+		test.Errorf("the unreachable block is still in the table")
 	}
 	if !slices.Equal(exit.predecessors, []ssa.BlockId{entry.id}) {
-		t.Errorf("exit's predecessors are %v, want only the entry", exit.predecessors)
+		test.Errorf("exit's predecessors are %v, want only the entry", exit.predecessors)
 	}
 }
 
 // TestFallthroughNothingReachesBecomesAPlaceholder: a structured terminal names a continuation no
 // real edge reaches, so it stays, empty, and is nobody's successor.
-func TestFallthroughNothingReachesBecomesAPlaceholder(t *testing.T) {
-	t.Parallel()
+func TestFallthroughNothingReachesBecomesAPlaceholder(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, body, continuation := f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -355,21 +355,21 @@ func TestFallthroughNothingReachesBecomesAPlaceholder(t *testing.T) {
 		}
 	}
 	if kept == nil || !kept.placeholder {
-		t.Fatalf("the fallthrough is %+v, want a placeholder in the slice", kept)
+		test.Fatalf("the fallthrough is %+v, want a placeholder in the slice", kept)
 	}
 	if len(kept.predecessors) != 0 {
-		t.Errorf("a fallthrough made a predecessor: %v", kept.predecessors)
+		test.Errorf("a fallthrough made a predecessor: %v", kept.predecessors)
 	}
 	if !slices.Equal(body.predecessors, []ssa.BlockId{entry.id}) {
-		t.Errorf("body's predecessors are %v", body.predecessors)
+		test.Errorf("body's predecessors are %v", body.predecessors)
 	}
 }
 
 // TestContextStoreReusesItsDefinition: a binding a closure captures is defined once, and a second
 // store to it in the same block names the same value, which the verifier accepts on the store's own
 // result alone.
-func TestContextStoreReusesItsDefinition(t *testing.T) {
-	t.Parallel()
+func TestContextStoreReusesItsDefinition(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry := f.block()
 	f.entry = entry.id
@@ -379,10 +379,10 @@ func TestContextStoreReusesItsDefinition(t *testing.T) {
 	second := f.define(entry, "n")
 	second.contextStore = true
 
-	construct(t, f)
+	construct(test, f)
 
 	if first.defines[0].id != second.defines[0].id {
-		t.Errorf("the context stores define $%d and $%d, want one value", first.defines[0].id, second.defines[0].id)
+		test.Errorf("the context stores define $%d and $%d, want one value", first.defines[0].id, second.defines[0].id)
 	}
 }
 
@@ -392,8 +392,8 @@ func TestContextStoreReusesItsDefinition(t *testing.T) {
 // It resolves to the block's END: x$2, written by the throwing instruction itself, which never
 // completed when the handler runs. That is #2yz9ra9. Its fix belongs in valueFromPredecessor, where
 // every lookup across an edge now goes, and flips the want below to the write before the throw.
-func TestExceptionalEdgeIsAnEdge(t *testing.T) {
-	t.Parallel()
+func TestExceptionalEdgeIsAnEdge(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, next, handler := f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -402,21 +402,21 @@ func TestExceptionalEdgeIsAnEdge(t *testing.T) {
 	read := f.use(handler, "x")
 	entry.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
 
-	construct(t, f)
+	construct(test, f)
 
 	if !slices.Equal(handler.predecessors, []ssa.BlockId{entry.id}) {
-		t.Fatalf("the handler's predecessors are %v, want the throwing block", handler.predecessors)
+		test.Fatalf("the handler's predecessors are %v, want the throwing block", handler.predecessors)
 	}
 	if got, want := read.uses[0].id, throwing.defines[0].id; got != want {
-		t.Errorf("the handler reads $%d, want $%d (the end of the block, #2yz9ra9; $%d once fixed)",
+		test.Errorf("the handler reads $%d, want $%d (the end of the block, #2yz9ra9; $%d once fixed)",
 			got, want, before.defines[0].id)
 	}
 }
 
 // TestEvaluationOrderFollowsTheSlice: instructions and terminals are numbered from 1 in reverse
 // postorder, with nothing left at zero.
-func TestEvaluationOrderFollowsTheSlice(t *testing.T) {
-	t.Parallel()
+func TestEvaluationOrderFollowsTheSlice(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, exit := f.block(), f.block()
 	f.entry = entry.id
@@ -434,14 +434,14 @@ func TestEvaluationOrderFollowsTheSlice(t *testing.T) {
 		orders = append(orders, block.terminalOrder)
 	}
 	if !slices.Equal(orders, []ssa.EvaluationOrder{1, 2, 3, 4}) {
-		t.Errorf("orders are %v, want [1 2 3 4]", orders)
+		test.Errorf("orders are %v, want [1 2 3 4]", orders)
 	}
 }
 
 // TestVerifierCatchesAnUndominatedUse: a hand-broken function, a read on one arm of a diamond naming
 // a value written on the other, is a violation, so a clean result elsewhere is a real one.
-func TestVerifierCatchesAnUndominatedUse(t *testing.T) {
-	t.Parallel()
+func TestVerifierCatchesAnUndominatedUse(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, left, right := f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -453,17 +453,17 @@ func TestVerifierCatchesAnUndominatedUse(t *testing.T) {
 
 	violations := ssa.VerifySSA(testGraph{}, f)
 	if len(violations) != 1 || violations[0].Kind != ssa.SSAViolationUseNotDominated {
-		t.Fatalf("violations are %v, want one undominated use", violations)
+		test.Fatalf("violations are %v, want one undominated use", violations)
 	}
 	if stats := ssa.CollectSSAStats(testGraph{}, f); stats.Uses != 1 || stats.NamedValues != 1 {
-		t.Errorf("stats are %+v, want one use and one named value", stats)
+		test.Errorf("stats are %+v, want one use and one named value", stats)
 	}
 }
 
 // TestDominanceIsTheEntrysAndTheJoins: the entry dominates every block, a branch arm dominates
 // neither the other arm nor the join.
-func TestDominanceIsTheEntrysAndTheJoins(t *testing.T) {
-	t.Parallel()
+func TestDominanceIsTheEntrysAndTheJoins(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, left, right, join := f.block(), f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -475,11 +475,11 @@ func TestDominanceIsTheEntrysAndTheJoins(t *testing.T) {
 	dominance := ssa.ComputeDominance(testGraph{}, f)
 	for _, block := range []*testBlock{entry, left, right, join} {
 		if !dominance.Dominates(entry.id, block.id) {
-			t.Errorf("the entry does not dominate bb%d", block.id)
+			test.Errorf("the entry does not dominate bb%d", block.id)
 		}
 	}
 	if dominance.Dominates(left.id, join.id) || dominance.Dominates(left.id, right.id) {
-		t.Errorf("an arm dominates the join or the other arm")
+		test.Errorf("an arm dominates the join or the other arm")
 	}
 }
 
@@ -487,8 +487,8 @@ func TestDominanceIsTheEntrysAndTheJoins(t *testing.T) {
 // does, so reverse postorder puts d ahead of every real predecessor it has. Every path to d runs a, b
 // and c, so all three dominate it. Over the block slice, dominance said only the entry and a did
 // (#6v4a54x, Adamic's generated-631).
-func TestDominanceFollowsRealEdgesPastAFallthrough(t *testing.T) {
-	t.Parallel()
+func TestDominanceFollowsRealEdgesPastAFallthrough(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, a, b, c, d := f.block(), f.block(), f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -504,12 +504,12 @@ func TestDominanceFollowsRealEdgesPastAFallthrough(t *testing.T) {
 		order = append(order, block.id)
 	}
 	if !slices.Equal(order, []ssa.BlockId{entry.id, a.id, d.id, b.id, c.id}) {
-		t.Fatalf("the block order is %v; the test needs d ahead of its real predecessors", order)
+		test.Fatalf("the block order is %v; the test needs d ahead of its real predecessors", order)
 	}
 	dominance := ssa.ComputeDominance(testGraph{}, f)
 	for _, dominator := range []*testBlock{entry, a, b, c, d} {
 		if !dominance.Dominates(dominator.id, d.id) {
-			t.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, d.id)
+			test.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, d.id)
 		}
 	}
 }
@@ -520,8 +520,8 @@ func TestDominanceFollowsRealEdgesPastAFallthrough(t *testing.T) {
 // intersection of its reachable predecessors', to a fixed point. The graphs have to reach the shape
 // #6v4a54x was, a block reached by real edges with none of its real predecessors ahead of it in the
 // block slice, or the comparison couldn't see that bug.
-func TestDominanceAgreesWithSetIntersection(t *testing.T) {
-	t.Parallel()
+func TestDominanceAgreesWithSetIntersection(test *testing.T) {
+	test.Parallel()
 	random := rand.New(rand.NewSource(20261007))
 	const graphs = 4000
 	behind := 0
@@ -557,7 +557,7 @@ func TestDominanceAgreesWithSetIntersection(t *testing.T) {
 		for _, block := range f.blocks {
 			for _, dominator := range f.blocks {
 				if got := dominance.Dominates(dominator.id, block.id); got != want[block.id][dominator.id] {
-					t.Fatalf("graph %d: Dominates(bb%d, bb%d) is %t, set intersection says %t\n%s",
+					test.Fatalf("graph %d: Dominates(bb%d, bb%d) is %t, set intersection says %t\n%s",
 						graph, dominator.id, block.id, got, !got, describeTestGraph(f))
 				}
 			}
@@ -567,9 +567,9 @@ func TestDominanceAgreesWithSetIntersection(t *testing.T) {
 		}
 	}
 	if behind == 0 {
-		t.Fatalf("none of the %d graphs puts a reached block ahead of all its real predecessors", graphs)
+		test.Fatalf("none of the %d graphs puts a reached block ahead of all its real predecessors", graphs)
 	}
-	t.Logf("%d graphs, %d of them with a reached block ahead of all its real predecessors", graphs, behind)
+	test.Logf("%d graphs, %d of them with a reached block ahead of all its real predecessors", graphs, behind)
 }
 
 // reachedBlocks is the blocks the entry reaches by real edges.
@@ -687,8 +687,8 @@ func describeTestGraph(f *testFunction) string {
 // VerifySSA says so, and Construct refuses with a panic that names the block. Without the refusal, the
 // read of x in c, which nothing defines, looks back through b, a and the entry, each with one sealed
 // predecessor, and around again until the stack runs out.
-func TestAnEntryWithPredecessorsIsReportedAndRefused(t *testing.T) {
-	t.Parallel()
+func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
+	test.Parallel()
 	f := newTestFunction()
 	entry, a, b, c := f.block(), f.block(), f.block(), f.block()
 	f.entry = entry.id
@@ -700,7 +700,7 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(t *testing.T) {
 
 	violations := ssa.VerifySSA(testGraph{}, f)
 	if len(violations) == 0 || violations[0].Kind != ssa.SSAViolationEntryHasPredecessors || violations[0].Block != entry.id {
-		t.Fatalf("violations are %v, want the entry's predecessors first", violations)
+		test.Fatalf("violations are %v, want the entry's predecessors first", violations)
 	}
 
 	refusal := func() (message string) {
@@ -711,6 +711,6 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(t *testing.T) {
 		return "no refusal"
 	}()
 	if want := fmt.Sprintf("the entry block bb%d has predecessors [%d]", entry.id, b.id); !strings.Contains(refusal, want) {
-		t.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
+		test.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
 	}
 }

@@ -26,8 +26,8 @@ const importAssignFile = "/repository/source/ImportAssign.ts"
 // a list of message ids: upstream points at three different nodes depending on the shape, and a rule
 // that pointed at the identifier every time would pass every message-id assertion while being wrong
 // on twelve of these.
-func TestNoImportAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoImportAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -95,15 +95,15 @@ func TestNoImportAssignFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noImportAssign"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				return
@@ -111,7 +111,7 @@ func TestNoImportAssignFires(t *testing.T) {
 			for index, wantSpan := range testCase.wantSpans {
 				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 		})
@@ -125,8 +125,8 @@ func TestNoImportAssignFires(t *testing.T) {
 // `mod.named.prop = 0` passes, `Object.assign(mod, obj)` fails and `Object.assign(mod.prop, obj)`
 // passes. Each pair was added upstream when somebody hit the bug, and each is a place this port
 // could be silently wide.
-func TestNoImportAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImportAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"import mod from 'mod'; mod.prop = 0",
@@ -189,10 +189,10 @@ func TestNoImportAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoImportAssign, importAssignFile, sourceText))
 		})
 	}
 }
@@ -203,8 +203,8 @@ func TestNoImportAssignStaysSilent(t *testing.T) {
 // the resolution question, so it never had to prove that resolution was being asked correctly. This
 // port asks it directly and these are the shapes where asking it wrongly still passes all 116 cases
 // above.
-func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
-	t.Parallel()
+func TestNoImportAssignFiresOnCasesUpstreamOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -314,15 +314,15 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noImportAssign"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				return
@@ -330,7 +330,7 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 			for index, wantSpan := range testCase.wantSpans {
 				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 		})
@@ -338,8 +338,8 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 }
 
 // Clean cases upstream does not cover, each with the reason it exists.
-func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
-	t.Parallel()
+func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -398,10 +398,10 @@ func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoImportAssign, importAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -411,14 +411,14 @@ func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 // This test exists so a revert of `RunTyped` to `Run` in the fixtures above fails loudly rather than
 // turning every clean case green vacuously. Without it, that revert makes the rule silent on all 116
 // corpus cases and the suite still passes.
-func TestNoImportAssignNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoImportAssignNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoImportAssign.NeedsTypeChecker {
-		t.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker")
+		test.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker")
 	}
-	result := rule_testing.Run(t, NoImportAssign, importAssignFile, "import mod from 'mod'; mod = 0")
+	result := rule_testing.Run(test, NoImportAssign, importAssignFile, "import mod from 'mod'; mod = 0")
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("the untyped harness produced %d findings, so this test no longer proves what it claims", len(result.Diagnostics))
+		test.Fatalf("the untyped harness produced %d findings, so this test no longer proves what it claims", len(result.Diagnostics))
 	}
 }

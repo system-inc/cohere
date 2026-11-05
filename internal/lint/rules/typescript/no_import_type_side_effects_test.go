@@ -16,8 +16,8 @@ const importTypeSideEffectsFile = "/repository/source/ImportTypeSideEffects.ts"
 // retyped, and byte-compared against the file afterwards. It carries 11 valid cases and 4 invalid
 // ones, and every invalid case ships an `output`, so the repair below is asserted rather than
 // eyeballed. Cases added beyond the corpus are marked and say what they cover.
-func TestNoImportTypeSideEffectsFires(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -31,17 +31,17 @@ func TestNoImportTypeSideEffectsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
-			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "useTopLevelQualifier")
+			rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 		})
 	}
 }
 
-func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -61,10 +61,10 @@ func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source))
 		})
 	}
 }
@@ -72,15 +72,15 @@ func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
 // The cases below are not in the corpus. Each was measured against the installed
 // @typescript-eslint 8.67.0 rule before being written down, by driving it through the ESLint Linter
 // API, and each covers a decision the corpus leaves unpinned.
-func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	// The empty specifier list is upstream's own early return and no corpus case reaches it. A
 	// universal quantifier over an empty list is vacuously true, so a port that drops the guard
 	// reports this and offers `import type {} from 'mod';` as the repair.
-	t.Run("an empty specifier list stays silent", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoImportTypeSideEffects,
+	test.Run("an empty specifier list stays silent", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoImportTypeSideEffects,
 			importTypeSideEffectsFile, "import {} from 'mod';"))
 	})
 
@@ -91,9 +91,9 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 	// universal below and reaches the report. Measured both ways by removing the guard: with it the
 	// input is silent, without it the rule reports and offers `import type type { A } from 'mod';`,
 	// which does not parse. Upstream is silent on it, measured at 8.67.0.
-	t.Run("a nested type qualifier under a top-level one stays silent", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoImportTypeSideEffects,
+	test.Run("a nested type qualifier under a top-level one stays silent", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoImportTypeSideEffects,
 			importTypeSideEffectsFile, "import type { type A } from 'mod';"))
 	})
 
@@ -150,12 +150,12 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range fixCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoImportTypeSideEffects,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoImportTypeSideEffects,
 				importTypeSideEffectsFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
-			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+			rule_testing.ExpectFindings(test, result, "useTopLevelQualifier")
+			rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 		})
 	}
 }
@@ -163,44 +163,44 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 // The span is the whole import declaration, which upstream states as column 1 through the statement's
 // last character, and which no message-id assertion can see. Asserted against a literal rather than
 // against the rule's own constant, because a constant compared to itself moves under mutation.
-func TestNoImportTypeSideEffectsSpansTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsSpansTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	const source = "const before = 1;\nimport { type A, type B } from 'mod';\n"
-	result := rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, source)
-	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
+	result := rule_testing.Run(test, NoImportTypeSideEffects, importTypeSideEffectsFile, source)
+	rule_testing.ExpectFindings(test, result, "useTopLevelQualifier")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "import { type A, type B } from 'mod';" {
-		t.Fatalf("reported span was %q", reported)
+		test.Fatalf("reported span was %q", reported)
 	}
 }
 
 // The message carries no format verbs, so there is nothing to render and the assertion is on the
 // value itself. Both fields, because the description is the half a reader acts on.
-func TestNoImportTypeSideEffectsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUseTopLevelQualifier.Id != "useTopLevelQualifier" {
-		t.Fatalf("message id was %q", messageUseTopLevelQualifier.Id)
+		test.Fatalf("message id was %q", messageUseTopLevelQualifier.Id)
 	}
 	if !strings.HasPrefix(messageUseTopLevelQualifier.Description,
 		"Every name in this import carries its own inline") {
-		t.Fatalf("message description was %q", messageUseTopLevelQualifier.Description)
+		test.Fatalf("message description was %q", messageUseTopLevelQualifier.Description)
 	}
 }
 
 // The rule takes no options, so it must survive being handed nil the way a bare "error" configuration
 // hands it. Bypasses the decoder entirely, which every fixture above reaches the rule through.
-func TestNoImportTypeSideEffectsTakesNoOptions(t *testing.T) {
-	t.Parallel()
+func TestNoImportTypeSideEffectsTakesNoOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoImportTypeSideEffects,
+	result := rule_testing.RunWithOptions(test, NoImportTypeSideEffects,
 		importTypeSideEffectsFile, "import { type A } from 'mod';", nil)
-	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
+	rule_testing.ExpectFindings(test, result, "useTopLevelQualifier")
 
 	if NoImportTypeSideEffects.NeedsTypeChecker {
-		t.Fatal("the rule declares the type checker and decides nothing that needs it")
+		test.Fatal("the rule declares the type checker and decides nothing that needs it")
 	}
 	var _ rule.Rule = NoImportTypeSideEffects
 }

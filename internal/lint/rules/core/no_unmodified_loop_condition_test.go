@@ -23,25 +23,25 @@ const unmodifiedLoopFile = "/repository/source/LoopConditions.ts"
 // The assertion names the variables and their order, not only the count. Two cases report twice, on
 // two different names, and a rule finding the right number of problems while naming the wrong
 // binding passes a count fixture.
-func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range unmodifiedLoopFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 
 			wantIds := make([]string, len(testCase.variables))
 			for index := range wantIds {
 				wantIds[index] = "loopConditionNotModified"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantVariable := range testCase.variables {
 				want := "The variable is '" + wantVariable + "'."
 				got := result.Diagnostics[index].Message.Description
 				if !strings.HasSuffix(got, want) {
-					t.Errorf("finding %d message: got %q, want it to end with %q", index, got, want)
+					test.Errorf("finding %d message: got %q, want it to end with %q", index, got, want)
 				}
 			}
 		})
@@ -53,14 +53,14 @@ func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
 // This half is the rule. A port that reports any loop-condition variable without a write in the
 // body passes most of the firing table and fails here on every call, every member access, every
 // group with one changing member, and the function called from inside the loop.
-func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range unmodifiedLoopCleanCases {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
 	}
 }
@@ -77,18 +77,18 @@ func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
 // change is exactly the thing nothing here can measure.
 //
 // When the installed build moves to 10.9, this test is the marker for the follow-up.
-func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(test *testing.T) {
+	test.Parallel()
 
 	if len(unmodifiedLoopOptionOnlyCases) == 0 {
-		t.Fatal("the option-only table is empty, so the version gap it records has gone unnoticed")
+		test.Fatal("the option-only table is empty, so the version gap it records has gone unnoticed")
 	}
 	for _, testCase := range unmodifiedLoopOptionOnlyCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
 			// Runs the rule for its own sake: these are real sources and a crash on one is a
 			// defect whatever the option question is.
-			rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 		})
 	}
 }
@@ -97,8 +97,8 @@ func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testi
 //
 // Upstream reports on the IDENTIFIER inside the condition, not on the loop and not on the
 // condition, so the span is one name. The two-finding case pins both spans and their order.
-func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -128,11 +128,11 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
 			}
 			// Sliced from the source the harness wrote. RunTyped trims, so a leading newline in
 			// the literal would offset every position; these cases have none, and going through
@@ -142,7 +142,7 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				got := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d span: got %q, want %q", index, got, want)
+					test.Errorf("finding %d span: got %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -155,27 +155,27 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 // format string does. Asserted against literals typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from is an equality both
 // sides of which move together under mutation.
-func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile,
+	result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile,
 		"var foo = 0; while (foo) { } foo = 1;")
-	rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+	rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 	message := result.Diagnostics[0].Message
 
 	if message.Id != "loopConditionNotModified" {
-		t.Errorf("message id: got %q, want %q", message.Id, "loopConditionNotModified")
+		test.Errorf("message id: got %q, want %q", message.Id, "loopConditionNotModified")
 	}
 	const wantPrefix = "This variable is read by the loop condition and never changed inside the loop,"
 	if !strings.HasPrefix(message.Description, wantPrefix) {
-		t.Errorf("description: got %q, want it to start with %q", message.Description, wantPrefix)
+		test.Errorf("description: got %q, want it to start with %q", message.Description, wantPrefix)
 	}
 	const wantSuffix = "The variable is 'foo'."
 	if !strings.HasSuffix(message.Description, wantSuffix) {
-		t.Errorf("description: got %q, want it to end with %q", message.Description, wantSuffix)
+		test.Errorf("description: got %q, want it to end with %q", message.Description, wantSuffix)
 	}
 	if strings.Count(message.Description, "'foo'") != 1 {
-		t.Errorf("description names 'foo' %d times, want 1: %q",
+		test.Errorf("description names 'foo' %d times, want 1: %q",
 			strings.Count(message.Description, "'foo'"), message.Description)
 	}
 }
@@ -186,20 +186,20 @@ func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
 // `GetSymbolAtLocation` on a nil checker returns nil rather than crashing, so a rule missing its
 // guard goes silently inert instead of announcing itself, and every StaysSilent case would then
 // pass vacuously.
-func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "var foo = 0; while (foo) { } foo = 1;"
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source),
 		"loopConditionNotModified")
 
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 
 	if !NoUnmodifiedLoopCondition.NeedsTypeChecker {
-		t.Error("the rule must declare NeedsTypeChecker, or the live run hands it a nil checker")
+		test.Error("the rule must declare NeedsTypeChecker, or the live run hands it a nil checker")
 	}
 }
 
@@ -211,17 +211,17 @@ func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(t *testing.T) {
 // condition would pass every imported case.
 //
 // Measured against the installed eslint 10.8.1 build: silent on both.
-func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"var foo = {}; for (var key in foo) { } foo = 1;",
 		"var foo = []; for (var item of foo) { } foo = 1;",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
 	}
 }
@@ -238,8 +238,8 @@ func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
 // name being referenced, and the name existing but unreferenced.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -264,13 +264,13 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -292,8 +292,8 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *
 //	a write directly in `d`        the plain case, clean
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -318,13 +318,13 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *t
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -344,8 +344,8 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *t
 // abandoned and the rule goes silent.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -375,14 +375,14 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *tes
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			wantIds := make([]string, testCase.reports)
 			for index := range wantIds {
 				wantIds[index] = "loopConditionNotModified"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -399,8 +399,8 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *tes
 // for the keyword, and the `let` shadows rather than writing the outer binding.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -430,13 +430,13 @@ func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -451,8 +451,8 @@ func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
 // function that writes it" from "that function can run here".
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -477,13 +477,13 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -509,8 +509,8 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
 // nested function rather than the loop, a write in the loop's own activation before the loop, a
 // closure created only after the loop, a hoisted writer nothing registers, one registered only after
 // the loop, and a closure writing a shadowing binding.
-func TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended(t *testing.T) {
-	t.Parallel()
+func TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended(test *testing.T) {
+	test.Parallel()
 
 	const ambient = "declare const process: { on(event: string, handler: () => void): void };\n" +
 		"declare function sleep(): Promise<void>;\n" +
@@ -742,13 +742,13 @@ async function watch() {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, ambient+testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, ambient+testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}

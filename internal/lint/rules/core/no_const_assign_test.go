@@ -20,8 +20,8 @@ const constAssignFile = "/repository/source/ConstAssign.ts"
 // The extra diagnostic belongs to `const x = 0; x = 1; x = 2;`, which writes twice and reports
 // twice. Recovered from the snapshot by source line rather than by an in-order walk, since that
 // case prints two entries with byte-identical source text.
-func TestNoConstAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoConstAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -127,10 +127,10 @@ func TestNoConstAssignFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoConstAssign, constAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -145,8 +145,8 @@ func TestNoConstAssignFires(t *testing.T) {
 //
 // The rest are the structural half. `x.key = 1` and `foo(x)` both resolve to the const binding and
 // neither reassigns it, so a rule built on symbol identity alone reports both.
-func TestNoConstAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConstAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -212,10 +212,10 @@ func TestNoConstAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoConstAssign, constAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -235,8 +235,8 @@ func TestNoConstAssignStaysSilent(t *testing.T) {
 // The destructuring and rest cases are here deliberately. Those are the shapes where a port is most
 // likely to report the enclosing pattern or the whole assignment rather than the identifier, and the
 // text of a one-character binding makes that invisible unless the span is checked.
-func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
-	t.Parallel()
+func TestNoConstAssignPointsAtTheWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -268,17 +268,17 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoConstAssign, constAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.want),
+				test.Fatalf("expected %d findings, got %d", len(testCase.want),
 					len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.want[index] {
-					t.Errorf("finding %d points at %q, want %q", index, reported,
+					test.Errorf("finding %d points at %q, want %q", index, reported,
 						testCase.want[index])
 				}
 			}
@@ -291,15 +291,15 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 // The test above compares the sliced text, and both slices read `x`, so it cannot tell one write
 // reported twice from two writes reported once each. A rule looping over the wrong collection
 // produces exactly that: the right count, the right ids, and the same span twice.
-func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
-	t.Parallel()
+func TestNoConstAssignReportsDistinctWrites(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1; x = 2;")
+	result := rule_testing.RunTyped(test, NoConstAssign, constAssignFile, "const x = 0; x = 1; x = 2;")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("expected 2 findings, got %d", len(result.Diagnostics))
+		test.Fatalf("expected 2 findings, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-		t.Errorf("both findings point at offset %d; the two writes are at different positions",
+		test.Errorf("both findings point at offset %d; the two writes are at different positions",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -309,11 +309,11 @@ func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
 // This rule declares `NeedsTypeChecker`, and the plain harness hands it a nil checker. The rule
 // returns early in that case, so every StaysSilent fixture would pass vacuously and the whole clean
 // table would stop measuring anything. Asserting the silence directly is what makes that visible.
-func TestNoConstAssignNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoConstAssignNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"))
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"),
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoConstAssign, constAssignFile, "const x = 0; x = 1;"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoConstAssign, constAssignFile, "const x = 0; x = 1;"),
 		"noConstAssign")
 }

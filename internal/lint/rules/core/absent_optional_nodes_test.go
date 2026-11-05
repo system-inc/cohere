@@ -41,8 +41,8 @@ import (
 // A probe that does not reach a line proves nothing about the line, only about the inputs. When a
 // new rule reaches for something optional in a shape not listed, the fix is to add the shape rather
 // than to trust the green.
-func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
-	t.Parallel()
+func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		// Declarations with no initializer, which is where a rule reaching for one finds nil.
@@ -93,13 +93,13 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 
 	for _, currentRule := range rules {
 		for index, source := range sources {
-			t.Run(fmt.Sprintf("%s/shape-%d", currentRule.Name, index), func(t *testing.T) {
-				t.Parallel()
+			test.Run(fmt.Sprintf("%s/shape-%d", currentRule.Name, index), func(test *testing.T) {
+				test.Parallel()
 				// A panic fails the test. The assertion is only that this returns at all, so
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard
 				// fail for reasons that are not crashes.
-				rule_testing.Run(t, currentRule, "shapes.ts", source)
+				rule_testing.Run(test, currentRule, "shapes.ts", source)
 			})
 		}
 	}

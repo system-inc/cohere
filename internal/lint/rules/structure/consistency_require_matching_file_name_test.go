@@ -10,8 +10,8 @@ import (
 // that varied the directory would be testing nothing this rule reads.
 const matchingFileNameDirectory = "/repository/source/components/"
 
-func TestReactComponentRequireMatchingFileNameFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequireMatchingFileNameFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -187,18 +187,18 @@ func TestReactComponentRequireMatchingFileNameFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConsistencyRequireMatchingFileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConsistencyRequireMatchingFileName,
 					matchingFileNameDirectory+testCase.fileName, testCase.sourceText),
 				"requireMatchingFileName")
 		})
 	}
 }
 
-func TestReactComponentRequireMatchingFileNameStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequireMatchingFileNameStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -379,10 +379,10 @@ func TestReactComponentRequireMatchingFileNameStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ConsistencyRequireMatchingFileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ConsistencyRequireMatchingFileName,
 					matchingFileNameDirectory+testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -394,8 +394,8 @@ func TestReactComponentRequireMatchingFileNameStaysSilent(t *testing.T) {
 // Three renderings: a capitalized file name, which is offered as the component's new name too; a
 // lowercase one, which is not, since a lowercase component cannot be rendered as JSX; and a dashed
 // one, which is not, since it cannot be a binding at all.
-func TestReactComponentRequireMatchingFileNameSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequireMatchingFileNameSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	const reasoning = "and the file is not named for it. With one component per file, the file name " +
 		"is how a reader finds a component and the component name is how they know what a file " +
@@ -435,18 +435,18 @@ func TestReactComponentRequireMatchingFileNameSpanAndMessage(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireMatchingFileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireMatchingFileName,
 				matchingFileNameDirectory+testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "requireMatchingFileName")
+			rule_testing.ExpectFindings(test, result, "requireMatchingFileName")
 			diagnostic := result.Diagnostics[0]
 			span := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if span != testCase.wantSpan {
-				t.Errorf("span = %q, want %q", span, testCase.wantSpan)
+				test.Errorf("span = %q, want %q", span, testCase.wantSpan)
 			}
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Errorf("message =\n%s\nwant\n%s", diagnostic.Message.Description, testCase.wantMessage)
+				test.Errorf("message =\n%s\nwant\n%s", diagnostic.Message.Description, testCase.wantMessage)
 			}
 		})
 	}

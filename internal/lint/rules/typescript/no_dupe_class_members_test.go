@@ -23,8 +23,8 @@ func noDupeClassMembersCaseName(index int) string {
 // build, upstream's own corpus for this rule produces BYTE-IDENTICAL output from the wrapper and
 // from the bare core on all twenty-one cases, because it writes no literal computed key anywhere.
 // Everything below the imported cases is measured for that reason.
-func TestNoDupeClassMembersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class A {\n  foo() {}\n  bar() {}\n}\n",
@@ -66,9 +66,9 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 		"abstract class A {\n  abstract foo(): void;\n  abstract foo(): void;\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers,
+		test.Run(noDupeClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDupeClassMembers,
 				noDupeClassMembersFile, sourceText))
 		})
 	}
@@ -86,8 +86,8 @@ type noDupeClassMembersFinding struct {
 
 // TestNoDupeClassMembersFires is upstream's ten reporting cases verbatim, plus measured rows where
 // a computed member sits beside a real duplicate.
-func TestNoDupeClassMembersFires(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -173,23 +173,23 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDupeClassMembers, noDupeClassMembersFile,
+		test.Run(noDupeClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDupeClassMembers, noDupeClassMembersFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range testCase.wantFindings {
 				wantIds[position] = "noDupeClassMembers"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 			}
 		})
@@ -208,8 +208,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 // which is the only shape that can tell a scoped swap from a permanent one. The second row is the
 // control: a class with nothing computed takes the no-swap path, and without it this test would
 // pass against a rule that never swapped at all.
-func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersRestoresTheMemberList(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -228,8 +228,8 @@ func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			observed := 0
 			observer := rule.Rule{
 				Name: "test/no-dupe-class-members-restore",
@@ -246,9 +246,9 @@ func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
 					}
 				},
 			}
-			rule_testing.Run(t, observer, noDupeClassMembersFile, testCase.sourceText)
+			rule_testing.Run(test, observer, noDupeClassMembersFile, testCase.sourceText)
 			if observed != testCase.wantMembers {
-				t.Fatalf("members after the rule ran: expected %d, got %d", testCase.wantMembers,
+				test.Fatalf("members after the rule ran: expected %d, got %d", testCase.wantMembers,
 					observed)
 			}
 		})

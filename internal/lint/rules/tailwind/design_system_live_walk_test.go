@@ -89,8 +89,8 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // The tree is ahra, the corpus the rest of the live suites in this package read. Without it the test
 // skips naming the variable, because what is under test is a property of the rules and not of the
 // machine.
-func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
-	liveWalkRepository := corpus.Ahra.Root(t)
+func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
+	liveWalkRepository := corpus.Ahra.Root(test)
 
 	resetDesignSystemCacheForTest()
 
@@ -99,12 +99,12 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 		CurrentDirectory: liveWalkRepository,
 	})
 	if err != nil {
-		t.Fatalf("building a program over %s: %v", liveWalkRepository, err)
+		test.Fatalf("building a program over %s: %v", liveWalkRepository, err)
 	}
 
 	files := graph.ProjectFiles()
 	if len(files) < 1000 {
-		t.Fatalf("the corpus repository yielded %d project files; this assertion is about a tree "+
+		test.Fatalf("the corpus repository yielded %d project files; this assertion is about a tree "+
 			"large enough to use the worker pool, and a number this small means the program was "+
 			"built over something other than the repository", len(files))
 	}
@@ -112,21 +112,21 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 	// The pool is asserted rather than assumed. A walk that silently ran single-threaded would pass
 	// every count below while proving nothing about the concurrency the cache's mutex exists for.
 	if workers := graph.Workers(); workers < 2 {
-		t.Fatalf("the walk would run with %d worker(s), so this test cannot observe a race between "+
+		test.Fatalf("the walk would run with %d worker(s), so this test cannot observe a race between "+
 			"two builds and the property it claims to prove would be untested", workers)
 	}
 
 	rules := liveWalkRules()
 	before := tailwindengine.BuildsSoFar()
 	if _, err := graph.Walk(context.Background(), files, rules); err != nil {
-		t.Fatalf("walking %s: %v", liveWalkRepository, err)
+		test.Fatalf("walking %s: %v", liveWalkRepository, err)
 	}
 	built := tailwindengine.BuildsSoFar() - before
 
 	if built != 1 {
 		// The counterfactual is stated in the failure rather than left for the reader to compute,
 		// because the whole defect is that the number is invisible until someone multiplies it out.
-		t.Fatalf("the design system was built %d times across %d files by %d rules on %d workers; "+
+		test.Fatalf("the design system was built %d times across %d files by %d rules on %d workers; "+
 			"it must be built exactly once per run. At the measured %v per build on this "+
 			"repository, %d extra builds is roughly %v of pure waste, and nothing else would fail",
 			built, len(files), len(rules), graph.Workers(), liveWalkMeasuredBuildCost,
@@ -141,8 +141,8 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 // test that keeps passing while measuring less, which is the quietest way for a guard to stop
 // guarding. Counting the list against the package's own registrations turns it into a failure that
 // names the missing rule.
-func TestLiveWalkCoversEveryRegisteredTailwindRule(t *testing.T) {
-	t.Parallel()
+func TestLiveWalkCoversEveryRegisteredTailwindRule(test *testing.T) {
+	test.Parallel()
 	covered := make(map[string]bool)
 	for _, subject := range liveWalkRules() {
 		covered[subject.Name] = true
@@ -157,14 +157,14 @@ func TestLiveWalkCoversEveryRegisteredTailwindRule(t *testing.T) {
 	// which is a failure that would read as this test being wrong rather than as the catalog moving.
 	registered := rule.Registered()
 	if len(registered) != len(liveWalkRules()) {
-		t.Fatalf("the catalog holds %d rules and liveWalkRules lists %d; either a Tailwind rule was "+
+		test.Fatalf("the catalog holds %d rules and liveWalkRules lists %d; either a Tailwind rule was "+
 			"added without being added to liveWalkRules, or another package's rules are now linked "+
 			"into this test binary and this comparison is measuring the wrong set",
 			len(registered), len(liveWalkRules()))
 	}
 	for _, registration := range registered {
 		if !covered[registration.Rule.Name] {
-			t.Errorf("rule %q is registered by this package but is not in liveWalkRules, so the "+
+			test.Errorf("rule %q is registered by this package but is not in liveWalkRules, so the "+
 				"build-once assertion never walks it", registration.Rule.Name)
 		}
 	}

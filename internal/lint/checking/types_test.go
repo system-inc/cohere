@@ -15,7 +15,7 @@ var unionTypePartsSink *checker.Type
 //
 // Not parallel: testing.AllocsPerRun reads the process-wide allocation count, so a test running
 // beside it would add its allocations to this one's.
-func TestUnionTypePartsSeqAllocatesNothing(t *testing.T) {
+func TestUnionTypePartsSeqAllocatesNothing(test *testing.T) {
 	plain := new(checker.Type)
 
 	sliced := testing.AllocsPerRun(100, func() {
@@ -24,7 +24,7 @@ func TestUnionTypePartsSeqAllocatesNothing(t *testing.T) {
 		}
 	})
 	if sliced < 1 {
-		t.Fatalf("UnionTypeParts allocated %.0f times per call; the comparison below cannot fail", sliced)
+		test.Fatalf("UnionTypeParts allocated %.0f times per call; the comparison below cannot fail", sliced)
 	}
 
 	iterated := testing.AllocsPerRun(100, func() {
@@ -33,9 +33,9 @@ func TestUnionTypePartsSeqAllocatesNothing(t *testing.T) {
 		}
 	})
 	if iterated != 0 {
-		t.Errorf("a range loop over UnionTypePartsSeq allocated %.0f times per call, want 0", iterated)
+		test.Errorf("a range loop over UnionTypePartsSeq allocated %.0f times per call, want 0", iterated)
 	}
 	if unionTypePartsSink != plain {
-		t.Error("the loop did not yield the type itself")
+		test.Error("the loop did not yield the type itself")
 	}
 }

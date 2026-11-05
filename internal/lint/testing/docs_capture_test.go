@@ -35,27 +35,27 @@ const captureProbeSource = "let a = 1;\n  debugger;\n"
 // TestDocsCaptureHelper is the body of each case TestDocsCaptureRecordsOnlyAssertedCases runs. It runs in
 // a subprocess because capture.Directory reads the environment once per process, so only a process
 // started with COHERE_DOCS_CAPTURE set can show what the hook does with it.
-func TestDocsCaptureHelper(t *testing.T) {
-	t.Parallel()
+func TestDocsCaptureHelper(test *testing.T) {
+	test.Parallel()
 	switch os.Getenv(captureHelperCase) {
 	case "":
-		t.Skip("run by TestDocsCaptureRecordsOnlyAssertedCases")
+		test.Skip("run by TestDocsCaptureRecordsOnlyAssertedCases")
 	case "Findings":
-		ExpectFindings(t, Run(t, captureProbe, "subject.ts", captureProbeSource), "debugger")
+		ExpectFindings(test, Run(test, captureProbe, "subject.ts", captureProbeSource), "debugger")
 	case "Clean":
-		ExpectClean(t, Run(t, captureProbe, "subject.ts", "let a = 1;\n"))
+		ExpectClean(test, Run(test, captureProbe, "subject.ts", "let a = 1;\n"))
 	case "FixedMismatch":
-		ExpectFixedSource(t, Run(t, captureProbe, "subject.ts", captureProbeSource), "not what the fix writes")
+		ExpectFixedSource(test, Run(test, captureProbe, "subject.ts", captureProbeSource), "not what the fix writes")
 	}
 }
 
 // TestDocsCaptureRecordsOnlyAssertedCases: a passing assertion writes one record of what it asserted,
 // a failing one writes nothing, and with capture off no file is created.
-func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
-	t.Parallel()
-	run := func(t *testing.T, helperCase string, captureOn bool) ([]capture.Record, string, error) {
-		t.Helper()
-		directory := t.TempDir()
+func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
+	test.Parallel()
+	run := func(test *testing.T, helperCase string, captureOn bool) ([]capture.Record, string, error) {
+		test.Helper()
+		directory := test.TempDir()
 		command := exec.Command(os.Args[0], "-test.run=^TestDocsCaptureHelper$", "-test.count=1")
 		command.Env = append(os.Environ(), captureHelperCase+"="+helperCase)
 		if captureOn {
@@ -66,82 +66,82 @@ func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
 		output, err := command.CombinedOutput()
 		paths, globError := filepath.Glob(filepath.Join(directory, "*"))
 		if globError != nil {
-			t.Fatal(globError)
+			test.Fatal(globError)
 		}
 		var records []capture.Record
 		for _, path := range paths {
 			file, openError := os.Open(path)
 			if openError != nil {
-				t.Fatal(openError)
+				test.Fatal(openError)
 			}
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
 				var record capture.Record
 				if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
-					t.Fatalf("%s: %v", path, decodeError)
+					test.Fatalf("%s: %v", path, decodeError)
 				}
 				records = append(records, record)
 			}
 			file.Close()
 		}
 		if !captureOn && len(paths) > 0 {
-			t.Errorf("capture off created %v", paths)
+			test.Errorf("capture off created %v", paths)
 		}
 		return records, string(output), err
 	}
 
-	t.Run("a passing ExpectFindings writes one record of the finding", func(t *testing.T) {
-		t.Parallel()
-		records, output, err := run(t, "Findings", true)
+	test.Run("a passing ExpectFindings writes one record of the finding", func(test *testing.T) {
+		test.Parallel()
+		records, output, err := run(test, "Findings", true)
 		if err != nil {
-			t.Fatalf("the helper failed: %v\n%s", err, output)
+			test.Fatalf("the helper failed: %v\n%s", err, output)
 		}
 		if len(records) != 1 {
-			t.Fatalf("%d records, want 1: %+v", len(records), records)
+			test.Fatalf("%d records, want 1: %+v", len(records), records)
 		}
 		record := records[0]
 		if record.Rule != captureProbe.Name || record.File != "subject.ts" || record.Source != captureProbeSource ||
 			record.Outcome != capture.OutcomeFindings {
-			t.Errorf("record %+v", record)
+			test.Errorf("record %+v", record)
 		}
 		// The statement opens line 2 at its third byte, and its range ends after the semicolon, so the end
 		// column is the twelfth: one past the last byte, as a range end is.
 		want := capture.Finding{Line: 2, Column: 3, EndLine: 2, EndColumn: 12, MessageId: "debugger", Message: "A debugger statement.", Fix: true}
 		if len(record.Findings) != 1 || record.Findings[0] != want {
-			t.Errorf("findings %+v, want [%+v]", record.Findings, want)
+			test.Errorf("findings %+v, want [%+v]", record.Findings, want)
 		}
 	})
 
-	t.Run("a passing ExpectClean writes a Clean record", func(t *testing.T) {
-		t.Parallel()
-		records, output, err := run(t, "Clean", true)
+	test.Run("a passing ExpectClean writes a Clean record", func(test *testing.T) {
+		test.Parallel()
+		records, output, err := run(test, "Clean", true)
 		if err != nil {
-			t.Fatalf("the helper failed: %v\n%s", err, output)
+			test.Fatalf("the helper failed: %v\n%s", err, output)
 		}
 		if len(records) != 1 || records[0].Outcome != capture.OutcomeClean || len(records[0].Findings) != 0 {
-			t.Errorf("records %+v", records)
+			test.Errorf("records %+v", records)
 		}
 	})
 
-	t.Run("a failing ExpectFixedSource writes nothing", func(t *testing.T) {
-		t.Parallel()
-		records, output, err := run(t, "FixedMismatch", true)
+	test.Run("a failing ExpectFixedSource writes nothing", func(test *testing.T) {
+		test.Parallel()
+		records, output, err := run(test, "FixedMismatch", true)
 		if err == nil {
-			t.Fatalf("the helper passed, so the mismatch was never asserted:\n%s", output)
+			test.Fatalf("the helper passed, so the mismatch was never asserted:\n%s", output)
 		}
 		if len(records) != 0 {
-			t.Errorf("a failed assertion recorded %+v", records)
+			test.Errorf("a failed assertion recorded %+v", records)
 		}
 	})
 
-	t.Run("with capture off nothing is written", func(t *testing.T) {
-		t.Parallel()
-		records, output, err := run(t, "Findings", false)
+	test.Run("with capture off nothing is written", func(test *testing.T) {
+		test.Parallel()
+		records, output, err := run(test, "Findings", false)
 		if err != nil {
-			t.Fatalf("the helper failed: %v\n%s", err, output)
+			test.Fatalf("the helper failed: %v\n%s", err, output)
 		}
 		if len(records) != 0 {
-			t.Errorf("capture off recorded %+v", records)
+			test.Errorf("capture off recorded %+v", records)
 		}
 	})
 }

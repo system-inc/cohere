@@ -13,20 +13,20 @@ import (
 // The stand-in changes its verdict without changing the land command: failure
 // must stop before ordinary tests and fast-forward, and a later attempt must run
 // it again rather than use the previous result.
-func TestLandRefusesTheRuleCPUBudgetBeforeTests(t *testing.T) {
-	t.Parallel()
-	fixture := newLandFixture(t)
+func TestLandRefusesTheRuleCPUBudgetBeforeTests(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
 	a := fixture.worktree("a")
 	path := filepath.Join(a, ruleCPUCheck)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("stand-in budget check\n"), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	fixture.git(a, "add", "internal")
 	fixture.git(a, "commit", "-q", "-m", "a rule CPU check")
-	bin := t.TempDir()
+	bin := test.TempDir()
 	marker := filepath.Join(bin, "under-budget")
 	log := filepath.Join(bin, "commands")
 	stand := `#!/bin/sh
@@ -45,7 +45,7 @@ esac
 exit 0
 `
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	environment := append(fixture.environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	land := func() (string, error) {
@@ -56,34 +56,34 @@ exit 0
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
 	if output, err := land(); err == nil || !strings.Contains(output, "planted-rule 501ms > 500ms") || strings.Contains(output, "landed ") {
-		t.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
+		test.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
 	}
 	commands, err := os.ReadFile(log)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(commands)), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(lines[1], "-count=1 -timeout=30s -run=^TestRegisteredRuleCPUBudget$ -v ./internal/lint/registry") {
-		t.Fatalf("commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests", lines)
+		test.Fatalf("commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests", lines)
 	}
 	if got := fixture.git(fixture.repository, "rev-parse", "main"); got != before {
-		t.Fatalf("refused land moved main: %s -> %s", before, got)
+		test.Fatalf("refused land moved main: %s -> %s", before, got)
 	}
 	if err := os.WriteFile(marker, nil, 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if output, err := land(); err != nil || !strings.Contains(output, "rule CPU budget passed") || !strings.Contains(output, "landed ") {
-		t.Fatalf("under-budget land did not land (%v):\n%s", err, output)
+		test.Fatalf("under-budget land did not land (%v):\n%s", err, output)
 	}
 }
 
-func TestCohereHasTheRuleCPUCheckTheGateRuns(t *testing.T) {
-	t.Parallel()
+func TestCohereHasTheRuleCPUCheckTheGateRuns(test *testing.T) {
+	test.Parallel()
 	source, err := os.ReadFile(filepath.Join("..", "..", ruleCPUCheck))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	if !strings.Contains(string(source), "func TestRegisteredRuleCPUBudget(t *testing.T)") {
-		t.Fatal("the gate's named test is missing")
+	if !strings.Contains(string(source), "func TestRegisteredRuleCPUBudget(test *testing.T)") {
+		test.Fatal("the gate's named test is missing")
 	}
 }

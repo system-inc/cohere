@@ -22,8 +22,8 @@ const extendNativeFile = "/repository/source/ExtendNative.ts"
 // The message interpolates the builtin's name, so the invalid table names the expected builtin per
 // finding rather than only the message id: `ExpectFindings` cannot see anything the format string
 // does, and one input reports twice with a different name each time.
-func TestNoExtendNativeFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -54,23 +54,23 @@ func TestNoExtendNativeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.builtins) {
-				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.builtins), len(result.Diagnostics))
+				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.builtins), len(result.Diagnostics))
 			}
 			for index, wantBuiltin := range testCase.builtins {
 				diagnostic := result.Diagnostics[index]
 				if diagnostic.Message.Id != "unexpected" {
-					t.Fatalf("finding %d had id %q", index, diagnostic.Message.Id)
+					test.Fatalf("finding %d had id %q", index, diagnostic.Message.Id)
 				}
 				// The interpolated name, which the id assertion cannot see. A rule reusing the
 				// wrong variable in the format slot passes every id fixture in this file.
 				if want := "`" + wantBuiltin + ".prototype`"; !strings.Contains(
 					diagnostic.Message.Description, want) {
-					t.Fatalf("finding %d did not name %s: %q", index, want, diagnostic.Message.Description)
+					test.Fatalf("finding %d did not name %s: %q", index, want, diagnostic.Message.Description)
 				}
 			}
 		})
@@ -84,8 +84,8 @@ func TestNoExtendNativeFires(t *testing.T) {
 // `parseFloat.prototype.x = 1` row is the one that pins the uppercase-first filter on the builtin
 // set: `parseFloat` is a global and its prototype is being extended, and it is clean purely because
 // its name does not start with a capital.
-func TestNoExtendNativeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -113,9 +113,9 @@ func TestNoExtendNativeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
 				extendNativeFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -126,8 +126,8 @@ func TestNoExtendNativeStaysSilent(t *testing.T) {
 // The two shapes point at different nodes and both are measured on eslint 10.8.1: an assignment
 // reports the whole assignment, and a define call reports the whole call. A port reporting the
 // `.prototype` member access instead passes every id fixture in this file.
-func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeReportsTheWholeExtension(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -142,17 +142,17 @@ func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := result.Diagnostics[0].Range
 			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
-				t.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
+				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), onDisk[got.Pos():got.End()],
 					testCase.wantPos, testCase.wantEnd, onDisk[testCase.wantPos:testCase.wantEnd])
 			}
@@ -166,8 +166,8 @@ func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
 // `delete Object.prototype.p` both extend or change a native prototype and both are clean on eslint
 // 10.8.1, because upstream matches an assignment expression and nothing else. Reproduced rather than
 // improved on, and recorded here so the next reader does not helpfully "fix" it.
-func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeDeclinesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -182,9 +182,9 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -195,29 +195,29 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
 //
 // Handing the harness a struct directly would leave the serde tag untested, and the tag is the line
 // most likely to have no upstream counterpart. This decodes the same JSON the config would carry.
-func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeDecodesItsOptions(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoExtendNativeOptions]()
 
 	decoded, err := decode(json.RawMessage(`{"exceptions": ["Object"]}`))
 	if err != nil {
-		t.Fatalf("decoding failed: %v", err)
+		test.Fatalf("decoding failed: %v", err)
 	}
 	settings, ok := decoded.(NoExtendNativeOptions)
 	if !ok {
-		t.Fatalf("decoded to %T", decoded)
+		test.Fatalf("decoded to %T", decoded)
 	}
 	if len(settings.Exceptions) != 1 || settings.Exceptions[0] != "Object" {
-		t.Fatalf("exceptions decoded as %#v", settings.Exceptions)
+		test.Fatalf("exceptions decoded as %#v", settings.Exceptions)
 	}
 
 	// And the decoded value reaches the rule: the same input reports without the exception.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", decoded))
-	if got := len(rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	if got := len(rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", nil).Diagnostics); got != 1 {
-		t.Fatalf("without the exception the same input gave %d diagnostics", got)
+		test.Fatalf("without the exception the same input gave %d diagnostics", got)
 	}
 }
 
@@ -226,10 +226,10 @@ func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
 // This bypasses the decoder entirely, which is the path a bare `"error"` actually takes: the config
 // turns a decode error on empty input into nil, and a type assertion on nil yields the zero value.
 // The zero value being correct here is a coincidence worth pinning rather than relying on.
-func TestNoExtendNativeDefaultsWithoutTheDecoder(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeDefaultsWithoutTheDecoder(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", nil), "unexpected")
 }
 
@@ -237,17 +237,17 @@ func TestNoExtendNativeDefaultsWithoutTheDecoder(t *testing.T) {
 //
 // The rule guards on a nil checker, so under `rule_testing.Run` it goes silent rather than panicking,
 // and every StaysSilent case above would pass vacuously.
-func TestNoExtendNativeNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "Object.prototype.p = 0"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 		source, nil), "unexpected")
 
-	if got := len(rule_testing.RunWithOptions(t, NoExtendNative, extendNativeFile,
+	if got := len(rule_testing.RunWithOptions(test, NoExtendNative, extendNativeFile,
 		source, nil).Diagnostics); got != 0 {
-		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
+		test.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
 	}
 }
@@ -262,8 +262,8 @@ func TestNoExtendNativeNeedsTheTypedHarness(t *testing.T) {
 // Reading is legitimate and common: comparing, adding, or testing a native prototype property does
 // not change the shared object. All five rows are clean on eslint 10.8.1, measured before they were
 // written here.
-func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeDeclinesReadingAPrototypeProperty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -277,9 +277,9 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -297,8 +297,8 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
 // than improved on, and recorded so the next reader does not helpfully widen it.
 //
 // All four measured clean on eslint 10.8.1 before being written here.
-func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -311,9 +311,9 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -329,8 +329,8 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
 // eslint 10.8.1 reports all three rows below. They cover the three positions the rule reads a
 // property name in: the prototype of an assignment target, the prototype inside a define call, and
 // the define method's own name.
-func TestNoExtendNativeReadsATemplateSubscript(t *testing.T) {
-	t.Parallel()
+func TestNoExtendNativeReadsATemplateSubscript(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -343,16 +343,16 @@ func TestNoExtendNativeReadsATemplateSubscript(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			if want := "`" + testCase.builtin + ".prototype`"; !strings.Contains(
 				result.Diagnostics[0].Message.Description, want) {
-				t.Fatalf("did not name %s: %q", want, result.Diagnostics[0].Message.Description)
+				test.Fatalf("did not name %s: %q", want, result.Diagnostics[0].Message.Description)
 			}
 		})
 	}

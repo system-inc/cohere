@@ -35,18 +35,18 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the defaults under test. An empty body is the nil-options case.
-func noUnknownPropertyOptions(t *testing.T, raw string) any {
-	t.Helper()
+func noUnknownPropertyOptions(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoUnknownPropertyOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+		test.Fatalf("decoding %q: %v", raw, err)
 	}
 	return decoded
 }
 
 // TestNoUnknownPropertyFires runs every case this port reports on.
-func TestNoUnknownPropertyFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -140,18 +140,18 @@ func TestNoUnknownPropertyFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := noUnknownPropertyOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := noUnknownPropertyOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoUnknownPropertyStaysSilent runs every case this port declines.
-func TestNoUnknownPropertyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -321,11 +321,11 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := noUnknownPropertyOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := noUnknownPropertyOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -335,8 +335,8 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 // Only the standard-name branch carries a repair, and it replaces the NAME node alone so the value
 // survives. `ExpectFixedSource` replays the fix and compares the whole rewritten file, so a repair
 // with the right text over the wrong span fails here even though its message id is correct.
-func TestNoUnknownPropertyRepairs(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyRepairs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -354,11 +354,11 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, ``))
+			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -369,8 +369,8 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 // Only `unknownPropWithStandardName` knows what to write. A fixer on the other three would be
 // guessing, and a fix is applied unattended. Asserting the ABSENCE of a repair is something no
 // message-id fixture can see.
-func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -383,14 +383,14 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-				t.Fatalf("a repair was offered for a name the rule cannot spell: %v", fixes)
+				test.Fatalf("a repair was offered for a name the rule cannot spell: %v", fixes)
 			}
 		})
 	}
@@ -401,8 +401,8 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 // Three of the four messages interpolate, so an id assertion cannot see what the format string
 // computed, and the tag-restricted one joins a whole list into its text. Asserted against literals
 // typed here rather than against the rule's own constants, which would move under mutation.
-func TestNoUnknownPropertyMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -434,14 +434,14 @@ func TestNoUnknownPropertyMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("message is %q, want %q", got, testCase.want)
+				test.Fatalf("message is %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -453,8 +453,8 @@ func TestNoUnknownPropertyMessageText(t *testing.T) {
 // value together rather than either alone. The repair, by contrast, replaces only the NAME node,
 // and that asymmetry is exactly the shape the brief warns about: a fix that lands correctly while
 // the finding points elsewhere shows the reader a line they were never told about.
-func TestNoUnknownPropertyAnchor(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyAnchor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -467,16 +467,16 @@ func TestNoUnknownPropertyAnchor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, ``))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			fixture := strings.TrimSpace(testCase.sourceText) + "\n"
 			span := result.Diagnostics[0].Range
 			if got := fixture[span.Pos():span.End()]; got != testCase.want {
-				t.Fatalf("finding spans %q, want %q", got, testCase.want)
+				test.Fatalf("finding spans %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -487,23 +487,23 @@ func TestNoUnknownPropertyAnchor(t *testing.T) {
 // Upstream tests the ignore list before normalising case, so an entry has to be written the way the
 // attribute is written. Naming the canonical spelling does NOT exempt the DOM one, which is the
 // half a single-row fixture would miss.
-func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyIgnoreOption(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the written spelling exempts", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["class"]}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("the written spelling exempts", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["class"]}`))
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("the canonical spelling does not exempt the written one", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["className"]}`))
-		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+	test.Run("the canonical spelling does not exempt the written one", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["className"]}`))
+		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
-	t.Run("an unrelated entry exempts nothing", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["other"]}`))
-		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+	test.Run("an unrelated entry exempts nothing", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["other"]}`))
+		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
 }
 
@@ -511,28 +511,28 @@ func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
 //
 // The default is false, and the default matters: with it off an uppercase data attribute is
 // accepted silently, which is the opposite verdict from every other unknown name.
-func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyRequireDataLowercase(test *testing.T) {
+	test.Parallel()
 
-	t.Run("off by default", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, ``))
-		rule_testing.ExpectClean(t, result)
+	test.Run("off by default", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, ``))
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("explicitly false", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":false}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("explicitly false", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":false}`))
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("on reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
-		rule_testing.ExpectFindings(t, result, "dataLowercaseRequired")
+	test.Run("on reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`))
+		rule_testing.ExpectFindings(test, result, "dataLowercaseRequired")
 	})
-	t.Run("on leaves a lowercase data attribute alone", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("on leaves a lowercase data attribute alone", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`))
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -543,8 +543,8 @@ func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
 //
 // `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see.
-func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = `<div class="x" />`
 
@@ -553,48 +553,48 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/NoUnknownProperty.jsx",
 		"/repository/source/NoUnknownProperty.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, fileName, source, noUnknownPropertyOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnknownProperty, fileName, source, noUnknownPropertyOptions(test, ``))
+			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 		})
 	}
 }
 
 // TestDecodeNoUnknownPropertyOptions covers both options and the nil-options path.
-func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body carries upstream's defaults", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty body carries upstream's defaults", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoUnknownPropertyOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding an empty body: %v", err)
+			test.Fatalf("decoding an empty body: %v", err)
 		}
 		options, ok := decoded.(NoUnknownPropertyOptions)
 		if !ok {
-			t.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
 		}
 		if len(options.Ignore) != 0 {
-			t.Fatalf("ignore list is %v, want empty", options.Ignore)
+			test.Fatalf("ignore list is %v, want empty", options.Ignore)
 		}
 		if options.RequireDataLowercase {
-			t.Fatal("requireDataLowercase defaulted to true, want false")
+			test.Fatal("requireDataLowercase defaulted to true, want false")
 		}
 	})
 
-	t.Run("both keys decode", func(t *testing.T) {
-		t.Parallel()
+	test.Run("both keys decode", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
 		if err != nil {
-			t.Fatalf("decoding both keys: %v", err)
+			test.Fatalf("decoding both keys: %v", err)
 		}
 		options := decoded.(NoUnknownPropertyOptions)
 		if strings.Join(options.Ignore, ",") != "a,b" {
-			t.Fatalf("ignore list is %v", options.Ignore)
+			test.Fatalf("ignore list is %v", options.Ignore)
 		}
 		if !options.RequireDataLowercase {
-			t.Fatal("requireDataLowercase is false, want true")
+			test.Fatal("requireDataLowercase is false, want true")
 		}
 	})
 }
@@ -604,8 +604,8 @@ func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
 // The tables ARE the rule, so a generator that emitted half of one would leave most fixtures
 // passing while the rule quietly stopped knowing names. These counts were taken from the installed
 // module's own constants at extraction time.
-func TestNoUnknownPropertyTables(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyTables(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -626,18 +626,18 @@ func TestNoUnknownPropertyTables(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if testCase.got != testCase.want {
-			t.Errorf("%s holds %d entries, want %d", testCase.name, testCase.got, testCase.want)
+			test.Errorf("%s holds %d entries, want %d", testCase.name, testCase.got, testCase.want)
 		}
 	}
 
 	// Spot-check the entries whose CASING is the rule, in both directions.
 	if noUnknownPropertySvgDomAttributeNames["stroke-width"] != "strokeWidth" {
-		t.Error("the svg map lost its stroke-width entry")
+		test.Error("the svg map lost its stroke-width entry")
 	}
 	if noUnknownPropertyDomAttributeNames["class"] != "className" {
-		t.Error("the dom map lost its class entry")
+		test.Error("the dom map lost its class entry")
 	}
 	if _, present := noUnknownPropertySvgDomAttributeNames["strokeWidth"]; present {
-		t.Error("the svg map keys on the canonical spelling, which would invert the rule")
+		test.Error("the svg map keys on the canonical spelling, which would invert the rule")
 	}
 }

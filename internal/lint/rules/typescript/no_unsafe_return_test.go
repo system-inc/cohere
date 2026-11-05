@@ -27,8 +27,8 @@ func noUnsafeReturnCaseName(index int) string {
 // awaited return is `unknown`, because `unknown` forces the caller to narrow. An explicit `any`
 // return annotation is a decision the author made and is respected. And a `Promise<any>` returned
 // from a synchronous function is not this rule's finding.
-func TestNoUnsafeReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function foo() {\n  return;\n}\n",
@@ -83,9 +83,9 @@ func TestNoUnsafeReturnStaysSilent(t *testing.T) {
 		"const foo: (() => Set<string>) | null = () => new Set<any>();\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnsafeReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeReturn,
+		test.Run(noUnsafeReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeReturn,
 				noUnsafeReturnFile, sourceText))
 		})
 	}
@@ -111,8 +111,8 @@ type noUnsafeReturnFinding struct {
 // thirty-second is the `return this` case, which reports twice either way while its id moves from
 // `unsafeReturnThis` to `unsafeReturn`; it is pinned at ours and the other is recorded in the rule's
 // doc comment so the branch is not read as unported.
-func TestNoUnsafeReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -455,16 +455,16 @@ func TestNoUnsafeReturnFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeReturnCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeReturn, noUnsafeReturnFile,
+		test.Run(noUnsafeReturnCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeReturn, noUnsafeReturnFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above. The captured spans came from a file written the
@@ -475,14 +475,14 @@ func TestNoUnsafeReturnFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}

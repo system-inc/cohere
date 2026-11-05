@@ -35,10 +35,10 @@ import (
 
 // forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml/dist/compose/composer.js.
-func forkRoot(t *testing.T) string {
-	t.Helper()
-	corpus.Resolve(t, "prettier-fork:node_modules/yaml/dist/compose/composer.js")
-	return corpus.PrettierFork.Root(t)
+func forkRoot(test *testing.T) string {
+	test.Helper()
+	corpus.Resolve(test, "prettier-fork:node_modules/yaml/dist/compose/composer.js")
+	return corpus.PrettierFork.Root(test)
 }
 
 const oracleScript = `
@@ -147,15 +147,15 @@ process.stdout.write(JSON.stringify(inputs.map(run)));
 `
 
 // upstreamOutputs runs the oracle over texts, one Node process per batch of a few megabytes.
-func upstreamOutputs(t *testing.T, texts []string) []string {
-	t.Helper()
+func upstreamOutputs(test *testing.T, texts []string) []string {
+	test.Helper()
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the composer oracle needs it")
+		test.Skip("node is not installed; the composer oracle needs it")
 	}
-	root := forkRoot(t)
-	script := filepath.Join(t.TempDir(), "oracle.mjs")
+	root := forkRoot(test)
+	script := filepath.Join(test.TempDir(), "oracle.mjs")
 	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var outputs []string
 	for start := 0; start < len(texts); {
@@ -164,17 +164,17 @@ func upstreamOutputs(t *testing.T, texts []string) []string {
 			size += len(texts[end])
 			end++
 		}
-		outputs = append(outputs, runOracle(t, script, texts[start:end])...)
+		outputs = append(outputs, runOracle(test, script, texts[start:end])...)
 		start = end
 	}
 	return outputs
 }
 
-func runOracle(t *testing.T, script string, texts []string) []string {
-	t.Helper()
+func runOracle(test *testing.T, script string, texts []string) []string {
+	test.Helper()
 	encoded, err := json.Marshal(texts)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -183,16 +183,16 @@ func runOracle(t *testing.T, script string, texts []string) []string {
 	output, err := command.Output()
 	if err != nil {
 		if exitError, isExit := err.(*exec.ExitError); isExit {
-			t.Fatalf("the composer oracle failed: %v\n%s", err, exitError.Stderr)
+			test.Fatalf("the composer oracle failed: %v\n%s", err, exitError.Stderr)
 		}
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var outputs []string
 	if err := json.Unmarshal(output, &outputs); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(outputs) != len(texts) {
-		t.Fatalf("the composer oracle returned %d outputs for %d inputs", len(outputs), len(texts))
+		test.Fatalf("the composer oracle returned %d outputs for %d inputs", len(outputs), len(texts))
 	}
 	return outputs
 }
@@ -504,16 +504,16 @@ func (writer *jsonWriter) document(document *Document) {
 }
 
 // compareOutputs reports each input whose port output differs from upstream's, up to limit of them.
-func compareOutputs(t *testing.T, label string, texts []string, limit int) (failures int) {
-	t.Helper()
-	expected := upstreamOutputs(t, texts)
+func compareOutputs(test *testing.T, label string, texts []string, limit int) (failures int) {
+	test.Helper()
+	expected := upstreamOutputs(test, texts)
 	threw, withErrors, withWarnings := 0, 0, 0
 	for index, text := range texts {
 		actual := portOutput(text)
 		if actual != expected[index] {
 			failures++
 			if failures <= limit {
-				t.Errorf("%s %q: %s", label, truncateInput(text), firstDifference(expected[index], actual))
+				test.Errorf("%s %q: %s", label, truncateInput(text), firstDifference(expected[index], actual))
 			}
 		}
 		switch {
@@ -526,7 +526,7 @@ func compareOutputs(t *testing.T, label string, texts []string, limit int) (fail
 			withWarnings++
 		}
 	}
-	t.Logf("%s: of %d inputs, upstream threw on %d, reported errors on %d and warnings on %d",
+	test.Logf("%s: of %d inputs, upstream threw on %d, reported errors on %d and warnings on %d",
 		label, len(texts), threw, withErrors, withWarnings)
 	return failures
 }
@@ -554,78 +554,78 @@ func normalize(text string) string {
 }
 
 // TestDocumentsMatchUpstream runs every fixture through both sides.
-func TestDocumentsMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestDocumentsMatchUpstream(test *testing.T) {
+	test.Parallel()
 	texts := make([]string, 0, len(fixtures))
 	for _, fixture := range fixtures {
 		texts = append(texts, normalize(fixture))
 	}
-	failures := compareOutputs(t, "fixture", texts, 60)
-	t.Logf("%d of %d fixtures match upstream", len(texts)-failures, len(texts))
+	failures := compareOutputs(test, "fixture", texts, 60)
+	test.Logf("%d of %d fixtures match upstream", len(texts)-failures, len(texts))
 }
 
 // TestGeneratedDocumentsMatchUpstream compares inputs drawn from YAML's indicators, properties, scalar
 // styles, spaces, tabs and line breaks, where the hand-written fixtures cannot reach every combination.
-func TestGeneratedDocumentsMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestGeneratedDocumentsMatchUpstream(test *testing.T) {
+	test.Parallel()
 	count := 30000
 	if testing.Short() {
 		count = 3000
 	}
-	failures := compareOutputs(t, "generated", generatedInputs(count), 40)
-	t.Logf("%d of %d generated inputs match upstream", count-failures, count)
+	failures := compareOutputs(test, "generated", generatedInputs(count), 40)
+	test.Logf("%d of %d generated inputs match upstream", count-failures, count)
 }
 
 // TestOracleCanFail proves the comparison sees a difference: documents composed from one input compared
 // against upstream's for another must differ.
-func TestOracleCanFail(t *testing.T) {
-	t.Parallel()
-	expected := upstreamOutputs(t, []string{"a: b", "a: 1", "[a]"})
+func TestOracleCanFail(test *testing.T) {
+	test.Parallel()
+	expected := upstreamOutputs(test, []string{"a: b", "a: 1", "[a]"})
 	if portOutput("a:  b") == expected[0] {
-		t.Fatal("the comparison found no difference between a: b and a:  b")
+		test.Fatal("the comparison found no difference between a: b and a:  b")
 	}
 	if portOutput("a: 1.0") == expected[1] {
-		t.Fatal("the comparison found no difference between the values of a: 1 and a: 1.0")
+		test.Fatal("the comparison found no difference between the values of a: 1 and a: 1.0")
 	}
 	if portOutput("[a ]") == expected[2] {
-		t.Fatal("the comparison found no difference between [a] and [a ]")
+		test.Fatal("the comparison found no difference between [a] and [a ]")
 	}
 }
 
 // TestYamlTestSuiteMatchesUpstream compares every case of the yaml-test-suite package in the fork.
-func TestYamlTestSuiteMatchesUpstream(t *testing.T) {
-	t.Parallel()
-	root := forkRoot(t)
+func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
+	test.Parallel()
+	root := forkRoot(test)
 	suite := filepath.Join(root, "node_modules", "yaml-test-suite", "index.js")
 	if _, err := os.Stat(suite); err != nil {
-		t.Skip("the fork has no yaml-test-suite package")
+		test.Skip("the fork has no yaml-test-suite package")
 	}
-	script := filepath.Join(t.TempDir(), "suite.mjs")
+	script := filepath.Join(test.TempDir(), "suite.mjs")
 	source := `import suite from "SUITE";
 const inputs = [];
 for (const test of suite) for (const testCase of test.cases) if (typeof testCase.yaml === "string") inputs.push(testCase.yaml);
 process.stdout.write(JSON.stringify(inputs));`
 	if err := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	output, err := exec.Command("node", script).Output()
 	if err != nil {
-		t.Fatalf("listing the yaml-test-suite failed: %v", err)
+		test.Fatalf("listing the yaml-test-suite failed: %v", err)
 	}
 	var texts []string
 	if err := json.Unmarshal(output, &texts); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	failures := compareOutputs(t, "suite", texts, 40)
-	t.Logf("%d of %d yaml-test-suite cases match upstream", len(texts)-failures, len(texts))
+	failures := compareOutputs(test, "suite", texts, 40)
+	test.Logf("%d of %d yaml-test-suite cases match upstream", len(texts)-failures, len(texts))
 }
 
 // TestCorpusMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, a measuring run.
-func TestCorpusMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestCorpusMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	root := os.Getenv("COHERE_YAML_CORPUS")
 	if root == "" {
-		t.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
+		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
 	}
 	var paths, texts []string
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -647,9 +647,9 @@ func TestCorpusMatchesUpstream(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	expected := upstreamOutputs(t, texts)
+	expected := upstreamOutputs(test, texts)
 	failures, withErrors := 0, 0
 	for index, text := range texts {
 		if strings.Contains(expected[index], `"name":"YAMLParseError"`) {
@@ -658,9 +658,9 @@ func TestCorpusMatchesUpstream(t *testing.T) {
 		if actual := portOutput(text); actual != expected[index] {
 			failures++
 			if failures <= 40 {
-				t.Errorf("%s: %s", paths[index], firstDifference(expected[index], actual))
+				test.Errorf("%s: %s", paths[index], firstDifference(expected[index], actual))
 			}
 		}
 	}
-	t.Logf("%d of %d files match upstream's documents (%d of them with errors)", len(texts)-failures, len(texts), withErrors)
+	test.Logf("%d of %d files match upstream's documents (%d of them with errors)", len(texts)-failures, len(texts), withErrors)
 }

@@ -46,8 +46,8 @@ func asTheTypedHarnessWroteIt(text string) string {
 // case 2 starts from a union containing `any`, and cases 6 and 7 assert to NonNullable<T>, which
 // removes nullish from a type ALIAS rather than from the expression, so the assertion is doing real
 // work a `!` would not do.
-func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\ndeclare const original: number | string;\nconst cast = original as string;\n    ",
@@ -63,9 +63,9 @@ func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.
 		"\ndeclare function foo<T = any>(): T;\nconst bar = foo() as number;\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(nonNullableTypeAssertionStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+		test.Run(nonNullableTypeAssertionStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, sourceText))
 		})
 	}
@@ -82,8 +82,8 @@ func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.
 // The spans come from replaying each case through the installed build one file per program, because
 // upstream records only a start column on this rule and a start column cannot see a finding anchored
 // on the wrong node that happens to begin in the right place.
-func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -137,21 +137,21 @@ func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(nonNullableTypeAssertionStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+		test.Run(nonNullableTypeAssertionStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferNonNullAssertion")
+			rule_testing.ExpectFindings(test, result, "preferNonNullAssertion")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0]
 			written := asTheTypedHarnessWroteIt(testCase.sourceText)
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Errorf("the finding points at %q, wanted %q", gotSpan, testCase.wantSpan)
+				test.Errorf("the finding points at %q, wanted %q", gotSpan, testCase.wantSpan)
 			}
-			rule_testing.ExpectFixedSource(t, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
+			rule_testing.ExpectFixedSource(test, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
 		})
 	}
 }
@@ -165,8 +165,8 @@ func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
 // upstream's corpus writes parentheses in only two of its nine failing rows and never writes a bare
 // call, a bare await, or a redundant parenthesis, so the wrapping decision is almost entirely
 // untested by the imported cases.
-func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -254,27 +254,27 @@ func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *tes
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "preferNonNullAssertion")
+			rule_testing.ExpectFindings(test, result, "preferNonNullAssertion")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d, on the case that covers: %s",
+				test.Fatalf("wanted one finding, got %d, on the case that covers: %s",
 					len(result.Diagnostics), testCase.why)
 			}
 			reported := result.Diagnostics[0]
 			written := asTheTypedHarnessWroteIt(testCase.sourceText)
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Errorf("the finding points at %q, wanted %q (%s)",
+				test.Errorf("the finding points at %q, wanted %q (%s)",
 					gotSpan, testCase.wantSpan, testCase.why)
 			}
-			rule_testing.ExpectFixedSource(t, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
+			rule_testing.ExpectFixedSource(test, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
 		})
 	}
 }
@@ -286,22 +286,22 @@ func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *tes
 // here goes through ExpectFindings, which compares ids and count and nothing else. The wanted string
 // is typed as a literal rather than read from the rule's own constant, because a comparison against
 // the constant moves with any mutation of it.
-func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+	result := rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 		nonNullableTypeAssertionStyleFile,
 		"declare const maybe: string | undefined;\nconst bar = maybe as string;\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := result.Diagnostics[0]
 	if reported.Message.Id != "preferNonNullAssertion" {
-		t.Errorf("reported id %q, wanted %q", reported.Message.Id, "preferNonNullAssertion")
+		test.Errorf("reported id %q, wanted %q", reported.Message.Id, "preferNonNullAssertion")
 	}
 	const wantMessage = "Use a ! assertion to more succinctly remove null and undefined from the type."
 	if reported.Message.Description != wantMessage {
-		t.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
+		test.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
 	}
 }
 
@@ -312,13 +312,13 @@ func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(t *testing.T) 
 // vacuous green is the more dangerous of the two failures because nothing announces it, so this
 // asserts the untyped harness produces no finding on an input the typed one reports, which makes a
 // later revert to rule_testing.Run fail loudly rather than quietly.
-func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const maybe: string | undefined;\nconst bar = maybe as string;\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NonNullableTypeAssertionStyle,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NonNullableTypeAssertionStyle,
 		nonNullableTypeAssertionStyleFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 		nonNullableTypeAssertionStyleFile, sourceText), "preferNonNullAssertion")
 }
 
@@ -332,8 +332,8 @@ func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(t *testing.T) {
 //
 // Every verdict and every repair was measured against the installed 8.x build on that exact source in
 // its own program, with a reporting control in the same run.
-func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -400,27 +400,27 @@ func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testin
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "preferNonNullAssertion")
+			rule_testing.ExpectFindings(test, result, "preferNonNullAssertion")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d, on the case that covers: %s",
+				test.Fatalf("wanted one finding, got %d, on the case that covers: %s",
 					len(result.Diagnostics), testCase.why)
 			}
 			reported := result.Diagnostics[0]
 			written := asTheTypedHarnessWroteIt(testCase.sourceText)
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Errorf("the finding points at %q, wanted %q (%s)",
+				test.Errorf("the finding points at %q, wanted %q (%s)",
 					gotSpan, testCase.wantSpan, testCase.why)
 			}
-			rule_testing.ExpectFixedSource(t, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
+			rule_testing.ExpectFixedSource(test, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
 		})
 	}
 }
@@ -444,8 +444,8 @@ func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testin
 // `x as T` into `x!` where T is constrained to `string | undefined`, widening the type unattended,
 // because meta.fixable is code. Measured against the installed 8.x build with controls in the same
 // runs.
-func TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions(t *testing.T) {
-	t.Parallel()
+func TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -540,27 +540,27 @@ func TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions(t *testin
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "preferNonNullAssertion")
+			rule_testing.ExpectFindings(test, result, "preferNonNullAssertion")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d, on the case that covers: %s",
+				test.Fatalf("wanted one finding, got %d, on the case that covers: %s",
 					len(result.Diagnostics), testCase.why)
 			}
 			reported := result.Diagnostics[0]
 			written := asTheTypedHarnessWroteIt(testCase.sourceText)
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Errorf("the finding points at %q, wanted %q (%s)",
+				test.Errorf("the finding points at %q, wanted %q (%s)",
 					gotSpan, testCase.wantSpan, testCase.why)
 			}
-			rule_testing.ExpectFixedSource(t, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
+			rule_testing.ExpectFixedSource(test, result, asTheTypedHarnessWroteIt(testCase.wantFixed))
 		})
 	}
 }

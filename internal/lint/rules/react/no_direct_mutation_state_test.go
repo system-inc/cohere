@@ -39,8 +39,8 @@ const directMutationStateFile = "/repository/source/DirectMutationState.tsx"
 // difference is the rule's own: an assignment reports its left-hand side alone, while an update
 // expression reports the whole expression including the operator. `this.state.foo` against
 // `this.state.foo++` is that difference, and no message-id assertion can see it.
-func TestNoDirectMutationStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoDirectMutationStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -183,15 +183,15 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDirectMutationState, directMutationStateFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noDirectMutationState"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
 				if index >= len(result.Diagnostics) {
@@ -199,7 +199,7 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 				}
 				diagnostic := result.Diagnostics[index]
 				if got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; got != wantSpan {
-					t.Errorf("finding %d reported %q, want %q", index, got, wantSpan)
+					test.Errorf("finding %d reported %q, want %q", index, got, wantSpan)
 				}
 			}
 		})
@@ -215,8 +215,8 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 // exemption; a nested class inside a constructor, which is the `Class` break in the ancestor walk;
 // and a component constructor inside a `describe` callback, which is the exemption surviving two
 // intervening call expressions that are outside the class rather than inside the constructor.
-func TestNoDirectMutationStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDirectMutationStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -290,10 +290,10 @@ func TestNoDirectMutationStateStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoDirectMutationState, directMutationStateFile, testCase.sourceText))
 		})
 	}
 }
@@ -306,8 +306,8 @@ func TestNoDirectMutationStateStaysSilent(t *testing.T) {
 // so the expectation is a measurement rather than a reading of the Rust. That mattered: three of
 // these fall the opposite way from what the rule's name predicts, and two of them are parenthesis
 // forms no fixture in either corpus writes.
-func TestNoDirectMutationStateMeasuredAgainstTheReleaseBinary(t *testing.T) {
-	t.Parallel()
+func TestNoDirectMutationStateMeasuredAgainstTheReleaseBinary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -484,19 +484,19 @@ class Outer extends React.Component {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDirectMutationState, directMutationStateFile, testCase.source)
 
 			if len(testCase.wantSpans) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noDirectMutationState"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
 				if index >= len(result.Diagnostics) {
@@ -504,7 +504,7 @@ class Outer extends React.Component {
 				}
 				diagnostic := result.Diagnostics[index]
 				if got := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != wantSpan {
-					t.Errorf("finding %d reported %q, want %q", index, got, wantSpan)
+					test.Errorf("finding %d reported %q, want %q", index, got, wantSpan)
 				}
 			}
 		})
@@ -520,20 +520,20 @@ class Outer extends React.Component {
 //
 // The `.tsx` control below is kept: it is what makes this a measurement of the suffix rather than
 // of the rule going silent for some other reason.
-func TestNoDirectMutationStateReportsInNonJsxFiles(t *testing.T) {
-	t.Parallel()
+func TestNoDirectMutationStateReportsInNonJsxFiles(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 class A extends React.Component {
   m() { this.state.x = 1; }
 }`
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoDirectMutationState, "/repository/source/Plain.ts", source),
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoDirectMutationState, "/repository/source/Plain.ts", source),
 		"noDirectMutationState")
 
 	// The control: the identical source in a JSX file also reports, so both suffixes agree.
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, source), "noDirectMutationState")
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoDirectMutationState, directMutationStateFile, source), "noDirectMutationState")
 }
 
 // TestNoDirectMutationStateMessage asserts the rendered message exactly.
@@ -541,20 +541,20 @@ class A extends React.Component {
 // Equality rather than `strings.Contains`, because a predicate weaker than the property it guards
 // is not a guard: a description carrying a doubled word or a stray interpolation would satisfy a
 // substring check while being wrong on screen.
-func TestNoDirectMutationStateMessage(t *testing.T) {
-	t.Parallel()
+func TestNoDirectMutationStateMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, `
+	result := rule_testing.Run(test, NoDirectMutationState, directMutationStateFile, `
 class A extends React.Component {
   m() { this.state.x = 1; }
 }`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noDirectMutationState" {
-		t.Fatalf("message id = %q, want %q", got, "noDirectMutationState")
+		test.Fatalf("message id = %q, want %q", got, "noDirectMutationState")
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoDirectMutationState.Description {
-		t.Fatalf("message description = %q, want %q", got, messageNoDirectMutationState.Description)
+		test.Fatalf("message description = %q, want %q", got, messageNoDirectMutationState.Description)
 	}
 }

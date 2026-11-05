@@ -20,8 +20,8 @@ const scriptUrlFile = "/repository/source/ScriptUrl.ts"
 // after it are longer than usual. Four failing cases cannot distinguish a direct-parent tagged
 // template check from a walk up the ancestors, and cannot see the case fold at all beyond one
 // capital letter.
-func TestNoScriptUrlFires(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"var a = 'javascript:void(0);';",
@@ -31,10 +31,10 @@ func TestNoScriptUrlFires(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText), "unexpectedScriptURL")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoScriptUrl, scriptUrlFile, sourceText), "unexpectedScriptURL")
 		})
 	}
 }
@@ -45,8 +45,8 @@ func TestNoScriptUrlFires(t *testing.T) {
 // start. A template written `${foo}javascript:` carries an expression, so its value is not
 // statically knowable, and it is a different node kind here rather than a helper returning null.
 // A template written foo`javaScript:` is tagged, so the tag decides what the text means.
-func TestNoScriptUrlStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"var a = 'Hello World!';",
@@ -58,9 +58,9 @@ func TestNoScriptUrlStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoScriptUrl, scriptUrlFile, sourceText))
 		})
 	}
 }
@@ -82,8 +82,8 @@ func TestNoScriptUrlStaysSilent(t *testing.T) {
 //
 // The `String.raw` case is the same shape with a member-expression tag, confirming the check is on
 // the parent's kind rather than on the tag being a plain identifier.
-func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -99,13 +99,13 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
+				rule_testing.ExpectFindings(test, result, "unexpectedScriptURL")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -125,8 +125,8 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
 // `toLowerCase` disagree. Measured against the installed build, the long s spelling is clean and
 // the plain one beside it reports. Writing this rule with `EqualFold` would ship a false positive
 // that no imported fixture could see.
-func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -147,13 +147,13 @@ func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
+				rule_testing.ExpectFindings(test, result, "unexpectedScriptURL")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -165,8 +165,8 @@ func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
 // `typeof value === "string"` test rather than by anything about regular expressions. Measured:
 // `/javascript:/` is clean on the installed build. Here that falls out of the listener map, and
 // this is what pins that the translation did not widen it.
-func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlDeclinesOtherLiteralKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -179,9 +179,9 @@ func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoScriptUrl, scriptUrlFile, testCase.sourceText))
 		})
 	}
 }
@@ -194,8 +194,8 @@ func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
 // measured against the installed build, `var a = 'javascript:void(0);';` reports columns 9 through
 // 30, which is the string including both quotes. The parenthesized template case pins that the
 // span is the template rather than the parentheses; measured.
-func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlReportsTheWholeLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -209,15 +209,15 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -229,17 +229,17 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 //
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
-func TestNoScriptUrlMessage(t *testing.T) {
-	t.Parallel()
+func TestNoScriptUrlMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, "var a = 'javascript:void(0);';")
+	result := rule_testing.Run(test, NoScriptUrl, scriptUrlFile, "var a = 'javascript:void(0);';")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "unexpectedScriptURL" {
-		t.Errorf("message id = %q, want %q", got, "unexpectedScriptURL")
+		test.Errorf("message id = %q, want %q", got, "unexpectedScriptURL")
 	}
 	if result.Diagnostics[0].Message.Description == "" {
-		t.Error("the message carries no description, so the finding says nothing about why")
+		test.Error("the message carries no description, so the finding says nothing about why")
 	}
 }

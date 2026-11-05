@@ -10,29 +10,29 @@ import (
 // trailing comment per file and gained one elsewhere would hold any count stable, and a rule that
 // stops receiving a comment reports nothing for it while every fixture still passes. The comparison
 // has to be of the thing itself.
-func TestCommentGuardFindsTheSameComments(t *testing.T) {
-	t.Parallel()
-	files := realSourceFiles(t, 1200)
+func TestCommentGuardFindsTheSameComments(test *testing.T) {
+	test.Parallel()
+	files := realSourceFiles(test, 1200)
 
 	for _, file := range files {
 		guarded := All(file.sourceFile)
 		reference := AllWithoutGuard(file.sourceFile)
 
 		if len(guarded) != len(reference) {
-			t.Fatalf("%s: guard found %d comments, ungated scan found %d",
+			test.Fatalf("%s: guard found %d comments, ungated scan found %d",
 				file.name, len(guarded), len(reference))
 		}
 		for index := range guarded {
 			if guarded[index].Range != reference[index].Range {
-				t.Fatalf("%s: comment %d differs, guard %v against ungated %v",
+				test.Fatalf("%s: comment %d differs, guard %v against ungated %v",
 					file.name, index, guarded[index].Range, reference[index].Range)
 			}
 			if guarded[index].Text != reference[index].Text {
-				t.Fatalf("%s: comment %d text differs", file.name, index)
+				test.Fatalf("%s: comment %d text differs", file.name, index)
 			}
 		}
 	}
-	t.Logf("guard preserves every comment range across %d real files", len(files))
+	test.Logf("guard preserves every comment range across %d real files", len(files))
 }
 
 // The cases a corpus cannot be relied on to contain.
@@ -40,8 +40,8 @@ func TestCommentGuardFindsTheSameComments(t *testing.T) {
 // A differential test over 800 files recently passed a gate that would have broken `s\tc`, because
 // no file happened to hold the multi-space form. Absence from a corpus is not absence in general, so
 // the separators and the near-miss shapes are written out by hand as well as measured.
-func TestCommentGuardHandlesEverySeparator(t *testing.T) {
-	t.Parallel()
+func TestCommentGuardHandlesEverySeparator(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -73,22 +73,22 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 		{"a string containing two slashes", "const a = 'http://example.com';\n", 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			sourceFile := parseSourceForTest(t, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile := parseSourceForTest(test, testCase.sourceText)
 
 			guarded := All(sourceFile)
 			reference := AllWithoutGuard(sourceFile)
 
 			if len(guarded) != testCase.wantCount {
-				t.Fatalf("expected %d comments, guard found %d", testCase.wantCount, len(guarded))
+				test.Fatalf("expected %d comments, guard found %d", testCase.wantCount, len(guarded))
 			}
 			if len(guarded) != len(reference) {
-				t.Fatalf("guard found %d, ungated scan found %d", len(guarded), len(reference))
+				test.Fatalf("guard found %d, ungated scan found %d", len(guarded), len(reference))
 			}
 			for index := range guarded {
 				if guarded[index].Range != reference[index].Range {
-					t.Fatalf("comment %d differs from the ungated scan", index)
+					test.Fatalf("comment %d differs from the ungated scan", index)
 				}
 			}
 		})
@@ -97,16 +97,16 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 
 // A guard that never skips is pure overhead, and a guard that skips everything is a bug that the
 // differential test alone would not catch on a corpus with few comments.
-func TestCommentGuardActuallySkips(t *testing.T) {
-	t.Parallel()
+func TestCommentGuardActuallySkips(test *testing.T) {
+	test.Parallel()
 	// A run of whitespace with no slash cannot begin a comment.
 	if canBeginAt("const a = 1;    const b = 2;", 12) {
-		t.Fatalf("guard admits a position with no slash after it")
+		test.Fatalf("guard admits a position with no slash after it")
 	}
 	// A slash after whitespace must be admitted, whatever the whitespace is.
 	for _, text := range []string{"a; // c", "a;\t// c", "a;\n// c", "a;\r\n// c", "a;// c", "a;/* c */"} {
 		if !canBeginAt(text, 2) {
-			t.Fatalf("guard rejects %q, where a comment does begin", text)
+			test.Fatalf("guard rejects %q, where a comment does begin", text)
 		}
 	}
 }

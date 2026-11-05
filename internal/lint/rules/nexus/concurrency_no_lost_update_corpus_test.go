@@ -777,11 +777,11 @@ async function withRestore() {
 	},
 }
 
-func TestConcurrencyNoLostUpdateReplaysTheAtomicUpdatesCorpus(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoLostUpdateReplaysTheAtomicUpdatesCorpus(test *testing.T) {
+	test.Parallel()
 
 	if len(concurrencyNoLostUpdateAtomicCorpus) != 84 {
-		t.Fatalf("the replay holds %d cases, want 84", len(concurrencyNoLostUpdateAtomicCorpus))
+		test.Fatalf("the replay holds %d cases, want 84", len(concurrencyNoLostUpdateAtomicCorpus))
 	}
 	reporting := 0
 	for index, testCase := range concurrencyNoLostUpdateAtomicCorpus {
@@ -789,18 +789,18 @@ func TestConcurrencyNoLostUpdateReplaysTheAtomicUpdatesCorpus(t *testing.T) {
 			reporting++
 		}
 		if testCase.lostUpdate > testCase.atomic {
-			t.Errorf("case %d: this rule reports where the rule it narrows does not", index)
+			test.Errorf("case %d: this rule reports where the rule it narrows does not", index)
 		}
 		if (testCase.lostUpdate != testCase.atomic) != (testCase.reason != "") {
-			t.Errorf("case %d: a difference needs a reason, and only a difference has one", index)
+			test.Errorf("case %d: a difference needs a reason, and only a difference has one", index)
 		}
-		result := rule_testing.RunTyped(t, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, testCase.source)
+		result := rule_testing.RunTyped(test, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, testCase.source)
 		if len(result.Diagnostics) != testCase.lostUpdate {
-			t.Errorf("case %d: got %d findings, want %d (%v)", index, len(result.Diagnostics), testCase.lostUpdate, result.MessageIds())
+			test.Errorf("case %d: got %d findings, want %d (%v)", index, len(result.Diagnostics), testCase.lostUpdate, result.MessageIds())
 		}
 	}
 	// The control: a replay in which nothing reports would pass every silent row above.
 	if reporting < 20 {
-		t.Fatalf("only %d replayed cases report; the corpus's read-modify-writes are not being judged", reporting)
+		test.Fatalf("only %d replayed cases report; the corpus's read-modify-writes are not being judged", reporting)
 	}
 }

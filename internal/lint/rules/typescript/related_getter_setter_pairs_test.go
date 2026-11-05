@@ -18,8 +18,8 @@ const relatedGetterSetterPairsFile = "/repository/source/Accessors.ts"
 // Extracted from the corpus by a script and byte-compared against it, not retyped. Every one of them
 // was also driven through the installed 8.67.0 build before this file existed, and all sixteen were
 // clean there.
-func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -43,9 +43,9 @@ func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
 		{"a type literal number pair that matches", "\ntype Example = {\n  get value(): number;\n  set value(newValue: number);\n};\n    "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
 	}
@@ -57,8 +57,8 @@ func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
 // rather than about the traversal: an inline object type, an unused alias sitting beside the real
 // one, and a named alias all reach the same verdict, which is what pins that the comparison is on
 // TYPES and not on the spelling of the annotation.
-func TestRelatedGetterSetterPairsFires(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -73,9 +73,9 @@ func TestRelatedGetterSetterPairsFires(t *testing.T) {
 		{"a declared class against a named alias", "\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
 	}
@@ -95,8 +95,8 @@ func TestRelatedGetterSetterPairsFires(t *testing.T) {
 // The harness TRIMS the fixture before writing it, so the file on disk is one byte shorter at the
 // front than the Go literal here. That is why the expectation is compared against a slice of the
 // harness's own result rather than against a slice of the literal.
-func TestRelatedGetterSetterPairsSpans(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -112,17 +112,17 @@ func TestRelatedGetterSetterPairsSpans(t *testing.T) {
 		{"a declared class against a named alias", "\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      ", "GetType"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.want {
-				t.Errorf("reported span = %q, want %q", got, testCase.want)
+				test.Errorf("reported span = %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -142,8 +142,8 @@ func TestRelatedGetterSetterPairsSpans(t *testing.T) {
 // The rest are traversal: a class expression, a type literal nested in an interface and one in a
 // parameter position, a setter written before its getter, and a `declare class`, which is the
 // control proving the abstract exclusion below is about `abstract` and not about having no body.
-func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -182,9 +182,9 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
 		{"a type literal in a function parameter position", "function f(x: { get value(): number; set value(v: string) }) {}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
 	}
@@ -203,8 +203,8 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
 // The object literal is the second gap with no tree exposure: its accessors are the same node kinds
 // a class holds and are told apart only by their parent, so a rule anchored on the accessor kind
 // rather than on the container would report it.
-func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -245,9 +245,9 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
 			"class C {\n  static get value() { return ''; }\n  set value(param: number) {}\n}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
 	}
@@ -262,8 +262,8 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
 // typescript-go keeps a `KindParenthesizedType` spanning `(string)`, so reporting the getter's type
 // node directly would be two characters wider than upstream on exactly this input, and no imported
 // fixture can see it because the corpus writes no parenthesized type.
-func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -275,17 +275,17 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
 		{"a symbol-keyed pair reports the getter's type", "class C {\n  get [Symbol.iterator](): number { return 1; }\n  set [Symbol.iterator](v: string) {}\n}", "number"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.want {
-				t.Errorf("reported span = %q, want %q", got, testCase.want)
+				test.Errorf("reported span = %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -301,8 +301,8 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
 // The second case is the nesting claim stated as a measurement: an inner class declared inside an
 // outer method reports its own pair and never sees the outer names, which is what the per-container
 // listener buys instead of upstream's push-and-pop stack.
-func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsReportsInSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -313,18 +313,18 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 		{"an outer and an inner class each report their own", "class Outer {\n  get a(): number { return 1; }\n  set a(v: string) {}\n  m() {\n    class Inner {\n      get b(): boolean { return true; }\n      set b(v: string) {}\n    }\n    return Inner;\n  }\n}", []string{"number", "boolean"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("want %d diagnostics, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("want %d diagnostics, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			for i, want := range testCase.want {
 				diagnostic := result.Diagnostics[i]
 				got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("diagnostic %d span = %q, want %q", i, got, want)
+					test.Errorf("diagnostic %d span = %q, want %q", i, got, want)
 				}
 			}
 		})
@@ -338,11 +338,11 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 // panicking. Silence is the more dangerous of the two, because every StaysSilent case above would
 // then pass vacuously and the whole suite would prove nothing. This fails loudly if the guard is
 // ever removed and the shim's nil tolerance changes underneath it.
-func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, RelatedGetterSetterPairs,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, RelatedGetterSetterPairs,
 		relatedGetterSetterPairsFile, source))
 }
 
@@ -352,16 +352,16 @@ func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
 // nothing a format string can get wrong. Both fields are asserted against literals typed here rather
 // than against the rule's own constant, because a comparison to the constant moves with it under
 // mutation and passes while the message is wrong.
-func TestRelatedGetterSetterPairsMessage(t *testing.T) {
-	t.Parallel()
+func TestRelatedGetterSetterPairsMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
-	result := rule_testing.RunTyped(t, RelatedGetterSetterPairs, relatedGetterSetterPairsFile, source)
+	result := rule_testing.RunTyped(test, RelatedGetterSetterPairs, relatedGetterSetterPairsFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "mismatch" {
-		t.Errorf("message id = %q, want %q", got, "mismatch")
+		test.Errorf("message id = %q, want %q", got, "mismatch")
 	}
 	want := "A getter and its setter name one property, so a caller that reads the property and " +
 		"writes the value straight back has to type-check. The getter here returns a type the " +
@@ -369,6 +369,6 @@ func TestRelatedGetterSetterPairsMessage(t *testing.T) {
 		"the two annotations is wrong. Widen the setter's parameter, or narrow what the getter " +
 		"returns."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("message description = %q, want %q", got, want)
+		test.Errorf("message description = %q, want %q", got, want)
 	}
 }

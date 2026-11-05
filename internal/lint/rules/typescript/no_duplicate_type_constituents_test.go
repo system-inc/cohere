@@ -27,14 +27,14 @@ type noDuplicateTypeConstituentsFinding struct {
 }
 
 // noDuplicateTypeConstituentsOptionsFor routes a case's options through the rule's own decoder.
-func noDuplicateTypeConstituentsOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func noDuplicateTypeConstituentsOptionsFor(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoDuplicateTypeConstituentsSettings()
 	}
 	decoded, err := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -47,8 +47,8 @@ func noDuplicateTypeConstituentsOptionsFor(t *testing.T, optionsJson string) any
 //
 // Two of the thirty-four carry options, one per key, so both halves of the option surface are
 // exercised in the direction that turns the rule off.
-func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -90,11 +90,11 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T)
 		{sourceText: "(a: string | undefined) => {};", optionsJson: ""},
 	}
 	for index, testCase := range cases {
-		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+		test.Run(noDuplicateTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
-				noDuplicateTypeConstituentsOptionsFor(t, testCase.optionsJson)))
+				noDuplicateTypeConstituentsOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -114,8 +114,8 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T)
 // transformed the way the harness transforms the input. One upstream case carries an `output` ARRAY
 // of two states because its repairs converge over two passes; the harness applies one pass, so that
 // row asserts the first state and is called out at its line.
-func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -518,17 +518,17 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+		test.Run(noDuplicateTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
-				noDuplicateTypeConstituentsOptionsFor(t, testCase.optionsJson))
+				noDuplicateTypeConstituentsOptionsFor(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
@@ -536,23 +536,23 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
 				}
 
 				// The repair is a fix rather than a suggestion, matching upstream's fixable meta.
 				// Removing a duplicate constituent cannot change what the type means.
 				if len(diagnostic.Suggestions) != 0 {
-					t.Fatalf("finding %d: expected a fix, got %d suggestions", position, len(diagnostic.Suggestions))
+					test.Fatalf("finding %d: expected a fix, got %d suggestions", position, len(diagnostic.Suggestions))
 				}
 				// One finding carries one or TWO removals: the separator token and the
 				// constituent are removed independently so that the whitespace between them
 				// survives, which is what upstream's recorded outputs show. The exact bytes are
 				// asserted by the whole-file comparison below rather than by counting edits.
 				if len(diagnostic.Fixes) == 0 {
-					t.Fatalf("finding %d: expected a repair, got none", position)
+					test.Fatalf("finding %d: expected a repair, got none", position)
 				}
 			}
 
@@ -564,7 +564,7 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 			// share index 35. The harness refuses to guess which wins, correctly, so this row
 			// asserts the findings and leaves the rewrite to the engine.
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}
 		})
 	}
@@ -580,8 +580,8 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Every verdict, span, message and rewrite below was measured against the installed 8.x build over
 // a real program, and all fifteen agree with this port on all four.
-func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -592,17 +592,17 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(t *testing.T) 
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+		test.Run(noDuplicateTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				DefaultNoDuplicateTypeConstituentsSettings()))
 		})
 	}
 }
 
-func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -724,9 +724,9 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+		test.Run(noDuplicateTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				DefaultNoDuplicateTypeConstituentsSettings())
 
@@ -734,21 +734,21 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
 				}
 			}
 
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -759,8 +759,8 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
 // hand-rolled one is tested anyway, because the coincidence is a property of today's defaults
 // rather than of the option surface, and a sibling rule in this package had to be repaired for
 // exactly the inverse case.
-func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name              string
@@ -775,21 +775,21 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
 		{name: "explicitFalse", raw: `{"ignoreUnions": false}`, wantIntersections: false, wantUnions: false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.raw, err)
+				test.Fatalf("decoding %s: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(NoDuplicateTypeConstituentsOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.IgnoreIntersections != testCase.wantIntersections {
-				t.Fatalf("ignoreIntersections: expected %v, got %v", testCase.wantIntersections, options.IgnoreIntersections)
+				test.Fatalf("ignoreIntersections: expected %v, got %v", testCase.wantIntersections, options.IgnoreIntersections)
 			}
 			if options.IgnoreUnions != testCase.wantUnions {
-				t.Fatalf("ignoreUnions: expected %v, got %v", testCase.wantUnions, options.IgnoreUnions)
+				test.Fatalf("ignoreUnions: expected %v, got %v", testCase.wantUnions, options.IgnoreUnions)
 			}
 		})
 	}
@@ -802,23 +802,23 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
 // separating input is any duplicate at all: under the fallback it reports, and a rule that had lost
 // its options entirely would too, which is why the controls below turn each half OFF and confirm
 // the silence moves.
-func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(test *testing.T) {
+	test.Parallel()
 
 	const union = "type T = A | A;\ntype A = string;"
 	const intersection = "type T = A & A;\ntype A = { a: 1 };"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 		noDuplicateTypeConstituentsFile, union, nil), "duplicate")
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 		noDuplicateTypeConstituentsFile, intersection, nil), "duplicate")
 
 	// The controls: each half must go silent when its own key is set, so the reports above are the
 	// defaults being applied rather than the options being ignored.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 		noDuplicateTypeConstituentsFile, union,
 		NoDuplicateTypeConstituentsOptions{IgnoreUnions: true}))
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
 		noDuplicateTypeConstituentsFile, intersection,
 		NoDuplicateTypeConstituentsOptions{IgnoreIntersections: true}))
 }
@@ -828,13 +828,13 @@ func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(t *testing
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing. The syntactic comparison alone would still catch
 // `A | A`, which makes the vacuous green here especially convincing.
-func TestNoDuplicateTypeConstituentsNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateTypeConstituentsNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoDuplicateTypeConstituents.NeedsTypeChecker {
-		t.Fatal("the rule compares constituent types by identity, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule compares constituent types by identity, so it must declare NeedsTypeChecker")
 	}
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateTypeConstituents,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoDuplicateTypeConstituents,
 		noDuplicateTypeConstituentsFile, "type T = A | A;\ntype A = string;"))
 }

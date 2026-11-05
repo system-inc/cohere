@@ -29,10 +29,10 @@ import (
 
 // forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
-func forkRoot(t testing.TB) string {
-	t.Helper()
-	corpus.Resolve(t, "prettier-fork:node_modules/yaml-unist-parser")
-	return corpus.PrettierFork.Root(t)
+func forkRoot(test testing.TB) string {
+	test.Helper()
+	corpus.Resolve(test, "prettier-fork:node_modules/yaml-unist-parser")
+	return corpus.PrettierFork.Root(test)
 }
 
 const oracleScript = `
@@ -121,14 +121,14 @@ type oracleResult struct {
 }
 
 // oracleParse runs the real parser over every text, a Node process per few megabytes.
-func oracleParse(t testing.TB, texts []string) []oracleResult {
-	t.Helper()
+func oracleParse(test testing.TB, texts []string) []oracleResult {
+	test.Helper()
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the parse oracle needs it")
+		test.Skip("node is not installed; the parse oracle needs it")
 	}
-	script := filepath.Join(t.TempDir(), "parse.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(t))), 0o644); err != nil {
-		t.Fatal(err)
+	script := filepath.Join(test.TempDir(), "parse.mjs")
+	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(test))), 0o644); err != nil {
+		test.Fatal(err)
 	}
 	results := make([]oracleResult, 0, len(texts))
 	const batchBytes = 4 << 20
@@ -140,7 +140,7 @@ func oracleParse(t testing.TB, texts []string) []oracleResult {
 		}
 		encoded, err := json.Marshal(texts[start:end])
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		command := exec.Command("node", "--stack-size=65500", script)
 		command.Stdin = bytes.NewReader(encoded)
@@ -148,14 +148,14 @@ func oracleParse(t testing.TB, texts []string) []oracleResult {
 		command.Stderr = &stderr
 		output, err := command.Output()
 		if err != nil {
-			t.Fatalf("the parse oracle failed: %v\n%s", err, stderr.String())
+			test.Fatalf("the parse oracle failed: %v\n%s", err, stderr.String())
 		}
 		var batch []oracleResult
 		if err := json.Unmarshal(output, &batch); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if len(batch) != end-start {
-			t.Fatalf("the parse oracle returned %d results for %d inputs", len(batch), end-start)
+			test.Fatalf("the parse oracle returned %d results for %d inputs", len(batch), end-start)
 		}
 		results = append(results, batch...)
 		start = end
@@ -366,9 +366,9 @@ func compareParse(text string, expected oracleResult) []string {
 }
 
 // compareAll parses every text both ways and reports the first few that differ.
-func compareAll(t *testing.T, label string, names []string, texts []string, maxReported int) (failures int, errored int) {
-	t.Helper()
-	expected := oracleParse(t, texts)
+func compareAll(test *testing.T, label string, names []string, texts []string, maxReported int) (failures int, errored int) {
+	test.Helper()
+	expected := oracleParse(test, texts)
 	for index, text := range texts {
 		if expected[index].Error != nil {
 			errored++
@@ -388,7 +388,7 @@ func compareAll(t *testing.T, label string, names []string, texts []string, maxR
 			if len(differences) > 5 {
 				differences = differences[:5]
 			}
-			t.Errorf("%s %s:\n  %s", label, name, strings.Join(differences, "\n  "))
+			test.Errorf("%s %s:\n  %s", label, name, strings.Join(differences, "\n  "))
 		}
 	}
 	return failures, errored
