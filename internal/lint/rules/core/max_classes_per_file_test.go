@@ -16,7 +16,7 @@ const maxClassesPerFileFile = "/repository/source/MaxClassesPerFile.ts"
 //
 // The decoder is where this rule's two hazards live: the option is polymorphic, so an integer and
 // an object must both reach the same settings, and the default is 1 rather than the zero value, so
-// an absent option read as a plain int would be a maximum of ZERO and report every file holding one
+// an absent option read as a plain int would be a maximum of zero and report every file holding one
 // class. A fixture handing the rule a struct would exercise neither. An empty string here is the
 // bare "error" the live config writes.
 func decodedMaxClassesPerFileOptions(test *testing.T, raw string) any {
@@ -38,7 +38,7 @@ func decodedMaxClassesPerFileOptions(test *testing.T, raw string) any {
 // deliberately rather than dropped. It is clean upstream because of that comment, which is the
 // suppression layer's decision rather than the rule's, and `rule_testing.Run` never consults
 // suppressions. Reproducing it as clean would mean breaking the rule; reporting it is what the rule
-// actually does, and the same source without the disable line IS covered, as the comment-wrapped
+// actually does, and the same source without the disable line is covered, as the comment-wrapped
 // reporting case below.
 //
 // Every case string was built from a list rather than typed, so no escape could be cooked on the
@@ -115,7 +115,7 @@ func TestMaxClassesPerFileStaysSilent(test *testing.T) {
 
 // TestMaxClassesPerFileSpansTheProgramBody pins where the finding points.
 //
-// Upstream reports on the program while overriding the location to the program's BODY: the start of
+// Upstream reports on the program while overriding the location to the program's body: the start of
 // the first statement to the end of the last. The difference from the program node itself is
 // trivia, and it is load-bearing rather than cosmetic, which is why upstream's own corpus carries a
 // comment-wrapped case asserting line 2 column 1 for a file whose first line is a comment.

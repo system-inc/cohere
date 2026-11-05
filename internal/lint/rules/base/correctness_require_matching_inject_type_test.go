@@ -49,7 +49,7 @@ func TestInjectTypeMatchesParameterStaysSilent(test *testing.T) {
 		"type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@TypedInject<Service>() private u) {} }\n",
 		// A union parameter that includes the resolved type.
 		"type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@TypedInject<Service>() private u: Service | Other) {} }\n",
-		// A branded decorator on something that is NOT a parameter. The contract only means anything
+		// A branded decorator on something that is not a parameter. The contract only means anything
 		// on a parameter, and no other case here places one elsewhere, so a mutant dropping the
 		// parameter-kind test survived the whole suite. All three placements measured clean against
 		// the original.
@@ -68,7 +68,7 @@ func TestInjectTypeMatchesParameterStaysSilent(test *testing.T) {
 
 // TestInjectTypeMatchesParameterFires covers the shapes the original reports.
 //
-// Every row asserts the rendered message as well as the span. The message names BOTH types by their
+// Every row asserts the rendered message as well as the span. The message names both types by their
 // printed names and the decorator by its own, so it is where a port comparing the wrong pair, or
 // printing the namespace instead of the member, shows itself. The span is the parameter rather than
 // the decorator, which is the original's choice and is the half a reader changes.
@@ -108,7 +108,7 @@ func TestInjectTypeMatchesParameterFires(test *testing.T) {
 			wantSpan:    "plain: Other",
 			wantMessage: "@TypedInject resolves to 'Service' but parameter is typed as 'Other'",
 		},
-		// A NAMESPACED decorator, which prints the property name rather than the namespace. The
+		// A namespaced decorator, which prints the property name rather than the namespace. The
 		// message says `@inject` and not `@Namespace`, which no other row can distinguish.
 		{
 			sourceText:  "type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@Namespace.inject<Service>() private n: Other) {} }\n",
@@ -140,8 +140,8 @@ func TestInjectTypeMatchesParameterFires(test *testing.T) {
 // TestInjectTypeMatchesParameterRequiresTheTypedHarness pins the nil-checker guard.
 //
 // A mutant removing that guard survives every other fixture here, and structurally so: the guard
-// prevents a PANIC and no findings assertion can see one. It matters more than usual for a rule in
-// this package, because the walk recovers per FILE rather than per rule, so one nil dereference
+// prevents a panic and no findings assertion can see one. It matters more than usual for a rule in
+// this package, because the walk recovers per file rather than per rule, so one nil dereference
 // costs every rule its verdict on that whole file.
 //
 // The untyped harness hands the rule a nil checker, so silence there is the guard working. The

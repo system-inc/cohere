@@ -21,7 +21,7 @@ var messagePreferPromiseRejectErrors = rule.Message{
 
 // PreferPromiseRejectErrorsOptions is upstream's one option.
 //
-// It defaults to FALSE, which is what makes the generic decoder safe here: a rule handed nil
+// It defaults to `false`, which is what makes the generic decoder safe here: a rule handed nil
 // options gets the zero value, and the zero value is the default. That is the opposite of the
 // default-true trap, and it is worth saying out loud because reaching for a pointer field by habit
 // would add a decoder with nothing to decide.
@@ -80,7 +80,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 //
 // Upstream's `checkRejectCall`, and the argument order matters: `allowEmptyReject` only exempts the
 // no-argument case, so `Promise.reject(undefined)` still reports under it. The corpus pins that
-// with a case carrying `allowEmptyReject: true` in the INVALID list.
+// with a case carrying `allowEmptyReject: true` in the `invalid` list.
 func preferPromiseRejectErrorsCheckCall(
 	ruleContext rule.Context,
 	call *ast.Node,
@@ -131,10 +131,10 @@ func preferPromiseRejectErrorsCheckExecutor(
 		return
 	}
 
-	// Upstream requires the second parameter to be an Identifier, and the corpus pins BOTH
+	// Upstream requires the second parameter to be an Identifier, and the corpus pins both
 	// directions: `function(resolve, {apply}) { apply(5) }` is clean because a destructured second
 	// parameter is not tracked, while `({foo, bar, baz}, reject) => reject(5)` reports because the
-	// destructure is on the FIRST parameter.
+	// destructure is on the first parameter.
 	//
 	// The guard is also crash protection rather than only fidelity. `Node.Text()` panics on a
 	// binding pattern, and the walk recovers per file, so one such executor would cost every rule
@@ -162,7 +162,7 @@ func preferPromiseRejectErrorsCheckExecutor(
 // destructuring or defaults, so nothing can observe the first binding.
 //
 // That reasoning is about one variable. Measured here, our checker gives the two parameters of
-// `function(reject, reject) { reject(5) }` DIFFERENT symbols, and the call resolves to the FIRST
+// `function(reject, reject) { reject(5) }` different symbols, and the call resolves to the first
 // one. So keying strictly on the second parameter's symbol goes silent on a case upstream reports,
 // and no reading of either source would have shown it. Collecting every parameter spelled the same
 // as the second reproduces upstream's verdict on all sixteen executor cases in the corpus.
@@ -192,7 +192,7 @@ func preferPromiseRejectErrorsRejectSymbols(
 //
 // Two properties are deliberate and both are pinned by fixtures. It recurses into nested functions,
 // because a reject called from a closure inside the executor still rejects this promise and
-// upstream reports it. And it only considers an identifier in CALLEE position, because passing
+// upstream reports it. And it only considers an identifier in callee position, because passing
 // reject somewhere as a value is not a rejection: `resolve(5, reject)` is one of upstream's clean
 // cases.
 //
@@ -282,10 +282,10 @@ func preferPromiseRejectErrorsResolvesToTheGlobalPromise(ruleContext rule.Contex
 // preferPromiseRejectErrorsIsGlobalUndefined answers whether an expression is the global
 // `undefined` rather than a binding shadowing it.
 //
-// Written as the COMPLEMENT of the ambient test above, and that asymmetry is the whole point.
-// Measured: the real `undefined` resolves to a symbol with ZERO declarations, while
+// Written as the complement of the ambient test above, and that asymmetry is the whole point.
+// Measured: the real `undefined` resolves to a symbol with zero declarations, while
 // `function f(undefined) { ... }` gives its parameter one. So the shipped `resolvesToAGlobal`
-// exemplar, which requires at least one ambient declaration, answers FALSE on every input this
+// exemplar, which requires at least one ambient declaration, answers `false` on every input this
 // arm must report. A rule built on it would pass its whole corpus while being silently inert on
 // `Promise.reject(undefined)`, which is upstream's own reported case.
 //
@@ -306,7 +306,7 @@ func preferPromiseRejectErrorsIsGlobalUndefined(ruleContext rule.Context, expres
 
 // preferPromiseRejectErrorsCouldBeError is upstream's `couldBeError` from its shared ast utilities.
 //
-// The judgment is deliberately optimistic: it asks whether the expression COULD produce an Error,
+// The judgment is deliberately optimistic: it asks whether the expression could produce an Error,
 // not whether it does. An identifier, a call, a member read and an await are all opaque, so they
 // pass. Everything the syntax settles as not-an-Error reports.
 func preferPromiseRejectErrorsCouldBeError(node *ast.Node) bool {
@@ -404,13 +404,13 @@ func preferPromiseRejectErrorsIsFunction(node *ast.Node) bool {
 //
 // The four TypeScript wrappers are here for the same reason and it is not an improvement on
 // upstream, it is what upstream already does. ESTree has no node for any of them, so upstream's
-// switch never mentions them and its verdict is decided by the value INSIDE. Measured on the
+// switch never mentions them and its verdict is decided by the value inside. Measured on the
 // parenthesis it does have: `Promise.reject((5))` reports and `Promise.reject((error))` does not,
 // so the wrapper is transparent and the inner expression decides.
 //
 // Left out, they would fall to the switch's default and report, which is how this was found: the
 // dry run's one finding on the real tree was `reject(error as Error)`, source that asserts the
-// value IS an Error. `no_unsafe_optional_chaining.go:317` and `no_misleading_character_class.go:418`
+// value is an Error. `no_unsafe_optional_chaining.go:317` and `no_misleading_character_class.go:418`
 // take the same set for the same stated reason.
 func preferPromiseRejectErrorsUnwrap(node *ast.Node) *ast.Node {
 	for node != nil {

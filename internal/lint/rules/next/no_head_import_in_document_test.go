@@ -380,7 +380,7 @@ func TestNoHeadImportInDocumentPointsAtEachImportSeparately(test *testing.T) {
 // reports, and the difference is the whole point. Comparing the result to
 // `messageNoHeadImportInDocument.Description` compares the symbol to itself, so a mutation rewriting
 // the description moves both sides together and the assertion cannot fail. Measured: that mutant
-// SURVIVED against the symbol form of this test and is caught by the literal form below.
+// survived against the symbol form of this test and is caught by the literal form below.
 //
 // Equality rather than containment, because a predicate weaker than the property it guards is not a
 // guard.

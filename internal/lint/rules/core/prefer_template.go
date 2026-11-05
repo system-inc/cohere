@@ -37,18 +37,18 @@ var messagePreferTemplateUnexpectedStringConcatenation = rule.Message{
 // # The corpus needs espree, for the same reason `dot-notation`'s did
 //
 // Five of the reporting cases carry octal or non-octal decimal escapes -- `'\033'`, `'\8'`, `'\0\1'`
-// -- and under `@typescript-eslint/parser` all five are FATAL PARSE ERRORS, which read exactly like
+// -- and under `@typescript-eslint/parser` all five are fatal parse errors, which read exactly like
 // clean verdicts. The oracle said "linted 83 of 88" and those five silences looked like five clean
 // cases. Espree in script mode gives 88 of 88 with zero disagreements against the corpus.
 //
 // Our own parser reads all five, measured directly with a control, so the rule's verdict on them is
 // real here rather than inherited. That matters because those five are exactly the cases upstream
-// reports on and refuses to FIX; see below.
+// reports on and refuses to fix; see below.
 //
 // # What the rule decides, which is narrower than "a concatenation exists"
 //
 // Three conditions, all required. There must be a string literal somewhere in the concatenation, a
-// NON-string somewhere in it, and the report anchors on the TOP of the concatenation chain rather
+// non-string somewhere in it, and the report anchors on the top of the concatenation chain rather
 // than on the operand that triggered it. So `'a' + 'b'` is clean (no non-string), `a + b` is clean
 // (no string literal), and `'a' + b + 'c'` reports exactly once rather than twice.
 //
@@ -56,7 +56,7 @@ var messagePreferTemplateUnexpectedStringConcatenation = rule.Message{
 // Reproduced here as a set of already-reported nodes, because both a `Literal` and a
 // `TemplateLiteral` operand can trigger the same chain and upstream visits both.
 //
-// # A TEMPLATE literal counts as a string literal for triggering, and that is easy to miss
+// # A template literal counts as a string literal for triggering, and that is easy to miss
 //
 // Upstream registers `Literal` and `TemplateLiteral` on the same handler, so a backtick template
 // concatenated with an identifier reports. But `astUtils.isStringLiteral` -- which decides whether
@@ -110,7 +110,7 @@ var PreferTemplate = rule.Rule{
 
 // preferTemplateIsConcatenation answers upstream's `isConcatenation`.
 //
-// A binary `+` and nothing else. Note this does NOT skip parentheses: `('a') + b` has a
+// A binary `+` and nothing else. Note this does not skip parentheses: `('a') + b` has a
 // parenthesized operand rather than a parenthesized concatenation, and upstream's parser folds the
 // parens away so its `node.parent` is the binary expression directly. Ours keeps the node, so a
 // parenthesized concatenation is a different shape and is handled where the chain is walked.
@@ -152,9 +152,9 @@ func preferTemplateTopConcatenation(node *ast.Node) *ast.Node {
 
 // preferTemplateIsStringLiteral answers upstream's `astUtils.isStringLiteral`.
 //
-// A string literal OR a template literal of either shape. The template half is what makes a
+// A string literal or a template literal of either shape. The template half is what makes a
 // backtick template concatenated with an identifier report, and it is the same predicate upstream
-// uses on both sides of the question: it decides what counts as the string half AND, negated, what
+// uses on both sides of the question: it decides what counts as the string half and, negated, what
 // counts as the non-string half.
 func preferTemplateIsStringLiteral(node *ast.Node) bool {
 	if node == nil {
@@ -171,7 +171,7 @@ func preferTemplateIsStringLiteral(node *ast.Node) bool {
 
 // preferTemplateHasNonStringLiteral answers upstream's `hasNonStringLiteral`.
 //
-// Recurses through the concatenation and answers true if ANY operand is not a string or template
+// Recurses through the concatenation and answers true if any operand is not a string or template
 // literal. Upstream notes that `left` is normally deeper than `right`, so it tests `right` first;
 // the order is an optimization rather than a behaviour and is kept for the same reason.
 //
@@ -208,13 +208,13 @@ func preferTemplateSkipParentheses(node *ast.Node) *ast.Node {
 // preferTemplateHasOctalOrNonOctalDecimalEscape answers upstream's
 // `hasOctalOrNonOctalDecimalEscapeSequence`, which is what makes the fixer decline.
 //
-// Recurses the concatenation and tests each string literal's RAW text. Five corpus cases carry
+// Recurses the concatenation and tests each string literal's raw text. Five corpus cases carry
 // `output: null` for this reason, and the decline is the interesting half of the rule's repair
 // story: a legacy octal escape means different things inside a template literal than inside a
 // quoted string, so converting one would change what the program produces rather than how it is
 // spelled.
 //
-// Reads the raw source rather than `Text()`, which returns the COOKED value with escapes already
+// Reads the raw source rather than `Text()`, which returns the cooked value with escapes already
 // resolved -- by which point `\033` and the character it denotes are indistinguishable.
 func preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext rule.Context, node *ast.Node) bool {
 	unwrapped := preferTemplateSkipParentheses(node)
@@ -239,7 +239,7 @@ func preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext rule.Context, nod
 // a backslash followed by a digit, where an even number of preceding backslashes means the
 // backslash is itself escaped and the digit is literal.
 //
-// `\0` alone is NOT a legacy escape -- it is the null character and is legal in a template -- but
+// `\0` alone is not a legacy escape -- it is the null character and is legal in a template -- but
 // `\0` followed by a digit is. Upstream's pattern encodes that, and the corpus pins it: `'\0\1'`
 // declines while a bare `'\0'` does not appear as a decline.
 func preferTemplateRawHasLegacyEscape(raw string) bool {
@@ -298,7 +298,7 @@ func preferTemplateRawText(ruleContext rule.Context, node *ast.Node) string {
 
 // preferTemplateFix builds the repair that turns a concatenation into a template literal.
 //
-// Returns false where upstream returns null, which is a DECLINE rather than an absent repair: the
+// Returns false where upstream returns null, which is a decline rather than an absent repair: the
 // finding is still reported and only the fix is withheld. Five corpus cases are `output: null`, all
 // for the same reason -- a legacy octal or non-octal decimal escape means something different inside
 // a template literal than inside a quoted string, so converting one would change what the program
@@ -328,7 +328,7 @@ func preferTemplateFix(ruleContext rule.Context, top *ast.Node) ([]rule.Fix, boo
 	if preferTemplateNeedsSemicolonGuard(ruleContext, top) {
 		built = ";" + built
 	}
-	// `Pos()` is where a node's LEADING TRIVIA begins, not where its first token does, so replacing
+	// `Pos()` is where a node's leading trivia begins, not where its first token does, so replacing
 	// from it swallows the space before the expression: `var foo = 'a' + b` repaired to
 	// `var foo =` with the space eaten. Every one of the 74 repair fixtures caught this at once,
 	// which is what a systematic off-by-trivia looks like.
@@ -339,27 +339,27 @@ func preferTemplateFix(ruleContext rule.Context, top *ast.Node) ([]rule.Fix, boo
 
 // preferTemplateNeedsSemicolonGuard answers whether the repair would need a leading `;`.
 //
-// Upstream emits one when the top expression starts an expression statement AND the previous token
+// Upstream emits one when the top expression starts an expression statement and the previous token
 // could join with a backtick under automatic semicolon insertion. This port declines the repair in
 // that narrow position rather than emitting the semicolon, because getting it wrong either writes a
 // syntax error or silently joins two statements, and reproducing it needs
 // `isStartOfExpressionStatement` plus `needsPrecedingSemicolon`, neither of which this tree has.
 //
 // The first draft of this guard was "any concatenation that begins an expression statement", which
-// DECLINED the repair rather than emitting the semicolon, on the reasoning that withholding is the
+// declined the repair rather than emitting the semicolon, on the reasoning that withholding is the
 // safe direction. It is the safe direction and it was still wrong: it withheld 50 of the 74 repairs
 // the corpus specifies, turning a working fixer into one that almost never fires.
 //
 // Worth recording how that draft was justified, because the justification was a bad measurement. It
 // rested on "zero of the 74 outputs begin with a semicolon", counted with
-// `output.lstrip().startswith(";")`. Five of them DO carry one -- the semicolon appears after a
+// `output.lstrip().startswith(";")`. Five of them do carry one -- the semicolon appears after a
 // newline, in the middle of the string, where a check anchored at the start cannot see it. So the
 // guard was defended by a measurement that asked a question shaped like the answer it got.
 //
-// Narrowed to the shape that actually needs it: an expression statement whose PREVIOUS
-// non-whitespace character can begin an ASI hazard when a backtick follows. That is a closing
+// Narrowed to the shape that actually needs it: an expression statement whose previous
+// non-whitespace character can begin an `ASI` hazard when a backtick follows. That is a closing
 // bracket, paren, or an identifier or literal character. Those are the cases where a line ending in
-// a value, followed by a line starting with a backtick, parses as a TAGGED TEMPLATE rather than as
+// a value, followed by a line starting with a backtick, parses as a tagged template rather than as
 // two statements. A statement already ending in a semicolon or a brace cannot be joined, which is
 // the common case and the reason this guard almost never fires.
 //
@@ -414,7 +414,7 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 	if node == nil {
 		return "", false
 	}
-	// Every arm below asks what KIND the node is, and a parenthesized expression answers with the
+	// Every arm below asks what kind the node is, and a parenthesized expression answers with the
 	// paren rather than with what it wraps. Upstream never sees one, so unwrapping here is what
 	// keeps `('baz')` taking the string-literal arm instead of the catch-all.
 	if unwrapped := preferTemplateSkipParentheses(node); unwrapped != nil && unwrapped != node {
@@ -422,7 +422,7 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 	}
 
 	if node.Kind == ast.KindStringLiteral {
-		// From the TOKEN start, not `Pos()`. A literal's `Pos()` includes its leading trivia, so a
+		// From the token start, not `Pos()`. A literal's `Pos()` includes its leading trivia, so a
 		// `/* a */ 'bar'` would carry the comment into the template text -- and since the
 		// replacement span also starts after that comment, the result duplicates it. Upstream reads
 		// `currentNode.raw`, which is the literal alone.
@@ -441,12 +441,12 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 
 	if preferTemplateIsConcatenation(node) && preferTemplateHasStringLiteral(node) {
 		expression := node.AsBinaryExpression()
-		// Our `OperatorToken` range is NOT upstream's `+` token. Measured: for `'a' + b` the token
+		// Our `OperatorToken` range is not upstream's `+` token. Measured: for `'a' + b` the token
 		// spans `" +"` -- its `Pos()` includes the leading whitespace and its `End()` runs to the
 		// right operand -- so the gaps either side come back empty and every `${  x  }` in the
 		// corpus renders as `${x}`. Upstream's token is the bare `+` with the whitespace outside it.
 		//
-		// So the operator CHARACTER is located rather than the token trusted, and the two gaps are
+		// So the operator character is located rather than the token trusted, and the two gaps are
 		// measured against that. All 74 repair fixtures depend on it, which is what made the defect
 		// systematic rather than incidental.
 		plusOffset, located := preferTemplateOperatorOffset(ruleContext, expression)
@@ -456,7 +456,7 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 		textBeforePlus := preferTemplateTextBetween(ruleContext, expression.Left.End(), plusOffset)
 		// The right operand's `Pos()` includes its own leading trivia, so measuring to it makes the
 		// second gap empty and the rendered curly comes out `${ x }` where upstream writes
-		// `${  x  }`. Upstream's `right.range[0]` is the TOKEN start, which is what this helper
+		// `${  x  }`. Upstream's `right.range[0]` is the token start, which is what this helper
 		// answers. Same trivia distinction as the replacement span above, one level down.
 		textAfterPlus := preferTemplateTextBetween(ruleContext, plusOffset+1,
 			preferTemplateTokenStart(ruleContext, expression.Right))
@@ -465,7 +465,7 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 		rightStartsWithCurly := preferTemplateStartsWithCurly(ruleContext, expression.Right)
 
 		// `textBeforePlus` and `textAfterPlus` are the raw gaps around the operator, which for
-		// ordinary code is the surrounding WHITESPACE rather than a comment. Upstream carries it
+		// ordinary code is the surrounding whitespace rather than a comment. Upstream carries it
 		// into the curly, which is why its outputs read `${  baz  }` with two spaces rather than
 		// `${baz}`: one space came from each side of the `+`. Dropping it is not cosmetic, because
 		// the corpus asserts the rewritten file byte for byte.
@@ -506,7 +506,7 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 	if inner == nil {
 		inner = node
 	}
-	// From the TOKEN start for the same reason the literal arm is: the operand's `Pos()` includes
+	// From the token start for the same reason the literal arm is: the operand's `Pos()` includes
 	// the comment that sat after the `+`, and `textBefore` already carries that comment. Reading
 	// from `Pos()` here emits it twice.
 	return "`${" + textBefore + preferTemplateRawTextFromToken(ruleContext, inner) + textAfter + "}`", true
@@ -555,7 +555,7 @@ func preferTemplateEscapeForTemplate(inner string) string {
 	return builder.String()
 }
 
-// preferTemplateUnescapeQuote drops the escaping on the ORIGINAL quote character.
+// preferTemplateUnescapeQuote drops the escaping on the original quote character.
 //
 // Inside a template literal a `\'` or `\"` no longer needs its backslash, and upstream removes it so
 // the repair does not leave pointless escapes behind. Upstream builds the pattern from
@@ -569,7 +569,7 @@ func preferTemplateUnescapeQuote(inner string, quote byte) string {
 //
 // Upstream's `getTextBetween` walks the tokens and concatenates the gaps, which is how it keeps
 // comments and drops the tokens themselves. Between an operand and its `+` there are no intervening
-// tokens, so the gap IS the text and a slice answers the same question.
+// tokens, so the gap is the text and a slice answers the same question.
 func preferTemplateTextBetween(ruleContext rule.Context, from int, to int) string {
 	if ruleContext.SourceFile == nil || from < 0 || to > len(ruleContext.SourceFile.Text()) || from >= to {
 		return ""
@@ -594,7 +594,7 @@ func preferTemplateHasStringLiteral(node *ast.Node) bool {
 // preferTemplateStartsWithCurly answers upstream's `startsWithTemplateCurly`.
 //
 // Whether the node, once converted, begins with a `${`. A concatenation defers to its left side; a
-// template literal starts with a curly when its first quasi is EMPTY, which is upstream's
+// template literal starts with a curly when its first quasi is empty, which is upstream's
 // `quasis[0].range[0] === quasis[0].range[1]`; anything that is not a string literal becomes a curly
 // outright.
 func preferTemplateStartsWithCurly(ruleContext rule.Context, node *ast.Node) bool {
@@ -640,13 +640,13 @@ func preferTemplateEndsWithCurly(ruleContext rule.Context, node *ast.Node) bool 
 	return unwrapped.Kind != ast.KindStringLiteral
 }
 
-// preferTemplateTokenStart returns where a node's first TOKEN begins, skipping leading trivia.
+// preferTemplateTokenStart returns where a node's first token begins, skipping leading trivia.
 //
 // `Pos()` includes the whitespace and comments before a node, which is the right position for a
 // comment scanner and the wrong one for a replacement span: replacing from it deletes the space
 // that separated the expression from whatever preceded it.
 //
-// Walks forward from `Pos()` over whitespace AND comments, because both are leading trivia and the
+// Walks forward from `Pos()` over whitespace and comments, because both are leading trivia and the
 // replacement must begin at the first real token.
 //
 // Skipping comments is not optional, and getting it wrong is subtle rather than loud. A scan that

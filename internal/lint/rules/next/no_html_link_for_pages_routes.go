@@ -21,7 +21,7 @@ import (
 // The quirks a reader is most likely to "fix", each pinned by a fixture:
 //
 //   - A pages index file pushes two routes, `dir/` and `dir/index`, so `/blog/index` is a route too.
-//   - Below the top of an app directory the walk uses the PAGES parser, so a nested `layout.tsx`
+//   - Below the top of an app directory the walk uses the pages parser, so a nested `layout.tsx`
 //     becomes the route `/about/layout` and a nested `index.tsx` pushes two, as in pages.
 //   - App routes are anchored with no trailing slash while every href is normalized with one, so a
 //     static app route other than `/` never matches. Only `/` and routes with a dynamic segment do.
@@ -117,7 +117,7 @@ func noHtmlLinkForPagesSettingsKey(settings NoHtmlLinkForPagesOptions) string {
 // walk them, compile the routes.
 //
 // One reading differs, on input upstream crashes on. Upstream asks `fs.existsSync`, which is true for
-// a file as well as a directory, and then `readdirSync` throws ENOTDIR and the rule fails to load. A
+// a file as well as a directory, and then `readdirSync` throws `ENOTDIR` and the rule fails to load. A
 // file named `pages` is not a pages directory, so here it is simply not found.
 func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings NoHtmlLinkForPagesOptions) *noHtmlLinkForPagesRouteModel {
 	pagesDirectories := settings.PagesDirectories

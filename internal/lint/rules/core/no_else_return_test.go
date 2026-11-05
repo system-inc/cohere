@@ -19,7 +19,7 @@ var (
 // elseReturnOptions routes the option through the rule's own exported decoder.
 //
 // Building the settings struct directly would leave the decoder untested, and this rule's
-// default is TRUE, which is the one shape a generic decoder gets wrong: a zero-value struct
+// default is `true`, which is the one shape a generic decoder gets wrong: a zero-value struct
 // sets allowElseIf false, and false is not a no-op here but a different judgment.
 func elseReturnOptions(test *testing.T, allowElseIf *bool) any {
 	test.Helper()
@@ -45,7 +45,7 @@ func elseReturnOptions(test *testing.T, allowElseIf *bool) any {
 // 13 pass and 78 fail, with 32 fix vectors and 46 deliberate declines.
 //
 // 4 cases are excluded and counted rather than silently dropped: each binds the name
-// arguments with let or const, which is a strict-mode PARSE ERROR rather than a rule verdict.
+// arguments with let or const, which is a strict-mode parse error rather than a rule verdict.
 // Measured against the installed rule, those inputs report nothing at all and the finding that
 // comes back has a null rule id.
 //
@@ -187,8 +187,8 @@ func TestNoElseReturnStaysSilent(test *testing.T) {
 
 // The fix vectors, which are upstream's own output fields.
 //
-// Only the 27 single-finding vectors are asserted here. The other 3 report TWICE, and
-// upstream's output field for those is a SINGLE-PASS artifact rather than the converged result:
+// Only the 27 single-finding vectors are asserted here. The other 3 report twice, and
+// upstream's output field for those is a single-pass artifact rather than the converged result:
 // its FixTracker widens every repair to the whole enclosing function, so two nested else blocks
 // overlap and eslint applies one per pass, deferring the other. This port proposes narrow
 // repairs that do not overlap, so ExpectFixedSource applies both at once and lands one pass
@@ -248,10 +248,10 @@ func TestNoElseReturnFixes(test *testing.T) {
 // trailingNewlineOn transforms an upstream output the way the harness transformed the input.
 //
 // The typed harness writes strings.TrimSpace(contents)+newline, so a fixed-source expectation
-// needs the same trailing newline. It does NOT need TrimSpace applied to itself, and applying it
+// needs the same trailing newline. It does not need TrimSpace applied to itself, and applying it
 // is wrong: upstream's unwrap of `else { let a; }` legitimately leaves a trailing space inside
 // the file, and trimming the expectation reported a byte-correct repair as broken. Only the
-// LEADING whitespace is the harness's doing, and no upstream output here carries any.
+// leading whitespace is the harness's doing, and no upstream output here carries any.
 func trailingNewlineOn(want string) string {
 	return strings.TrimLeft(want, " \t\n\r") + "\n"
 }
@@ -262,7 +262,7 @@ func trailingNewlineOn(want string) string {
 // larger half of this port rather than a detail of it. Three independent reasons: a name
 // collision the unwrap would create, and automatic semicolon insertion at either end.
 //
-// Asserted as the ABSENCE of a proposal rather than through ExpectFixedSource, which refuses a
+// Asserted as the absence of a proposal rather than through ExpectFixedSource, which refuses a
 // result carrying no fixes rather than treating it as an unchanged rewrite.
 func TestNoElseReturnDeclinesToFix(test *testing.T) {
 	test.Parallel()
@@ -339,7 +339,7 @@ func TestNoElseReturnDeclinesToFix(test *testing.T) {
 
 // Five fix vectors this port reports and declines to repair, where upstream repairs.
 //
-// One mechanism: GetSymbolsInScope answers whether a name is VISIBLE at the if statement and
+// One mechanism: GetSymbolsInScope answers whether a name is visible at the if statement and
 // not at which scope depth it was bound, so a binding one scope out reads as colliding with an
 // else block nested a block deeper. Upstream separates the two levels through eslint-scope.
 //
@@ -390,7 +390,7 @@ func TestNoElseReturnDivergesOnScopeDepth(test *testing.T) {
 //
 // This fixer also builds a replacement, so everything living inside the replaced span has to
 // survive. The span runs from the `else` keyword to the end of the else statement and the
-// replacement is that block's own INNER SOURCE TEXT, carried through byte for byte rather than
+// replacement is that block's own inner source text, carried through byte for byte rather than
 // reconstructed from the tree. These cases assert that on an annotated declaration, a generic call,
 // a satisfies expression, a type assertion, a definite-assignment marker and a decorator, and the
 // guard was mutated to confirm they fail without it.
@@ -482,7 +482,7 @@ func TestNoElseReturnPointsAtTheElse(test *testing.T) {
 
 // The decoder's own shapes, and the default is the dangerous one.
 //
-// allowElseIf defaults to TRUE, so a generic decoder handing back a zero-value struct would set it
+// allowElseIf defaults to `true`, so a generic decoder handing back a zero-value struct would set it
 // false, and false is not a no-op here but a different judgment: it reports an `else if` after a
 // returning branch, which the default deliberately allows. Upstream's corpus proves the two are
 // distinct by carrying the same source in its valid list under true and its invalid list under
@@ -551,14 +551,14 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 
 // The last-statement-only check is upstream's, including its deliberate naivety.
 //
-// alwaysReturns scans EVERY statement of a branch, while naiveHasReturn looks only at the LAST one.
+// alwaysReturns scans every statement of a branch, while naiveHasReturn looks only at the last one.
 // The asymmetry is upstream's and reproducing it matters: a nested `if` counts as fully returning
-// only when both of its branches END in a return, so a branch whose return is followed by anything
-// stops the OUTER else from being reported.
+// only when both of its branches end in a return, so a branch whose return is followed by anything
+// stops the outer else from being reported.
 //
 // Written for a surviving mutant. Making naiveHasReturn scan all statements changed no fixture,
 // because upstream's corpus never writes a nested if whose branch returns and then continues. The
-// counts here were measured against the installed rule: the first two report ONCE and the control
+// counts here were measured against the installed rule: the first two report once and the control
 // reports twice.
 func TestNoElseReturnLooksAtTheLastStatementOnly(test *testing.T) {
 	test.Parallel()

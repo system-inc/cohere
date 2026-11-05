@@ -51,13 +51,13 @@ var preferExponentiationOperatorPrecedence = operatorAssignmentBinaryPrecedence(
 //
 // This port answers the same question through resolution, which covers the direct spellings and not
 // the four alias forms. That is a stated divergence rather than an oversight, and it is bounded: an alias binds
-// `pow` to a LOCAL declaration, so the checker sees an ordinary local function and cannot tell it
+// `pow` to a local declaration, so the checker sees an ordinary local function and cannot tell it
 // from any other. Probed directly with controls, `Math.pow` and `const M = Math; M.pow` both
 // resolve to an ambient declaration while a destructured, renamed or property alias resolves to a
 // source one, indistinguishable from `function pow() {}`.
 //
-// The gap is smaller than it reads. Upstream's own corpus contains ZERO alias cases: its only bare
-// `pow(a, b)` is a VALID case, clean because the name is undeclared. So the tracker reaches a shape
+// The gap is smaller than it reads. Upstream's own corpus contains zero alias cases: its only bare
+// `pow(a, b)` is a valid case, clean because the name is undeclared. So the tracker reaches a shape
 // upstream never tests, and this tree has 29 `Math.pow` sites and no alias sites at all, measured
 // with a control. If an alias ever appears, this rule goes quiet on it rather than reporting
 // wrongly, which is the safe direction for a rule that rewrites.
@@ -113,7 +113,7 @@ var PreferExponentiationOperator = rule.Rule{
 // Three shapes reach here: `Math.pow(...)`, `Math['pow'](...)` and `globalThis.Math.pow(...)`, each
 // optionally chained. The receiver is required to resolve to an ambient declaration, which is what
 // separates the real global from a local `Math` shadowing it, and the property name is required to
-// be STATIC, which is what keeps `Math[pow](a, b)` clean.
+// be static, which is what keeps `Math[pow](a, b)` clean.
 func preferExponentiationOperatorIsMathPow(ruleContext rule.Context, node *ast.Node) bool {
 	callee := preferExponentiationOperatorUnwrapParentheses(node.AsCallExpression().Expression)
 	if callee == nil {
@@ -151,7 +151,7 @@ func preferExponentiationOperatorIsMathPow(ruleContext rule.Context, node *ast.N
 // preferExponentiationOperatorStaticAccess reads a static property name off an access expression.
 //
 // Both spellings count, since `Math['pow']` is the same property as `Math.pow`. A computed key that
-// is not a string literal is NOT a static name, which is upstream's own distinction and why
+// is not a string literal is not a static name, which is upstream's own distinction and why
 // `Math[pow](a, b)` and a template key holding a substitution are clean, while a plain
 // no-substitution template key is not.
 func preferExponentiationOperatorStaticAccess(node *ast.Node) (name string, receiver *ast.Node, ok bool) {
@@ -230,7 +230,7 @@ func preferExponentiationOperatorFix(ruleContext rule.Context, node *ast.Node) (
 		return rule.Fix{}, false
 	}
 
-	// Unwrap before reading the text AND before asking about precedence. Our parser keeps
+	// Unwrap before reading the text and before asking about precedence. Our parser keeps
 	// parentheses that ESTree folds away, so `Math.pow((a), (b))` would otherwise render as
 	// `(a)**(b)` where upstream writes `a**b`, and the kind tests below would see a parenthesized
 	// expression rather than the operand itself.
@@ -253,7 +253,7 @@ func preferExponentiationOperatorFix(ruleContext rule.Context, node *ast.Node) (
 	needsOuter := preferExponentiationOperatorNeedsOuterParentheses(node)
 
 	// Upstream's statement-start clause. A `{`, `function` or `class` opening an expression
-	// STATEMENT is parsed as a block, a function declaration or a class declaration instead, so the
+	// statement is parsed as a block, a function declaration or a class declaration instead, so the
 	// whole expression is wrapped. Only when the base was not already parenthesized, since that
 	// would have moved the opening character.
 	if !needsOuter && !preferExponentiationOperatorBaseNeedsParentheses(base) &&
@@ -292,7 +292,7 @@ func preferExponentiationOperatorHasCommentInside(ruleContext rule.Context, from
 
 // preferExponentiationOperatorBaseNeedsParentheses is upstream's `doesBaseNeedParens`.
 //
-// Two reasons, and the second is not about precedence at all. `**` is RIGHT-associative, so a base
+// Two reasons, and the second is not about precedence at all. `**` is right-associative, so a base
 // binding no tighter than `**` would re-associate: `Math.pow(a ** b, c)` must become
 // `(a ** b) ** c` rather than `a ** b ** c`, which means `a ** (b ** c)`. And a unary or await
 // expression cannot precede `**` at all, since `-2 ** 2` is a SyntaxError rather than a different
@@ -315,11 +315,11 @@ func preferExponentiationOperatorBaseNeedsParentheses(base *ast.Node) bool {
 }
 
 // preferExponentiationOperatorPrecedenceOf is upstream's `getPrecedence` for the kinds this rule
-// meets, and it is NOT the table `operator-assignment` uses.
+// meets, and it is not the table `operator-assignment` uses.
 //
 // That table collapses every tightly-binding kind to one value, which is enough when the only
 // question is whether an operand binds looser than a binary operator. Here the answers above `**`
-// have to be distinguished from each other, because a base binding NO TIGHTER than `**` is wrapped
+// have to be distinguished from each other, because a base binding no tighter than `**` is wrapped
 // while one binding tighter is not, and upstream ranks update, call, member and new expressions
 // each on their own rung. Measured, `Math.pow(++a, ++b)` becomes `++a**++b` with no parentheses
 // while `Math.pow(a ? b : c, 2)` gains a pair, so the two kinds cannot share a value.
@@ -343,12 +343,12 @@ func preferExponentiationOperatorPrecedenceOf(node *ast.Node) int {
 		return 3
 	case ast.KindPrefixUnaryExpression:
 		// ESTree splits this kind in two and the split is load-bearing here. `++a` and `--a` are an
-		// `UpdateExpression` at precedence 17, which binds TIGHTER than `**`; `-a`, `!a` and `~a`
+		// `UpdateExpression` at precedence 17, which binds tighter than `**`; `-a`, `!a` and `~a`
 		// are a `UnaryExpression` at 16, which does not. Our parser puts all five under one kind,
 		// so the operator decides. Measured: `Math.pow(++a, ++b)` becomes `++a**++b` with no
 		// parentheses while `Math.pow(-2, 2)` gains a pair.
 		//
-		// The 17 is upstream's number and is INERT here, which is worth recording rather than
+		// The 17 is upstream's number and is inert here, which is worth recording rather than
 		// leaving for the next reader to rediscover. A mutation lowering it to 16 survives the
 		// whole corpus, and the reason is not a fixture gap: `**` scores 15, so 16 and 17 give the
 		// same answer at both sites that read this table, and the third site never reaches it
@@ -385,7 +385,7 @@ func preferExponentiationOperatorPrecedenceOf(node *ast.Node) int {
 
 // preferExponentiationOperatorExponentNeedsParentheses is upstream's `doesExponentNeedParens`.
 //
-// Strictly LOOSER rather than "no tighter", which is the whole difference from the base and follows
+// Strictly looser rather than "no tighter", which is the whole difference from the base and follows
 // from right-associativity: `a ** b ** c` already groups to the right, so an exponentiation on the
 // right needs nothing. Measured, this is why `Math.pow(2, -2)` becomes `2**-2` with no parentheses
 // while `Math.pow(-2, 2)` gains a pair.
@@ -407,8 +407,8 @@ func preferExponentiationOperatorNeedsOuterParentheses(node *ast.Node) bool {
 	}
 
 	switch parent.Kind {
-	// An ARGUMENT of a call or a new expression is already delimited by the argument list, but the
-	// CALLEE is not: `Math.pow(a, b)()` must become `(a**b)()` or the call binds to `b`.
+	// An argument of a call or a new expression is already delimited by the argument list, but the
+	// callee is not: `Math.pow(a, b)()` must become `(a**b)()` or the call binds to `b`.
 	case ast.KindCallExpression:
 		return parent.AsCallExpression().Expression == node
 	case ast.KindNewExpression:
@@ -433,7 +433,7 @@ func preferExponentiationOperatorNeedsOuterParentheses(node *ast.Node) bool {
 		ast.KindExpressionWithTypeArguments, ast.KindHeritageClause:
 		return true
 	// TypeScript only, so upstream has no arm for it and its corpus reaches it through a custom
-	// parser fixture. `as` and `satisfies` bind LOOSER than `**`, so a precedence comparison alone
+	// parser fixture. `as` and `satisfies` bind looser than `**`, so a precedence comparison alone
 	// says no wrap is needed; upstream's own asserted output is `(a**b) as any`, because the
 	// assertion has to apply to the power rather than to its right operand.
 	case ast.KindAsExpression, ast.KindSatisfiesExpression:
@@ -579,7 +579,7 @@ func preferExponentiationOperatorContinuesIdentifier(character byte) bool {
 
 // preferExponentiationOperatorStaticStringValue evaluates a computed key to a string when it can.
 //
-// Upstream reads the STATIC VALUE of the property name rather than testing the node's kind, so
+// Upstream reads the static value of the property name rather than testing the node's kind, so
 // three spellings that look different are the same property. Measured against the installed build:
 // a plain template, a template whose only substitution is a string literal, and a concatenation of
 // string literals all report, while a bare identifier key is clean.
@@ -626,7 +626,7 @@ func preferExponentiationOperatorStaticStringValue(node *ast.Node) (string, bool
 // would be read as something other than an expression.
 //
 // `{` opens a block, `function` a function declaration and `class` a class declaration. Upstream
-// checks the first TOKEN rather than the first character, which is why an identifier merely
+// checks the first token rather than the first character, which is why an identifier merely
 // beginning with those letters does not count.
 func preferExponentiationOperatorOpensAStatementAmbiguously(text string) bool {
 	if text == "" {

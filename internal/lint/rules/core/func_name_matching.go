@@ -17,7 +17,7 @@ import (
 //	["always" | "never", {options}]     a direction followed by an options object
 //	[{options}]                         an options object alone, direction defaulting to "always"
 //
-// So the FIRST element is either a string or the object. The rule registers with `DecodeOptionList`
+// So the first element is either a string or the object. The rule registers with `DecodeOptionList`
 // and is handed upstream's list as written; see DecodeFuncNameMatchingOptions, which reads both.
 type FuncNameMatchingOptions struct {
 	// Direction is upstream's `nameMatches`: "always" requires the names to match, "never" requires
@@ -25,7 +25,7 @@ type FuncNameMatchingOptions struct {
 	Direction string `json:"-"`
 
 	// ConsiderPropertyDescriptor makes `{value: function foo(){}}` inside `Object.defineProperty`
-	// compare against the PROPERTY being defined rather than against the literal key `value`.
+	// compare against the property being defined rather than against the literal key `value`.
 	ConsiderPropertyDescriptor bool `json:"considerPropertyDescriptor"`
 
 	// IncludeCommonJSModuleExports stops `module.exports = function foo(){}` from being exempt.
@@ -50,7 +50,7 @@ type FuncNameMatchingOptions struct {
 // Unicode 8 moved it into `Other_ID_Start`, so it is an identifier start under ES6 and not under
 // ES5.
 //
-// # The corpus carries that source TWICE, with opposite verdicts, and that is the whole answer
+// # The corpus carries that source twice, with opposite verdicts, and that is the whole answer
 //
 // `var obj = { '\u1885': function foo() {} };` appears as both `invalid[49]` and `valid[142]`,
 // byte for byte identical. The only difference is a field a careless extractor throws away:
@@ -97,7 +97,7 @@ func funcNameMatchingIsIdentifierStart(character rune) bool {
 
 // funcNameMatchingIsIdentifierPart answers ES6's IdentifierPart.
 //
-// The two zero-width characters are U+200C ZERO WIDTH NON-JOINER and U+200D ZERO WIDTH JOINER,
+// The two zero-width characters are U+200C `ZERO WIDTH NON-JOINER` and U+200D `ZERO WIDTH JOINER`,
 // which JavaScript admits in identifiers and Unicode's ID_Continue does not. Written as escapes
 // rather than as literals: this file is scanned for non-ASCII bytes.
 func funcNameMatchingIsIdentifierPart(character rune) bool {
@@ -191,13 +191,13 @@ func funcNameMatchingMessage(direction string, isProperty bool, functionName str
 //
 // # `module.exports` is exempt by default, and that exemption is the whole of one option
 //
-// `module.exports = function foo() {}` is CLEAN unless `includeCommonJSModuleExports` is set. The
+// `module.exports = function foo() {}` is clean unless `includeCommonJSModuleExports` is set. The
 // test covers both `module.exports` and `module["exports"]`, which upstream spells out separately
 // because the second is a computed access whose property is a literal.
 //
-// # An ARROW function is never checked, and neither is an anonymous function
+// # An arrow function is never checked, and neither is an anonymous function
 //
-// The rule compares a function's OWN name against its target, so a function with no name has nothing
+// The rule compares a function's own name against its target, so a function with no name has nothing
 // to compare and an arrow function cannot have one. Every arm requires
 // `node.init.type === "FunctionExpression"` and then `node.init.id`, so both exclusions come from
 // the same two lines rather than from a separate guard.
@@ -253,7 +253,7 @@ func (checker *funcNameMatchingChecker) report(node *ast.Node, name string, func
 // checkVariableDeclarator is upstream's `VariableDeclarator` listener.
 //
 // Our parser groups declarators under one `KindVariableDeclaration` per `var`, so the listener fires
-// once and iterates rather than firing per declarator. Upstream reports on the DECLARATOR, so the
+// once and iterates rather than firing per declarator. Upstream reports on the declarator, so the
 // finding is anchored on each declaration individually rather than on the statement.
 func (checker *funcNameMatchingChecker) checkVariableDeclarator(node *ast.Node) {
 	declaration := node.AsVariableDeclaration()
@@ -324,7 +324,7 @@ func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
 		return
 	}
 
-	// A COMPUTED key whose expression is a string literal is still a static name upstream:
+	// A computed key whose expression is a string literal is still a static name upstream:
 	// `({['foo']: function bar(){}})` reports. Any other computed key -- `['b' + 'ar']`, or a
 	// variable -- is not comparable and is declined. Unwrapping here rather than in the literal
 	// arm keeps the identifier arm below reading only genuine identifiers.
@@ -348,13 +348,13 @@ func (checker *funcNameMatchingChecker) checkProperty(node *ast.Node) {
 		propertyName := key.Text()
 
 		// The property-descriptor arm. `{value: function foo(){}}` inside `Object.defineProperty`
-		// compares against the property BEING DEFINED rather than against the literal key `value`.
+		// compares against the property being defined rather than against the literal key `value`.
 		if checker.considerPropertyDescriptor && propertyName == "value" &&
 			node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
 			descriptorName, isDescriptor, readable := funcNameMatchingDescriptorTarget(node.Parent)
 			if isDescriptor {
 				// Inside a descriptor whose target name cannot be read -- `'b' + 'ar'`, or a
-				// computed key -- upstream reports NOTHING. It does not fall back to comparing
+				// computed key -- upstream reports nothing. It does not fall back to comparing
 				// against the literal key `value`, which is what a reader assumes and what an
 				// earlier draft here did: each of its branches guards the report with
 				// `isStringLiteral(property)` or `!node.parent.parent.computed` and simply
@@ -403,11 +403,11 @@ func funcNameMatchingPropertyValue(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// funcNameMatchingFunctionExpressionName reads a NAMED function expression's own name.
+// funcNameMatchingFunctionExpressionName reads a named function expression's own name.
 //
-// Both halves are the rule's whole precondition. It must be a function EXPRESSION, which excludes an
+// Both halves are the rule's whole precondition. It must be a function expression, which excludes an
 // arrow (which cannot be named) and a function declaration (whose name is its binding); and it must
-// be NAMED, since an anonymous function has nothing to compare.
+// be named, since an anonymous function has nothing to compare.
 func funcNameMatchingFunctionExpressionName(node *ast.Node) (string, bool) {
 	if node == nil || node.Kind != ast.KindFunctionExpression {
 		return "", false
@@ -534,7 +534,7 @@ func funcNameMatchingDescriptorTarget(descriptor *ast.Node) (name string, isDesc
 	}
 	// Upstream guards with `!node.parent.parent.computed`, so a computed key here is a descriptor
 	// whose name cannot be read rather than a non-descriptor: `Object.defineProperties(foo,
-	// {['bar']: {value: function bar(){}}})` is CLEAN.
+	// {['bar']: {value: function bar(){}}})` is clean.
 	key := property.Name()
 	if key == nil || key.Kind != ast.KindIdentifier {
 		return "", true, false
@@ -581,7 +581,7 @@ func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
 
 // DecodeFuncNameMatchingOptions reads upstream's option list off the config.
 //
-// Hand-rolled because upstream's schema is an `anyOf` of two LIST shapes rather than a single
+// Hand-rolled because upstream's schema is an `anyOf` of two list shapes rather than a single
 // object, and the generic decoder has no way to express that:
 //
 //	["never"]                                 the direction alone
@@ -629,7 +629,7 @@ func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 
 // funcNameMatchingIsAssignmentOperator answers whether a binary operator assigns.
 //
-// Upstream's listener is `AssignmentExpression`, which in ESTree covers EVERY assignment operator
+// Upstream's listener is `AssignmentExpression`, which in ESTree covers every assignment operator
 // rather than just `=`. Our parser models all of them as binary expressions, so the operator has to
 // be tested explicitly, and restricting it to `=` costs three of upstream's reporting cases:
 // `foo &&= function bar(){}`, `obj.foo ||= ...` and `obj['foo'] ??= ...` are all in the corpus.

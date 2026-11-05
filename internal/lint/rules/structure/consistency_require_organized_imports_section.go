@@ -546,7 +546,7 @@ func localBindingNames(declaration *ast.Node) []string {
 		}
 	}
 	for _, element := range bindings.Named {
-		// The LOCAL name, which is what the original reads. `{ Thing as useThing }` contributes
+		// The local name, which is what the original reads. `{ Thing as useThing }` contributes
 		// `useThing` and classifies as Hooks; reading the imported name would answer `Thing`.
 		if name := element.Name(); name != nil && name.Kind == ast.KindIdentifier {
 			names = append(names, name.Text())

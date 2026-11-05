@@ -217,7 +217,7 @@ func TestNoPromiseExecutorReturnFires(test *testing.T) {
 // so reporting the body node directly would span `(1)`. `((1))` unwraps all the way down to `1`,
 // which is why the rule unwraps in a loop rather than one step.
 //
-// The FIX anchors run the OTHER way. `wrapBraces` on `new Promise(r => (1))` writes `{(1)}`, so
+// The fix anchors run the other way. `wrapBraces` on `new Promise(r => (1))` writes `{(1)}`, so
 // the braces sit outside the parentheses the span excludes. One node, two answers, and only a
 // span assertion beside a suggestion-output assertion records which is which.
 func TestNoPromiseExecutorReturnSpans(test *testing.T) {
@@ -265,13 +265,13 @@ func TestNoPromiseExecutorReturnSpans(test *testing.T) {
 // module is legal; our harness parses TypeScript modules where a bare top-level return is a syntax
 // error rather than a construct the rule declines.
 //
-// The directive-comment one is worth naming separately because it is the case that FAILED rather
+// The directive-comment one is worth naming separately because it is the case that failed rather
 // than merely being unexpressible: this port reports it, because `Promise` there does resolve to the
 // standard library and nothing reads the comment. Reproducing upstream's silence needs a
 // configured-globals layer, which cohere does not carry.
 //
 // Both are facts about the harness rather than about the rule, so hiding them inside a relaxed
-// rule would turn them into facts about the rule. What IS asserted here is the part that does not
+// rule would turn them into facts about the rule. What is asserted here is the part that does not
 // depend on the missing surface: each input reaches the rule and the rule does not crash on it.
 func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
 	test.Parallel()
@@ -301,7 +301,7 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
 	}
 }
 
-// The decoder is the line with no upstream counterpart. `allowVoid` defaults to FALSE, so the
+// The decoder is the line with no upstream counterpart. `allowVoid` defaults to false, so the
 // zero value happens to be right, and the fallback is written out anyway so a later default change
 // cannot invert the rule silently.
 func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
@@ -400,7 +400,7 @@ func TestNoPromiseExecutorReturnMessages(test *testing.T) {
 
 // The 41 suggestion outputs upstream asserts, byte for byte.
 //
-// `rule_testing` can apply a FIX but not a SUGGESTION, so the applier below is hand-rolled. That
+// `rule_testing` can apply a fix but not a suggestion, so the applier below is hand-rolled. That
 // is not optional coverage: a suggestion writing the right text over the wrong span passes any
 // assertion that only compares the text, and this rule's two suggestions are built from two
 // separate insertions each, so the span is most of what can go wrong.

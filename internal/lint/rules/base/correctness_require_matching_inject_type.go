@@ -21,7 +21,7 @@ var correctnessRequireMatchingInjectTypeText = policy.MessageOf("base/correctnes
 //	valid:   constructor(@Inject<any>() private loose: Other) {}         no concrete contract
 //	invalid: constructor(@Inject<Service>() private wrong: Other) {}
 //
-// The contract lives on the decorator's CALL return type, as a phantom brand:
+// The contract lives on the decorator's call return type, as a phantom brand:
 //
 //	type TypedParameterDecorator<TResolved> = ParameterDecorator & {
 //	    readonly __resolvedType?: TResolved;
@@ -35,7 +35,7 @@ var correctnessRequireMatchingInjectTypeText = policy.MessageOf("base/correctnes
 //
 // `__resolvedType?` is declared optional, so the symbol's type is `TResolved | undefined`. Probed
 // here before writing anything: without stripping that member, the brand for `@Inject<Service>()`
-// reads as `Service | undefined`, which is NOT assignable to a parameter typed `Service`, so the
+// reads as `Service | undefined`, which is not assignable to a parameter typed `Service`, so the
 // correct case reports and the rule inverts. The original strips it for exactly this reason and
 // carries a shared option distinguishing this brand from a sibling whose `undefined` is meaningful.
 //
@@ -71,7 +71,7 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				// Only a decorator on a PARAMETER carries this contract. The original resolves the
+				// Only a decorator on a parameter carries this contract. The original resolves the
 				// node whose type should be read and declines when there is none.
 				parameterNode := node.Parent
 				if parameterNode == nil || parameterNode.Kind != ast.KindParameter {
@@ -107,10 +107,10 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 					return
 				}
 
-				// The finding points at the PARAMETER rather than at the decorator, which is the
+				// The finding points at the parameter rather than at the decorator, which is the
 				// original's `node: parameterNode`. The parameter is the half the reader changes.
 				//
-				// The span starts at the parameter's NAME rather than at its own start. estree's
+				// The span starts at the parameter's name rather than at its own start. estree's
 				// parameter node is the identifier, with the decorators and modifiers as siblings;
 				// ours is the whole declaration and its range therefore covers `@Inject<T>() private
 				// x: T` entire. Measured against the original on five reporting shapes, whose spans
@@ -141,7 +141,7 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 //
 // The strip is not a tidy-up. Measured before this rule was written: the brand field is declared
 // optional, so its type is `T | undefined`, and comparing that against a parameter typed `T` answers
-// NOT assignable. Without the strip the rule reports every correct site and is silent on none of
+// not assignable. Without the strip the rule reports every correct site and is silent on none of
 // them, which is the exact inversion of its purpose.
 func readInjectResolvedTypeBrand(ruleContext rule.Context, decoratorType *checker.Type) *checker.Type {
 	symbol := ruleContext.TypeChecker.GetPropertyOfType(decoratorType, "__resolvedType")
@@ -188,7 +188,7 @@ func readInjectResolvedTypeBrand(ruleContext rule.Context, decoratorType *checke
 // the empty string, because every rule using it keys on a bare identifier and treats a qualified
 // name as a different symbol.
 //
-// This rule does not key on the name at all. It PRINTS it, in a message the reader uses to find the
+// This rule does not key on the name at all. It prints it, in a message the reader uses to find the
 // decorator, so the empty string is the one answer that helps nobody. Measured against the original:
 // `@Namespace.inject<Service>()` prints `@inject`, which a fixture asserts, and `CallName` would
 // make that `@`. The sentinel exists for the same reason, so a report always names something.

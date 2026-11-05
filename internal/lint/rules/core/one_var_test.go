@@ -23,7 +23,7 @@ type oneVarCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's single option value, routed through the rule's own
+	// options is the raw JSON of upstream's single option value, routed through the rule's own
 	// exported decoder rather than built as a struct. That is what puts the union decoding, the
 	// absent-versus-set distinction and the default under test; a struct built by hand reaches
 	// the rule having skipped every line that could be wrong.
@@ -32,7 +32,7 @@ type oneVarCase struct {
 	// ids are the message ids upstream produced, in order.
 	ids []string
 
-	// messages are the RENDERED message texts upstream produced, in order.
+	// messages are the rendered message texts upstream produced, in order.
 	//
 	// Six of the seven messages interpolate `{{type}}`, and a message id cannot see a rendering.
 	// A rule that reports the right id having computed "var" where upstream computed "await
@@ -658,11 +658,11 @@ var oneVarSilentCases = []oneVarCase{
 
 // oneVarRepairCases are the rows whose `output` upstream pins to a rewritten string.
 //
-// `output` is the SPECIFICATION for the repair, and it is the ONLY coverage a fixer has: a fixer
+// `output` is the specification for the repair, and it is the only coverage a fixer has: a fixer
 // that reports in the right place and rewrites wrongly is indistinguishable, at the message-id
 // layer, from a correct one.
 //
-// These assert a SINGLE fix pass, which is what upstream's RuleTester records. The real engine
+// These assert a single fix pass, which is what upstream's RuleTester records. The real engine
 // loops to a fixed point, and three of these cases converge somewhere else because the second
 // pass merges declarations the first one only just created. Asserting the fixed point here would
 // disagree with upstream's own expectations on exactly those three.
@@ -905,10 +905,10 @@ var oneVarRepairCases = []oneVarFixCase{
 		wanted: "await using a = 0; await using b = 1;"},
 }
 
-// oneVarDeclineCases are the rows upstream reports and deliberately does NOT repair.
+// oneVarDeclineCases are the rows upstream reports and deliberately does not repair.
 //
 // `output: null` is a decision rather than an omission. Twenty-six of them here, more than any
-// other rule in this batch, and they are asserted as the ABSENCE of a proposed fix -- never as
+// other rule in this batch, and they are asserted as the absence of a proposed fix -- never as
 // "the output equals the input", because `ExpectFixedSource` fatals when no fix was proposed and
 // would therefore agree with any expectation at all.
 var oneVarDeclineCases = []oneVarCase{
@@ -964,7 +964,7 @@ func TestOneVarStaysSilent(test *testing.T) {
 	}
 }
 
-// TestOneVarRendersTheTypeUpstreamRenders asserts the message TEXT, not only the id.
+// TestOneVarRendersTheTypeUpstreamRenders asserts the message text, not only the id.
 //
 // Six of the seven messages interpolate `{{type}}`, whose value is the declaration spelling --
 // and `await using` is the one most likely to be computed wrongly, because the flag named for it
@@ -997,7 +997,7 @@ func TestOneVarRendersTheTypeUpstreamRenders(test *testing.T) {
 	}
 }
 
-// TestOneVarAnchorsOnTheDeclarationStatement asserts the SPAN of every finding.
+// TestOneVarAnchorsOnTheDeclarationStatement asserts the span of every finding.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule pointing at the wrong node
 // passes a complete fixture pair. That matters twice over here because the findings carry fixes:
@@ -1055,7 +1055,7 @@ func TestOneVarRepairsWhatUpstreamRepairs(test *testing.T) {
 //
 // Not "the output equals the input": `ExpectFixedSource` fatals when no fix was proposed, so
 // routing a decline through it would make the assertion agree with any expectation at all. The
-// decline withholds the REPAIR, not the report, so the finding must still be there.
+// decline withholds the repair, not the report, so the finding must still be there.
 func TestOneVarDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range oneVarDeclineCases {
@@ -1078,14 +1078,14 @@ func TestOneVarDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
 // oneVarTypeScriptGapCases are shapes upstream's corpus cannot contain, measured against the
 // installed rule rather than reasoned about.
 //
-// Upstream's corpus is JavaScript of an era before class methods were common, and it writes ZERO
+// Upstream's corpus is JavaScript of an era before class methods were common, and it writes zero
 // class methods, constructors, getters or setters -- every "method-like" case in it is a static
 // block. ESTree wraps a method body in a FunctionExpression, so upstream's single listener covers
 // all of them; our parser has no wrapper, so each member kind is a function scope only because
 // this rule names it. Deleting those four names is a mutation the whole 296-case corpus does not
 // notice, which is what these rows exist to fix.
 //
-// The namespace rows are the other half of the same gap and fall the OTHER way: two sibling
+// The namespace rows are the other half of the same gap and fall the other way: two sibling
 // namespaces are not separate `var` scopes upstream, because a namespace body is not a function
 // scope. So `ModuleBlock` is a statement list here and deliberately not a function scope.
 //
@@ -1118,7 +1118,7 @@ var oneVarTypeScriptGapFiringCases = []oneVarCase{
 	{name: "gap-method-never", source: "class C { a() { var x, y; } }", options: "\"never\"",
 		ids:      []string{"split"},
 		messages: []string{"Split 'var' declarations into multiple statements."}},
-	// A namespace body is a statement list but NOT a function scope, so these DO report.
+	// A namespace body is a statement list but not a function scope, so these do report.
 	{name: "gap-namespace-pair", source: "namespace N { const a = 1; } namespace M { const b = 2; }",
 		options: "\"always\"", ids: []string{"combine"},
 		messages: []string{"Combine this with the previous 'const' statement."}},
@@ -1164,7 +1164,7 @@ func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
 // Upstream's `if (!options[key]) return;` is what makes `{ "var": "never" }` govern `var` alone
 // and leave `let` and `const` untouched. That guard is redundant in this port today, because every
 // read of a group goes through `modeIs` and nil answers false there -- so a mutation removing the
-// guard SURVIVES the whole 296-case corpus.
+// guard survives the whole 296-case corpus.
 //
 // The behaviour is still a contract, and this test asserts it where the guard cannot be seen: a
 // change to `modeIs` that made nil compare equal would break these rows immediately, which is
@@ -1216,7 +1216,7 @@ type oneVarExportCase struct {
 // and for an export `declaration.parent` is the ExportNamedDeclaration, which carries no `body`
 // array. So the consecutive check sees index 0 and the join fixer sees an empty list: upstream
 // neither reports a consecutive finding on an exported declaration nor repairs a combine on one,
-// and an exported PREVIOUS sibling fails `previousNode.kind === type` because a wrapper node has
+// and an exported previous sibling fails `previousNode.kind === type` because a wrapper node has
 // no `kind`.
 //
 // Our parser has no wrapper. The exported statement sits directly in the enclosing statement list
@@ -1276,7 +1276,7 @@ func TestOneVarDeclinesToRepairExportedDeclarations(test *testing.T) {
 }
 
 // TestOneVarSplitStillRepairsExports is the other half, and it is why the collapse above is scoped
-// to the JOIN rather than applied to exports generally.
+// to the join rather than applied to exports generally.
 //
 // Upstream's split fixer reads `declaration.parent.type === "ExportNamedDeclaration"` to decide
 // whether to write an `export ` prefix, so it very much does repair an exported declaration under
@@ -1358,10 +1358,10 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
 
 // TestOneVarJoinDeclinesAgainstADifferentKindPredecessor pins the fixer's own same-kind check.
 //
-// The check appears twice in upstream: once in the CONSECUTIVE arm, which tests
+// The check appears twice in upstream: once in the consecutive arm, which tests
 // `previousNode.kind === type` before reporting, and once inside `joinDeclarationsFixer`, which
 // tests it again before yielding anything. The second looks redundant beside the first and is not,
-// because the `always` arm calls the same fixer WITHOUT any such test -- it reports on what the
+// because the `always` arm calls the same fixer without any such test -- it reports on what the
 // enclosing scope has accumulated, which need not be the immediately preceding statement.
 //
 // The isolating shape is a reporting statement whose predecessor is a different declaration kind:
@@ -1411,12 +1411,12 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
 
 // TestOneVarRequireIsASpellingNotAResolution pins what `isRequire` actually asks.
 //
-// Upstream reads `decl.init.callee.name === "require"`, which is a NAME test on the callee rather
+// Upstream reads `decl.init.callee.name === "require"`, which is a name test on the callee rather
 // than a resolution. Two consequences follow, and no corpus case can see either, because all ten
 // of its `separateRequires` cases call `require` and nothing else:
 //
 //   - any other call is not a require, so a mixed list containing one is ordinary;
-//   - a LOCALLY declared function named `require` still counts, because nothing resolves it.
+//   - a locally declared function named `require` still counts, because nothing resolves it.
 //
 // The callee-kind guard is the other half. `callee.name` is `undefined` for a member access, and
 // `undefined === "require"` is false, so `a.require('foo')` is not a require either. Reproducing
@@ -1458,7 +1458,7 @@ func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
 // TestOneVarConsecutiveNeedsUpstreamsParentBody pins where the sibling index exists.
 //
 // Upstream's consecutive arm reads `(parent.body && parent.body.length > 0 &&
-// parent.body.indexOf(node)) || 0`, so it fires only where the container has a `body` ARRAY. An
+// parent.body.indexOf(node)) || 0`, so it fires only where the container has a `body` array. An
 // ESTree SwitchCase keeps its statements in `.consequent`, so `parent.body` is undefined and the
 // consecutive arm never fires inside a switch clause -- while `always` and `never`, which read the
 // scope stack rather than the index, still do.
@@ -1468,7 +1468,7 @@ func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
 // under `consecutive`, so nothing in it could see the false positive.
 //
 // A TypeScript namespace body falls the other way: upstream's TSModuleBlock does carry `body`, so
-// the consecutive arm DOES fire there. Both directions are pinned, because a fix that turned the
+// the consecutive arm does fire there. Both directions are pinned, because a fix that turned the
 // arm off for every unusual container would pass the switch rows and break the namespace ones.
 //
 // Every expectation measured against ESLint 10.10.0.
@@ -1494,7 +1494,7 @@ func TestOneVarConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
 	}
 
 	firing := []oneVarCase{
-		// A namespace body DOES carry `body` upstream, so consecutive fires there.
+		// A namespace body does carry `body` upstream, so consecutive fires there.
 		{name: "namespace-consecutive", source: "namespace N { const a = 1; const b = 2; }",
 			options: "\"consecutive\"", ids: []string{"combine"}},
 		// The same switch clause still reports under the two arms that do not read the index,

@@ -25,7 +25,7 @@ var messageSymbolDescription = rule.Message{
 //
 // Four of upstream's six clean cases are shadowing, and a rule matching the name textually reports
 // every one. Upstream asks `eslint-scope` for the variable named `Symbol` and proceeds only when it
-// has NO definitions, which is its way of saying "this is the global one". `resolvesToAGlobal` in
+// has no definitions, which is its way of saying "this is the global one". `resolvesToAGlobal` in
 // this package asks the same question through the checker: it resolves the identifier and answers
 // true only when every declaration behind it lives in a declaration file.
 //
@@ -39,15 +39,15 @@ var messageSymbolDescription = rule.Message{
 // All three measured against the installed build at 10.8.1, and all three reproduced rather than
 // improved on.
 //
-// `new Symbol()` is CLEAN. It throws at run time and carries no description either, but upstream's
+// `new Symbol()` is clean. It throws at run time and carries no description either, but upstream's
 // `isCallee` is false for a `new` expression, so the rule never sees it. Anchoring on
 // `KindCallExpression` alone reproduces that.
 //
-// `Symbol(undefined)` and `Symbol(...args)` are CLEAN. The check is `arguments.length === 0`, so a
+// `Symbol(undefined)` and `Symbol(...args)` are clean. The check is `arguments.length === 0`, so a
 // spread that expands to nothing and an explicit undefined both pass. Counting arguments rather than
 // inspecting them is the decision.
 //
-// `globalThis.Symbol()` is CLEAN, because there the identifier is a property rather than the callee.
+// `globalThis.Symbol()` is clean, because there the identifier is a property rather than the callee.
 //
 // # Parentheses
 //
@@ -66,7 +66,7 @@ var SymbolDescription = rule.Rule{
 				// crashing, which is the more dangerous failure: every clean fixture would pass
 				// vacuously. `TestSymbolDescriptionRequiresTheTypedHarness` pins it.
 				//
-				// A mutation removing this guard SURVIVED the whole fixture set, and that is
+				// A mutation removing this guard survived the whole fixture set, and that is
 				// subsumption rather than a blind spot: the only checker use in this listener is
 				// inside `resolvesToAGlobal`, whose own first line returns false on a nil checker.
 				// So no input can distinguish the two versions today. Kept anyway, because the
@@ -87,7 +87,7 @@ var SymbolDescription = rule.Rule{
 					return
 				}
 
-				// `SkipParentheses` DEREFERENCES its argument, so the nil test above comes first.
+				// `SkipParentheses` dereferences its argument, so the nil test above comes first.
 				callee := ast.SkipParentheses(call.Expression)
 				if !ast.IsIdentifier(callee) || callee.Text() != "Symbol" {
 					return

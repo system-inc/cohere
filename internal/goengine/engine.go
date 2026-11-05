@@ -9,11 +9,13 @@
 package goengine
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf8"
 
@@ -58,9 +60,19 @@ var engineRuleNames = []string{
 	suppression.RuleRequireIgnoreReason,
 }
 
+// mainHasRun is set by the first Main in this process.
+var mainHasRun atomic.Bool
+
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
 // prose to standardError, and returns the exit code.
 func Main(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
+	// A run sets its rule options on the registry's analyzers, which outlive it, so a second run in this process
+	// would be judged by the first's options with no error. The front door starts one engine process per Go root
+	// and main exits after this call, so a second call is a caller's mistake, refused before anything runs.
+	if mainHasRun.Swap(true) {
+		return refuse(standardError, errors.New("refusing a second engine run in one process, since the first run's "+
+			"rule options are still set on the analyzers; start a new engine process for each project"))
+	}
 	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
 	capMemory(os.LookupEnv, debug.SetMemoryLimit)
 	return run(arguments, standardOutput, standardError, rules.All())

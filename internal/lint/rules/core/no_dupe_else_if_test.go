@@ -28,7 +28,7 @@ func TestNoDupeElseIfFires(test *testing.T) {
 
 		// Commutativity, which is sound only because these are read for truthiness.
 		//
-		// The first two cases below do NOT exercise the commutative branch in conditionsAreEqual,
+		// The first two cases below do not exercise the commutative branch in conditionsAreEqual,
 		// which is worth stating because I thought they did. Splitting `a && b` and `b && a` gives
 		// the operand sets {a,b} and {b,a}, and the subset test is order-independent, so they match
 		// without any commutative comparison. Found by dropping the commutative branch and watching
@@ -58,7 +58,7 @@ func TestNoDupeElseIfFires(test *testing.T) {
 		// rather than comparing against the immediately preceding branch only.
 		{"two earlier branches covering one later", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} else if(a || b) {} }\n"},
 
-		// A later `&&` extending an earlier one. Fires, but it does NOT measure the conjunct
+		// A later `&&` extending an earlier one. Fires, but it does not measure the conjunct
 		// expansion: `a && b && c` splits into the single operand set {a,b,c}, which the earlier
 		// {a,b} is already a subset of. Kept as a case in its own right.
 		{
@@ -67,7 +67,7 @@ func TestNoDupeElseIfFires(test *testing.T) {
 				"export function run() { if(a && b) {} else if(a && b && c) {} }\n",
 		},
 		// These two do measure it, and finding them took three attempts. The expansion matters when
-		// a conjunct is itself an OR, because the conjunct then has its own OR-groups that earlier
+		// a conjunct is itself an `||`, because the conjunct then has its own `||`-groups that earlier
 		// branches can cover separately. `(a || b) && c` as a whole is one group {(a||b), c} that
 		// nothing covers, while the conjunct `a || b` is two groups that `if(a)` and `if(b)`
 		// between them eliminate.
@@ -122,7 +122,7 @@ func TestNoDupeElseIfStaysSilent(test *testing.T) {
 		// A nested if inside a consequent is not part of this chain, which is what the alternate
 		// check enforces. Without it the inner condition would be compared to the outer one.
 		//
-		// The braced cases do NOT measure that check, which is worth stating because I assumed they
+		// The braced cases do not measure that check, which is worth stating because I assumed they
 		// did. A braced consequent makes the inner if's parent a Block, so the walk stops at the
 		// kind test one line earlier and never reaches the alternate test. Found by dropping the
 		// alternate check and watching both stay green.

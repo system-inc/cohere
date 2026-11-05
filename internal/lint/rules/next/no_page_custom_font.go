@@ -126,7 +126,7 @@ var NoPageCustomFont = rule.Rule{
 		inDocument := nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString())
 
 		// Collected once at rule entry rather than by a stateful visitor, because
-		// `export default CustomDocument;` may sit BELOW the JSX it exports and upstream's answer
+		// `export default CustomDocument;` may sit below the JSX it exports and upstream's answer
 		// is order independent: it reads the module record rather than the walk. Upstream's fourth
 		// passing case is exactly that shape and a source-order visitor reports it.
 		defaultExportedNames := defaultExportedLocalNames(ruleContext.SourceFile)
@@ -174,7 +174,7 @@ var NoPageCustomFont = rule.Rule{
 // Two ways to be inside, matching upstream's ancestor walk exactly:
 //
 //   - an ancestor is a declaration carrying both `export` and `default`, which covers
-//     `export default function CustomDocument() {}` and, critically, the ANONYMOUS
+//     `export default function CustomDocument() {}` and, critically, the anonymous
 //     `export default function() {}` — that one is reached without ever resolving a name, and a
 //     port that walks up looking for a named function and then consults an export table reports it
 //   - an ancestor is a function or class whose name is what a separate `export default <name>`
@@ -185,10 +185,10 @@ var NoPageCustomFont = rule.Rule{
 //
 // # Where a name comes from, and the part a research pass got backwards
 //
-// An arrow function contributes no name OF ITS OWN and therefore falls back to the enclosing
+// An arrow function contributes no name of its own and therefore falls back to the enclosing
 // variable declarator, exactly like an anonymous function expression does. A recorded research pass
 // read oxc's `AstKind::ArrowFunctionExpression(_) => None` as "arrows are skipped, only anonymous
-// functions fall through to the declarator" and had it inverted: that `None` IS the id, and it flows
+// functions fall through to the declarator" and had it inverted: that `None` is the id, and it flows
 // straight into the `map_or_else` whose fallback reads the declarator. `_ => continue` is what skips
 // a node; `None` does the opposite.
 //
@@ -199,7 +199,7 @@ var NoPageCustomFont = rule.Rule{
 //	const D = function () { return <link .../> };      export default D;   SILENT
 //	const D = function Inner() { return <link .../> }; export default D;   REPORTS
 //
-// The last line is the same mechanism seen from the other side and is the sharper case: a NAMED
+// The last line is the same mechanism seen from the other side and is the sharper case: a named
 // function expression takes its own name, `Inner`, and never consults the declarator, so the
 // declarator's `D` is never compared and the default export never matches. The rule is not "what is
 // this thing called at its binding site" but "what is its own name, or failing that its binding
@@ -277,7 +277,7 @@ func nameOfFunctionOrClass(node *ast.Node) (name string, carriesName bool) {
 // Measured: `const [D] = [() => <link ... />]; export default D;` reports upstream, and reports
 // here.
 //
-// The identifier guard is kept for intent and is EQUIVALENT rather than load-bearing, which is
+// The identifier guard is kept for intent and is equivalent rather than load-bearing, which is
 // recorded because a sweep will find it and a later reader should not spend the round trip twice.
 // Relaxing it to `binding == nil` alone was scored and survived; the mutant was then run directly
 // on the destructuring input above and produced the identical answer, so no input distinguishes
@@ -305,7 +305,7 @@ func nameFromEnclosingVariableDeclarator(node *ast.Node) (name string, carriesNa
 // by `module.IsDefaultExported` on the ancestor walk instead, so collecting it here as well would
 // be a second answer to a question already answered.
 //
-// `export { D as default }` is deliberately NOT collected, and that is fidelity rather than an
+// `export { D as default }` is deliberately not collected, and that is fidelity rather than an
 // omission: upstream reads `local_export_entries` and measured on the release binary that spelling
 // **reports**, so a file exporting its document that way is flagged upstream and is flagged here.
 func defaultExportedLocalNames(sourceFile *ast.SourceFile) map[string]bool {

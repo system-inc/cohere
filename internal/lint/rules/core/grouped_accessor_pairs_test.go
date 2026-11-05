@@ -212,9 +212,9 @@ func TestGroupedAccessorPairsFires(test *testing.T) {
 
 // The span upstream reports, for every finding that states a column.
 //
-// It is the accessor HEAD rather than the whole member: `set a`, `static get a`, `set [a]`, from
+// It is the accessor head rather than the whole member: `set a`, `static get a`, `set [a]`, from
 // the `get`/`set` or `static` keyword through the key, stopping before the parameter list.
-// Upstream computes it with `getFunctionHeadLoc` over the accessor's function VALUE; our tree has
+// Upstream computes it with `getFunctionHeadLoc` over the accessor's function value; our tree has
 // no separate value node, so the same span is the member's own token start through its key's end,
 // which was probed against seven shapes including a static, a computed key, a private name, a
 // numeric key and a string key before being written.
@@ -585,15 +585,15 @@ func TestGroupedAccessorPairsMessageText(test *testing.T) {
 	}
 }
 
-// A computed key whose expression is NOT a literal, beside a static key that reads the same way.
+// A computed key whose expression is not a literal, beside a static key that reads the same way.
 //
 // A mutation tagging the token-text fallback as though it were a static name survived the whole
 // imported corpus, because upstream never writes a computed key beside a plain key of the same
-// spelling. These three do, and all three measured CLEAN against the installed eslint at 10.8.1:
+// spelling. These three do, and all three measured clean against the installed eslint at 10.8.1:
 // `get [a]` names whichever property the variable `a` holds, which is not knowable before it runs,
 // so it can never be shown to be the same property as `a` or `'a'`.
 //
-// The fourth row is the control. Two computed keys spelled the same way DO pair, through upstream's
+// The fourth row is the control. Two computed keys spelled the same way do pair, through upstream's
 // token-list comparison, so a rule that simply declined every computed key would pass the first
 // three for the wrong reason.
 func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(test *testing.T) {

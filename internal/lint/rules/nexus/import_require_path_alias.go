@@ -98,7 +98,7 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 
 	information, statError := os.Stat(root)
 	if statError != nil {
-		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which cannot be read (%v), so no file "+
+		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which cannot be read (%w), so no file "+
 			"would be inside it and the rule would report nothing", settings.RepositoryRoot, root, statError)
 	}
 	if !information.IsDir() {

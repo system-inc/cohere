@@ -57,7 +57,7 @@ func TestNoExtraLabelFires(test *testing.T) {
 
 // The clean cases are the whole discrimination, and the scope stack is what they test.
 //
-// A rule reporting whenever a jump's label names SOME enclosing label reports every one of these,
+// A rule reporting whenever a jump's label names some enclosing label reports every one of these,
 // because in all fifteen the label does enclose the jump. What makes them clean is that something
 // breakable sits between the jump and the label, so the label is the only thing that reaches it.
 // The two continue cases pin the switch frame: a switch is breakable but cannot be continued, so
@@ -98,7 +98,7 @@ func TestNoExtraLabelStaysSilent(test *testing.T) {
 
 // The fix vectors, which are upstream's own output fields.
 //
-// These assert what the repair WRITES rather than that a finding appeared, which is the only
+// These assert what the repair writes rather than that a finding appeared, which is the only
 // assertion that can see a fixer repairing the right span with the wrong text. The comment cases
 // are the interesting half: a comment before the keyword or after the label sits outside the
 // removal span and the repair is still offered.
@@ -140,7 +140,7 @@ func TestNoExtraLabelFixes(test *testing.T) {
 //
 // Each carries output: null upstream, which is a decision rather than an omission: a comment sits
 // inside the span the removal would delete, so applying the repair unattended would destroy it.
-// Asserting the source is UNCHANGED is the only thing that can see a port which repairs a case
+// Asserting the source is unchanged is the only thing that can see a port which repairs a case
 // upstream refuses to touch, since the finding itself is identical either way.
 func TestNoExtraLabelDeclinesToFixOverAComment(test *testing.T) {
 	test.Parallel()
@@ -160,7 +160,7 @@ func TestNoExtraLabelDeclinesToFixOverAComment(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "unexpected")
-			// The decline is asserted as the ABSENCE of a proposal rather than through
+			// The decline is asserted as the absence of a proposal rather than through
 			// ExpectFixedSource, which refuses a result carrying no fixes rather than treating it
 			// as an unchanged rewrite. Asserting the count is what separates a withheld repair from
 			// one that lands and happens to write the same bytes.
@@ -210,7 +210,7 @@ func TestNoExtraLabelPointsAtTheLabel(test *testing.T) {
 // never push, both survived all 38 imported cases. The arm pushes a frame that is labeled and not
 // breakable, and such a frame can never itself produce a report, since the report condition wants a
 // frame that is both. It can only stop the outward search early, and stopping early changes the
-// answer only when an outer frame of the SAME name would otherwise have reported.
+// answer only when an outer frame of the same name would otherwise have reported.
 //
 // Two labels of one name in one nest are a syntax error, so that shape is reachable only across a
 // function boundary, where the inner label starts a fresh scope. Upstream's corpus writes no

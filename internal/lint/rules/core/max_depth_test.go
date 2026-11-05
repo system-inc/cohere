@@ -12,7 +12,7 @@ const maxDepthFile = "/repository/source/MaxDepth.ts"
 
 // maxDepthOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder,
+// The argument is the option as JSON text, exactly the bytes the config layer hands the decoder,
 // so a fixture cannot bypass the decoder or accidentally test a shape a config could not deliver.
 // That is section 7c of the standard applied at the fixture rather than only in a contract test.
 func maxDepthOf(optionJson string) any {
@@ -24,15 +24,15 @@ func maxDepthOf(optionJson string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/max-depth.js by RUNNING that file with RuleTester
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/max-depth.js by running that file with RuleTester
 // intercepted, so upstream's own cases produced the fixtures rather than a parser of mine. 28 cases
 // were captured from the single RuleTester.run call.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered when driven over that case
+// Every expectation is what the installed ESLint 10.8.1 rule answered when driven over that case
 // through the Linter interface under `sourceType: module` with the typescript-eslint parser, which
 // is the only configuration cohere has. The oracle reproduced all 28 of the corpus's own declared
 // verdicts under upstream's own languageOptions, which is the control saying it measured the rule,
-// and ZERO cases change verdict between that configuration and cohere's.
+// and zero cases change verdict between that configuration and cohere's.
 //
 //	17 reporting cases, 11 clean cases.
 func TestMaxDepthFires(test *testing.T) {
@@ -103,17 +103,17 @@ func TestMaxDepthStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
-		// matches the CALL NAME.
+		// matches the call name.
 		rule_testing.ExpectClean(test, result)
 	}
 }
 
-// TestMaxDepthSpansAndMessages asserts where each finding POINTS and what it says, which
+// TestMaxDepthSpansAndMessages asserts where each finding points and what it says, which
 // TestMaxDepthFires cannot: that test compares ids and counts, so a rule anchored on the whole
 // statement instead of its keyword passes it completely.
 //
 // The span is the sharpest thing to get wrong here. Upstream reports
-// `loc: sourceCode.getFirstToken(node).loc`, so the finding covers the KEYWORD alone.
+// `loc: sourceCode.getFirstToken(node).loc`, so the finding covers the keyword alone.
 // `rule.TokenRange` -- the obvious helper, and the one nearly every other rule in this package
 // uses -- extends to `node.End()` and would underline the entire statement including its body.
 // Nothing about a message id or a count would say so.
@@ -150,7 +150,7 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 			messages: []string{"Blocks are nested too deeply (2). Maximum allowed is 1."},
 		},
 		{
-			// Two findings from one function, so the reported DEPTH has to rise between them. A
+			// Two findings from one function, so the reported depth has to rise between them. A
 			// rule reporting a constant depth passes every count-based fixture.
 			source:   "function foo() { while (true) { if (true) { if (false) { } } } }",
 			settings: maxDepthOf("1"),
@@ -190,8 +190,8 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 // exercise only where the corpus happened to configure it.
 //
 // Upstream's schema is a `oneOf` and its object form carries a JavaScript quirk that no reading of
-// the source alone predicts: the `hasOwn` guard decides whether the branch is ENTERED and the `||`
-// inside decides the VALUE, and the two disagree exactly when a zero is written. An earlier draft
+// the source alone predicts: the `hasOwn` guard decides whether the branch is entered and the `||`
+// inside decides the value, and the two disagree exactly when a zero is written. An earlier draft
 // of the decoder read it as a plain truthiness fallback and got both zero rows wrong.
 //
 // Every expected limit is read out of the installed rule's own message, which states maxDepth
@@ -211,13 +211,13 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 		{optionJson: `{"max": 2}`, maximum: 2},
 		// Neither key present, so upstream never enters the branch and the default of 4 stands.
 		{optionJson: `{}`, maximum: 4},
-		// `undefined || 0` is 0, so a lone `max` of zero WINS and reports every block.
+		// `undefined || 0` is 0, so a lone `max` of zero wins and reports every block.
 		{optionJson: `{"max": 0}`, maximum: 0},
 		// `0 || undefined` is undefined, so every comparison is false and the rule goes silent.
 		// No integer limit can express this, which is why it is a flag.
 		{optionJson: `{"maximum": 0}`, disabled: true},
 		// The `||` consults maximum first, so a truthy maximum wins over any max. The zero rows
-		// below do NOT show that precedence -- whichever key is non-zero wins under either order,
+		// below do not show that precedence -- whichever key is non-zero wins under either order,
 		// so swapping the two branches survives them. These two rows are the ones that
 		// discriminate, because both keys are non-zero and different:
 		//
@@ -252,7 +252,7 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 	}
 
 	// And end to end, because a decoder row is not a verdict. The disabled shape must report
-	// NOTHING on source that a limit of 0 would report five times.
+	// nothing on source that a limit of 0 would report five times.
 	nested := "function f() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }"
 	result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"maximum": 0}`))
 	rule_testing.ExpectClean(test, result)
@@ -285,10 +285,10 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 // # The obvious discriminating shape is the wrong one, and it cost a round
 //
 // The first version of this test used sibling methods, on the argument that without a frame the
-// second would inherit the first one's depth. That argument is wrong: the depth DECREMENTS on the
+// second would inherit the first one's depth. That argument is wrong: the depth decrements on the
 // way out, so siblings never accumulate either way, and the mutation survived these fixtures too.
 //
-// A frame RESETS a count, so it can only show where there is a count to reset: a class nested
+// A frame resets a count, so it can only show where there is a count to reset: a class nested
 // inside an already-deep block. Every row below is what the installed ESLint 10.8.1 rule answered,
 // and deleting the arm makes all four fail at once while the sibling rows stay green.
 func TestMaxDepthClassMembersAreEachTheirOwnFrame(test *testing.T) {
@@ -306,7 +306,7 @@ func TestMaxDepthClassMembersAreEachTheirOwnFrame(test *testing.T) {
 		{source: "function f() { if (a) { class C { get g() { if (b) {} } } } }", limit: "1", findings: 0},
 		{source: "function f() { if (a) { class C { constructor() { if (b) {} } } } }", limit: "1", findings: 0},
 
-		// The sibling rows, kept as a record of what does NOT discriminate: they pass with the arm
+		// The sibling rows, kept as a record of what does not discriminate: they pass with the arm
 		// and without it, because the depth decrements on exit. A reader who deletes the arm and
 		// sees these stay green should look at the rows above.
 		{source: "class C { a() { if (x) {} } b() { if (y) {} } }", limit: "1", findings: 0},

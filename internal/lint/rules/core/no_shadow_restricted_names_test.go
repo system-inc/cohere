@@ -265,7 +265,7 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(test *testing.T) {
 		{"a var undefined with an initializer", "var undefined = 5;", 1},
 		// The identity trap from brief step 8b, written for this rule's declaration type. Two
 		// `KindVariableDeclaration` anchors with the same kind and the same name in different
-		// scopes, and only the outer one is written to. Comparing declaration KIND instead of node
+		// scopes, and only the outer one is written to. Comparing declaration kind instead of node
 		// identity calls the inner declaration a match for the outer one's write, carves nothing
 		// out, and reports twice on code where upstream reports once. Confirmed against our
 		// checker: the two declarations have distinct pointers.
@@ -359,7 +359,7 @@ func TestNoShadowRestrictedNamesNeedsTheTypedHarness(test *testing.T) {
 // the offset differs, by 30 bytes.
 //
 // This is the case brief step 8b names, written for a variable declaration rather than a class. A
-// rule comparing declaration KIND rather than node identity finds both declarations to be
+// rule comparing declaration kind rather than node identity finds both declarations to be
 // `KindVariableDeclaration`, treats either as the anchor of that write, carves out neither, and
 // reports twice. Confirmed against our checker before the rule was written: the two declarations
 // have distinct pointers and the write resolves to the inner one.

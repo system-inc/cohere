@@ -24,7 +24,7 @@ import (
 // contact, because "use the logger for errors, console.log is fine for debugging" collapses the
 // first time somebody debugs an error.
 //
-// # The anchor is a member ACCESS, not a call, and that is the whole design
+// # The anchor is a member access, not a call, and that is the whole design
 //
 // Upstream registers a `MemberExpression` visitor rather than a `CallExpression` one, with a comment
 // saying why: the aliasing routes are the point. `const log = console.log` and passing
@@ -58,7 +58,7 @@ import (
 // The message interpolates the accessed member. Upstream reads it as
 // `node.property.type === 'Identifier' ? node.property.name : 'log'`, and the subtlety is that
 // estree's `property` is whatever expression sits in the brackets rather than a marker of
-// computedness. So the fallback fires on the KEY'S KIND, not on the access being computed:
+// computedness. So the fallback fires on the key's kind, not on the access being computed:
 //
 //	console.error       renders console.error
 //	console[key]        renders console.key       an Identifier property
@@ -85,7 +85,7 @@ var ConsistencyNoConsole = rule.Rule{
 			// missing on the first writing.
 			//
 			// estree has no parenthesized-expression node, so upstream's `node.object` for
-			// `(console).log('x')` IS the identifier and it reports. Our parser keeps
+			// `(console).log('x')` is the identifier and it reports. Our parser keeps
 			// `KindParenthesizedExpression`, so a receiver test without this unwrap goes silent on
 			// that shape. Measured against the real rule driven over the eslint interface; it was
 			// the one disagreement in twenty-five probed inputs.
@@ -128,7 +128,7 @@ var ConsistencyNoConsole = rule.Rule{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				access := node.AsElementAccessExpression()
 
-				// The rendered member name for a computed access is NOT always the fallback, and
+				// The rendered member name for a computed access is not always the fallback, and
 				// reading upstream's ternary got this backwards on the first writing.
 				//
 				// estree keeps `property` as whatever expression sits in the brackets, so
@@ -140,7 +140,7 @@ var ConsistencyNoConsole = rule.Rule{
 				//	console['error']    renders console.log
 				//	console['log']      renders console.log
 				//
-				// So the test is on the KEY'S KIND rather than on the access being computed.
+				// So the test is on the key's kind rather than on the access being computed.
 				methodName := "log"
 				if key := access.ArgumentExpression; key != nil && key.Kind == ast.KindIdentifier {
 					methodName = key.Text()

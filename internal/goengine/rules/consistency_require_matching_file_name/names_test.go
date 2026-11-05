@@ -8,10 +8,11 @@ import "testing"
 func TestNamesType(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		stem      string
-		typeName  string
-		declared  bool
-		wantNamed bool
+		stem             string
+		typeName         string
+		declared         bool
+		buildConstrained bool
+		wantNamed        bool
 	}{
 		{stem: "registry", typeName: "Registry", declared: true, wantNamed: true},
 		{stem: "registry_linux", typeName: "Registry", declared: true, wantNamed: true},
@@ -34,16 +35,27 @@ func TestNamesType(test *testing.T) {
 		{stem: "helpers_registry", typeName: "Registry", declared: false, wantNamed: false},
 		// A trailing underscore names no theme, and the stem still spells the type.
 		{stem: "registry_", typeName: "Registry", declared: true, wantNamed: true},
+		// A file carrying a //go:build line is a variant, and one word after the type's name is the variant's.
+		{stem: "registry_unix", typeName: "Registry", declared: true, buildConstrained: true, wantNamed: true},
+		{stem: "registry_other", typeName: "Registry", declared: true, buildConstrained: true, wantNamed: true},
+		{stem: "registry_linux_amd64", typeName: "Registry", declared: true, buildConstrained: true, wantNamed: true},
+		{stem: "registry_unix", typeName: "Registry", declared: true, wantNamed: false},
+		{stem: "registry_cgo_helpers", typeName: "Registry", declared: true, buildConstrained: true, wantNamed: false},
+		{stem: "store_unix", typeName: "Registry", declared: true, buildConstrained: true, wantNamed: false},
 	}
 	for _, testCase := range cases {
 		allowedTail := isToolchainSuffix
+		if testCase.buildConstrained {
+			allowedTail = isVariantSuffix
+		}
 		if !testCase.declared {
 			allowedTail = isThemeSuffix
 		}
 		if named := namesType(testCase.stem, testCase.typeName, allowedTail); named != testCase.wantNamed {
 			test.Errorf(
-				"namesType(%q, %q), declared %v, is %v, want %v",
-				testCase.stem, testCase.typeName, testCase.declared, named, testCase.wantNamed,
+				"namesType(%q, %q), declared %v, build constrained %v, is %v, want %v",
+				testCase.stem, testCase.typeName, testCase.declared, testCase.buildConstrained, named,
+				testCase.wantNamed,
 			)
 		}
 	}
@@ -54,9 +66,10 @@ func TestNamesType(test *testing.T) {
 func TestSuggestedName(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		typeName string
-		stem     string
-		want     string
+		typeName         string
+		stem             string
+		buildConstrained bool
+		want             string
 	}{
 		{typeName: "Registry", stem: "store", want: "registry"},
 		{typeName: "Registry", stem: "store_linux", want: "registry_linux"},
@@ -67,16 +80,27 @@ func TestSuggestedName(test *testing.T) {
 		{typeName: "URLParser", stem: "parse", want: "url_parser"},
 		{typeName: "parseState", stem: "state", want: "parse_state"},
 		{typeName: "Utf8Reader", stem: "reader", want: "utf8_reader"},
+		// A build-constrained file keeps its variant's word, and an unconstrained one has no variant to keep.
+		{typeName: "Registry", stem: "store_unix", buildConstrained: true, want: "registry_unix"},
+		{typeName: "Registry", stem: "store_helpers_other", buildConstrained: true, want: "registry_other"},
+		{typeName: "Registry", stem: "store_linux", buildConstrained: true, want: "registry_linux"},
+		{typeName: "Registry", stem: "store", buildConstrained: true, want: "registry"},
+		{typeName: "Registry", stem: "store_", buildConstrained: true, want: "registry"},
+		{typeName: "Registry", stem: "store_unix", want: "registry"},
 	}
 	for _, testCase := range cases {
-		suggestion := snakeCase(testCase.typeName) + toolchainSuffix(testCase.stem)
+		suggestion := snakeCase(testCase.typeName) + variantSuffix(testCase.stem, testCase.buildConstrained)
 		if suggestion != testCase.want {
 			test.Errorf(
 				"the suggestion for %s in %s is %q, want %q",
 				testCase.typeName, testCase.stem, suggestion, testCase.want,
 			)
 		}
-		if !namesType(suggestion, testCase.typeName, isToolchainSuffix) {
+		allowedTail := isToolchainSuffix
+		if testCase.buildConstrained {
+			allowedTail = isVariantSuffix
+		}
+		if !namesType(suggestion, testCase.typeName, allowedTail) {
 			test.Errorf("the suggestion %q for %s does not pass the rule", suggestion, testCase.typeName)
 		}
 	}

@@ -37,7 +37,7 @@ var (
 // `@VerifyIsOptional()` present with a non-nullable type is always a finding: the validator would
 // accept a missing value the compiler forbids.
 //
-// The reverse only fires when the property carries at least one OTHER `Verify*` decorator. A
+// The reverse only fires when the property carries at least one other `Verify*` decorator. A
 // nullable property with `@VerifyIsOptional()` alone is not a problem, and a nullable property with
 // no validation at all is outside the rule's scope entirely. That "at least one other" test is what
 // separates the two, and it is easy to drop into "has any Verify decorator", which would report
@@ -55,7 +55,7 @@ var (
 // they erase the distinction rather than answering it. A type of `any` beside a validator that
 // forbids missing values is not a claim anyone checked.
 //
-// Measured before this rule was written: a union carrying `undefined` does NOT answer
+// Measured before this rule was written: a union carrying `undefined` does not answer
 // `IsTypeFlagSet` directly. `string | undefined` reports the union's own flags, and only its member
 // carries `Undefined`. So the recursion inside `IsNullableType` is load-bearing rather than
 // defensive, and a port testing the top-level flags alone goes silent on every optional property.
@@ -67,7 +67,7 @@ var (
 var CorrectnessRequireVerifyOptionalParity = rule.Rule{
 	Name: "base/correctness-require-verify-optional-parity",
 
-	// The judgment is about the resolved TYPE of the property, not about its annotation. A property
+	// The judgment is about the resolved type of the property, not about its annotation. A property
 	// written `name?: string` and one written `name: string | undefined` are the same question, and
 	// only the checker collapses them.
 	NeedsTypeChecker: true,
@@ -129,13 +129,13 @@ func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *as
 		return
 	}
 
-	// The `hasOtherVerifyRule` test is the original's, and it is SUBSUMED here rather than
+	// The `hasOtherVerifyRule` test is the original's, and it is subsumed here rather than
 	// load-bearing. The line above already requires `!hasOptionalSentinel`, and the guard further up
 	// already returned for a property with no Verify decorator at all, so by this point "not the
 	// sentinel" and "some other rule" are the same fact.
 	//
 	// Measured rather than argued, because a single-site mutation cannot see it: dropping this test
-	// SURVIVES, dropping the unvalidated-property guard SURVIVES, and dropping both together fails
+	// survives, dropping the unvalidated-property guard survives, and dropping both together fails
 	// 8 lines. Kept because it states the original's condition at the line a reader compares
 	// against, and because deleting it would make the two implementations differ textually for no
 	// behavioural gain.

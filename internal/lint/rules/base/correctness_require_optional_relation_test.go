@@ -18,7 +18,7 @@ func asTheRelationHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestRelationMustBeOptional measures this port against the SOURCE rule, shape by shape.
+// TestRelationMustBeOptional measures this port against the source rule, shape by shape.
 //
 // These are our rules, so there is no corpus to import and inventing fixtures would encode the
 // same belief as the port. Every row below was measured by driving the real rule from

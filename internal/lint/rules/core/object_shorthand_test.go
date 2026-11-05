@@ -11,7 +11,7 @@ const objectShorthandFile = "/repository/source/ObjectShorthand.ts"
 
 // objectShorthandOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option list as JSON TEXT, exactly the bytes the config layer hands the
+// The argument is the option list as JSON text, exactly the bytes the config layer hands the
 // decoder, so the fixtures exercise the three-shape `anyOf` decoder rather than bypassing it.
 func objectShorthandOf(optionJson string) any {
 	settings, decodeObjectShorthandOptionsError := DecodeObjectShorthandOptions([]byte(optionJson))
@@ -22,14 +22,14 @@ func objectShorthandOf(optionJson string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/object-shorthand.js by RUNNING that file with
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/object-shorthand.js by running that file with
 // RuleTester intercepted. 262 cases from one RuleTester.run call, across 20 distinct option shapes.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered, driven through the Linter
+// Every expectation is what the installed ESLint 10.8.1 rule answered, driven through the Linter
 // interface under `sourceType: module` with the typescript-eslint parser. The oracle reproduced all
-// 262 declared verdicts AND all 122 declared outputs, 16 of which are `output: null` declines.
+// 262 declared verdicts and all 122 declared outputs, 16 of which are `output: null` declines.
 //
-// This rule has SEVEN message ids, so the findings column carries the real id per finding rather
+// This rule has seven message ids, so the findings column carries the real id per finding rather
 // than a repeated one: a rule reporting the right count under the wrong id would otherwise pass.
 //
 //	134 reporting cases (16 declines), 128 clean cases.
@@ -204,7 +204,7 @@ func TestObjectShorthandFires(test *testing.T) {
 					testCase.source, proposed)
 			}
 		case testCase.fixed != nil:
-			// `RunWithOptions` does NOT trim, unlike `RunTyped`: the untyped harness hands the
+			// `RunWithOptions` does not trim, unlike `RunTyped`: the untyped harness hands the
 			// rule the source exactly as written, so the expectation is the corpus string as-is.
 			// prefer-arrow-callback needs the opposite because it is a typed rule.
 			rule_testing.ExpectFixedSource(test, result, *testCase.fixed)
@@ -375,7 +375,7 @@ func TestObjectShorthandStaysSilent(test *testing.T) {
 // else, and every one was caught by an `output` rather than by a count.
 //
 // The rows below are the ones the corpus under-covers. Its only generic case is written with
-// ARROWS, so the function-expression branch's handling of `<T>` is unreached by it, and a mutation
+// arrows, so the function-expression branch's handling of `<T>` is unreached by it, and a mutation
 // removing that handling survived all 262 imported fixtures. Every expectation is what the
 // installed ESLint 10.8.1 rule produced.
 func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
@@ -387,7 +387,7 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
 		fixed    string
 	}{
 		{
-			// A generic FUNCTION EXPRESSION. Upstream slices from just after `function`, so the
+			// A generic function expression. Upstream slices from just after `function`, so the
 			// type parameters and the space both survive.
 			source:   "({ key: function <T>(a: T): T { return a; } });",
 			settings: nil,
@@ -399,7 +399,7 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
 			fixed:    "({ async key <T>(a: T): Promise<T> { return a; } });",
 		},
 		{
-			// A generic ARROW takes the other branch, where `<T>` sits before the parameter list
+			// A generic arrow takes the other branch, where `<T>` sits before the parameter list
 			// and the arrow token has to be dropped between them.
 			source:   "({ key: <T>(a: T): T => { return a; } });",
 			settings: objectShorthandOf(`["always", {"avoidExplicitReturnArrows": true}]`),

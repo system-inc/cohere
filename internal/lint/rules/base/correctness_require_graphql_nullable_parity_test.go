@@ -16,7 +16,7 @@ func graphQlNullableParityCaseName(index int) string {
 
 // graphQlNullableParityPreamble declares the decorators the rule keys on.
 //
-// The field decorator is declared as both a property AND a method decorator, which is not padding:
+// The field decorator is declared as both a property and a method decorator, which is not padding:
 // the underlying decorator really is valid on both, and the rule's method arm exists for that.
 const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unknown, f?: unknown, o?: unknown): ParameterDecorator;\n" +
 	"declare function GraphQlField(f?: unknown, o?: unknown): PropertyDecorator & MethodDecorator;\n" +
@@ -51,7 +51,7 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"class C {\n  @GraphQlField(() => [String], { nullable: 'items' })\n  a!: string[];\n}\n",
 		"class C {\n  @GraphQlField(() => [String], { nullable: 'itemsAndList' })\n  a!: string[];\n}\n",
 
-		// The same two spellings beside a NULLABLE type, which is what actually pins the skip. The
+		// The same two spellings beside a nullable type, which is what actually pins the skip. The
 		// pair above cannot: a skipped decorator and one read as `nullable: false` both agree with
 		// a non-nullable type, so a mutant disabling the skip survives them. Here the two paths
 		// diverge, because reading the flag as false would report typeNullableButDecoratorNot.
@@ -65,14 +65,14 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"class C {\n  @OrmManyToOne(() => Thing)\n  @GraphQlField(() => Thing, { nullable: false })\n  a?: Thing;\n}\n",
 
 		// A decorator this rule does not target, carrying a flag that would report if it did. The
-		// METHOD form is the one that pins the target-set gate: the property form is declined by
+		// method form is the one that pins the target-set gate: the property form is declined by
 		// the method gate further down anyway, so a mutant removing the target set survives it. A
 		// method with a non-target decorator reaches the return-type read and reports without the
 		// gate. Found by probing, since the corpus is mine and the obvious fixture was the weak one.
 		"class C {\n  @SomethingElse(() => String, { nullable: true })\n  a!: string;\n}\n",
 		"class C {\n  @SomethingElse(() => String, { nullable: true })\n  m(): string {\n    return '';\n  }\n}\n",
 
-		// An OPERATION decorator on something that is not a method. The original requires a method
+		// An operation decorator on something that is not a method. The original requires a method
 		// definition before reading a return type, so these are silent however wrong the flag is,
 		// and a port dropping that gate reports both. The shapes parse, so the gate is a real
 		// filter rather than a guard against something impossible. Measured silent against the real
@@ -80,10 +80,10 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"class C {\n  @GraphQlQuery(() => String, { nullable: true })\n  prop!: string;\n}\n",
 		"class C {\n  @GraphQlMutation(() => String, { nullable: true })\n  get g(): string {\n    return '';\n  }\n}\n",
 
-		// A FUNCTION-VALUED property, which is the shape that actually pins the method gate. The two
+		// A function-valued property, which is the shape that actually pins the method gate. The two
 		// above cannot: a plain property and a getter have no call signature, so the nil check below
 		// the gate declines them anyway and a mutant removing the gate survives. This one's type
-		// DOES have a call signature, so without the gate the rule reads the function's return type
+		// does have a call signature, so without the gate the rule reads the function's return type
 		// and reports. Probed to find it, then measured silent against the real ESLint rule.
 		"class C {\n  @GraphQlQuery(() => String, { nullable: true })\n  fnProp!: () => string;\n}\n",
 
@@ -103,7 +103,7 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string | null;\n}\n",
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a!: string | null;\n}\n",
 
-		// A NON-nullable input, the common shape, is not asked for null: only `nullable: true`
+		// A non-nullable input, the common shape, is not asked for null: only `nullable: true`
 		// promises a client may send one. Without this pair, the input check dropping its
 		// `declaredNullable` condition survives, since every other input fixture is nullable.
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String)\n  a!: string;\n}\n",
@@ -115,21 +115,21 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: any;\n}\n",
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: unknown;\n}\n",
 
-		// OUTPUTS keep `?: T`, ruled for #twm9k22: a resolver's undefined serializes as null, so the
+		// Outputs keep `?: T`, ruled for #twm9k22: a resolver's undefined serializes as null, so the
 		// type says nothing false about the wire. A field outside any input class, a field of an
 		// object type (which pins the input set as a set rather than as "any class decorator"),
 		// and a field resolver's return (above) all stay silent.
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string;\n}\n",
 		"@GraphQlObjectType()\nclass O {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string;\n}\n",
 
-		// A field on a METHOD inside an input class is not asked: a client sends properties, and a
+		// A field on a method inside an input class is not asked: a client sends properties, and a
 		// computed field is output whatever class holds it.
 		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  computed(): string | undefined {\n    return undefined;\n  }\n}\n",
 
-		// The field decorator on a METHOD and on a GETTER, in agreement. The property arm alone
+		// The field decorator on a method and on a getter, in agreement. The property arm alone
 		// would go silent on both rather than report them, so these pin that the arm exists at all.
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  computed(): string | null {\n    return null;\n  }\n}\n",
-		// A GETTER is silent even when its decorator and its type DISAGREE, which is a real
+		// A getter is silent even when its decorator and its type disagree, which is a real
 		// divergence from what the rule looks like it should do and was measured rather than
 		// assumed. estree calls a getter a method definition, so the original reaches it, and then
 		// declines: `getCallSignatures()` on a getter returns nothing, so its `if(!signature)
@@ -143,9 +143,9 @@ func TestGraphQlNullableParityStaysSilent(test *testing.T) {
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  get computed(): string {\n    return '';\n  }\n}\n",
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  get computed(): string | null {\n    return null;\n  }\n}\n",
 
-		// An argument decorator on something that is NOT a parameter. Unlike the operation
+		// An argument decorator on something that is not a parameter. Unlike the operation
 		// decorators, the argument arm has nothing below it to decline a wrong owner, so the
-		// parameter kind guard is directly load-bearing: measured, ALL FOUR of these report a bogus
+		// parameter kind guard is directly load-bearing: measured, all four of these report a bogus
 		// decoratorNullableButTypeNot without it, reading the property's or the class's own type as
 		// if it were a parameter's.
 		//
@@ -193,7 +193,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 			wantSpan:    "a",
 		},
 
-		// An ABSENT `nullable` is read as false, so an optional property reports. This is the third
+		// An absent `nullable` is read as false, so an optional property reports. This is the third
 		// outcome of the option read and the one a two-valued port would get wrong: it would skip
 		// the decorator entirely and go silent here.
 		{
@@ -213,7 +213,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 		},
 
 		// A method return through the Promise unwrap. Without the unwrap the type is a Promise,
-		// which is never nullable, so this case would report the OPPOSITE message and a port
+		// which is never nullable, so this case would report the opposite message and a port
 		// missing the unwrap still looks like it works.
 		{
 			sourceText:  "class C {\n  @GraphQlQuery(() => Thing, { nullable: true })\n  async find(): Promise<Thing> {\n    return new Thing();\n  }\n}\n",
@@ -234,7 +234,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 			wantSpan:    "resolve",
 		},
 
-		// An argument, which reports on the PARAMETER rather than on a name.
+		// An argument, which reports on the parameter rather than on a name.
 		{
 			sourceText:  "class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id: string): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
 			wantId:      "decoratorNullableButTypeNot",
@@ -242,7 +242,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 			wantSpan:    "@GraphQlArgument('id', () => String, { nullable: true }) id: string",
 		},
 
-		// A nullable INPUT that admits undefined but not null: the client's null is what the type
+		// A nullable input that admits undefined but not null: the client's null is what the type
 		// says cannot happen. On an argument, reported on the parameter as the parity messages are.
 		{
 			sourceText:  "class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id?: string): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
@@ -272,7 +272,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 			wantSpan:    "a",
 		},
 
-		// The field decorator on a METHOD and on a GETTER, disagreeing. Their agreeing siblings are
+		// The field decorator on a method and on a getter, disagreeing. Their agreeing siblings are
 		// in the silent list; this pair is what proves the method arm reports rather than merely
 		// declining to crash.
 		{
@@ -281,7 +281,7 @@ func TestGraphQlNullableParityFires(test *testing.T) {
 			wantMessage: "Decorator declares 'nullable: true' but the type 'string' is not nullable",
 			wantSpan:    "computed",
 		},
-		// A relation decorator that is NOT one of the three ORM ones does not exempt anything, so
+		// A relation decorator that is not one of the three ORM ones does not exempt anything, so
 		// the relation gate is pinned as a specific set rather than as "carries another decorator".
 		{
 			sourceText:  "class C {\n  @SomethingElse(() => Thing)\n  @GraphQlField(() => Thing, { nullable: false })\n  a?: Thing;\n}\n",

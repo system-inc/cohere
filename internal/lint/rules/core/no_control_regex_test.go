@@ -11,7 +11,7 @@ const controlRegexFile = "/repository/source/ControlRegex.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
-// That file carries FIVE Tester blocks, and four of them call `.test()` rather than
+// That file carries five Tester blocks, and four of them call `.test()` rather than
 // `.test_and_snapshot()`. Reading only the last one, which is what a porter opening the file sees,
 // imports 34 of 57 failing cases and silently drops the rest. The extractor counts the blocks first
 // for exactly this reason.

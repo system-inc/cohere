@@ -45,9 +45,9 @@ func runNoRestrictedExports(test *testing.T, testCase noRestrictedExportsCase) r
 //
 // `/tmp/lint-sources-fresh/eslint/tests/lib/rules/no-restricted-exports.js` was loaded with its
 // RuleTester stubbed so every case came out as data with its options attached, then every case was
-// replayed against the INSTALLED ESLint 10.8.1 rule through the Linter API under `sourceType:
+// replayed against the installed ESLint 10.8.1 rule through the Linter API under `sourceType:
 // module` with the typescript-eslint parser and a `.ts` filename, which is the only configuration
-// cohere has. The expectations below are what the installed rule ANSWERED, not what the corpus file
+// cohere has. The expectations below are what the installed rule answered, not what the corpus file
 // annotates.
 //
 // The clone (10.10.0) and the installed build (10.8.1) hold byte-identical copies of this rule,
@@ -57,7 +57,7 @@ func runNoRestrictedExports(test *testing.T, testCase noRestrictedExportsCase) r
 // clean-looking number:
 //
 //   - An absolute fixture path outside the flat config's base directory made the Linter answer
-//     "No matching configuration found" as a MESSAGE rather than an error, so all 183 cases
+//     "No matching configuration found" as a message rather than an error, so all 183 cases
 //     "reported" and the control read as satisfied. The extractor now refuses any message with no
 //     messageId.
 //   - The first interceptor kept only one RuleTester.run call. This corpus makes one, so it was
@@ -339,17 +339,17 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(test *testing.T) {
 	}
 }
 
-// TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags pins upstream's arm ORDER, which no
+// TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags pins upstream's arm order, which no
 // corpus case can reach.
 //
-// `checkExportedName` reports the named message and RETURNS, so the five default-export arms below
+// `checkExportedName` reports the named message and returns, so the five default-export arms below
 // it never run for a name that was already restricted. That return is invisible to every imported
 // fixture: reaching it needs `default` listed in `restrictedNamedExports` alongside a
 // `restrictDefaultExports` flag, and upstream's schema forbids exactly that pairing, which is why
 // the decoder here refuses it too and why upstream's corpus has no such case.
 //
 // It is still reachable, because a caller can build the options struct directly, and without the
-// return that configuration reports TWICE on one export. Found by a mutation that deleted the return
+// return that configuration reports twice on one export. Found by a mutation that deleted the return
 // and survived every one of the 183 corpus rows.
 func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(test *testing.T) {
 	test.Parallel()
@@ -376,7 +376,7 @@ func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(test *testin
 		rule_testing.ExpectFindings(test, result, "restrictedNamed")
 	}
 
-	// The control: with the name NOT restricted, the same sources reach the default arms and report
+	// The control: with the name not restricted, the same sources reach the default arms and report
 	// under the other message. Without this the assertions above would also pass for a rule that
 	// had simply stopped reading the flags at all.
 	flagsOnly := NoRestrictedExportsOptions{RestrictDefaultExports: options.RestrictDefaultExports}

@@ -12,7 +12,7 @@ const idLengthFile = "/repository/source/IdLength.ts"
 
 // idLengthOf builds the settings a config carrying this option object would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder, so
+// The argument is the option as JSON text, exactly the bytes the config layer hands the decoder, so
 // a fixture cannot bypass the decoder or test a shape a config could not deliver. That is section
 // 7c of the standard applied at the fixture rather than only in a contract test.
 func idLengthOf(optionJson string) any {
@@ -24,13 +24,13 @@ func idLengthOf(optionJson string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-length.js by RUNNING that file with RuleTester
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-length.js by running that file with RuleTester
 // intercepted. 181 cases were captured from the single RuleTester.run call.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered when driven over that case
+// Every expectation is what the installed ESLint 10.8.1 rule answered when driven over that case
 // through the Linter interface under `sourceType: module` with the typescript-eslint parser. The
 // oracle reproduced all 181 of the corpus's own declared verdicts under upstream's own
-// languageOptions, and ZERO cases change verdict between that configuration and cohere's.
+// languageOptions, and zero cases change verdict between that configuration and cohere's.
 //
 // 35 of these cases carry non-ASCII identifiers, which is what makes the grapheme count testable:
 // see text.GraphemeCount, which is scored against Intl.Segmenter.
@@ -277,7 +277,7 @@ func TestIdLengthStaysSilent(test *testing.T) {
 // 181 imported fixtures.
 //
 // Decomposed Hangul is the distinguishing shape and it is not exotic: `각` written as three
-// conjoining jamo is ONE grapheme and three runes, it carries no combining-mark property, and the
+// conjoining jamo is one grapheme and three runes, it carries no combining-mark property, and the
 // parser accepts it as an identifier. Every verdict below is what the installed ESLint 10.8.1 rule
 // answered:
 //
@@ -290,7 +290,7 @@ func TestIdLengthStaysSilent(test *testing.T) {
 // The last row is the control -- it says the skip is not simply "count Hangul as one", since two
 // decomposed syllables still count as two.
 //
-// The source LITERALS are written as escapes rather than raw characters, so nothing in the editing
+// The source literals are written as escapes rather than raw characters, so nothing in the editing
 // path can normalise a decomposed sequence into its precomposed form -- which would leave the rows
 // looking identical while silently destroying what they test. The glyphs above appear raw in this
 // comment only, for readability; the first draft of this file wrote them raw in the literals too,
@@ -351,7 +351,7 @@ func TestIdLengthCountsGraphemesNotRunes(test *testing.T) {
 // would reveal it, so deleting the arm changes nothing any imported case can see.
 //
 // **The destructuring key.** In `var { a: b } = x` only `b` is a name this file chose; `a` is the
-// source object's own property. The corpus never writes a key that is too SHORT beside a binding
+// source object's own property. The corpus never writes a key that is too short beside a binding
 // that is fine, so both survive a rule that checks the key. Measured against the installed rule at
 // min 2:
 //
@@ -373,7 +373,7 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(test *testing.T) {
 		source   string
 		settings any
 		findings int
-		// reported names the identifier the single finding must cover, so a rule reporting the KEY
+		// reported names the identifier the single finding must cover, so a rule reporting the key
 		// instead of the binding fails even where the count matches.
 		reported string
 	}{
@@ -411,12 +411,12 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(test *testing.T) {
 	}
 }
 
-// TestIdLengthSpansAndMessages asserts where each finding POINTS and what it says, which
+// TestIdLengthSpansAndMessages asserts where each finding points and what it says, which
 // TestIdLengthFires cannot: that test compares ids and counts.
 //
 // The private rows earn their place twice over. `Text()` carries the leading `#`, so a port
 // measuring the hashed spelling counts one character too many, and the message must render the
-// hash back. And upstream's own two private messages are INCONSISTENT about where the hash goes --
+// hash back. And upstream's own two private messages are inconsistent about where the hash goes --
 // `'#{{name}}'` for too-short but `#'{{name}}'` for too-long -- which is reproduced here because
 // the message text is a verdict a fixture asserts, not a thing to tidy.
 //
@@ -450,7 +450,7 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 			messages: []string{"Identifier name 'a' is too short (< 2)."},
 		},
 		{
-			// The span covers the hash while the LENGTH was measured without it.
+			// The span covers the hash while the length was measured without it.
 			source:   "class Klass { #a = 1; }",
 			settings: idLengthOf(`{"min": 2}`),
 			spans:    []string{"#a"},
@@ -490,7 +490,7 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 // TestIdLengthDecoderReadsEveryOption pins the option surface, including the two defaults that a
 // zero-value struct gets wrong.
 //
-// A rule handed nil options must enforce a minimum of 2 with properties ON. The zero value says
+// A rule handed nil options must enforce a minimum of 2 with properties on. The zero value says
 // minimum 0 and properties off, which is not a weaker rule but a silent one, and every fixture
 // above would still pass because they all configure explicitly.
 func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
@@ -515,7 +515,10 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	}
 
 	// The defaults, which the zero value does not supply.
-	decoded, _ = DecodeIdLengthOptions(nil)
+	decoded, decodeError := DecodeIdLengthOptions(nil)
+	if decodeError != nil {
+		test.Fatalf("expected no options to decode to the defaults, got %v", decodeError)
+	}
 	settings, _ = decoded.(IdLengthSettings)
 	if settings.Minimum != 2 || !settings.CheckProperties || settings.HasMaximum {
 		test.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)

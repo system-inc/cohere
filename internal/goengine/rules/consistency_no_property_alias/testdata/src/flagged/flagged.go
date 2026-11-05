@@ -123,3 +123,13 @@ func structCopy(server server) int {
 	options := server.options // want "`options` is a pure alias for `server.options`"
 	return options.port
 }
+
+// A pointer root with a return between: a nil server panics at the declaration here, and after the rewrite at the
+// read or not at all, so the message says where the panic moves rather than calling the two the same.
+func guarded(server *server, ready bool) string {
+	name := server.name // want "pure alias .* Through a nil pointer the reach panics where `name` is read"
+	if !ready {
+		return ""
+	}
+	return name
+}

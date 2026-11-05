@@ -252,7 +252,7 @@ func TestNoExtendNativeNeedsTheTypedHarness(test *testing.T) {
 	}
 }
 
-// READING a native prototype property is not extending it, which the imported corpus cannot see.
+// Reading a native prototype property is not extending it, which the imported corpus cannot see.
 //
 // The corpus writes 21 reporting cases and every one of them is an assignment or a define call, so a
 // port that anchors on `KindBinaryExpression` and forgets to ask which operator it found passes all
@@ -285,7 +285,7 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(test *testing.T) {
 	}
 }
 
-// The define call's RECEIVER must be `Object`, which the imported corpus cannot see.
+// The define call's receiver must be `Object`, which the imported corpus cannot see.
 //
 // Every define case in the corpus writes `Object.defineProperty` or `Object.defineProperties`, so a
 // port that checks the method name and forgets the receiver passes all 40 imported cases. A mutation

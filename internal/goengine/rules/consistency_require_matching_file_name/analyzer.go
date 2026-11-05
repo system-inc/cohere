@@ -10,6 +10,7 @@ package consistency_require_matching_file_name
 import (
 	"cmp"
 	"go/ast"
+	"go/build/constraint"
 	"go/token"
 	"go/types"
 	"path/filepath"
@@ -30,9 +31,10 @@ const Name = "cohere-go/consistency-require-matching-file-name"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_matching_file_name",
 	Doc: "Flags a file that serves exactly one type with methods and is not named for it: a file declaring the type " +
-		"is its name in snake_case, with Go's own _GOOS, _GOARCH or _GOOS_GOARCH suffix if it has one, and a file " +
-		"of only its methods may add a theme, graph_walk.go for Graph. A test file, main.go in package main, and " +
-		"a file serving no type or several are not judged.",
+		"is its name in snake_case, with Go's own _GOOS, _GOARCH or _GOOS_GOARCH suffix if it has one, or one " +
+		"trailing word naming its variant if it carries a //go:build line, registry_unix.go, and a file of only " +
+		"its methods may add a theme, graph_walk.go for Graph. A test file, main.go in package main, and a file " +
+		"serving no type or several are not judged.",
 	Run: run,
 }
 
@@ -116,21 +118,29 @@ func judgeFile(pass *analysis.Pass, file *ast.File, hasMethods map[*types.TypeNa
 	}
 	only := served[0]
 	stem := fileStem(fileName)
+	buildConstrained := hasBuildConstraint(file)
 	allowedTail := isToolchainSuffix
+	// A type split across build variants, registry_unix.go and registry_other.go, needs a name per variant, and a
+	// build tag such as unix, other or cgo is no suffix go/build reads, so the file's //go:build line is what makes
+	// its last word the variant's name rather than a theme.
+	if buildConstrained {
+		allowedTail = isVariantSuffix
+	}
 	if !only.declared {
 		allowedTail = isThemeSuffix
 	}
 	if namesType(stem, only.typeName.Name(), allowedTail) {
 		return
 	}
+	suffix := variantSuffix(stem, buildConstrained)
 	values := map[string]string{
 		"typeName":     only.typeName.Name(),
 		"fileName":     fileName,
-		"typeFileName": snakeCase(only.typeName.Name()) + toolchainSuffix(stem) + ".go",
+		"typeFileName": snakeCase(only.typeName.Name()) + suffix + ".go",
 	}
 	alternative := noAlternative
 	if !only.declared {
-		values["themedFileName"] = snakeCase(only.typeName.Name()) + "_<purpose>" + toolchainSuffix(stem) + ".go"
+		values["themedFileName"] = snakeCase(only.typeName.Name()) + "_<purpose>" + suffix + ".go"
 		alternative = methodFileAlternative
 	}
 	pass.Report(analysis.Diagnostic{
@@ -255,6 +265,31 @@ func isToolchainSuffix(tail string) bool {
 	}
 }
 
+// isVariantSuffix is whether tail names a build-constrained file's variant: a suffix go/build reads, or one word, the
+// build tag the file is split by, as unix in registry_unix.go. Two words are a theme and a variant, which a file
+// declaring its type does not take.
+func isVariantSuffix(tail string) bool {
+	return isToolchainSuffix(tail) || !strings.Contains(tail, "_")
+}
+
+// hasBuildConstraint is whether file carries a //go:build line before its package clause, where go/build reads one.
+// The comments are read from the AST, so //go:build in a sentence, in a string, or after the package clause, where
+// it constrains nothing, does not count.
+func hasBuildConstraint(file *ast.File) bool {
+	for _, group := range file.Comments {
+		// The comment groups are in source order, so the first past the package clause ends the search.
+		if group.Pos() >= file.Package {
+			return false
+		}
+		for _, comment := range group.List {
+			if constraint.IsGoBuild(comment.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // isThemeSuffix accepts any tail, since a file of one type's methods may be named for their theme as well as their
 // type, graph_walk.go beside graph.go, and a toolchain suffix is one more such tail.
 func isThemeSuffix(string) bool {
@@ -277,6 +312,21 @@ func toolchainSuffix(stem string) string {
 		return "_" + parts[count-1]
 	}
 	return ""
+}
+
+// variantSuffix is the suffix a suggested name keeps, so following the suggestion never changes what the file builds
+// for: the toolchain suffix stem ends with, or else, in a build-constrained file, its last word, which names the
+// variant when anything does. The name it makes always passes the rule.
+func variantSuffix(stem string, buildConstrained bool) string {
+	if suffix := toolchainSuffix(stem); suffix != "" || !buildConstrained {
+		return suffix
+	}
+	index := strings.LastIndex(stem, "_")
+	// A stem with no underscore, or only a leading or trailing one, has no word after a name to keep.
+	if index <= 0 || index == len(stem)-1 {
+		return ""
+	}
+	return stem[index:]
 }
 
 // snakeCase is name in lowercase with an underscore at each word boundary: before a capital that follows a lowercase

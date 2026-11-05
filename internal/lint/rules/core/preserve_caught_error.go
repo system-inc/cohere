@@ -163,7 +163,7 @@ var builtInErrorTypes = map[string]bool{
 //
 // # Reading the options argument
 //
-// The `cause` is the LAST property whose static key is `cause`, because the last one is what the
+// The `cause` is the last property whose static key is `cause`, because the last one is what the
 // object holds at runtime. A quoted key, a template key and a bracketed literal (`{ ["cause"]: err }`)
 // all name it; a bracketed variable does not, since it names whatever the variable holds. The port
 // this replaced read only a plain identifier key and the first match, as oxc does, so

@@ -39,11 +39,11 @@ var messageVarsOnTop = rule.Message{
 //
 // Upstream's parser wraps an exported declaration in an ExportNamedDeclaration node, so the `var`
 // is not itself a member of the statement list. That costs it two pieces of machinery: it reports
-// the PARENT so the finding does not point inside the export, and it counts an export-wrapped
+// the parent so the finding does not point inside the export, and it counts an export-wrapped
 // declaration as a declaration when scanning the run, without which `var x; export var y; var z;`
 // would report on `z`.
 //
-// Our parser makes `export` a MODIFIER on the variable statement itself, so the statement in the
+// Our parser makes `export` a modifier on the variable statement itself, so the statement in the
 // list is the declaration, its parent is the source file, and both pieces are unnecessary. Probed
 // before this was written rather than after: the three exported cases in upstream's corpus each
 // produce one VariableStatement with one modifier and a source-file parent.
@@ -53,19 +53,19 @@ var messageVarsOnTop = rule.Message{
 //
 // # Two things the directive skip gets right that are easy to get wrong
 //
-// The skip is a PREFIX scan rather than a filter. `'use strict'; var x; 'directive'; var y;` reports
+// The skip is a prefix scan rather than a filter. `'use strict'; var x; 'directive'; var y;` reports
 // on `y`, because the run of directives ended at the first `var` and the later string is an
 // ordinary expression statement sitting between two declarations. A filter that removed every
 // directive-looking statement anywhere would call it clean.
 //
 // The skip does not happen at all inside a class static block, which upstream states outright and
-// its corpus pins: `class C { static { 'use strict'; var x; } }` REPORTS. A static block has no
+// its corpus pins: `class C { static { 'use strict'; var x; } }` reports. A static block has no
 // directive prologue and no import, so a string there is just an expression. This is the one place
 // the two container kinds behave differently and it is easy to unify them by accident.
 var VarsOnTop = rule.Rule{
 	Name: "vars-on-top",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		// Anchored on the declaration LIST rather than on the variable statement, because a `var`
+		// Anchored on the declaration list rather than on the variable statement, because a `var`
 		// in a loop header has no statement wrapping it.
 		//
 		// Upstream can anchor on its VariableDeclaration because its parser uses one node for both
@@ -156,7 +156,7 @@ func varsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, insideStaticB
 // The corpus pins the looseness. `'use strict'; 'directive'; var x; var y; f();` is clean, so a
 // second unrelated string still counts as part of the prologue.
 //
-// A TEMPLATE literal deliberately does not count, and this is the one place a plausible improvement
+// A template literal deliberately does not count, and this is the one place a plausible improvement
 // would have been a real divergence. Upstream tests `expression.type === "Literal"`, and a template
 // is a TemplateLiteral in that grammar rather than a Literal, so it falls out. Our parser gives a
 // backtick string its own kind too, and a first draft accepted it on the reasoning that a template

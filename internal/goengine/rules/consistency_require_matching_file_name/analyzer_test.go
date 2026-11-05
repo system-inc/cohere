@@ -24,10 +24,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 
 // The flagged fixtures carry a // want on every file whose one type is not its name: a declaration in a file named
 // for something else or for a theme, a file of methods named for neither the type nor a theme of it, a generic type,
-// a type whose only method sits in a test file, and main.go outside package main. analysistest fails on a finding no
-// want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet
-// on a file named for its type in any spelling of its words, a themed file of methods, a //line directive, a test
-// file's helper, a file serving no type or two, and main.go in package main.
+// a type whose only method sits in a test file, main.go outside package main, a build tag's word on a file with no
+// //go:build line, and two words on one with it. analysistest fails on a finding no want expects as much as on a want
+// nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on a file named for its type in any
+// spelling of its words, a build-constrained variant named for its tag, a themed file of methods, a //line directive,
+// a test file's helper, a file serving no type or two, and main.go in package main.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

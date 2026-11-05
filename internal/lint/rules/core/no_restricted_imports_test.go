@@ -44,15 +44,15 @@ func runNoRestrictedImports(test *testing.T, testCase noRestrictedImportsCase) r
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `/tmp/lint-sources-fresh/eslint/tests/lib/rules/no-restricted-imports.js` was loaded with its
-// RuleTester stubbed, then every case was replayed against the INSTALLED ESLint 10.8.1 rule through
+// RuleTester stubbed, then every case was replayed against the installed ESLint 10.8.1 rule through
 // the Linter API under `sourceType: module` with the typescript-eslint parser and a `.ts` filename,
 // which is the only configuration cohere has. The expectations below are what the installed rule
-// ANSWERED, not what the corpus file annotates. They agree with upstream's own annotations exactly:
+// answered, not what the corpus file annotates. They agree with upstream's own annotations exactly:
 // 111 cases upstream calls valid reported nothing, 152 it calls invalid reported, and zero disagreed
 // in either direction.
 //
-// ONE row below then departs from that measurement, and it is marked at the line. Its source carries
-// an `// eslint-disable-line` comment, so what the oracle recorded was ESLint's SUPPRESSION layer
+// One row below then departs from that measurement, and it is marked at the line. Its source carries
+// an `// eslint-disable-line` comment, so what the oracle recorded was ESLint's suppression layer
 // removing a finding the rule had already produced. cohere suppresses outside the rule, so the rule's
 // own verdict is what belongs in a rule fixture. Verified by re-running the same source without the
 // comment, which reports. That makes 153 reporting rows here against the oracle's 152.
@@ -60,7 +60,7 @@ func runNoRestrictedImports(test *testing.T, testCase noRestrictedImportsCase) r
 // The clone (10.10.0) and the installed build (10.8.1) hold byte-identical copies of this rule,
 // checked with diff, so there is no version drift to reason about.
 //
-// Upstream's options are a positional ARRAY with four legal shapes; ours is one struct, and the
+// Upstream's options are a positional array with four legal shapes; ours is one struct, and the
 // decoder is where the four collapse. The rows below are written in the collapsed shape, so a row
 // that came from `["error", "foo"]` reads as one path entry named `foo`.
 func noRestrictedImportsCases() []noRestrictedImportsCase {
@@ -108,7 +108,7 @@ func noRestrictedImportsCases() []noRestrictedImportsCase {
 		{"import AllowedObject, { AllowedObjectTwo as DisallowedObject } from \"foo\";", NoRestrictedImportsOptions{Paths: []NoRestrictedImportsPath{NoRestrictedImportsPath{Name: "foo", Message: "Please import 'DisallowedObject' and 'DisallowedObjectTwo' from /bar/ instead.", ImportNames: []string{"DisallowedObject", "DisallowedObjectTwo"}}}}, []string{}},
 		{"import AllowedObject, * as DisallowedObject from \"foo\";", NoRestrictedImportsOptions{Paths: []NoRestrictedImportsPath{NoRestrictedImportsPath{Name: "bar", Message: "Please import 'DisallowedObject' from /bar/ instead.", ImportNames: []string{"DisallowedObject"}}}}, []string{}},
 		{"import \"foo\";", NoRestrictedImportsOptions{Paths: []NoRestrictedImportsPath{NoRestrictedImportsPath{Name: "foo", Message: "Please import 'DisallowedObject' and 'DisallowedObjectTwo' from /bar/ instead.", ImportNames: []string{"DisallowedObject", "DisallowedObjectTwo"}}}}, []string{}},
-		// The one row in this corpus whose expectation is NOT what the oracle answered, and the
+		// The one row in this corpus whose expectation is not what the oracle answered, and the
 		// reason is the oracle rather than the rule. Its source carries an `// eslint-disable-line`
 		// comment, so ESLint's directive layer removed the finding after the rule produced it.
 		// Measured both ways through the installed build: with the comment the Linter answers `[]`,
@@ -407,7 +407,7 @@ func TestNoRestrictedImportsEmptyObjectRestrictsNothing(test *testing.T) {
 // expectations come from reading its source rather than from replaying a measured verdict, and that
 // is stated here rather than left for a reader to infer from the corpus's silence.
 //
-// Two behaviours are asserted, both of which follow from upstream passing an EMPTY import-name map
+// Two behaviours are asserted, both of which follow from upstream passing an empty import-name map
 // for this form: a whole-module restriction reports, and an `importNames` restriction cannot.
 func TestNoRestrictedImportsChecksImportEquals(test *testing.T) {
 	test.Parallel()
@@ -494,7 +494,7 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(test *testing.T) {
 // TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup pins a shape that is observable rather
 // than cosmetic.
 //
-// Upstream folds a bare `patterns: ["a", "!b"]` into ONE entry whose group is both, which means the
+// Upstream folds a bare `patterns: ["a", "!b"]` into one entry whose group is both, which means the
 // `!` un-matches the earlier entry. Decoding them as two separate entries would make the negation
 // apply to nothing, and `foo/bar` would report where upstream is silent.
 func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) {
@@ -525,7 +525,7 @@ func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) 
 // TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly pins the second half of upstream's
 // `isTypeOnlyImport`, which its corpus never exercises.
 //
-// The predicate is a disjunction: the declaration is `import type`, OR it has specifiers and EVERY
+// The predicate is a disjunction: the declaration is `import type`, or it has specifiers and every
 // one is `type`-marked. Only the first half appears in upstream's corpus, so a mutation that deleted
 // the second survived all 263 rows while changing the verdict on ordinary TypeScript.
 //
@@ -558,7 +558,7 @@ func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(test *testing
 		{"export { type A, B } from 'mod';", []string{"path"}},
 		{"export type { A } from 'mod';", []string{}},
 		{"export { A } from 'mod';", []string{"path"}},
-		// A default import alongside an all-type named list is NOT type-only: `default` cannot
+		// A default import alongside an all-type named list is not type-only: `default` cannot
 		// carry a per-specifier `type` marker, so the statement still imports a value. Measured
 		// through the installed build, which reports `path` here. A reading that looked only at the
 		// named specifiers would call this type-only and stay silent.
@@ -572,7 +572,7 @@ func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(test *testing
 	}
 }
 
-// TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar asserts WHERE a finding lands, which no
+// TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar asserts where a finding lands, which no
 // fixture comparing message ids can see.
 //
 // A namespace import and a `export * from` both report under the `everything` family, and upstream
@@ -665,7 +665,7 @@ func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(test *testing.T) {
 		rule_testing.ExpectFindings(test, refused, "allowedImportNamePattern")
 	}
 
-	// The control that `caseSensitive` is doing something at all, on the half it DOES govern. With
+	// The control that `caseSensitive` is doing something at all, on the half it does govern. With
 	// it off, an uppercase group matches a lowercase path; with it on, it does not. Without this,
 	// the assertions above would also hold for a rule that ignored the option entirely.
 	insensitive := NoRestrictedImportsOptions{Patterns: []NoRestrictedImportsPattern{
@@ -679,7 +679,7 @@ func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(test *testing.T) {
 		noRestrictedImportsFile, "import { a } from 'mod';", sensitive))
 }
 
-// TestNoRestrictedImportsRendersTheWholeMessage asserts the TEXT a reader sees, which every fixture
+// TestNoRestrictedImportsRendersTheWholeMessage asserts the text a reader sees, which every fixture
 // above is blind to because they compare message ids and the ids do not move.
 //
 // Three things vary inside one sentence and each can be wrong independently: the list rendering

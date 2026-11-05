@@ -51,7 +51,7 @@ func TestNoDuplicateHeadReports(test *testing.T) {
 		},
 		{
 			// Not upstream, and the axis the recorded research had backwards. oxc matches the
-			// specifier's LOCAL name, so an import whose *imported* name is `Header` but which
+			// specifier's local name, so an import whose *imported* name is `Header` but which
 			// binds locally to `Head` reports. Measured reporting.
 			name:     "aliased so the local name is Head",
 			fileName: "components/Shell.tsx",
@@ -91,7 +91,7 @@ func TestNoDuplicateHeadReports(test *testing.T) {
 		{
 			// Not upstream, and it exists because a mutant reading only `Declarations[0]` survived
 			// every other fixture here. Declaration merging gives one symbol two declarations, and
-			// the checker lists them in source order, so writing the interface FIRST puts the
+			// the checker lists them in source order, so writing the interface first puts the
 			// import at index 1 and a rule reading only the first declaration goes silent on an
 			// input the release binary reports. Measured both ways: the binary reports, and the
 			// probe confirmed the ordering flips with the source order.
@@ -232,7 +232,7 @@ func TestNoDuplicateHeadIsSilent(test *testing.T) {
 // TestNoDuplicateHeadReportsOncePerFile pins the count, which is the question the corpus cannot
 // answer and the one a reader is most likely to get wrong.
 //
-// oxc accumulates labels and calls `ctx.diagnostic` once, so N copies produce ONE finding carrying N
+// oxc accumulates labels and calls `ctx.diagnostic` once, so N copies produce one finding carrying N
 // underlines. The two other readings are both natural designs: one finding per extra copy, which is
 // what `jsx-no-duplicate-props` in this tree does for a structurally similar question, and one per
 // pair. All three agree on a two-copy input, which is why the corpus cannot separate them, and they

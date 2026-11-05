@@ -52,7 +52,7 @@ func correctnessRequireResponseStatusCheckDiscardMessage() rule.Message {
 //     or a 500 the error body parses, `data.tasks` is `undefined`, and that is returned as the task
 //     list, which the read request caches as a success. The UI fails later, far from the cause.
 //   - `app/(os-layout)/finance/_components/FinanceReviewView.tsx:44`: `postCategorize` awaits the
-//     categorize POST and returns nothing, so a categorize rejected with 400 or 500 reports success,
+//     categorize `POST` and returns nothing, so a categorize rejected with 400 or 500 reports success,
 //     invalidates the cache, and the row comes back as if the click did nothing.
 //
 // # Which Responses it tracks

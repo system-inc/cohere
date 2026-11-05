@@ -21,7 +21,7 @@ import (
 //
 // The discriminator is shape, and it was bought with a corpus survey rather than guessed. A naive
 // "is it uppercase" test cannot separate shouted English from an acronym, and real prose is full of
-// both: the measured corpus put NOT, THE, IS, AND, ONE right beside SDK, API, DB, and RPC. An
+// both: the measured corpus put `NOT`, `THE`, `IS`, `AND`, `ONE` right beside SDK, API, DB, and RPC. An
 // acronym is usually a consonant cluster, or carries digits or underscores; a shouted word almost
 // always has a vowel and is a real word. Vowel-plus-allowlist was right across the whole corpus.
 //
@@ -82,13 +82,13 @@ var allowedUppercaseTokens = map[string]bool{
 	"RIFF": true, "RLE": true, "RLI": true, "RLM": true, "RLO": true, "ROAS": true, "ROI": true,
 	"RPC": true, "RSA": true, "S3": true, "SAAS": true, "SAFE": true, "SDK": true, "SEO": true, "SES": true,
 	"SGR": true, "SHA": true, "SID": true, "SKU": true, "SLA": true, "SNS": true, "SOI": true, "SPA": true,
-	"SPKI": true, "SQL": true, "SRE": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true, "SSN": true,
-	"SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
+	"SPKI": true, "SQL": true, "SRE": true, "SSA": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true,
+	"SSN": true, "SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
 	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "TUI": true, "UDID": true,
 	"UGC": true, "UI": true,
 	"UPC": true, "UPS": true, "URI": true, "URL": true, "URN": true, "US": true, "USPS": true, "UTC": true,
 	"UTF": true, "UTM": true, "UUID": true, "UX": true, "VINT": true, "WAL": true, "WASM": true,
-	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WIP": true, "XML": true, "YAML": true,
+	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WHATWG": true, "WIP": true, "XML": true, "YAML": true,
 	"YTD": true, "YUV": true, "YYYY": true,
 }
 
@@ -117,7 +117,7 @@ var currencyCodes = map[string]bool{
 
 // shoutedTwoLetterWords are two-letter words that are shouting when capitalized.
 //
-// At two characters the vowel test cannot help, since IS and IP have the same shape. So the short
+// At two characters the vowel test cannot help, since `IS` and `IP` have the same shape. So the short
 // words are named, and every other two-letter token is assumed to be an abbreviation.
 var shoutedTwoLetterWords = map[string]bool{
 	"AM": true, "AN": true, "AS": true, "AT": true, "BE": true, "BY": true, "DO": true, "GO": true,
@@ -278,7 +278,7 @@ func maskWrappedDoubleQuotes(text string) string {
 //
 // A quote is only a quote at a word boundary: the opening one must not follow a letter or a digit,
 // and the closing one must not be followed by one. Without that, the plural possessive in "the
-// users' 'NOT NULL'" could open a pair, and a quote glued to a suffix ('RENAME COLUMN'd) would mask
+// users' 'NOT NULL'" could open a pair, and a quote glued to a suffix (`'RENAME COLUMN'd`) would mask
 // a phrase the writer never closed. RE2 has no lookaround, so the boundary is checked on the match
 // indices rather than in the pattern.
 func maskSingleQuotedCapitalPhrases(text string) string {

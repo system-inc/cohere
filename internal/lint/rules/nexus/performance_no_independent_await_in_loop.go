@@ -309,7 +309,7 @@ func (analysis *independentAwaitLoopAnalysis) isIndependent() bool {
 	return !analysis.exitsOnAwaitedValue()
 }
 
-// holdsItsOwnAwait answers whether an await in the body runs once per iteration of THIS loop rather
+// holdsItsOwnAwait answers whether an await in the body runs once per iteration of this loop rather
 // than of a loop nested inside it.
 func (analysis *independentAwaitLoopAnalysis) holdsItsOwnAwait() bool {
 	found := false

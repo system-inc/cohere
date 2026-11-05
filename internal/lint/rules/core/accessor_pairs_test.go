@@ -12,7 +12,7 @@ const accessorPairsFile = "/repository/source/AccessorPairs.ts"
 
 // Addressable booleans, because every option on this rule is a pointer.
 //
-// The pointer is not decoration: `setWithoutGet` and `enforceForClassMembers` both default to TRUE,
+// The pointer is not decoration: `setWithoutGet` and `enforceForClassMembers` both default to `true`,
 // so a plain bool field cannot tell "the key was absent" from "the key was written as false", and
 // the zero value would silently invert the rule for anyone configuring it as a bare severity.
 var (
@@ -57,7 +57,7 @@ func runAccessorPairs(test *testing.T, testCase accessorPairsCase) rule_testing.
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/accessor-pairs.js` was loaded with its RuleTester stubbed, so every case came out
-// as data with its options attached, and each one was then replayed against the INSTALLED rule in
+// as data with its options attached, and each one was then replayed against the installed rule in
 // `node_modules` to record what it actually reports. All 313 reproduced exactly, so the expectations
 // below are measurements rather than transcriptions of the `errors` arrays.
 //
@@ -409,13 +409,13 @@ func TestAccessorPairsStaysSilent(test *testing.T) {
 
 // The three imported cases that cannot be expressed here, and what covers them instead.
 //
-// Upstream's corpus has three clean cases whose cleanliness comes from OUTSIDE the rule: two set
+// Upstream's corpus has three clean cases whose cleanliness comes from outside the rule: two set
 // `languageOptions.globals` to mark `Object` or `Reflect` as undefined, and one writes the same
 // thing as a `/* globals Object:off */` comment directive. Our harness has no channel for either,
 // so the inputs cannot be reproduced as clean and are recorded here rather than dropped or bent to
 // green.
 //
-// Measured against the installed rule with the globals left in place, all three REPORT, and this
+// Measured against the installed rule with the globals left in place, all three report, and this
 // asserts that agreement rather than upstream's disabled-global silence. So the divergence is in
 // what the harness can say, not in what the rule decides.
 //
@@ -466,7 +466,7 @@ func TestAccessorPairsDeclinesALocalObjectBinding(test *testing.T) {
 // The typed harness is required, and a revert to `Run` must fail loudly rather than go quiet.
 //
 // `GetSymbolAtLocation` on a nil checker returns nil rather than crashing, so a rule that lost its
-// type information would report NOTHING on the descriptor path and every clean fixture would pass
+// type information would report nothing on the descriptor path and every clean fixture would pass
 // vacuously. This pins the direction: with no checker the descriptor finding disappears, while the
 // object-literal finding, which needs no checker, survives.
 func TestAccessorPairsNeedsTheTypedHarness(test *testing.T) {
@@ -486,8 +486,8 @@ func TestAccessorPairsNeedsTheTypedHarness(test *testing.T) {
 //
 // The span runs from the accessor's first keyword through the end of its key, so a static member
 // reports `static set a` and a quoted key reports `set 'a b'` with the quotes. Every expectation
-// here was read off the INSTALLED rule's reported columns rather than off its source: upstream
-// builds the span with `getFunctionHeadLoc`, whose argument is the function VALUE rather than the
+// here was read off the installed rule's reported columns rather than off its source: upstream
+// builds the span with `getFunctionHeadLoc`, whose argument is the function value rather than the
 // accessor, and reading that helper does not obviously predict that `static` is inside the span.
 //
 // A rule reporting the whole accessor including its body would pass every id fixture above.
@@ -544,7 +544,7 @@ func TestAccessorPairsPointsAtTheAccessorHead(test *testing.T) {
 	}
 }
 
-// What the finding SAYS, asserted by equality on the whole rendered sentence.
+// What the finding says, asserted by equality on the whole rendered sentence.
 //
 // The accessor description is built by interpolation, so nothing above can see it: a description
 // naming the wrong half, dropping `static`, or quoting a private name would satisfy every message-id
@@ -552,7 +552,7 @@ func TestAccessorPairsPointsAtTheAccessorHead(test *testing.T) {
 // ones where its two name paths diverge.
 //
 // `setter '#a'` against `private setter #a` is the pair worth reading. A string key that happens to
-// spell a private name renders QUOTED, while a real private name renders bare and keeps its hash.
+// spell a private name renders quoted, while a real private name renders bare and keeps its hash.
 // Upstream reaches those through two different branches, and a port collapsing them to one would
 // render one of the two wrongly while every count stayed right.
 func TestAccessorPairsDescribesTheAccessor(test *testing.T) {
@@ -610,7 +610,7 @@ func TestAccessorPairsDescribesTheAccessor(test *testing.T) {
 
 // The decoder, which is the line most likely to be wrong and has no upstream counterpart.
 //
-// Two of these four options default to TRUE, so the failure mode is a rule that silently stops
+// Two of these four options default to `true`, so the failure mode is a rule that silently stops
 // reporting rather than one that errors. An absent key must keep the default; an explicit `false`
 // must override it; and nil input, which is what the config layer hands a rule configured as a bare
 // severity, must produce the defaults rather than the zero value.
@@ -682,7 +682,7 @@ func TestAccessorPairsWithNilOptionsUsesTheDefaults(test *testing.T) {
 		"var o = { get a() {} };"))
 }
 
-// Computed keys that differ only in SHAPE, which the imported corpus does not separate.
+// Computed keys that differ only in shape, which the imported corpus does not separate.
 //
 // Written for a surviving mutant: dropping the kind marker from the token rendering left every
 // upstream case green, because upstream's own computed-key pairs all differ in a leaf or an
@@ -692,7 +692,7 @@ func TestAccessorPairsWithNilOptionsUsesTheDefaults(test *testing.T) {
 //
 // Every verdict here was measured against the installed rule before being written down, because the
 // question "does upstream compare structure or text" is not answerable from `getTokens` alone: a
-// token stream is flat, so upstream separates these by the BRACKET tokens it happens to include,
+// token stream is flat, so upstream separates these by the bracket tokens it happens to include,
 // while this separates them by the node kind. Different mechanisms, and the corpus does not say
 // they agree, so it was measured.
 func TestAccessorPairsSeparatesComputedKeysByShape(test *testing.T) {

@@ -41,7 +41,7 @@ var messageMultiStr = rule.Message{
 // a Windows break as one match; since this rule only asks whether a break is present at all, that
 // branch makes no difference here and the membership test below says the same thing.
 //
-// # The JSX exemption is real, and it is about the PARENT
+// # The JSX exemption is real, and it is about the parent
 //
 // Upstream declines when `node.parent.type` starts with `JSX`. The shape that reaches it is a
 // string-valued JSX attribute, whose parent is a `JSXAttribute`, and the exemption is why a

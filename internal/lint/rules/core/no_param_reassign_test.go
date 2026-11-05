@@ -30,13 +30,13 @@ func decodedParamOptions(test *testing.T, raw string) any {
 // invalid. Extracted by evaluating the tester with a stubbed RuleTester, so no source string here
 // was typed by hand.
 //
-// Each invalid row carries the message id, the RENDERED message text, and the byte offsets of the
+// Each invalid row carries the message id, the rendered message text, and the byte offsets of the
 // span, all measured by running the installed rule. The rendered text matters because this rule
 // interpolates the parameter name into both messages, and an id assertion cannot see a message
 // naming the wrong parameter -- which is exactly what a rule reporting at the anchor rather than at
 // the occurrence would produce on a two-parameter function.
 //
-// The offsets are stated against the source AS THE HARNESS WRITES IT. `RunTyped` writes each fixture
+// The offsets are stated against the source as the harness writes it. `RunTyped` writes each fixture
 // as the trimmed source plus a newline, and every case here is a single line with no leading
 // whitespace, so the offsets are unshifted. That is checked rather than assumed: the assertion
 // slices the same string it passed in and compares the reported text.
@@ -185,7 +185,7 @@ func TestNoParamReassignStaysSilent(test *testing.T) {
 		// A catch binding spelled like the parameter, which is not it.
 		{"function foo(a) { try {} catch (a) { a = 1; } }", nil},
 
-		// A property NAMED like the parameter, on some other object. `WritesToBinding` declines the
+		// A property named like the parameter, on some other object. `WritesToBinding` declines the
 		// name side of a property access, and this is the shape that reaches that guard.
 		{"function foo(a) { other.a = 1; }", nil},
 
@@ -193,9 +193,9 @@ func TestNoParamReassignStaysSilent(test *testing.T) {
 		{"function foo(a) { a: for(;;) break a; }", nil},
 		{"function foo(a) { var o = { a: 1 }; }", nil},
 
-		// A parameter property on the RIGHT of an assignment, which is a read of it rather than a
+		// A parameter property on the right of an assignment, which is a read of it rather than a
 		// write through it. The corpus writes every clean shape where the parameter is read to
-		// decide WHERE a write lands and never the plainer one where it is simply the value being
+		// decide where a write lands and never the plainer one where it is simply the value being
 		// read, so a climb that forgot which side of the assignment it came up passes all 78
 		// imported cases and reports all three of these. Found by a mutant; measured silent.
 		{"function foo(a) { x = a.b; }", decodedParamOptions(test, `{"props": true}`)},
@@ -219,7 +219,7 @@ func TestNoParamReassignStaysSilent(test *testing.T) {
 	}
 }
 
-// A CONCISE arrow body, which is the one place the climb reaches a function with no statement first.
+// A concise arrow body, which is the one place the climb reaches a function with no statement first.
 //
 // Every other shape puts a statement between the expression and its function, and the statement stops
 // the climb, so the function-scope half of the stop set is never asked. A concise arrow has no
@@ -263,12 +263,12 @@ func TestNoParamReassignStopsAtAConciseArrowBody(test *testing.T) {
 			"const f = (a) => a.b;", decodedParamOptions(test, `{"props": true}`)))
 	})
 
-	// The case where the function-scope arm changes the VERDICT rather than only where the walk
+	// The case where the function-scope arm changes the verdict rather than only where the walk
 	// stops. Everything above reaches a statement or a declaration eventually, so removing the arm
 	// moves where the climb ends without moving what it answers -- both routes reach the same
 	// silence, which is why the first fixtures written for this mutant did not kill it.
 	//
-	// Here the parameter is read INSIDE a nested arrow whose whole value is then written through.
+	// Here the parameter is read inside a nested arrow whose whole value is then written through.
 	// Without the arm the climb escapes the arrow, reaches the assignment outside it, and reports a
 	// write through a parameter that is only being closed over. Measured silent upstream.
 	silentAcrossAFunctionBoundary := []string{
@@ -286,7 +286,7 @@ func TestNoParamReassignStopsAtAConciseArrowBody(test *testing.T) {
 	}
 }
 
-// A POSTFIX update through a parameter, which the corpus writes only in its prefix form.
+// A postfix update through a parameter, which the corpus writes only in its prefix form.
 //
 // Upstream's tree gives both fixities one node type and its rule answers true for that type without
 // looking at the operator; ours gives them two kinds, so the postfix one is a separate arm that no
@@ -312,10 +312,10 @@ func TestNoParamReassignSeesPostfixUpdates(test *testing.T) {
 	}
 }
 
-// A write inside a parameter's DEFAULT VALUE reports, and the parameter's own binding does not.
+// A write inside a parameter's default value reports, and the parameter's own binding does not.
 //
 // The corpus writes neither shape, and the obvious reading of upstream -- that it walks the body --
-// loses all of the reporting half. It excludes only the reference that IS the declaration, through
+// loses all of the reporting half. It excludes only the reference that is the declaration, through
 // the initialization flag on it, so everything else in the parameter list is an ordinary reference.
 // Found by a mutant that widened the search from the body to the whole function and survived every
 // fixture; measured against the installed rule on the five shapes below.
@@ -342,7 +342,7 @@ func TestNoParamReassignSeesIntoParameterDefaults(test *testing.T) {
 	}
 
 	// The silent half, and it is what keeps the widening from being a false-positive class. A
-	// parameter's own binding is the declaration, and a default that merely READS another parameter
+	// parameter's own binding is the declaration, and a default that merely reads another parameter
 	// is a read.
 	silent := []struct {
 		sourceText string
@@ -402,15 +402,15 @@ func TestNoParamReassignReachesIntoClassBodies(test *testing.T) {
 	}
 }
 
-// A nested function whose own parameter shadows an outer one reports EXACTLY ONCE.
+// A nested function whose own parameter shadows an outer one reports exactly once.
 //
 // This is the shape the corpus never writes and the one the declaration-anchor family gets wrong.
 // The corpus shadows a parameter with a `var` and never with another parameter, so a port comparing
-// declaration KIND rather than node identity passes all 78 imported cases: two parameters are the
+// declaration kind rather than node identity passes all 78 imported cases: two parameters are the
 // same kind, so a kind test calls the inner one a match for the outer, and the write is then
 // attributed to both functions and reported twice.
 //
-// It is a count assertion rather than a silence one, because upstream DOES report each of these --
+// It is a count assertion rather than a silence one, because upstream does report each of these --
 // the inner function's own parameter is being reassigned. Written first as a clean case on the
 // reasoning that a shadow is exempt, which is true of the binding it shadows and not of the shadow
 // itself. Measured against the installed rule, which reports one finding on each.
@@ -425,7 +425,7 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(test *testing.T) {
 		{"function foo(a) { function inner(a) { a = 1; } }", "a"},
 		{"function foo(a) { const inner = (a) => { a = 1; }; }", "a"},
 
-		// The same nesting with the write reaching the OUTER parameter instead, which is the case
+		// The same nesting with the write reaching the outer parameter instead, which is the case
 		// that separates "attributed to the right function" from "attributed to one function".
 		{"function foo(a) { function inner(b) { a = 1; } }", "a"},
 	}
@@ -446,7 +446,7 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(test *testing.T) {
 
 // The typed harness is required, and this pins that a later revert to the plain one fails loudly.
 //
-// The failure without a checker is SILENCE rather than a crash, because GetSymbolAtLocation tolerates
+// The failure without a checker is silence rather than a crash, because GetSymbolAtLocation tolerates
 // a nil receiver and answers nil. That is the more dangerous of the two failure modes: every
 // StaysSilent case passes vacuously and only the Fires cases notice.
 func TestNoParamReassignNeedsTheTypedHarness(test *testing.T) {
@@ -503,7 +503,7 @@ func TestNoParamReassignOptions(test *testing.T) {
 		test.Parallel()
 		// A divergence, stated at the rule and pinned here. Upstream builds a RegExp at every call
 		// and a bad pattern throws, taking the run down; this drops it, so the name stops being
-		// excused and the rule reports MORE. That is the visible direction rather than the one that
+		// excused and the rule reports more. That is the visible direction rather than the one that
 		// hides findings.
 		options := decodedParamOptions(test,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(unclosed"]}`)

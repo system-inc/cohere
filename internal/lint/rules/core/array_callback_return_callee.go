@@ -33,8 +33,8 @@ var arrayCallbackTargetMethods = map[string]bool{
 
 // arrayMethodNameFor reports which array method a function is the callback of, if any.
 //
-// This is upstream's `getArrayMethodName`, and it is the half of the rule that decides WHETHER to
-// judge at all. It walks UP from the function, because the callback can be nested inside expressions
+// This is upstream's `getArrayMethodName`, and it is the half of the rule that decides whether to
+// judge at all. It walks up from the function, because the callback can be nested inside expressions
 // that choose between callbacks without changing which method receives one:
 //
 //	foo.every(cb || function(){})         a logical expression picks one
@@ -94,7 +94,7 @@ func arrayMethodNameFor(node *ast.Node) (string, bool) {
 			if enclosing == nil {
 				return "", false
 			}
-			// Upstream writes `currentNode = func.parent`, which in ESLint's tree IS the call,
+			// Upstream writes `currentNode = func.parent`, which in ESLint's tree is the call,
 			// because that tree has no parenthesized-expression node at all. Ours does, so the
 			// wrapper's parent is the paren and the call is one step further up. Climbing to the
 			// call itself is the same position in both trees.
@@ -137,13 +137,13 @@ func arrayMethodNameForCall(call *ast.Node, argument *ast.Node, isAsync bool) (s
 	arguments := callExpression.Arguments
 
 	if !isAsync {
-		// `Array.from(iterable, mapFn)` takes its callback SECOND, which is the whole reason this
+		// `Array.from(iterable, mapFn)` takes its callback second, which is the whole reason this
 		// arm is separate from the target-method one below.
 		if isArrayStaticMethod(callee, "from") &&
 			arguments != nil && len(arguments.Nodes) >= 2 && arguments.Nodes[1] == argument {
 			return "from", true
 		}
-		// Every prototype method in the set takes its callback FIRST.
+		// Every prototype method in the set takes its callback first.
 		if name, isTarget := targetMethodNameOf(callee); isTarget &&
 			arguments != nil && len(arguments.Nodes) >= 1 && arguments.Nodes[0] == argument {
 			return name, true
@@ -164,7 +164,7 @@ func arrayMethodNameForCall(call *ast.Node, argument *ast.Node, isAsync bool) (s
 // targetMethodNameOf returns the method name a callee accesses, when it is one this rule checks.
 //
 // Upstream asks `astUtils.isSpecificMemberAccess(node, null, TARGET_METHODS)` with a null object
-// pattern, so the RECEIVER is not constrained at all: `foo.every`, `foo.bar().every` and
+// pattern, so the receiver is not constrained at all: `foo.every`, `foo.bar().every` and
 // `[1,2].every` all match, and so does anything else with a `.every`. That is deliberate upstream,
 // since the receiver's type is not knowable from syntax, and it is reproduced rather than narrowed.
 //
@@ -205,7 +205,7 @@ func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
 		return object.Text() == "Array"
 	}
 	// `isArrayFromMethod` uses `arrayOrTypedArrayPattern`, which is `/Array$/u`: any identifier
-	// ENDING in `Array`, so every typed-array constructor matches. `Int32Array.from(x, fn)` is in
+	// ending in `Array`, so every typed-array constructor matches. `Int32Array.from(x, fn)` is in
 	// the corpus and is what makes this a suffix test rather than an equality one.
 	return strings.HasSuffix(object.Text(), "Array")
 }

@@ -22,10 +22,12 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a // want at every write to standard output the rule must report: fmt's three, the
-// builtins, the standard logger's nine, under an import alias or a dot import, handed on as a value, and behind a
-// //line directive naming a test file. analysistest fails on a finding no want expects as much as on a want nothing
-// found, so the allowed and lookalike fixtures prove the rule stays quiet in package main, in a test file, on a write
-// to a writer or through a *log.Logger, and on a print or Println that resolves to something else.
+// builtins, the standard logger's nine, fmt's three writes to a writer handed os.Stdout or os.Stderr, under an import
+// alias or a dot import, handed on as a value, and behind a //line directive naming a test file. analysistest fails
+// on a finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the
+// rule stays quiet in package main, in a test file, on a write to a writer the caller hands in or through a
+// *log.Logger, on os.Stderr given as a value rather than the writer, and on a print, Println or Stdout that resolves
+// to something else.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

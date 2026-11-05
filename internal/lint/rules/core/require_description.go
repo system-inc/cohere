@@ -233,7 +233,13 @@ func requireDescriptionAdditionalPattern(additional []string) *regexp.Regexp {
 	for index, directive := range additional {
 		quoted[index] = regexp.QuoteMeta(directive)
 	}
-	return regexp.MustCompile(`^(` + strings.Join(quoted, "|") + `)(?:` + jsWhitespace + `|$)`)
+	pattern, compileError := regexp.Compile(`^(` + strings.Join(quoted, "|") + `)(?:` + jsWhitespace + `|$)`)
+	if compileError != nil {
+		// Invariant: every directive is quoted by QuoteMeta and jsWhitespace is a constant class, so the
+		// pattern always compiles; returning nil instead would quietly drop the configured directives.
+		panic(fmt.Sprintf("require-description's additional-directive pattern: %v", compileError))
+	}
+	return pattern
 }
 
 // requireDescriptionCouldBeUpstream reports whether upstream's parser could read a directive here at all,

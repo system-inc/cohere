@@ -14,7 +14,7 @@ const complexityFile = "/repository/source/Complexity.ts"
 
 // complexityOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder, so
+// The argument is the option as JSON text, exactly the bytes the config layer hands the decoder, so
 // a fixture cannot bypass the decoder or test a shape a config could not deliver.
 func complexityOf(optionJson string) any {
 	settings, decodeComplexityOptionsError := DecodeComplexityOptions([]byte(optionJson))
@@ -25,13 +25,13 @@ func complexityOf(optionJson string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/complexity.js by RUNNING that file with RuleTester
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/complexity.js by running that file with RuleTester
 // intercepted. 165 cases were captured from the single RuleTester.run call.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered when driven over that case
+// Every expectation is what the installed ESLint 10.8.1 rule answered when driven over that case
 // through the Linter interface under `sourceType: module` with the typescript-eslint parser. The
 // oracle reproduced all 165 of the corpus's own declared verdicts under upstream's own
-// languageOptions, and ZERO cases change verdict between that configuration and cohere's.
+// languageOptions, and zero cases change verdict between that configuration and cohere's.
 //
 //	96 reporting cases, 69 clean cases.
 func TestComplexityFires(test *testing.T) {
@@ -247,7 +247,7 @@ func TestComplexityStaysSilent(test *testing.T) {
 	}
 }
 
-// TestComplexityNamesAndSpans asserts every distinct NAME rendering and the span each finding
+// TestComplexityNamesAndSpans asserts every distinct name rendering and the span each finding
 // carries, which TestComplexityFires cannot: this rule has one message id, so a count fixture is
 // blind to both the name builder and the head-location logic, and those are most of the port.
 //
@@ -263,7 +263,7 @@ func TestComplexityStaysSilent(test *testing.T) {
 //	class C { static { } static(){ } }        a method named `static` is "Method 'static'",
 //	                                          while `static static(){}` is "Static method 'static'"
 //
-// The first two are upstream naming a function by what it is ASSIGNED to rather than by its own
+// The first two are upstream naming a function by what it is assigned to rather than by its own
 // syntax, and the third is the modifier and the name being the same word.
 func TestComplexityNamesAndSpans(test *testing.T) {
 	test.Parallel()
@@ -271,7 +271,7 @@ func TestComplexityNamesAndSpans(test *testing.T) {
 	cases := []struct {
 		source   string
 		settings any
-		// span is the text the finding must cover: the function HEAD, never its body.
+		// span is the text the finding must cover: the function head, never its body.
 		span string
 		// message is the whole computed sentence up to the threshold clause, so both the name and
 		// the counted complexity are asserted.
@@ -302,7 +302,7 @@ func TestComplexityNamesAndSpans(test *testing.T) {
 			span: "y", message: "Method 'y' has a complexity of 3.",
 		},
 		{
-			// An arrow in a field position is named for the FIELD, not as an arrow function.
+			// An arrow in a field position is named for the field, not as an arrow function.
 			source: "class C { x = () => a || b || c; }", settings: complexityOf("2"),
 			span: "x = ", message: "Method 'x' has a complexity of 3.",
 		},
@@ -311,13 +311,13 @@ func TestComplexityNamesAndSpans(test *testing.T) {
 			span: "static", message: "Class static block has a complexity of 2.",
 		},
 		{
-			// A method whose NAME is `static`, with no static modifier.
+			// A method whose name is `static`, with no static modifier.
 			source:   "class C { static { a || b; } static(){ c || d || e; } static { f || g; } }",
 			settings: complexityOf("2"),
 			span:     "static", message: "Method 'static' has a complexity of 3.",
 		},
 		{
-			// The same name WITH the modifier, so both words appear.
+			// The same name with the modifier, so both words appear.
 			source:   "class C { static { a || b; } static static(){ c || d || e; } static { f || g; } }",
 			settings: complexityOf("2"),
 			span:     "static static", message: "Static method 'static' has a complexity of 3.",
@@ -367,7 +367,7 @@ func TestComplexityNamesAndSpans(test *testing.T) {
 //	if (a) {} function f() { if (b) {} }    1 finding, on `f` with a complexity of 2
 //
 // The third row is the control, and it is the one that makes the first two mean something: it says
-// the rule is reporting at all on this input, and that `f` does NOT inherit the top-level `if`.
+// the rule is reporting at all on this input, and that `f` does not inherit the top-level `if`.
 func TestComplexityNeverReportsTheProgram(test *testing.T) {
 	test.Parallel()
 
@@ -448,7 +448,7 @@ func TestComplexityNamesModifiersTheCorpusNeverCrosses(test *testing.T) {
 			span:   "static async *m", message: "Static async generator method 'm' has a complexity of 2.",
 		},
 		{
-			// A private name is rendered WITHOUT quotes, unlike every other name.
+			// A private name is rendered without quotes, unlike every other name.
 			source: "class C { #p() { a || b; } }",
 			span:   "#p", message: "Private method #p has a complexity of 2.",
 		},
@@ -480,7 +480,7 @@ func TestComplexityNamesModifiersTheCorpusNeverCrosses(test *testing.T) {
 // TestComplexityDecoderReadsEveryOptionShape pins the option surface, including the JavaScript
 // quirk this rule shares with max-depth.
 //
-// Upstream's threshold handling gates on PRESENCE (`hasOwn`) and picks by TRUTHINESS (`||`), and
+// Upstream's threshold handling gates on presence (`hasOwn`) and picks by truthiness (`||`), and
 // the two disagree exactly when a zero is written, so the two zero spellings do opposite things.
 // The table below is the same one `DecodeMaxDepthOptions` carries, verified against the installed
 // complexity rule rather than assumed to transfer.
@@ -540,7 +540,7 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 		}
 	}
 
-	// End to end, because a decoder row is not a verdict. The silencing shape must report NOTHING
+	// End to end, because a decoder row is not a verdict. The silencing shape must report nothing
 	// on source that a threshold of 0 reports on.
 	branchy := "function f() { if (a) {} if (b) {} }"
 	result := rule_testing.RunWithOptions(test, Complexity, complexityFile, branchy, complexityOf(`{"maximum": 0}`))
@@ -570,7 +570,7 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 	rule_testing.ExpectClean(test, result)
 }
 
-// TestComplexityNameBuilderBranches tests `complexityNameOf` DIRECTLY rather than through the
+// TestComplexityNameBuilderBranches tests `complexityNameOf` directly rather than through the
 // rule's messages.
 //
 // The two tables above assert renderings end to end, and they are the ones that caught three real
@@ -667,7 +667,7 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 			want:   "Class field initializer",
 		},
 		{
-			// A function that BORROWS its name from what it is assigned to, which is the branch
+			// A function that borrows its name from what it is assigned to, which is the branch
 			// three end-to-end defects came from.
 			source: "class C { x = () => 1; }",
 			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
@@ -684,7 +684,7 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 			want:   "Method 'c'",
 		},
 		{
-			// A named function expression in a property position is named for the PROPERTY, not
+			// A named function expression in a property position is named for the property, not
 			// for itself: upstream tries the property name first and falls back to the function's
 			// own id only when the property name is not static. Measured against the installed
 			// rule, which renders "Method 'd'" here.

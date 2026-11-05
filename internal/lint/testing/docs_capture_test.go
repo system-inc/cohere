@@ -85,7 +85,9 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 			if scanError := scanner.Err(); scanError != nil {
 				test.Fatalf("%s: %v", path, scanError)
 			}
-			file.Close()
+			if closeError := file.Close(); closeError != nil {
+				test.Fatalf("%s: %v", path, closeError)
+			}
 		}
 		if !captureOn && len(paths) > 0 {
 			test.Errorf("capture off created %v", paths)

@@ -15,7 +15,7 @@ const uselessComputedKeyFile = "/repository/source/UselessComputedKey.ts"
 //
 // `optionsJson` is the raw config text rather than a built struct, so every case is routed through
 // the rule's own decoder. That is the only thing that puts the default inversion under test: the
-// option defaults to TRUE, so a struct built by hand in a fixture would silently agree with a
+// option defaults to `true`, so a struct built by hand in a fixture would silently agree with a
 // decoder that had the default backwards.
 type noUselessComputedKeyCase struct {
 	source      string
@@ -153,7 +153,7 @@ var noUselessComputedKeyFiringCases = []noUselessComputedKeyCase{
 // TestNoUselessComputedKeyFires runs upstream's 65 invalid cases.
 //
 // Each asserts three things rather than one: that the finding appears, that its rendered message
-// carries the key's SOURCE text, and that the repair writes exactly what upstream's `output` says.
+// carries the key's source text, and that the repair writes exactly what upstream's `output` says.
 // The last two are what a message-id assertion cannot see, and this rule is precisely the shape
 // where that matters -- a fixer replacing a constructed span can be anchored correctly, report the
 // right id, and still write the wrong bytes.
@@ -474,7 +474,7 @@ func TestNoUselessComputedKeyReportsRawTextNotCookedText(test *testing.T) {
 // TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers pins the default that a generic
 // decoder would invert.
 //
-// `enforceForClassMembers` defaults to TRUE, so nil options, an empty object, and an explicit true
+// `enforceForClassMembers` defaults to `true`, so nil options, an empty object, and an explicit true
 // must all enforce, while only an explicit false narrows. A `DecodeOptionsInto` would answer the
 // zero value for the first two and silently disagree with upstream on both.
 func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testing.T) {
@@ -526,7 +526,7 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testin
 // The check reads as defensive coding and a mutation neutralising it survived every other fixture
 // here, so its reachability was probed rather than argued. Error recovery synthesizes an
 // unterminated computed name from source no well-formed file contains: across eleven malformed
-// inputs, seven produced a `KindComputedPropertyName` whose token range does NOT end in `]`, with
+// inputs, seven produced a `KindComputedPropertyName` whose token range does not end in `]`, with
 // spans like `[`, `['x'`, and `['x' ()`.
 //
 // That matters because this rule's repair replaces bracket to bracket. Handed a span whose last
@@ -535,7 +535,7 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testin
 // the shape the brief calls for: report the finding, withhold the repair.
 //
 // No fixture asserting a message id can see this, because the id is identical either way. The
-// assertion has to be on what the finding OFFERS.
+// assertion has to be on what the finding offers.
 func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(test *testing.T) {
 	test.Parallel()
 

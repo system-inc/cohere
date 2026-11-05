@@ -10,7 +10,7 @@ import (
 // eqeqeqFile is where the fixtures pretend to live.
 const eqeqeqFile = "/repository/source/Eqeqeq.ts"
 
-// eqeqeqRepair says which KIND of repair a finding must carry.
+// eqeqeqRepair says which kind of repair a finding must carry.
 //
 // This is the whole rule, and it is the one property no message-id fixture can see. Every finding
 // this rule produces carries exactly one repair, and whether that repair is applied unattended or
@@ -40,7 +40,7 @@ type eqeqeqCase struct {
 // runEqeqeq drives one case, routing options through the rule's own exported decoder.
 //
 // Through the decoder rather than by building the struct, because the decoder is where upstream's
-// mode-DEPENDENT default lives -- the null policy defaults to Always under Always and is forced to
+// mode-dependent default lives -- the null policy defaults to Always under Always and is forced to
 // Ignore under Smart -- and where an unknown spelling is rejected. Neither line has an upstream
 // counterpart to inherit correctness from.
 func runEqeqeq(test *testing.T, testCase eqeqeqCase) rule_testing.Result {
@@ -75,7 +75,7 @@ func eqeqeqUpstreamList(options EqeqeqOptions) string {
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/eqeqeq.js` was loaded with its RuleTester stubbed so every case came out as data
-// with its options attached, then each was replayed against the INSTALLED rule in `node_modules` to
+// with its options attached, then each was replayed against the installed rule in `node_modules` to
 // record what it reports, which repair each finding carries, and what the fix phase writes. All 77
 // findings and all 46 fix outcomes reproduced, so everything below is a measurement rather than a
 // transcription of the `errors` arrays.
@@ -199,7 +199,7 @@ func TestEqeqeqStaysSilent(test *testing.T) {
 	}
 }
 
-// Which KIND of repair each finding carries, which is the rule's central judgment.
+// Which kind of repair each finding carries, which is the rule's central judgment.
 //
 // Twenty of upstream's findings carry a Fix and twenty-eight carry a Suggestion, and none carries
 // both. The split is not stylistic: a Fix is applied by the edit engine with nobody watching, and
@@ -251,7 +251,7 @@ func TestEqeqeqSplitsFixesFromSuggestions(test *testing.T) {
 	}
 }
 
-// What the fix phase WRITES, for the twenty cases that carry an applicable repair.
+// What the fix phase writes, for the twenty cases that carry an applicable repair.
 //
 // `ExpectFixedSource` replays every fix into the source and compares the whole rewritten file, so it
 // catches a repair that lands on the right span with the wrong text. Suggestions are deliberately
@@ -284,7 +284,7 @@ func TestEqeqeqFixesTheSource(test *testing.T) {
 // The twenty-six cases upstream reports and deliberately declines to apply.
 //
 // Their `output` is null because every finding on them is suggestion-only, so the fix phase leaves
-// the source alone. Asserted as carrying NO fix rather than as a fix that happens to be a no-op:
+// the source alone. Asserted as carrying no fix rather than as a fix that happens to be a no-op:
 // those are different artifacts and only the first is what upstream ships.
 func TestEqeqeqDeclinesToApplyASuggestion(test *testing.T) {
 	test.Parallel()
@@ -316,7 +316,7 @@ func TestEqeqeqDeclinesToApplyASuggestion(test *testing.T) {
 // Two fixers shipped tonight that were right about JavaScript and destroyed type information here,
 // because they built a replacement span from a node's neighbour and our AST puts `Type`,
 // `ExclamationToken` and type arguments where ESTree does not. This rule is structurally safe from
-// that -- its repair replaces the OPERATOR TOKEN and nothing else, so nothing can be swallowed --
+// that -- its repair replaces the operator token and nothing else, so nothing can be swallowed --
 // and these rows are what turns that argument into a measurement.
 //
 // Every verdict was taken from the installed rule driven through the TypeScript parser, not from
@@ -380,7 +380,7 @@ func TestEqeqeqPreservesTypeSyntax(test *testing.T) {
 // The repair replaces exactly the operator, and nothing on either side of it.
 //
 // The rows above assert the rewritten source, which would still pass if the repair happened to
-// reproduce the neighbouring bytes it deleted. This asserts the SPAN directly: the fix range must
+// reproduce the neighbouring bytes it deleted. This asserts the span directly: the fix range must
 // cover the operator token and no more. That is the property that makes this rule structurally
 // unable to eat a type annotation, so it is worth stating as a property rather than as six examples.
 func TestEqeqeqRepairSpansOnlyTheOperator(test *testing.T) {
@@ -428,7 +428,7 @@ func TestEqeqeqRepairSpansOnlyTheOperator(test *testing.T) {
 	}
 }
 
-// The decoder, which reads upstream's option list and carries a MODE-DEPENDENT default.
+// The decoder, which reads upstream's option list and carries a mode-dependent default.
 //
 // A fixture that built the options struct directly would leave the list reading, the mode-dependent
 // second element, and the rejection of an unknown spelling completely untested.

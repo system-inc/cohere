@@ -16,8 +16,9 @@ import (
 // used its default.
 //
 // This sets flags on package-level analyzers, which outlive the run. That is safe because the engine is a child
-// process that runs once, and the settings are the only thing that sets them; a process running the engine twice
-// with different options would see the second run's values in both.
+// process that runs once, which Main enforces by refusing a second call, and the settings are the only thing that
+// sets them. A test running the engine in process many times (TestEndToEnd) gives any rule it configures an
+// analyzer of its own, which runCase checks.
 func configureRules(ruleSettings settings.Settings, registered []rule.Rule) error {
 	analyzerRules := map[string]rule.Rule{}
 	for _, registeredRule := range registered {

@@ -96,6 +96,8 @@ func analyzeDeadStoresByLiveness(ruleContext rule.Context, sourceFile *ast.Node)
 func deadStoreCheckSkipped(ruleContext rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) {
 	for _, block := range deadStoreGraph(ruleContext, root, symbols).Blocks {
 		if len(block.Events) > 0 {
+			// Invariant: the gate skips a root only when it holds no occurrence of a tracked binding, the only
+			// thing that emits an event, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 			panic("no-useless-assignment skipped a root whose graph holds an event")
 		}
 	}
@@ -181,7 +183,7 @@ func collectSymbolFacts(ruleContext rule.Context, sourceFile *ast.Node) (map[*as
 		// a root is what gets its own graph, so an occurrence inside one has no edge to or from any
 		// write in another and no dataflow can see the two together.
 		//
-		// The two directions are NOT the same guard, and collapsing them costs a real diagnostic.
+		// The two directions are not the same guard, and collapsing them costs a real diagnostic.
 		// Measured against the release binary on the two shapes that separate them:
 		//
 		//	cross-root READ    `let v = 'used'; console.log(v); setTimeout(() => v = 42, 1);
@@ -255,7 +257,7 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 	//
 	// # The duplicate-layout trap, and why position-keyed reachability alone is not enough here
 	//
-	// The graph lays a `finally` block out TWICE, once for normal completion and once for the path
+	// The graph lays a `finally` block out twice, once for normal completion and once for the path
 	// leaving the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the
 	// same source positions. `unused_exports.FindUnreachable` hit this first and keyed liveness on source
 	// position rather than block identity, because for its question — can this statement run — any
@@ -263,14 +265,14 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 	//
 	// That is not sufficient for this rule, and the difference cost a real false positive on an
 	// imported clean case. Measured on upstream's clean case 39,
-	// `let a; try { foo(); } finally { a = 5; } console.log(a);`, BOTH copies of `a = 5` are
+	// `let a; try { foo(); } finally { a = 5; } console.log(a);`, both copies of `a = 5` are
 	// reachable: one sits on the normal path and flows to the `console.log(a)` that reads it, and
 	// the other sits on the abrupt path and is a terminal block with no successors at all. A
 	// per-block verdict reports the terminal copy, because nothing follows it, and the write it
 	// names certainly runs and is certainly read.
 	//
 	// So the reachability question and the liveness question need different keys. Reachability is
-	// keyed by position, as `unused` established. Liveness has to be UNIONED across every copy of
+	// keyed by position, as `unused` established. Liveness has to be unioned across every copy of
 	// one position before a write is judged, because the copies are one write in the source and a
 	// value read after any copy is a value that write produced.
 	reachable := map[int]bool{}
@@ -287,14 +289,14 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 	//
 	// # What moved out of this file, and what did not
 	//
-	// This used to be a hand-written loop here: iterate blocks by DESCENDING INDEX, rebuild each
+	// This used to be a hand-written loop here: iterate blocks by descending index, rebuild each
 	// block's successor union from scratch every round, compare, repeat. Both of those were
 	// workarounds for the graph exposing neither an iteration order nor predecessor edges, and both
 	// are now the framework's problem rather than this rule's. `Solve` walks reverse postorder
 	// reversed, which is the order a backward analysis wants, and it excludes unreachable blocks for
 	// the reason spelled out above.
 	//
-	// The LATTICE did not move. The meet is still the union of the reachable successors' entry sets
+	// The lattice did not move. The meet is still the union of the reachable successors' entry sets
 	// and the transfer is still `applyBlockTransfer` walking one block's events backward, because
 	// those two are what this rule believes about liveness and they are exactly what the framework
 	// declines to have an opinion about. What changed is who runs them, not what they say.
@@ -309,7 +311,7 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 	)
 
 	// The reporting pass runs once the sets have settled, walking each reachable block backward and
-	// collecting a verdict per write. A write is named only when EVERY reachable copy of it found
+	// collecting a verdict per write. A write is named only when every reachable copy of it found
 	// its bit dead, which is the union described above expressed as an all-copies-agree test.
 	type writeVerdict struct {
 		event deadStoreEvent
@@ -320,7 +322,7 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 
 	// Only reachable blocks are walked, and that costs one shape upstream reports.
 	//
-	// A write that exists ONLY in an unreachable block is never judged. `function f() { let v = 1;
+	// A write that exists only in an unreachable block is never judged. `function f() { let v = 1;
 	// g(v); return v; v = 2; }` puts `v = 2` after the return, in a block nothing arrives at, and
 	// the release binary reports it while this stays silent. Measured, with a control case in the
 	// same invocation firing to prove the rule was running.
@@ -340,7 +342,7 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 		if !block.Reachable {
 			continue
 		}
-		// `In` on a Backward solution is the value on EXIT from the block: the symbols live after it.
+		// `In` on a Backward solution is the value on exit from the block: the symbols live after it.
 		// That is what the reporting walk starts from, exactly as `liveOnExit` used to supply it.
 		liveAfter, ok := solution.In(block)
 		if !ok {
@@ -400,7 +402,7 @@ func deadStoreGraph(ruleContext rule.Context, root *ast.Node, symbols map[*ast.S
 //
 // # Bottom and Entry are both empty, and they mean different things
 //
-// Bottom is the identity for union, so it is the empty set. Entry is the claim that NOTHING is live
+// Bottom is the identity for union, so it is the empty set. Entry is the claim that nothing is live
 // where the code path leaves — no symbol declared inside this root can be read after it returns —
 // and it is also the empty set. They coincide numerically and not in meaning, which is why they are
 // written separately rather than sharing one constructor.
@@ -526,7 +528,7 @@ func applyBlockTransfer(
 			// backward walk reaches it.
 			//
 			// Measured rather than argued, because the argument runs the wrong way round. A mutant
-			// replacing a set-live here with a clear SURVIVED the whole imported corpus and every
+			// replacing a set-live here with a clear survived the whole imported corpus and every
 			// fixture, and the first hypothesis — that no fixture wrote a compound assignment — was
 			// wrong: three fixtures added for it did not kill the mutant either. The line was
 			// subsumed by the Read event, so no input could distinguish the two versions. The
@@ -574,7 +576,7 @@ func recordDeadStoreEvent(
 	if hookKind == occurrenceWrite {
 		// The Write hook does not distinguish a store that loaded first, so the AST is asked.
 		//
-		// This is kept for what it SAYS rather than for what it decides, and that is recorded
+		// This is kept for what it says rather than for what it decides, and that is recorded
 		// because the honest verdict is equivalence rather than coverage. A mutant forcing this
 		// branch off survived every fixture and the whole imported corpus, and five constructed
 		// inputs across `+=`, `++` twice over, an update killed by a later write, and `||=` produced

@@ -51,7 +51,7 @@ type NoParamReassignOptions struct {
 // away the argument while leaving the name in place, and every later read gets the new value while
 // still reading as "the thing that was passed in". It also breaks `arguments` aliasing in sloppy
 // mode, where the parameter and `arguments[0]` are the same storage. Under `props` the rule extends
-// to writes THROUGH the parameter, which is a different defect: those reach the caller's object and
+// to writes through the parameter, which is a different defect: those reach the caller's object and
 // mutate it, which is invisible at the call site.
 //
 // # Why this reaches the checker
@@ -73,10 +73,10 @@ type NoParamReassignOptions struct {
 //
 // # Two findings, and the second is not a write at all
 //
-// `bar = 13` is a write to the binding and reports as one. `bar.a = 0` is a READ of the binding whose
+// `bar = 13` is a write to the binding and reports as one. `bar.a = 0` is a read of the binding whose
 // surrounding expression mutates a property, so the identifier itself writes nothing and the finding
 // comes from climbing outward from it. Upstream separates them the same way, and reports the property
-// finding only when the reference is NOT a write, which is why `({bar} = {})` reports the binding
+// finding only when the reference is not a write, which is why `({bar} = {})` reports the binding
 // finding rather than the property one.
 //
 // # The climb, which is upstream's algorithm rather than a simplification
@@ -84,9 +84,9 @@ type NoParamReassignOptions struct {
 // From the identifier, walk outward until a node that stops the search, answering along the way.
 // An assignment answers true if the climb came up its left side, an update or a `delete` answers true
 // outright, a `for...in` or `for...of` head answers true only if the climb came up its left. Four
-// shapes answer FALSE and each is a real clean case: the arguments of a call, the computed property
+// shapes answer `false` and each is a real clean case: the arguments of a call, the computed property
 // of a member access, the key of an object property, and the test of a ternary. Each is a position
-// where the parameter's value is being READ to decide where some other write lands.
+// where the parameter's value is being read to decide where some other write lands.
 //
 // The stop set is upstream's regular expression over node type names, which matches anything ending
 // in Statement, Declaration, Function, FunctionExpression, or Program -- with `for...in` and
@@ -140,8 +140,8 @@ var NoParamReassign = rule.Rule{
 				return
 			}
 
-			// The parameter list AND the body, which is one more place than the obvious reading
-			// suggests. Upstream excludes only the reference that IS the declaration, through the
+			// The parameter list and the body, which is one more place than the obvious reading
+			// suggests. Upstream excludes only the reference that is the declaration, through the
 			// `init` flag on it, and everything else in the parameter list is a reference like any
 			// other -- so `function foo(a, b = (a = 1)) { }` reports and `function foo(a, b = a) { }`
 			// does not. Searching the body alone loses every write inside a default value; measured
@@ -208,7 +208,7 @@ func collectParameterBindings(name *ast.Node, into map[*ast.Node]string) {
 	}
 	switch name.Kind {
 	case ast.KindIdentifier:
-		// Keyed on the identifier's PARENT rather than on the identifier, because that is the node
+		// Keyed on the identifier's parent rather than on the identifier, because that is the node
 		// the checker hands back as the declaration: `KindParameter` for a plain parameter and
 		// `KindBindingElement` for a destructured one. Keying on the identifier itself compiles,
 		// passes nothing, and reads as a rule that never fires -- measured, all 38 failing cases
@@ -230,7 +230,7 @@ func collectParameterBindings(name *ast.Node, into map[*ast.Node]string) {
 	}
 }
 
-// isOwnParameterBinding reports whether an identifier IS one of the anchors rather than a use of one.
+// isOwnParameterBinding reports whether an identifier is one of the anchors rather than a use of one.
 //
 // This is upstream's `init` exclusion, spelled structurally. A parameter's own binding identifier
 // resolves to the parameter and would otherwise be judged like any other occurrence; upstream skips
@@ -244,7 +244,7 @@ func collectParameterBindings(name *ast.Node, into map[*ast.Node]string) {
 //
 // It is kept because deleting it would leave the rule's silence on `function foo(a) {}` resting on
 // a property of a shelf helper in another package rather than on a decision made here, and because
-// the search now covers the parameter LIST, where the own-binding occurrence actually appears. The
+// the search now covers the parameter list, where the own-binding occurrence actually appears. The
 // redundancy is with an absence rather than with another branch, which is the shape a single-site
 // sweep structurally cannot see. Verdict taken over this function's single caller.
 func isOwnParameterBinding(identifier *ast.Node, anchors map[*ast.Node]string) bool {
@@ -254,15 +254,15 @@ func isOwnParameterBinding(identifier *ast.Node, anchors map[*ast.Node]string) b
 
 // anchoredParameterName reports whether an identifier resolves to one of this function's parameters.
 //
-// A LOOP over the symbol's declarations rather than an index into it, because the question here is
+// A loop over the symbol's declarations rather than an index into it, because the question here is
 // "does any declaration of this symbol belong to this function's parameter list". Indexing at zero
 // would go silent wherever a symbol carries more than one declaration and the parameter is not the
 // first, and the ordering of that list is not a promise.
 //
-// A mutant replacing the loop with an index at zero SURVIVES every fixture, and the reason is worth
+// A mutant replacing the loop with an index at zero survives every fixture, and the reason is worth
 // recording rather than acting on. Probed across overload shapes -- overloaded functions, overloaded
 // class methods, overloaded interface method signatures, an ambient declaration beside a definition
-// -- a merged symbol appears on the function or method NAME and never on a parameter: each overload
+// -- a merged symbol appears on the function or method name and never on a parameter: each overload
 // signature's parameters are distinct symbols carrying one declaration each. So no input
 // distinguishes the two spellings today.
 //
@@ -273,7 +273,7 @@ func isOwnParameterBinding(identifier *ast.Node, anchors map[*ast.Node]string) b
 // single caller.
 //
 // A shorthand property in a destructuring target resolves through a different accessor: `({bar} = {})`
-// asked through the plain one answers with the PROPERTY's symbol, which reads exactly like a
+// asked through the plain one answers with the property's symbol, which reads exactly like a
 // correctly declined shadow. That case is in upstream's corpus as a failing one, so the wrong
 // accessor loses a finding silently.
 func anchoredParameterName(ruleContext rule.Context, identifier *ast.Node, anchors map[*ast.Node]string) (string, bool) {
@@ -311,7 +311,7 @@ func anchoredParameterName(ruleContext rule.Context, identifier *ast.Node, ancho
 // reportParameterUse decides which of the two findings an occurrence earns, or neither.
 //
 // The order is upstream's and it is load-bearing: a write to the binding reports the binding finding
-// and STOPS, so the property check never sees it. `({bar} = {})` is a write to `bar` and reports as
+// and stops, so the property check never sees it. `({bar} = {})` is a write to `bar` and reports as
 // one; without the ordering it would also satisfy the property climb and report twice.
 func reportParameterUse(
 	ruleContext rule.Context,
@@ -335,8 +335,8 @@ func reportParameterUse(
 // modifiesPropertyThrough reports whether the expression around an identifier writes through it.
 //
 // Upstream's climb, kind for kind. It walks outward from the identifier until a node that stops the
-// search, and the four FALSE arms are the whole value of the function: each one is a position where
-// the parameter is read in order to decide where some OTHER write lands, and each is a clean case
+// search, and the four `false` arms are the whole value of the function: each one is a position where
+// the parameter is read in order to decide where some other write lands, and each is a clean case
 // upstream shipped after somebody hit it.
 //
 //	bar(a.b).c = 0        the call's argument -- the write lands on the call's result
@@ -420,12 +420,12 @@ func modifiesPropertyThrough(identifier *ast.Node) bool {
 
 // stopsPropertyClimb reproduces upstream's stop set over the kinds our parser produces.
 //
-// Upstream tests the node's TYPE NAME against a regular expression matching anything ending in
+// Upstream tests the node's type name against a regular expression matching anything ending in
 // Statement, Declaration, Function, FunctionExpression, or Program. That is a string test over
 // estree's type names, and the obvious translation -- `ast.IsStatement(node) || ast.IsDeclaration(node)`
 // plus the function-like kinds -- is wrong here in a way that costs every property finding.
 //
-// `ast.IsDeclaration` answers TRUE for a `KindBinaryExpression`, because typescript-go treats an
+// `ast.IsDeclaration` answers `true` for a `KindBinaryExpression`, because typescript-go treats an
 // assignment as a declaration site: `exports.x = 1` and `this.x = 1` declare in JavaScript, and the
 // predicate has to say so for the binder. So the obvious spelling stops the climb at the assignment
 // node, which is the one node the climb exists to reach, and the rule goes silent on all 25 property
@@ -535,10 +535,10 @@ func (ignored ignoredParameterNames) matches(name string) bool {
 
 // compileIgnoredNames turns the two option lists into one predicate, compiling each pattern once.
 //
-// A pattern that will not compile is DROPPED rather than treated as matching nothing-or-everything,
+// A pattern that will not compile is dropped rather than treated as matching nothing-or-everything,
 // and that is a divergence worth stating: upstream builds a `RegExp` at every call and a bad pattern
 // throws, taking the whole lint run down with a message naming the rule. Dropping it means a
-// misconfigured pattern silently stops excusing, which reports MORE rather than less -- the direction
+// misconfigured pattern silently stops excusing, which reports more rather than less -- the direction
 // that is visible rather than the one that hides findings.
 //
 // Each pattern is upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refused a

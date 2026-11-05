@@ -18,7 +18,7 @@ import (
 // Upstream's schema accepts a bare string here as shorthand for `{name: "<string>"}`, and the
 // decoder below expands that rather than the rule carrying two shapes.
 type NoRestrictedImportsPath struct {
-	// Name is the module specifier, compared for EXACT equality after trimming. Not a pattern:
+	// Name is the module specifier, compared for exact equality after trimming. Not a pattern:
 	// `paths` is the literal-name list and `patterns` is the pattern list.
 	Name string `json:"name"`
 
@@ -86,13 +86,13 @@ type NoRestrictedImportsOptions struct {
 
 // noRestrictedImportsRawPattern is the wire shape of a `patterns` entry.
 //
-// Separate from the resolved type because a `patterns` value may also be a bare array of STRINGS,
+// Separate from the resolved type because a `patterns` value may also be a bare array of strings,
 // which upstream folds into a single entry with all of them as its group.
 type noRestrictedImportsRawPattern = NoRestrictedImportsPattern
 
 // DecodeNoRestrictedImportsOptions reads upstream's option list off the config.
 //
-// Hand-rolled because upstream's schema is an `anyOf` of two LISTS that no single struct can accept,
+// Hand-rolled because upstream's schema is an `anyOf` of two lists that no single struct can accept,
 // and because three of upstream's schema constraints are cross-field rules with no struct-tag
 // spelling. The rule registers with `DecodeOptionList`, so the list arrives whole:
 //
@@ -173,7 +173,7 @@ func noRestrictedImportsDecodeObjectForm(
 	}
 
 	if rawPatterns, present := probe["patterns"]; present {
-		// `patterns` may be a bare array of strings, which upstream folds into ONE entry whose
+		// `patterns` may be a bare array of strings, which upstream folds into one entry whose
 		// group is all of them. That folding is observable rather than cosmetic: a single group
 		// evaluates its `!` entries against each other, where separate entries would not.
 		if string(rawPatterns) == "null" {
@@ -237,7 +237,7 @@ func noRestrictedImportsDecodePaths(raw json.RawMessage) ([]NoRestrictedImportsP
 
 // noRestrictedImportsValidate enforces the schema constraints upstream expresses declaratively.
 //
-// Every one of these would otherwise fail SILENTLY. A path with no name matches nothing and reads as
+// Every one of these would otherwise fail silently. A path with no name matches nothing and reads as
 // a clean tree; a pattern with neither a group nor a regex likewise; and a pattern pairing an
 // allow-list with a restrict-list asks the rule to both permit and forbid the same name, where the
 // answer depends on which branch is reached first rather than on anything the author decided.
@@ -336,13 +336,13 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 // than evidence of a clean tree, which is exactly what the audit for this rule recorded. Measured
 // through the installed ESLint 10.8.1: `import fs from 'fs';` with no options reports nothing.
 //
-// So it is registered here and NOT enabled. Enabling it means choosing which modules a project bans,
+// So it is registered here and not enabled. Enabling it means choosing which modules a project bans,
 // which is a decision about this codebase rather than a porting question.
 //
 // # A namespace import is reported once for the whole module, at the `*`
 //
 // `import * as ns from 'mod'` binds every export at once, so a restriction naming any import name at
-// all applies to it and there is no per-name finding to give. Upstream reports at the SPECIFIER's
+// all applies to it and there is no per-name finding to give. Upstream reports at the specifier's
 // location under the `everything` family of messages, and the corpus pins that: `import
 // AllowedObject, * as AllowedObjectTwo from "foo"` reports at column 23, the `*`, not at column 1.
 //
@@ -354,13 +354,13 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 //
 // `export { a } from 'mod'` and `export * from 'mod'` both name a module the file depends on, so
 // both go through the same check as an `import`. `export const a = 1` names no module and is not
-// visited at all, which is why the listener is on the export declaration's MODULE SPECIFIER being
+// visited at all, which is why the listener is on the export declaration's module specifier being
 // present rather than on the statement.
 //
 // `allowTypeImports` is the one option that reads the type-only marker, and the marker lives in two
 // places here rather than one. `import type { A } from 'm'` sets `PhaseModifier` on the import
-// CLAUSE to `KindTypeKeyword`; `import { type A } from 'm'` sets `IsTypeOnly` on the SPECIFIER.
-// Upstream's `isTypeOnlyImport` is the union of both -- the declaration is type-only, OR it has
+// clause to `KindTypeKeyword`; `import { type A } from 'm'` sets `IsTypeOnly` on the specifier.
+// Upstream's `isTypeOnlyImport` is the union of both -- the declaration is type-only, or it has
 // specifiers and every one of them is. Measured directly rather than read off the field names,
 // because an earlier reading looked for `IsTypeOnly` on the clause, where this version of the
 // compiler does not put it.
@@ -477,7 +477,7 @@ func newNoRestrictedImportsChecker(
 // no specifier node to point at, and its finding is anchored on the `*` token instead.
 type noRestrictedImportsBinding struct {
 	// name is `default` for a default import, `*` for a namespace one, and the imported name
-	// otherwise -- the name the MODULE exports, not the local alias.
+	// otherwise -- the name the module exports, not the local alias.
 	name string
 
 	// reportRange is where the finding is anchored.
@@ -575,7 +575,7 @@ func (c *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
 
 // checkImportEquals handles `import foo = require('bar')`.
 //
-// Upstream passes an EMPTY import-name map for this form, so only a whole-module restriction can
+// Upstream passes an empty import-name map for this form, so only a whole-module restriction can
 // report on it and an `importNames` entry never does. Ported from upstream's source rather than
 // from a measured verdict: its corpus has no case for this arm.
 func (c *noRestrictedImportsChecker) checkImportEquals(node *ast.Node) {
@@ -683,7 +683,7 @@ func (c *noRestrictedImportsChecker) checkPaths(
 // reportForPattern is upstream's `reportPathForPatterns`.
 //
 // The four name-restriction fields are mutually exclusive, which the decoder enforces, so the arms
-// below never both apply. Their ORDER still matters for the namespace case, where upstream picks
+// below never both apply. Their order still matters for the namespace case, where upstream picks
 // among four messages by which field is set.
 func (c *noRestrictedImportsChecker) reportForPattern(
 	node *ast.Node,
@@ -779,7 +779,7 @@ func noRestrictedImportsSpecifierText(node *ast.Node) (string, bool) {
 	return node.Text(), true
 }
 
-// noRestrictedImportsImportedName reads the name the MODULE exports for an import specifier.
+// noRestrictedImportsImportedName reads the name the module exports for an import specifier.
 //
 // `import { a as b }` imports `a` and binds `b`, and this rule restricts what a module exports, so
 // the answer is `a`. On an `ImportSpecifier` here `PropertyName` is the imported name when an alias
@@ -792,7 +792,7 @@ func noRestrictedImportsImportedName(specifier *ast.Node) string {
 	return noRestrictedExportsNameText(imported.Name())
 }
 
-// noRestrictedImportsExportedLocalName reads the name a re-export takes FROM the module.
+// noRestrictedImportsExportedLocalName reads the name a re-export takes from the module.
 //
 // `export { a as b } from 'm'` reads `a` out of the module and publishes `b`, and the restriction is
 // about what is taken, so the answer is `a`.
@@ -807,7 +807,7 @@ func noRestrictedImportsExportedLocalName(specifier *ast.Node) string {
 // noRestrictedImportsDeclarationIsTypeOnly is upstream's `isTypeOnlyImport`.
 //
 // Two questions, either of which is enough: the declaration itself is `import type`, or it has
-// specifiers and EVERY one of them is `type`-marked. The second is why `import { type A, B }` is not
+// specifiers and every one of them is `type`-marked. The second is why `import { type A, B }` is not
 // type-only while `import { type A, type B }` is.
 //
 // The declaration-level marker is `PhaseModifier == KindTypeKeyword` on the import clause in this
@@ -824,7 +824,7 @@ func noRestrictedImportsDeclarationIsTypeOnly(node *ast.Node) bool {
 
 	// The named specifiers again through the shared reader, for the reason given at the call site.
 	// A default or namespace import is not `type`-markable per specifier, so an all-type list means
-	// a list of NAMED specifiers and nothing else -- `import def, { type A } from 'm'` is not
+	// a list of named specifiers and nothing else -- `import def, { type A } from 'm'` is not
 	// type-only, and reading only the named ones would say it was.
 	declared := imports.BindingsOf(node)
 	if declared.Default != nil || declared.Namespace != nil || len(declared.Named) == 0 {

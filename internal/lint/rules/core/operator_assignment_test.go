@@ -29,7 +29,7 @@ func decodedOperatorAssignmentOptions(test *testing.T, raw string) any {
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/operator-assignment.js`, and it was not
-// transcribed. Upstream's tester file was LOADED with a stub RuleTester that captured the case
+// transcribed. Upstream's tester file was loaded with a stub RuleTester that captured the case
 // objects, so every string here is the cooked value upstream's own tester would have used and no
 // escape could be changed on the way in. 50 clean cases and 69 reporting ones, which is the whole
 // file.
@@ -238,16 +238,16 @@ func TestOperatorAssignmentStaysSilent(test *testing.T) {
 // a non-null operator. This project has now lost type information twice to fixers that were correct
 // about JavaScript, so these shapes are enumerated rather than assumed safe.
 //
-// Both fixers copy BYTES out of the source rather than re-rendering the construct, which is what
+// Both fixers copy bytes out of the source rather than re-rendering the construct, which is what
 // makes most of these safe by construction: a generic argument or an as-expression inside a copied
 // slice survives because nothing looked at it. That is worth pinning, because the natural way to
 // write either fixer is to rebuild the expression from its parts, and that is how the two earlier
 // incidents happened.
 //
 // The `as` and `satisfies` rows are a defect this found rather than a property it confirms. Both
-// bind LOOSER than every arithmetic operator, so before the precedence table carried a row for them
+// bind looser than every arithmetic operator, so before the precedence table carried a row for them
 // they were ranked tightest and the expansion silently re-associated: `x += 1 as number` became
-// `x = x + 1 as number`, which asserts the type of the SUM rather than of the addend. The two
+// `x = x + 1 as number`, which asserts the type of the sum rather than of the addend. The two
 // parses were compared directly to establish that, rather than read off the grammar.
 func TestOperatorAssignmentTypeScriptShapes(test *testing.T) {
 	test.Parallel()

@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-rolled rather than `rule.DecodeOptionsInto`, and that is the part worth
 // reading. The generic helper errors on empty input, the config layer turns that error into nil for
 // a non-required rule, and a nil handed to a rule reading bool fields yields false for all of them.
-// Two of this rule's four options default to TRUE, so that path would silently switch off the class
+// Two of this rule's four options default to `true`, so that path would silently switch off the class
 // check and the setter-without-getter check, leaving a rule that registers everywhere and reports
 // almost nothing. `DecodeAccessorPairsOptions` returns the defaults on empty input instead, and the
 // fields behind it are pointers so an absent key stays distinguishable from an explicit false.

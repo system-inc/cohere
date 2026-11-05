@@ -12,7 +12,7 @@ const preferArrowCallbackFile = "/repository/source/PreferArrowCallback.ts"
 
 // preferArrowCallbackOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder.
+// The argument is the option as JSON text, exactly the bytes the config layer hands the decoder.
 func preferArrowCallbackOf(optionJson string) any {
 	settings, decodePreferArrowCallbackOptionsError := DecodePreferArrowCallbackOptions([]byte(optionJson))
 	if decodePreferArrowCallbackOptionsError != nil {
@@ -22,12 +22,12 @@ func preferArrowCallbackOf(optionJson string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/prefer-arrow-callback.js by RUNNING that file with RuleTester
-// intercepted. 111 cases from TWO RuleTester.run calls, the second of which supplies @typescript-eslint/parser.
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/prefer-arrow-callback.js by running that file with RuleTester
+// intercepted. 111 cases from two RuleTester.run calls, the second of which supplies @typescript-eslint/parser.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered, driven through the Linter
+// Every expectation is what the installed ESLint 10.8.1 rule answered, driven through the Linter
 // interface under `sourceType: module` with the typescript-eslint parser. The oracle reproduced all
-// 111 declared verdicts AND all 72 declared outputs, which is the control saying the fixer half of
+// 111 declared verdicts and all 72 declared outputs, which is the control saying the fixer half of
 // the harness measures the fixer rather than nothing. Zero cases change verdict between upstream's
 // configuration and cohere's.
 //
@@ -35,7 +35,7 @@ func preferArrowCallbackOf(optionJson string) any {
 //
 // Section 3b of the standard is blunt about why: a fixer that reports in the right place and
 // repairs wrongly is indistinguishable, at the message-id layer, from a correct one. So a corpus
-// `output` is not optional coverage, it is the ONLY coverage the fixer has.
+// `output` is not optional coverage, it is the only coverage the fixer has.
 //
 // Upstream's corpus states three different things and they need three different assertions:
 //
@@ -44,7 +44,7 @@ func preferArrowCallbackOf(optionJson string) any {
 //	                      assertion is that this rule proposes no fix either
 //	output: "<source>"    ExpectFixedSource compares the whole rewritten file
 //
-// Collapsing the middle case into "the output equals the input" does NOT work and the harness is
+// Collapsing the middle case into "the output equals the input" does not work and the harness is
 // right to refuse it: `ExpectFixedSource` fatals when a rule proposed no fixes, because passing
 // there would make it agree with any expectation at all. A decline has to be asserted as an
 // absence of fixes, not as an unchanged string.
@@ -228,7 +228,7 @@ func TestPreferArrowCallbackStaysSilent(test *testing.T) {
 // TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched covers what upstream's corpus cannot.
 //
 // A function expression that calls itself by name needs that binding, and an arrow does not provide
-// one, so upstream exempts it. The question is whether the reference actually RESOLVES to the
+// one, so upstream exempts it. The question is whether the reference actually resolves to the
 // function's own name or merely spells it the same way, and a mutation replacing the resolution
 // with a text comparison survived all 111 imported fixtures: the corpus contains no case where a
 // nested declaration shadows the function's name, so nothing in it separates the two.
@@ -245,7 +245,7 @@ func TestPreferArrowCallbackStaysSilent(test *testing.T) {
 // three and prove nothing.
 //
 // The same class covers `arguments`, which is resolved differently because it has no declaration to
-// resolve TO. A reference belongs to the nearest enclosing function, and a PARAMETER named
+// resolve to. A reference belongs to the nearest enclosing function, and a parameter named
 // `arguments` is a real binding that shadows the implicit one:
 //
 //	foo(function() { arguments; });                       clean,   the implicit binding is used
@@ -283,13 +283,13 @@ func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(test *testing.T) {
 //
 // The callback walk has an arm for `KindCallExpression` and `KindNewExpression`. A first draft
 // shared one body and called `parent.AsCallExpression()` before testing which kind it had, which is
-// an interface conversion that PANICS on a NewExpression rather than returning nil. It crashed
+// an interface conversion that panics on a NewExpression rather than returning nil. It crashed
 // **71 files** on the real ahra tree, and the fixture suite was completely green:
 //
 //	interface conversion: ast.nodeData is *ast.NewExpression, not *ast.CallExpression
 //
 // Two things made it invisible. Upstream's corpus writes no `new Foo(function() {})` case at all,
-// so nothing imported reaches the arm. And the walk recovers per FILE rather than per rule, so one
+// so nothing imported reaches the arm. And the walk recovers per file rather than per rule, so one
 // panic silently costs every registered rule its verdict on that file: the same run reported
 // 2,029,962 nodes visited where a clean one reports 2,184,766, and still printed a findings summary
 // that looked ordinary.

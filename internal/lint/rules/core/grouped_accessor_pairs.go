@@ -24,7 +24,7 @@ const (
 
 // GroupedAccessorPairsOptions carries upstream's whole option surface.
 //
-// The wire shape is a LIST, unlike most rules here, because upstream's schema is positional:
+// The wire shape is a list, unlike most rules here, because upstream's schema is positional:
 // `["error", "getBeforeSet", { enforceForTSTypes: true }]`. The rule registers with
 // `DecodeOptionList`, so the decoder is handed that list with the severity removed.
 type GroupedAccessorPairsOptions struct {
@@ -38,7 +38,7 @@ type GroupedAccessorPairsOptions struct {
 // DecodeGroupedAccessorPairsOptions turns the configured array into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto`, and this rule is a case that helper cannot
-// serve. The first option is a bare STRING whose default is "anyOrder", so a zero value would be the
+// serve. The first option is a bare string whose default is "anyOrder", so a zero value would be the
 // empty string, which matches none of the three arms: the rule would register on every file, be
 // handed nil by the live config's bare "error", and silently stop enforcing order while every
 // fixture passing an explicit option stayed green.
@@ -107,7 +107,7 @@ var messageGroupedAccessorPairsInvalidOrder = rule.Message{
 //
 // # Four lists, not one
 //
-// Upstream checks an object literal's properties as one list, and a class body as TWO: static
+// Upstream checks an object literal's properties as one list, and a class body as two: static
 // members and instance members separately. That is what makes
 // `class A { get a(){} static set a(foo){} }` clean rather than a split pair, since those are two
 // different properties that happen to share a name. Reproduced by running the class scan twice with
@@ -115,12 +115,12 @@ var messageGroupedAccessorPairsInvalidOrder = rule.Message{
 //
 // # Which pairs count
 //
-// Only a key with exactly ONE getter and ONE setter. A duplicate getter means the code is already
+// Only a key with exactly one getter and one setter. A duplicate getter means the code is already
 // broken in a way this rule has no opinion about, and upstream skips it rather than guessing which
 // of the two the setter belongs to.
 //
 // Keys are matched by their static name where one exists. A computed key has no static name, and
-// upstream falls back to comparing the key's TOKEN LIST, so `get [a]` and `set [a]` pair while
+// upstream falls back to comparing the key's token list, so `get [a]` and `set [a]` pair while
 // `get [a]` and `set [b]` do not. That is reproduced here by comparing the key's source text, which
 // is the same comparison over the same bytes for every shape the corpus writes.
 //
@@ -276,7 +276,7 @@ func checkGroupedAccessorList(ruleContext rule.Context, order GroupedAccessorPai
 	}
 }
 
-// reportGroupedAccessorPair reports on the LATTER accessor's head, naming both.
+// reportGroupedAccessorPair reports on the latter accessor's head, naming both.
 //
 // The format string takes the former name first and the latter second in both cases; the ordering
 // message reverses them with an explicit index rather than by swapping the arguments, so the two
@@ -326,17 +326,17 @@ func groupedAccessorIsStatic(member *ast.Node) bool {
 // groupedAccessorKeyText returns the text two accessors are matched on.
 //
 // Upstream matches on `getStaticPropertyName` where the syntax settles the name, and falls back to
-// comparing the key's TOKEN LIST otherwise. `property.Name` with `property.Static` is this tree's
+// comparing the key's token list otherwise. `property.Name` with `property.Static` is this tree's
 // lift of that same decision, probed against nine key spellings before being built on and agreeing
 // with the installed eslint on every one.
 //
 // The static half is wider than it looks and getting it wrong was this port's first defect. A
-// computed key whose expression is a LITERAL still has a static name, so `set 123` pairs with
+// computed key whose expression is a literal still has a static name, so `set 123` pairs with
 // `get [123]`, `set ['abc']` pairs with a template-keyed getter, and a computed key pairs with a plain one
 // across the bracket. Four of upstream's own cases assert exactly that, and a first draft that
 // prefixed computed keys to keep them apart failed all four.
 //
-// A computed key with a NON-literal expression settles nothing, and there upstream compares tokens
+// A computed key with a non-literal expression settles nothing, and there upstream compares tokens
 // so that `get [a]` and `set [a]` pair while `get [a]` and `set [b]` do not. Comparing the key's
 // source bytes is that same comparison for every shape the corpus writes.
 //
@@ -350,9 +350,9 @@ func groupedAccessorKeyText(ruleContext rule.Context, member *ast.Node) (string,
 	if staticName, settled := property.Name(name, property.Static); settled {
 		// A private name is tagged apart from every other spelling. `property.Name` returns `#abc`
 		// for `#abc`, hash included, and its doc comment says that can never collide with the
-		// ordinary property `abc`. True, and not the whole story: it DOES collide with the string
+		// ordinary property `abc`. True, and not the whole story: it does collide with the string
 		// key `'#abc'`, which upstream treats as a different property. Measured against the
-		// installed eslint at 10.8.1, `class A { get '#abc'(){} b(){} set #abc(foo){} }` is CLEAN
+		// installed eslint at 10.8.1, `class A { get '#abc'(){} b(){} set #abc(foo){} }` is clean
 		// while both same-spelling pairs report, and four of upstream's clean cases are exactly this
 		// shape. The helper is right about what it documents; this rule needs one distinction more.
 		if name.Kind == ast.KindPrivateIdentifier {
@@ -360,14 +360,14 @@ func groupedAccessorKeyText(ruleContext rule.Context, member *ast.Node) (string,
 		}
 		return "static:" + staticName, true
 	}
-	// Not statically named, so compare the written bytes. `.Text()` PANICS on a computed property
+	// Not statically named, so compare the written bytes. `.Text()` panics on a computed property
 	// name rather than returning empty, measured on a probe here before the rule existed, so this
 	// branch must not reach for it.
 	//
-	// The `computed:` tag is DECORATIVE rather than load-bearing, and that was measured rather than
+	// The `computed:` tag is decorative rather than load-bearing, and that was measured rather than
 	// assumed. A mutation rewriting it to `static:` survives every fixture, including three written
 	// specifically to kill it, and the reason is that the two branches already cannot collide: this
-	// one returns the key's source text WITH its brackets, so `[a]` never equals the static branch's
+	// one returns the key's source text with its brackets, so `[a]` never equals the static branch's
 	// `a` whatever either is tagged. There is no input that distinguishes the two versions.
 	//
 	// Kept because it says which question was asked, and because narrowing this range to the bracket
@@ -407,7 +407,7 @@ func groupedAccessorNameWithKind(member *ast.Node) string {
 		return prefix + "private " + kind + " " + name.Text()
 	}
 
-	// The SAME static-name question the pairing uses, which is why a computed key that resolves is
+	// The same static-name question the pairing uses, which is why a computed key that resolves is
 	// named rather than left bare. A first draft rendered every computed key as a bare kind and
 	// failed four of upstream's own cases: `` get [`abc`] `` renders as `getter 'abc'`, because
 	// upstream reads the name through `getStaticPropertyName` here too.

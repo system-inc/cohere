@@ -60,10 +60,10 @@ func TestGetterReturnFires(test *testing.T) {
 		// same property as `{ get: fn }` and has to be read the same way.
 		{"a descriptor with a quoted get key", "Object.defineProperty(foo, 'bar', { 'get': function (){} });", "expected"},
 		// Two cases written here rather than imported, and they are what keeps the upward paren walk
-		// alive. Every parenthesized case upstream ships parenthesizes the CALLEE, and that is the
+		// alive. Every parenthesized case upstream ships parenthesizes the callee, and that is the
 		// downward walk's job. A mutant neutering the upward walk survived the entire corpus.
 		//
-		// The upward walk exists for a parenthesized DESCRIPTOR, where the parentheses sit between
+		// The upward walk exists for a parenthesized descriptor, where the parentheses sit between
 		// the object literal and the call argument list, so the parent chain gains a level and the
 		// descriptor stops being found without it.
 		{"a parenthesized descriptor argument", "Object.defineProperty(foo, 'bar', ({ get: function (){} }));", "expected"},
@@ -72,10 +72,10 @@ func TestGetterReturnFires(test *testing.T) {
 		{"a try whose catch and finally do not return", "var foo = { get bar() { try { return a(); } catch {  } finally {  } } };", "expectedAlways"},
 		// A labeled block and a `with` block, both written here. Upstream ships neither, so mutants
 		// making the rule stop unwrapping them survived the whole corpus. These are the fail halves:
-		// a label or a `with` wrapping a block that does NOT exit is still a path through.
+		// a label or a `with` wrapping a block that does not exit is still a path through.
 		{"a labeled block that does not return", "var foo = { get bar() { outer: { qux(); } } };", "expected"},
 		// Three switch cases written here rather than imported, all three earned by surviving
-		// mutants. Upstream's whole corpus contains exactly ONE switch, and it is the friendliest
+		// mutants. Upstream's whole corpus contains exactly one switch, and it is the friendliest
 		// possible shape: a default is present and every single clause returns. So three separate
 		// discriminations in this branch were never exercised by it.
 		//
@@ -89,13 +89,13 @@ func TestGetterReturnFires(test *testing.T) {
 		// scrutinee matching neither case falls straight out. Upstream's single switch carries both
 		// kinds, so it cannot tell the two predicates apart.
 		//
-		// The switch has to be the getter's ONLY statement. A first attempt at this case wrote it
+		// The switch has to be the getter's only statement. A first attempt at this case wrote it
 		// as a clean fixture with a trailing `return c;` after the switch, which passes under the
 		// mutant and under the original alike, because the block exits on the trailing return and
 		// the switch's own verdict is never consulted. The mutant survived that fixture and the
 		// re-score is the only reason it was noticed.
 		{"a switch with no default at all", "var foo = { get bar(){ switch (baz) { case 1: return a; case 2: return b; } } };", "expectedAlways"},
-		// And this one kills the mutant that let a TRAILING empty clause pass. `case 1:` with no
+		// And this one kills the mutant that let a trailing empty clause pass. `case 1:` with no
 		// statements and nothing after it falls straight out of the switch. An empty clause in the
 		// middle is a deliberate fallthrough and is fine, which is why the check is positional
 		// rather than a blanket refusal of empty clauses.
@@ -107,7 +107,7 @@ func TestGetterReturnFires(test *testing.T) {
 		},
 		// Written here rather than imported, because upstream has no case like it and a mutation
 		// sweep proved the gap. Its whole corpus contains exactly one `if` carrying an `else`, and
-		// both arms of it return, so a rule crediting an `if` when only ONE arm exits passes every
+		// both arms of it return, so a rule crediting an `if` when only one arm exits passes every
 		// upstream fixture. Two mutants survived on exactly that: dropping the then-arm conjunct,
 		// and dropping the else-arm conjunct. These two cases are the distinguishing inputs, one
 		// for each conjunct, and each one alone kills only its own mutant.
@@ -223,7 +223,7 @@ func TestGetterReturnStaysSilent(test *testing.T) {
 			"\n        var foo = {\n                get bar() {\n                        let name = ([] || [])[1];\n                        return name;\n                },\n        };\n        ",
 		},
 		{"a try that returns with an empty finally", "var foo = { get bar() { try { return a(); } finally {  } } };"},
-		// Also written here rather than imported. Upstream's only try-with-finally case has an EMPTY
+		// Also written here rather than imported. Upstream's only try-with-finally case has an empty
 		// finally, so the branch crediting a finally that exits on its own never fires on the
 		// corpus: the try block carries that case by itself. A mutant deleting the finally-wins
 		// branch entirely survived every upstream fixture. This is the distinguishing input, a
@@ -242,7 +242,7 @@ func TestGetterReturnStaysSilent(test *testing.T) {
 		{"a labeled block that returns", "var foo = { get bar() { outer: { return 1; } } };"},
 		{"a labeled if whose arms both return", "var foo = { get bar() { lbl: if (a) { return 1; } else { return 2; } } };"},
 		{"a with block that returns", "var foo = { get bar() { with (o) { return 1; } } };"},
-		// The arrow with an expression body, as a DESCRIPTOR getter rather than the object-literal
+		// The arrow with an expression body, as a descriptor getter rather than the object-literal
 		// spelling upstream ships. Upstream's one case of this shape is clean under every mutant
 		// tried, because two gates subsume each other there: `bodyOf` declines a non-block arrow
 		// body, and `check` declines a non-block body again. Written at the descriptor position and
@@ -250,7 +250,7 @@ func TestGetterReturnStaysSilent(test *testing.T) {
 		// body is credited while an empty block is not.
 		{"a descriptor arrow getter with an expression body", "Object.defineProperty(foo, 'bar', { get: () => 1 });"},
 		// The counterpart to the trailing-empty-clause fail case above: an empty clause in the
-		// MIDDLE is a deliberate fallthrough, `case A:` reaching `case B`'s return, and it must not
+		// middle is a deliberate fallthrough, `case A:` reaching `case B`'s return, and it must not
 		// be read as a path out.
 		{"a switch with a fallthrough empty clause in the middle", "var foo = { get bar(){ switch (baz) { case 1: case 2: return a; default: return d; } } };"},
 		{

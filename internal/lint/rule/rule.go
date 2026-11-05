@@ -367,13 +367,13 @@ type Rule struct {
 	TypeReach TypeReach
 
 	// ResolvesReactValueTypes declares that this rule identifies a React value by asking the checker
-	// for its TYPE, so a file where the hook call resolves to `any` costs it every finding it would
+	// for its type, so a file where the hook call resolves to `any` costs it every finding it would
 	// otherwise make, silently.
 	//
 	// This is narrower than NeedsTypeChecker and the difference is the whole reason the field exists.
 	// Measured on 2026-08-24: of the forty-one rules declaring NeedsTypeChecker, only the two that
 	// call GetTypeAtLocation and read the resulting type go blind when `useState` resolves to `any`.
-	// The rest ask GetSymbolAtLocation, which resolves a BINDING rather than a type, and a binding to
+	// The rest ask GetSymbolAtLocation, which resolves a binding rather than a type, and a binding to
 	// `declare function useState<T>(initial: T): any` resolves exactly as well as one to the real
 	// declaration. Probed both ways on the same input: under the ambient shim the symbol comes back
 	// named `useState` with one declaration, while the call's type comes back `any` with TypeFlagsAny.

@@ -25,7 +25,7 @@ type strictCase struct {
 	sourceText string
 	options    any
 	wantIds    []string
-	// wantFixedSource is "" when the case is reported and deliberately NOT repaired.
+	// wantFixedSource is "" when the case is reported and deliberately not repaired.
 	wantFixedSource string
 }
 
@@ -55,11 +55,11 @@ func runStrictIn(test *testing.T, fileName string, testCase strictCase) rule_tes
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/strict.js` was loaded with its RuleTester stubbed so every case came out as data
-// with its options and source type attached, then replayed against the INSTALLED rule to record what
+// with its options and source type attached, then replayed against the installed rule to record what
 // it reports and what its fixer writes. 127 of 128 reproduced; the one that did not is recorded in
 // TestStrictSuppressionCaseReports below.
 //
-// # The corpus is mostly SCRIPT and this tree is almost entirely modules
+// # The corpus is mostly script and this tree is almost entirely modules
 //
 // Upstream's tester defaults to `ecmaVersion: 5, sourceType: "script"`, so 107 of its 128 cases are
 // scripts, 17 modules and 4 commonjs. That is the opposite of what cohere lints: measured, 2,917 of
@@ -192,7 +192,7 @@ func TestStrictStaysSilent(test *testing.T) {
 	}
 }
 
-// What the fixer WRITES, for the cases carrying an applicable repair.
+// What the fixer writes, for the cases carrying an applicable repair.
 //
 // Twenty-one of the imported rows assert an exact rewritten source. The repair always deletes one
 // whole directive statement, so a fixer that deleted the wrong statement, or trimmed a neighbour,
@@ -224,7 +224,7 @@ func TestStrictFixesTheSource(test *testing.T) {
 // The findings upstream reports and deliberately declines to repair.
 //
 // Upstream's `shouldFix` allows a repair only where the directive is merely redundant. A directive
-// in the wrong FORM for the configuration, or one that is a syntax error because of the parameter
+// in the wrong form for the configuration, or one that is a syntax error because of the parameter
 // list, is reported with nothing offered, because choosing between deleting the directive and
 // changing the surrounding code is a judgment the rule cannot make.
 func TestStrictDeclinesToRepair(test *testing.T) {
@@ -260,7 +260,7 @@ func TestStrictDeclinesToRepair(test *testing.T) {
 // Since ES2016 a `use strict` directive is a syntax error in a function whose parameter list uses a
 // default, a rest element or destructuring, which is what separates a merely redundant directive
 // from one that stops the file running. Upstream's corpus is JavaScript, so it cannot say what a
-// TYPE annotation does to that judgment, and the answer is not obvious: an annotation is extra
+// type annotation does to that judgment, and the answer is not obvious: an annotation is extra
 // syntax on the parameter, and a port that asked "is this parameter node a bare identifier" without
 // looking past the annotation would get it backwards.
 //
@@ -406,7 +406,7 @@ func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
 //
 // Two fixers shipped tonight that were right about JavaScript and destroyed type information here,
 // both because they built a replacement span from a node's neighbour. This one removes the
-// directive STATEMENT, so a parameter annotation, a return type and a generic list all sit outside
+// directive statement, so a parameter annotation, a return type and a generic list all sit outside
 // the deleted range by construction. These rows turn that argument into a measurement.
 func TestStrictRepairPreservesTypeSyntax(test *testing.T) {
 	test.Parallel()
@@ -436,7 +436,7 @@ func TestStrictRepairPreservesTypeSyntax(test *testing.T) {
 // "module"`, which overrides whatever was configured. That is the arm this tree actually runs:
 // measured, 2,917 of 2,919 TypeScript files here carry a top-level import or export.
 //
-// Each row configures a DIFFERENT mode and expects the same `module` finding, which is what pins
+// Each row configures a different mode and expects the same `module` finding, which is what pins
 // the override. Without them a rule that simply ignored the option would look correct.
 func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
 	test.Parallel()
@@ -467,7 +467,7 @@ func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
 
 // Forty of upstream's cases could not be imported, and each is recorded rather than dropped.
 //
-// Four axes, none of them expressible in this harness, and three of them are PARSER features rather
+// Four axes, none of them expressible in this harness, and three of them are parser features rather
 // than anything the rule decides:
 //
 //	ecmaFeatures.impliedStrict   forces the mode to `implied`, overriding the configuration.
@@ -484,7 +484,7 @@ func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
 //	                             would change the input, and the input is the corpus.
 //
 // These are facts about the harness rather than about the rule, and hiding them inside a relaxed
-// rule would turn them into facts about the rule. This test asserts the one thing that IS
+// rule would turn them into facts about the rule. This test asserts the one thing that is
 // expressible about them: the two parser features have no configuration surface at all, so no
 // spelling of the options can select the `implied` mode.
 //
@@ -583,7 +583,7 @@ func TestDecodeStrictOptions(test *testing.T) {
 // rows green, because upstream's corpus writes no other prologue directive.
 //
 // The mechanism is worth stating because it looks like a bug and is one. Upstream builds its
-// directive list as a SPARSE array indexed by statement position, assigning only for `use strict`,
+// directive list as a sparse array indexed by statement position, assigning only for `use strict`,
 // and its later `forEach` and `slice` skip the holes. So a hole swallows everything after it:
 //
 //	'use strict'; 'use asm';   reports    the directive is at index 0

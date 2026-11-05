@@ -112,7 +112,7 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindImportSpecifier:
 					// Declaring or binding a name is not reaching for the global one.
 					//
-					// Only when the identifier IS the name. `const storage = localStorage` has a
+					// Only when the identifier is the name. `const storage = localStorage` has a
 					// VariableDeclaration parent too, and there the identifier is the initializer,
 					// which is a real use. Matching on the parent kind alone silenced exactly that
 					// case, and a fixture caught it.

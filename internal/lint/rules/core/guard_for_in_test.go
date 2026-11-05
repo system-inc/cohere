@@ -45,7 +45,7 @@ func TestGuardForInStaysSilent(test *testing.T) {
 // The failing cases, and what separates each from its neighbour above.
 //
 // The first two are the sharpest: an `if` whose consequent is a block containing a `continue` and
-// something else is NOT the early-exit idiom, in either order, because the other statement runs. The
+// something else is not the early-exit idiom, in either order, because the other statement runs. The
 // third and fourth guard part of the body and then run `g()` unguarded. The last two have no guard
 // at all, braced and unbraced.
 func TestGuardForInFires(test *testing.T) {
@@ -71,7 +71,7 @@ func TestGuardForInFires(test *testing.T) {
 
 // The span, which no message-id fixture above can see.
 //
-// Upstream reports on the loop STATEMENT rather than on the body or on the `for` keyword, so the
+// Upstream reports on the loop statement rather than on the body or on the `for` keyword, so the
 // finding covers the whole loop including its head. A port anchoring on the body would pass every
 // assertion above while pointing somewhere the reader was not shown.
 func TestGuardForInReportsOnTheWholeLoop(test *testing.T) {
@@ -96,11 +96,11 @@ func TestGuardForInReportsOnTheWholeLoop(test *testing.T) {
 	}
 }
 
-// A case written from reading OUR code rather than upstream's, pinning the asymmetry the doc
+// A case written from reading our code rather than upstream's, pinning the asymmetry the doc
 // comment describes.
 //
 // The corpus has `{ if (x) { f(); } }` clean and `{ if (x) { f(); } g(); }` reporting, but it never
-// isolates why: the single-statement arm accepts ANY consequent while the longer-block arm demands
+// isolates why: the single-statement arm accepts any consequent while the longer-block arm demands
 // a bare `continue`. A port collapsing the two arms into one `continue` test would report the first
 // of these, which upstream accepts. A port collapsing them the other way would accept the second.
 func TestGuardForInSeparatesTheTwoBlockArms(test *testing.T) {
@@ -117,7 +117,7 @@ func TestGuardForInSeparatesTheTwoBlockArms(test *testing.T) {
 
 // `for-of` never walks the prototype chain, so it has nothing to guard.
 //
-// Written because our parser gives `for-in` and `for-of` the SAME node struct
+// Written because our parser gives `for-in` and `for-of` the same node struct
 // (`ForInOrOfStatement`) and separates them only by kind. A listener keyed on the shared shape
 // rather than on `KindForInStatement` would report every unguarded `for-of` in the tree, and no
 // imported fixture can see it: upstream's corpus writes no `for-of` at all, because its parser
@@ -133,7 +133,7 @@ func TestGuardForInDeclinesForOf(test *testing.T) {
 		"for (var x in o) foo();"), "wrap")
 }
 
-// Cases the corpus does not write, each measured against the INSTALLED eslint 10.8.1 build rather
+// Cases the corpus does not write, each measured against the installed eslint 10.8.1 build rather
 // than read off the source.
 //
 // The corpus covers six clean shapes and six failing ones and leaves every neighbouring shape
@@ -157,7 +157,7 @@ func TestGuardForInMatchesTheInstalledBuild(test *testing.T) {
 		// body starts with a `Block` rather than an `If`. Upstream does not look through it.
 		{"a guard wrapped in its own block", "for (var x in o) { { if (x) continue; } g(); }", 1},
 
-		// Only the CONSEQUENT is inspected. An `if` with an else whose consequent is a bare
+		// Only the consequent is inspected. An `if` with an else whose consequent is a bare
 		// continue still exempts, even though the else arm runs unfiltered work.
 		{"an else arm beside a bare continue", "for (var x in o) { if (x) continue; else f(); g(); }", 0},
 
@@ -168,10 +168,10 @@ func TestGuardForInMatchesTheInstalledBuild(test *testing.T) {
 		{"a block holding only an empty statement", "for (var x in o) { ; }", 1},
 
 		// A continue nested one block deeper inside the consequent is not the bare skip: upstream
-		// requires the consequent block's ONE statement to be a continue, and here it is a block.
+		// requires the consequent block's one statement to be a continue, and here it is a block.
 		{"a continue nested inside the consequent", "for (var x in o) { if (x) { { continue; } } g(); }", 1},
 
-		// The guard is not required to come FIRST for the single-statement arm, but for a longer
+		// The guard is not required to come first for the single-statement arm, but for a longer
 		// block it is: a statement before the guard runs on every key.
 		{"a statement before the guard", "for (var x in o) { var y = 1; if (x) continue; }", 1},
 

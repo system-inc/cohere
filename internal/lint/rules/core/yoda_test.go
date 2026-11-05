@@ -275,8 +275,8 @@ func TestYodaStaysSilent(test *testing.T) {
 // yodaTypeScriptCases are shapes upstream's corpus cannot contain, because its corpus is
 // JavaScript and the gap between it and our tree is exactly TypeScript syntax.
 //
-// This is the set that matters for a FIXER. Two rules in this tree silently destroyed type
-// information while passing every one of upstream's fixture cases, both because they CONSTRUCTED a
+// This is the set that matters for a fixer. Two rules in this tree silently destroyed type
+// information while passing every one of upstream's fixture cases, both because they constructed a
 // replacement from node properties. This fixer reorders verbatim source slices instead, so the
 // claim is that nothing inside an operand can be lost, and these cases are what test the claim
 // rather than assert it.
@@ -375,7 +375,7 @@ func TestYodaTypeScriptOperandsSurviveTheFix(test *testing.T) {
 
 // TestYodaRangeTestRequiresLessThanOperators pins the range-test operator restriction.
 //
-// A range test must use `<` or `<=` on BOTH sides. Upstream's `isRangeTestOperator` names those two
+// A range test must use `<` or `<=` on both sides. Upstream's `isRangeTestOperator` names those two
 // and no others, so a `>`-shaped range is not exempt even when it expresses the same interval.
 // Every case below reports, and the exempt control beside them is what shows the option is
 // otherwise working.

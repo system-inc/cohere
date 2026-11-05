@@ -38,7 +38,7 @@ var messageExtraLabel = rule.Message{
 // some enclosing label reports every one of upstream's fifteen passing cases, because in all of
 // them the label does enclose the jump. The scope stack is the whole rule.
 //
-// # A labeled statement whose body is breakable contributes ONE scope, not two
+// # A labeled statement whose body is breakable contributes one scope, not two
 //
 // In `A: while (a) ...` the label and the loop are one target: an unlabeled break leaves that loop,
 // and the loop is what `A` names. Upstream builds the stack so a labeled breakable statement pushes
@@ -52,7 +52,7 @@ var messageExtraLabel = rule.Message{
 //
 // # A divergence our parser creates, and upstream cannot express
 //
-// `A: switch (a) { case 0: continue A; }` reports here and is a SYNTAX ERROR upstream, because
+// `A: switch (a) { case 0: continue A; }` reports here and is a syntax error upstream, because
 // `continue` may only target a loop and ESLint refuses to parse it. Our parser recovers and hands
 // the rule a continue statement, so the rule judges it and finds the label redundant against the
 // switch frame. The same applies to any duplicate label in one scope, which is likewise illegal.
@@ -82,7 +82,7 @@ var messageExtraLabel = rule.Message{
 // `output: null` for exactly this reason, and a comment written just outside the span still fixes,
 // which is what separates `break/**/ A` (declines) from `/*comment*/break A` (fixes).
 //
-// The span runs from the keyword's END rather than from the label's start, so a comment written
+// The span runs from the keyword's end rather than from the label's start, so a comment written
 // after the label survives: upstream rewrites `continue A/*comment*/;` to `continue/*comment*/;`.
 //
 // The verdict at any jump depends on every enclosing statement, which the pre-order walk has not
@@ -116,7 +116,7 @@ var NoExtraLabel = rule.Rule{
 						// A labeled breakable statement is handled by the branch above when the
 						// walk reaches the body, so this pushes only for the other bodies.
 						//
-						// The breakable half of that guard is EQUIVALENT rather than load bearing,
+						// The breakable half of that guard is equivalent rather than load bearing,
 						// and it is kept because it states the intent. Dropping it makes a labeled
 						// loop push two frames, the label frame first and the breakable frame for
 						// its own body second; the search runs innermost first and always stops at
@@ -125,7 +125,7 @@ var NoExtraLabel = rule.Rule{
 						// label names, both jump kinds and both targets produced byte identical
 						// findings under both spellings.
 						//
-						// The OTHER half is load bearing and its mutant is caught. A labeled block
+						// The other half is load bearing and its mutant is caught. A labeled block
 						// must push, so that a jump naming it stops there instead of reaching an
 						// outer loop of the same name. That shape needs a function boundary to be
 						// legal source, which is why upstream's corpus cannot reach it and why
@@ -238,7 +238,7 @@ func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.N
 	// those callers, so adding another caller voids it.
 	//
 	// It stays because a fix is applied unattended and an inverted range is the one repair the edit
-	// engine's parse check cannot refuse, and because keywordEnd is computed from a token LENGTH
+	// engine's parse check cannot refuse, and because keywordEnd is computed from a token length
 	// rather than scanned, so a future jump kind reaching jumpKeywordText would land here silently.
 	if keywordEnd >= labelEnd {
 		return rule.Fix{}, false

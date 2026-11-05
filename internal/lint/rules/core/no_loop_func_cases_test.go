@@ -12,7 +12,7 @@ package core
 // Four cases were fatal parse errors under the ecmaVersion upstream gave them, all of them
 // `using` or `await using` at the top level of a script. Upstream lists them as valid, but the
 // parser is what makes them clean there rather than the rule. Re-measured through a parser that
-// accepts the syntax, so the RULE decides: all four report nothing, which is the same verdict for
+// accepts the syntax, so the rule decides: all four report nothing, which is the same verdict for
 // the reason upstream intended.
 
 // loopFuncFiringCases are the corpus inputs upstream reports on, with the rendered message it

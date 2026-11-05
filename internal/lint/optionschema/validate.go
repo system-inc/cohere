@@ -53,12 +53,16 @@ func load() (file, error) {
 
 // GeneratedFrom is the version of every package the embedded schemas were read from.
 func GeneratedFrom() map[string]string {
+	// Ignored: a failed load leaves an empty file, so this reads as no versions, and For returns the error
+	// to the config load that needs the schemas.
 	schemas, _ := load()
 	return schemas.GeneratedFrom
 }
 
 // RuleNames is every rule the embedded schemas cover, sorted.
 func RuleNames() []string {
+	// Ignored: a failed load leaves an empty file, so this reads as no rules, and For returns the error to
+	// the config load that needs the schemas.
 	schemas, _ := load()
 	names := make([]string, 0, len(schemas.Rules))
 	for name := range schemas.Rules {

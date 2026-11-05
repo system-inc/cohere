@@ -9,7 +9,7 @@ import (
 
 const consistencyNoHandRolledDelayFile = "/repository/source/ConsistencyNoHandRolledDelay.ts"
 
-// Each case is a real ahra site at HEAD on 2026-10-01, trimmed to the wait, plus the spelling variants
+// Each case is a real ahra site at `HEAD` on 2026-10-01, trimmed to the wait, plus the spelling variants
 // the rule names. One finding per case, anchored on the `new` expression.
 func TestConsistencyNoHandRolledDelayReports(test *testing.T) {
 	test.Parallel()
@@ -190,7 +190,7 @@ func TestConsistencyNoHandRolledDelayStaysSilent(test *testing.T) {
 		name  string
 		lines []string
 	}{
-		// Delay.ts at HEAD: the definition of the primitive. The promise is the function's single
+		// Delay.ts at `HEAD`: the definition of the primitive. The promise is the function's single
 		// return and the duration is the function's own parameter.
 		{"Delay.ts, the definition of delay", []string{
 			"export function delay(durationInMilliseconds: number): Promise<void> {",

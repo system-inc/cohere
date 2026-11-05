@@ -29,7 +29,7 @@ const (
 
 // oneVarGroup is upstream's per-declaration-kind pair of settings.
 //
-// Both fields are POINTERS, and that is load bearing rather than defensive. Upstream builds
+// Both fields are pointers, and that is load bearing rather than defensive. Upstream builds
 // `options.var = { uninitialized: mode.var, initialized: mode.var }`, so an unconfigured kind gets
 // `undefined` in both slots, and `if (!options[key]) return;` then skips that kind entirely. A
 // value type cannot tell "not configured" from a mode, so `{ "var": "never" }` would silently
@@ -41,7 +41,7 @@ type oneVarGroup struct {
 
 // configured answers upstream's `if (!options[key])`.
 //
-// Upstream tests the GROUP object for truthiness, and for the object form it always assigns one, so
+// Upstream tests the group object for truthiness, and for the object form it always assigns one, so
 // the group is falsy only when the key is not one of the five it knows. Here a group with neither
 // half set is the same condition and is what the decoder produces for a kind the config never
 // named.
@@ -77,12 +77,12 @@ type OneVarSettings struct {
 
 // oneVarObjectOptions is the wire shape of the object form.
 //
-// Every field is a POINTER for the same reason `oneVarGroup`'s are: upstream distinguishes an
+// Every field is a pointer for the same reason `oneVarGroup`'s are: upstream distinguishes an
 // absent key from a present one with `Object.hasOwn`, and the two take different paths. A plain
 // string field would decode an absent `initialized` to `""`, which matches no mode and reads as
 // "configured to something invalid" rather than as "not configured".
 //
-// The two object arms of upstream's schema are decoded into ONE struct rather than two, because
+// The two object arms of upstream's schema are decoded into one struct rather than two, because
 // they are disjoint by `additionalProperties: false` and a config carrying keys from both is
 // refused below. Decoding into one struct and then refusing the mixture keeps the refusal in a
 // place that can explain itself.
@@ -99,7 +99,7 @@ type oneVarObjectOptions struct {
 
 // oneVarModeFromWire maps upstream's lowercase spelling onto the enum.
 //
-// A value outside the three is an ERROR rather than a silent fallback. Upstream gets that refusal
+// A value outside the three is an error rather than a silent fallback. Upstream gets that refusal
 // from `meta.schema`'s enum before the rule ever runs; there is no schema layer here, so a bad
 // value would otherwise decode to a mode matching nothing and produce a rule that registers, runs,
 // and enforces nothing. That is the inert-but-configured shape section 7c of the porting standard
@@ -131,15 +131,15 @@ func DefaultOneVarSettings() OneVarSettings {
 // DecodeOneVarOptions reads the string or object form off the config.
 //
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the wire shape is a
-// UNION: upstream's single schema element is `oneOf` a string enum and two object shapes, and no
+// union: upstream's single schema element is `oneOf` a string enum and two object shapes, and no
 // single Go struct decodes all three.
 //
 // # The variadic hazard does not apply here, and it is worth saying why
 //
 // `internal/lint/configuration/configuration.go` keeps only `tuple[1]`, so a rule whose upstream
-// option surface is VARIADIC loses everything after the first value -- the defect measured on
+// option surface is variadic loses everything after the first value -- the defect measured on
 // `id-match`, whose flag object vanished while the rule went on looking configured. `one-var`'s
-// schema declares exactly ONE element, so the single value arrives intact and there is no second
+// schema declares exactly one element, so the single value arrives intact and there is no second
 // spelling to accept. Checked against `meta.schema` in the clone rather than assumed.
 //
 // # Absent is not a mode, at three separate layers
@@ -174,7 +174,7 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	}
 
 	// Upstream's two object arms are `additionalProperties: false`, so a config naming a
-	// declaration kind AND an initialization state is rejected by the schema before the rule runs.
+	// declaration kind and an initialization state is rejected by the schema before the rule runs.
 	// Reproduced as a refusal rather than by picking one arm, because either choice silently
 	// enforces something the author did not write.
 	namesKind := object.Var != nil || object.Let != nil || object.Const != nil ||
@@ -191,7 +191,7 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 		settings.SeparateRequires = *object.SeparateRequires
 	}
 
-	// Each named kind sets BOTH halves of its group, which is upstream's
+	// Each named kind sets both halves of its group, which is upstream's
 	// `options.var = { uninitialized: mode.var, initialized: mode.var }`.
 	assignKind := func(wire *string, group *oneVarGroup) error {
 		if wire == nil {
@@ -220,7 +220,7 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 		}
 	}
 
-	// The state form sets one HALF across all five kinds, which is upstream's pair of
+	// The state form sets one half across all five kinds, which is upstream's pair of
 	// `Object.hasOwn` blocks. Note it overwrites rather than merges, matching the order upstream
 	// applies them in -- though the mixture is refused above, so the two never meet in practice.
 	if object.Uninitialized != nil {
@@ -364,7 +364,7 @@ func (kind oneVarKind) text() string {
 //
 // # The composite flag, which is the trap this function exists to avoid
 //
-// `NodeFlagsAwaitUsing` is NOT a distinct bit. `ast/nodeflags.go` defines it as
+// `NodeFlagsAwaitUsing` is not a distinct bit. `ast/nodeflags.go` defines it as
 // `NodeFlagsConst | NodeFlagsUsing`, because those two never co-occur on a single spelling and the
 // pair is free to mean the third thing. So `flags&NodeFlagsAwaitUsing != 0` is true for a plain
 // `const` and for a plain `using` as well, and a test written that way classifies every `const` in
@@ -453,7 +453,7 @@ func (scopes *oneVarScopes) endFunction() {
 
 // current returns a pointer to the state a declaration kind reads and writes.
 //
-// A POINTER, because upstream mutates the frame in place through an aliased reference and the
+// A pointer, because upstream mutates the frame in place through an aliased reference and the
 // recorded flags have to outlive the call. Returning a copy makes `recordTypes` write to nothing,
 // which reads as a rule that never remembers a previous declaration -- every `always` case would
 // then pass and only the corpus could tell. A mutant dropping the `var` arm is caught by 91 lines.
@@ -485,7 +485,7 @@ func (scopes *oneVarScopes) current(kind oneVarKind) *oneVarStateFlags {
 //
 // Upstream registers Program, FunctionDeclaration, FunctionExpression, ArrowFunctionExpression and
 // StaticBlock. ESTree wraps every method, constructor and accessor body in a FunctionExpression, so
-// that one entry covers all of them. Our parser has no such wrapper -- a method IS
+// that one entry covers all of them. Our parser has no such wrapper -- a method is
 // KindMethodDeclaration and is both the member and the function -- so the four member kinds are
 // named here explicitly. Measured with a probe: `class C { m() {} }` produces
 // KindMethodDeclaration directly under KindClassDeclaration, with no function node between.
@@ -495,8 +495,8 @@ func (scopes *oneVarScopes) current(kind oneVarKind) *oneVarStateFlags {
 // zero class methods, constructors, getters or setters -- which is why
 // `TestOneVarStaysSilentOnTypeScriptShapesUpstreamCannotWrite` exists.
 //
-// A namespace body is deliberately NOT here. Measured: two sibling namespaces each declaring a
-// `const` DO report upstream, because a TSModuleBlock is not a function scope.
+// A namespace body is deliberately not here. Measured: two sibling namespaces each declaring a
+// `const` do report upstream, because a TSModuleBlock is not a function scope.
 func oneVarIsFunctionScope(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindSourceFile,
@@ -520,13 +520,13 @@ func oneVarIsFunctionScope(node *ast.Node) bool {
 //
 // # The static block's inner Block is deliberately excluded
 //
-// Upstream's `StaticBlock` node is both the function scope AND the statement list, so it pushes one
+// Upstream's `StaticBlock` node is both the function scope and the statement list, so it pushes one
 // function frame and (via startFunction) one block frame. Our parser puts a KindBlock inside
-// KindClassStaticBlockDeclaration, which would push a SECOND block frame for the same statements.
+// KindClassStaticBlockDeclaration, which would push a second block frame for the same statements.
 //
-// Removing this guard is an EQUIVALENT mutant, and that is established structurally rather than
+// Removing this guard is an equivalent mutant, and that is established structurally rather than
 // inferred from its survival. A probe printing the children of a KindClassStaticBlockDeclaration
-// shows it has exactly ONE child, its Block, and that every statement lives inside that Block. So
+// shows it has exactly one child, its Block, and that every statement lives inside that Block. So
 // there is no position where a statement sits in the outer frame but not the inner one: the two
 // frames span identical statement sets and no verdict can differ between them.
 //
@@ -549,7 +549,7 @@ func oneVarIsBlockScope(node *ast.Node) bool {
 
 // oneVarStatementOf returns the node that plays the part of ESTree's VariableDeclaration.
 //
-// ESTree's VariableDeclaration is the STATEMENT and holds every declarator. Ours splits that into a
+// ESTree's VariableDeclaration is the statement and holds every declarator. Ours splits that into a
 // VariableStatement wrapping a VariableDeclarationList, except in a for-head where the list stands
 // alone. So the statement-shaped node is the list's parent when that parent is a VariableStatement,
 // and the list itself otherwise.
@@ -572,27 +572,27 @@ func oneVarStatementOf(list *ast.Node) *ast.Node {
 // so this answers "what does `parent.body` contain", which is narrower than "is this a statement
 // list".
 //
-// # A switch clause is deliberately ABSENT, and it is the one container where the two disagree
+// # A switch clause is deliberately absent, and it is the one container where the two disagree
 //
 // An ESTree SwitchCase keeps its statements in `.consequent`, not `.body`. So `parent.body` is
 // undefined there, the whole index expression is 0, and the consecutive arm never fires inside a
 // switch case at all. Measured against ESLint 10.10.0: two adjacent `let`s report `combine` in a
-// block and report NOTHING in a `case` or a `default`, while the same clause still reports under
+// block and report nothing in a `case` or a `default`, while the same clause still reports under
 // `always` and `never`, both of which reach the scope stack rather than the sibling index.
 //
 // Ours calls that node a statement list, because it is one, so returning its statements here made
 // the port report where upstream is silent. The corpus writes three switch cases and none of them
 // is under `consecutive`, so nothing in it could see the divergence.
 //
-// `oneVarIsInStatementList` DOES include the clause, and that is not an inconsistency: it answers
+// `oneVarIsInStatementList` does include the clause, and that is not an inconsistency: it answers
 // upstream's `isInStatementList`, which tests `astUtils.STATEMENT_LIST_PARENTS` -- a set that names
 // SwitchCase explicitly. Two different questions, two different answers, one node.
 //
 // # Each kind gets its own arm, and that is not stylistic
 //
 // `As*()` accessors are interface conversions rather than casts, so calling `AsBlock()` on a
-// KindSourceFile PANICS instead of answering nil. A shared `case KindA, KindB:` arm reaching for one
-// accessor is exactly the shape that crashes, and the walk recovers per FILE rather than per rule,
+// KindSourceFile panics instead of answering nil. A shared `case KindA, KindB:` arm reaching for one
+// accessor is exactly the shape that crashes, and the walk recovers per file rather than per rule,
 // so one such panic costs every rule its verdict on that file.
 func oneVarStatementList(container *ast.Node) []*ast.Node {
 	if container == nil {
@@ -611,7 +611,7 @@ func oneVarStatementList(container *ast.Node) []*ast.Node {
 
 // oneVarIsInStatementList answers upstream's `isInStatementList`, which gates the split fixer.
 //
-// Upstream tests whether the node's PARENT is one of Program, BlockStatement, StaticBlock or
+// Upstream tests whether the node's parent is one of Program, BlockStatement, StaticBlock or
 // SwitchCase, which is exactly "this statement is a member of a statement list". `if (foo) var x, y;`
 // fails it, and upstream declines to autofix there because splitting would move the second
 // declaration outside the `if`.
@@ -621,7 +621,7 @@ func oneVarStatementList(container *ast.Node) []*ast.Node {
 // an export modifier, sitting directly in the statement list -- so the statement node is already the
 // right thing to test and the branch collapses.
 //
-// The switch clauses ARE here, unlike in `oneVarStatementList`. See that function's note.
+// The switch clauses are here, unlike in `oneVarStatementList`. See that function's note.
 func oneVarIsInStatementList(statement *ast.Node) bool {
 	if statement == nil || statement.Parent == nil {
 		return false
@@ -654,7 +654,7 @@ func oneVarCountDeclarations(declarators []*ast.Node) oneVarCounts {
 
 // oneVarIsRequire is upstream's `isRequire`.
 //
-// Upstream reads `decl.init.callee.name === "require"`, which is a NAME test rather than a
+// Upstream reads `decl.init.callee.name === "require"`, which is a name test rather than a
 // resolution: a locally declared `function require()` satisfies it, and so does a shadowed one.
 // Reproduced as written, because the rule's judgment is the spelling. Measured against the
 // installed rule, which reports on `function require(x) { return x; } var foo = require('foo'), bar;`.
@@ -662,7 +662,7 @@ func oneVarCountDeclarations(declarators []*ast.Node) oneVarCounts {
 // `callee.name` is `undefined` for any callee that is not an identifier -- a member access, a
 // parenthesized expression -- and `undefined === "require"` is false, so those are not requires.
 // Testing the kind first is what reproduces that without dereferencing something that has no name:
-// measured, `a.require('foo')` is NOT a require upstream.
+// measured, `a.require('foo')` is not a require upstream.
 //
 // Every one of the corpus's ten `separateRequires` cases calls `require` and nothing else, so a
 // mutant answering true for every call survives all 296. See
@@ -681,7 +681,7 @@ func oneVarIsRequire(declarator *ast.Node) bool {
 
 // oneVarAnyRequire and oneVarAllRequire are upstream's `.some(isRequire)` and `.every(isRequire)`.
 //
-// Note `every` on an EMPTY slice is true in JavaScript, and Go's loop form gives the same answer,
+// Note `every` on an empty slice is true in JavaScript, and Go's loop form gives the same answer,
 // so a list with no declarators is "all requires" in both. That only ever combines with `some`
 // being false, so the pair reads as "no requires" either way.
 func oneVarAnyRequire(declarators []*ast.Node) bool {
@@ -725,14 +725,14 @@ func oneVarDeclarationListOfStatement(statement *ast.Node) *ast.Node {
 	if statement == nil || statement.Kind != ast.KindVariableStatement {
 		return nil
 	}
-	// An EXPORTED previous sibling is an ExportNamedDeclaration upstream, whose `kind` is
+	// An exported previous sibling is an ExportNamedDeclaration upstream, whose `kind` is
 	// `undefined` rather than "const", so `previousNode.kind === type` is false and both the
 	// consecutive check and the join repair decline against it. Ours has no wrapper, so the export
 	// modifier is what stands in for that node's identity.
 	//
 	// Measured: `export const a = 1; const b = 2;` under "always" reports and returns `output:
 	// null` upstream, while without this the port repaired it to `export const a = 1,  b = 2;` --
-	// which moves a binding INTO an export and changes the module's public surface. The corpus
+	// which moves a binding into an export and changes the module's public surface. The corpus
 	// cannot reach it: its exported cases are all under "never".
 	if oneVarIsExported(statement) {
 		return nil
@@ -747,7 +747,7 @@ func oneVarDeclarationListOfStatement(statement *ast.Node) *ast.Node {
 // oneVarIsForStatementInitializer answers upstream's `parent.type !== "ForStatement" || parent.init !== node`.
 //
 // Only the classic three-part `for` head is excluded. A `for...in` or `for...of` head is a different
-// parent kind and is NOT excluded here, which is upstream's behaviour and is why the `always` arm
+// parent kind and is not excluded here, which is upstream's behaviour and is why the `always` arm
 // carries its own separate for-in/for-of guard.
 func oneVarIsForStatementInitializer(list *ast.Node) bool {
 	parent := list.Parent
@@ -786,7 +786,7 @@ func oneVarIsForInOrOfLeft(list *ast.Node) bool {
 // `declaration.parent.type`. Our parser has no wrapper: the modifier hangs off the statement, which
 // is why this reads modifiers rather than the parent kind.
 //
-// # The wrapper changes what the rule DOES, not only how it is spelled
+// # The wrapper changes what the rule does, not only how it is spelled
 //
 // Upstream reaches an exported declaration's siblings through `declaration.parent.parent.body` in
 // the fixer and `parent.body` in the consecutive check. For an export, `declaration.parent` is the
@@ -797,7 +797,7 @@ func oneVarIsForInOrOfLeft(list *ast.Node) bool {
 // So upstream neither reports a consecutive finding on an exported declaration nor repairs a
 // combine on one. Ours puts the exported statement directly in the enclosing statement list, where
 // it has real siblings and a real index, so without the collapse this rule reports where upstream
-// is silent and -- far worse -- REPAIRS where upstream declines.
+// is silent and -- far worse -- repairs where upstream declines.
 //
 // Measured before it was fixed, driving both: upstream returns `output: null` for all four export
 // shapes while this port produced
@@ -805,7 +805,7 @@ func oneVarIsForInOrOfLeft(list *ast.Node) bool {
 //	export const a = 1; export const b = 2;   ->   export const a = 1; export,  b = 2;
 //
 // which is not valid syntax. The corpus cannot see any of it: every one of its seven exported cases
-// is under `never`, which reaches the SPLIT fixer and never the join. The split fixer very much
+// is under `never`, which reaches the split fixer and never the join. The split fixer very much
 // does repair an export, which is why the collapse is scoped to the join.
 func oneVarIsExported(statement *ast.Node) bool {
 	modifiers := statement.Modifiers()
@@ -887,7 +887,7 @@ func (checker *oneVarChecker) recordTypes(kind oneVarKind, declarators []*ast.No
 
 // hasOnlyOneStatement is upstream's function of the same name.
 //
-// It answers "may this statement declare, given what the scope has already seen", and it RECORDS on
+// It answers "may this statement declare, given what the scope has already seen", and it records on
 // the way out when the answer is yes. The recording is the reason this cannot be split into a pure
 // predicate: the third `var` in a scope is judged against a flag the second one set.
 func (checker *oneVarChecker) hasOnlyOneStatement(kind oneVarKind, declarators []*ast.Node) bool {
@@ -935,7 +935,7 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	group := checker.groupFor(kind)
 
 	// Upstream's `if (!options[key]) return;`, which skips a declaration kind the config never
-	// named. Removing this is an EQUIVALENT mutant today and the sweep says so, for a reason
+	// named. Removing this is an equivalent mutant today and the sweep says so, for a reason
 	// established by enumeration rather than by the survival: every read of a group's two halves
 	// goes through `modeIs`, which answers false for nil, so an unconfigured group already
 	// declines at every one of the fourteen comparison sites.
@@ -963,7 +963,7 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	// consecutive
 	//
 	// Upstream's index expression is `(parent.body && parent.body.length > 0 &&
-	// parent.body.indexOf(node)) || 0`, whose `|| 0` makes a node that is FIRST in its list (index
+	// parent.body.indexOf(node)) || 0`, whose `|| 0` makes a node that is first in its list (index
 	// 0) and a node with no list at all indistinguishable. Both mean "no previous sibling to merge
 	// with", so the guard below is `> 0` and reproduces it exactly.
 	siblings := oneVarStatementList(container)
@@ -998,7 +998,7 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	//
 	// Upstream skips a `for` statement's own initializer, because splitting `for (var i = 0, j = 0;;)`
 	// would move `j` outside the head and change what the loop means. `parent.init !== node` is the
-	// test, and here the list IS the init when its parent is the for statement.
+	// test, and here the list is the init when its parent is the for statement.
 	if !oneVarIsForStatementInitializer(list) {
 		if counts.Uninitialized+counts.Initialized > 1 {
 			checker.reportNever(statement, list, kind, group, counts)
@@ -1060,18 +1060,18 @@ func (checker *oneVarChecker) reportNever(statement *ast.Node, list *ast.Node,
 //
 // # Two edits that only mean something together
 //
-// Upstream's fixer is a GENERATOR yielding two or three edits: turn the previous statement's
+// Upstream's fixer is a generator yielding two or three edits: turn the previous statement's
 // terminator into a comma, drop the `using` token when the kind is `await using`, and delete this
 // statement's declaration keyword. They are disjoint spans, and `internal/edit`'s ProposalsFrom
-// flattens a diagnostic's fixes into INDEPENDENT proposals, so the engine judges each separately.
+// flattens a diagnostic's fixes into independent proposals, so the engine judges each separately.
 //
 // Measured against the real engine rather than assumed: both halves survive overlap resolution, and
-// a rival fix spanning the gap between them LOSES to this pair rather than splitting it, because
+// a rival fix spanning the gap between them loses to this pair rather than splitting it, because
 // these sort first and claim their bytes.
 //
 // What that measurement does not buy is safety against the one-byte gap between the two spans. A
 // rival fix landing strictly inside it would take one half and leave the other, and applying only
-// the keyword deletion yields `var bar = true; baz = false;` -- which PARSES, and silently declares
+// the keyword deletion yields `var bar = true; baz = false;` -- which parses, and silently declares
 // an implicit global. The engine's parse-failure guard cannot see that, so it is the one shape
 // worth naming here. It has no live caller today: this is the first shipped rule to report more
 // than one fix on one diagnostic, and `ProposalsFrom`'s own comment says grouping should be built
@@ -1091,15 +1091,15 @@ func (checker *oneVarChecker) reportJoin(statement *ast.Node, list *ast.Node,
 
 // joinFixes builds upstream's `joinDeclarationsFixer`, or nothing when it declines.
 //
-// Upstream's generator yields NOTHING unless the previous sibling is a declaration of the same
+// Upstream's generator yields nothing unless the previous sibling is a declaration of the same
 // kind. The consecutive arm has already established that, but the `always` arm calls the same fixer
-// WITHOUT checking, so a combine reported on a statement whose predecessor is something else
+// without checking, so a combine reported on a statement whose predecessor is something else
 // carries no repair at all. That is a report without a fix rather than a bug, and 26 corpus cases
 // record it as `output: null`.
 //
 // The same-kind check here is therefore not redundant with the caller's. The isolating shape is
 // `function f() { var a = 1; let b = 2; var c = 3; }`, where the third statement reports because
-// the FUNCTION scope already holds a `var` while its immediate predecessor is a `let`. Measured:
+// the function scope already holds a `var` while its immediate predecessor is a `let`. Measured:
 // upstream returns `output: null`. No corpus case writes it, so a mutant dropping this check
 // survives all 296; see `TestOneVarJoinDeclinesAgainstADifferentKindPredecessor`.
 func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
@@ -1113,14 +1113,14 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 		return nil
 	}
 
-	// An AMBIENT declaration is declined, which is this port's own decision and a measured one.
+	// An ambient declaration is declined, which is this port's own decision and a measured one.
 	// `declare let a: number; declare let b: number;` was joined to `declare let a: number;
 	// declare,  b: number;`, because the token before this statement's keyword is its own `declare`
 	// rather than the previous statement's semicolon. That does not parse. Upstream's installed
 	// build writes `declare let a: number,\n let b: number;`, which does not parse either.
 	//
 	// Repairing it properly would mean deleting the second `declare` too, and is only meaning-
-	// preserving when BOTH statements are ambient: joining an ambient binding into a real one, or the
+	// preserving when both statements are ambient: joining an ambient binding into a real one, or the
 	// reverse, changes whether a variable exists at runtime. Reporting without a repair is the subset
 	// that can be shown correct.
 	if oneVarIsAmbient(statement) || oneVarIsAmbient(previous) {
@@ -1136,9 +1136,9 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 	// `type` is upstream's first token of the declaration -- the `var`/`let`/`const`/`using`
 	// keyword, or `await` for an `await using`.
 	//
-	// Taken off the LIST rather than the statement. The two positions differ only for an exported
+	// Taken off the list rather than the statement. The two positions differ only for an exported
 	// declaration, where the statement's first token is `export` and the list's is the keyword,
-	// and the caller has already returned for those -- so a mutation swapping them SURVIVES, and
+	// and the caller has already returned for those -- so a mutation swapping them survives, and
 	// the sweep says so. The list is what upstream reads (its node begins at the keyword, with the
 	// export wrapper above it), and reading the statement here would make this function's
 	// correctness depend on a guard in another function rather than on anything local.
@@ -1157,7 +1157,7 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 	if beforeEnd > 0 && text[beforeEnd-1] == ';' {
 		fixes = append(fixes, rule.ReplaceRange(core.NewTextRange(beforeEnd-1, beforeEnd), ","))
 	} else {
-		// Upstream's `insertTextAfter`, for a previous statement with no semicolon (ASI).
+		// Upstream's `insertTextAfter`, for a previous statement with no semicolon (automatic semicolon insertion).
 		fixes = append(fixes, rule.ReplaceRange(core.NewTextRange(beforeEnd, beforeEnd), ","))
 	}
 
@@ -1177,7 +1177,7 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 // Returns -1 when nothing but trivia lies between here and the floor, which means there is no
 // previous token to attach a comma to.
 //
-// Scanning BACKWARD over a line comment is the case that makes this more than a whitespace skip: a
+// Scanning backward over a line comment is the case that makes this more than a whitespace skip: a
 // `//` comment runs to the end of its line, so a backward scan that stopped at the first
 // non-whitespace byte would stop on the comment's last character and treat it as a token. The loop
 // therefore walks whole lines and re-examines each one for a comment start.
@@ -1244,7 +1244,7 @@ func (checker *oneVarChecker) reportSplit(statement *ast.Node, list *ast.Node,
 //
 // Upstream returns null -- declining the repair entirely -- when the statement is not a member of a
 // statement list, because splitting `if (foo) var x, y;` would move `y` outside the `if` and change
-// what the code means. That is a decline of the FIX, not of the report.
+// what the code means. That is a decline of the fix, not of the report.
 //
 // Each comma becomes `; <kind> `, with an `export ` prefix when the statement is exported, and the
 // three shapes upstream distinguishes are about where the comment and the newline go.
@@ -1285,7 +1285,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 			continue
 		}
 
-		// `afterComma` is the next token INCLUDING comments, which is what decides between the
+		// `afterComma` is the next token including comments, which is what decides between the
 		// three shapes below.
 		afterCommaPos := oneVarNextTokenOrCommentStart(text, comma.End())
 		if afterCommaPos < 0 {
@@ -1321,7 +1321,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 	return fixes
 }
 
-// oneVarNextTokenOrCommentStart returns where the next token OR comment begins, or -1.
+// oneVarNextTokenOrCommentStart returns where the next token or comment begins, or -1.
 func oneVarNextTokenOrCommentStart(text string, from int) int {
 	position := from
 	for position < len(text) {
@@ -1408,7 +1408,7 @@ func oneVarLastCommentRunStart(text string, from int) int {
 //
 // # Five places our AST differs from ESTree, and four of them move a verdict
 //
-// ESTree's `VariableDeclaration` is the statement AND holds the declarators. Ours splits it into a
+// ESTree's `VariableDeclaration` is the statement and holds the declarators. Ours splits it into a
 // `VariableStatement` wrapping a `VariableDeclarationList`, and in a for-head the list stands alone
 // with no statement above it. `oneVarStatementOf` picks whichever plays the statement's part, and
 // getting it wrong moves every span and breaks every consecutive verdict at once.
@@ -1423,7 +1423,7 @@ func oneVarLastCommentRunStart(text string, from int) int {
 // See the note above `oneVarIsInStatementList`.
 //
 // ESTree wraps a method body in a `FunctionExpression`, so upstream's one listener covers methods,
-// constructors and accessors. Ours has no wrapper -- a method IS `KindMethodDeclaration` -- so those
+// constructors and accessors. Ours has no wrapper -- a method is `KindMethodDeclaration` -- so those
 // four kinds are named explicitly as function scopes.
 //
 // The fifth is inert and recorded anyway: our `ClassStaticBlockDeclaration` holds a `Block` where

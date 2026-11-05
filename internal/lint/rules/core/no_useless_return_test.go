@@ -11,11 +11,11 @@ import (
 // vectors, extracted by loading its test file with a stubbed rule tester so nothing was retyped.
 //
 // Upstream runs the whole file at `ecmaVersion: 5` with `globalReturn`, so three of its cases are
-// TOP-LEVEL returns. Our parser does not accept one, so those three are wrapped in a function here
+// top-level returns. Our parser does not accept one, so those three are wrapped in a function here
 // and marked at the line. The wrapping preserves what each case tests, since none of them is about
 // being at the top level; they are about what follows the return.
 //
-// Three invalid cases carry `output: null`, and each is asserted as reporting AND offering no
+// Three invalid cases carry `output: null`, and each is asserted as reporting and offering no
 // repair. Two of them are the comment guard, which is the most dangerous line in this rule: the
 // fix deletes a statement, and without that guard it deletes a comment somebody wrote along with it.
 
@@ -91,7 +91,7 @@ func TestNoUselessReturnFires(test *testing.T) {
 		// Wrapped in a function here; the judgment and the repair are unchanged.
 		{name: "invalid7", source: "function wrapper() { if (foo) { bar(); return; } else { baz(); } }", findings: 1, wantFixed: "function wrapper() { if (foo) { bar();  } else { baz(); } }"},
 		// Upstream's recorded output keeps the second `return;`, and that is an artifact of its
-		// FIX ENGINE rather than of the rule. Measured: it reports both returns and BOTH fixes
+		// fix engine rather than of the rule. Measured: it reports both returns and both fixes
 		// rewrite the whole function, range [0,47], because upstream wraps every repair in
 		// FixTracker.retainEnclosingFunction to avoid conflicting with no-else-return. Two
 		// overlapping fixes cannot both apply in one pass, so ESLint drops the second and its
@@ -184,8 +184,8 @@ func TestNoUselessReturnSpanAndMessage(test *testing.T) {
 // The comment guard, written here rather than taken from the corpus.
 //
 // Upstream's corpus does exercise it, at `return/**/;` and `return//\n;`, so the omission is not
-// invisible the way it would be for a guard nothing tested. What the corpus does NOT pin is the
-// boundary: the guard is `getCommentsInside`, so a comment merely NEAR the return is still fixed.
+// invisible the way it would be for a guard nothing tested. What the corpus does not pin is the
+// boundary: the guard is `getCommentsInside`, so a comment merely near the return is still fixed.
 // Measured against the installed build at 10.8.1:
 //
 //	function foo() { bar(); return/**/; }          reports, NO repair
@@ -258,7 +258,7 @@ func TestNoUselessReturnRemovability(test *testing.T) {
 		}
 	}
 
-	// A control: the same judgment inside a block IS repaired, so the decline above is about the
+	// A control: the same judgment inside a block is repaired, so the decline above is about the
 	// parent rather than about the rule declining to fix anything.
 	rule_testing.ExpectFixedSource(test,
 		rule_testing.Run(test, NoUselessReturn, "file.ts", "function foo() { if (foo) { return; } }"),
@@ -358,7 +358,7 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(test *testing.T) {
 // The try boundary, in all six directions. Found by a false positive on the real tree rather than
 // by the corpus, which has no case for the first one.
 //
-// A return inside a try block is rescued by later statements in that SAME BLOCK, and not by the
+// A return inside a try block is rescued by later statements in that same block, and not by the
 // catch or the finally. Upstream's corpus writes the catch and finally halves and never writes an
 // early exit followed by more work inside the try, which is the ordinary shape of guarded code:
 // before this was corrected the rule reported 51 such sites across 33 files on this tree, and every

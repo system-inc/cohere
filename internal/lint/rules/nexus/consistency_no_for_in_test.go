@@ -9,7 +9,7 @@ import (
 
 const consistencyNoForInFile = "/repository/source/ConsistencyNoForIn.ts"
 
-// Every `for...in` in ahra at HEAD on 2026-10-01, trimmed to the loop. The first four are the ones
+// Every `for...in` in ahra at `HEAD` on 2026-10-01, trimmed to the loop. The first four are the ones
 // upstream `guard-for-in` reported; the last four are the ones it accepted as guarded, and this rule
 // reports them too, because a guarded `for...in` is still the shape being retired. The fifth is the
 // case that shows why: its guard is `if (key === 'parent') continue;`, which upstream counts as a

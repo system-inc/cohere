@@ -114,7 +114,7 @@ func TestNoUnreachableLoopHandlesNilOptions(test *testing.T) {
 // last. Measured against the installed build, which gives `while (a) break;` columns 1 through 17,
 // the whole 16-character statement.
 //
-// The nested case is the one worth having twice over: it pins both spans AND their order, and a
+// The nested case is the one worth having twice over: it pins both spans and their order, and a
 // port emitting findings as its per-root walk discovers them would order these the other way.
 func TestNoUnreachableLoopSpans(test *testing.T) {
 	test.Parallel()

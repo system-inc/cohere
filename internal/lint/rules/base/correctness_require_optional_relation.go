@@ -46,10 +46,10 @@ var relationDecorators = map[string]struct{}{
 //
 // Measured against the source rule across sixteen shapes rather than inferred. `| null` reports;
 // `| null | undefined` does not; `any` and `unknown` are silent because they erase the distinction
-// rather than answer it; and `void` REPORTS, which is the one that reads as a surprise and is
+// rather than answer it; and `void` reports, which is the one that reads as a surprise and is
 // deliberate, since void is absent from the narrow mask.
 //
-// # The decorator must be CALLED, and that is a real discrimination
+// # The decorator must be called, and that is a real discrimination
 //
 // The source's `hasDecoratorInSet` requires a call expression with an identifier callee, so
 // `@OrmManyToOne()` matches and a bare `@OrmManyToOne` does not. Measured: the bare form is silent.
@@ -77,7 +77,7 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 				// The shelf's HasDecoratorInSet, which was measured to agree with the source's
 				// `hasDecoratorInSet` exactly: both require a call expression with a bare identifier
 				// callee, so `@OrmManyToOne()` matches while `@OrmManyToOne` and `@Orm.ManyToOne()`
-				// do not. The sibling rule in this package deliberately does NOT use it, for the
+				// do not. The sibling rule in this package deliberately does not use it, for the
 				// reason recorded there.
 				if !decorators.HasDecoratorInSet(node, relationDecorators) {
 					return

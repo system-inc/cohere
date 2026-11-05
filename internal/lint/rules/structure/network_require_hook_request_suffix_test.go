@@ -187,7 +187,7 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(test *testing.T) {
 // The base name is taken before the suffix test, and the two cases below pin that it is the last
 // path segment being judged.
 //
-// Worth saying what these do NOT prove, because the first version of this comment claimed it. I
+// Worth saying what these do not prove, because the first version of this comment claimed it. I
 // mutated the base-name extraction away (judging the whole path instead) and the suite stayed
 // green, then went looking for the fixture that would catch it and could not write one. The reason
 // is that the test is a suffix test: a path always ends with its own base name, so
