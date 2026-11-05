@@ -101,7 +101,7 @@ export default function sitemap() {
 // added next year with a rename fixer is held to the same line on its first run.
 //
 // Two levels of evidence, because a fix is the dangerous half and a finding is how the bad rename
-// got made by hand: any FIX whose range touches a contract name fails, and so does any finding a
+// got made by hand: any fix whose range touches a contract name fails, and so does any finding a
 // naming rule anchors on one, since its message is advice to rename a name that must not change.
 //
 // Every rule runs with nil options, which is the strict case: a consumer that passes no framework
@@ -159,7 +159,7 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 }
 
 // isNamingRule names the rules whose findings are advice to rename, recase or un-export a
-// declaration. Their FINDINGS on a contract name are defects, not just their fixes.
+// declaration. Their findings on a contract name are defects, not just their fixes.
 func isNamingRule(name string) bool {
 	for _, prefix := range []string{
 		"nexus/consistency-no-abbreviated-identifier",

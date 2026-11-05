@@ -69,12 +69,12 @@ func TestNoSequencesFires(test *testing.T) {
 
 		// Beyond the corpus. Chained commas are one node upstream and several here, so these pin the
 		// count as well as the position: measured against the installed rule, both report exactly
-		// once and both at column 2, which is the chain's FIRST comma rather than its outermost.
+		// once and both at column 2, which is the chain's first comma rather than its outermost.
 		{"a, b, c;", nil, 2},
 		{"a, b, c, d;", nil, 2},
 		{"a, b, c, d, e;", nil, 2},
 
-		// A three-element chain in a position that is NOT exempt, paired with the five silent cases
+		// A three-element chain in a position that is not exempt, paired with the five silent cases
 		// below. These are the inputs that caught the chain-deduplication running in the wrong
 		// direction: standing down on the outer node instead of the inner one still reports here,
 		// so a fixture in this direction alone cannot see the defect and the silent half is the
@@ -92,12 +92,12 @@ func TestNoSequencesFires(test *testing.T) {
 		{"a, (b, c);", nil, 2},
 		{"((a, b)), c;", nil, 9},
 
-		// The `for` exemption is the initializer and the update, and NOT the condition. The corpus
+		// The `for` exemption is the initializer and the update, and not the condition. The corpus
 		// covers the condition; these two pin that the exemption is positional rather than a blanket
 		// exemption for the statement, which a structural port could easily get backwards.
 		{"for (; a, b ;);", nil, 9},
 
-		// The `for` slot comparison has to see through parentheses, and it has to happen BEFORE the
+		// The `for` slot comparison has to see through parentheses, and it has to happen before the
 		// paren allowance. This is the inner half of the pair upstream's two `allowInParentheses:
 		// false` clean cases establish: the outer sequence is the initializer and is exempt, the
 		// inner one's parent is that sequence rather than the statement, and it reports. Measured
@@ -121,7 +121,7 @@ func TestNoSequencesFires(test *testing.T) {
 		// invert.
 		{"a = (b, c) , d", nil, 12},
 
-		// A chain whose LAST element is a parenthesized sequence. The outer chain is unparenthesized
+		// A chain whose last element is a parenthesized sequence. The outer chain is unparenthesized
 		// and reports at its first comma; the inner one is excused. Measured at column 2.
 		{"a, b, (c, d);", nil, 2},
 
@@ -131,7 +131,7 @@ func TestNoSequencesFires(test *testing.T) {
 		{"(a, b), (c, d);", nil, 7},
 
 		// A whole chain wrapped in parentheses, then extended. The parenthesized part is excused and
-		// is a separate node upstream; what reports is the comma OUTSIDE the parentheses. Written
+		// is a separate node upstream; what reports is the comma outside the parentheses. Written
 		// first with the expectation of column 3, on the reasoning that the leftmost comma of the
 		// chain is reported -- which is true only when the chain is unbroken. Measured at 12, and
 		// the rule was right where the reasoning was not.
@@ -163,7 +163,7 @@ func TestNoSequencesFires(test *testing.T) {
 	}
 }
 
-// The clean cases are what separate the comma OPERATOR from the four separators spelled the same
+// The clean cases are what separate the comma operator from the four separators spelled the same
 // way: array elements, object properties, argument lists, and the declarators of one `var`. Each is
 // a class of false positive a rule matching on the token would ship.
 func TestNoSequencesStaysSilent(test *testing.T) {
@@ -233,7 +233,7 @@ func TestNoSequencesStaysSilent(test *testing.T) {
 		{"class C { [(a, b)]() {} }", nil},
 		{"({...(a, b)})", nil},
 
-		// Arrow PARAMETERS are a separator list rather than a sequence, and they parse into a shape
+		// Arrow parameters are a separator list rather than a sequence, and they parse into a shape
 		// that has no comma operator in it at all. Written because a rule reaching for a comma token
 		// would find one here.
 		{"(a, b) => c", nil},
@@ -256,7 +256,7 @@ func TestNoSequencesStaysSilent(test *testing.T) {
 
 // A nested pair under `allowInParentheses: false` reports twice, and this pins both spans.
 //
-// It is asserted as a SET rather than as a sequence because the emission order is this port's one
+// It is asserted as a set rather than as a sequence because the emission order is this port's one
 // measured divergence from upstream: our pre-order walk reaches the outer node first, and the outer
 // node's reported comma is the later one, so we emit later-then-earlier where upstream emits
 // earlier-then-later. Identical count, identical spans, and invisible downstream because the
@@ -304,7 +304,7 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(test *testing.T) {
 // The decoder is the one line of this rule with no upstream counterpart, so it gets its own test.
 //
 // An absent key and an explicit `true` must both mean allowed, an explicit `false` must mean not
-// allowed, and NIL OPTIONS -- which is what the live config produces for a rule configured as bare
+// allowed, and `nil` options -- which is what the live config produces for a rule configured as bare
 // "error" -- must mean allowed. That last one is the case no fixture routed through the decoder can
 // reach, because it is the shape the config layer produces when the decoder is never called.
 func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {

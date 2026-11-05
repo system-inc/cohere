@@ -103,7 +103,7 @@ func TestNoMultiStrJsxExemption(test *testing.T) {
 		{"a multiline string in attribute braces", "var a = <div attr={'Line 1 \\\n Line 2'} />;", false},
 		{"a multiline string in element braces", "var a = <div>{'Line 1 \\\n Line 2'}</div>;", false},
 		{"a multiline string in a spread object", "var a = <div {...{a: 'Line 1 \\\n Line 2'}} />;", true},
-		// A string spread DIRECTLY as attributes, whose parent is the spread attribute itself rather
+		// A string spread directly as attributes, whose parent is the spread attribute itself rather
 		// than an object literal inside it. Upstream is silent; measured on the installed build.
 		// This case was found by a surviving mutant: narrowing the kind enumeration to the two
 		// parents that everyday well-formed JSX produces passed every other fixture here, and
@@ -132,8 +132,8 @@ func TestNoMultiStrJsxExemption(test *testing.T) {
 // against the installed build. A port reading the cooked value reports the escape, which is the
 // ordinary correct way to write a newline, and would fire on a large fraction of every real tree.
 //
-// The last case is the sharpest: a string whose VALUE contains a newline because of an escape,
-// sitting on one source line, is clean, while a string whose value contains NO newline because the
+// The last case is the sharpest: a string whose value contains a newline because of an escape,
+// sitting on one source line, is clean, while a string whose value contains no newline because the
 // continuation swallows it does report. The rule is about the source, not the string.
 func TestNoMultiStrDistinguishesEscapesFromContinuations(test *testing.T) {
 	test.Parallel()

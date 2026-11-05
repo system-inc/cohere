@@ -415,7 +415,7 @@ func TestNoArrayConstructorNeverProposesAnAutomaticFix(test *testing.T) {
 	}
 
 	// And the suggestion, if a human took it blindly, would be the meaning change described above.
-	// Recorded rather than repaired, so that a later change adding an ASI guard has a fixture that
+	// Recorded rather than repaired, so that a later change adding an `ASI` guard has a fixture that
 	// visibly flips instead of a comment nobody reads.
 	fix := result.Diagnostics[0].Suggestions[0].Fixes[0]
 	rewritten := sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]

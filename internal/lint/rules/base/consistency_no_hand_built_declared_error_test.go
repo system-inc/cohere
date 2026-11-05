@@ -21,7 +21,7 @@ func consistencyNoHandBuiltDeclaredErrorCaseName(index int) string {
 // `@nexus` alias mapped by hand, and the verdict recorded here is what the original produced rather
 // than what I expected.
 //
-// Four of these are places the original KNOWINGLY misses, all four measured rather than reasoned
+// Four of these are places the original knowingly misses, all four measured rather than reasoned
 // about: a computed key, a string-literal key, a spread, and a namespaced constructor. Each plainly
 // carries or names the option, and widening any of them would report inputs the original is silent
 // on.
@@ -49,13 +49,13 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(test *testing.T) {
 			fileName:   "/repository/source/Probe.ts",
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst o = { identifier: 'X' };\nconst e = new BaseError('boom', o);\n",
 		},
-		// A COMPUTED key. The original tests `property.key.type === 'Identifier'`, which a computed key
+		// A computed key. The original tests `property.key.type === 'Identifier'`, which a computed key
 		// is not, so it is silent even though the option is plainly there. Measured.
 		{
 			fileName:   "/repository/source/Probe.ts",
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst e = new BaseError('boom', { ['identifier']: 'X' });\n",
 		},
-		// A STRING-LITERAL key, silent for the same reason. Both are places the rule knowingly misses,
+		// A string-literal key, silent for the same reason. Both are places the rule knowingly misses,
 		// and widening either would report inputs the original does not.
 		{
 			fileName:   "/repository/source/Probe.ts",
@@ -66,7 +66,7 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(test *testing.T) {
 			fileName:   "/repository/source/Probe.ts",
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst rest = { identifier: 'X' };\nconst e = new BaseError('boom', { ...rest });\n",
 		},
-		// A NAMESPACED constructor. The original matches a bare `BaseError` identifier callee only, so
+		// A namespaced constructor. The original matches a bare `BaseError` identifier callee only, so
 		// `Errors.BaseError` is silent. Measured rather than assumed.
 		{
 			fileName:   "/repository/source/Probe.ts",
@@ -82,7 +82,7 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(test *testing.T) {
 			fileName:   "/repository/source/a/b/CreateBaseErrors.ts",
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst e = new BaseError('boom', { identifier: 'X' });\n",
 		},
-		// Another class taking the same option shape. The rule keys on the CLASS as well as on the
+		// Another class taking the same option shape. The rule keys on the class as well as on the
 		// option, and no other case here constructs anything but a BaseError, so a mutant dropping
 		// the callee-name test survived the whole suite. Measured clean against the original.
 		{
@@ -124,7 +124,7 @@ func TestNoHandBuiltDeclaredErrorFires(test *testing.T) {
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst e = new BaseError('boom', { identifier: 'X', statusCode: 404 });\n",
 			wantSpan:   "new BaseError('boom', { identifier: 'X', statusCode: 404 })",
 		},
-		// A SHORTHAND property. estree makes this a Property whose key is an Identifier named
+		// A shorthand property. estree makes this a Property whose key is an Identifier named
 		// `identifier`, so the original counts it; our parser gives it its own node kind, which is why
 		// the predicate names both spellings. Measured reporting against the original.
 		{
@@ -132,7 +132,7 @@ func TestNoHandBuiltDeclaredErrorFires(test *testing.T) {
 			sourceText: "declare class BaseError { constructor(m: string, o?: object); }\nconst identifier = 'X';\nconst e = new BaseError('boom', { identifier });\n",
 			wantSpan:   "new BaseError('boom', { identifier })",
 		},
-		// A file whose name ENDS in BaseError.ts without being it, which REPORTS. The suffix includes
+		// A file whose name ends in BaseError.ts without being it, which reports. The suffix includes
 		// the separator, so the exemption does not leak to a neighbour.
 		//
 		// This row was nearly wrong in the worst way. The first measurement of all three filename

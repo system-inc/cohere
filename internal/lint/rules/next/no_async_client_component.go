@@ -152,7 +152,7 @@ func reportIndirectAsyncDefaultExport(ruleContext rule.Context, statement *ast.N
 		return
 	}
 
-	// The declaration that comes FIRST IN SOURCE ORDER, which is neither a loop nor an index-zero
+	// The declaration that comes first in source order, which is neither a loop nor an index-zero
 	// read, and every part of this was measured rather than reasoned.
 	//
 	// The standing advice in this tree is to loop over `symbol.Declarations` because indexing zero
@@ -161,7 +161,7 @@ func reportIndirectAsyncDefaultExport(ruleContext rule.Context, statement *ast.N
 	// chances to match. It is wrong here, where the question is "what single thing is this name",
 	// and it is wrong in both of its halves.
 	//
-	// First, declarations are NOT in source order in typescript-go. Measured: an
+	// First, declarations are not in source order in typescript-go. Measured: an
 	// `interface MyComponent {}` written above `async function MyComponent() {}` still puts the
 	// function at index 0, because a value declaration sorts ahead of a type one no matter where it
 	// was written. So the input the loop advice exists to catch does not arise for this shape at

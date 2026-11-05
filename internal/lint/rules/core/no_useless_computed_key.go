@@ -11,7 +11,7 @@ import (
 // NoUselessComputedKeySettings is the decoded option surface.
 //
 // Upstream's schema is one object with a single boolean, and its `defaultOptions` sets
-// `enforceForClassMembers: true`. The default is the trap here: it is TRUE, so a decoder handing
+// `enforceForClassMembers: true`. The default is the trap here: it is `true`, so a decoder handing
 // back a zero-valued struct would silently switch off every class member while leaving object
 // literals enforced, and every fixture built from a struct rather than routed through the decoder
 // would pass anyway.
@@ -34,7 +34,7 @@ type noUselessComputedKeyWire struct {
 // DecodeNoUselessComputedKeyOptions reads the option object off the config.
 //
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the option defaults to
-// TRUE. The generic helper yields the zero value on an absent or empty option, which here means
+// `true`. The generic helper yields the zero value on an absent or empty option, which here means
 // `enforceForClassMembers: false` -- not the rule disabled, but the rule quietly narrowed to object
 // literals. Upstream's corpus tests `enforceForClassMembers: void 0` explicitly and expects the
 // class member to report, so the distinction is asserted upstream as well.
@@ -106,14 +106,14 @@ var messageUnnecessarilyComputedProperty = rule.Message{
 //	class C { static ['prototype']() {} } a runtime error; the plain form fails to parse
 //
 // So the exempt name depends on both the member kind and whether it is static, and the `__proto__`
-// exemption applies only inside an object EXPRESSION. In a destructuring pattern there is no
+// exemption applies only inside an object expression. In a destructuring pattern there is no
 // prototype to set, which is why `var { ['__proto__']: a } = obj` reports while
 // `({ ['__proto__']: [] })` does not. That pair is the whole reason upstream checks the parent kind
 // rather than just the name.
 //
 // # What TypeScript adds, measured against the installed rule rather than reasoned about
 //
-// Three TypeScript member shapes carry a computed key and are SILENT upstream, and in every case the
+// Three TypeScript member shapes carry a computed key and are silent upstream, and in every case the
 // mechanism is that typescript-eslint gives them their own ESTree node type which upstream's
 // `create` never listens on:
 //
@@ -206,7 +206,7 @@ func checkUselessComputedKey(ruleContext rule.Context, node *ast.Node, settings 
 	// dereferences its argument -- a computed key's expression is optional in a recovered parse.
 	//
 	// The repair stays correct through the unwrap, and that is worth stating because the opposite
-	// was assumed first. Upstream reports `sourceCode.getText(key)` where `key` is the FOLDED
+	// was assumed first. Upstream reports `sourceCode.getText(key)` where `key` is the folded
 	// literal, so its message says `'x'` and not `('x')`, and its fixer replaces the whole
 	// bracket-to-bracket span, so the parentheses fall inside what is being replaced and vanish.
 	// All three of upstream's parenthesized cases assert exactly that output. Declining them, which
@@ -225,7 +225,7 @@ func checkUselessComputedKey(ruleContext rule.Context, node *ast.Node, settings 
 		return
 	}
 
-	// The key's SOURCE text, not its cooked value. Upstream reports `sourceCode.getText(key)` and
+	// The key's source text, not its cooked value. Upstream reports `sourceCode.getText(key)` and
 	// its fixer writes `key.raw`, so `({ ['A']: 0 })` reports the escape as written and
 	// repairs to `'A'` rather than to `'A'`. Reading `key.Text()` here would cook the escape
 	// and both the message and the repair would silently change what the source says.
@@ -251,7 +251,7 @@ func checkUselessComputedKey(ruleContext rule.Context, node *ast.Node, settings 
 // # Why constructing a span is safe here, when it was not for `no-undef-init`
 //
 // This fixer replaces `[` through `]` and writes back the key's own source text. Everything a
-// TypeScript declaration can carry sits OUTSIDE those brackets -- the `?`, the `!`, the type
+// TypeScript declaration can carry sits outside those brackets -- the `?`, the `!`, the type
 // annotation, the type parameters, the modifiers, the decorators -- so none of it is inside the
 // span being rewritten and none of it can be dropped. Measured against the installed rule on eleven
 // TypeScript shapes: `['x']?: number`, `['x']!: number`, `declare ['x']: number`,
@@ -259,7 +259,7 @@ func checkUselessComputedKey(ruleContext rule.Context, node *ast.Node, settings 
 // `['x']<T>(a: T): T`, `['x'](a: number, b?: string): void`, `['x']: 0 as const`, and an object
 // literal under `satisfies` all repair with every annotation intact.
 //
-// The one thing that CAN live inside the brackets besides the key is a comment, and that is the
+// The one thing that can live inside the brackets besides the key is a comment, and that is the
 // case upstream declines. Four of its invalid cases carry `output: null` for exactly this.
 //
 // So the enumeration this fixer's span requires is short and complete: the brackets, the key, and
@@ -298,7 +298,7 @@ func uselessComputedKeyRepair(ruleContext rule.Context, name *ast.Node, key *ast
 	// `sourceCode.commentsExistBetween(leftSquareBracket, rightSquareBracket)`.
 	//
 	// Asked of the whole bracket interior rather than only of the two gaps flanking the key,
-	// because a parenthesized key puts a third gap INSIDE the parens that neither flank covers:
+	// because a parenthesized key puts a third gap inside the parens that neither flank covers:
 	// `({ [(/* c */ 'x')]: 0 })` has `(` on the left, `)` on the right, and the comment between
 	// them. Measured against the installed rule, that case reports and is left unrepaired, so
 	// scanning the flanks alone would have shipped a repair upstream declines.
@@ -342,7 +342,7 @@ func uselessComputedKeyHasTrivia(between string) bool {
 
 // uselessComputedKeyTokensCanBeAdjacent reproduces upstream's `needsSpaceBeforeKey`.
 //
-// Upstream's condition has two halves and both matter. The tokens must be FLUSH -- if there is
+// Upstream's condition has two halves and both matter. The tokens must be flush -- if there is
 // already a space, as in `({ get [2]() {} })`, nothing is inserted and the output keeps the one
 // space that was written. And they must be unable to sit next to each other, which
 // `astUtils.canTokensBeAdjacent` decides by re-tokenizing the pair.
@@ -366,7 +366,7 @@ func uselessComputedKeyTokensCanBeAdjacent(source string, openBracket int, key *
 	if key.Kind != ast.KindNumericLiteral {
 		// A string literal starts with a quote, which cannot continue an identifier.
 		//
-		// This arm is EQUIVALENT to falling through to the numeric path below, and the mutation
+		// This arm is equivalent to falling through to the numeric path below, and the mutation
 		// removing it survives for that reason rather than because a fixture is missing. The
 		// distinguishing input would have to be a string literal whose first source byte is a word
 		// character, and no such token exists: a `KindStringLiteral` always opens with `'` or `"`,
@@ -412,7 +412,7 @@ func uselessComputedKeyName(node *ast.Node) *ast.Node {
 // Read off the member's own kind rather than off its parent, because the two families do not
 // overlap: a `KindPropertyAssignment` and a `KindBindingElement` only ever appear in an object
 // literal or a destructuring pattern, and a `KindPropertyDeclaration` only ever appears in a class.
-// The accessor and method kinds DO appear in both, so those ask the parent.
+// The accessor and method kinds do appear in both, so those ask the parent.
 func isUselessComputedKeyClassMember(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindPropertyAssignment, ast.KindBindingElement:
@@ -453,10 +453,10 @@ func uselessComputedKeyIsRemovable(node *ast.Node, key *ast.Node) bool {
 		// node type of their own, and the judgment does not consult it.
 		//
 		// An object literal's method reaches here too, and it takes the same non-static arm as a
-		// class method: upstream's switch reads the node type, and an object method IS a
+		// class method: upstream's switch reads the node type, and an object method is a
 		// `Property` there rather than a `MethodDefinition`... which means it takes the Property
 		// arm and is judged against `__proto__` instead. Measured against the installed rule,
-		// `({ ['constructor']() {} })` REPORTS and `({ ['__proto__']() {} })` does not, so an
+		// `({ ['constructor']() {} })` reports and `({ ['__proto__']() {} })` does not, so an
 		// object method is a Property upstream and is routed as one below.
 		if !isUselessComputedKeyClassMember(node) {
 			return value != "__proto__"

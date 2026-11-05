@@ -33,7 +33,7 @@ func TestOrmColumnNullableParityStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []string{
-		// The same decorator on a METHOD rather than a property. Closes a mutant that accepted any
+		// The same decorator on a method rather than a property. Closes a mutant that accepted any
 		// owner kind, which the rest of the corpus could not see because every other row is
 		// already a property. Measured clean against the real rule.
 		"\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @OrmColumn({ nullable: true }) m(): string { return \"a\"; } }",
@@ -121,7 +121,7 @@ func TestOrmColumnNullableParityFires(test *testing.T) {
 
 // TestOrmColumnNullableParityKeysOnTheDecoratorName pins the name-shaped behaviour.
 //
-// The rule reads a decorator's callee SPELLING rather than resolving it, which is what keeps the
+// The rule reads a decorator's callee spelling rather than resolving it, which is what keeps the
 // decorator half of this rule free of the type checker. Two consequences, both measured against the
 // real rule, which agrees on both:
 //

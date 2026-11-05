@@ -15,7 +15,7 @@ const noImplicitCoercionFile = "/repository/source/NoImplicitCoercion.ts"
 
 // decodedNoImplicitCoercionOptions routes a fixture's options through the rule's own decoder.
 //
-// Three of the four booleans default to TRUE, so a struct built by hand in a fixture would carry
+// Three of the four booleans default to `true`, so a struct built by hand in a fixture would carry
 // non-nil pointers and every case would pass while the live config's bare "error" still handed the
 // rule a nil it read as three judgments switched off. An empty string here is that bare
 // configuration.
@@ -38,7 +38,7 @@ func decodedNoImplicitCoercionOptions(test *testing.T, raw string) any {
 // id, on whether a fix is applicable, and on the fix text.
 //
 // One case is omitted and named here rather than dropped silently: upstream writes `!!(foo + bar)`
-// TWICE with opposite verdicts, separated only by `languageOptions.globals.Boolean = "off"`. The
+// twice with opposite verdicts, separated only by `languageOptions.globals.Boolean = "off"`. The
 // harness has no way to unset a global, so the second is inexpressible. It is the same judgment the
 // shadowing cases below cover from the other side, and the rule's own decision is pinned by
 // TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed.
@@ -133,7 +133,7 @@ func TestNoImplicitCoercionFires(test *testing.T) {
 				}
 				// The typed harness writes each fixture as `TrimSpace(source)+"\n"`
 				// (`internal/rule_testing/program.go:160`), and `ExpectFixedSource` compares the
-				// WHOLE rewritten file, so upstream's `output` has to be transformed the same way
+				// whole rewritten file, so upstream's `output` has to be transformed the same way
 				// the input was. Padding the rule to make the comparison line up would be the
 				// wrong repair.
 				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
@@ -301,7 +301,7 @@ func TestNoImplicitCoercionStaysSilent(test *testing.T) {
 // and each was measured against the installed build at 10.8.1 before being written down.
 //
 // The last row is the one that separates a scope-aware answer from a textual one: a shadow in a
-// SIBLING function does not reach the expression, so the fix stands.
+// sibling function does not reach the expression, so the fix stands.
 func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(test *testing.T) {
 	test.Parallel()
 
@@ -350,7 +350,7 @@ func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(test *testing.T)
 // parentheses twice, as `Boolean((foo + bar))`.
 //
 // The last two rows are the sharp end and are not in upstream's corpus as a pair: parenthesizing a
-// CALLEE ends an optional chain, so the recommendation moves from `>= 0` back to `!== -1`. Measured
+// callee ends an optional chain, so the recommendation moves from `>= 0` back to `!== -1`. Measured
 // against the installed build, which recommends exactly that for each.
 func TestNoImplicitCoercionParenthesesShapes(test *testing.T) {
 	test.Parallel()
@@ -441,11 +441,11 @@ func TestNoImplicitCoercionIndexOfShapes(test *testing.T) {
 // this parser has one, since `&& || ??` are a `LogicalExpression` and the comma operator is a
 // `SequenceExpression`, neither of which upstream's test excludes.
 //
-// So a kind test alone is wrong in BOTH directions, and each direction cost a real defect. Without
+// So a kind test alone is wrong in both directions, and each direction cost a real defect. Without
 // the unwrap the rule reported `(index + 1) * 1.0` in modules/tasks, which the installed build
 // leaves alone; that one was found on the real tree rather than in the corpus, which writes no
 // parenthesized operand here. With the unwrap but without the operator test, `(a, b) * 1` went
-// silent, and that one IS in the corpus.
+// silent, and that one is in the corpus.
 //
 // Every row was measured against the installed build at 10.8.1.
 func TestNoImplicitCoercionMultiplyByOneOperandShapes(test *testing.T) {
@@ -482,7 +482,7 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(test *testing.T) {
 	}
 }
 
-// TestNoImplicitCoercionMultilineOperand pins the shape whose RECOMMENDATION spans lines.
+// TestNoImplicitCoercionMultilineOperand pins the shape whose recommendation spans lines.
 //
 // Upstream writes every case on one line, so no imported fixture produces a recommendation
 // containing a newline. That matters beyond the rule: the message embeds the operand's own source
@@ -509,7 +509,7 @@ func TestNoImplicitCoercionMultilineOperand(test *testing.T) {
 		{"a newline after the opening parenthesis only", "var x = !!(\n\ta && b);", "Boolean(a && b)"},
 		{"a newline before the closing parenthesis only", "var x = !!(a && b\n);", "Boolean(a && b)"},
 		// The tree's shape at DialogRoot.tsx:175, with operands that are not already booleans. Its
-		// real operand, `b === undefined && c === undefined && !d`, IS a boolean, so the rule is now
+		// real operand, `b === undefined && c === undefined && !d`, is a boolean, so the rule is now
 		// silent there (#vsy2eym) and that shape lives in the nothing-is-coerced table instead.
 		{"the shape reported from the tree", "var x = a ?? !!(\n\tb &&\n\tc &&\n\td\n);", "Boolean(b &&\n\tc &&\n\td)"},
 	} {
@@ -523,7 +523,7 @@ func TestNoImplicitCoercionMultilineOperand(test *testing.T) {
 				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 			// Note which rows carry a newline in the recommendation and which do not: a break
-			// INSIDE the operand survives into the message because the text is sliced from source,
+			// inside the operand survives into the message because the text is sliced from source,
 			// while a break between the parenthesis and the operand is trivia and does not. Both
 			// are asserted by the equality above rather than by a separate predicate, which is
 			// what an earlier version of this test got wrong.
@@ -534,7 +534,7 @@ func TestNoImplicitCoercionMultilineOperand(test *testing.T) {
 // TestNoImplicitCoercionTypeScriptShapes covers syntax upstream's corpus structurally cannot carry.
 //
 // Its tests are JavaScript, so no imported case puts a type assertion, a non-null operator or a
-// generic call inside a coerced operand. This rule's repairs are built by SLICING source text
+// generic call inside a coerced operand. This rule's repairs are built by slicing source text
 // rather than re-rendering the expression, which is what makes these safe, and that is a property
 // worth pinning: the natural way to write the recommendation is to rebuild it from parts, and that
 // is how this project lost type information twice.
@@ -566,7 +566,7 @@ func TestNoImplicitCoercionTypeScriptShapes(test *testing.T) {
 
 // TestDecodeNoImplicitCoercionOptions is where this rule's decoder is hard.
 //
-// Three of the four booleans default to TRUE, so an absent option read as a zero value would leave
+// Three of the four booleans default to `true`, so an absent option read as a zero value would leave
 // three of the four judgments switched off, and every fixture built from a struct rather than routed
 // through the decoder would pass anyway.
 func TestDecodeNoImplicitCoercionOptions(test *testing.T) {

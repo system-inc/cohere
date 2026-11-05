@@ -45,7 +45,7 @@ var functionConstructorMethods = map[string]bool{
 // # Where the finding points, measured rather than inferred
 //
 // The report is on the invoking expression, which for the indirect form is the `apply`/`bind`/`call`
-// call and NOT the outer call it may be part of. Measured on eslint 10.8.1:
+// call and not the outer call it may be part of. Measured on eslint 10.8.1:
 //
 //	Function.bind(null, "b")()    reports columns 1 through 20, which ends at the bind call's
 //	                              closing paren rather than at the trailing ()

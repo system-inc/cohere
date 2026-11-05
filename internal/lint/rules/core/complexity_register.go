@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand rolled because upstream's schema is a `oneOf` over a bare integer and an
 // object carrying `maximum` or `max` plus a `variant`, which no single Go struct decodes.
 //
-// `RequiresOptions` is deliberately NOT set: upstream's default threshold is 20, so an unconfigured
+// `RequiresOptions` is deliberately not set: upstream's default threshold is 20, so an unconfigured
 // rule enforces that rather than doing nothing.
 func init() {
 	rule.Register(rule.Registration{
