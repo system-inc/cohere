@@ -44,6 +44,11 @@ var allowedRuleImports = map[string]bool{
 	// to base's 33, so the load and the package's own size dominate that gap; it does not isolate the imports.
 	"github.com/system-inc/cohere/internal/naming/abbreviation": true,
 	"github.com/system-inc/cohere/internal/shouting":            true,
+	// The SQL reading nexus/security-no-interpolated-sql-string and its Go engine twin share: which holes in SQL
+	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
+	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/shouting made. It
+	// imports only `strings`, so it is a leaf by its imports, and it changes only when the shared reading does.
+	"github.com/system-inc/cohere/internal/sqltext": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
