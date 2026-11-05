@@ -628,7 +628,9 @@ func pinGoEnvironment() {
 
 // TestAReplayThatCannotBeWrittenFailsTheRun: a replay whose stdout cannot be written exits nonzero and says so,
 // as a run that computed its report does. A replay used to write straight to the terminal's files and drop every
-// error, so a replay into output that went nowhere exited 0 with nothing said.
+// error, so the review's `cohere --no-fix 1</dev/null`, run three times, exited 1 on the miss and 0 on both
+// replays, with nothing said. Here stdout is a file opened for reading only, which every write fails on, as on
+// that descriptor.
 func TestAReplayThatCannotBeWrittenFailsTheRun(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -639,31 +641,31 @@ func TestAReplayThatCannotBeWrittenFailsTheRun(test *testing.T) {
 		"Clean.ts":      "export const clean = 1;\n",
 	})
 	arguments := []string{"--no-fix", "--no-format", "--verbose"}
-	if output, exitCode := runCohere(test, binary, root, arguments...); exitCode != 0 {
-		test.Fatalf("the recorded run exited %d, so a failed replay could not be told from it:\n%s", exitCode, output)
-	}
-	if output, _ := runCohere(test, binary, root, arguments...); !isRunCacheReplay(output) {
-		test.Fatalf("an unchanged tree did not replay, so nothing below is about a replay:\n%s", output)
-	}
-
-	// Opened for reading only, so every write to it fails.
 	unwritable, openError := os.Open(filepath.Join(root, "Clean.ts"))
 	if openError != nil {
 		test.Fatal(openError)
 	}
 	// Ignored: opened only to be handed to the child as an output it cannot write, and never written here.
 	defer unwritable.Close()
-	var standardError bytes.Buffer
-	command := exec.Command(binary, arguments...)
-	command.Dir = root
-	command.Stdout, command.Stderr = unwritable, &standardError
-	runError := command.Run()
-	var exitError *exec.ExitError
-	if !errors.As(runError, &exitError) || childExitCode(test, exitError) == 0 {
-		test.Fatalf("a replay into output it could not write ended with %v, want a nonzero exit:\n%s", runError,
-			standardError.String())
+
+	// The first is the miss, which records the run; the other two replay it.
+	for _, run := range []string{"the miss", "the first replay", "the second replay"} {
+		var standardError bytes.Buffer
+		command := exec.Command(binary, arguments...)
+		command.Dir = root
+		command.Stdout, command.Stderr = unwritable, &standardError
+		runError := command.Run()
+		var exitError *exec.ExitError
+		if !errors.As(runError, &exitError) || childExitCode(test, exitError) == 0 {
+			test.Fatalf("%s, into output it could not write, ended with %v, want a nonzero exit:\n%s", run, runError,
+				standardError.String())
+		}
+		if !strings.Contains(standardError.String(), "Writing the output failed") {
+			test.Errorf("%s does not say its output did not arrive:\n%s", run, standardError.String())
+		}
 	}
-	if !strings.Contains(standardError.String(), "Writing the output failed") {
-		test.Errorf("the failed replay does not say its output did not arrive:\n%s", standardError.String())
+	// And the runs above had a recorded run to replay: the tree, unchanged, replays now.
+	if output, _ := runCohere(test, binary, root, arguments...); !isRunCacheReplay(output) {
+		test.Fatalf("an unchanged tree did not replay, so the runs above may not have been replays:\n%s", output)
 	}
 }

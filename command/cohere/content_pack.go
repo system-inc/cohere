@@ -36,6 +36,7 @@ func openContentPack(root string) *program.ContentPack {
 	if openContentPackError != nil {
 		// A fact about this invocation, never about the tree, so a replay never says it again.
 		printInvocation(accountOutput(streams.Errors), "note: %v\n", openContentPackError)
+		showWarning()
 	}
 	pack.TrustStats(runCacheCheckStats)
 	activeContentPack, activeContentPackRoot = pack, root

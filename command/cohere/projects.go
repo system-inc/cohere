@@ -98,6 +98,7 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 		for _, note := range found.notes() {
 			fmt.Fprintf(accountOutput(streams.Errors), "cohere: %s\n", note)
 		}
+		showWarning()
 		return 0, false, nil
 	}
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), streams.Output), true, nil
@@ -294,6 +295,8 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			fmt.Fprintf(failures, "cohere: %s\n",
 				sentence.FromError(fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)))
 		}
+		// Each project's stderr where its section is, as when it was written straight to the terminal.
+		showWarning()
 		fmt.Fprintln(account)
 		if checked.exitCode > worst {
 			worst = checked.exitCode

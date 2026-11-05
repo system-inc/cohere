@@ -203,6 +203,7 @@ func applyProposedFixes(
 	}
 	reportWithheld(withheld, writable)
 	reportInNestedRepositories(accountOutput(streams.Errors), inNestedRepository)
+	showWarning()
 
 	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
 	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
@@ -336,6 +337,7 @@ func applyProposedFixes(
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
 			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(err))
+			showWarning()
 
 			// A failure is its own category rather than a flavor of "did not converge". The two send a
 			// reader somewhere different: not-converged means the pass budget ran out with work still
@@ -350,6 +352,7 @@ func applyProposedFixes(
 	}
 
 	lineEndings.report(accountOutput(streams.Errors), write)
+	showWarning()
 
 	summary := edit.Summarize(results)
 	summary.Checked = !write
@@ -509,6 +512,7 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 	fmt.Fprintf(accountOutput(streams.Errors),
 		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
 		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
+	showWarning()
 }
 
 // reportInNestedRepositories says, per repository, how many fixes a whole-tree run did not apply

@@ -944,6 +944,7 @@ func run() error {
 					recordUniverse = slices.Concat(recordUniverse, claimedAdamic)
 				}
 				activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(streams.Errors, repositoryRoot, held)
+				showWarning()
 			}
 		}
 		if early == nil {
@@ -1022,6 +1023,7 @@ func run() error {
 		// so it is a note rather than a failure.
 		if saveError := record.save(recordUniverse); saveError != nil {
 			fmt.Fprintf(accountOutput(streams.Errors), "note: the format record could not be written: %v\n", firstLine(saveError.Error()))
+			showWarning()
 		}
 
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
@@ -1073,6 +1075,7 @@ func run() error {
 				for _, note := range nested.Notes {
 					fmt.Fprintln(accountOutput(streams.Errors), note)
 				}
+				showWarning()
 				printNestedDrift(streams.Output, nested)
 				findings += len(nested.Drift)
 				activeSummary.WouldChange += len(nested.Drift)
@@ -1121,6 +1124,7 @@ func run() error {
 			for _, fileName := range lost {
 				fmt.Fprintf(accountOutput(streams.Errors), "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
 			}
+			showWarning()
 			// The notes are --verbose's, so the footer says the gap they name.
 			if len(lost) > 0 && activeSummary.Gaps.Unread == "" {
 				activeSummary.Gaps.Unread = fmt.Sprintf("%d file%s in scope not in the rebuilt program", len(lost), plural(len(lost)))
@@ -1665,6 +1669,7 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 				fmt.Fprintf(streams.Errors, "cohere: %s\n",
 					sentence.Of(fmt.Sprintf("writing the incremental cache: %s", diagnostic.MessageKey())))
 			}
+			showWarning()
 		}
 	}
 
@@ -1943,6 +1948,7 @@ func narrowToClosure(
 		fmt.Fprintf(accountOutput(streams.Errors),
 			"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
 			scope.RequestDescription, program.DependentClosureLimit)
+		showWarning()
 		return formatScope{Everything: true}, projectFiles
 	}
 
@@ -1956,5 +1962,6 @@ func reportForeignCheckers(graph *program.Graph, walked program.Result, files in
 	if graph.WalkOnForeignCheckers {
 		fmt.Fprintf(streams.Errors, "foreign checkers: %d of %d files walked on a checker other than their own\n",
 			walked.FilesOnForeignCheckers, files)
+		showWarning()
 	}
 }

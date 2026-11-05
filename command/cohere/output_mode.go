@@ -50,6 +50,14 @@ func accountOutput(out *bufio.Writer) *bufio.Writer {
 	return discardedOutput()
 }
 
+// showWarning delivers a warning or note just written to streams.Errors where it happened, among the findings, as
+// it landed when stderr was written straight to the terminal: stdout first, so nothing said before the warning
+// on stdout is left behind it, then stderr. Main goroutine only, as the streams are.
+func showWarning() {
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
+}
+
 // discardedOutput is a stream for a line no one reads, a stream rather than io.Discard so that every print through
 // accountOutput writes to a *bufio.Writer (see package streams). A fresh one each time rather than one shared,
 // because io.Discard was safe from any goroutine and a shared buffer is not, and the printers' tests render in

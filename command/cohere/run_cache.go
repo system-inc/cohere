@@ -333,6 +333,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
 			// thrown away on every run would otherwise look like a cache that is merely cold.
 			fmt.Fprintf(accountOutput(streams.Errors), "note: %v; this run starts cold and writes what it drops anew\n", readError)
+			showWarning()
 		}
 	}
 
@@ -405,6 +406,7 @@ func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
 		if createDirectoryError := os.MkdirAll(cacheDirectory(root), 0o755); createDirectoryError != nil {
 			fmt.Fprintf(accountOutput(streams.Errors), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(createDirectoryError.Error()))
+			showWarning()
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
@@ -415,6 +417,7 @@ func prepareCacheDirectory(root string) {
 		if ignored, _, ignoredPathError := matcher.IgnoredPath(".cache/cohere/findings.gob", false); ignoredPathError == nil && !ignored {
 			fmt.Fprintf(accountOutput(streams.Errors), "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile, cacheDirectory(root))
+			showWarning()
 		}
 	})
 }
@@ -805,6 +808,7 @@ func (session *runCacheSession) note(text string) {
 func cacheNote(directory string, text string) {
 	if !verdictSent {
 		fmt.Fprintf(accountOutput(streams.Errors), "note: %s\n", text)
+		showWarning()
 		return
 	}
 	file, openError := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
@@ -838,6 +842,7 @@ func printPreviousNotes(directory string) {
 			fmt.Fprintf(accountOutput(streams.Errors), "note: after the last run returned, %s\n", line)
 		}
 	}
+	showWarning()
 }
 
 func firstLine(text string) string {

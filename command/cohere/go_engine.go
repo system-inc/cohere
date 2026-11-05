@@ -59,6 +59,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.Of(fmt.Sprintf(
 			"this process was started as a Go engine (%s is set) and was about to start another, "+
 				"so it refused, and nothing was checked", goEngineChildVariable)))
+		showWarning()
 		return 2, nil
 	}
 	if given["tsconfig"] {
