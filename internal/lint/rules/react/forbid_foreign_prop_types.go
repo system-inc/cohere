@@ -144,10 +144,11 @@ var ForbidForeignPropTypes = rule.Rule{
 		// away. A loop rather than a single step, because `((x))` nests, and written here rather
 		// than with `ast.SkipParentheses`, which dereferences its argument.
 		unwrapParentheses := func(node *ast.Node) *ast.Node {
-			for node != nil && node.Kind == ast.KindParenthesizedExpression {
-				node = node.Parent
+			current := node
+			for current != nil && current.Kind == ast.KindParenthesizedExpression {
+				current = current.Parent
 			}
-			return node
+			return current
 		}
 
 		// isAssignmentTarget reproduces upstream's `ast.isAssignmentLHS`.

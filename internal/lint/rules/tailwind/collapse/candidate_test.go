@@ -748,21 +748,25 @@ func TestArbitraryTypehintIsSplitFromTheValue(test *testing.T) {
 			continue
 		}
 
-		value := readings[0].Value
-		if value == nil {
+		parsedValue := readings[0].Value
+		if parsedValue == nil {
 			test.Errorf("%s: the first reading carries no value", testCase.className)
 			continue
 		}
-		if value.Kind != ParsedValueKindArbitrary {
-			test.Errorf("%s: the first reading's value is %s, want arbitrary", testCase.className, value.Kind)
+		if parsedValue.Kind != ParsedValueKindArbitrary {
+			test.Errorf(
+				"%s: the first reading's value is %s, want arbitrary",
+				testCase.className,
+				parsedValue.Kind,
+			)
 			continue
 		}
-		if value.DataType != testCase.dataType {
-			test.Errorf("%s: DataType is %q, want %q", testCase.className, value.DataType, testCase.dataType)
+		if parsedValue.DataType != testCase.dataType {
+			test.Errorf("%s: DataType is %q, want %q", testCase.className, parsedValue.DataType, testCase.dataType)
 		}
 		// The annotation must be gone from the value, not merely also present in DataType.
-		if value.Value != testCase.value {
-			test.Errorf("%s: Value is %q, want %q", testCase.className, value.Value, testCase.value)
+		if parsedValue.Value != testCase.value {
+			test.Errorf("%s: Value is %q, want %q", testCase.className, parsedValue.Value, testCase.value)
 		}
 	}
 }

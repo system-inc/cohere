@@ -70,7 +70,8 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 									continue
 								}
 								visited++
-								var frozenResult, frozenArgument bool
+								var frozenResult bool
+								var frozenArgument bool
 								for _, effect := range effects.Get(instruction.Id) {
 									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
 										effect.Into.Identifier == instruction.LValue.Identifier {

@@ -459,7 +459,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 
 	name := node.String("name")
 	parameters := node.Get("params")
-	stringParameters, paramsIsString := parameters.(string)
+	stringParameters, parametersIsString := parameters.(string)
 	isImportUnknownValueEndsWithSemiColon := name == "import" &&
 		node.Child("params").Type() == "value-unknown" &&
 		strings.HasSuffix(node.Child("params").String("value"), ";")
@@ -491,7 +491,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 			}
 		}
 		var parametersDoc doc.Doc
-		if paramsIsString {
+		if parametersIsString {
 			parametersDoc = doc.Text(stringParameters)
 		} else {
 			parametersDoc = print("params", nil)
@@ -531,7 +531,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 			selectorValueIsString &&
 			lastLineHasInlineComment(selector.String("value"))) ||
 			(selector == nil &&
-				paramsIsString &&
+				parametersIsString &&
 				lastLineHasInlineComment(stringParameters)) {
 			opening = doc.LineDoc
 		}

@@ -341,42 +341,42 @@ var NoMisusedPromises = rule.Rule{
 			return nil
 		}
 
-		opts, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
+		settings, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
 		if !ok {
-			opts = NoMisusedPromisesOptions{}
+			settings = NoMisusedPromisesOptions{}
 		}
-		if opts.ChecksConditionals == nil {
-			opts.ChecksConditionals = type_checking.Ref(true)
+		if settings.ChecksConditionals == nil {
+			settings.ChecksConditionals = type_checking.Ref(true)
 		}
-		if opts.ChecksConditionalsFlagUnions == "" {
-			opts.ChecksConditionalsFlagUnions = "none"
+		if settings.ChecksConditionalsFlagUnions == "" {
+			settings.ChecksConditionalsFlagUnions = "none"
 		}
-		if opts.ChecksSpreads == nil {
-			opts.ChecksSpreads = type_checking.Ref(true)
+		if settings.ChecksSpreads == nil {
+			settings.ChecksSpreads = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturn == nil {
-			opts.ChecksVoidReturn = type_checking.Ref(true)
+		if settings.ChecksVoidReturn == nil {
+			settings.ChecksVoidReturn = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts == nil {
-			opts.ChecksVoidReturnOpts = type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
+		if settings.ChecksVoidReturnOpts == nil {
+			settings.ChecksVoidReturnOpts = type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
 		}
-		if opts.ChecksVoidReturnOpts.Arguments == nil {
-			opts.ChecksVoidReturnOpts.Arguments = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Arguments == nil {
+			settings.ChecksVoidReturnOpts.Arguments = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Attributes == nil {
-			opts.ChecksVoidReturnOpts.Attributes = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Attributes == nil {
+			settings.ChecksVoidReturnOpts.Attributes = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.InheritedMethods == nil {
-			opts.ChecksVoidReturnOpts.InheritedMethods = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.InheritedMethods == nil {
+			settings.ChecksVoidReturnOpts.InheritedMethods = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Properties == nil {
-			opts.ChecksVoidReturnOpts.Properties = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Properties == nil {
+			settings.ChecksVoidReturnOpts.Properties = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Returns == nil {
-			opts.ChecksVoidReturnOpts.Returns = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Returns == nil {
+			settings.ChecksVoidReturnOpts.Returns = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Variables == nil {
-			opts.ChecksVoidReturnOpts.Variables = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Variables == nil {
+			settings.ChecksVoidReturnOpts.Variables = type_checking.Ref(true)
 		}
 
 		anySignatureIsThenableType := func(
@@ -426,7 +426,7 @@ var NoMisusedPromises = rule.Rule{
 			}
 		}
 
-		isFunctionParam := func(
+		isFunctionParameter := func(
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
@@ -468,7 +468,7 @@ var NoMisusedPromises = rule.Rule{
 				for subType := range type_checking.UnionTypePartsSeq(thenType) {
 					for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, subType) {
 						parameters := checker.Signature_parameters(signature)
-						if len(parameters) != 0 && isFunctionParam(parameters[0], node) {
+						if len(parameters) != 0 && isFunctionParameter(parameters[0], node) {
 							hasThenableSignature = true
 						}
 					}
@@ -533,7 +533,7 @@ var NoMisusedPromises = rule.Rule{
 
 			// flagUnions widens the check to a union holding a thenable: every one under "all", and
 			// under "strict" only one whose awaited half is the rest, as in `Promise<T> | T`.
-			switch opts.ChecksConditionalsFlagUnions {
+			switch settings.ChecksConditionalsFlagUnions {
 			case "all":
 				if isSometimesThenable(ruleContext.TypeChecker, node) {
 					ruleContext.ReportNode(node, buildConditionalMessage())
@@ -1087,18 +1087,18 @@ var NoMisusedPromises = rule.Rule{
 
 		listeners := rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if *opts.ChecksConditionals {
+				if *settings.ChecksConditionals {
 					checkConditional(node, false)
 				}
 
-				if *opts.ChecksVoidReturn &&
-					*opts.ChecksVoidReturnOpts.Variables &&
+				if *settings.ChecksVoidReturn &&
+					*settings.ChecksVoidReturnOpts.Variables &&
 					ast.IsAssignmentExpression(node, false) {
 					checkAssignment(node.AsBinaryExpression())
 				}
 			},
 		}
-		if *opts.ChecksConditionals {
+		if *settings.ChecksConditionals {
 			listeners[ast.KindPropertyAccessExpression] = checkArrayPredicates
 			listeners[ast.KindElementAccessExpression] = checkArrayPredicates
 
@@ -1124,32 +1124,32 @@ var NoMisusedPromises = rule.Rule{
 			listeners[ast.KindIfStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
 		}
 
-		if *opts.ChecksVoidReturn {
-			if *opts.ChecksVoidReturnOpts.Arguments {
+		if *settings.ChecksVoidReturn {
+			if *settings.ChecksVoidReturnOpts.Arguments {
 				listeners[ast.KindCallExpression] = checkArguments
 				listeners[ast.KindNewExpression] = checkArguments
 			}
-			if *opts.ChecksVoidReturnOpts.Attributes {
+			if *settings.ChecksVoidReturnOpts.Attributes {
 				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute()) }
 			}
-			if *opts.ChecksVoidReturnOpts.InheritedMethods {
+			if *settings.ChecksVoidReturnOpts.InheritedMethods {
 				listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindClassExpression] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindInterfaceDeclaration] = checkClassLikeOrInterfaceNode
 			}
-			if *opts.ChecksVoidReturnOpts.Properties {
+			if *settings.ChecksVoidReturnOpts.Properties {
 				listeners[ast.KindPropertyAssignment] = checkProperty
 				listeners[ast.KindMethodDeclaration] = checkProperty
 				listeners[ast.KindShorthandPropertyAssignment] = checkProperty
 			}
-			if *opts.ChecksVoidReturnOpts.Returns {
+			if *settings.ChecksVoidReturnOpts.Returns {
 				listeners[ast.KindReturnStatement] = func(
 					node *ast.Node,
 				) {
 					checkReturnStatement(node.AsReturnStatement())
 				}
 			}
-			if *opts.ChecksVoidReturnOpts.Variables {
+			if *settings.ChecksVoidReturnOpts.Variables {
 				listeners[ast.KindVariableDeclaration] = func(
 					node *ast.Node,
 				) {
@@ -1158,7 +1158,7 @@ var NoMisusedPromises = rule.Rule{
 			}
 
 		}
-		if *opts.ChecksSpreads {
+		if *settings.ChecksSpreads {
 			listeners[ast.KindSpreadElement] = checkSpread
 			listeners[ast.KindSpreadAssignment] = checkSpread
 		}

@@ -52,9 +52,9 @@ func dedentBlockStringLines(lines []string) []string {
 	return dedented[firstNonEmptyLine : lastNonEmptyLine+1]
 }
 
-func leadingWhitespace(str string) int {
+func leadingWhitespace(text string) int {
 	i := 0
-	for i < len(str) && isWhiteSpace(int(str[i])) {
+	for i < len(text) && isWhiteSpace(int(text[i])) {
 		i++
 	}
 	return i

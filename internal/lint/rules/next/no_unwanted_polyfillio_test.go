@@ -294,7 +294,8 @@ func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(test *testing.T) {
 	if len(duplicateResult.Diagnostics) != 1 {
 		test.Fatalf("wanted one finding on the duplicate arm, got %d", len(duplicateResult.Diagnostics))
 	}
-	duplicateReported := duplicateSource[duplicateResult.Diagnostics[0].Range.Pos():duplicateResult.Diagnostics[0].Range.End()]
+	duplicateDiagnostic := duplicateResult.Diagnostics[0]
+	duplicateReported := duplicateSource[duplicateDiagnostic.Range.Pos():duplicateDiagnostic.Range.End()]
 	if duplicateReported != "src='https://polyfill-fastly.io/v3/p.js?features=Promise'" {
 		test.Fatalf("duplicate finding underlines %q", duplicateReported)
 	}

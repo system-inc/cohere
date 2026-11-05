@@ -112,10 +112,10 @@ func judge(pass *analysis.Pass, file *ast.File, assignment *ast.AssignStmt) {
 // `values[index+1] = values[index+1] + 1` clean: a call may answer differently the second time, and an arithmetic
 // key is left alone rather than proved pure. Parentheses are transparent, as they are to the port.
 func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
-	left = ast.Unparen(left)
-	right = ast.Unparen(right)
-	leftValue := pass.TypesInfo.Types[left]
-	rightValue := pass.TypesInfo.Types[right]
+	unwrappedLeft := ast.Unparen(left)
+	unwrappedRight := ast.Unparen(right)
+	leftValue := pass.TypesInfo.Types[unwrappedLeft]
+	rightValue := pass.TypesInfo.Types[unwrappedRight]
 	if leftValue.Value != nil || rightValue.Value != nil {
 		// A key of interface type keeps its dynamic type, so `byKey[int8(1)]` and `byKey[1]` are two entries. The
 		// types are compared before the values for a second reason: constant.Compare reads a string against a number
@@ -124,9 +124,9 @@ func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 			types.Identical(leftValue.Type, rightValue.Type) &&
 			constant.Compare(leftValue.Value, token.EQL, rightValue.Value)
 	}
-	switch leftNode := left.(type) {
+	switch leftNode := unwrappedLeft.(type) {
 	case *ast.Ident:
-		rightNode, isIdentifier := right.(*ast.Ident)
+		rightNode, isIdentifier := unwrappedRight.(*ast.Ident)
 		if !isIdentifier {
 			return false
 		}
@@ -135,7 +135,7 @@ func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 		variable, isVariable := pass.TypesInfo.ObjectOf(leftNode).(*types.Var)
 		return isVariable && pass.TypesInfo.ObjectOf(rightNode) == variable
 	case *ast.SelectorExpr:
-		rightNode, isSelector := right.(*ast.SelectorExpr)
+		rightNode, isSelector := unwrappedRight.(*ast.SelectorExpr)
 		if !isSelector {
 			return false
 		}
@@ -151,14 +151,14 @@ func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 			leftSelection.Obj() == rightSelection.Obj() &&
 			isSameReference(pass, leftNode.X, rightNode.X)
 	case *ast.IndexExpr:
-		rightNode, isIndex := right.(*ast.IndexExpr)
+		rightNode, isIndex := unwrappedRight.(*ast.IndexExpr)
 		// An instantiation of a generic function is an IndexExpr too, and its function is no variable, so it fails
 		// the comparison of what is indexed.
 		return isIndex &&
 			isSameReference(pass, leftNode.X, rightNode.X) &&
 			isSameReference(pass, leftNode.Index, rightNode.Index)
 	case *ast.StarExpr:
-		rightNode, isStar := right.(*ast.StarExpr)
+		rightNode, isStar := unwrappedRight.(*ast.StarExpr)
 		return isStar && isSameReference(pass, leftNode.X, rightNode.X)
 	}
 	return false

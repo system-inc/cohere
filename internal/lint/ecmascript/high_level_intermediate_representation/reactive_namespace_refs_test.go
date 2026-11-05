@@ -106,7 +106,9 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var visited, findings, markers int
+			var visited int
+			var findings int
+			var markers int
 			probe := rule.Rule{
 				Name:             "namespace-ref-memoization",
 				NeedsTypeChecker: true,

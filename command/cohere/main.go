@@ -1963,8 +1963,8 @@ func lintConfigSources(path string) []string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *configuration.Config) {
-	if config == nil {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+	if lintConfiguration == nil {
 		return
 	}
 
@@ -1989,7 +1989,7 @@ func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *confi
 	}
 
 	orphaned := make([]string, 0)
-	for key := range config.Rules {
+	for key := range lintConfiguration.Rules {
 		if !resolves(key) {
 			orphaned = append(orphaned, key)
 		}
@@ -1997,7 +1997,7 @@ func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *confi
 	sort.Strings(orphaned)
 
 	for _, key := range orphaned {
-		setting := config.Rules[key]
+		setting := lintConfiguration.Rules[key]
 		fmt.Fprintf(out,
 			"  config: key %q matches no registered rule, so its %s never applies: either the rule is not ported yet, or the key is spelled for an older name\n",
 			key, setting.Severity,

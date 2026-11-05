@@ -44,14 +44,16 @@ func TestNoVoidWidening(test *testing.T) {
 			if strings.HasPrefix(filepath.Base(file), "legal-") {
 				rule_testing.ExpectClean(test, result)
 				// Plant the same runtime hole in every quiet fixture. Its assertion must detect it.
-				source += "\n{ const make: () => void = () => 'x'; const wider: () => number | void = make; const next = wider(); if (next) console.log(next.toFixed(1)); }\n"
+				source += "\n{ const make: () => void = () => 'x'; const wider: () => number | void = make; " +
+					"const next = wider(); if (next) console.log(next.toFixed(1)); }\n"
 				rule_testing.ExpectFindings(test, runAdamic(test, voidWideningSubject(), source), "voidWidening")
 				return
 			}
 			rule_testing.ExpectFindings(test, result, "voidWidening")
 			span := "make"
 			switch filepath.Base(file) {
-			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts", "mutable-promise.ts", "promise-union-origin.ts":
+			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts",
+				"mutable-promise.ts", "promise-union-origin.ts":
 				span = "narrow"
 			case "promise-body-call.ts":
 				span = "make()"

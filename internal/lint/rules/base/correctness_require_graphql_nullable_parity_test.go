@@ -18,7 +18,8 @@ func graphQlNullableParityCaseName(index int) string {
 //
 // The field decorator is declared as both a property and a method decorator, which is not padding:
 // the underlying decorator really is valid on both, and the rule's method arm exists for that.
-const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unknown, f?: unknown, o?: unknown): ParameterDecorator;\n" +
+const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unknown, f?: unknown, o?: unknown): " +
+	"ParameterDecorator;\n" +
 	"declare function GraphQlField(f?: unknown, o?: unknown): PropertyDecorator & MethodDecorator;\n" +
 	"declare function GraphQlQuery(f?: unknown, o?: unknown): MethodDecorator;\n" +
 	"declare function GraphQlMutation(f?: unknown, o?: unknown): MethodDecorator;\n" +

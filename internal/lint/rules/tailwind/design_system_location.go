@@ -58,6 +58,11 @@ func (options *TailwindLocationOptions) anchorAt(directory string) {
 	options.anchor = directory
 }
 
+// tailwindSettingsNamespaces are the two keys upstream reads its settings from, the first preferred:
+// `eslintContext.settings["eslint-plugin-better-tailwindcss"] ?? settings["better-tailwindcss"]`.
+// registry.CheckSettings refuses a config writing both, so at most one is ever here.
+var tailwindSettingsNamespaces = []string{"better-tailwindcss", "eslint-plugin-better-tailwindcss"}
+
 // decodeTailwindOptionsAt decodes a better-tailwindcss rule's options and anchors their paths at the
 // config's directory. A bare severity decodes to the defaults, still anchored.
 //
@@ -125,11 +130,6 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 	}
 }
 
-// tailwindSettingsNamespaces are the two keys upstream reads its settings from, the first preferred:
-// `eslintContext.settings["eslint-plugin-better-tailwindcss"] ?? settings["better-tailwindcss"]`.
-// registry.CheckSettings refuses a config writing both, so at most one is ever here.
-var tailwindSettingsNamespaces = []string{"better-tailwindcss", "eslint-plugin-better-tailwindcss"}
-
 // tailwindSettings is the project's better-tailwindcss settings, under whichever spelling it wrote.
 func tailwindSettings(settings map[string]json.RawMessage) json.RawMessage {
 	for _, namespace := range tailwindSettingsNamespaces {
@@ -139,6 +139,10 @@ func tailwindSettings(settings map[string]json.RawMessage) json.RawMessage {
 	}
 	return nil
 }
+
+// tailwindOptionKeys is the keys each better-tailwindcss rule's options declare, by rule name, filled
+// at registration.
+var tailwindOptionKeys = map[string]map[string]bool{}
 
 // splitTailwindSettings hands each better-tailwindcss rule the keys of the settings it declares, and
 // refuses every key none of them declares. An upstream option not ported yet is one of those: it is
@@ -183,10 +187,6 @@ func splitTailwindSettings(raw []byte) (map[string]json.RawMessage, error) {
 	}
 	return encoded, nil
 }
-
-// tailwindOptionKeys is the keys each better-tailwindcss rule's options declare, by rule name, filled
-// at registration.
-var tailwindOptionKeys = map[string]map[string]bool{}
 
 // tailwindRegistration registers one better-tailwindcss rule with its options, recording the keys
 // those options declare for splitTailwindSettings.
@@ -273,6 +273,8 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 	}
 	read := func(key string) string {
 		var value string
+		// Ignored: an absent key reads as "", naming no location, which is what it means. A value of the
+		// wrong type reads as "" too, and registry.CheckSettings refuses it by name for the run.
 		_ = json.Unmarshal(written[key], &value)
 		return value
 	}

@@ -23,6 +23,12 @@ import (
 	"reflect"
 )
 
+// hirPackagePath is this package, used to decide what deepCopyValue descends into.
+//
+// Taken from a declared type rather than written as a string so a package move cannot silently turn
+// the copy shallow again.
+var hirPackagePath = reflect.TypeOf(Place{}).PkgPath()
+
 // InlineRemap is the correspondence between a nested function's ids and the parent's.
 //
 // Returned rather than applied, so a caller can rewrite the terminals it owns -- the call site's
@@ -67,6 +73,8 @@ type InlineRemap struct {
 // names the same values in the parent. Index i of the two is one binding seen from both sides, so
 // the mapping starts by pairing them: a capture must resolve to the parent's existing value, not to
 // a fresh copy of it, or the inlined body reads a different variable than the code around it.
+//
+// Mutates: parent the copy is made into it, its identifiers, blocks, instructions and nested functions
 func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*InlineRemap, bool) {
 	if parent == nil || nested == nil {
 		return nil, false
@@ -370,9 +378,3 @@ func deepCopyValue(source reflect.Value) reflect.Value {
 		return source
 	}
 }
-
-// hirPackagePath is this package, used to decide what deepCopyValue descends into.
-//
-// Taken from a declared type rather than written as a string so a package move cannot silently turn
-// the copy shallow again.
-var hirPackagePath = reflect.TypeOf(Place{}).PkgPath()

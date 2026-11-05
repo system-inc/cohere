@@ -5,7 +5,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_syntax_tree -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_syntax_tree \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces, and
 // it bites harder here. `getPropertySort` looks like a tree walk and is not one: it is a

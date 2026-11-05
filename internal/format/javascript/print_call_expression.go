@@ -24,9 +24,9 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		typeArgumentsDoc = concatIn(path, print("typeArguments", nil), lineSuffixBoundary)
 	}
 
-	isTemplateLiteralSingleArg := len(args) == 1 && isTemplateOnItsOwnLine(args[0], originalText(options))
+	isTemplateLiteralSingleArgument := len(args) == 1 && isTemplateOnItsOwnLine(args[0], originalText(options))
 
-	if isTemplateLiteralSingleArg ||
+	if isTemplateLiteralSingleArgument ||
 		// Don't break simple `import()` with long module name
 		isSimpleModuleImport(path) ||
 		// Dangling comments are not handled, all these special cases should have arguments #9668

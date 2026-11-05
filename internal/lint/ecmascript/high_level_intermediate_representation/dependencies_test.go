@@ -564,7 +564,7 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -573,6 +573,9 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
 	sort.Strings(files)
 	if len(files) > 200 {
 		files = files[:200]

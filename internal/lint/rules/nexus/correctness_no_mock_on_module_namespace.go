@@ -35,12 +35,16 @@ var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
 // or `mock.property` called with an `import * as` namespace object as the object to patch, in a file
 // that runs as an ES module.
 //
-//	invalid: import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	invalid: import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	invalid: import * as Store from './Store.ts'; t.mock.method(Store, 'load');
 //	invalid: import * as NodeOs from 'node:os'; mock.property(NodeOs, 'EOL', '\r\n');
-//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process') as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
-//	valid:   import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
-//	valid:   import NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process')
+//	         as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
+//	valid:   import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
+//	valid:   import NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	valid:   import * as Nonce from './Nonce'; jest.spyOn(Nonce, 'createNonce');
 //
 // # Where it came from

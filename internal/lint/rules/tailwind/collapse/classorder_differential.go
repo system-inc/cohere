@@ -421,8 +421,8 @@ func (report Report) Trustworthy() (bool, []string) {
 func (report Report) RepositoriesDiverge() (bool, string) {
 	if report.SystemDivergence.UniqueToOneSystem == 0 && report.SystemDivergence.DivergentReadings == 0 {
 		return false, fmt.Sprintf(
-			"the two design systems agree on all %d shared registry classes and neither holds a class the other lacks, "+
-				"so this fixture no longer demonstrates that a per-repository table is required",
+			"the two design systems agree on all %d shared registry classes and neither holds a class the other "+
+				"lacks, so this fixture no longer demonstrates that a per-repository table is required",
 			report.SystemDivergence.SharedRegistryClasses,
 		)
 	}
@@ -643,6 +643,8 @@ func classify(aCase ClassCase, goReading Reading, goAnswered bool) Outcome {
 // The corrupted divergences are appended to the report marked Planted, so the evidence that
 // detection works is visible in the same table a reader is already reading, and the summary counts
 // them apart from observations.
+//
+// Mutates: report gains one planted divergence per control, the evidence the caller's table shows
 func runControl(systems []SystemCases, honest ReadingSource, control Control, report *Report) ControlResult {
 	corrupted := control.Corrupt(honest)
 	result := ControlResult{Control: control, Detail: control.Detail}
@@ -712,18 +714,19 @@ func acknowledgedKey(className string, outcome Outcome) string {
 
 // AcknowledgedIndex builds the lookup a run uses, and refuses an acknowledgement with no reason.
 //
-// The refusal is a panic rather than a silent skip because this list is source code reviewed like
-// any other, and an unreasoned entry in it is a defect in the review rather than in a run.
-func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) map[string]AcknowledgedDivergence {
+// The refusal is an error rather than a silent skip because this list is source code reviewed like
+// any other, and an unreasoned entry in it is a defect in the review that the caller must see.
+func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) (map[string]AcknowledgedDivergence, error) {
 	index := make(map[string]AcknowledgedDivergence, len(acknowledged))
 	for _, one := range acknowledged {
 		// Go whitespace: a reason written in cohere's own Go source, which no JavaScript tool reads.
 		if strings.TrimSpace(one.Reason) == "" {
-			panic("tailwind: acknowledged divergence for " +
-				one.ClassName +
-				" has no reason; an unreasoned acknowledgement is a suppression")
+			return nil, fmt.Errorf(
+				"acknowledged divergence for %s has no reason: an unreasoned acknowledgement is a suppression",
+				one.ClassName,
+			)
 		}
 		index[acknowledgedKey(one.ClassName, one.Outcome)] = one
 	}
-	return index
+	return index, nil
 }

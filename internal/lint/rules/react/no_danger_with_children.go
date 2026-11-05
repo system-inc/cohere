@@ -281,10 +281,11 @@ func variableHasProperty(
 		return false
 	}
 
-	if seen == nil {
-		seen = map[*ast.Node]bool{}
+	resolvedSeen := seen
+	if resolvedSeen == nil {
+		resolvedSeen = map[*ast.Node]bool{}
 	}
-	seen[declaration] = true
+	resolvedSeen[declaration] = true
 
 	for _, property := range initializer.AsObjectLiteralExpression().Properties.Nodes {
 		switch property.Kind {
@@ -293,7 +294,7 @@ func variableHasProperty(
 			if spread == nil || spread.Kind != ast.KindIdentifier {
 				continue
 			}
-			if variableHasProperty(ruleContext, spread, propertyName, seen) {
+			if variableHasProperty(ruleContext, spread, propertyName, resolvedSeen) {
 				return true
 			}
 

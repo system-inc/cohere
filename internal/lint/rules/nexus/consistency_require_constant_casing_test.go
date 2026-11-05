@@ -473,10 +473,12 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(test 
 			"ConnectedGraphQl.ts:14, the client an imported factory returns",
 			map[string]string{
 				factoryPath: constantCasingGraphQlClientFactory,
-				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } from '../system/base/BaseGraphQlClient';\n" +
+				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } " +
+					"from '../system/base/BaseGraphQlClient';\n" +
 					"export const connectedGraphQlClient = createGraphQlClient({\n" +
 					"    name: 'Connected',\n    defaultApiUrl: 'https://api.connected.app/graphql',\n});\n",
-				"source/connected/ConnectedAgents.ts": "import { connectedGraphQlClient } from './ConnectedGraphQl';\n" +
+				"source/connected/ConnectedAgents.ts": "import { connectedGraphQlClient } " +
+					"from './ConnectedGraphQl';\n" +
 					"export function listAgents(): Promise<Record<string, unknown>> {\n" +
 					"    return connectedGraphQlClient('query { agents { id } }');\n}\n",
 			},
@@ -487,7 +489,8 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(test 
 			"PhiGraphQl.ts:57, the same factory reached from deeper in the tree",
 			map[string]string{
 				factoryPath: constantCasingGraphQlClientFactory,
-				"source/phi/core/PhiGraphQl.ts": "import { createGraphQlClient } from '../../system/base/BaseGraphQlClient';\n" +
+				"source/phi/core/PhiGraphQl.ts": "import { createGraphQlClient } " +
+					"from '../../system/base/BaseGraphQlClient';\n" +
 					"export const phiGraphQlClient = createGraphQlClient({\n" +
 					"    name: 'Phi',\n    defaultApiUrl: 'https://phi.health/api/graphql',\n});\n",
 				"source/phi/core/PhiTickets.ts": "import { phiGraphQlClient } from './PhiGraphQl';\n" +
@@ -504,7 +507,8 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(test 
 			"the same client named PascalCase, as a decorator would be",
 			map[string]string{
 				factoryPath: constantCasingGraphQlClientFactory,
-				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } from '../system/base/BaseGraphQlClient';\n" +
+				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } " +
+					"from '../system/base/BaseGraphQlClient';\n" +
 					"export const ConnectedGraphQlClient = createGraphQlClient({\n" +
 					"    name: 'Connected',\n    defaultApiUrl: 'https://api.connected.app/graphql',\n});\n",
 			},
@@ -546,7 +550,8 @@ const constantCasingFactories = "export interface Store {\n    get(): string;\n 
 
 // The element shape a component returns, standing in for React's own declarations. The check reads
 // members rather than names, so a fixture does not need the real package installed.
-const constantCasingReact = "export interface ReactElement {\n    type: unknown;\n    props: unknown;\n    key: string | null;\n}\n" +
+const constantCasingReact = "export interface ReactElement {\n" +
+	"    type: unknown;\n    props: unknown;\n    key: string | null;\n}\n" +
 	"export type ReactNode = ReactElement | string | number | boolean | null | undefined;\n" +
 	"export interface MemoExoticComponent<P> {\n    (props: P): ReactNode;\n    readonly $$typeof: symbol;\n}\n" +
 	"export declare function memo<P>(\n    component: (props: P) => ReactNode,\n" +
@@ -1017,7 +1022,8 @@ func TestConsistencyRequireConstantCasingCountsALocalExportClause(test *testing.
 			// The clause re-exports another module's name; the same spelling here is a different
 			// binding and stays file-local.
 			"a re-export of another module's same-named binding does not count",
-			"import { first } from './Other';\nconst OrderColumns = [first];\nexport const Total = OrderColumns.length;\n" +
+			"import { first } from './Other';\nconst OrderColumns = [first];\n" +
+				"export const Total = OrderColumns.length;\n" +
 				"export { OrderColumns as Columns } from './Other';\n",
 			[]string{"requireCamelCaseLocal"},
 		},
@@ -1025,7 +1031,8 @@ func TestConsistencyRequireConstantCasingCountsALocalExportClause(test *testing.
 			// Matched by binding, not spelling: the clause names the outer constant, so the inner
 			// same-spelled constant is still file-local.
 			"a same-spelled inner binding is not the exported one",
-			"const OrderColumns = [1];\nexport function f(): number {\n    const OrderColumns = 2;\n    return OrderColumns;\n}\n" +
+			"const OrderColumns = [1];\nexport function f(): number {\n" +
+				"    const OrderColumns = 2;\n    return OrderColumns;\n}\n" +
 				"export { OrderColumns };\n",
 			[]string{"requireCamelCaseLocal"},
 		},

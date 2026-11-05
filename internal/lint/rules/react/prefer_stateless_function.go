@@ -291,10 +291,11 @@ func preferStatelessFunctionComponentMembers(component *ast.Node) []*ast.Node {
 // argument and the thing being unwrapped here is an argument that may be absent. That helper is how
 // this project lost 167 files to a nil panic.
 func preferStatelessFunctionUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // preferStatelessFunctionMemberName reads a member's name the way upstream's `getPropertyName` does.
@@ -712,21 +713,21 @@ func preferStatelessFunctionFunctionBody(member *ast.Node) *ast.Node {
 // sequence by its last expression. `isReturningNull` separately accepts the literals null and false.
 // A bare `return;` has no argument and qualifies as neither, which upstream treats as invalid.
 func preferStatelessFunctionIsValidReturn(expression *ast.Node) bool {
-	expression = preferStatelessFunctionUnwrapParentheses(expression)
-	if expression == nil {
+	unwrapped := preferStatelessFunctionUnwrapParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	case ast.KindNullKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return preferStatelessFunctionIsValidReturn(conditional.WhenTrue) ||
 			preferStatelessFunctionIsValidReturn(conditional.WhenFalse)
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
 			return preferStatelessFunctionIsValidReturn(binary.Left) ||

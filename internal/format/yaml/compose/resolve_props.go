@@ -38,16 +38,16 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 	comment := ""
 	commentSep := ""
 	hasNewline := false
-	reqSpace := false
+	requiresSpace := false
 	var tab, anchor, tag, newlineAfterProperty, comma, found *cst.Token
 	start, startSet := 0, false
 	for _, token := range tokens {
-		if reqSpace {
+		if requiresSpace {
 			if token.Type != "space" && token.Type != "newline" && token.Type != "comma" {
 				onError(token.Offset, "MISSING_CHAR",
 					"Tags and anchors must be separated from the next token by white space", false)
 			}
-			reqSpace = false
+			requiresSpace = false
 		}
 		if tab != nil {
 			if atNewline && token.Type != "comment" && token.Type != "newline" {
@@ -111,7 +111,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 			}
 			atNewline = false
 			hasSpace = false
-			reqSpace = true
+			requiresSpace = true
 		case "tag":
 			if tag != nil {
 				onError(token, "MULTIPLE_TAGS", "A node can have at most one tag", false)
@@ -122,7 +122,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 			}
 			atNewline = false
 			hasSpace = false
-			reqSpace = true
+			requiresSpace = true
 		case indicator:
 			// Could here handle preceding comments differently
 			if anchor != nil || tag != nil {
@@ -163,7 +163,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 		last := tokens[len(tokens)-1]
 		end = last.Offset + len(last.Source)
 	}
-	if reqSpace && next != nil && next.Type != "space" && next.Type != "newline" && next.Type != "comma" &&
+	if requiresSpace && next != nil && next.Type != "space" && next.Type != "newline" && next.Type != "comma" &&
 		(next.Type != "scalar" || len(next.Source) != 0) {
 		onError(
 			next.Offset,
@@ -200,7 +200,7 @@ type resolvedEnd struct {
 
 // resolveEnd reads the tokens after a node to the end of its line: its comment, and where it ends. end
 // is nil for upstream's undefined.
-func resolveEnd(end []*cst.Token, offset int, reqSpace bool, onError onErrorFunc) resolvedEnd {
+func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErrorFunc) resolvedEnd {
 	comment := ""
 	if end != nil {
 		hasSpace := false
@@ -211,7 +211,7 @@ func resolveEnd(end []*cst.Token, offset int, reqSpace bool, onError onErrorFunc
 			case "space":
 				hasSpace = true
 			case "comment":
-				if reqSpace && !hasSpace {
+				if requiresSpace && !hasSpace {
 					onError(token, "MISSING_CHAR",
 						"Comments must be separated from other tokens by white space characters", false)
 				}

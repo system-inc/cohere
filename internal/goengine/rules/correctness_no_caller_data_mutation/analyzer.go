@@ -162,8 +162,8 @@ func judgedParameters(
 	parameters := map[*types.Var]bool{}
 	for _, field := range function.Type.Params.List {
 		for _, name := range field.Names {
-			parameter, isVar := pass.TypesInfo.Defs[name].(*types.Var)
-			if isVar && !outParameters[parameter] {
+			parameter, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
+			if isVariable && !outParameters[parameter] {
 				parameters[parameter] = true
 			}
 		}
@@ -330,8 +330,8 @@ func parameterNamed(pass *analysis.Pass, expression ast.Expr, parameters map[*ty
 	if !isIdentifier {
 		return nil
 	}
-	parameter, isVar := pass.TypesInfo.Uses[name].(*types.Var)
-	if !isVar || !parameters[parameter] {
+	parameter, isVariable := pass.TypesInfo.Uses[name].(*types.Var)
+	if !isVariable || !parameters[parameter] {
 		return nil
 	}
 	return parameter
@@ -462,7 +462,7 @@ func parameterOf(pass *analysis.Pass, function *ast.FuncDecl, name string) *type
 			if parameterName.Name != name {
 				continue
 			}
-			if parameter, isVar := pass.TypesInfo.Defs[parameterName].(*types.Var); isVar {
+			if parameter, isVariable := pass.TypesInfo.Defs[parameterName].(*types.Var); isVariable {
 				return parameter
 			}
 		}

@@ -380,13 +380,14 @@ func isPointerToHttpNamed(candidate types.Type, name string) bool {
 
 // outward is the index in stack of the node at index seen from outside every pair of parentheses around it.
 func outward(stack []ast.Node, index int) int {
-	for index > 0 {
-		if _, isParenthesized := stack[index-1].(*ast.ParenExpr); !isParenthesized {
+	outermost := index
+	for outermost > 0 {
+		if _, isParenthesized := stack[outermost-1].(*ast.ParenExpr); !isParenthesized {
 			break
 		}
-		index--
+		outermost--
 	}
-	return index
+	return outermost
 }
 
 // isNil is whether expression is the predeclared nil, by its object, so a variable a package names nil is not.

@@ -497,7 +497,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
+	parsedCommandLine, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
 		tspath.RootedFilePath(configurationFileName),
 		&core.CompilerOptions{},
 		nil,
@@ -507,7 +507,7 @@ func buildOnce(options Options) (*Graph, error) {
 	if len(configurationErrors) > 0 {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
 	}
-	if config == nil {
+	if parsedCommandLine == nil {
 		return nil, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
 	}
 
@@ -520,7 +520,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
 	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
 	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
-	if configurationFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(
+	if configurationFileDiagnostics := parsedCommandLine.GetConfigFileParsingDiagnostics(); len(
 		configurationFileDiagnostics,
 	) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationFileDiagnostics))
@@ -529,7 +529,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// The config resolving to zero files is a configuration error, not a clean tree. Catching it here
 	// means the caller never has to distinguish "nothing to check" from "nothing was checked", which
 	// is the distinction every silent-green failure in this project's history collapsed.
-	if len(config.FileNames()) == 0 {
+	if len(parsedCommandLine.FileNames()) == 0 {
 		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configurationFileName)
 	}
 	if options.Timing != nil {
@@ -562,7 +562,7 @@ func buildOnce(options Options) (*Graph, error) {
 	if checkerCount <= 0 {
 		checkerCount = defaultCheckerCount()
 	}
-	config.CompilerOptions().Checkers = &checkerCount
+	parsedCommandLine.CompilerOptions().Checkers = &checkerCount
 
 	// The lib files TypeScript ships are never type-checked here, whatever the tsconfig says. A diagnostic
 	// in one is never reported, since a run reports the files the tsconfig names and those are never
@@ -574,7 +574,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// The incremental build info compares the option only to decide whether the lib files' diagnostics
 	// can be copied, so a project's own tsc or tsgo sharing that build info rechecks the lib files after a
 	// cohere run and nothing else.
-	config.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
+	parsedCommandLine.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
 
 	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` (the compiler now decides
@@ -596,7 +596,7 @@ func buildOnce(options Options) (*Graph, error) {
 	}
 	programStarted := time.Now()
 	builtProgram := compiler.NewProgram(compiler.ProgramOptions{
-		Config:         config,
+		Config:         parsedCommandLine,
 		Host:           programHost,
 		SingleThreaded: singleThreaded,
 	})
@@ -624,7 +624,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	return &Graph{
 		Program:        builtProgram,
-		Config:         config,
+		Config:         parsedCommandLine,
 		ConfigFileName: configurationFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),

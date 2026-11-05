@@ -133,7 +133,8 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 			"}\n",
 		"job.ts": "import { RecordInterface, ScheduledExecutable } from './base';\n" +
 			"export class Job extends ScheduledExecutable {\n" +
-			"    protected run(job: RecordInterface, context: RecordInterface): void { job.status = 'done'; job.log.push('done'); context.status = 'x'; }\n" +
+			"    protected run(job: RecordInterface, context: RecordInterface): void { job.status = 'done'; " +
+			"job.log.push('done'); context.status = 'x'; }\n" +
 			"}\n",
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})

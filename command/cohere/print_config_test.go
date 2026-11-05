@@ -20,7 +20,7 @@ import (
 // through its typescript-eslint twin's key.
 func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	t.Parallel()
-	config := &configuration.Config{
+	lintConfiguration := &configuration.Config{
 		Root: "/repository",
 		Rules: map[string]configuration.RuleSetting{
 			"max-classes-per-file": {
@@ -37,7 +37,7 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	}
 
 	printed := func(path string) map[string][]json.RawMessage {
-		return resolvedConfigRules(config.Resolve(path))
+		return resolvedConfigRules(lintConfiguration.Resolve(path))
 	}
 
 	source := printed("/repository/source/Thing.ts")

@@ -478,10 +478,11 @@ func jsxCurlyBracePresenceLintUnnecessary(
 // parentheses go with the braces, which is what upstream writes. Measured against the installed
 // build on all three shapes.
 func jsxCurlyBracePresenceUnwrapParentheses(expression *ast.Node) *ast.Node {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return expression
+	return unwrapped
 }
 
 // jsxCurlyBracePresenceIsStringOrTemplate answers the parent-attribute guard in

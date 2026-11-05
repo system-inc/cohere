@@ -319,11 +319,11 @@ func commandOf(pass *analysis.Pass, expression ast.Expr) (command, bool) {
 
 // commandLiteral is the exec.Cmd composite literal an expression is, through parentheses and &, or nil.
 func commandLiteral(pass *analysis.Pass, expression ast.Expr) *ast.CompositeLit {
-	expression = ast.Unparen(expression)
-	if unary, isUnary := expression.(*ast.UnaryExpr); isUnary && unary.Op == token.AND {
-		expression = ast.Unparen(unary.X)
+	unwrapped := ast.Unparen(expression)
+	if unary, isUnary := unwrapped.(*ast.UnaryExpr); isUnary && unary.Op == token.AND {
+		unwrapped = ast.Unparen(unary.X)
 	}
-	literal, isLiteral := expression.(*ast.CompositeLit)
+	literal, isLiteral := unwrapped.(*ast.CompositeLit)
 	if !isLiteral || !isCommand(pass.TypesInfo.TypeOf(literal)) {
 		return nil
 	}
@@ -366,10 +366,11 @@ func isCommand(candidate types.Type) bool {
 	if candidate == nil {
 		return false
 	}
+	dereferenced := candidate
 	if pointer, isPointer := types.Unalias(candidate).(*types.Pointer); isPointer {
-		candidate = pointer.Elem()
+		dereferenced = pointer.Elem()
 	}
-	return isNamed(candidate, "os/exec", "Cmd")
+	return isNamed(dereferenced, "os/exec", "Cmd")
 }
 
 func isNamed(candidate types.Type, packagePath string, name string) bool {

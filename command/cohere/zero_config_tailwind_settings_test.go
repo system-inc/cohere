@@ -23,7 +23,7 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 	test.Helper()
 	// The vendored snapshot of tailwindcss, since cohere installs no npm packages, so this runs on any
 	// machine (#sycrdr6). It used to be ahra's installed copy, through the ahra corpus.
-	packageRoot := vendored.TailwindPackageRoot()
+	packageRoot := vendored.TailwindPackageRootForTest(test)
 	root := test.TempDir()
 	tree := maps.Clone(files)
 	tree["tsconfig.json"] = tailwindProjectConfig

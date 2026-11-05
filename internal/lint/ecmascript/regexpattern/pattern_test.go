@@ -190,11 +190,14 @@ func TestWalkBoundsAnOctalEscape(test *testing.T) {
 		wantCount int
 		wantFirst uint32
 	}{
-		{"three digits", `A`, 1, 65},
-		{"two digits", `!`, 1, 33},
+		// Every pattern is a raw string so the walker receives the backslash and its digits. An
+		// interpreted Go string decodes `\101` itself, and these cases once held the decoded letters,
+		// which passed without the walker ever seeing an octal escape.
+		{"three digits", `\101`, 1, 65},
+		{"two digits", `\41`, 1, 33},
 		{"a value above 255 stops early", `\400`, 2, 32},
-		{"a fourth digit is literal", `A1`, 2, 65},
-		{"a non-octal digit ends it", `8`, 2, 1},
+		{"a fourth digit is literal", `\1011`, 2, 65},
+		{"a non-octal digit ends it", `\18`, 2, 1},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

@@ -184,15 +184,18 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 	// until nothing moves.
 	analysis.immediate[0] = 0
 	intersect := func(left, right int) int {
-		for left != right {
-			for analysis.rpoPosition[left] > analysis.rpoPosition[right] {
-				left = analysis.immediate[left]
+		// Each finger climbs the dominator tree from its own block until the two meet.
+		leftFinger := left
+		rightFinger := right
+		for leftFinger != rightFinger {
+			for analysis.rpoPosition[leftFinger] > analysis.rpoPosition[rightFinger] {
+				leftFinger = analysis.immediate[leftFinger]
 			}
-			for analysis.rpoPosition[right] > analysis.rpoPosition[left] {
-				right = analysis.immediate[right]
+			for analysis.rpoPosition[rightFinger] > analysis.rpoPosition[leftFinger] {
+				rightFinger = analysis.immediate[rightFinger]
 			}
 		}
-		return left
+		return leftFinger
 	}
 	for changed := true; changed; {
 		changed = false

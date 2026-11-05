@@ -872,7 +872,8 @@ func TestNoParamReassignOptions(test *testing.T) {
 		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			"function foo(one, two, three) { one.a = 0; two.a = 0; three.a = 0; }", options)
 		rule_testing.ExpectFindings(test, result, "assignmentToFunctionParamProp")
-		if got := result.Diagnostics[0].Message.Description; got != "Assignment to property of function parameter 'three'." {
+		got := result.Diagnostics[0].Message.Description
+		if got != "Assignment to property of function parameter 'three'." {
 			test.Errorf("reported %q, want the third parameter", got)
 		}
 	})

@@ -105,7 +105,7 @@ func foldLines(source []uint16) []uint16 {
 	if n == -1 {
 		return source
 	}
-	res := append([]uint16{}, source[:foldLinesEnd(source, 0, n)]...)
+	result := append([]uint16{}, source[:foldLinesEnd(source, 0, n)]...)
 	sep := []uint16{' '}
 	position := n + 1
 	for {
@@ -126,12 +126,12 @@ func foldLines(source []uint16) []uint16 {
 		match := source[start:foldLinesEnd(source, start, newline)]
 		if len(match) == 0 {
 			if equalsASCII(sep, "\n") {
-				res = append(res, sep...)
+				result = append(result, sep...)
 			} else {
 				sep = []uint16{'\n'}
 			}
 		} else {
-			res = append(append(res, sep...), match...)
+			result = append(append(result, sep...), match...)
 			sep = []uint16{' '}
 		}
 		position = newline + 1
@@ -140,25 +140,25 @@ func foldLines(source []uint16) []uint16 {
 	for start < len(source) && isSpaceOrTab(int(source[start])) {
 		start++
 	}
-	return concatUnits(res, sep, source[start:])
+	return concatUnits(result, sep, source[start:])
 }
 
 func doubleQuotedValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
-	res := []uint16{}
+	result := []uint16{}
 	for i := 1; i < len(source)-1; i++ {
-		ch := source[i]
-		if ch == '\r' && characterAt(source, i+1) == '\n' {
+		codeUnit := source[i]
+		if codeUnit == '\r' && characterAt(source, i+1) == '\n' {
 			continue
 		}
-		if ch == '\n' {
+		if codeUnit == '\n' {
 			fold, offset := foldNewline(source, i)
-			res = append(res, fold...)
+			result = append(result, fold...)
 			i = offset
-		} else if ch == '\\' {
+		} else if codeUnit == '\\' {
 			i++
 			next := characterAt(source, i)
 			if cc, found := escapeCodes[next]; found {
-				res = append(res, cc)
+				result = append(result, cc)
 			} else if next == '\n' {
 				// skip escaped newlines, but still trim the following line
 				next = characterAt(source, i+1)
@@ -181,14 +181,14 @@ func doubleQuotedValue(source []uint16, onError func(rel int, code string, messa
 				} else if next == 'u' {
 					length = 4
 				}
-				res = append(res, parseCharCode(source, i+1, length, onError)...)
+				result = append(result, parseCharCode(source, i+1, length, onError)...)
 				i += length
 			} else {
 				raw := substr(source, i-1, 2)
 				onError(i-1, "BAD_DQ_ESCAPE", "Invalid escape sequence "+unitsToString(raw))
-				res = append(res, raw...)
+				result = append(result, raw...)
 			}
-		} else if ch == ' ' || ch == '\t' {
+		} else if codeUnit == ' ' || codeUnit == '\t' {
 			// trim trailing whitespace
 			wsStart := i
 			next := characterAt(source, i+1)
@@ -198,35 +198,35 @@ func doubleQuotedValue(source []uint16, onError func(rel int, code string, messa
 			}
 			if next != '\n' && !(next == '\r' && characterAt(source, i+2) == '\n') {
 				if i > wsStart {
-					res = append(res, slice(source, wsStart, i+1)...)
+					result = append(result, slice(source, wsStart, i+1)...)
 				} else {
-					res = append(res, ch)
+					result = append(result, codeUnit)
 				}
 			}
 		} else {
-			res = append(res, ch)
+			result = append(result, codeUnit)
 		}
 	}
 	if characterAt(source, len(source)-1) != '"' || len(source) == 1 {
 		onError(len(source), "MISSING_CHAR", `Missing closing "quote`)
 	}
-	return res
+	return result
 }
 
 // foldNewline folds a single newline into a space, multiple newlines to N - 1 newlines. Presumes
 // `source[offset] === '\n'`.
 func foldNewline(source []uint16, offset int) ([]uint16, int) {
 	fold := []uint16{}
-	ch := characterAt(source, offset+1)
-	for ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-		if ch == '\r' && characterAt(source, offset+2) != '\n' {
+	character := characterAt(source, offset+1)
+	for character == ' ' || character == '\t' || character == '\n' || character == '\r' {
+		if character == '\r' && characterAt(source, offset+2) != '\n' {
 			break
 		}
-		if ch == '\n' {
+		if character == '\n' {
 			fold = append(fold, '\n')
 		}
 		offset += 1
-		ch = characterAt(source, offset+1)
+		character = characterAt(source, offset+1)
 	}
 	if len(fold) == 0 {
 		fold = []uint16{' '}
@@ -461,14 +461,14 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 	var chomp uint16
 	errorOffset := -1
 	for i := 1; i < len(source); i++ {
-		ch := source[i]
-		if chomp == 0 && (ch == '-' || ch == '+') {
-			chomp = ch
+		codeUnit := source[i]
+		if chomp == 0 && (codeUnit == '-' || codeUnit == '+') {
+			chomp = codeUnit
 		} else {
 			// `Number(ch)` is truthy only for the digits 1 to 9.
 			n := 0
-			if ch >= '1' && ch <= '9' {
-				n = int(ch - '0')
+			if codeUnit >= '1' && codeUnit <= '9' {
+				n = int(codeUnit - '0')
 			}
 			if indent == 0 && n != 0 {
 				indent = n

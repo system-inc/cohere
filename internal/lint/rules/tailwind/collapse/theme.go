@@ -306,11 +306,11 @@ type ThemeEntry struct {
 // The stored keys are unprefixed; see PrefixKey.
 func (theme *Theme) Entries() []ThemeEntry {
 	entries := make([]ThemeEntry, 0, len(theme.values))
-	theme.liveKeys(func(key string, value themeValue) bool {
+	theme.liveKeys(func(key string, declaration themeValue) bool {
 		entries = append(entries, ThemeEntry{
 			Key:     theme.PrefixKey(key),
-			Value:   value.value,
-			Options: value.options,
+			Value:   declaration.value,
+			Options: declaration.options,
 		})
 		return true
 	})
@@ -358,8 +358,8 @@ func (theme *Theme) KeysInNamespaces(themeKeys []string) []string {
 // value, and applies no ignored-key filtering: it is a direct lookup.
 func (theme *Theme) Get(themeKeys []string) (string, bool) {
 	for _, key := range themeKeys {
-		if value, ok := theme.values[key]; ok {
-			return value.value, true
+		if declaration, ok := theme.values[key]; ok {
+			return declaration.value, true
 		}
 	}
 	return "", false
@@ -376,8 +376,8 @@ func (theme *Theme) HasDefault(key string) bool {
 // rather than as it is stored. That asymmetry is upstream's: Entries hands out prefixed keys, and
 // this takes them back.
 func (theme *Theme) GetOptions(key string) ThemeOptions {
-	key = unescapeCSSIdentifier(theme.unprefixKey(key))
-	if value, ok := theme.values[key]; ok {
+	storedKey := unescapeCSSIdentifier(theme.unprefixKey(key))
+	if value, ok := theme.values[storedKey]; ok {
 		return value.options
 	}
 	return ThemeOptionNone
@@ -491,14 +491,14 @@ func (theme *Theme) resolveKey(candidateValue string, candidateValuePresent bool
 // `@reference` cannot assume the browser will have one, and without the fallback the declaration
 // would resolve to nothing at runtime.
 func (theme *Theme) variableReference(themeKey string) (string, bool) {
-	value, ok := theme.values[themeKey]
+	declaration, ok := theme.values[themeKey]
 	if !ok {
 		return "", false
 	}
 
 	reference := "var(" + escapeCSSIdentifier(theme.PrefixKey(themeKey))
-	if value.options&ThemeOptionReference != 0 && value.value != "" {
-		reference += ", " + value.value
+	if declaration.options&ThemeOptionReference != 0 && declaration.value != "" {
+		reference += ", " + declaration.value
 	}
 	return reference + ")", true
 }
@@ -540,9 +540,9 @@ func (theme *Theme) Resolve(
 		return "", false
 	}
 
-	value := theme.values[themeKey]
-	if (options|value.options)&ThemeOptionInline != 0 {
-		return value.value, true
+	declaration := theme.values[themeKey]
+	if (options|declaration.options)&ThemeOptionInline != 0 {
+		return declaration.value, true
 	}
 
 	return theme.variableReference(themeKey)
@@ -600,9 +600,9 @@ func (theme *Theme) ResolveWith(
 		}
 	}
 
-	value := theme.values[themeKey]
-	if value.options&ThemeOptionInline != 0 {
-		return value.value, extra, true
+	declaration := theme.values[themeKey]
+	if declaration.options&ThemeOptionInline != 0 {
+		return declaration.value, extra, true
 	}
 
 	reference, _ := theme.variableReference(themeKey)
@@ -639,15 +639,15 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 	var entries []NamespaceEntry
 	prefix := namespace + "-"
 
-	theme.liveKeys(func(key string, value themeValue) bool {
+	theme.liveKeys(func(key string, declaration themeValue) bool {
 		switch {
 		case key == namespace:
-			entries = append(entries, NamespaceEntry{KeyIsNull: true, Value: value.value})
+			entries = append(entries, NamespaceEntry{KeyIsNull: true, Value: declaration.value})
 		case strings.HasPrefix(key, prefix+"-"):
 			// Preserve the `--` prefix for sub-variables, e.g. `--font-size-sm--line-height`.
-			entries = append(entries, NamespaceEntry{Key: key[len(namespace):], Value: value.value})
+			entries = append(entries, NamespaceEntry{Key: key[len(namespace):], Value: declaration.value})
 		case strings.HasPrefix(key, prefix):
-			entries = append(entries, NamespaceEntry{Key: key[len(prefix):], Value: value.value})
+			entries = append(entries, NamespaceEntry{Key: key[len(prefix):], Value: declaration.value})
 		}
 		return true
 	})

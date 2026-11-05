@@ -43,7 +43,8 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 		"declare const memo: unknown;\nexport const value = 1;\n",
 		"import { networkService } from './NetworkService.ts';\nlet useThingRequest;\nexport const value = useThingRequest;\n",
 		"import { networkService } from './NetworkService.ts';\ndeclare const Document: unknown;\n" +
-			"export function useThingRequest(o?: unknown) { return networkService.useGraphQlQuery(Document, { shorthand }, o); }\n" +
+			"export function useThingRequest(o?: unknown) { " +
+			"return networkService.useGraphQlQuery(Document, { shorthand }, o); }\n" +
 			"declare const shorthand: unknown;\n",
 		"import { networkService } from './NetworkService.ts';\nexport function useThingRequest() { return networkService.useGraphQlQuery(); }\n",
 		"declare const Field: { displayName: string };\nlet other;\nexport const value = other;\n",

@@ -138,16 +138,16 @@ func judge(
 	if !isSelector || selector.Sel.Name != local.Name || local.Name == "_" {
 		return
 	}
-	localObject, isVar := pass.TypesInfo.Defs[local].(*types.Var)
-	if !isVar {
+	localObject, isVariable := pass.TypesInfo.Defs[local].(*types.Var)
+	if !isVariable {
 		return
 	}
 	root := chainRoot(pass, selector)
 	if root == nil {
 		return
 	}
-	rootObject, rootIsVar := pass.TypesInfo.Uses[root].(*types.Var)
-	if !rootIsVar {
+	rootObject, rootIsVariable := pass.TypesInfo.Uses[root].(*types.Var)
+	if !rootIsVariable {
 		return
 	}
 	read := onlyRead(pass, body, localObject)
@@ -188,16 +188,17 @@ func judge(
 // else: a call, an index, a dereference, an assertion, a method, or a package's qualified identifier, which go/types
 // records as no selection at all.
 func chainRoot(pass *analysis.Pass, selector *ast.SelectorExpr) *ast.Ident {
+	current := selector
 	for {
-		selection, isSelection := pass.TypesInfo.Selections[selector]
+		selection, isSelection := pass.TypesInfo.Selections[current]
 		if !isSelection || selection.Kind() != types.FieldVal {
 			return nil
 		}
-		switch object := ast.Unparen(selector.X).(type) {
+		switch object := ast.Unparen(current.X).(type) {
 		case *ast.Ident:
 			return object
 		case *ast.SelectorExpr:
-			selector = object
+			current = object
 		default:
 			return nil
 		}

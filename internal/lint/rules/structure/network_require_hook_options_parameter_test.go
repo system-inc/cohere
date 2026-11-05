@@ -62,7 +62,8 @@ func TestNetworkRequireHookOptionsParameterFires(test *testing.T) {
 		// slot, so it is dropped exactly as if it were never passed.
 		{
 			"options forwarded in the variables position of a three-argument query",
-			"export function useUserRequest(variables: UserQueryVariablesType, options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
+			"export function useUserRequest(variables: UserQueryVariablesType, " +
+				"options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
 				"    return networkService.useGraphQlQuery(Document, options, variables);\n}\n",
 			[]string{"optionsParameterNotPassedThrough"},
 		},
@@ -107,7 +108,8 @@ func TestNetworkRequireHookOptionsParameterFires(test *testing.T) {
 		// the hook reads as having none.
 		{
 			"a destructured last parameter",
-			"export function useUserRequest({ options }: { options?: InferUseGraphQlQueryOptions<typeof Document> }) {\n" +
+			"export function useUserRequest({ options }: " +
+				"{ options?: InferUseGraphQlQueryOptions<typeof Document> }) {\n" +
 				"    return networkService.useGraphQlQuery(Document, undefined, options);\n}\n",
 			[]string{"missingOptionsParameter"},
 		},
@@ -131,7 +133,8 @@ func TestNetworkRequireHookOptionsParameterStaysSilent(test *testing.T) {
 		// The shape the rule asks for, in the three-argument query form.
 		{
 			"a query forwarding options third with variables second",
-			"export function useUserRequest(variables: UserQueryVariablesType, options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
+			"export function useUserRequest(variables: UserQueryVariablesType, " +
+				"options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
 				"    return networkService.useGraphQlQuery(Document, variables, options);\n}\n",
 		},
 		{

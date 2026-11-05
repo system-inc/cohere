@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -60,7 +61,7 @@ func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.Opt
 }
 
 // decodedKey re-encodes decoded options and returns one key's value, compacted.
-func decodedKey(test *testing.T, decoded any, key string) string {
+func decodedKey[Options any](test *testing.T, decoded Options, key string) string {
 	test.Helper()
 	encoded, encodeError := json.Marshal(decoded)
 	if encodeError != nil {
@@ -73,14 +74,56 @@ func decodedKey(test *testing.T, decoded any, key string) string {
 	return compactJsonForTest(test, fields[key])
 }
 
+// compactJsonForTest is raw compacted with every object's keys sorted, so two spellings of one value compare
+// equal. Raw that is not JSON, such as the empty value of a key the decoded options never wrote, comes back as
+// written.
 func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
 	test.Helper()
-	var value any
-	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
+	if !json.Valid(raw) {
 		return string(raw)
 	}
-	compacted, _ := json.Marshal(value)
-	return string(compacted)
+	return string(canonicalJsonForTest(test, raw))
+}
+
+// canonicalJsonForTest is one well-formed JSON value read as raw text, so each object and array is decoded only
+// as far as its members, into types that hold no value of unknown kind. An object is re-encoded from a map, which
+// encoding/json writes with its keys sorted.
+func canonicalJsonForTest(test *testing.T, raw json.RawMessage) json.RawMessage {
+	test.Helper()
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading an object's members: %v\n%s", decodeError, trimmed)
+		}
+		for key, member := range members {
+			members[key] = canonicalJsonForTest(test, member)
+		}
+		encoded, encodeError := json.Marshal(members)
+		if encodeError != nil {
+			test.Fatalf("encoding an object's members: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading an array's elements: %v\n%s", decodeError, trimmed)
+		}
+		for index, element := range elements {
+			elements[index] = canonicalJsonForTest(test, element)
+		}
+		encoded, encodeError := json.Marshal(elements)
+		if encodeError != nil {
+			test.Fatalf("encoding an array's elements: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	var compacted bytes.Buffer
+	if compactError := json.Compact(&compacted, trimmed); compactError != nil {
+		test.Fatalf("compacting a value: %v\n%s", compactError, trimmed)
+	}
+	return compacted.Bytes()
 }
 
 func settingsBase(block string) rule.OptionsBase {

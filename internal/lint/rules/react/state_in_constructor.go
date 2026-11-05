@@ -295,11 +295,11 @@ func isStateInConstructorStateProperty(node *ast.Node) bool {
 // {}` report upstream; without the unwrapping this rule would go silent on both, which no imported
 // fixture could see because the corpus writes no parenthesized form at all.
 func isStateInConstructorThisStateTarget(target *ast.Node) bool {
-	target = ast.SkipParentheses(target)
-	if target == nil || target.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := ast.SkipParentheses(target)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := target.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if ast.SkipParentheses(access.Expression) == nil ||
 		ast.SkipParentheses(access.Expression).Kind != ast.KindThisKeyword {
 		return false

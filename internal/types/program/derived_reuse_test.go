@@ -309,7 +309,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+					`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 					`"include":["**/*.ts"]}`,
 				"red-marker.ts":  "// red\n",
 				"blue-marker.ts": "// blue\n",
@@ -322,7 +323,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 					Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 				}
 			}
-			config := &configuration.Config{
+			lintConfiguration := &configuration.Config{
 				Root:  root,
 				Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("red-marker.ts")},
 				Overrides: []configuration.Override{{Files: []string{"blues/**"},
@@ -354,7 +355,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 						graph.Workers(),
 					)
 				}
-				graph.LintConfig, graph.RuleOptions = config, registry
+				graph.LintConfig, graph.RuleOptions = lintConfiguration, registry
 				runs := &sync.Map{}
 				var reuse *program.FindingsReuse
 				if cached {
@@ -450,7 +451,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+			`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 			`"include":["**/*.ts"]}`,
 	}
 	for _, directory := range []string{"a", "b", "c"} {

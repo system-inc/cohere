@@ -69,10 +69,11 @@ func itoa(value int) string {
 	}
 	digits := [20]byte{}
 	position := len(digits)
-	for value > 0 {
+	remaining := value
+	for remaining > 0 {
 		position--
-		digits[position] = byte('0' + value%10)
-		value /= 10
+		digits[position] = byte('0' + remaining%10)
+		remaining /= 10
 	}
 	return string(digits[position:])
 }
@@ -433,15 +434,30 @@ func TestClassOrderHarnessDistinguishesPlantedFromObserved(test *testing.T) {
 // TestClassOrderAcknowledgementsRequireAReason proves an unreasoned excuse is refused.
 //
 // An acknowledgement with no reason is indistinguishable from a suppression added to turn a red
-// build green, which is why the index panics rather than skipping it.
+// build green, which is why the index refuses it with an error rather than skipping it.
 func TestClassOrderAcknowledgementsRequireAReason(test *testing.T) {
 	test.Parallel()
-	defer func() {
-		if recovered := recover(); recovered == nil {
-			test.Error("an acknowledgement with no reason was accepted")
-		}
-	}()
-	AcknowledgedIndex([]AcknowledgedDivergence{{ClassName: "flex", Outcome: OutcomeGoSilent, Owner: "#nobody"}})
+	index, indexError := AcknowledgedIndex(
+		[]AcknowledgedDivergence{{ClassName: "flex", Outcome: OutcomeGoSilent, Owner: "#nobody"}},
+	)
+	if indexError == nil {
+		test.Fatalf("an acknowledgement with no reason was accepted into an index of %d", len(index))
+	}
+	want := "acknowledged divergence for flex has no reason: an unreasoned acknowledgement is a suppression"
+	if indexError.Error() != want {
+		test.Errorf("the refusal reads %q, want %q", indexError.Error(), want)
+	}
+
+	// A reasoned acknowledgement is indexed, so the refusal above is about the reason and not every entry.
+	reasoned, reasonedError := AcknowledgedIndex(
+		[]AcknowledgedDivergence{{ClassName: "flex", Outcome: OutcomeGoSilent, Owner: "#nobody", Reason: "measured"}},
+	)
+	if reasonedError != nil {
+		test.Fatalf("a reasoned acknowledgement was refused: %v", reasonedError)
+	}
+	if _, indexed := reasoned[acknowledgedKey("flex", OutcomeGoSilent)]; !indexed {
+		test.Error("a reasoned acknowledgement is missing from the index")
+	}
 }
 
 // TestClassOrderUnresolvableAlphaPredicateIsNarrow guards the acknowledgement's own blast radius.

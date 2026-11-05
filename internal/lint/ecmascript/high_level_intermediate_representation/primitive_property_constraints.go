@@ -39,17 +39,17 @@ func (state *primitiveConstraintState) bind(key primitiveConstraintKey, kind pri
 }
 
 func (state *primitiveConstraintState) alias(left, right primitiveConstraintKey) {
-	left, right = state.root(left), state.root(right)
-	if left == right {
+	leftRoot, rightRoot := state.root(left), state.root(right)
+	if leftRoot == rightRoot {
 		return
 	}
-	leftKind, rightKind := state.kinds[left], state.kinds[right]
+	leftKind, rightKind := state.kinds[leftRoot], state.kinds[rightRoot]
 	if leftKind != primitiveConstraintUnknown && rightKind != primitiveConstraintUnknown && leftKind != rightKind {
 		return
 	}
-	state.parents[left] = right
+	state.parents[leftRoot] = rightRoot
 	if rightKind == primitiveConstraintUnknown {
-		state.kinds[right] = leftKind
+		state.kinds[rightRoot] = leftKind
 	}
 }
 
@@ -77,73 +77,73 @@ func (state *primitiveConstraintState) visit(function *Function) {
 				continue
 			}
 			left := key(instruction.LValue)
-			switch value := instruction.Value.(type) {
+			switch shape := instruction.Value.(type) {
 			case *Primitive, *TemplateLiteral, *UnaryExpression:
 				state.bind(left, primitiveConstraintPrimitive)
 			case *LoadLocal:
-				state.alias(left, key(value.Place))
+				state.alias(left, key(shape.Place))
 			case *StoreLocal:
-				state.alias(left, key(value.Value))
-				state.alias(key(value.LValue), key(value.Value))
-				if value.Kind == InstructionKindConst {
-					state.constant[key(value.LValue)] = true
+				state.alias(left, key(shape.Value))
+				state.alias(key(shape.LValue), key(shape.Value))
+				if shape.Kind == InstructionKindConst {
+					state.constant[key(shape.LValue)] = true
 				}
 			case *LoadContext:
-				if state.constant[key(value.Place)] {
-					state.alias(left, key(value.Place))
+				if state.constant[key(shape.Place)] {
+					state.alias(left, key(shape.Place))
 				}
 			case *StoreContext:
-				if value.Kind == InstructionKindConst {
-					state.alias(key(value.LValue), key(value.Value))
-					state.constant[key(value.LValue)] = true
+				if shape.Kind == InstructionKindConst {
+					state.alias(key(shape.LValue), key(shape.Value))
+					state.constant[key(shape.LValue)] = true
 				}
 			case *BinaryExpression:
-				switch value.Operator {
+				switch shape.Operator {
 				case "+", "-", "/", "%", "*", "**", "&", "|", ">>", "<<", "^", ">", "<", ">=", "<=", "|>":
-					state.bind(key(value.Left), primitiveConstraintPrimitive)
-					state.bind(key(value.Right), primitiveConstraintPrimitive)
+					state.bind(key(shape.Left), primitiveConstraintPrimitive)
+					state.bind(key(shape.Right), primitiveConstraintPrimitive)
 				}
 				state.bind(left, primitiveConstraintPrimitive)
 			case *PrefixUpdate:
-				state.bind(key(value.Value), primitiveConstraintPrimitive)
-				state.bind(key(value.LValue), primitiveConstraintPrimitive)
+				state.bind(key(shape.Value), primitiveConstraintPrimitive)
+				state.bind(key(shape.LValue), primitiveConstraintPrimitive)
 				state.bind(left, primitiveConstraintPrimitive)
 			case *PostfixUpdate:
-				state.bind(key(value.Value), primitiveConstraintPrimitive)
-				state.bind(key(value.LValue), primitiveConstraintPrimitive)
+				state.bind(key(shape.Value), primitiveConstraintPrimitive)
+				state.bind(key(shape.LValue), primitiveConstraintPrimitive)
 				state.bind(left, primitiveConstraintPrimitive)
 			case *LoadGlobal, *ObjectExpression, *ArrayExpression, *RegExpLiteral, *ObjectMethod, *NewExpression:
 				state.bind(left, primitiveConstraintOther)
 			case *PropertyLoad:
-				if value.Property == "current" ||
-					state.kinds[state.root(key(value.Object))] != primitiveConstraintUnknown {
+				if shape.Property == "current" ||
+					state.kinds[state.root(key(shape.Object))] != primitiveConstraintUnknown {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *ComputedLoad:
 				state.bind(left, primitiveConstraintOther)
 			case *CallExpression:
-				state.bind(key(value.Callee), primitiveConstraintOther)
-				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" ||
-					value.CalleeOrigin.Export == "useState" ||
-					value.CalleeOrigin.Export == "useReducer" ||
-					value.CalleeOrigin.Export == "useCallback") {
+				state.bind(key(shape.Callee), primitiveConstraintOther)
+				if shape.CalleeOrigin.Module == "react" && (shape.CalleeOrigin.Export == "useRef" ||
+					shape.CalleeOrigin.Export == "useState" ||
+					shape.CalleeOrigin.Export == "useReducer" ||
+					shape.CalleeOrigin.Export == "useCallback") {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *MethodCall:
-				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" ||
-					value.CalleeOrigin.Export == "useState" ||
-					value.CalleeOrigin.Export == "useReducer" ||
-					value.CalleeOrigin.Export == "useCallback") {
+				if shape.CalleeOrigin.Module == "react" && (shape.CalleeOrigin.Export == "useRef" ||
+					shape.CalleeOrigin.Export == "useState" ||
+					shape.CalleeOrigin.Export == "useReducer" ||
+					shape.CalleeOrigin.Export == "useCallback") {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *FunctionExpression:
 				state.bind(left, primitiveConstraintOther)
-				if int(value.Function) >= len(function.Functions) {
+				if int(shape.Function) >= len(function.Functions) {
 					continue
 				}
-				nested := function.Functions[value.Function]
-				if nested != nil && len(nested.Context) == len(value.Captures) {
-					for index, capture := range value.Captures {
+				nested := function.Functions[shape.Function]
+				if nested != nil && len(nested.Context) == len(shape.Captures) {
+					for index, capture := range shape.Captures {
 						if state.constant[key(capture)] {
 							context := primitiveConstraintKey{nested, nested.Context[index].Identifier}
 							state.constant[context] = true
