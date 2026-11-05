@@ -80,9 +80,17 @@ func goLanguage(container string) engineLanguage {
 // goVersionLines is the Go engine's `--version` lines. The Go engine has no source-commit line: nothing
 // builds it from a commit's sources on the front door's behalf, so the front door has no commit to vouch
 // for, and its own provenance record names what it was built from.
+//
+// The line names the contract the engine's record says it speaks. The `swift contract` line above it is
+// cohere's own and stays in every mode, Go's included, because the release reads it from a `--version` run
+// wherever it stands, and cohere's own repository is a Go root.
 func goVersionLines(provenance *engineProvenanceRecord, _ string) []string {
-	lines := []string{fmt.Sprintf("go engine: %s %s (commit %s, %s)",
-		provenance.Engine, provenance.Version, provenance.Commit, provenance.Toolchain)}
+	contract := "none"
+	if provenance.Contract != nil {
+		contract = fmt.Sprint(*provenance.Contract)
+	}
+	lines := []string{fmt.Sprintf("go engine: %s %s (commit %s, %s, contract %s)",
+		provenance.Engine, provenance.Version, provenance.Commit, provenance.Toolchain, contract)}
 	if provenance.SourceTreeModified {
 		lines = append(lines, "  the Go engine was built from a modified tree, so no commit reproduces it")
 	}

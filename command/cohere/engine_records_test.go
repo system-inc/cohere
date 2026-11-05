@@ -603,12 +603,12 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 	}
 
 	clean := render(provenance, "a97349d9534c52c831ec0835fe7ceba880637fd1")
-	requireLines(test, clean, "\n  swift contract: 3\ngo engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64)\n")
+	requireLines(test, clean, "\n  swift contract: 3\ngo engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n")
 	forbidLines(test, clean, "modified tree", "identical to commit", "swift engine", "Swift", "swift-syntax")
 
 	modified := render(strings.Replace(provenance, `"sourceTreeModified":false`, `"sourceTreeModified":true`, 1), "")
 	requireLines(test, modified,
-		"go engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64)\n",
+		"go engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
 		"  the Go engine was built from a modified tree, so no commit reproduces it\n",
 	)
 }
