@@ -19,7 +19,7 @@ import (
 // printArray is upstream's printArray.
 func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	elementsProperty := "elements"
 	if isTupleType(current) {
@@ -27,7 +27,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	elements := current.List(elementsProperty)
 	if len(elements) == 0 {
-		parts = append(parts, groupIn(path, concatIn(path, "[", printDanglingCommentsInList(path, options, nil), "]")))
+		parts = append(parts, groupIn(path, concatIn(path, doc.Text("["), printDanglingCommentsInList(path, options, nil), doc.Text("]"))))
 	} else {
 		lastElem := elements[len(elements)-1]
 		canHaveTrailingComma := !lastElem.Is("RestElement")
@@ -81,9 +81,9 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		case !shouldPrintTrailingComma(options, "es5"):
 			trailingComma = emptyDoc
 		case shouldUseConciseFormatting:
-			trailingComma = ifBreakWithGroup(",", "", groupID)
+			trailingComma = ifBreakWithGroup(doc.Text(","), doc.Text(""), groupID)
 		default:
-			trailingComma = ifBreak(",", "")
+			trailingComma = ifBreak(doc.Text(","), doc.Text(""))
 		}
 
 		var elementsDoc Doc
@@ -95,13 +95,13 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 			)
 		}
 
-		parts = append(parts, groupWithIn(path, concatIn(path, "[",
+		parts = append(parts, groupWithIn(path, concatIn(path, doc.Text("["),
 			indentIn(path, concatIn(path, softline,
 				elementsDoc,
 				printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
 			)),
 			softline,
-			"]",
+			doc.Text("]"),
 		),
 			doc.GroupOptions{ShouldBreak: shouldBreak, ID: groupID},
 		))
@@ -182,7 +182,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 			if current != nil && isLineAfterElementEmpty(path, options) {
 				separator = softline
 			}
-			parts = append(parts, concatIn(path, ",", line, separator))
+			parts = append(parts, concatIn(path, doc.Text(","), line, separator))
 		}
 	}, elementsProperty)
 
@@ -230,8 +230,8 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 		optional = "?"
 	}
 	return concatIn(path, print("label", nil),
-		optional,
-		": ",
+		textDoc(optional),
+		doc.Text(": "),
 		print("elementType", nil),
 	)
 }
@@ -242,5 +242,5 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 
 // printArrayType is upstream's printArrayType, print/array-type.js.
 func printArrayType(print PrintFunc) Doc {
-	return concat(print("elementType", nil), "[]")
+	return concat(print("elementType", nil), doc.Text("[]"))
 }

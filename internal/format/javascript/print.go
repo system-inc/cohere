@@ -70,9 +70,9 @@ func printEstree(path *Path, options *Options, print PrintFunc, args any) Doc {
 			open, close = "(", ")"
 		}
 		if hasDecorators {
-			return concatIn(path, open, groupIn(path, concatIn(path, decoratorsDoc, printed)), close)
+			return concatIn(path, textDoc(open), groupIn(path, concatIn(path, decoratorsDoc, printed)), textDoc(close))
 		}
-		return concatIn(path, open, printed, close)
+		return concatIn(path, textDoc(open), printed, textDoc(close))
 	})
 }
 
@@ -117,11 +117,11 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		expression := current.Child("expression")
 		shouldHug := !hasAnyComment(expression) && (isObjectExpression(expression) || isArrayExpression(expression))
 		if shouldHug {
-			return concatIn(path, "(", print("expression", nil), ")")
+			return concatIn(path, doc.Text("("), print("expression", nil), doc.Text(")"))
 		}
 		return groupIn(
 			path,
-			concatIn(path, "(", indentIn(path, concatIn(path, softline, print("expression", nil))), softline, ")"),
+			concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, print("expression", nil))), softline, doc.Text(")")),
 		)
 	case "AssignmentExpression":
 		return printAssignmentExpression(path, options, print)
@@ -130,13 +130,13 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "BinaryExpression", "LogicalExpression":
 		return printBinaryishExpression(path, options, print)
 	case "AssignmentPattern":
-		return concatIn(path, print("left", nil), " = ", print("right", nil))
+		return concatIn(path, print("left", nil), doc.Text(" = "), print("right", nil))
 	case "OptionalMemberExpression", "MemberExpression":
 		return printMemberExpression(path, options, print)
 	case "MetaProperty":
-		return concatIn(path, print("meta", nil), ".", print("property", nil))
+		return concatIn(path, print("meta", nil), doc.Text("."), print("property", nil))
 	case "Identifier":
-		return concatIn(path, current.String("name"),
+		return concatIn(path, textDoc(current.String("name")),
 			printOptionalToken(path),
 			printDefiniteToken(path),
 			printTypeAnnotationProperty(path, print),
@@ -156,9 +156,9 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		var argument Doc = emptyDoc
 		if current.Child("argument") != nil {
-			argument = concatIn(path, " ", print("argument", nil))
+			argument = concatIn(path, doc.Text(" "), print("argument", nil))
 		}
-		return concatIn(path, keyword, argument)
+		return concatIn(path, textDoc(keyword), argument)
 	case "AwaitExpression":
 		return printAwaitExpression(path, options, print)
 	case "ExportDefaultDeclaration", "ExportNamedDeclaration", "ExportAllDeclaration":
@@ -191,7 +191,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "ObjectProperty":
 		return printProperty(path, options, print)
 	case "Decorator":
-		return concatIn(path, "@", print("expression", nil))
+		return concatIn(path, doc.Text("@"), print("expression", nil))
 	case "ArrayExpression", "ArrayPattern":
 		return printArray(path, options, print)
 	case "SequenceExpression":
@@ -204,15 +204,15 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		return concatIn(path, print("value", nil), printSemicolon(options))
 	case "UnaryExpression":
 		operator := current.String("operator")
-		parts := []any{operator}
+		parts := []Doc{textDoc(operator)}
 		if lowercaseLetterEnd.MatchString(operator) {
-			parts = append(parts, " ")
+			parts = append(parts, doc.Text(" "))
 		}
 		argumentDoc := print("argument", nil)
 		if hasAnyComment(current.Child("argument")) {
 			parts = append(parts, groupIn(
 				path,
-				concatIn(path, "(", indentIn(path, concatIn(path, softline, argumentDoc)), softline, ")"),
+				concatIn(path, doc.Text("("), indentIn(path, concatIn(path, softline, argumentDoc)), softline, doc.Text(")")),
 			))
 		} else {
 			parts = append(parts, argumentDoc)
@@ -220,9 +220,9 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		return concatIn(path, parts...)
 	case "UpdateExpression":
 		if current.Bool("prefix") {
-			return concatIn(path, current.String("operator"), print("argument", nil), "")
+			return concatIn(path, textDoc(current.String("operator")), print("argument", nil), doc.Text(""))
 		}
-		return concatIn(path, "", print("argument", nil), current.String("operator"))
+		return concatIn(path, doc.Text(""), print("argument", nil), textDoc(current.String("operator")))
 	case "ConditionalExpression":
 		return printTernary(path, options, print, argsOf(args))
 	case "VariableDeclaration":
@@ -244,15 +244,15 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		var labelDoc Doc = emptyDoc
 		if current.Child("label") != nil {
-			labelDoc = concatIn(path, " ", print("label", nil))
+			labelDoc = concatIn(path, doc.Text(" "), print("label", nil))
 		}
-		return concatIn(path, keyword, labelDoc, printSemicolon(options))
+		return concatIn(path, textDoc(keyword), labelDoc, printSemicolon(options))
 	case "LabeledStatement":
 		separator := ": "
 		if current.Child("body").Is("EmptyStatement") && !hasComment(current.Child("body"), commentLeading, nil) {
 			separator = ":"
 		}
-		return concatIn(path, print("label", nil), separator, print("body", nil))
+		return concatIn(path, print("label", nil), textDoc(separator), print("body", nil))
 	case "TryStatement":
 		return printTryStatement(path, options, print)
 	case "CatchClause":
@@ -262,7 +262,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "SwitchCase":
 		return printSwitchCase(path, options, print)
 	case "DebuggerStatement":
-		return concatIn(path, "debugger", printSemicolon(options))
+		return concatIn(path, doc.Text("debugger"), printSemicolon(options))
 	case "ClassDeclaration", "ClassExpression":
 		return printClass(path, options, print)
 	case "ClassMethod", "ClassPrivateMethod", "MethodDefinition":
@@ -284,7 +284,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TaggedTemplateExpression":
 		return printTaggedTemplateExpression(path, options, print)
 	case "PrivateIdentifier":
-		return concatIn(path, "#", current.String("name"))
+		return concatIn(path, doc.Text("#"), textDoc(current.String("name")))
 	case "EmptyStatement":
 		if isMeaningfulEmptyStatement(path) {
 			return doc.Text(";")
@@ -316,7 +316,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSDeclareFunction":
 		return printFunction(path, options, print, nil)
 	case "TSExportAssignment":
-		return concatIn(path, "export = ", print("expression", nil), printSemicolon(options))
+		return concatIn(path, doc.Text("export = "), print("expression", nil), printSemicolon(options))
 	case "TSModuleBlock":
 		return printBlock(path, options, print)
 	case "TSInterfaceBody", "TSTypeLiteral":
@@ -324,7 +324,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSTypeAliasDeclaration":
 		return printTypeAlias(path, options, print)
 	case "TSQualifiedName":
-		return concatIn(path, print("left", nil), ".", print("right", nil))
+		return concatIn(path, print("left", nil), doc.Text("."), print("right", nil))
 	case "TSAbstractMethodDefinition", "TSDeclareMethod":
 		return printClassMethod(path, options, print)
 	case "TSAbstractAccessorProperty", "TSAbstractPropertyDefinition":
@@ -338,7 +338,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSRestType":
 		return printRestType(path, options, print)
 	case "TSOptionalType":
-		return concatIn(path, print("typeAnnotation", nil), "?")
+		return concatIn(path, print("typeAnnotation", nil), doc.Text("?"))
 	case "TSInterfaceDeclaration":
 		return printClass(path, options, print)
 	case "TSTypeParameterDeclaration", "TSTypeParameterInstantiation":
@@ -354,7 +354,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 		if current.Bool("readonly") {
 			readonly = "readonly "
 		}
-		return concatIn(path, readonly,
+		return concatIn(path, textDoc(readonly),
 			printKey(path, options, print),
 			printOptionalToken(path),
 			printTypeAnnotationProperty(path, print),
@@ -374,9 +374,9 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 		return concatIn(
 			path,
 			printTypeScriptAccessibilityToken(current),
-			static,
-			override,
-			readonly,
+			textDoc(static),
+			textDoc(override),
+			textDoc(readonly),
 			print("parameter", nil),
 		)
 	case "TSTypeQuery":
@@ -386,11 +386,11 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSTypePredicate":
 		return printTypePredicate(path, print)
 	case "TSNonNullExpression":
-		return concatIn(path, print("expression", nil), "!")
+		return concatIn(path, print("expression", nil), doc.Text("!"))
 	case "TSImportType":
 		var qualifier Doc = emptyDoc
 		if current.Child("qualifier") != nil {
-			qualifier = concatIn(path, ".", print("qualifier", nil))
+			qualifier = concatIn(path, doc.Text("."), print("qualifier", nil))
 		}
 		return concatIn(path, printCallExpression(path, options, print),
 			qualifier,
@@ -401,13 +401,13 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSIndexedAccessType":
 		return printIndexedAccessType(path, options, print)
 	case "TSTypeOperator":
-		return concatIn(path, current.String("operator"), " ", print("typeAnnotation", nil))
+		return concatIn(path, textDoc(current.String("operator")), doc.Text(" "), print("typeAnnotation", nil))
 	case "TSMappedType":
 		return printTypeScriptMappedType(path, options, print)
 	case "TSMethodSignature":
 		return printMethodSignature(path, options, print)
 	case "TSNamespaceExportDeclaration":
-		return concatIn(path, "export as namespace ", print("id", nil), printSemicolon(options))
+		return concatIn(path, doc.Text("export as namespace "), print("id", nil), printSemicolon(options))
 	case "TSEnumDeclaration":
 		return printEnumDeclaration(path, print)
 	case "TSEnumBody":
@@ -415,10 +415,10 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSEnumMember":
 		return printEnumMember(path, options, print)
 	case "TSImportEqualsDeclaration":
-		return concatIn(path, "import ",
-			printImportKind(current, false),
+		return concatIn(path, doc.Text("import "),
+			textDoc(printImportKind(current, false)),
 			print("id", nil),
-			" = ",
+			doc.Text(" = "),
 			print("moduleReference", nil),
 			printSemicolon(options),
 		)

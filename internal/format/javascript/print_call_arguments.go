@@ -20,7 +20,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	args := getCallArguments(current)
 
 	if len(args) == 0 {
-		return groupIn(path, concatIn(path, "(", printDanglingCommentsInList(path, options, nil), ")"))
+		return groupIn(path, concatIn(path, doc.Text("("), printDanglingCommentsInList(path, options, nil), doc.Text(")")))
 	}
 
 	lastArgIndex := len(args) - 1
@@ -28,14 +28,14 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	// useEffect(() => { ... }, [foo, bar, baz])
 	// useImperativeHandle(ref, () => { ... }, [foo, bar, baz])
 	if isReactHookCallWithDepsArray(args) {
-		parts := []any{"("}
+		parts := []Doc{doc.Text("(")}
 		iterateCallArgumentsPath(path, func(path *Path, index int) {
 			parts = append(parts, print(nil, nil))
 			if index != lastArgIndex {
-				parts = append(parts, ", ")
+				parts = append(parts, doc.Text(", "))
 			}
 		})
-		parts = append(parts, ")")
+		parts = append(parts, doc.Text(")"))
 		return concatIn(path, parts...)
 	}
 
@@ -49,9 +49,9 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			// do nothing
 		} else if isNextLineEmptyAfter(arg, options) {
 			anyArgEmptyLine = true
-			argDoc = concatIn(path, argDoc, ",", hardline, hardline)
+			argDoc = concatIn(path, argDoc, doc.Text(","), hardline, hardline)
 		} else {
-			argDoc = concatIn(path, argDoc, ",", line)
+			argDoc = concatIn(path, argDoc, doc.Text(","), line)
 		}
 
 		printedArguments = append(printedArguments, argDoc)
@@ -70,11 +70,11 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	allArgsBrokenOut := func() Doc {
 		return groupWithIn(path, concatIn(
 			path,
-			"(",
+			doc.Text("("),
 			indentIn(path, concatIn(path, spreadDocs(line, printedArguments)...)),
 			trailingComma,
 			line,
-			")",
+			doc.Text(")"),
 		),
 			doc.GroupOptions{ShouldBreak: true},
 		)
@@ -171,11 +171,11 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}, doc.GroupOptions{})
 	}
 
-	contents := concatIn(path, "(",
+	contents := concatIn(path, doc.Text("("),
 		indentIn(path, concatIn(path, spreadDocs(softline, printedArguments)...)),
 		trailingComma,
 		softline,
-		")",
+		doc.Text(")"),
 	)
 	if isLongCurriedCallExpression(path) {
 		// By not wrapping the arguments in a group, the printer prioritizes
@@ -220,8 +220,8 @@ func printCatchingArgExpansionBailout(
 
 // spreadDocs is a JavaScript array literal with `...docs` spread into it: each []Doc part is
 // flattened in place, so the Go builds the same flat array upstream does.
-func spreadDocs(parts ...any) []any {
-	result := make([]any, 0, len(parts))
+func spreadDocs(parts ...any) []Doc {
+	result := make([]Doc, 0, len(parts))
 	for _, part := range parts {
 		if spread, isSpread := part.([]Doc); isSpread {
 			for _, element := range spread {

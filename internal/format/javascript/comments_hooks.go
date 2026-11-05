@@ -3,6 +3,7 @@ package javascript
 import (
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -14,13 +15,13 @@ import (
 func printComment(path *Path, options *Options) Doc {
 	comment := node(path)
 	if isLineComment(comment) {
-		return concatIn(path, estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)]))
+		return concatIn(path, textDoc(estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)])))
 	}
 	if estree.IsIndentableBlockComment(comment) {
 		return printIndentableBlockComment(comment)
 	}
 	if isBlockComment(comment) {
-		return concatIn(path, "/*", replaceEndOfLine(comment.String("value")), "*/")
+		return concatIn(path, doc.Text("/*"), replaceEndOfLine(comment.String("value")), doc.Text("*/"))
 	}
 	// Invariant: estree builds every comment as a Line or a Block, which the two tests above take, as Prettier's
 	// printComment assumes before its throw.
@@ -32,7 +33,7 @@ func replaceEndOfLine(text string) Doc {
 	lines := strings.Split(text, "\n")
 	parts := make([]Doc, len(lines))
 	for index, line := range lines {
-		parts[index] = concat(line)
+		parts[index] = concat(textDoc(line))
 	}
 	return join(literalline, parts)
 }
@@ -42,24 +43,24 @@ func printIndentableBlockComment(comment Node) Doc {
 	lines := estree.IndentableBlockCommentLines(comment)
 	value := comment.String("value")
 	isJsdoc := len(value) > 0 && value[0] == '*' && (len(value) < 2 || value[1] != '*')
-	parts := make([]any, len(lines))
+	parts := make([]Doc, len(lines))
 	for index, line := range lines {
 		switch {
 		case index == 0:
-			parts[index] = concat(estree.TrimEndJavaScript(line), hardline)
+			parts[index] = concat(textDoc(estree.TrimEndJavaScript(line)), hardline)
 		case index == len(lines)-1:
-			parts[index] = concat(" ", line)
+			parts[index] = concat(doc.Text(" "), textDoc(line))
 		default:
 			trimmed := estree.TrimEndJavaScript(line)
-			content := concat(" ", trimmed)
+			content := concat(doc.Text(" "), textDoc(trimmed))
 			if isJsdoc && trimmed != "*" && strings.HasSuffix(line, "  ") {
-				parts[index] = concat(content, "  ", markAsRoot(literalline))
+				parts[index] = concat(content, doc.Text("  "), markAsRoot(literalline))
 			} else {
 				parts[index] = concat(content, hardline)
 			}
 		}
 	}
-	return concat("/", concat(parts...), "/")
+	return concat(doc.Text("/"), concat(parts...), doc.Text("/"))
 }
 
 // isNodeCantAttachComment is upstream's isNodeCantAttachComment.

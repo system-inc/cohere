@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // print/miscellaneous.js.
 
@@ -12,9 +15,9 @@ func printOptionalToken(path *Path) Doc {
 	}
 	if isCallExpression(current) || isMemberExpression(current) && current.Bool("computed") ||
 		current.Is("OptionalIndexedAccessType") {
-		return concatIn(path, "?.")
+		return concatIn(path, doc.Text("?."))
 	}
-	return concatIn(path, "?")
+	return concatIn(path, doc.Text("?"))
 }
 
 // printDefiniteToken is upstream's printDefiniteToken.
@@ -24,7 +27,7 @@ func printDefiniteToken(path *Path) Doc {
 		key, _ := name.(string)
 		return key == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
 	}) {
-		return concatIn(path, "!")
+		return concatIn(path, doc.Text("!"))
 	}
 	return emptyDoc
 }
@@ -48,7 +51,7 @@ func shouldPrintDeclareToken(path *Path) bool {
 // printDeclareToken is upstream's printDeclareToken.
 func printDeclareToken(path *Path) Doc {
 	if shouldPrintDeclareToken(path) {
-		return concatIn(path, "declare ")
+		return concatIn(path, doc.Text("declare "))
 	}
 	return emptyDoc
 }
@@ -62,7 +65,7 @@ func isTsAbstractNode(node Node) bool {
 func printAbstractToken(path *Path) Doc {
 	current := node(path)
 	if current.Truthy("abstract") || isTsAbstractNode(current) {
-		return concatIn(path, "abstract ")
+		return concatIn(path, doc.Text("abstract "))
 	}
 	return emptyDoc
 }
@@ -70,7 +73,7 @@ func printAbstractToken(path *Path) Doc {
 // printTypeScriptAccessibilityToken is upstream's printTypeScriptAccessibilityToken.
 func printTypeScriptAccessibilityToken(node Node) Doc {
 	if accessibility := node.String("accessibility"); accessibility != "" {
-		return concat(accessibility + " ")
+		return concat(textDoc(accessibility + " "))
 	}
 	return emptyDoc
 }
@@ -149,7 +152,7 @@ func printTrailingComma(options *Options, level string) Doc {
 		resolvedLevel = "es5"
 	}
 	if shouldPrintTrailingComma(options, resolvedLevel) {
-		return ifBreak(",", "")
+		return ifBreak(doc.Text(","), doc.Text(""))
 	}
 	return emptyDoc
 }
@@ -157,7 +160,7 @@ func printTrailingComma(options *Options, level string) Doc {
 // printSemicolon is upstream's printSemicolon.
 func printSemicolon(options *Options) Doc {
 	if settingsOf(options).Semi {
-		return concat(";")
+		return concat(doc.Text(";"))
 	}
 	return emptyDoc
 }

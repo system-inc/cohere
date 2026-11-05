@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/member.js.
 
 // isCallExpressionWithArguments is upstream's isCallExpressionWithArguments.
@@ -67,15 +69,15 @@ func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
 	optional := printOptionalToken(path)
 
 	if !current.Bool("computed") {
-		return concatIn(path, optional, ".", property)
+		return concatIn(path, optional, doc.Text("."), property)
 	}
 
 	if current.Child("property") == nil || isNumericLiteral(current.Child("property")) {
-		return concatIn(path, optional, "[", property, "]")
+		return concatIn(path, optional, doc.Text("["), property, doc.Text("]"))
 	}
 
 	return groupIn(
 		path,
-		concatIn(path, optional, "[", indentIn(path, concatIn(path, softline, property)), softline, "]"),
+		concatIn(path, optional, doc.Text("["), indentIn(path, concatIn(path, softline, property)), softline, doc.Text("]")),
 	)
 }

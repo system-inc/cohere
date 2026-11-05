@@ -88,7 +88,7 @@ func toDoc(value any) Doc {
 }
 
 // concat is upstream's array doc.
-func concat(parts ...any) Doc {
+func concat(parts ...Doc) Doc {
 	result := make(doc.Concat, len(parts))
 	for index, part := range parts {
 		result[index] = toDoc(part)
@@ -151,7 +151,7 @@ func docMemoryOf(path *Path) *docMemory {
 
 // concatIn is concat from the format's docMemory, when the path's print has one: its parts from the slab
 // and the doc a *doc.Sequence from the arena, so it allocates nothing.
-func concatIn(path *Path, parts ...any) Doc {
+func concatIn(path *Path, parts ...Doc) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return concat(parts...)
@@ -184,12 +184,12 @@ func partsIn(path *Path, count int) []Doc {
 }
 
 // groupIn is group with the group from the format's docMemory.
-func groupIn(path *Path, contents any) Doc {
+func groupIn(path *Path, contents Doc) Doc {
 	return groupWithIn(path, contents, doc.GroupOptions{})
 }
 
 // groupWithIn is groupWith with the group from the format's docMemory. It builds what doc.NewGroup does.
-func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
+func groupWithIn(path *Path, contents Doc, options doc.GroupOptions) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return groupWith(contents, options)
@@ -203,7 +203,7 @@ func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
 }
 
 // indentIn is indent with the indent from the format's docMemory. It builds what doc.NewIndent does.
-func indentIn(path *Path, contents any) Doc {
+func indentIn(path *Path, contents Doc) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return indent(contents)
@@ -212,7 +212,7 @@ func indentIn(path *Path, contents any) Doc {
 }
 
 // groupWith is upstream's group(contents, options).
-func groupWith(contents any, options doc.GroupOptions) Doc {
+func groupWith(contents Doc, options doc.GroupOptions) Doc {
 	return doc.NewGroup(toDoc(contents), options)
 }
 
@@ -222,43 +222,43 @@ func conditionalGroup(states []Doc, options doc.GroupOptions) Doc {
 }
 
 // indent is upstream's indent(contents).
-func indent(contents any) Doc { return doc.NewIndent(toDoc(contents)) }
+func indent(contents Doc) Doc { return doc.NewIndent(toDoc(contents)) }
 
 // align is upstream's align(width, contents) for a numeric width.
-func align(width int, contents any) Doc { return doc.NewAlign(width, toDoc(contents)) }
+func align(width int, contents Doc) Doc { return doc.NewAlign(width, toDoc(contents)) }
 
 // dedent is upstream's dedent(contents).
-func dedent(contents any) Doc { return doc.Dedent(toDoc(contents)) }
+func dedent(contents Doc) Doc { return doc.Dedent(toDoc(contents)) }
 
 // dedentToRoot is upstream's dedentToRoot(contents).
-func dedentToRoot(contents any) Doc { return doc.DedentToRoot(toDoc(contents)) }
+func dedentToRoot(contents Doc) Doc { return doc.DedentToRoot(toDoc(contents)) }
 
 // markAsRoot is upstream's markAsRoot(contents).
-func markAsRoot(contents any) Doc { return doc.MarkAsRoot(toDoc(contents)) }
+func markAsRoot(contents Doc) Doc { return doc.MarkAsRoot(toDoc(contents)) }
 
 // fill is upstream's fill(parts).
 func fill(parts []Doc) Doc { return doc.NewFill(parts) }
 
 // ifBreak is upstream's ifBreak(breakContents, flatContents).
-func ifBreak(breakContents any, flatContents any) Doc {
+func ifBreak(breakContents Doc, flatContents Doc) Doc {
 	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), nil)
 }
 
 // ifBreakWithGroup is upstream's ifBreak(breakContents, flatContents, { groupId }).
-func ifBreakWithGroup(breakContents any, flatContents any, groupID *doc.GroupID) Doc {
+func ifBreakWithGroup(breakContents Doc, flatContents Doc, groupID *doc.GroupID) Doc {
 	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), groupID)
 }
 
 // indentIfBreak is upstream's indentIfBreak(contents, { groupId, negate }).
-func indentIfBreak(contents any, groupID *doc.GroupID, negate bool) Doc {
+func indentIfBreak(contents Doc, groupID *doc.GroupID, negate bool) Doc {
 	return doc.NewIndentIfBreak(toDoc(contents), groupID, negate)
 }
 
 // label is upstream's label(name, contents).
-func label(name string, contents any) Doc { return doc.NewLabel(name, toDoc(contents)) }
+func label(name string, contents Doc) Doc { return doc.NewLabel(name, toDoc(contents)) }
 
 // join is upstream's join(separator, parts).
-func join(separator any, parts []Doc) Doc { return doc.Join(toDoc(separator), parts) }
+func join(separator Doc, parts []Doc) Doc { return doc.Join(toDoc(separator), parts) }
 
 // newGroupID is upstream's Symbol(name) used as a group id.
 func newGroupID(name string) *doc.GroupID { return doc.NewGroupID(name) }

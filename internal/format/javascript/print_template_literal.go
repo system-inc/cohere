@@ -34,16 +34,16 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 	parts := mapPath(path, func(_ *Path, index int) Doc {
 		isLast := index == quasiCount-1
 		if isLast {
-			return concatIn(path, print(nil, nil), "")
+			return concatIn(path, print(nil, nil), doc.Text(""))
 		}
 		return concatIn(path, print(nil, nil), expressionDocs[index])
 	}, "quasis")
 
-	result := []any{lineSuffixBoundary, "`"}
+	result := []Doc{lineSuffixBoundary, doc.Text("`")}
 	for _, part := range parts {
 		result = append(result, part)
 	}
-	result = append(result, "`")
+	result = append(result, doc.Text("`"))
 	return concatIn(path, result...)
 }
 
@@ -182,16 +182,16 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 					)
 				}
 			}
-			rowDocs[rowIndex] = join(" | ", cellDocs)
+			rowDocs[rowIndex] = join(doc.Text(" | "), cellDocs)
 		}
 
 		return concatIn(path, lineSuffixBoundary,
-			"`",
+			doc.Text("`"),
 			indentIn(path, concatIn(path, hardline,
 				join(hardline, rowDocs),
 			)),
 			hardline,
-			"`",
+			doc.Text("`"),
 		)
 	}
 	return nil
@@ -301,7 +301,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 		expressionDoc = addAlignmentToDoc(expressionDoc, indentSize, settingsOf(options).TabWidth)
 	}
 
-	return groupIn(path, concatIn(path, "${", expressionDoc, lineSuffixBoundary, "}"))
+	return groupIn(path, concatIn(path, doc.Text("${"), expressionDoc, lineSuffixBoundary, doc.Text("}")))
 }
 
 // printTemplateExpressions is upstream's printTemplateExpressions.

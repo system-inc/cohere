@@ -122,7 +122,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		} else if current.Is("TSNonNullExpression") && !needsParentheses(path, options) {
 			unshift(printedNode{
 				node:    current,
-				printed: printing.PrintComments(path, concatIn(path, "!"), options, nil),
+				printed: printing.PrintComments(path, concatIn(path, doc.Text("!")), options, nil),
 			})
 			call(path, rec, "expression")
 		} else {

@@ -148,12 +148,12 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	}
 	var trailing Doc = emptyDoc
 	if shouldPrintAsChain && isCallee {
-		trailing = ifBreakWithGroup(softline, "", chainGroupID)
+		trailing = ifBreakWithGroup(softline, doc.Text(""), chainGroupID)
 	}
 	return groupIn(path, concatIn(
 		path,
 		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
-		" =>",
+		doc.Text(" =>"),
 		body,
 		trailing,
 	))
@@ -162,10 +162,10 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 // printArrowFunctionSignature is upstream's printArrowFunctionSignature.
 func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	if current.Truthy("async") {
-		parts = append(parts, "async ")
+		parts = append(parts, doc.Text("async "))
 	}
 
 	if shouldPrintParamsWithoutParens(path, options) {
@@ -198,7 +198,7 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 		Marker: "commentBeforeArrow",
 	})
 	if !isEmptyString(dangling) {
-		parts = append(parts, " ", dangling)
+		parts = append(parts, doc.Text(" "), dangling)
 	}
 	return concatIn(path, parts...)
 }
@@ -237,8 +237,8 @@ func printArrowFunctionSignatures(
 	if (key != "callee" && isCallLikeExpression(parent)) ||
 		isBinaryish(parent) {
 		return groupWithIn(path, concatIn(path, signatureDocs[0],
-			" =>",
-			indentIn(path, concatIn(path, line, join(concatIn(path, " =>", line), signatureDocs[1:]))),
+			doc.Text(" =>"),
+			indentIn(path, concatIn(path, line, join(concatIn(path, doc.Text(" =>"), line), signatureDocs[1:]))),
 		),
 			doc.GroupOptions{ShouldBreak: shouldBreak},
 		)
@@ -249,14 +249,14 @@ func printArrowFunctionSignatures(
 		args.assignmentLayout != "" {
 		return groupWithIn(
 			path,
-			join(concatIn(path, " =>", line), signatureDocs),
+			join(concatIn(path, doc.Text(" =>"), line), signatureDocs),
 			doc.GroupOptions{ShouldBreak: shouldBreak},
 		)
 	}
 
 	return groupWithIn(
 		path,
-		indentIn(path, join(concatIn(path, " =>", line), signatureDocs)),
+		indentIn(path, join(concatIn(path, doc.Text(" =>"), line), signatureDocs)),
 		doc.GroupOptions{ShouldBreak: shouldBreak},
 	)
 }
@@ -291,19 +291,19 @@ func printArrowFunctionBody(
 	}
 
 	if shouldPutBodyOnSameLine && shouldAddParensIfNotBreak(functionBody) {
-		return concatIn(path, " ",
-			groupIn(path, concatIn(path, ifBreak("", "("),
+		return concatIn(path, doc.Text(" "),
+			groupIn(path, concatIn(path, ifBreak(doc.Text(""), doc.Text("(")),
 				indentIn(path, concatIn(path, softline, bodyDoc)),
-				ifBreak("", ")"),
+				ifBreak(doc.Text(""), doc.Text(")")),
 				trailingComma,
 				trailingSpace,
 			)),
-			bodyComments,
+			doc.Concat(bodyComments),
 		)
 	}
 
 	if shouldPutBodyOnSameLine {
-		return concatIn(path, " ", bodyDoc, bodyComments)
+		return concatIn(path, doc.Text(" "), bodyDoc, doc.Concat(bodyComments))
 	}
-	return concatIn(path, indentIn(path, concatIn(path, line, bodyDoc, bodyComments)), trailingComma, trailingSpace)
+	return concatIn(path, indentIn(path, concatIn(path, line, bodyDoc, doc.Concat(bodyComments))), trailingComma, trailingSpace)
 }

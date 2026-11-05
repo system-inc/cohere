@@ -62,27 +62,27 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		}, "elements")
 		return concatIn(
 			path,
-			"[",
-			indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))),
+			doc.Text("["),
+			indentIn(path, concatIn(path, hardline, join(concatIn(path, doc.Text(","), hardline), printed))),
 			hardline,
-			"]",
+			doc.Text("]"),
 		)
 	case "ObjectExpression":
 		if len(current.List("properties")) == 0 {
 			return doc.Text("{}")
 		}
-		return concatIn(path, "{", indentIn(
+		return concatIn(path, doc.Text("{"), indentIn(
 			path,
-			concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties"))),
-		), hardline, "}")
+			concatIn(path, hardline, join(concatIn(path, doc.Text(","), hardline), printAll(path, print, "properties"))),
+		), hardline, doc.Text("}"))
 	case "ObjectProperty":
-		return concatIn(path, print("key", nil), ": ", print("value", nil))
+		return concatIn(path, print("key", nil), doc.Text(": "), print("value", nil))
 	case "UnaryExpression":
 		operator := current.String("operator")
 		if operator == "+" {
 			operator = ""
 		}
-		return concatIn(path, operator, print("argument", nil))
+		return concatIn(path, textDoc(operator), print("argument", nil))
 	case "NullLiteral":
 		return doc.Text("null")
 	case "BooleanLiteral":

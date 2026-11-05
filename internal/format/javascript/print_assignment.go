@@ -37,7 +37,7 @@ func printAssignment(
 
 	// First break right-hand side, then left-hand side
 	case "never-break-after-operator":
-		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, " ", rightDoc))
+		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, doc.Text(" "), rightDoc))
 
 	// First break right-hand side, then after operator
 	case "fluid":
@@ -50,7 +50,7 @@ func printAssignment(
 		))
 
 	case "break-lhs":
-		return groupIn(path, concatIn(path, leftDoc, operator, " ", groupIn(path, rightDoc)))
+		return groupIn(path, concatIn(path, leftDoc, operator, doc.Text(" "), groupIn(path, rightDoc)))
 
 	// Parts of assignment chains aren't wrapped in groups.
 	// Once one of them breaks, the chain breaks too.
@@ -79,14 +79,14 @@ func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Do
 		options,
 		print,
 		print("left", nil),
-		concatIn(path, " ", current.String("operator")),
+		concatIn(path, doc.Text(" "), textDoc(current.String("operator"))),
 		"right",
 	)
 }
 
 // printVariableDeclarator is upstream's printVariableDeclarator.
 func printVariableDeclarator(path *Path, options *Options, print PrintFunc) Doc {
-	return printAssignment(path, options, print, print("id", nil), " =", "init")
+	return printAssignment(path, options, print, print("id", nil), doc.Text(" ="), "init")
 }
 
 // chooseLayout is upstream's chooseLayout.

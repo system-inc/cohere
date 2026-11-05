@@ -96,10 +96,10 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramete
 			}))
 
 	if shouldInline {
-		return concatIn(path, "<",
-			join(", ", printAll(path, print, parametersKey)),
+		return concatIn(path, doc.Text("<"),
+			join(doc.Text(", "), printAll(path, print, parametersKey)),
 			printDanglingCommentsForInline(path, options),
-			">",
+			doc.Text(">"),
 		)
 	}
 
@@ -107,16 +107,16 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramete
 	if current.Is("TSTypeParameterInstantiation") { // https://github.com/microsoft/TypeScript/issues/21984
 		trailingComma = emptyDoc
 	} else if shouldForceTrailingComma(path, options, parametersKey) {
-		trailingComma = toDoc(",")
+		trailingComma = doc.Text(",")
 	} else {
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	return groupIn(path, concatIn(path, "<",
-		indentIn(path, concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, parametersKey)))),
+	return groupIn(path, concatIn(path, doc.Text("<"),
+		indentIn(path, concatIn(path, softline, join(concatIn(path, doc.Text(","), line), printAll(path, print, parametersKey)))),
 		trailingComma,
 		softline,
-		">",
+		doc.Text(">"),
 	))
 }
 
@@ -146,7 +146,7 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("const") {
 		constKeyword = "const "
 	}
-	parts := []any{constKeyword}
+	parts := []Doc{textDoc(constKeyword)}
 
 	var name any
 	if current.Is("TSTypeParameter") {
@@ -160,11 +160,11 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Truthy("in") {
-		parts = append(parts, "in ")
+		parts = append(parts, doc.Text("in "))
 	}
 
 	if current.Truthy("out") {
-		parts = append(parts, "out ")
+		parts = append(parts, doc.Text("out "))
 	}
 
 	parts = append(parts, name)
@@ -175,7 +175,7 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("constraint") {
 		groupID := newGroupID("constraint")
 		parts = append(parts,
-			" extends",
+			doc.Text(" extends"),
 			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
 			lineSuffixBoundary,
 			indentIfBreak(print("constraint", nil), groupID, false),
@@ -185,7 +185,7 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("default") {
 		groupID := newGroupID("default")
 		parts = append(parts,
-			" =",
+			doc.Text(" ="),
 			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
 			lineSuffixBoundary,
 			indentIfBreak(print("default", nil), groupID, false),

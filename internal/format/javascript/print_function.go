@@ -104,16 +104,16 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 	}
 
 	return concatIn(path, printDeclareToken(path),
-		async,
-		keyword,
-		generator,
-		idSpace,
+		textDoc(async),
+		textDoc(keyword),
+		textDoc(generator),
+		textDoc(idSpace),
 		idDoc,
 		print("typeParameters", nil),
 		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
 		)),
-		bodySpace,
+		textDoc(bodySpace),
 		print("body", nil),
 		semicolon,
 	)
@@ -141,11 +141,11 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 	if value == nil {
 		value = current
 	}
-	var parts []any
+	var parts []Doc
 
 	if kind == "" || kind == "init" || kind == "method" || kind == "constructor" {
 		if value.Truthy("async") {
-			parts = append(parts, "async ")
+			parts = append(parts, doc.Text("async "))
 		}
 	} else {
 		// upstream's assert.ok(kind === "get" || kind === "set")
@@ -155,12 +155,12 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 			panic(fmt.Sprintf("javascript: unexpected method kind %q", kind))
 		}
 
-		parts = append(parts, kind, " ")
+		parts = append(parts, textDoc(kind), doc.Text(" "))
 	}
 
 	// A `getter`/`setter` can't be a generator, but it's recoverable
 	if value.Truthy("generator") {
-		parts = append(parts, "*")
+		parts = append(parts, doc.Text("*"))
 	}
 
 	optional := ""
@@ -175,7 +175,7 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts = append(parts,
 		printKey(path, options, print),
-		optional,
+		textDoc(optional),
 		valueDoc,
 	)
 
@@ -211,7 +211,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	} else {
 		parameters = parametersDoc
 	}
-	parts := []any{
+	parts := []Doc{
 		print("typeParameters", nil),
 		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
@@ -219,7 +219,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Truthy("body") {
-		parts = append(parts, " ", print("body", nil))
+		parts = append(parts, doc.Text(" "), print("body", nil))
 	} else {
 		parts = append(parts, printSemicolon(options))
 	}
@@ -262,7 +262,7 @@ func printReturnType(path *Path, print PrintFunc) Doc {
 	current := node(path)
 	returnType := printTypeAnnotationProperty(path, print, "returnType")
 
-	parts := []any{returnType}
+	parts := []Doc{returnType}
 
 	if current.Truthy("predicate") {
 		parts = append(parts, print("predicate", nil))

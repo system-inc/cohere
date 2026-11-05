@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/type-annotation.js.
 
 // shouldHugType is upstream's shouldHugType.
@@ -49,7 +51,7 @@ func printTypeAnnotationProperty(path *Path, print PrintFunc, property ...string
 	}
 
 	if shouldPrintLeadingSpace {
-		return concatIn(path, " ", print(propertyName, nil))
+		return concatIn(path, doc.Text(" "), print(propertyName, nil))
 	}
 	return print(propertyName, nil)
 }
@@ -107,7 +109,7 @@ func getTypeAnnotationFirstToken(path *Path) string {
 func printTypeAnnotation(path *Path, options *Options, print PrintFunc) Doc {
 	token := getTypeAnnotationFirstToken(path)
 	if token != "" {
-		return concatIn(path, token, " ", print("typeAnnotation", nil))
+		return concatIn(path, textDoc(token), doc.Text(" "), print("typeAnnotation", nil))
 	}
 	return print("typeAnnotation", nil)
 }

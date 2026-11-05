@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/function-type.js.
 
 /*
@@ -13,14 +15,14 @@ package javascript
 // helper isFlowArrowFunctionTypeAnnotation never match a TypeScript tree and are dropped.
 func printFunctionType(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	parts := []any{
+	parts := []Doc{
 		// `TSConstructorType` only
 		printAbstractToken(path),
 	}
 
 	if current.Is("TSConstructorType") ||
 		current.Is("TSConstructSignatureDeclaration") {
-		parts = append(parts, "new ")
+		parts = append(parts, doc.Text("new "))
 	}
 
 	parametersDoc := printFunctionParameters(

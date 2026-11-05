@@ -68,10 +68,10 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 			len(children) > 0 &&
 			hasNewLineAfterOpeningBrace(current, children[0], options))
 
-	var separatorParts []any
+	var separatorParts []Doc
 	parts := mapPath(path, func(path *Path, _ int) Doc {
-		result := concatIn(path, append(append([]any{}, separatorParts...), print(nil, nil))...)
-		separatorParts = []any{",", line}
+		result := concatIn(path, append(append([]Doc{}, separatorParts...), print(nil, nil))...)
+		separatorParts = []Doc{doc.Text(","), line}
 		if isNextLineEmptyAfter(node(path), options) {
 			separatorParts = append(separatorParts, hardline)
 		}
@@ -82,9 +82,9 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 	var content Doc
 	if len(parts) == 0 {
-		content = groupIn(path, concatIn(path, "{",
+		content = groupIn(path, concatIn(path, doc.Text("{"),
 			printDanglingCommentsInList(path, options, nil),
-			"}",
+			doc.Text("}"),
 			printOptionalToken(path),
 			printTypeAnnotationProperty(path, print),
 		))
@@ -97,11 +97,11 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 		if canHaveTrailingSeparator {
 			trailingSeparator = printTrailingComma(options, "")
 		}
-		content = concatIn(path, "{",
-			indentIn(path, append([]Doc{spacing}, parts...)),
+		content = concatIn(path, doc.Text("{"),
+			indentIn(path, doc.Concat(append([]Doc{spacing}, parts...))),
 			trailingSeparator,
 			spacing,
-			"}",
+			doc.Text("}"),
 			printOptionalToken(path),
 			printTypeAnnotationProperty(path, print),
 		)

@@ -238,7 +238,7 @@ func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, op
 	if newDoc == nil {
 		return nil, errorCouldNotInsertExpressions
 	}
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, newDoc)), softline, "`"), nil
+	return concatIn(path, doc.Text("`"), indentIn(path, concatIn(path, hardline, newDoc)), softline, doc.Text("`")), nil
 }
 
 var placeholderPattern = regexp.MustCompile(`@prettier-placeholder-(\d+)-id`)
@@ -474,7 +474,7 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		}
 	}
 
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, "`"), nil
+	return concatIn(path, doc.Text("`"), indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, doc.Text("`")), nil
 }
 
 // isCommentOrWhitespaceLine is upstream's /^\s*(?:#[^\n\r]*)?$/ over one line. JavaScript's \s reaches
@@ -504,7 +504,7 @@ func printGraphqlComments(lines []string) Doc {
 		if index > 0 && trimmed[index-1] == "" && seenComment {
 			// If a non-first comment is preceded by a blank (whitespace only) line,
 			// add in a blank line.
-			parts = append(parts, concat(hardline, textLine))
+			parts = append(parts, concat(hardline, textDoc(textLine)))
 		} else {
 			parts = append(parts, doc.Text(textLine))
 		}
