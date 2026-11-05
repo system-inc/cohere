@@ -67,3 +67,32 @@ func variableSubcommand(subcommand string) *exec.Cmd {
 func keyedLiteral() *exec.Cmd {
 	return exec.Command("go", []string{1: "-count=1", 0: "test"}...)
 }
+
+// A reasoned marker excuses the run, directly above its statement or at the end of it.
+
+func reasonAbove() *exec.Cmd {
+	// Uncached: the test reads a database the cache cannot see.
+	return exec.Command("go", "test", "-count=1")
+}
+
+func reasonWrappedAbove() *exec.Cmd {
+	// Uncached: the test reaches a service outside its own files,
+	// and a cached pass would replay a reply the service no longer gives.
+	return exec.Command("go", "test", "-count=1")
+}
+
+func reasonAtTheEnd() *exec.Cmd {
+	return exec.Command("go", "test", "-count=1") // Uncached: the test reads a database the cache cannot see.
+}
+
+func reasonAtTheEndOfManyLines() *exec.Cmd {
+	return exec.Command(
+		"go", "test", "-count=1",
+	) // Uncached: the test reads a database the cache cannot see.
+}
+
+func reasonAboveTheCall(requestContext context.Context) (*exec.Cmd, *exec.Cmd) {
+	arguments := []string{"test", "-count=1"}
+	// Uncached: the test reads a database the cache cannot see.
+	return exec.Command("go", arguments...), exec.CommandContext(requestContext, "go", arguments...)
+}

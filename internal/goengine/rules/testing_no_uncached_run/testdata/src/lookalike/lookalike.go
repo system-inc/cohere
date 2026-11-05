@@ -38,6 +38,12 @@ func notAdjacent() *osexec.Cmd {
 	return osexec.Command("go", "test", "-count=3", "1")
 }
 
+// Everything after -args goes to the test binary, so the count there is not go test's flag.
+func afterArgs() (*osexec.Cmd, *osexec.Cmd) {
+	return osexec.Command("go", "test", "./...", "-args", "-count=1"),
+		osexec.Command("go", "test", "./...", "--args", "-count", "1")
+}
+
 // A flag whose name only starts like count.
 func otherFlag() *osexec.Cmd {
 	return osexec.Command("go", "test", "-countdown=1", "-cover=1")

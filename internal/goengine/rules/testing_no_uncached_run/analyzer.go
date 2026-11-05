@@ -28,7 +28,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags an os/exec Command or CommandContext that runs the constant program \"go\" with test and -count=1 " +
 		"among its constant arguments, written inline, spread from a []string literal, or spread from a local " +
 		"assigned that literal once, since -count=1 discards an honest test cache to rerun around a flaky test. " +
-		"Arguments the rule cannot read as constants leave it quiet.",
+		"Arguments the rule cannot read as constants, and those after -args, which go to the test binary, leave it " +
+		"quiet, as does a // Uncached: <reason> comment directly above the call's statement or at the end of it.",
 	Run: run,
 }
 
@@ -36,6 +37,21 @@ var Analyzer = &analysis.Analyzer{
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var uncachedRunMessage = policy.MessageOf(Name, "uncachedRun")
+
+var uncachedWithoutReasonMessage = policy.MessageOf(Name, "uncachedWithoutReason")
+
+// uncachedMarker opens the comment that excuses a run from the test cache, matched as written.
+const uncachedMarker = "Uncached:"
+
+// excuse is what the comments beside a command's statement say about why it skips the cache.
+type excuse int
+
+const (
+	excuseNone excuse = iota
+	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
+	excuseWithoutReason
+	excuseWithReason
+)
 
 // argument is one element of a command's argument list as the rule reads it. An argument whose value is not a
 // string constant is kept as unknown, holding its place, so a flag and its value are only paired when they are
@@ -61,7 +77,15 @@ func run(pass *analysis.Pass) (any, error) {
 	// A literal spread from a local reaches every command that spreads that local, and one finding at it is enough.
 	reported := map[token.Pos]bool{}
 	for _, file := range pass.Files {
+		comments := commentsOf(pass, file)
+		// The nodes from the file down to the one being visited, so a call finds the statement holding it.
+		var enclosing []ast.Node
 		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				enclosing = enclosing[:len(enclosing)-1]
+				return true
+			}
+			enclosing = append(enclosing, node)
 			call, isCall := node.(*ast.CallExpr)
 			if !isCall {
 				return true
@@ -69,6 +93,14 @@ func run(pass *analysis.Pass) (any, error) {
 			arguments, isGoCommand := goArguments(pass, known, call)
 			if !isGoCommand {
 				return true
+			}
+			message := uncachedRunMessage
+			switch comments.excuseFor(pass, holdingStatement(enclosing)) {
+			case excuseWithReason:
+				return true
+			case excuseWithoutReason:
+				message = uncachedWithoutReasonMessage
+			case excuseNone:
 			}
 			for _, flag := range uncachedFlags(arguments) {
 				if reported[flag.node.Pos()] {
@@ -78,14 +110,126 @@ func run(pass *analysis.Pass) (any, error) {
 				pass.Report(analysis.Diagnostic{
 					Pos:      flag.node.Pos(),
 					End:      flag.node.End(),
-					Category: uncachedRunMessage.Id,
-					Message:  uncachedRunMessage.Render(map[string]string{}),
+					Category: message.Id,
+					Message:  message.Render(map[string]string{}),
 				})
 			}
 			return true
 		})
 	}
 	return nil, nil
+}
+
+// holdingStatement is the innermost statement among enclosing, or, for a call in a package-level declaration, which
+// no statement holds, the innermost value specification or declaration. It is what an Uncached comment sits beside.
+// enclosing ends with the call itself, which stands in when nothing holds it.
+func holdingStatement(enclosing []ast.Node) ast.Node {
+	for index := len(enclosing) - 1; index >= 0; index-- {
+		switch enclosing[index].(type) {
+		case ast.Stmt, *ast.ValueSpec, ast.Decl:
+			return enclosing[index]
+		}
+	}
+	return enclosing[len(enclosing)-1]
+}
+
+// fileComments is file's comment groups found by line, with the lines a group may excuse from: the group ending on a
+// line, for a comment directly above a statement, and the groups starting on it, for a comment at the end of one.
+type fileComments struct {
+	endingOn   map[int]*ast.CommentGroup
+	startingOn map[int][]*ast.CommentGroup
+	// codeStarts and codeEnds are, for each line, the earliest position at which a node of the file starts or ends
+	// there, so a group with code before it on its first line is known to trail that code.
+	codeStarts map[int]token.Pos
+	codeEnds   map[int]token.Pos
+}
+
+func commentsOf(pass *analysis.Pass, file *ast.File) fileComments {
+	comments := fileComments{
+		endingOn:   map[int]*ast.CommentGroup{},
+		startingOn: map[int][]*ast.CommentGroup{},
+		codeStarts: map[int]token.Pos{},
+		codeEnds:   map[int]token.Pos{},
+	}
+	for _, group := range file.Comments {
+		comments.endingOn[pass.Fset.PositionFor(group.End(), false).Line] = group
+		startLine := pass.Fset.PositionFor(group.Pos(), false).Line
+		comments.startingOn[startLine] = append(comments.startingOn[startLine], group)
+	}
+	earliest := func(onLine map[int]token.Pos, position token.Pos) {
+		line := pass.Fset.PositionFor(position, false).Line
+		if known, found := onLine[line]; !found || position < known {
+			onLine[line] = position
+		}
+	}
+	// Every token of gofmt'd code on a line before a comment is the first or the last token of some node, an
+	// identifier, a literal, or the brace or parenthesis closing one, so the nodes' own bounds find it.
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch node.(type) {
+		case nil:
+			return true
+		case *ast.CommentGroup, *ast.Comment:
+			// A doc or field comment the tree holds is a comment, not code before one.
+			return false
+		}
+		earliest(comments.codeStarts, node.Pos())
+		earliest(comments.codeEnds, node.End())
+		return true
+	})
+	return comments
+}
+
+// opensItsLine is whether no code precedes group on the line it starts on.
+func (comments fileComments) opensItsLine(pass *analysis.Pass, group *ast.CommentGroup) bool {
+	line := pass.Fset.PositionFor(group.Pos(), false).Line
+	if start, found := comments.codeStarts[line]; found && start < group.Pos() {
+		return false
+	}
+	end, found := comments.codeEnds[line]
+	return !found || end > group.Pos()
+}
+
+// excuseFor is the best excuse the comments give statement: a group opening its own line and ending on the line above
+// statement's first line, or one starting after statement on its last line. A comment trailing the code on the line
+// above speaks for that code, not for statement.
+func (comments fileComments) excuseFor(pass *analysis.Pass, statement ast.Node) excuse {
+	found := excuseNone
+	above := comments.endingOn[pass.Fset.PositionFor(statement.Pos(), false).Line-1]
+	if above != nil && comments.opensItsLine(pass, above) {
+		found = excuseOf(above)
+	}
+	for _, group := range comments.startingOn[pass.Fset.PositionFor(statement.End(), false).Line] {
+		// A comment before the statement on its own line, `/* note */ command := ...`, is not at the end of it.
+		if group.Pos() >= statement.End() {
+			found = max(found, excuseOf(group))
+		}
+	}
+	return found
+}
+
+// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
+// comment no part of the reason. A nil group says nothing.
+func excuseOf(group *ast.CommentGroup) excuse {
+	if group == nil {
+		return excuseNone
+	}
+	found := excuseNone
+	for _, comment := range group.List {
+		for _, line := range strings.Split(comment.Text, "\n") {
+			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
+			// mentions it, "this was Uncached: once", excuses nothing.
+			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
+			reason, hasMarker := strings.CutPrefix(opening, uncachedMarker)
+			if !hasMarker {
+				continue
+			}
+			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
+				return excuseWithReason
+			}
+			found = excuseWithoutReason
+		}
+	}
+	return found
 }
 
 // goArguments is the argument list, after the program, of a call to os/exec's Command or CommandContext whose program
@@ -189,7 +333,8 @@ func (known locals) appended(pass *analysis.Pass, call *ast.CallExpr) ([]argumen
 // uncachedFlags is every argument that sets the test count to 1 in a go test command line: -count=1, -test.count=1,
 // or either flag followed by a separate "1", with one dash or two, as Go's flag package reads them all alike. The
 // command must be go test, its subcommand first or after -C and its directory, so a program go run runs, which may
-// take arguments spelled the same, is never mistaken for it.
+// take arguments spelled the same, is never mistaken for it. Everything after -args goes to the test binary as it is,
+// so a count there is not go test's flag.
 func uncachedFlags(arguments []argument) []argument {
 	subcommand := subcommandIndex(arguments)
 	if subcommand < 0 || !arguments[subcommand].known || arguments[subcommand].value != "test" {
@@ -200,6 +345,9 @@ func uncachedFlags(arguments []argument) []argument {
 		candidate := arguments[index]
 		if !candidate.known {
 			continue
+		}
+		if candidate.value == "-args" || candidate.value == "--args" {
+			break
 		}
 		name, value, hasValue := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(candidate.value, "-"), "-"), "=")
 		if !strings.HasPrefix(candidate.value, "-") || (name != "count" && name != "test.count") {
