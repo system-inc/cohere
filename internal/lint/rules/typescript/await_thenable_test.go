@@ -735,7 +735,8 @@ func TestAwaitThenableAggregatorShapesTheCorpusDoesNotWrite(test *testing.T) {
 						want,
 					)
 				}
-				if diagnostic.Message.Description != "Unexpected iterable of non-Promise (non-\"Thenable\") values passed to promise aggregator." {
+				if diagnostic.Message.Description != "Unexpected iterable of non-Promise (non-\"Thenable\") values "+
+					"passed to promise aggregator." {
 					test.Errorf("message text is %q", diagnostic.Message.Description)
 				}
 			}

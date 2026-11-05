@@ -223,7 +223,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		isLiteralLikeType := func(t *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
 				t,
-				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
+				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|
+					checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
 		}
 

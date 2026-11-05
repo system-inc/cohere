@@ -163,7 +163,8 @@ var NoUnsafeUnaryMinus = rule.Rule{
 				for t := range type_checking.UnionTypePartsSeq(argType) {
 					if !type_checking.IsTypeFlagSet(
 						t,
-						checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike,
+						checker.TypeFlagsAny|checker.TypeFlagsNever|
+							checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike,
 					) {
 						ruleContext.ReportNode(node, buildUnaryMinusMessage(ruleContext.TypeChecker.TypeToString(t)))
 						break

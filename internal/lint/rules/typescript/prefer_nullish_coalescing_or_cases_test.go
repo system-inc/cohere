@@ -438,88 +438,168 @@ x || y;
 declare let x: bigint | undefined;
 x || y;
       `, optionsJson: `{"ignorePrimitives": {"boolean": true, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[236]", source: `
+	{
+		name: "upstream invalid[236]",
+		source: `
 declare let x: '' | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{
 		name:        "upstream invalid[237]",
 		source:      "\ndeclare let x: `` | undefined;\nx || y;\n      ",
 		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
 		findings:    1,
 	},
-	{name: "upstream invalid[238]", source: `
+	{
+		name: "upstream invalid[238]",
+		source: `
 declare let x: 0 | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`, findings: 1},
-	{name: "upstream invalid[239]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[239]",
+		source: `
 declare let x: 0n | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[240]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[240]",
+		source: `
 declare let x: false | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[246]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[246]",
+		source: `
 declare let x: 'a' | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{
 		name:        "upstream invalid[247]",
 		source:      "\ndeclare let x: `hello${'string'}` | undefined;\nx || y;\n      ",
 		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
 		findings:    1,
 	},
-	{name: "upstream invalid[248]", source: `
+	{
+		name: "upstream invalid[248]",
+		source: `
 declare let x: 1 | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`, findings: 1},
-	{name: "upstream invalid[249]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[249]",
+		source: `
 declare let x: 1n | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[250]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[250]",
+		source: `
 declare let x: true | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[261]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[261]",
+		source: `
 declare let x: 'a' | 'b' | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{
 		name:        "upstream invalid[262]",
 		source:      "\ndeclare let x: 'a' | `b` | undefined;\nx || y;\n      ",
 		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
 		findings:    1,
 	},
-	{name: "upstream invalid[263]", source: `
+	{
+		name: "upstream invalid[263]",
+		source: `
 declare let x: 0 | 1 | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`, findings: 1},
-	{name: "upstream invalid[264]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[264]",
+		source: `
 declare let x: 1 | 2 | 3 | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`, findings: 1},
-	{name: "upstream invalid[265]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": false, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[265]",
+		source: `
 declare let x: 0n | 1n | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[266]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[266]",
+		source: `
 declare let x: 1n | 2n | 3n | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[267]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[267]",
+		source: `
 declare let x: true | false | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`, findings: 1},
-	{name: "upstream invalid[282]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[282]",
+		source: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": false, "string": true}}`, findings: 1},
-	{name: "upstream invalid[283]", source: `
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": false, "boolean": true, "number": false, "string": true}}`,
+		findings:    1,
+	},
+	{
+		name: "upstream invalid[283]",
+		source: `
 declare let x: true | false | null | undefined;
 x || y;
-      `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`, findings: 1},
+      `,
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": true, "string": true}}`,
+		findings:    1,
+	},
 	{name: "upstream invalid[288]", source: `
 declare let x: null;
 x || y;

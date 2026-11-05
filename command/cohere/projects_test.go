@@ -248,12 +248,14 @@ func coverageAnswerThrough(repository string, alias string, provenance string) s
 		alias +
 		"${real#\"$base\"}\"\n" +
 		"checked=\"\\\"$printed\\\"\"; vendored=''\n" +
-		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then checked=\"$checked,\\\"$printed/Libraries/Lib\\\"\"; fi\n" +
+		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then " +
+		"checked=\"$checked,\\\"$printed/Libraries/Lib\\\"\"; fi\n" +
 		"if [ -f \"$root/Vendor/Third/Package.swift\" ]; then vendored=\"\\\"$printed/Vendor/Third\\\"\"; fi\n" +
 		"head -1 '" +
 		provenance +
 		"'\n" +
-		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$printed\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[$vendored]}\"\n" +
+		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$printed\\\"," +
+		"\\\"checked\\\":[$checked],\\\"vendored\\\":[$vendored]}\"\n" +
 		"exit 0"
 }
 

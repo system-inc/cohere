@@ -585,7 +585,8 @@ func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
 	}
 	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
 	want := "lint: 0 findings \u2014 0 rules over 0 files, 0 nodes visited, in 1s\n" +
-		"coverage: 4 rules = 1 ran and found nothing + 1 registered no listener + 1 off by the config + 1 nobody has configured\n" +
+		"coverage: 4 rules = 1 ran and found nothing + 1 registered no listener + 1 off by the config + " +
+		"1 nobody has configured\n" +
 		"  0 files crashed · 4 findings suppressed, 0 without a reason · details: cohere --coverage\n"
 	if output != want {
 		test.Errorf("a clean run printed:\n%s\nwant:\n%s", output, want)
@@ -765,7 +766,8 @@ func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
 
 	detailed := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s", Details: true})
 	requireLines(test, detailed,
-		"  skipped (1): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n"+
+		"  skipped (1): rules that declined files on a compiler option or a missing precondition, "+
+			"so they checked nothing there\n"+
 			"    "+ruleName+": skipped on 3 files, strictNullChecks is off\n"+
 			"  notes (2): what rules counted rather than reported\n"+
 			"    nexus/correctness-no-caller-data-mutation\n"+

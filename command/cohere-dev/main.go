@@ -83,7 +83,8 @@ func usage() int {
 		"       cohere-dev land\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
-		"       cohere-dev worktree <name> [--branch <branch>]   a name per hand, not per member: system_cohere_tools_1\n"+
+		"       cohere-dev worktree <name> [--branch <branch>]   "+
+		"a name per hand, not per member: system_cohere_tools_1\n"+
 		"       cohere-dev worktree remove <name>")
 	return 2
 }
