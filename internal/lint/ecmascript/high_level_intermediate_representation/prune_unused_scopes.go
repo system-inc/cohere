@@ -75,6 +75,8 @@ func (pruner *scopePruner) walk(block ReactiveBlock) bool {
 }
 
 // visitScope prunes one scope if it qualifies, and reports whether it contained a return.
+//
+// Mutates: scope the pruning marks the caller's scope block pruned where it sits in the reactive tree
 func (pruner *scopePruner) visitScope(scope *ReactiveScopeBlock) bool {
 	sawReturn := pruner.walk(scope.Instructions)
 	if scope.Pruned {

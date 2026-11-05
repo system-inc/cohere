@@ -93,7 +93,8 @@ return items;
 return <div>{result}</div>;
 }`, false},
 		{"no iteration", `import {useMemo} from 'react'; import {useProjects} from './hooks';
-function Component() {const request = useProjects(); const result = useMemo(() => request.data ?? [], [request.data]); return <div>{result}</div>;}`, false},
+function Component() {const request = useProjects(); const result = useMemo(() => request.data ?? [], ` +
+			`[request.data]); return <div>{result}</div>;}`, false},
 		{
 			"unpreserved dependency",
 			`import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`,

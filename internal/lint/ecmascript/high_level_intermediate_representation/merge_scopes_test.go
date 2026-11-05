@@ -27,7 +27,6 @@ type mergeCase struct {
 	// terminalScope, when non-zero, gives the terminal a Return carrying a place in that scope.
 	// Zero leaves the terminal an Unreachable with no operands.
 	terminalScope int
-	terminalRange mutation_aliasing.MutableRange
 	// wantGroups maps each scope id to the id it should end up in.
 	wantGroups map[ScopeId]ScopeId
 	// wantRanges is the range each surviving scope should carry.
@@ -569,8 +568,14 @@ func TestMergePreservesScopeWidthAndMembership(test *testing.T) {
 	test.Parallel()
 
 	skipWithoutCorpus(test)
-	var oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore int
-	var oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter int
+	var oneNarrowBefore int
+	var oneWideBefore int
+	var manyNarrowBefore int
+	var manyWideBefore int
+	var oneNarrowAfter int
+	var oneWideAfter int
+	var manyNarrowAfter int
+	var manyWideAfter int
 
 	forEachCorpusFunction(test, 400, func(
 		function *Function,
@@ -631,6 +636,12 @@ func TestMergePreservesScopeWidthAndMembership(test *testing.T) {
 	}
 }
 
+// classify counts one scope into the cell its width and member count put it in.
+//
+// Mutates: oneNarrow the caller's counter for one-member scopes of width one, which a whole corpus walk sums
+// Mutates: oneWide the caller's counter for one-member scopes wider than one, which a whole corpus walk sums
+// Mutates: manyNarrow the caller's counter for many-member scopes of width one, which a whole corpus walk sums
+// Mutates: manyWide the caller's counter for many-member scopes wider than one, which a whole corpus walk sums
 func classify(width, members int, oneNarrow, oneWide, manyNarrow, manyWide *int) {
 	switch {
 	case members == 1 && width == 1:

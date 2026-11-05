@@ -43,10 +43,8 @@ func TestPostDominatorFrontiersMatchTheChainWalk(test *testing.T) {
 		sources[name] = code
 	}
 	paths, contents := pinnedCorpusFilesIfPresent(test, 400)
-	if paths != nil {
-		for _, path := range paths {
-			sources[path] = contents[path]
-		}
+	for _, path := range paths {
+		sources[path] = contents[path]
 	}
 
 	handWrittenCompared, corpusCompared := 0, 0

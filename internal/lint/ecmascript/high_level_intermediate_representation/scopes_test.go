@@ -25,25 +25,6 @@ func scopesFor(test *testing.T, source string) (*Function, *ReactiveScopes) {
 	return function, AssignReactiveScopesWithSets(function, ranges, set)
 }
 
-// scopeOfName returns the scope holding the LAST value a named binding takes.
-func scopeOfName(test *testing.T, function *Function, scopes *ReactiveScopes, name string) ScopeId {
-	test.Helper()
-	var target static_single_assignment.IdentifierId
-	found := false
-	for id, identifier := range function.Identifiers {
-		if identifier != nil && identifier.Name == name {
-			if !found || static_single_assignment.IdentifierId(id) > target {
-				target = static_single_assignment.IdentifierId(id)
-				found = true
-			}
-		}
-	}
-	if !found {
-		test.Fatalf("no identifier named %q, so this test measured nothing", name)
-	}
-	return scopes.ScopeOf(target)
-}
-
 // ---------------------------------------------------------------------------
 // The hull, measured against React's own merge loop
 // ---------------------------------------------------------------------------
@@ -353,7 +334,8 @@ func TestScopeAssignmentIsASinglePass(test *testing.T) {
 
 	// 2,000 values in 200 classes of 10. Large enough that a quadratic or iterating implementation
 	// is visible as a hang rather than as a slow test.
-	const classes, perClass = 200, 10
+	const classes = 200
+	const perClass = 10
 	function.Identifiers = append(function.Identifiers, nil)
 	for class := 0; class < classes; class++ {
 		var members []static_single_assignment.IdentifierId
@@ -887,7 +869,7 @@ func TestScopeMatchesTheDisjointSetPartition(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -896,6 +878,9 @@ func TestScopeMatchesTheDisjointSetPartition(test *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
+	}
 	sort.Strings(files)
 	if len(files) > 120 {
 		files = files[:120]
