@@ -1580,3 +1580,52 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(test *testing.T) {
 		})
 	}
 }
+
+// A case written because a mutation survived the imported corpus, not because upstream has it.
+//
+// `??` cannot sit beside `&&` or `||` without parentheses. That is a grammar restriction rather than
+// a precedence one, and in this tree it cannot be expressed as a precedence comparison at all:
+// `ast.GetBinaryOperatorPrecedence` gives `??` and `||` the same value, 5, so the ordinary
+// comparisons see them as equal and let both through. oxc's own precedence table separates them,
+// which is why its version of this check reads as one more comparison and this one has to name the
+// operators.
+//
+// Upstream's corpus reaches the guard only through `if (a ?? Boolean(b || c)) {}`, where the
+// replacement is on the right at equal precedence, so the left-associativity branch above already
+// returns true and the guard is never the reason. Deleting the guard therefore changed nothing any
+// of the 382 repair comparisons could see.
+//
+// `&&` distinguishes them: it is precedence 6 against `??`'s 5, so neither earlier branch fires, and
+// without the guard the repair emits `a ?? b && c`. That does not merely mean something different,
+// it does not parse, which is the one failure an unattended fixer structurally cannot refuse.
+func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(test *testing.T) {
+	test.Parallel()
+
+	const sourceText = "if (a ?? Boolean(b && c)) {}"
+
+	result := rule_testing.RunWithOptions(test, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
+		NoExtraBooleanCastOptions{EnforceForInnerExpressions: true})
+	rule_testing.ExpectFixedSource(test, result, "if (a ?? (b && c)) {}")
+}
+
+// A second case written for a survivor, covering the other half of the token-boundary padding.
+//
+// Upstream's corpus exercises the *leading* half thoroughly, through the `yield!!a`, `void!Boolean()`
+// and `typeof!Boolean()` family, where the cast being removed was the only thing separating a
+// keyword from its operand. It never exercises the trailing half, so deleting that branch changed
+// none of the 382 repair comparisons.
+//
+// `!Boolean()in x` reaches it. The whole `!Boolean()` collapses to the literal `true`, and the next
+// character begins the `in` operator with no space in front of it, so without the trailing pad the
+// repair writes `truein x`. That parses, as a reference to an identifier named `truein`, and then
+// fails to compile against a name that does not exist. A fix producing source that parses and does
+// not compile is the one failure the edit engine structurally cannot refuse, which is what makes
+// this worth a fixture rather than a comment.
+func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(test *testing.T) {
+	test.Parallel()
+
+	const sourceText = "!Boolean()in x"
+
+	result := rule_testing.Run(test, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
+	rule_testing.ExpectFixedSource(test, result, "true in x")
+}
