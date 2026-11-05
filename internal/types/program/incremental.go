@@ -10,12 +10,12 @@ import (
 // IncrementalSession is one warm-capable pass over a graph: check, then persist what the next
 // run needs to know which files it can skip.
 //
-// It exists as a type rather than as two methods on Graph because of the single most
-// expensive thing to get wrong here. The build info must be emitted from the SAME incremental
-// program that performed the checking. That program's snapshot records which files it
-// checked, and the emit writes those records; a build info emitted from a freshly-wrapped
-// program has an empty snapshot, so it marks every file as "unchanged but never checked",
-// which on load means "check it".
+// It exists as a type rather than as two methods on Graph because of the single most expensive
+// thing to get wrong here. The build info must be emitted from the incremental program that
+// performed the checking, that one and not another. That program's snapshot records which files it
+// checked, and the emit writes those records; a build info emitted from a freshly-wrapped program
+// has an empty snapshot, so it marks every file as "unchanged but never checked", which on load
+// means "check it".
 //
 // Measured, because the difference does not look like anything from the call site:
 //
@@ -26,7 +26,7 @@ import (
 // correct, it was slower than not caching at all, and every test passed. Holding the program
 // across both calls is what makes the type worth its weight.
 //
-// THE RISK, stated where the code is rather than in a task nobody will read: a cache that
+// The risk, stated where the code is rather than in a task nobody will read: a cache that
 // fails to invalidate reports zero findings forever, and that is indistinguishable from a
 // clean tree on every measurement except a planted violation. "Cold equals warm" does not test
 // it, because a permanently-stale cache passes that too. The test that matters is

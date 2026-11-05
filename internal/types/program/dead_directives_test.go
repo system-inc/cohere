@@ -16,7 +16,9 @@ import (
 func deadDirectiveRules() []rule.Rule {
 	return []rule.Rule{
 		{Name: "test-quiet", Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				// Listens and reports nothing, so a directive naming this rule withholds nothing.
+			}}
 		}},
 		{Name: "test-live", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindDebuggerStatement: func(node *ast.Node) {

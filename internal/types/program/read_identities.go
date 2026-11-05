@@ -57,6 +57,7 @@ func startsWithByteOrderMark(path string) bool {
 	if err != nil {
 		return true
 	}
+	// Ignored: the file is opened read-only, so closing it loses nothing.
 	defer file.Close()
 	var head [3]byte
 	count, err := io.ReadFull(file, head[:])

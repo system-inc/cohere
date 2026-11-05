@@ -216,8 +216,9 @@ func isScreamingSnakeCase(name string) bool {
 
 // mixedCaps is name with its underscores folded into word boundaries: each word after the first raised, and the first
 // opening with a capital only when exported. A word with no lower-case letter has no inner boundary to keep, so it is
-// lowered whole first: MAX_RETRIES becomes MaxRetries and parse_URL parseUrl, never MAXRETRIES or parseURL. A word in
-// mixed case keeps its inside, since its capitals are boundaries already. Only the casing changes, never the words.
+// lowered whole first: `MAX_RETRIES` becomes `MaxRetries` and `parse_URL` `parseUrl`, never `MAXRETRIES` or
+// `parseURL`. A word in mixed case keeps its inside, since its capitals are boundaries already. Only the casing
+// changes, never the words.
 func mixedCaps(name string, exported bool) string {
 	var words []string
 	for _, part := range strings.Split(name, "_") {
@@ -267,7 +268,7 @@ func lowerOpening(word string) string {
 }
 
 // isSystemPackage is whether path is syscall or a package of golang.org/x/sys, whose constants keep the operating
-// system's spelling, O_RDONLY and SIGTERM, so a reader can find them in the system's own documentation.
+// system's spelling, `O_RDONLY` and `SIGTERM`, so a reader can find them in the system's own documentation.
 func isSystemPackage(path string) bool {
 	return path == "syscall" || path == "golang.org/x/sys" || strings.HasPrefix(path, "golang.org/x/sys/")
 }
@@ -322,6 +323,8 @@ func mirroredConstants(pass *analysis.Pass) map[types.Object]bool {
 // markAssignedConstants marks each constant in declaration whose value mentions a system constant. A specification
 // with no values repeats the last one that had them, as Go reads a constant group, so `SecondSignal` after
 // `FirstSignal = unix.SignalBase + iota` is computed from unix's constant too.
+//
+// Mutates: mirrored gains each constant whose value mentions a system constant, for the caller to leave unreported
 func markAssignedConstants(pass *analysis.Pass, declaration *ast.GenDecl, mirrored map[types.Object]bool) {
 	var values []ast.Expr
 	for _, specification := range declaration.Specs {

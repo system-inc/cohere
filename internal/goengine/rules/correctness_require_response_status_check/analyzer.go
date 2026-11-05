@@ -157,6 +157,8 @@ func responseVariable(pass *analysis.Pass, identifier *ast.Ident) *types.Var {
 
 // classify records what identifier, the node at the top of stack, does to its response. stack runs from the file
 // down to the identifier.
+//
+// Mutates: found records what this use does to the response, gathered over every use the caller walks
 func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, found *response) {
 	switch parent := stack[len(stack)-2].(type) {
 	case *ast.AssignStmt:
@@ -228,6 +230,8 @@ func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, foun
 }
 
 // classifySelection records what resp.<selector>, the node at stack[index], does to its response.
+//
+// Mutates: found records a status check or a body read through the selection, for the caller's verdict
 func classifySelection(pass *analysis.Pass, stack []ast.Node, index int, selector *ast.SelectorExpr, found *response) {
 	selection, isSelection := pass.TypesInfo.Selections[selector]
 	if !isSelection {

@@ -214,7 +214,7 @@ func TestSetupIsBilledApartFromListeners(test *testing.T) {
 //
 // So a fill is a frame of its own, billed to its derivation's family, and the frame around it is billed
 // less the fill: the rule that asked, or an outer fill when one derivation fills another. The family is
-// the key up to its first colon, because the HIR cache keys per function node and once reported 11,150
+// the key up to its first colon, because the `HIR` cache keys per function node and once reported 11,150
 // rows of 0.00ms.
 func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(test *testing.T) {
 	test.Parallel()

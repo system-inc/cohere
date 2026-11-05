@@ -104,6 +104,8 @@ func judgeChain(pass *analysis.Pass, head *ast.IfStmt) {
 
 // recordInitDeclarations adds to declared every variable that statement's init statement declares. Only a short
 // variable declaration declares in an init; an assignment, a send or a call there names nothing new.
+//
+// Mutates: declared gains each variable the init declares, so the caller's set covers every init of the chain
 func recordInitDeclarations(pass *analysis.Pass, statement *ast.IfStmt, declared map[types.Object]bool) {
 	assignment, isAssignment := statement.Init.(*ast.AssignStmt)
 	if !isAssignment {

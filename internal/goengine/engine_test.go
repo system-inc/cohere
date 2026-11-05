@@ -293,7 +293,8 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 		arguments[index] = strings.ReplaceAll(argument, "{root}", root)
 	}
 
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	exitCode := run(arguments, &standardOutput, &standardError, registered)
 	stream := normalize(standardOutput.String(), root)
 	prose := strings.ReplaceAll(standardError.String(), root, "/project")

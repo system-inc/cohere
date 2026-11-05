@@ -19,7 +19,7 @@ import (
 // This is a different cache from the lint findings cache beside it, and the difference is the whole
 // reason it exists. That cache was measured at about 9% and left unwired because it still walked the
 // tree: it could only skip map lookups the one-traversal design had already made nearly free. This
-// one skips the walk AND the graph build, which is roughly 0.45s on the ahra tree before any rule
+// one skips the walk and the graph build as well, which is roughly 0.45s on the ahra tree before any rule
 // runs. Its prize is the entire run, so the earlier verdict says nothing about it.
 //
 // # The rule it has to keep
@@ -34,7 +34,7 @@ import (
 //
 // The program's file list only exists after the graph is built, which is the cost this cache exists
 // to skip. So a full run records the list and the next run re-stats what was recorded. That is sound
-// for a file edited or deleted. It is blind to a file ADDED: a new source file under an include glob
+// for a file edited or deleted. It is blind to a file that was added: a new source file under an include glob
 // is an input the recorded list has never heard of, and re-statting the old list finds nothing wrong.
 //
 // Directories close that gap. Adding or removing an entry changes the mtime of the directory that
@@ -479,10 +479,10 @@ func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
 			return nil
 		}
 		// Neither present nor provably absent, for example a permission error. Doubt is a miss.
-		return fmt.Errorf("%w: %s cannot be checked: %v", ErrRunCacheMiss, input.Path, statError)
+		return fmt.Errorf("%w: %s cannot be checked: %w", ErrRunCacheMiss, input.Path, statError)
 	}
 	if statError != nil {
-		return fmt.Errorf("%w: %s: %v", ErrRunCacheMiss, input.Path, statError)
+		return fmt.Errorf("%w: %s: %w", ErrRunCacheMiss, input.Path, statError)
 	}
 	if information.IsDir() != input.Directory {
 		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)

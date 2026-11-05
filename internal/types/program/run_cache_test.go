@@ -90,7 +90,9 @@ func waitForClock(test *testing.T, path string) {
 	for time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 		probe := filepath.Join(test.TempDir(), "clock")
-		os.WriteFile(probe, nil, 0o644)
+		if writeError := os.WriteFile(probe, nil, 0o644); writeError != nil {
+			test.Fatalf("writing the clock probe: %v", writeError)
+		}
 		if info, statError := os.Stat(probe); statError == nil && info.ModTime().After(before.ModTime()) {
 			return
 		}
@@ -123,7 +125,9 @@ func TestRunCacheInvalidatesOnEveryInputCategory(test *testing.T) {
 			writeFile(test, tree.sourceA, "export const a = 100;\n")
 		}},
 		{"a source file is deleted", func(test *testing.T, tree *runCacheTree) {
-			os.Remove(tree.sourceB)
+			if removeError := os.Remove(tree.sourceB); removeError != nil {
+				test.Fatal(removeError)
+			}
 		}},
 		{"a file is added at the top level", func(test *testing.T, tree *runCacheTree) {
 			waitForClock(test, filepath.Dir(tree.sourceA))
@@ -147,8 +151,12 @@ func TestRunCacheInvalidatesOnEveryInputCategory(test *testing.T) {
 			writeFile(test, tree.absent[0], "{}")
 		}},
 		{"a file is replaced by a directory of the same name", func(test *testing.T, tree *runCacheTree) {
-			os.Remove(tree.sourceA)
-			os.MkdirAll(tree.sourceA, 0o755)
+			if removeError := os.Remove(tree.sourceA); removeError != nil {
+				test.Fatal(removeError)
+			}
+			if createDirectoryError := os.MkdirAll(tree.sourceA, 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
+			}
 		}},
 	}
 
@@ -183,7 +191,10 @@ func TestRunCacheKeySeparatesRuns(test *testing.T) {
 	if runCacheKeyError != nil {
 		test.Fatalf("key: %v", runCacheKeyError)
 	}
-	same, _ := program.RunCacheKey([]string{"--lint"}, root)
+	same, sameKeyError := program.RunCacheKey([]string{"--lint"}, root)
+	if sameKeyError != nil {
+		test.Fatalf("key: %v", sameKeyError)
+	}
 	if lint != same {
 		test.Fatal("the same run produced two keys, so the cache could never hit")
 	}
@@ -307,7 +318,10 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(test *testing.T) {
 		test.Errorf("exit code %d, want 1: a failing run would replay as passing", loaded.ExitCode)
 	}
 
-	entries, _ := os.ReadDir(directory)
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
+	}
 	if len(entries) != 1 {
 		test.Errorf("the directory holds %d entries, want only the manifest: a temporary was left behind", len(entries))
 	}

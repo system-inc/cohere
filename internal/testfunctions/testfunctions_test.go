@@ -31,6 +31,8 @@ type suite struct{}
 func (each suite) TestMethod(count int) {}
 `
 
+var fileSetOfFixture = token.NewFileSet()
+
 // parsedFixture is the fixture parsed once for every test here.
 var parsedFixture = func() []*ast.File {
 	file, parseError := parser.ParseFile(fileSetOfFixture, "fixture_test.go", fixture, parser.AllErrors)
@@ -40,8 +42,6 @@ var parsedFixture = func() []*ast.File {
 	}
 	return []*ast.File{file}
 }()
-
-var fileSetOfFixture = token.NewFileSet()
 
 // Every refused function is named with go test's own words, at its line, and nothing else is: not a lower-case
 // continuation like Testify, and not a method.

@@ -50,8 +50,8 @@ var (
 	// is an instruction to a tool, //go:generate or //lint:ignore, and its arguments are the tool's words.
 	directive = regexp.MustCompile(`^//(line |extern |export |[a-z0-9]+:[a-z0-9])`)
 
-	// noteMarker is go/doc's note, MARKER(uid), where it opens a comment: two or more capitals naming the kind
-	// of note, BUG(who) the one go doc lists, and the uid in parentheses. go/doc collects these into their own
+	// noteMarker is go/doc's note, `MARKER(uid)`, where it opens a comment: two or more capitals naming the kind
+	// of note, `BUG(who)` the one go doc lists, and the uid in parentheses. go/doc collects these into their own
 	// section, so the marker is notation; the note's body after it is prose and is read.
 	noteMarker = regexp.MustCompile(`^/[/*][ \t]*([A-Z][A-Z]+\([^)]+\))`)
 
