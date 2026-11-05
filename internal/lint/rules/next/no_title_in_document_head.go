@@ -35,7 +35,7 @@ var messageNoTitleInDocumentHead = rule.Message{
 // delete the rule's main true positive, since `next/document`'s `Head` used *outside* a document
 // file is exactly the mistake being caught, and both upstreams catch it there.
 //
-// # Only the FIRST named specifier of a declaration is watched, and that is a defect reproduced
+// # Only the first named specifier of a declaration is watched, and that is a defect reproduced
 //
 // oxc reaches for the import's specifiers with `find_map`, which stops at the first one matching the
 // named arm, and then watches only that binding. Every later named specifier in the same declaration
@@ -49,7 +49,7 @@ var messageNoTitleInDocumentHead = rule.Message{
 // So the real violation goes unreported whenever `Head` is not written first, which is the ordering
 // `next/document` users actually write, since `Html` conventionally comes first. Upstream's own
 // second passing fixture is `import Document, { Html, Head }` with an empty `<Head>`, and it is
-// clean for two reasons at once rather than the one it looks like: the `Head` is empty AND the
+// clean for two reasons at once rather than the one it looks like: the `Head` is empty and the
 // watched binding is `Html`. That fixture cannot see this defect and neither can the other two.
 //
 // It is reproduced rather than corrected because the harness compares against oxc, and a port that
@@ -151,7 +151,7 @@ var NoTitleInDocumentHead = rule.Rule{
 				}
 				// Upstream reports inside the child loop rather than breaking, so two titles under
 				// one element produce two findings at the same span. Pinned by a fixture.
-				// The finding points at the `Head` tag NAME, which is upstream's
+				// The finding points at the `Head` tag name, which is upstream's
 				// `jsx_opening_element.name.span()`, not at the `<title>` that eslint blames and not
 				// at the whole opening element. Asserted by a span fixture, which is how the first
 				// version of this line was caught pointing at the title.
@@ -178,7 +178,7 @@ var NoTitleInDocumentHead = rule.Rule{
 				// This guard changes no verdict and is kept deliberately. Mutating it away survives
 				// the whole fixture set, and the survivor is equivalent rather than a blind spot: a
 				// member tag parses to KindPropertyAccessExpression, and resolving one answers the
-				// PROPERTY's symbol, never the imported binding's specifier node, so the identity
+				// property's symbol, never the imported binding's specifier node, so the identity
 				// test below already declines every such tag. Four shapes were run against the
 				// mutant to look for a distinguishing input, `<Head.Sub>`, `<NS.Head>` over a
 				// shorthand object, `<All.Head>` over a namespace import, and a namespace re-export,
@@ -200,7 +200,7 @@ var NoTitleInDocumentHead = rule.Rule{
 // resolvesToWatchedSpecifier reports whether a tag identifier binds to one of the watched import
 // specifiers, by declaration node identity rather than by name.
 //
-// Identity is the whole point. Comparing the declaration's KIND instead would answer true for any
+// Identity is the whole point. Comparing the declaration's kind instead would answer true for any
 // import specifier in the file, and comparing the identifier's text would answer true for a local
 // component shadowing the import. Both pass every fixture upstream ships.
 func resolvesToWatchedSpecifier(ruleContext rule.Context, tagName *ast.Node, watched []*ast.Node) bool {

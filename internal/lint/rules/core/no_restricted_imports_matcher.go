@@ -52,7 +52,7 @@ type noRestrictedImportsMatcher struct {
 
 // noRestrictedImportsCompileGroup compiles a `group` array into a matcher.
 //
-// A pattern that cannot be translated is DROPPED rather than treated as matching nothing quietly or
+// A pattern that cannot be translated is dropped rather than treated as matching nothing quietly or
 // everything quietly, and the boolean says whether every pattern survived. The caller refuses the
 // configuration when it did not, because a silently-dropped restriction is a rule that reports less
 // than its author asked for while looking healthy, which is the failure this whole tree is written
@@ -76,7 +76,7 @@ func noRestrictedImportsCompileGroup(group []string, caseSensitive bool) (*noRes
 
 // Ignores answers `matcher.ignores(path)`.
 //
-// Every pattern is tested and the LAST one that matches decides, which is how a negation undoes an
+// Every pattern is tested and the last one that matches decides, which is how a negation undoes an
 // earlier match. Testing in order and returning on the first hit would make `["foo/*", "!foo/bar"]`
 // report on `foo/bar`, which is the case upstream's corpus tests directly.
 func (m *noRestrictedImportsMatcher) Ignores(path string) bool {
@@ -194,7 +194,7 @@ func noRestrictedImportsCompileGlob(pattern string, caseSensitive bool) (*noRest
 			return nil, false
 		}
 		expression.WriteString(translated)
-		// An EMPTY path segment never matches, even against a segment that is nothing but `*`.
+		// An empty path segment never matches, even against a segment that is nothing but `*`.
 		// `*` itself is zero-or-more -- `f*` matches bare `f`, measured -- so the constraint is on
 		// the segment rather than on the wildcard, and it has to be written separately for that
 		// reason. Without it `foo/*` matches `foo/` and `foo//bar`, which was 6 of 540 disagreements

@@ -72,7 +72,7 @@ var messageUnreachableLoop = rule.Message{
 // the event already names its loop. `Builder.Current().Reachable` is the reachability question, at
 // both the loop statement and the loop event.
 //
-// # The reachability gate on the loop EVENT is load-bearing, and it is ours rather than upstream's
+// # The reachability gate on the loop event is load-bearing, and it is ours rather than upstream's
 //
 // Upstream gets reachability filtering for free, because ESLint's code path analysis does not raise
 // a segment-loop event out of an unreachable segment at all. Our builder does: `statements.go`
@@ -88,7 +88,7 @@ var messageUnreachableLoop = rule.Message{
 // current block is unreachable, so an unreachable `continue` raises no event. The gate is written
 // once, at the hook, and covers both.
 //
-// # Why the loop STATEMENT is gated too, and what it buys
+// # Why the loop statement is gated too, and what it buys
 //
 // A loop standing in unreachable code is skipped, "to avoid unnecessary complexity in the
 // implementation, or false positives otherwise" in upstream's words. So `function foo() { return;
@@ -134,13 +134,13 @@ var NoUnreachableLoop = rule.Rule{
 		// Every loop kind ignored means the rule has nothing to say, which upstream expresses by
 		// returning an empty visitor when the selector it would build is empty.
 		//
-		// This is a COST decision here rather than a behavioral one, and the sweep says so: with
+		// This is a cost decision here rather than a behavioral one, and the sweep says so: with
 		// this arm deleted the whole suite stays green, because the per-loop `Ignore` filter below
 		// already declines every kind in `unreachableLoopKindNames` whenever this predicate is
 		// true, and that map is exactly the set the predicate checks. There is no input on which
 		// the two versions report differently.
 		//
-		// It is kept because the two versions differ in what they DO: without it, a file's every
+		// It is kept because the two versions differ in what they do: without it, a file's every
 		// code-path root is enumerated and a control-flow graph built for each, all to hand every
 		// result to a filter that rejects it. Upstream declines the same work for the same reason.
 		if unreachableLoopIgnoresEverything(settings.Ignore) {
@@ -170,7 +170,7 @@ var unreachableLoopKindNames = map[ast.Kind]string{
 
 // unreachableLoopIgnoresEverything reports whether the option leaves no loop kind to judge.
 //
-// Upstream builds a selector string from the kinds NOT ignored and returns `{}` when it is empty.
+// Upstream builds a selector string from the kinds not ignored and returns `{}` when it is empty.
 // The corpus asserts this with an `ignore` naming all five.
 func unreachableLoopIgnoresEverything(ignore []string) bool {
 	for _, name := range unreachableLoopKindNames {
@@ -218,7 +218,7 @@ func reportUnreachableLoops(ruleContext rule.Context, sourceFile *ast.Node, sett
 				if !isLoop || slices.Contains(settings.Ignore, name) {
 					return
 				}
-				// No guard here that the loop belongs to THIS root, and the absence is measured
+				// No guard here that the loop belongs to this root, and the absence is measured
 				// rather than assumed.
 				//
 				// The obvious worry is that a loop inside a nested function would be visited by the
@@ -248,8 +248,8 @@ func reportUnreachableLoops(ruleContext rule.Context, sourceFile *ast.Node, sett
 				// `reachable` true and `state.reachable` stops being able to decline anything.
 				//
 				// Measured, and this is why it is written out. Deleting the else branch left all
-				// 1,636 fixtures green. It also flipped the `state.reachable` mutant from CAUGHT by
-				// 8 lines to SURVIVED, which is the sweep reporting a discrimination that had
+				// 1,636 fixtures green. It also flipped the `state.reachable` mutant from caught by
+				// 8 lines to survived, which is the sweep reporting a discrimination that had
 				// stopped existing while nothing else changed.
 				if builder.Current().Reachable {
 					stateFor(node).reachable = true

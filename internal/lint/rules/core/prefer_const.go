@@ -237,7 +237,7 @@ var PreferConst = rule.Rule{
 				// initializer and exactly one unconditional write". A guard was written first and
 				// then mutated out, and every ambient shape tried still reported nothing, so it was
 				// dead code standing in front of a decision already made below. The clean fixture
-				// stays, because it pins the OUTCOME rather than the guard.
+				// stays, because it pins the outcome rather than the guard.
 
 				if ruleContext.SourceFile == nil {
 					return
@@ -407,7 +407,7 @@ func judgeConstCandidate(ruleContext rule.Context, settings PreferConstOptions, 
 		// and the split is load-bearing rather than tidy. With an initializer the write is the
 		// declaration itself, so "read before assign" can only mean a read at a source position
 		// before the declaration. With no initializer the assignment is a separate statement, so
-		// the question is whether any read sits before THAT write, and a read after the declaration
+		// the question is whether any read sits before that write, and a read after the declaration
 		// still counts: `let x; function foo() { bar(x); } x = 0;` is upstream's own case, clean
 		// under the option and reported without it, and a single position test against the
 		// declaration answers it wrong whichever position it picks.

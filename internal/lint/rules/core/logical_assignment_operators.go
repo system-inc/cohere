@@ -110,15 +110,15 @@ const (
 // LogicalAssignmentOperatorsOptions carries upstream's two positional options.
 //
 // Require is a pointer for the reason `operator-assignment` states: upstream's
-// `defaultOptions: ["always"]` means an ABSENT option requires the shorthand, while the zero value
+// `defaultOptions: ["always"]` means an absent option requires the shorthand, while the zero value
 // of a plain setting is the empty string, which matches neither arm and makes the rule silent on
 // every file it is meant to catch. A rule configured as a bare severity in the live config is
 // exactly that case.
 //
-// EnforceForIfStatements defaults to FALSE, so it is a plain bool: the zero value is already the
+// EnforceForIfStatements defaults to `false`, so it is a plain bool: the zero value is already the
 // upstream default and nothing is lost by an absent key.
 //
-// ReactCompiler is ours, not upstream's, and defaults to TRUE: React Compiler refuses all three
+// ReactCompiler is ours, not upstream's, and defaults to `true`: React Compiler refuses all three
 // shorthands, so under `always` the rule is silent inside the functions the compiler compiles. A
 // project that does not run the compiler sets it false to have those findings back. The default is
 // the safe side because the fixer applies `||=` to a bare identifier unattended, and in a compiled
@@ -246,7 +246,7 @@ var logicalAssignmentLongForm = map[ast.Kind]string{
 //
 // Upstream's selector for the second shape is
 // `LogicalExpression[right.type="AssignmentExpression"]`, and its own comment says the right side
-// HAS to be parenthesized or the source would not parse. Its parser folds the parentheses away, so
+// has to be parenthesized or the source would not parse. Its parser folds the parentheses away, so
 // the node it matches is the assignment itself. Ours keeps them: measured in the probe, the right
 // side of `a || (a = b)` is a KindParenthesizedExpression wrapping the assignment. Matching without
 // unwrapping first would find nothing at all, silently, on every one of upstream's 37 cases for
@@ -260,7 +260,7 @@ var logicalAssignmentLongForm = map[ast.Kind]string{
 // suggestions instead. That split is not cosmetic here either: `ReportNodeWithFixes` is applied by
 // the edit engine with nobody watching, and `ReportNodeWithSuggestions` is not.
 //
-// The one place a member access IS fixed is the second shape, where upstream additionally accepts
+// The one place a member access is fixed is the second shape, where upstream additionally accepts
 // an access whose object is an identifier, `this` or `super` and whose key is not itself an access.
 // `a.b || (a.b = c)` is fixed; `a.b.c || (a.b.c = d)` is only suggested.
 //
@@ -393,7 +393,7 @@ func logicalAssignmentUnwrapParentheses(node *ast.Node) *ast.Node {
 
 // logicalAssignmentIsReference is upstream's `isReference`.
 //
-// `undefined` is excluded by name, because the rule reads a bare `undefined` as the VALUE rather
+// `undefined` is excluded by name, because the rule reads a bare `undefined` as the value rather
 // than as a place to assign to. That is what keeps `a = undefined || b` from being read as a
 // self-referential assignment when the target happens to be named `undefined`.
 func logicalAssignmentIsReference(expression *ast.Node) bool {
@@ -458,11 +458,11 @@ func (state *logicalAssignmentState) isShadowedInThisFile(identifier *ast.Node) 
 }
 
 // logicalAssignmentIsSameReference is upstream's `isSameReference` called with no third argument,
-// so `disableStaticComputedKey` is FALSE.
+// so `disableStaticComputedKey` is `false`.
 //
 // The flag changes real answers rather than being a detail, and this rule needs it false: the
 // corpus asserts that `a.b = a['b'] ?? c` reports, which requires a dot access and a bracket access
-// with the same static key to compare EQUAL. `operator-assignment` in this package needs the
+// with the same static key to compare equal. `operator-assignment` in this package needs the
 // opposite setting and carries its own copy for that reason; `yoda` carries a third at this
 // setting. A fourth copy is added here rather than sharing yoda's because these are rule-local
 // judgments about which flag upstream passed, and a shared helper would have to carry the flag as a
@@ -481,7 +481,7 @@ func logicalAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
 		return false
 	}
 
-	// The static-key equivalence, checked BEFORE the kind comparison because it is exactly what
+	// The static-key equivalence, checked before the kind comparison because it is exactly what
 	// lets a property access equal an element access.
 	if logicalAssignmentIsAccess(left) && logicalAssignmentIsAccess(right) {
 		if name, known := logicalAssignmentStaticPropertyName(left); known {
@@ -545,7 +545,7 @@ func logicalAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
 // its spine.
 //
 // This has no direct counterpart in upstream's code, and that is the point. Upstream wraps a whole
-// optional chain in a ChainExpression node, and its `isSameReference` unwraps that wrapper on ONE
+// optional chain in a ChainExpression node, and its `isSameReference` unwraps that wrapper on one
 // side only when the two node types differ, which makes `a?.b` and `a.b` compare equal there. Our
 // parser has no wrapper: `?.` is a QuestionDotToken hanging off the access, and the access kind is
 // otherwise identical, so a structural comparison answers equal for a reason upstream's never
@@ -559,7 +559,7 @@ func logicalAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
 //	if (a?.b) a.b = c     silent
 //	if (!a?.b) a.b = c    silent
 //
-// So upstream treats an optional access and a plain one as DIFFERENT references, and a port that
+// So upstream treats an optional access and a plain one as different references, and a port that
 // compares them structurally over-reports on every mixed pair. Four of upstream's clean cases are
 // exactly that pair, which is how this was caught.
 func logicalAssignmentIsOptionalChain(node *ast.Node) bool {
@@ -639,7 +639,7 @@ func logicalAssignmentStaticPropertyName(access *ast.Node) (string, bool) {
 	return "", false
 }
 
-// isInsideWithBlock is upstream's function of the same name: does this node sit in the BODY of a
+// isInsideWithBlock is upstream's function of the same name: does this node sit in the body of a
 // `with`, as opposed to in its scrutinee.
 //
 // The body test matters. `with (a = a || b) {}` puts the assignment in the scrutinee, where the
@@ -663,7 +663,7 @@ func logicalAssignmentIsInsideWithBlock(node *ast.Node) bool {
 // instead of twice.
 //
 // An identifier is safe, because a variable read has no side effect. Inside a non-strict `with`
-// block it is NOT safe, because the name may resolve to a property of the scrutinee, which may be
+// block it is not safe, because the name may resolve to a property of the scrutinee, which may be
 // a getter. Anything that is not an identifier is unsafe here, and the second shape widens that
 // separately through accessesSingleProperty.
 func (state *logicalAssignmentState) cannotBeGetter(node *ast.Node) bool {
@@ -675,7 +675,7 @@ func (state *logicalAssignmentState) cannotBeGetter(node *ast.Node) bool {
 
 // accessesSingleProperty is upstream's function of the same name.
 //
-// It widens the safe set for the second and third shapes to a member access reading exactly ONE
+// It widens the safe set for the second and third shapes to a member access reading exactly one
 // property off a simple base: the object must be an identifier, `this` or `super`, and a computed
 // key must not itself be an access. `a.b` qualifies and `a.b.c` does not, because evaluating `a.b`
 // twice is not knowably the same as evaluating it once.
@@ -720,7 +720,7 @@ func (state *logicalAssignmentState) accessesSingleProperty(node *ast.Node) bool
 //
 // Upstream reads `node.object.type` with no parenthesis skipping, and its parser has already
 // removed them. Ours has not, so `(a).b` would answer false without the unwrap and true with it.
-// Measured against the installed build: `(a).b || ((a).b = c)` is FIXED there, so the parentheses
+// Measured against the installed build: `(a).b || ((a).b = c)` is fixed there, so the parentheses
 // are transparent to this question and the unwrap reproduces upstream rather than widening it.
 func logicalAssignmentIsSimpleBase(object *ast.Node) bool {
 	object = logicalAssignmentUnwrapParentheses(object)
@@ -737,7 +737,7 @@ func logicalAssignmentIsSimpleBase(object *ast.Node) bool {
 // logicalAssignmentContainsOptionalChain answers whether an expression is an optional chain, which
 // is upstream's ChainExpression wrapper.
 //
-// Upstream refuses a computed key that is a ChainExpression, and its wrapper sits at the OUTERMOST
+// Upstream refuses a computed key that is a ChainExpression, and its wrapper sits at the outermost
 // position of the whole chain, so `a[b?.c]` is refused while `a[b.c]` is refused too by the
 // member-expression arm above. The corpus pins `a[b?.c] || (a[b?.c] = d)` as suggested rather than
 // fixed.
@@ -830,17 +830,17 @@ func (state *logicalAssignmentState) checkAssignment(node *ast.Node) {
 		return
 	}
 
-	// The right side IS unwrapped, and this is the parenthesis divergence in its subtle direction.
+	// The right side is unwrapped, and this is the parenthesis divergence in its subtle direction.
 	//
 	// Upstream's selector tests `right.type === "LogicalExpression"`, and its parser records the
 	// parentheses around a whole expression in `extra` rather than as a node, so a fully
-	// parenthesized right side still MATCHES there. Ours wraps it, so without this unwrap
+	// parenthesized right side still matches there. Ours wraps it, so without this unwrap
 	// `a = (a || b || c)` finds nothing. Measured against the installed build: it reports and
 	// fixes to `a ||= (b || c)`, keeping the parentheses that survive the deleted prefix.
 	//
 	// This is the opposite of the stop inside logicalAssignmentLeftmostOperand, and the pair is
-	// what the corpus separates: the OUTER parentheses are transparent, while parentheses around an
-	// INNER operand are a deliberate grouping the rule refuses to re-associate across. `a = (a || b)
+	// what the corpus separates: the outer parentheses are transparent, while parentheses around an
+	// inner operand are a deliberate grouping the rule refuses to re-associate across. `a = (a || b)
 	// || c` is clean for that second reason while `a = (a || b || c)` reports for this first one.
 	right := logicalAssignmentUnwrapParentheses(assignment.Right)
 	if right == nil || right.Kind != ast.KindBinaryExpression {
@@ -880,7 +880,7 @@ func logicalAssignmentIsLogicalOperator(operator ast.Kind) bool {
 //
 // `a = a || b || c` parses left-associatively, so the target sits at the bottom of a left spine of
 // same-operator logical expressions. Walking down it is what lets that input report. The walk stops
-// at a PARENTHESIZED operand, because `a = (a || b) || c` groups deliberately and upstream declines
+// at a parenthesized operand, because `a = (a || b) || c` groups deliberately and upstream declines
 // to re-associate across an explicit grouping. That stop is why the walk cannot simply unwrap.
 func logicalAssignmentLeftmostOperand(sourceFile *ast.SourceFile, node *ast.Node) *ast.Node {
 	operator := node.AsBinaryExpression().OperatorToken.Kind
@@ -900,7 +900,7 @@ func logicalAssignmentLeftmostOperand(sourceFile *ast.SourceFile, node *ast.Node
 		// the parser cannot produce. Subsumed rather than unreachable: the branch is reached, and
 		// the branch below answers identically.
 		//
-		// The DELIBERATE non-unwrapping here is the load-bearing part and it is easy to lose while
+		// The deliberate non-unwrapping here is the load-bearing part and it is easy to lose while
 		// simplifying. Unwrapping the operand would make `a = (a || b) || c` report, which upstream
 		// treats as an explicit grouping it refuses to re-associate across.
 		if left.Kind != ast.KindBinaryExpression ||
@@ -1073,7 +1073,7 @@ func (state *logicalAssignmentState) logicalFixNeedsOuterParentheses(node *ast.N
 // checkIfStatement is the third shape: `if (a) a = b`, which fires only under
 // enforceForIfStatements.
 //
-// The condition has to be an EXISTENCE check on the same reference the body assigns to, and
+// The condition has to be an existence check on the same reference the body assigns to, and
 // upstream recognises five spellings of that check. An `if` with an `else` is excluded entirely,
 // since the shorthand has nowhere to put the alternative.
 func (state *logicalAssignmentState) checkIfStatement(node *ast.Node) {
@@ -1116,7 +1116,7 @@ func (state *logicalAssignmentState) checkIfStatement(node *ast.Node) {
 	}
 
 	fixes := state.ifFix(node, ifStatement, body, expression, hasBody, operator)
-	// Upstream additionally refuses the widened member-access allowance when the TEST is itself a
+	// Upstream additionally refuses the widened member-access allowance when the test is itself a
 	// logical expression, because the two comparisons in `a === null || a === undefined` each read
 	// the reference, so the collapse changes the read count by more than one.
 	testIsLogical := logicalAssignmentTestIsLogical(ifStatement.Expression)
@@ -1129,7 +1129,7 @@ func (state *logicalAssignmentState) checkIfStatement(node *ast.Node) {
 
 // logicalAssignmentTestIsLogical answers upstream's `ifNode.test.type !== "LogicalExpression"`.
 //
-// Read off the test node WITHOUT unwrapping parentheses, matching upstream, whose parser records a
+// Read off the test node without unwrapping parentheses, matching upstream, whose parser records a
 // parenthesized test as the inner node but whose `test` here would be the wrapper. Measured against
 // the installed build: `if ((a.b === null || a.b === undefined)) a.b = c` is offered as a
 // suggestion there, the same as the unparenthesized spelling, so not unwrapping would diverge.
@@ -1199,7 +1199,7 @@ func (state *logicalAssignmentState) existence(expression *ast.Node) (*ast.Node,
 		}
 	}
 
-	// The two nullish spellings are read off the ORIGINAL expression rather than off `base`,
+	// The two nullish spellings are read off the original expression rather than off `base`,
 	// matching upstream, so a negated nullish comparison falls through to silence.
 	if reference, found := state.implicitNullishComparison(expression); found {
 		return reference, "??", true
@@ -1254,7 +1254,7 @@ func (state *logicalAssignmentState) implicitNullishComparison(
 		return nil, false
 	}
 
-	// Upstream picks the side that IS a reference and reads the other as the nullish literal,
+	// Upstream picks the side that is a reference and reads the other as the nullish literal,
 	// defaulting to left when neither is. That default is why `null == null` falls through: the
 	// left is taken as the reference, and it fails the reference test.
 	reference, nullish := binary.Left, binary.Right
@@ -1385,7 +1385,7 @@ func (state *logicalAssignmentState) ifFix(
 // logicalAssignmentIfFixWouldGlue answers upstream's automatic semicolon insertion guard.
 //
 // Upstream reads two tokens: the one before the `if`, and the first token of the body. It refuses
-// when the previous token is neither `;` nor `{` AND the body's first token is neither an
+// when the previous token is neither `;` nor `{` and the body's first token is neither an
 // identifier nor a keyword. Both halves are needed: `a` on its own line followed by `if (b) a = c`
 // is safe because the body starts with an identifier, which cannot continue the previous
 // expression, while `(a) = c` starts with a parenthesis, which can.
@@ -1480,7 +1480,7 @@ func (state *logicalAssignmentState) prohibit(node *ast.Node) {
 // prohibitFix builds the `never` repair: `a ||= b` becomes `a = a || b`.
 //
 // The operator token is replaced with `=`, and the target text plus the logical operator is written
-// after it. The target text is COPIED from the source rather than re-rendered, so an assertion or
+// after it. The target text is copied from the source rather than re-rendered, so an assertion or
 // an annotation inside it survives.
 //
 // The right operand is parenthesized when it does not bind tighter than the new logical operator,
@@ -1500,10 +1500,10 @@ func (state *logicalAssignmentState) prohibitFix(
 
 	text := state.ctx.SourceFile.Text()
 	operatorRange := rule.TokenRange(state.ctx.SourceFile, assignment.OperatorToken)
-	// The target text is read off the UNWRAPPED target, because upstream's
+	// The target text is read off the unwrapped target, because upstream's
 	// `sourceCode.getText(assignment.left)` reads a node whose parentheses live in `extra` rather
 	// than in the node's own range. Measured against the installed build: `(a) ||= b` expands to
-	// `(a) = a || b`, so the parentheses survive in place on the left and are NOT repeated in the
+	// `(a) = a || b`, so the parentheses survive in place on the left and are not repeated in the
 	// copy. Reading the wrapped node would write `(a) = (a) || b`, which is the same program and
 	// the wrong text.
 	target := logicalAssignmentUnwrapParentheses(assignment.Left)
@@ -1566,14 +1566,14 @@ func logicalAssignmentIsMixableLogical(operator ast.Kind) bool {
 
 // logicalAssignmentIsSurroundedByParentheses is upstream's `astUtils.isParenthesised`.
 //
-// It asks a purely TOKEN-LEVEL question: is the token immediately before this node an opening
+// It asks a purely token-level question: is the token immediately before this node an opening
 // parenthesis and the token immediately after it a closing one. It does not ask whether those
 // parentheses belong to the node, and that distinction is the whole reason this is written as a
 // text scan rather than as a check on the parent's kind.
 //
 // The case that forced it: `fn(a || (a = 0))` fixes to `fn(a ||= 0)` with no added parentheses,
 // while `fn(1, a || (a = 0))` fixes to `fn(1, (a ||= 0))` with them. The logical expression is a
-// call argument in both. What differs is that a SOLE argument is preceded by the call's own `(`,
+// call argument in both. What differs is that a sole argument is preceded by the call's own `(`,
 // which upstream's token test accepts as surrounding it, and a second argument is preceded by a
 // comma, which it does not.
 //

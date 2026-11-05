@@ -43,7 +43,7 @@ func TestNoConstructorReturnFires(test *testing.T) {
 		{"class C { constructor(a) { if (!a) { return '' } else { a() } } }", 1},
 
 		// added by this port, each measured against the installed rule
-		// a string-literal key spelled `constructor` IS a constructor; upstream reports and our parser agrees
+		// a string-literal key spelled `constructor` is a constructor; upstream reports and our parser agrees
 		{"class C { \"constructor\"() { return 1 } }", 1},
 		// a class expression, which upstream's corpus never writes
 		{"(class { constructor() { return 1 } })", 1},
@@ -55,7 +55,7 @@ func TestNoConstructorReturnFires(test *testing.T) {
 		{"class C { private constructor() { return 1 } }", 1},
 		// an overload signature has no body, so only the implementation reports
 		{"class C { constructor(); constructor() { return 1 } }", 1},
-		// the INNER constructor reports and the outer contributes nothing; this is the case that separates a walk stopping at the first function-like ancestor from one that keeps going
+		// the inner constructor reports and the outer contributes nothing; this is the case that separates a walk stopping at the first function-like ancestor from one that keeps going
 		{"class C { constructor() { class D { constructor() { return 1 } } } }", 1},
 		// two findings from one input, which a fixture asserting one per input would get wrong
 		{"class C { constructor() { if (a) { return 1 } else { return 2 } } }", 2},

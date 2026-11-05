@@ -11,14 +11,14 @@ import (
 //
 // Upstream's corpus is mostly configuration. Every one of its 76 invalid cases declares the global
 // it calls, through an explicit `globals` block, through `sourceType: "commonjs"` for `global`, or
-// through `ecmaVersion: 2020` for `globalThis`, and ZERO of them fire with nothing declared.
+// through `ecmaVersion: 2020` for `globalThis`, and zero of them fire with nothing declared.
 // Measured by extracting the corpus and grouping on what supplies the name: 57 name a `globals`
 // block, 15 rely on `commonjs`, 4 on the ecma version. Replaying `setTimeout("x = 1;")` through the
 // installed eslint 10.8.1 reports once with `setTimeout` declared and not at all without it.
 //
-// cohere has no globals configuration. It asks the checker whether anything in SOURCE declares the
+// cohere has no globals configuration. It asks the checker whether anything in source declares the
 // name, and treats "nothing does" as the global. So a case's configuration translates into which
-// names its PROGRAM declares, and the fixtures below run in one of two programs accordingly.
+// names its program declares, and the fixtures below run in one of two programs accordingly.
 //
 // # Nine sources carry opposite verdicts, and keying a fixture on source alone loses them
 //
@@ -30,7 +30,7 @@ import (
 //	globalThis.setTimeout('foo')   valid at ecmaVersion 6, invalid at ecmaVersion 2020
 //
 // Collapsing those onto one row produced eleven failures that all read as rule defects and were
-// none of them. Five further valid cases carry an EMPTY `globals: {}` block, which is upstream
+// none of them. Five further valid cases carry an empty `globals: {}` block, which is upstream
 // saying the name is deliberately not a global, and they belong in the bare program for the same
 // reason. The split below is on what each case needs declared, not on what it says.
 
@@ -267,7 +267,7 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(test *testing.T) {
 }
 
 // TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared carries the 41 valid cases that need the name
-// NOT to be a global: a local shadow, an unrelated receiver, or upstream's empty `globals: {}`.
+// not to be a global: a local shadow, an unrelated receiver, or upstream's empty `globals: {}`.
 //
 // This is the half of the corpus the rule reads the checker for. Twelve of these are shadows
 // specifically, in every shape that can produce one: a function declaration, a block-scoped const, a
@@ -329,10 +329,10 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(test *testing.T) {
 // TestNoImpliedEvalDivergesFromUpstreamOnStaticValues pins the two corpus cases this port does not
 // reproduce, and records why as a measurement rather than as an opinion.
 //
-// Upstream reports a string first argument by EITHER of two tests. The syntactic one is ported. The
+// Upstream reports a string first argument by either of two tests. The syntactic one is ported. The
 // other is `getStaticValue` from eslint-utils, a constant expression evaluator of roughly 786 lines
 // that follows bindings, folds conditionals, and evaluates about a hundred whitelisted builtin calls
-// whose whitelist is keyed on JavaScript function IDENTITY rather than on names.
+// whose whitelist is keyed on JavaScript function identity rather than on names.
 //
 // The cost of omitting it was measured rather than estimated. Upstream's own rule was copied with
 // the `getStaticValue` call replaced by `null`, and both versions were replayed over all 175 corpus
@@ -340,7 +340,7 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(test *testing.T) {
 // valid case moved at all. A control confirmed the neutered rule still caught a plain string
 // literal, so the two are a real difference rather than a broken instrument.
 //
-// Both divergences are toward SILENCE, the safe direction for a rule proposing no repair: the cost
+// Both divergences are toward silence, the safe direction for a rule proposing no repair: the cost
 // is a missed finding rather than a rewritten file. Counted with the TypeScript parser over 3,469
 // files in the ahra tree, neither shape occurs: 206 calls to the three eval-like functions and not
 // one passes a string, a template, a concatenation, or a const-bound string.
@@ -354,7 +354,7 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(test *testing.T) {
 	cases := []struct {
 		source string
 		// upstreamIds is what eslint reports for this case. It is recorded rather than asserted,
-		// because the assertion below is that this port is SILENT. A later change that closes the
+		// because the assertion below is that this port is silent. A later change that closes the
 		// gap should turn these into the expectation and fail here first.
 		upstreamIds []string
 	}{
@@ -438,7 +438,7 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(test *testing.
 // check, which upstream's corpus cannot exercise.
 //
 // Upstream walks only four receiver names, `global`, `window`, `globalThis` and `self`, because
-// those are the ones that ARE the global object. Every other receiver names an ordinary object
+// those are the ones that are the global object. Every other receiver names an ordinary object
 // whose `setTimeout` is its own method, and calling it with a string runs nothing.
 //
 // The corpus tests this only with receivers that are not globals at all, such as `foo.setTimeout`,
@@ -446,7 +446,7 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(test *testing.
 // imported cases. Found by mutation: replacing the candidate-name test with `if false` survived the
 // whole corpus.
 //
-// The distinguishing input is a receiver that is a REAL declared global and is not one of the four.
+// The distinguishing input is a receiver that is a real declared global and is not one of the four.
 // `document` is the natural one and it is in this codebase's own globals list. Measured against
 // eslint 10.8.1 with each name declared: `document.setTimeout('x')`, `navigator.setTimeout('x')` and
 // `top.setTimeout('x')` all report zero, while `window.setTimeout('x')` reports one, with nothing
@@ -454,7 +454,7 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(test *testing.
 func TestNoImpliedEvalDeclinesAGlobalReceiverOutsideTheCandidateSet(test *testing.T) {
 	test.Parallel()
 
-	// A program declaring three globals that are NOT global-object candidates, each carrying a
+	// A program declaring three globals that are not global-object candidates, each carrying a
 	// method with an eval-like name. Without these declarations the receiver would be declined for
 	// being undeclared and the case would pass for the wrong reason.
 	const nonCandidateGlobals = `interface ImpliedEvalOrdinaryObject {
@@ -499,7 +499,7 @@ declare var top: ImpliedEvalOrdinaryObject;
 // TestNoImpliedEvalDeclinesAVariableBracketKey covers the guard that refuses to read a bare
 // identifier as a bracketed property name, which upstream's corpus never writes.
 //
-// `window[setTimeout]('x')` reads whichever property the VARIABLE `setTimeout` names, which is not
+// `window[setTimeout]('x')` reads whichever property the variable `setTimeout` names, which is not
 // knowable before it runs, so it is not a call to the global's `setTimeout` at all. Upstream
 // declines it through `getStaticPropertyName`, which returns null for a computed key that is a bare
 // identifier. Measured against eslint 10.8.1 with both `window` and `setTimeout` declared:
@@ -508,7 +508,7 @@ declare var top: ImpliedEvalOrdinaryObject;
 //
 // The shelf's `property.Name` declines a bare identifier only under `Computed`, which is the shape
 // of an object-literal or class key. An element access hands its key over directly rather than
-// wrapped, so it reaches the `KindIdentifier` arm and is ACCEPTED. That is correct for the shelf's
+// wrapped, so it reaches the `KindIdentifier` arm and is accepted. That is correct for the shelf's
 // other callers and wrong here, so the rule guards it at the call site.
 //
 // Found by mutation: removing the guard survived all 175 imported cases, because the corpus writes
@@ -546,9 +546,9 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(test *testing.T) {
 //
 // The corpus tests the chain only with a repeated candidate, `window.window` and `global.global` and
 // `self.self`, so both halves of the link test are true together in every imported case and a rule
-// that weakened the test from OR to AND passes all of them. Found by mutation.
+// that weakened the test from `OR` to `AND` passes all of them. Found by mutation.
 //
-// The distinguishing input needs a middle link that IS a settled property name but is NOT one of
+// The distinguishing input needs a middle link that is a settled property name but is not one of
 // the four candidates. Measured against eslint 10.8.1 with `window`, `document`, `foo` and
 // `setTimeout` declared: `window.document.setTimeout('x')` and `window.foo.setTimeout('x')` report
 // zero, `window.window.setTimeout('x')` reports one.
@@ -642,7 +642,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(test *testing.T) {
 		})
 	}
 
-	// The control: a parenthesized argument that is NOT a string stays silent, so the cases above
+	// The control: a parenthesized argument that is not a string stays silent, so the cases above
 	// are the unwrap finding a string rather than the rule reporting any parenthesized argument.
 	for _, source := range []string{
 		"setTimeout((foo))",
@@ -669,7 +669,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(test *testing.T) {
 //	(window).setTimeout('x')        (window).window.setTimeout('x')
 //	((window)).setTimeout('x')      (window)['setTimeout']('x')
 //
-// Only the chain ROOT can carry parentheses. A middle link cannot: `window.(self).setTimeout` is not
+// Only the chain root can carry parentheses. A middle link cannot: `window.(self).setTimeout` is not
 // syntax, so the unwrap inside the walk loop matters on the first turn and is inert afterwards.
 func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(test *testing.T) {
 	test.Parallel()
@@ -702,7 +702,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(test *testing.T) {
 // declaration or removes the nil guard, either of which would buy a vacuous green.
 //
 // Measured on this substrate rather than assumed: `GetSymbolAtLocation` on a nil checker returns
-// nil rather than panicking, so an untyped run goes completely SILENT rather than crashing. Silence
+// nil rather than panicking, so an untyped run goes completely silent rather than crashing. Silence
 // is the more dangerous failure, because every clean fixture then passes for the wrong reason and
 // nothing announces itself.
 //
@@ -734,7 +734,7 @@ func TestNoImpliedEvalRequiresTheTypedHarness(test *testing.T) {
 //
 // `setTimeout()` is upstream's very first valid case and it is also the shape that would index an
 // empty list. No `ExpectFindings` fixture can see a panic, so the sweep reports a survivor
-// identically whether the guard matters or not; this asks what the line PREVENTS rather than what it
+// identically whether the guard matters or not; this asks what the line prevents rather than what it
 // decides.
 //
 // The other shapes here are calls whose callee is a bare keyword rather than a name, which reach the

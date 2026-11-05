@@ -142,7 +142,7 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(test *testing.T) 
 		"obj?.foo.bar.call(obj?.foo, 1, 2);"), "unnecessaryCall")
 }
 
-// A computed access with a STRING LITERAL key, which the imported corpus never writes.
+// A computed access with a string literal key, which the imported corpus never writes.
 //
 // Upstream requires `computed === false`, so `foo["call"](undefined, 1, 2)` is clean. Measured on
 // the installed rule for both method names. The corpus cannot see this: its two computed cases use a
