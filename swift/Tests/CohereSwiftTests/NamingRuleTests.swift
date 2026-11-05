@@ -188,6 +188,73 @@ struct NamingRuleTests {
         )
     }
 
+    /* A finding covers the name swift-format pointed at, from its first byte to its last, counted in UTF-8 bytes. */
+    @Test func lowerCamelCaseCoversTheName() throws {
+        let findings = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("let café = 1, max_bytes = 2"))
+        let finding = try #require(findings.first)
+        #expect(findings.count == 1)
+        #expect(finding.line == 1 && finding.column == 16)
+        #expect(finding.endLine == 1 && finding.endColumn == 25)
+    }
+
+    /* Types are UpperCamelCase with no `_` inside, which swift-format leaves alone, under their own message. */
+    @Test func typesAreUpperCamelCase() {
+        let source = """
+            struct Order_Line<element_Type> {}
+            final class lowercaseWidget {}
+            enum Shape_Kind {}
+            protocol Drawing_Surface { associatedtype canvas }
+            actor Ledger_Writer {}
+            typealias row_Index = Int
+            struct OrderLine<Element> {}
+            struct _Storage {}
+            """
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == [
+                "Order_Line:1", "element_Type:1", "lowercaseWidget:2", "Shape_Kind:3", "Drawing_Surface:4", "canvas:4",
+                "Ledger_Writer:5", "row_Index:6",
+            ]
+        )
+        let finding = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("struct Order_Line {}")).first
+        #expect(finding?.messageId == "alwaysUseUpperCamelCaseForType")
+        #expect(finding?.message.hasPrefix("Rename the struct 'Order_Line' using UpperCamelCase. Swift spells") == true)
+        #expect(finding?.column == 8 && finding?.endColumn == 18)
+    }
+
+    /* A value spelled exactly as the external name it reads is the owner's spelling, and is not judged. */
+    @Test func aValueMirroringTheNameItReadsIsNotJudged() {
+        let source = """
+            import Darwin
+            let DATABASE_URL = ProcessInfo.processInfo.environment["DATABASE_URL"] ?? ""
+            let HOME_DIRECTORY = getenv("HOME_DIRECTORY")
+            let PORT = Int(ProcessInfo.processInfo.environment["PORT"] ?? "") ?? 80
+            let O_RDONLY = Darwin.O_RDONLY
+            let O_WRONLY = (Darwin.O_WRONLY)
+            func check(MAX_SIZE: Int?) {
+                if let MAX_SIZE { use(MAX_SIZE) }
+                guard let MAX_SIZE = MAX_SIZE else { return }
+            }
+            """
+        #expect(Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == ["MAX_SIZE:7"])
+    }
+
+    /* The mirror is exact and read: a renamed upstream value, a key under another name, or a literal held is ours. */
+    @Test func aValueThatMirrorsNothingIsJudged() {
+        let source = """
+            let O_RDONLY_MODE = O_RDONLY
+            let DATABASE_ADDRESS = ProcessInfo.processInfo.environment["DATABASE_URL"]
+            let API_KEY = "API_KEY"
+            let SECRET_NAME = ["SECRET_NAME": 1]
+            let TOKEN_VALUE = environment["\\(prefix)TOKEN_VALUE"]
+            if let CACHE_SIZE = limits["cache_size"] {}
+            """
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == [
+                "O_RDONLY_MODE:1", "DATABASE_ADDRESS:2", "API_KEY:3", "SECRET_NAME:4", "TOKEN_VALUE:5", "CACHE_SIZE:6",
+            ]
+        )
+    }
+
     @Test func leadingUnderscoresAreSwiftFormatsOwnRule() {
         #expect(
             Self.flagged(SwiftFormatRule.noLeadingUnderscores, "let _cache = 1\nlet _ = 2\nfunc _reset() {}\n") == [

@@ -261,62 +261,6 @@
     },
     {
         "engine": "swift",
-        "family": "casing",
-        "case": "us01",
-        "kind": "span",
-        "task": "v1hnsz8",
-        "reason": "reports at the name's start with no end"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us02",
-        "kind": "span",
-        "task": "v1hnsz8",
-        "reason": "reports at each name's start with no end"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us03",
-        "kind": "verdict",
-        "task": "v1hnsz8",
-        "reason": "silent on the type `Order_Line`, since it judges values and not types"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us06",
-        "kind": "span",
-        "task": "v1hnsz8",
-        "reason": "reports at the name's start with no end"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us07",
-        "kind": "verdict",
-        "task": "v1hnsz8",
-        "reason": "reports `DATABASE_URL`, which mirrors the environment key it reads"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us08",
-        "kind": "span",
-        "task": "v1hnsz8",
-        "reason": "reports at the name's start with no end"
-    },
-    {
-        "engine": "swift",
-        "family": "casing",
-        "case": "us09",
-        "kind": "span",
-        "task": "v1hnsz8",
-        "reason": "reports at the base name's start with no end"
-    },
-    {
-        "engine": "swift",
         "family": "long-file",
         "case": "lf01",
         "kind": "span",

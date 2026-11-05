@@ -10,11 +10,12 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "3ff174301bf29fcc8f4e461773ee0afa170c399ba822376e8cd3db08e61c6993"
+    static let sourceDigest = "39f4f9c563e463e4105edc8cec800d99e0de7e19ed1314e88bc3b5ae2720f275"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
         "AlwaysUseLowerCamelCase.alwaysUseLowerCamelCase",
+        "AlwaysUseLowerCamelCase.alwaysUseUpperCamelCaseForType",
         "AlwaysUseLowerCamelCase.incumbentFailed",
         "ConcurrencyNoCheckThenWrite.checkThenWrite",
         "ConcurrencyNoLostUpdate.lostUpdate",
@@ -65,6 +66,14 @@ enum RuleMessages {
                 id: "alwaysUseLowerCamelCase",
                 text:
                     #"\#(swiftFormatFinding). Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."#,
+            )
+        }
+
+        static func alwaysUseUpperCamelCaseForType(declaration: String, name: String) -> Message {
+            Message(
+                id: "alwaysUseUpperCamelCaseForType",
+                text:
+                    #"Rename the \#(declaration) '\#(name)' using UpperCamelCase. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."#,
             )
         }
 

@@ -4,7 +4,8 @@
     "Swift": "cohere-swift/always-use-lower-camel-case"
   },
   "phrases": {
-    "reasoning": "`const` already tells the reader and the compiler the value is immutable, so shouting adds no information. The casing is free to signal scope instead, the way Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in this file. Reserve the shouting form for values that mirror an external system's grammar, where matching the upstream spelling keeps the value greppable across a boundary you do not control."
+    "reasoning": "`const` already tells the reader and the compiler the value is immutable, so shouting adds no information. The casing is free to signal scope instead, the way Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in this file. Reserve the shouting form for values that mirror an external system's grammar, where matching the upstream spelling keeps the value greppable across a boundary you do not control.",
+    "swiftCasing": "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."
   },
   "messages": {
     "noScreamingSnakeCaseExported": {
@@ -20,7 +21,13 @@
       ]
     },
     "alwaysUseLowerCamelCase": {
-      "text": "{{swiftFormatFinding}}. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
+      "text": "{{swiftFormatFinding}}. <<swiftCasing>>",
+      "languages": [
+        "Swift"
+      ]
+    },
+    "alwaysUseUpperCamelCaseForType": {
+      "text": "Rename the {{declaration}} '{{name}}' using UpperCamelCase. <<swiftCasing>>",
       "languages": [
         "Swift"
       ]
