@@ -76,11 +76,12 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 			solutions = fmt.Sprintf(" (%d solution tsconfigs found, %s, whose references reach no project here)",
 				len(found.Ownership.Solutions), strings.Join(found.Ownership.Solutions, ", "))
 		}
-		return 0, false, fmt.Errorf("no %s or %s in %s, any directory above it, or any directory below it that the repository keeps, "+
-			"so there is no project here to check%s (not searched: %d directories .gitignore ignores, %d dependency, build, cache "+
-			"or fixture directories, %d nested repositories): run from inside one, or name it with -tsconfig or -directory",
-			projectMarker, swiftProjectMarker, root, solutions, found.Ignored, found.NeverDescended,
-			len(found.NestedRepositories)+found.Submodules)
+		return 0, false, fmt.Errorf("no %s, %s, %s or %s in %s, any directory above it, or any directory "+
+			"below it that the repository keeps, so there is no project here to check%s (not searched: %d "+
+			"directories .gitignore ignores, %d dependency, build, cache or fixture directories, %d nested "+
+			"repositories): run from inside one, or name it with -tsconfig or -directory",
+			projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, root, solutions, found.Ignored,
+			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
 	if found.isTheLocatedProject(location, locateError) {
 		// The project runs here, and its build lists the directories discovery just did.
@@ -131,7 +132,8 @@ func (found discovery) isTheLocatedProject(location projectLocation, locateError
 
 // notes are the lines a run carries about markers discovery found and did not run, which a reader could have
 // expected checked: those the root's ignorePatterns refuse, solution roots, and projects left with no file of
-// their own. Ignored and dependency directories are not named, since skipping them is what everyone
+// their own. So is a Go module that runs on its own below a workspace, which a reader could have expected
+// the workspace to build. Ignored and dependency directories are not named, since skipping them is what everyone
 // expects, and neither is a nested repository: one inside a program, such as Structure or Base, is checked
 // as part of it, its drift reported read-only, as it always was. They are counted on the summary line.
 func (found discovery) notes() []string {
@@ -144,6 +146,10 @@ func (found discovery) notes() []string {
 	}
 	for _, label := range found.Ownership.Yielding {
 		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
+	}
+	for _, module := range found.UnusedModules {
+		lines = append(lines, fmt.Sprintf("%s runs as its own module: %s does not use it",
+			path.Join(module.Directory, goModuleMarker), path.Join(module.Workspace, goWorkspaceMarker)))
 	}
 	for label := range found.Ownership.SharedDirectory {
 		lines = append(lines, fmt.Sprintf("%s ran with the cache off: another tsconfig's run keeps its cache in the same directory", label))
@@ -388,7 +394,7 @@ func summaryLine(found discovery, runs []projectRun) string {
 		}
 	}
 	engines := []string{}
-	for _, engine := range []projectEngine{engineTypeScript, engineSwift} {
+	for _, engine := range []projectEngine{engineTypeScript, engineSwift, engineGo} {
 		if counts[engine] > 0 {
 			engines = append(engines, fmt.Sprintf("%d %s", counts[engine], engine))
 		}
