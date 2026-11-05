@@ -53,7 +53,7 @@ func rangesFor(test *testing.T, source string) (*Function, *mutation_aliasing.Mu
 	return outermost, InferMutableRanges(outermost)
 }
 
-// rangeOfName returns the range of the value a named binding takes, choosing the LAST definition.
+// rangeOfName returns the range of the value a named binding takes, choosing the last definition.
 //
 // Single-assignment form gives one binding several identifiers, so a name alone is ambiguous. The
 // last one is chosen because these tests ask about a value after its final write, which is the
@@ -132,14 +132,14 @@ func TestRangesAreHalfOpen(test *testing.T) {
 
 // TestRangesSpanTheGapBetweenDisjointWrites is the interval-versus-set proof.
 //
-// A value written at two positions with untouched instructions between them has ONE interval
+// A value written at two positions with untouched instructions between them has one interval
 // covering both plus the gap, not two disjoint spans. Upstream's representation is `{start, end}`
 // and its membership test is a comparison, so the gap is inside the range by construction.
 //
 // This is asserted over a hand-built range rather than over lowered source, deliberately. The
 // widening that produces a two-write range is `AliasingState.mutate`, which needs effect facts this
 // tree does not have, so no source input can produce the shape today. Building it by hand is what
-// makes the REPRESENTATION testable independently of the pass that would populate it, and it is the
+// makes the representation testable independently of the pass that would populate it, and it is the
 // case that would silently pass under a set-of-indices implementation while answering upstream's
 // actual question wrongly.
 func TestRangesSpanTheGapBetweenDisjointWrites(test *testing.T) {
@@ -210,7 +210,7 @@ export function f(c: boolean, items: number[]) {
 	_ = function
 }
 
-// TestRangesWidenAStoreIntoACapturedBinding pins the ONE widening rule that survives the absence of
+// TestRangesWidenAStoreIntoACapturedBinding pins the one widening rule that survives the absence of
 // effect facts.
 //
 // `n` is declared in `outer` and written from a nested arrow, which lowers to `StoreContext`. React
@@ -766,7 +766,7 @@ func unknownCallAndArgumentPhi(test *testing.T, function *Function,
 
 // TestRangesAreIdempotent pins that a second run produces an equal table.
 //
-// `Construct` is famously NOT idempotent in this package, and a pass built beside it inherits the
+// `Construct` is famously not idempotent in this package, and a pass built beside it inherits the
 // suspicion. Every guard here tests the range this pass itself wrote, so a second run reads what
 // the first wrote and changes nothing.
 func TestRangesAreIdempotent(test *testing.T) {
@@ -798,7 +798,7 @@ export function f(c: boolean) {
 // TestRangesRequireEvaluationOrder pins that an unnumbered graph yields nothing rather than
 // nonsense.
 //
-// Opening a range at order zero would write the UNSET value, which reads back as "no range" — a
+// Opening a range at order zero would write the unset value, which reads back as "no range": a
 // wrong answer wearing the shape of a right one. The pass skips instead, so a caller who forgot
 // `Finalize` gets an empty table they can notice.
 func TestRangesRequireEvaluationOrder(test *testing.T) {
@@ -910,7 +910,7 @@ func TestCreateFromMutationPropagatesTransitively(test *testing.T) {
 // TestRangesWidenToCoverAMutatingCall is the case Stage 2 wrote as an under-approximation and
 // Stage 2.5 turned positive.
 //
-// It was originally `TestRangesAreAnUnderApproximation`, asserting the SHORTER answer and carrying
+// It was originally `TestRangesAreAnUnderApproximation`, asserting the shorter answer and carrying
 // an error message instructing whoever made it fail to update the gap list and the package comment.
 // It failed on the first run of the widening, which is the event it existed to detect, and both were
 // updated. Kept as the positive assertion rather than deleted, because the input is the smallest one
@@ -944,15 +944,15 @@ export function f() {
 
 // TestRangesDoNotWidenWithoutAMutation is the two-sided control for the test above.
 //
-// Without it, a widening that extended EVERY range to the end of the function would pass the
+// Without it, a widening that extended every range to the end of the function would pass the
 // positive assertion and read as correct.
 //
-// # The first version of this control was WRONG and the code was right
+// # The first version of this control was wrong and the code was right
 //
 // It was written as the same source with `mutate(o)` replaced by `read(o)`, on the assumption that a
 // call taking a `readonly` parameter would carry no mutation effect. It failed, and the failure was
 // the fixture rather than the widening: `read` appears in no signature table, so it takes the
-// DEFAULT path, which `effects.go` documents as `MutateTransitiveConditionally` on every operand
+// default path, which `effects.go` documents as `MutateTransitiveConditionally` on every operand
 // plus a capture into every other one. An unknown call is assumed to mutate everything handed to it,
 // which is the conservative direction and is upstream's behavior rather than ours.
 //
@@ -1052,16 +1052,16 @@ export function g() {
 
 // TestRangesLeaveParametersUnset pins that a value this function did not define gets no range.
 //
-// Upstream opens a range only at an INSTRUCTION LVALUE. A parameter arrives already defined, so
+// Upstream opens a range only at an instruction lvalue. A parameter arrives already defined, so
 // nothing opens one for it, and `state.create` records it in the aliasing graph without touching
 // `mutableRange`. A pass that opened ranges at operand positions instead would give every parameter
-// a one-instruction range at its first USE, which is a different and wrong analysis: it would claim
+// a one-instruction range at its first use, which is a different and wrong analysis: it would claim
 // the parameter is still being written at the point it is merely read.
 //
 // This is the fixture a mutation sweep demanded. Inverting the `PlaceRoleDefine` filter in the
 // lvalue loop survived the whole suite, and the distinguishing input is exactly this shape:
 // measured, parameter `p` moves from unset to [1,2) under that mutant while every other assertion
-// in this file stays green, because every OTHER value is defined by an instruction before it is
+// in this file stays green, because every other value is defined by an instruction before it is
 // used and so its range is already open by the time the operand loop sees it.
 func TestRangesLeaveParametersUnset(test *testing.T) {
 	test.Parallel()
@@ -1093,7 +1093,7 @@ export function f(p: number) {
 	}
 }
 
-// TestRangeIsSetTreatsEitherFieldAsSet pins that a range with only an end is SET.
+// TestRangeIsSetTreatsEitherFieldAsSet pins that a range with only an end is set.
 //
 // This is a unit assertion rather than one over lowered source, deliberately. The state it
 // describes - an end without a start - cannot be produced by this pass today: measured two-sided
@@ -1126,7 +1126,7 @@ func TestRangeIsSetTreatsEitherFieldAsSet(test *testing.T) {
 // TestBlockFirstOrderFallsBackToTheTerminal pins upstream's `?? block.terminal.id`.
 //
 // An empty block is common in this graph - measured, 4,546 of 28,335 blocks, and 1,198 of those
-// carry phis - so the fallback runs constantly. What it cannot yet change is an ANSWER, because the
+// carry phis - so the fallback runs constantly. What it cannot yet change is an answer, because the
 // only reader is `phiOpensBefore`, whose own precondition needs a widened end that Stage 1 has not
 // landed. A mutation replacing the fallback with zero therefore survived every fixture over lowered
 // source.
@@ -1157,10 +1157,10 @@ func TestBlockFirstOrderFallsBackToTheTerminal(test *testing.T) {
 	}
 }
 
-// TestMutationSitesNameTheMutatedValueNotTheStoredOne pins WHICH value a site names.
+// TestMutationSitesNameTheMutatedValueNotTheStoredOne pins which value a site names.
 //
 // `o.a = v` mutates `o`, not `v`. Upstream's effect for it is `Mutate { value: object }`, and the
-// widening Stage 1 will apply extends the RECEIVER's range. A site naming the stored value instead
+// widening Stage 1 will apply extends the receiver's range. A site naming the stored value instead
 // would hand Stage 1 the wrong identifier and widen a range that was never mutated, which is the
 // unsafe direction: a value would look mutable past the point it settled.
 //
@@ -1206,8 +1206,8 @@ export function f(o: {a: number}) {
 
 // TestRangesStayValidAcrossALoopBackEdge pins the one divergence Stage 2.5 introduces.
 //
-// A loop-carried value is defined at a HIGH evaluation order by the back-edge store, while the
-// mutation that reaches it through the loop's phi happened at a LOWER one. Both upstreams then write
+// A loop-carried value is defined at a high evaluation order by the back-edge store, while the
+// mutation that reaches it through the loop's phi happened at a lower one. Both upstreams then write
 // `start` and `end` from independently-guarded branches and produce an interval whose end is at or
 // before its start, which React's own `validateMutableRange` declares invalid and which its config
 // does not check by default.
@@ -1260,17 +1260,17 @@ export function f(items: number[][]) {
 			"invariant assertion above passed vacuously", widest)
 	}
 
-	// # The loop counter's range must cross the whole loop, which is what pins the BACK-EDGE PHI
+	// # The loop counter's range must cross the whole loop, which is what pins the back-edge phi
 	//
 	// A phi operand whose predecessor block has not been walked yet is deferred to that block and
-	// applied there with the index recorded at DEFERRAL, which is how a back edge gets an index low
+	// applied there with the index recorded at deferral, which is how a back edge gets an index low
 	// enough for a mutation later in the loop to travel through it. Inverting that deferral test
 	// leaves the loop counter at [3,4) instead of [3,23): the widening never crosses the back edge,
 	// so every value defined before the loop reads as settled inside it.
 	//
-	// # Assert on the NARROWEST counter value, not the widest, and that distinction is the whole test
+	// # Assert on the narrowest counter value, not the widest, and that distinction is the whole test
 	//
-	// A first version of this assertion took the WIDEST range among the values named `i` and
+	// A first version of this assertion took the widest range among the values named `i` and
 	// survived the mutation, because single-assignment form gives the counter several identifiers
 	// and the mutant preserves the widest one. Measured on this input, base against mutant:
 	//
@@ -1278,7 +1278,7 @@ export function f(items: number[][]) {
 	//	id 26  `i`  base [4,23)   mutant [4,23)   the loop-header phi
 	//
 	// The phi keeps its widening either way, because the mutation inside the loop reaches it
-	// directly. What the back edge carries is the widening travelling BACK to the value the counter
+	// directly. What the back edge carries is the widening travelling back to the value the counter
 	// held before the loop, and only the initial value can see that. So the narrowest is the
 	// discriminating quantity and the widest is the one that cannot see the guard at all.
 	//
@@ -1317,7 +1317,7 @@ export function f(items: number[][]) {
 
 // TestRangesThirdLoopOpensAWidenedOperand pins the loop Stage 2 omitted and Stage 2.5 restored.
 //
-// # Why this needs a PARAMETER specifically
+// # Why this needs a parameter specifically
 //
 // Stage 2 omitted upstream's third loop, over operands rather than lvalues, after measuring that no
 // value in the corpus reached the state it exists for -- `End > order && Start == 0`, a value whose
@@ -1329,7 +1329,7 @@ export function f(items: number[][]) {
 // A parameter is the clean case and the reason is structural. Every ordinary value is defined by an
 // instruction lvalue, so the lvalue loop opens its start and the third loop has nothing to do. A
 // parameter is never an lvalue of any instruction -- it arrives already defined -- so when a mutation
-// widens its end, NOTHING else can give it a start. Measured on this input: the widening alone
+// widens its end, nothing else can give it a start. Measured on this input: the widening alone
 // leaves `p` at [0,4), which `IsSet` reads as unset because both fields being zero is the unset
 // range, and the third loop is what turns it into [2,4).
 //
@@ -1383,12 +1383,12 @@ export function f(p: number[]) {
 // Every edge and every mutation is stamped with a monotonically increasing index as the graph is
 // built, and the walk refuses to traverse an edge whose index is at or after the mutation's own.
 // That is upstream's model of time: a mutation flows only through aliases that already existed when
-// it happened, so a value aliased AFTER being mutated is not retroactively widened.
+// it happened, so a value aliased after being mutated is not retroactively widened.
 //
-// Removing that test does not change any NAMED value's range on a small input. It widens two
+// Removing that test does not change any named value's range on a small input. It widens two
 // unnamed temporaries that the faithful walk leaves alone, which is invisible to `rangeOfName` and
 // is why a first version of this test, asserting on `inner` and `holder`, passed against the mutant.
-// The assertion is therefore on the SIZE of the widened set, which is the level at which the
+// The assertion is therefore on the size of the widened set, which is the level at which the
 // difference actually appears: ten values here, twelve without the guard.
 //
 // Measured on the corpus rather than argued: over 959 functions in 200 files, dropping this guard
@@ -1443,8 +1443,8 @@ export function f() {
 // # The distinction the guard makes
 //
 // A capture edge records that information flowed from one value into another without aliasing them.
-// Mutating a container does NOT mutate what it holds, so a plain mutation must not walk a capture
-// edge backwards. A TRANSITIVE mutation does reach everything the value transitively holds, so it
+// Mutating a container does not mutate what it holds, so a plain mutation must not walk a capture
+// edge backwards. A transitive mutation does reach everything the value transitively holds, so it
 // must. Upstream gates the backward capture walk on `entry.transitive` for exactly that reason.
 //
 // # Finding an input that can see it took a signature-table method, and that is the point
@@ -1455,7 +1455,7 @@ export function f() {
 // operand, which makes the mutation transitive anyway and the guard vacuous.
 //
 // `Map.prototype.set` is in oxc's global signature table with a `Capture` effect, so it produces a
-// real capture edge alongside a NON-transitive mutation, which is the only shape on which the two
+// real capture edge alongside a non-transitive mutation, which is the only shape on which the two
 // walks disagree. Measured here: `seed` ends at 15 with the guard and at 21 without it, so dropping
 // the guard over-widens a captured parameter by six positions.
 //
@@ -1494,7 +1494,7 @@ export function f(seed: number[]) {
 			"cannot see the guard it exists for")
 	}
 
-	// The later `arr.push` mutates a value `seed` was captured INTO, non-transitively. A walk that
+	// The later `arr.push` mutates a value `seed` was captured into, non-transitively. A walk that
 	// followed the capture edge backwards anyway would carry that mutation back to `seed`.
 	const wantEnd = 15
 	if mutableRange.End != wantEnd {

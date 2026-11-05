@@ -3,7 +3,7 @@
 // This is the only component in cohere that writes to source. Everything else reads: the parser
 // reads bytes, the checker reads the parse, a rule reads the tree and proposes. A proposal is
 // inert until this package decides it lands, which is what lets a rule be written by anyone and
-// still be safe — a rule cannot damage a file it has no way to write to.
+// still be safe: a rule cannot damage a file it has no way to write to.
 //
 // The gate this replaces ran oxlint in check mode even during `lint fix`, and its own comment said
 // why: an unaudited fixer writing across every file is the widest blast radius in the tool. That
@@ -75,7 +75,7 @@ const (
 	// It stays a bare constant rather than naming the winner inline, and the reason is not that a
 	// longer string would break the tally: reasonKey prefix-matches, so `ReasonOverlap + " from X"`
 	// would collapse correctly. ReasonParseFailure is the precedent for when detail belongs in the
-	// string, and its comment says why — the compiler's message is actionable and has nowhere else
+	// string, and its comment says why: the compiler's message is actionable and has nowhere else
 	// to live. An overlap has no such payload. ConflictsWith is already a structured field holding
 	// the identity, so assembling it into the prose would duplicate a field into a string that a
 	// prefix-matcher then strips back off. Detail belongs in the reason only when no field carries it.
@@ -118,14 +118,14 @@ type Plan struct {
 // last one kept. Everything else is refused with the winner named.
 //
 // Determinism is the whole requirement. Two rules fighting over the same bytes is a real
-// disagreement about what the code should say, and no ordering resolves it correctly — but an
+// disagreement about what the code should say, and no ordering resolves it correctly. But an
 // ordering that varies run to run turns one disagreement into a file that changes shape depending
 // on map iteration order, which is far worse than picking the earlier one and saying so. The
 // refusal is reported, so a pair of rules that fight constantly shows up as a number rather than
 // as a mystery.
 //
 // A pure insertion (an empty range) is a real edit at a point and is treated as occupying no
-// bytes, so two insertions at the same point do not both land — the second is refused rather than
+// bytes, so two insertions at the same point do not both land: the second is refused rather than
 // silently interleaved with the first, because the order they would apply in is exactly the
 // ambiguity this function exists to remove.
 func resolveOverlaps(proposals []Proposal) Plan {
@@ -184,7 +184,7 @@ func resolveOverlaps(proposals []Proposal) Plan {
 // Back to front is the whole trick, and it is worth stating why rather than trusting the reader to
 // reconstruct it. Every fix carries offsets measured against the text as the rule saw it. Applying
 // the earliest fix first changes the length of everything after it, so every later fix is then
-// pointing at text that moved — by a delta that depends on all the edits before it. Applying from
+// pointing at text that moved, by a delta that depends on all the edits before it. Applying from
 // the end means each edit only ever disturbs bytes that no remaining fix refers to, so no offset
 // is ever recomputed and there is no arithmetic to get wrong. This is exactly where an off-by-one
 // corrupts a file quietly instead of failing loudly.
@@ -227,7 +227,7 @@ func applyToText(text string, plan Plan) (string, Plan) {
 
 // Resolve turns a set of proposals into a plan without applying it.
 //
-// Exposed so a caller can see what would land — `--no-fix` reporting, and the tests that prove the
+// Exposed so a caller can see what would land: `--no-fix` reporting, and the tests that prove the
 // overlap rule picks who it says it picks.
 func Resolve(proposals []Proposal) Plan {
 	return resolveOverlaps(proposals)
@@ -244,8 +244,8 @@ func Resolve(proposals []Proposal) Plan {
 // The fixes of one diagnostic are flattened into independent proposals, and a rule author writing a
 // multi-fix report should know what that costs. Two fixes reported together are not treated as one
 // atomic edit: overlap resolution judges them separately, so it may admit one and refuse the other.
-// For a pair that only makes sense together — wrapping a span in an opening and a closing token, the
-// obvious example — that is a half-application, and the result can be well-formed enough to parse
+// For a pair that only makes sense together (wrapping a span in an opening and a closing token, the
+// obvious example), that is a half-application, and the result can be well-formed enough to parse
 // while meaning something nobody proposed.
 //
 // No shipped rule does this today. Every ReportNodeWithFixes site emits exactly one fix, so the

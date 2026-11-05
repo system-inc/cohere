@@ -26,7 +26,7 @@ func isBreakableStatement(node *ast.Node) bool {
 // Keeping the outer label is a known deviation. ESLint attaches only the
 // innermost one, so a `continue` naming an outer label finds no loop there and
 // its back edge is dropped. It surfaces where a loop's exit hangs off that edge
-// — a `do…while`, whose test runs only from it — leaving what follows the loop
+// (a `do…while`, whose test runs only from it), leaving what follows the loop
 // reachable here and unreachable in ESLint, which `no-useless-return`,
 // `no-unreachable-loop` and `no-useless-assignment` all read.
 func labelsOf(node *ast.Node) []string {
@@ -63,9 +63,9 @@ func isAlwaysTruthyTest(node *ast.Node) bool {
 		// and reads `.Text == "0"` the same way.
 		return unwrapped.AsNumericLiteral().Text != "0"
 	case ast.KindBigIntLiteral:
-		// A BigInt literal is NOT normalized the way a numeric one is, which is the asymmetry that
+		// A BigInt literal is not normalized the way a numeric one is, which is the asymmetry that
 		// makes this branch load-bearing rather than redundant. Probed on our parser: `0n` arrives
-		// as "0n" and `0x0n` as "0x0n" — the `n` suffix survives, and a hex or binary spelling
+		// as "0n" and `0x0n` as "0x0n": the `n` suffix survives, and a hex or binary spelling
 		// survives with it, though `0b0n` and `0o0n` do arrive as "0n". So a bare `.Text != "0"`
 		// would call every zero BigInt truthy and mark the code after `while (0n)` unreachable.
 		return normalizeBigIntLiteral(unwrapped.AsBigIntLiteral().Text) != "0"
@@ -116,7 +116,7 @@ func isThrowableIdentifier(node *ast.Node) bool {
 //
 // Inlined from rslint's `utils.NormalizeBigIntLiteral` rather than imported, because that package
 // is the linter's whole shared shelf and this graph needs two lines of it. The numeric sibling was
-// dropped entirely — see `isAlwaysTruthyTest` for the measurement that says why one survived and
+// dropped entirely. See `isAlwaysTruthyTest` for the measurement that says why one survived and
 // one did not.
 //
 // `big.Int` rather than `strconv.ParseInt` because BigInt is arbitrary precision by definition and

@@ -36,7 +36,7 @@ const (
 	RegexCharSingle RegexCharElementKind = iota
 	// RegexCharRange is a character range `a-b` (inclusive on both ends).
 	// Value is the `a` side; Max is the `b` side. Only the min/max endpoints
-	// appear in the resulting character sequence — the inner characters are
+	// appear in the resulting character sequence: the inner characters are
 	// implicit.
 	RegexCharRange
 	// RegexCharBreaker is any element that interrupts a contiguous character
@@ -285,7 +285,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 // prior call to IterateRegexCharacterClasses).
 //
 // Note: nested v-flag classes themselves are not recursed into by this
-// function — they appear only as RegexCharBreaker. Callers that want to scan
+// function: they appear only as RegexCharBreaker. Callers that want to scan
 // nested classes should iterate them via IterateRegexCharacterClasses and
 // call ParseRegexCharacterClass on each separately.
 func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]RegexCharElement, int, bool) {
@@ -363,7 +363,7 @@ func parseRegexCharacterClass(
 				out = append(out, el)
 				pendingIndex = len(out) - 1
 				// Under non-u/v mode, a raw astral character or a `\u{H}` with H>0xFFFF
-				// should emit TWO units. But class escapes only produce 1 unit per call;
+				// should emit two units. But class escapes only produce 1 unit per call;
 				// astral raw chars are handled in the `default` case below, and `\u{H}`
 				// under u/v produces the combined code point (one element). Under non-u,
 				// `\u{H}` is not recognized at all (treated as identity `u`).
@@ -371,7 +371,7 @@ func parseRegexCharacterClass(
 			index += step
 
 		case character == '[' && flags.UnicodeSets:
-			// v-flag nested class — emit as breaker; caller recurses via
+			// v-flag nested class: emit as breaker; caller recurses via
 			// IterateRegexCharacterClasses to parse nested contents.
 			nestedEnd, ok := ClassEnd(pattern, index, flags)
 			if !ok {
@@ -385,7 +385,7 @@ func parseRegexCharacterClass(
 			flags.UnicodeSets &&
 			index+1 < len(pattern) &&
 			pattern[index+1] == character:
-			// v-flag set operator `--` or `&&` — breaker
+			// v-flag set operator `--` or `&&`: breaker
 			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2})
 			index += 2
 			pendingIndex = -1
@@ -439,8 +439,8 @@ func parseRegexCharacterClass(
 			if el.Kind == RegexCharSingle {
 				out = append(out, el)
 				pendingIndex = len(out) - 1
-				// Note: we do NOT split raw astrals into surrogate pairs here
-				// — callers (e.g. the misleading-character-class rule) decide
+				// Note: we do not split raw astrals into surrogate pairs here.
+				// Callers (e.g. the misleading-character-class rule) decide
 				// per-flag whether to expand them, based on the rule's own
 				// semantic needs. See IsLoneSurrogate on the element.
 			}
@@ -573,7 +573,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		return RegexCharElement{Kind: RegexCharSingle, Value: '\f', Start: index, End: index + 2}, 2, true
 	case '0':
 		// In u/v mode `\0` is always NUL (no octal extension). In non-u
-		// mode, if followed by a digit it's a legacy octal — but legacy
+		// mode, if followed by a digit it's a legacy octal, but legacy
 		// octals aren't meaningful for this project's detectors, so treat
 		// as NUL for simplicity.
 		return RegexCharElement{Kind: RegexCharSingle, Value: 0, Start: index, End: index + 2}, 2, true
@@ -586,7 +586,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}
 		return RegexCharElement{}, 0, false
 	}
-	// Identity escape — value is the (possibly multi-byte) character after `\`.
+	// Identity escape: value is the (possibly multi-byte) character after `\`.
 	character, size := utf8.DecodeRuneInString(pattern[index+1:])
 	if size == 0 {
 		return RegexCharElement{}, 0, false
@@ -601,11 +601,11 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 
 // readRawClassChar reads a non-`\`-prefixed character inside a class body
 // (i.e. a raw character at pattern[index]). Raw astral in non-u/v mode emits
-// the HIGH surrogate only — callers handle the low-surrogate companion by
+// the high surrogate only: callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
 //
 // To keep the protocol simple, ParseRegexCharacterClass calls this once and
-// trusts the single element returned; we do NOT split raw astrals here. The
+// trusts the single element returned; we do not split raw astrals here. The
 // misleading-character-class rule accepts this because it gets raw astrals
 // only in string-literal contexts, where the layer-3 parser already does the
 // UTF-16 surrogate split.

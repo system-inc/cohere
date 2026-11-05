@@ -34,7 +34,7 @@ func hoistableFor(test *testing.T, source string) (*Function, *ReactiveScopes, S
 //
 // `dependencies.go` shipped with every dependency truncated to its bare root -- 4,426 of 4,426 with
 // an empty path -- because `addDependency` stops at the first entry it cannot prove hoistable. The
-// measurement that shows this analysis works is therefore the PATH-LENGTH DISTRIBUTION, before and
+// measurement that shows this analysis works is therefore the PATH-length distribution, before and
 // after, over 400 corpus files and 677 functions:
 //
 //	path length      0      1     2     3    4+
@@ -46,22 +46,22 @@ func hoistableFor(test *testing.T, source string) (*Function, *ReactiveScopes, S
 // a real path and the total moves from 4,426 to 4,559, because a scope that reported one truncated
 // root can report two distinct deeper paths once they stop collapsing together.
 //
-// The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus.
+// The thresholds below are far looser than those numbers. This guards the shape, not the corpus.
 func TestHoistableAnalysisDeepensDependencyPaths(test *testing.T) {
 	test.Parallel()
 
 	// # Why this fixture and not a simpler one
 	//
 	// The first two attempts here used a single object literal reading `props.configuration.alpha`, and
-	// BOTH produced zero deep paths while the corpus test passed with 171. A fixture failing against
+	// both produced zero deep paths while the corpus test passed with 171. A fixture failing against
 	// working code means the fixture is wrong, so the shape was taken from a real corpus function
 	// (`parseListType` in `GraphQlOperationsMetadataPlugin.ts`) rather than invented again.
 	//
-	// What the invented fixtures missed: a scope that reads its root BARE anywhere collapses every
+	// What the invented fixtures missed: a scope that reads its root bare anywhere collapses every
 	// deeper path into that root, because `deriveMinimalDependencies` correctly prunes a subtree
 	// under a node already marked a dependency. Depending on all of `props` subsumes
-	// `props.configuration.alpha`. The shape that actually exercises path depth is REPEATED deep reads
-	// across BRANCHES with no bare read of the root -- which is also precisely the shape the
+	// `props.configuration.alpha`. The shape that actually exercises path depth is repeated deep reads
+	// across branches with no bare read of the root -- which is also precisely the shape the
 	// backward pass exists to serve, since it proves the deref safe above the branch.
 	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function parseListType(listType) {
@@ -156,14 +156,14 @@ func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(test *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Termination, which is a BOUND rather than a proof
+// Termination, which is a bound rather than a proof
 // ---------------------------------------------------------------------------
 
 // TestHoistableConvergenceIsFarInsideTheBound measures how close real code comes to the cap.
 //
 // The outer loop is capped at 100 alternating passes. That cap is not decoration: the monotonicity
 // argument that would make this a true fixpoint does not close, because `reduceOptionalChains`
-// REPLACES nodes rather than adding them. So the honest claim is a bound, and a bound that is
+// replaces nodes rather than adding them. So the honest claim is a bound, and a bound that is
 // routinely brushed is a materially different fact from one never approached.
 //
 // Measured over 400 corpus files and 677 functions:
@@ -205,7 +205,7 @@ func TestHoistableConvergenceIsFarInsideTheBound(test *testing.T) {
 // TestHoistableReportsRatherThanHidingNonConvergence pins the divergence from oxc.
 //
 // React raises a hard invariant when the loop fails to converge. oxc writes `for _ in 0..100` and
-// EXITS silently, so a truncated answer is indistinguishable from a converged one. A linter can do
+// exits silently, so a truncated answer is indistinguishable from a converged one. A linter can do
 // neither, so it reports -- and this pins that the reporting channel exists and answers true on
 // ordinary input, because a `Converged` that returned false everywhere would be just as useless as
 // one that always returned true.
@@ -230,7 +230,7 @@ func TestHoistableReportsRatherThanHidingNonConvergence(test *testing.T) {
 	}
 }
 
-// TestOptionalChainReductionTerminates pins the inner loop, which has NO bound at all.
+// TestOptionalChainReductionTerminates pins the inner loop, which has no bound at all.
 //
 // `reduceOptionalChains` is an unbounded `do/while` upstream and here. It terminates because each
 // replacement strictly decreases the number of optional entries in a path, and a path has finitely
@@ -271,7 +271,7 @@ func TestOptionalChainReductionTerminates(test *testing.T) {
 
 // TestForwardPropagationIntersectsRatherThanUnions pins soundness of the forward direction.
 //
-// A value is non-null at a join only if it was non-null on EVERY path reaching it. Unioning instead
+// A value is non-null at a join only if it was non-null on every path reaching it. Unioning instead
 // would let one branch's dereference vouch for a path the other branch never took, which is the
 // over-approximating direction that invents crashes.
 func TestForwardPropagationIntersectsRatherThanUnions(test *testing.T) {
@@ -304,7 +304,7 @@ func TestForwardPropagationIntersectsRatherThanUnions(test *testing.T) {
 // A top-level scope beginning inside a branch is seeded with that branch's own facts.
 //
 // The intersection above covers the join: after an `if`, a fact true on one arm alone is gone. This
-// covers the other half, which the intersection cannot reach. A scope whose first block sits INSIDE
+// covers the other half, which the intersection cannot reach. A scope whose first block sits inside
 // the arm is asking a block where the fact is still true, and upstream's keying -- which this tree
 // reproduces exactly -- hands it that block's set.
 //
@@ -483,7 +483,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// the real flag makes genuine disagreements visible, which is the point -- upstream raises on
 	// these, and being unable to see them at all is worse than counting one.
 	//
-	// The seam that produced them is the nested-function hoistable seed, which is assembled AFTER
+	// The seam that produced them is the nested-function hoistable seed, which is assembled after
 	// `reduceOptionalChains` has run and so can reintroduce the duplicates upstream's constructor
 	// documents as its precondition ("we expect these to not contain duplicates (e.g. both `a?.b`
 	// and `a.b`)"). `appendWithoutOptionalDuplicates` restores that precondition per prefix and
@@ -509,10 +509,10 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 
 	// # Why these are exact rather than loose bounds
 	//
-	// The first sweep against this file produced SEVEN survivors from seven mutants, which is the
+	// The first sweep against this file produced seven survivors from seven mutants, which is the
 	// shape of a broken harness rather than a weak suite -- so the harness was checked first, by
 	// neutralising the analysis entirely, and it was caught. The survivors were therefore real, and
-	// reading them found what they share: each moves a DIFFERENT quantity by a small amount, and
+	// reading them found what they share: each moves a different quantity by a small amount, and
 	// every assertion above was a loose bound that all of them satisfied.
 	//
 	// Measured, one mutant at a time, against a baseline of 171 deep / 1,434 flat / 2 iterations:
@@ -523,9 +523,9 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	//	immutability gate always true                 172 / 1,433, one path GAINED
 	//	component seed ungated                        171 / 1,434, unchanged
 	//
-	// The distinguishing quantity is a COUNT OVER A TABLE rather than any named value, which is why
+	// The distinguishing quantity is a count over A table rather than any named value, which is why
 	// the exact figures are asserted here. The immutability row is the one that matters most: a
-	// mutant that GAINS a path is moving in the over-approximating direction, the one that invents
+	// mutant that gains a path is moving in the over-approximating direction, the one that invents
 	// crashes, and only an exact count can see it -- every "at least one deep path" assertion in
 	// this file passes happily while it does so.
 	//
@@ -548,7 +548,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// `useCallback-nonescaping-invoked-callback-escaping-return`. Both are dependencies upstream
 	// infers and we did not.
 	//
-	// So these ranges were WRONG before, not conservative: a scope whose range did not contain its
+	// So these ranges were wrong before, not conservative: a scope whose range did not contain its
 	// own instructions made the hoistable analysis unable to prove accesses it should have proven.
 	// Measured, scopes covering the order of none of their own members: 2,345 of 3,357 before the
 	// fix, 0 after.
@@ -558,7 +558,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// and it is recorded rather than buried; it is smaller than two recovered true dependencies and
 	// a corrected invariant.
 	//
-	// # Both counts moved again when `isDeferredDependency` landed, and this gain in `deep` is NOT
+	// # Both counts moved again when `isDeferredDependency` landed, and this gain in `deep` is not
 	// over-approximation
 	//
 	// Transcribing upstream's `isDeferredDependency` -- skip an instruction whose lvalue is in the
@@ -596,7 +596,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// now invalidates on the field the callback actually reads.
 	//
 	// The oracle is unmoved -- 76 matched of 88, ours 158 against upstream's 116, identical before
-	// and after -- so it cannot adjudicate this one either way. What it CAN say is that nothing was
+	// and after -- so it cannot adjudicate this one either way. What it can say is that nothing was
 	// lost: `matched` did not fall and `ours` did not rise, so no dependency was dropped and none
 	// was invented. The eleven are on corpus files rather than on scored fixtures.
 	// # And again when `.current` reads stopped being dependencies
@@ -606,7 +606,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// with the comment "ref.current access is not a valid dep", because a scope must depend on the
 	// ref object rather than on the mutable slot inside it.
 	//
-	// A FALL in `deep` is the direction this heading calls safe, and the oracle agrees it cost
+	// A fall in `deep` is the direction this heading calls safe, and the oracle agrees it cost
 	// nothing: 78 matched of 88 with `ours` at 158, identical before and after.
 	// # And again when the dependency array stopped being evidence
 	//
@@ -638,7 +638,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// scope now stand alone. More scopes name a dependency, and fewer of those dependencies sit
 	// deep enough inside a widened range to carry a path.
 	//
-	// `deep` FALLING is the safe direction by this test's own rule -- a gain in depth is the
+	// `deep` falling is the safe direction by this test's own rule -- a gain in depth is the
 	// over-approximating one -- and the scope oracle agrees rather than merely not objecting:
 	// surviving scopes 114 to 108 against upstream's 97, and exact per-fixture agreement 26 to 30.
 	// # And again when three `Object.*` entries gained their aliasing signatures
@@ -676,7 +676,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// `dependency_oracle_test.go` and at `knownSurvivedExact` in `scope_oracle_test.go`.
 	// # And again when a property read off a frozen object stayed frozen
 	//
-	// 625 deep to 588, 2,023 flat to 2,203. `deep` FALLING is the safe direction by the rule above,
+	// 625 deep to 588, 2,023 flat to 2,203. `deep` falling is the safe direction by the rule above,
 	// and here an oracle says so outright rather than merely not objecting: the dependency count
 	// reaches upstream's exactly, 114 to 116 against 116, with `matched` unmoved at 74. Both added
 	// rows are therefore ones upstream also produces.
@@ -697,7 +697,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	//
 	// 610 deep to 615, 2,346 flat to 2,376. `deep` rising is the over-approximating direction and no
 	// oracle endorses it, which is why the move is small and the reason is fidelity rather than a
-	// gain: upstream prunes a capture whose DESTINATION is not mutable, in the same arm and the same
+	// gain: upstream prunes a capture whose destination is not mutable, in the same arm and the same
 	// comment as the source half -- "If the destination is not mutable, or the source value has
 	// copy-on-write semantics, then we can prune the effect".
 	//
@@ -716,7 +716,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// # And again when a scope inside a branch stopped being seeded from that branch
 	//
 	// 615 deep to 576, 2,379 flat to 2,414. Thirty-nine paths become shallow, and this is the only
-	// entry here where `deep` FALLS. That is the conservative direction the rule above asks for: a
+	// entry here where `deep` falls. That is the conservative direction the rule above asks for: a
 	// property proven non-null only under an `if` no longer licenses the walk to descend past it
 	// when the scope asking began inside that same `if`.
 	//
@@ -730,7 +730,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	//
 	// The old 576 / 2,414 pin ran range and scope inference directly after `Construct`, while the
 	// production path had moved to Outline -> InferReactive -> Drop -> inclusive Inline -> Merge ->
-	// DCE. On the final tree, the old probe reports 622 / 2,778 and the production-aligned probe
+	// `DCE`. On the final tree, the old probe reports 622 / 2,778 and the production-aligned probe
 	// reports 626 / 2,731: alignment recovers four deep paths and removes 47 flat dependencies that
 	// do not survive the real prefix.
 	//
@@ -749,7 +749,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	// lifetime rather than added path depth.
 	// # Re-pinned 2026-09-06: 2,764 to 2,809 flat, deep unchanged at 626
 	//
-	// This distribution is measured over a LIVE directory, not a frozen fixture, so it moves when
+	// This distribution is measured over a live directory, not a frozen fixture, so it moves when
 	// that directory does. Between the previous pin and this one the corpus gained 151 uncommitted
 	// files and an import-aliasing pass applied by this tool's own fixer, which is precisely the
 	// kind of edit a dependency analysis is supposed to notice: 45 more root-only dependencies, no

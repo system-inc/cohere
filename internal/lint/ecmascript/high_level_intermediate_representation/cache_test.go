@@ -22,7 +22,7 @@ export function Widget({items}: {items: number[]}) {
 }
 `
 
-// totalPhis counts phis across a function AND every nested function.
+// totalPhis counts phis across a function and every nested function.
 //
 // `CollectSSAStats` reports the top-level function only, which is why the first version of the test
 // below could not see the defect it exists to catch: repeated construction adds phis wherever the
@@ -42,14 +42,14 @@ func totalPhis(function *Function) int {
 	return total
 }
 
-// TestForFunctionLowersOncePerFunction is the assertion that the cache is HIT.
+// TestForFunctionLowersOncePerFunction is the assertion that the cache is hit.
 //
 // A faster timing number cannot distinguish a cache that hits perfectly from one that never hits,
 // so this counts. It asks for the same function three times, the way the three react rules do, and
 // requires exactly one lowering.
 //
 // It runs against the real `ForFunction` and a real `rule.Context` from the typed harness rather
-// than against a stand-in cache, because the property under test is that the PRODUCTION path shares
+// than against a stand-in cache, because the property under test is that the production path shares
 // work. Counting is possible without a hook into `Lower` because a lowering is a distinct pointer
 // every time it runs: three asks returning one pointer is one lowering.
 func TestForFunctionLowersOncePerFunction(test *testing.T) {
@@ -95,7 +95,8 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 		test.Fatal("the probe function did not lower, so this test proves nothing")
 	}
 	if results[1] != results[0] || results[2] != results[0] {
-		test.Errorf("each ask lowered again: %p, %p, %p — the cache is not being hit",
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Errorf("each ask lowered again: %p, %p, %p \u2014 the cache is not being hit",
 			results[0], results[1], results[2])
 	}
 	if directLowering == results[0] {
@@ -144,11 +145,13 @@ func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	if firstPhis == 0 {
-		test.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected — " +
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected \u2014 " +
 			"this test would pass against any implementation")
 	}
 	if firstPhis != lastPhis {
-		test.Errorf("repeated asks changed the graph: %d phis then %d — Construct ran more than once",
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Errorf("repeated asks changed the graph: %d phis then %d \u2014 Construct ran more than once",
 			firstPhis, lastPhis)
 	}
 }
@@ -197,7 +200,7 @@ func TestForFunctionWithoutCacheStillLowers(test *testing.T) {
 // shared-fill accounting, which is what moves the lowering cost off whichever rule asked first.
 //
 // This is the second independent check that a hit is real. The pointer test shows one object comes
-// back; this shows the cache recorded exactly one FILL for the function, so the work ran once by
+// back; this shows the cache recorded exactly one fill for the function, so the work ran once by
 // the cache's own accounting rather than only by identity.
 func TestForFunctionRecordsOneFillPerFunction(test *testing.T) {
 	test.Parallel()

@@ -15,7 +15,7 @@ import (
 // its own population and refuses to render a verdict that its population does not support.
 //
 // The two guards below fail in opposite directions and a sweep needs both. FilesLinted catches a
-// detector that was handed nothing to examine — the case a planted-violation control sails straight
+// detector that was handed nothing to examine: the case a planted-violation control sails straight
 // past, because a control file is itself a file and a harness linting only that one file would
 // still flag it. ControlDetected catches a detector that cannot detect at all, which a healthy
 // file count says nothing about.
@@ -103,7 +103,7 @@ type ControlResult struct {
 
 	// ExpectedSide is the gate that should see this violation. A control that only cohere can see
 	// and a control that only the gate can see prove different halves of the pipeline, and a
-	// harness that runs one direction only is half-proven — a parse bug on the unexercised side
+	// harness that runs one direction only is half-proven: a parse bug on the unexercised side
 	// would still report clean.
 	ExpectedSide Side
 
@@ -153,14 +153,16 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 	// where a clean answer is most convincing and most wrong.
 	if provenance.CohereFilesLinted > 0 && provenance.CohereFilesLinted < minimumPlausibleFileCount {
 		reasons = append(reasons, fmt.Sprintf(
-			"cohere linted only %d files, which is too few to be the tree — check the directory it was pointed at",
+			// The dash is written as its escape, the same bytes, so the reason reads as it always has.
+			"cohere linted only %d files, which is too few to be the tree \u2014 "+
+				"check the directory it was pointed at",
 			provenance.CohereFilesLinted,
 		))
 	}
 
 	// No controls at all is its own failure, and it has to be named separately from a control that
 	// ran and missed. Looping over an empty slice finds nothing wrong with it, so a run that never
-	// planted anything would otherwise pass this guard vacuously — the exact shape of bug this
+	// planted anything would otherwise pass this guard vacuously: the exact shape of bug this
 	// package exists to catch, one level up, inside the catcher. Found by a test, not by reading.
 	if !provenance.ControlsProven() {
 		reasons = append(
@@ -172,7 +174,8 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 	for _, control := range provenance.ControlsRun {
 		if !control.Detected {
 			reasons = append(reasons, fmt.Sprintf(
-				"control %q did not fire: %s — the harness has not been shown able to detect a difference",
+				// The dash is written as its escape, the same bytes, so the reason reads as it always has.
+				"control %q did not fire: %s \u2014 the harness has not been shown able to detect a difference",
 				control.Name, control.Detail,
 			))
 		}
@@ -185,7 +188,7 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 //
 // Reported separately from Trustworthy because they answer different questions. Trustworthy asks
 // whether this run's population was real. This asks whether the harness was shown able to detect a
-// difference at all — and both directions, because a harness that can only see one side's findings
+// difference at all, and both directions, because a harness that can only see one side's findings
 // reports a clean diff for every defect on the other.
 // A shared control leaves ExpectedSide empty and therefore satisfies neither direction, which is
 // deliberate and load-bearing rather than incidental. A shared control proves the pipeline carries
@@ -212,18 +215,19 @@ func (provenance Provenance) ControlsProven() bool {
 func (provenance Provenance) Describe() string {
 	builder := &strings.Builder{}
 
-	fmt.Fprintf(builder, "cohere: %d files, %d rules — %s\n",
+	// The dashes in these lines are written as escapes, the same bytes, so the report prints as it always has.
+	fmt.Fprintf(builder, "cohere: %d files, %d rules \u2014 %s\n",
 		provenance.CohereFilesLinted, provenance.CohereRulesRun, provenance.CohereCommand)
 	if provenance.CohereVersion != "" {
 		fmt.Fprintf(builder, "        %s\n", provenance.CohereVersion)
 	}
-	fmt.Fprintf(builder, "gate:   %d files, %d rules — %s\n",
+	fmt.Fprintf(builder, "gate:   %d files, %d rules \u2014 %s\n",
 		provenance.GateFilesLinted, provenance.GateRulesRun, provenance.GateCommand)
 
 	if len(provenance.ControlsRun) == 0 {
 		fmt.Fprintf(
 			builder,
-			"controls: none run — this harness has NOT been shown able to detect a difference on this run\n",
+			"controls: none run \u2014 this harness has NOT been shown able to detect a difference on this run\n",
 		)
 		return builder.String()
 	}

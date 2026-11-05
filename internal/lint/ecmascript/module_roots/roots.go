@@ -49,7 +49,7 @@ const (
 	// files under `translations/` directories are loaded exclusively as
 	// `import(`.../translations/${localeCode}`)`, so no static import to them exists and a naive
 	// reference index reports every one as unused. The specifier is computed at runtime, so no
-	// static analysis can resolve it — which means the honest answer is to treat the directory a
+	// static analysis can resolve it, which means the honest answer is to treat the directory a
 	// computed specifier points into as rooted, rather than to pretend the reference was found.
 	ReasonDynamicImportTarget Reason = "reachable only through a computed import() specifier"
 
@@ -90,8 +90,8 @@ var nextAppRouterFiles = map[string]bool{
 // buildConfigFiles are files a build tool loads by name from a project root.
 //
 // The Next.js and OpenNext entries are the framework's. The capitalized ones are this codebase's own
-// convention — ProjectSettings.tsx, TailwindConfiguration.ts, LintConfiguration.ts and their
-// neighbours are read by Structure's tooling rather than imported by application code — and they are
+// convention (ProjectSettings.tsx, TailwindConfiguration.ts, LintConfiguration.ts and their
+// neighbours are read by Structure's tooling rather than imported by application code), and they are
 // here because measuring the tree found them, not because a framework document lists them.
 var buildConfigFiles = map[string]bool{
 	"next.config":             true,
@@ -159,7 +159,7 @@ func (set *Set) IsRoot(fileName string) (bool, Reason) {
 		return true, ReasonNextPagesRoute
 	}
 
-	// Contains rather than HasPrefix. The collected entry is a directory SEGMENT (`/translations/`)
+	// Contains rather than HasPrefix. The collected entry is a directory segment (`/translations/`)
 	// because a computed specifier's literal prefix is an alias path that this analysis deliberately
 	// does not resolve, so the match has to be against the middle of an absolute path rather than
 	// its start. HasPrefix here silently spared nothing and the locale fixture caught it.
@@ -202,7 +202,7 @@ func withinRouteDirectory(fileName string) bool {
 // route regardless of its name.
 //
 // The `_components` and similar underscore-prefixed directories are private by Next.js convention
-// and are NOT routes, so they are excluded: a component parked in `pages/_components/` really can be
+// and are not routes, so they are excluded: a component parked in `pages/_components/` really can be
 // unused, and rooting it would hide the finding.
 func withinPagesDirectory(fileName string) bool {
 	if !hasPathSegment(fileName, "pages") {
@@ -318,7 +318,7 @@ func templateHeadText(node *ast.Node) string {
 // resolveSpecifierDirectory turns the literal prefix of a computed specifier into a directory
 // suffix that a file path can be matched against.
 //
-// It deliberately returns a path SUFFIX rather than a resolved absolute path. Resolving the alias
+// It deliberately returns a path suffix rather than a resolved absolute path. Resolving the alias
 // (`@structure/...`) would mean reimplementing module resolution for a specifier that is not fully
 // known, and getting that wrong fails silently in the direction that reports live files as dead.
 // Matching on the trailing directory is coarser and cannot make that mistake.

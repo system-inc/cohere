@@ -36,7 +36,7 @@ const formatterPackage = "./internal/format/native"
 const FormatterPassLoop = "command/cohere/format.go"
 
 // FormatterIdentity hashes the formatter's inputs in moduleDirectory. environment is added to the `go
-// list` that finds them, which a snapshot needs to point GOWORK at its own workspace.
+// list` that finds them, which a snapshot needs to point `GOWORK` at its own workspace.
 //
 // A module with no formatter package answers empty, and the binary is built unstamped: its format record
 // is then keyed by the binary itself, which is always sound and only slower. The package moving is

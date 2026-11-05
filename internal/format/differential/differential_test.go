@@ -17,7 +17,7 @@ import (
  * been shown to detect one, and a harness that has never reported 100% has not been shown to agree.
  */
 
-// trimmingOracle stands in for Prettier: it rewrites trailing whitespace, and refuses files named BROKEN.
+// trimmingOracle stands in for Prettier: it rewrites trailing whitespace, and refuses files named `BROKEN`.
 type trimmingOracle struct{ calls *atomic.Int64 }
 
 func (trimmingOracle) Handles(string) bool { return true }
@@ -52,7 +52,7 @@ func factory(formatter Formatter) NewFormatter {
 	return func() (Formatter, error) { return formatter, nil }
 }
 
-// corpus writes files and returns their paths. Three are already formatted, two are not, one is BROKEN.
+// corpus writes files and returns their paths. Three are already formatted, two are not, one is `BROKEN`.
 func corpus(test *testing.T) (string, []string) {
 	test.Helper()
 	root := test.TempDir()

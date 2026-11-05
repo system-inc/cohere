@@ -8,8 +8,8 @@
 // # What this pass computes, and what a "dependency" actually is
 //
 // A reactive scope memoizes a group of values together. To know when to recompute them, the scope
-// needs its INPUTS: the values it reads that were produced before it began. Those inputs are
-// dependencies, and a dependency is not an identifier -- it is an ACCESS PATH rooted at one.
+// needs its inputs: the values it reads that were produced before it began. Those inputs are
+// dependencies, and a dependency is not an identifier -- it is an access PATH rooted at one.
 //
 //	ReactiveScopeDependency { Identifier, Reactive, Path []DependencyPathEntry }
 //	DependencyPathEntry     { Property string, Optional bool }
@@ -17,7 +17,7 @@
 // So `props.a.b` is one dependency: root `props`, path `[a, b]`. This matters because a scope
 // reading only `props.a.b` should not invalidate when `props.c` changes, and because the dedup
 // predicate compares the whole path. Upstream's `areEqualPaths` (bundle line 47352) compares each
-// entry's property AND its `Optional` flag, so `a?.b` and `a.b` are DIFFERENT dependencies. That
+// entry's property and its `Optional` flag, so `a?.b` and `a.b` are different dependencies. That
 // asymmetry is reproduced here rather than simplified; see `DependencyPathEntry.Optional`.
 //
 // # The three fields this pass writes, and why they are all one pass
@@ -31,10 +31,10 @@
 // exception found was `propagate_early_returns.rs:199`, a second `declarations` producer, which is
 // the pass `scopes.go` had already assigned elsewhere.
 //
-// # Its input is the GRAPH, not the scope table, which is why three stages had to land first
+// # Its input is the graph, not the scope table, which is why three stages had to land first
 //
 // The single most surprising thing about this pass is that it never reads a scope side table to
-// find its subjects. It recovers scopes by walking blocks for a `Scope` TERMINAL, through
+// find its subjects. It recovers scopes by walking blocks for a `Scope` terminal, through
 // `ScopeBlockTraversal` (bundle 20758). React's `keyByScopeId` (46602) is six lines of
 // `if (block.terminal.kind === 'scope')`.
 //
@@ -47,12 +47,12 @@
 // terminal construction) closed it, and the count is now 2,874 reachable.
 //
 // The lesson generalised into the instrument this package now uses: a writer-check confirms the
-// OUTPUT field belongs to this file and is silent on whether the file's INPUTS exist. Both levels
+// output field belongs to this file and is silent on whether the file's inputs exist. Both levels
 // have to be checked, and the second level is "is the type ever CONSTRUCTED", not merely declared.
 // `Optional` used to be the standing example; optional-chain lowering now constructs it and its
 // sidemap is an input to this pass.
 //
-// # DIVERGENCE FROM React: oxc sorts a collection React does not
+// # Divergence from React: oxc sorts a collection React does not
 //
 // `ReactiveScopeDependencyTreeHIR::new` in oxc sorts its hoistable objects so optional-first entries
 // precede non-optional ones, with a comment claiming this "matches the TS behavior". React does no
@@ -66,7 +66,7 @@
 //
 // # Termination is a single ordered walk, with no fixpoint anywhere
 //
-// There is no worklist and no iteration to convergence. `CollectScopeDependencies` makes ONE pass
+// There is no worklist and no iteration to convergence. `CollectScopeDependencies` makes one pass
 // over the blocks in order, maintaining a stack of active scopes. Every block is visited once, every
 // instruction once, and every operand once. The dependency tree is built by insertion and read once
 // by `deriveMinimalDependencies`, whose recursion is over a tree whose depth is the longest property
@@ -80,8 +80,8 @@
 // # The distribution that proves these dependencies are real
 //
 // A count cannot separate a working pass from one that collects nothing, so the headline is a
-// CROSS-TABULATION of dependencies per scope against scope member count, over 400 corpus files and
-// 677 outermost functions. The control cell is scopes carrying ZERO dependencies: a pass that
+// cross-tabulation of dependencies per scope against scope member count, over 400 corpus files and
+// 677 outermost functions. The control cell is scopes carrying zero dependencies: a pass that
 // collected nothing would put every scope there, and a pass that over-collected would empty it.
 //
 // See `TestDependencyDistributionIsReal`, which pins the shape rather than the corpus numbers.
@@ -97,7 +97,7 @@ import (
 // DependencyPathEntry is one step in an access path: the `.b` in `props.a.b`.
 //
 // `Optional` records that this step came from `?.` rather than `.`. It is part of the entry's
-// IDENTITY rather than a decoration: upstream's `areEqualPaths` compares it, so `a?.b` and `a.b` are
+// identity rather than a decoration: upstream's `areEqualPaths` compares it, so `a?.b` and `a.b` are
 // two different dependencies and both can be present on one scope. Reproduced rather than collapsed
 // because collapsing them would silently merge a null-guarded read with an unguarded one.
 type DependencyPathEntry struct {
@@ -155,14 +155,14 @@ const (
 	// DependencyGapTypeExclusions is upstream's two type-based dependency filters, not applied.
 	//
 	// `checkValidDependency` rejects two kinds of value outright: a ref's `.current` (via
-	// `isRefValueType`) and an object method (`Type::ObjectMethod`). Both are EXCLUSIONS, so their
-	// absence can only ADD dependencies, never drop one.
+	// `isRefValueType`) and an object method (`Type::ObjectMethod`). Both are exclusions, so their
+	// absence can only add dependencies, never drop one.
 	//
 	// This IR carries no type (measured when it still had an always-nil type field: 0 of 110,265
 	// identifiers over the corpus carried one). So neither predicate is expressible. The
 	// exposure was measured rather than estimated: 7 `ObjectMethod` instructions and 3 `.current`
 	// property loads across 4,766 loads in 677 functions. The object-method half is recoverable
-	// structurally -- an `ObjectMethod` INSTRUCTION is identifiable without types -- and is applied
+	// structurally -- an `ObjectMethod` instruction is identifiable without types -- and is applied
 	// here; only the ref half is genuinely absent, and it is three accesses.
 	DependencyGapTypeExclusions
 )
@@ -370,7 +370,7 @@ func (dependencies *ScopeDependencies) Len() int {
 // propertyAccessType is how a node in the dependency tree was reached.
 //
 // Two independent bits packed into upstream's four-variant enum: whether the access was guarded by
-// `?.` (optional) or not (unconditional), and whether the node is itself a DEPENDENCY or merely a
+// `?.` (optional) or not (unconditional), and whether the node is itself a dependency or merely a
 // waypoint on the path to one. `mergeAccess` below is what combines two readings of the same node.
 type propertyAccessType uint8
 
@@ -392,8 +392,8 @@ func isDependencyAccess(access propertyAccessType) bool {
 // mergeAccess combines two readings of one tree node, upstream's `merge`.
 //
 // The two bits combine differently and that asymmetry is the point. "Dependency" is a union: reached
-// as a dependency on either path, it is one. "Unconditional" is an INTERSECTION expressed by De
-// Morgan -- the result is optional only when BOTH readings were optional, so a value read once
+// as a dependency on either path, it is one. "Unconditional" is an intersection expressed by De
+// Morgan -- the result is optional only when both readings were optional, so a value read once
 // guarded and once unguarded is unguarded, because the unguarded read already happened.
 func mergeAccess(left, right propertyAccessType) propertyAccessType {
 	unconditional := !(isOptionalAccess(left) && isOptionalAccess(right))
@@ -464,14 +464,14 @@ type dependencyTree struct {
 
 // newDependencyTree builds the tree, seeding it with the accesses proven hoistable.
 //
-// # DIVERGENCE FROM oxc, recorded at the line that resolves it
+// # Divergence from oxc, recorded at the line that resolves it
 //
 // oxc sorts `hoistable_objects` here so that optional-first entries precede non-optional ones,
 // commenting that this "matches the TS behavior". It does not. React iterates the collection in
 // insertion order with no sort (bundle 46967) and raises `CompilerError.invariant('Conflicting
 // access types')` when two entries disagree about a property, where oxc silently keeps the first.
 //
-// React is the truth, so there is no sort. The divergence WAS unobservable because `hoistable` was
+// React is the truth, so there is no sort. The divergence was unobservable because `hoistable` was
 // always empty, and that is no longer the state: `CollectHoistablePropertyLoads` is built and
 // supplies real entries. Measured on `useMemo-alias-property-load-dep.ts`, the tree seeds three
 // roots, one carrying a property and marked non-null. So ordering and conflicts are now reachable
@@ -501,12 +501,12 @@ func newDependencyTree(hoistable map[static_single_assignment.IdentifierId]*hois
 //
 // # The open question this comment used to pose is answered, and it was not about this tree
 //
-// The question was why a BARE access is recorded alongside the deep path, given the tree then emits
+// The question was why a bare access is recorded alongside the deep path, given the tree then emits
 // the root and prunes the deep path under it as redundant -- upstream's own shape in
 // `collectMinimalInSubtree`, and correct given the root is there.
 //
 // The root should not have been there. `t = propA` records `t -> propA` in the temporaries sidemap,
-// and the instruction reading `t` resolves through that sidemap and records the FULL path. Visiting
+// and the instruction reading `t` resolves through that sidemap and records the full path. Visiting
 // the intermediate instruction's operands as well recorded the prefix a second time, as a bare root.
 // Upstream skips such an instruction entirely; see `isDeferredDependency`, now transcribed.
 //
@@ -555,7 +555,7 @@ func (tree *dependencyTree) addDependency(dep ReactiveScopeDependency) {
 
 // deriveMinimalDependencies returns the shallowest set of paths covering every access.
 //
-// A node marked as a dependency is emitted and its children are NOT walked, because depending on
+// A node marked as a dependency is emitted and its children are not walked, because depending on
 // `props.a` already covers `props.a.b`. That pruning is the whole point of the tree: a scope reading
 // `props.a`, `props.a.b` and `props.a.c` reports one dependency rather than three.
 func (tree *dependencyTree) deriveMinimalDependencies() []ReactiveScopeDependency {
@@ -608,7 +608,7 @@ type temporaries map[static_single_assignment.IdentifierId]ReactiveScopeDependen
 
 // getProperty resolves one property access into a dependency, upstream's `getProperty`.
 //
-// When the object is itself a known temporary the access EXTENDS that temporary's path; otherwise it
+// When the object is itself a known temporary the access extends that temporary's path; otherwise it
 // starts a new path rooted at the object. The extension copies the path rather than appending in
 // place, because two accesses off one temporary must not share a backing array.
 func (temporaries temporaries) getProperty(object Place, property string, optional bool) ReactiveScopeDependency {
@@ -645,11 +645,11 @@ func (temporaries temporaries) resolve(place Place) ReactiveScopeDependency {
 
 // collectTemporaries builds the sidemap, upstream's `collectTemporariesSidemap`.
 //
-// A value is recorded only when it is NOT used outside the scope that declares it: a temporary read
+// A value is recorded only when it is not used outside the scope that declares it: a temporary read
 // from elsewhere is a real value with its own identity rather than a rename of the thing it loaded.
 // `usedOutside` carries that answer, computed by `findTemporariesUsedOutsideDeclaringScope`.
 //
-// The `LoadLocal` arm requires the destination to be ANONYMOUS and the source to be NAMED, which is
+// The `LoadLocal` arm requires the destination to be anonymous and the source to be named, which is
 // upstream's `lvalue.identifier.name === null && place.identifier.name !== null`. That asymmetry is
 // what keeps this a map from temporaries to real values rather than a general alias table.
 func collectTemporaries(function *Function, usedOutside map[static_single_assignment.DeclarationId]bool) temporaries {
@@ -660,14 +660,14 @@ func collectTemporaries(function *Function, usedOutside map[static_single_assign
 
 // collectTemporariesInto walks one function, recursing into nested ones.
 //
-// # DIVERGENCE FROM React: nested functions get their own map here
+// # Divergence from React: nested functions get their own map here
 //
-// Upstream threads ONE `temporaries` map through the recursion into nested functions, keyed by
+// Upstream threads one `temporaries` map through the recursion into nested functions, keyed by
 // `IdentifierId`. That is safe there because ids are unique across the whole compilation. They are
 // per-function here -- `FindDisjointMutableValues` records why -- so a shared map would conflate
 // values: measured on a two-closure function, 14 collisions across 30 distinct ids.
 //
-// Nested functions are therefore walked with a FRESH map, whose results are discarded. That is
+// Nested functions are therefore walked with a fresh map, whose results are discarded. That is
 // narrower than upstream, and the narrowing is in the safe direction: a dependency inside a nested
 // function resolves to the nested value rather than to a path through the outer one, so a path is
 // reported shallower rather than wrong. Recorded because a reader diffing against the bundle will
@@ -759,8 +759,8 @@ func findTemporariesUsedOutsideDeclaringScope(function *Function,
 	}
 
 	// Iterating the slice rather than sorting by id: `Function.Blocks` is held in reverse postorder
-	// after lowering, so slice order IS execution order and `block.Id` is the addressing key. Using
-	// the slice INDEX as a BlockId would be a silent correctness bug, because the two move
+	// after lowering, so slice order is execution order and `block.Id` is the addressing key. Using
+	// the slice index as a BlockId would be a silent correctness bug, because the two move
 	// independently -- see the doc on `BlockId`.
 	for _, block := range function.Blocks {
 		if block == nil {
@@ -809,7 +809,7 @@ func findTemporariesUsedOutsideDeclaringScope(function *Function,
 // Upstream's `ScopeBlockInfo`, a two-variant union of `begin` and `end`. The `pruned` flag it also
 // carries is absent here: it is set only for a `PrunedScope` terminal, which this tree does not
 // declare because nothing constructs one (see `ScopeTerminalsGapPrunedScope`). Its two uses upstream
-// are both SKIPS -- exclude the scope from `usedOutsideDeclaringScope`, and do not record its deps
+// are both skips -- exclude the scope from `usedOutsideDeclaringScope`, and do not record its deps
 // -- so a uniformly-false flag records every scope rather than wrongly dropping any.
 type scopeBlockInfo struct {
 	scope  ScopeId
@@ -820,7 +820,7 @@ type scopeBlockInfo struct {
 // `ScopeBlockTraversal.blockInfos`.
 //
 // This is the function that made three earlier stages necessary. It finds scopes by looking for a
-// `Scope` TERMINAL in the graph rather than by consulting a table, so before
+// `Scope` terminal in the graph rather than by consulting a table, so before
 // `BuildReactiveScopeTerminals` landed it returned an empty map on every function and every
 // consumer of it silently produced nothing.
 func scopeBlockTraversal(function *Function) map[static_single_assignment.BlockId]scopeBlockInfo {
@@ -840,7 +840,7 @@ func scopeBlockTraversal(function *Function) map[static_single_assignment.BlockI
 // declaration records where a value was declared and which scopes were open at the time.
 //
 // Upstream's `Decl`. The scope stack is what `visitDependency` consults to decide that a value
-// produced inside one scope and read inside another must be recorded as a DECLARATION of the first.
+// produced inside one scope and read inside another must be recorded as a declaration of the first.
 type declaration struct {
 	order      static_single_assignment.EvaluationOrder
 	scopeStack []ScopeId
@@ -897,7 +897,7 @@ func (collector *dependencyCollector) enterScope(scope ScopeId) {
 // exitScope closes a scope, recording its dependencies and propagating them outward.
 //
 // The propagation is what makes a nested scope's inputs also inputs of its parent: a value the inner
-// scope needs must be available before the outer one runs. Only dependencies that are still VALID
+// scope needs must be available before the outer one runs. Only dependencies that are still valid
 // at the outer level propagate, which `checkValidDependency` decides.
 func (collector *dependencyCollector) exitScope(scope ScopeId) {
 	if len(collector.scopeStack) == 0 {
@@ -933,9 +933,9 @@ func (collector *dependencyCollector) declare(id static_single_assignment.Identi
 	}
 }
 
-// checkValidDependency decides whether a value read inside a scope is an INPUT to it.
+// checkValidDependency decides whether a value read inside a scope is an input to it.
 //
-// A value is a dependency only when it was declared BEFORE the scope began. A value produced inside
+// A value is a dependency only when it was declared before the scope began. A value produced inside
 // the scope is not an input to it -- it is part of what the scope computes. That comparison is the
 // whole predicate, and it is why the scope's final range matters: comparing against a pre-alignment
 // range would misclassify values declared in the widened region.
@@ -965,7 +965,7 @@ func (collector *dependencyCollector) checkValidDependency(dep ReactiveScopeDepe
 	return decl.order < collector.scopeRange(scope).Start
 }
 
-// visitDependency records one access, and records a DECLARATION when it crosses a scope boundary.
+// visitDependency records one access, and records a declaration when it crosses a scope boundary.
 //
 // The second half is the `declarations` field: a value produced inside a scope and read outside it
 // must be exported from that scope, because the memoized block has to return it.
@@ -978,7 +978,7 @@ func (collector *dependencyCollector) visitDependency(dep ReactiveScopeDependenc
 	// expressible here -- the IR carries no type, which is what `DependencyGapTypeExclusions`
 	// records.
 	//
-	// Taking the name half alone is a DIVERGENCE and is measured rather than assumed safe: a value
+	// Taking the name half alone is a divergence and is measured rather than assumed safe: a value
 	// named `current` on a non-ref object would be truncated where upstream keeps the path, which
 	// costs precision in the safe direction -- the scope depends on the whole object and
 	// invalidates more often, never less.
@@ -1080,7 +1080,7 @@ func containsIdentifier(list []static_single_assignment.IdentifierId, id static_
 
 // CollectScopeDependencies computes every reactive scope's inputs, declarations and reassignments.
 //
-// Requires a graph whose reactive scopes have been built into `Scope` TERMINALS: call
+// Requires a graph whose reactive scopes have been built into `Scope` terminals: call
 // `BuildReactiveScopeTerminals` first. A function with no such terminals gets an empty result, which
 // is the correct answer for it and is also the characteristic failure of a caller that forgot --
 // `TestDependenciesRequireScopeTerminals` pins the distinction.
@@ -1217,7 +1217,7 @@ func (dependencies *ScopeDependencies) Conflicts() int {
 // objectMethodValues returns the values produced by an ObjectMethod instruction.
 //
 // This is the recoverable half of `DependencyGapTypeExclusions`. Upstream rejects an object method
-// as a dependency by consulting `Type::ObjectMethod`; types are nil in this IR, but the INSTRUCTION
+// as a dependency by consulting `Type::ObjectMethod`; types are nil in this IR, but the instruction
 // that produces one is identifiable, and its lvalue is the value upstream's type would have named.
 // Seven such instructions exist across the corpus, so this is a small but exact recovery rather than
 // an approximation of the type check.
@@ -1265,13 +1265,13 @@ func (collector *dependencyCollector) walk(
 		// on entry to the block, and in ascending predecessor order so the output order is the same
 		// between runs.
 		for _, phi := range block.Phis {
-			// `PhiOperandsInOrder` returns the PREDECESSOR block ids in sorted order, the order
+			// `PhiOperandsInOrder` returns the predecessor block ids in sorted order, the order
 			// `Phi.Operands` keeps.
 			//
 			// # The order cannot be observed here today, and the reason is not that a fixture is
 			// missing
 			//
-			// The real reason, measured: every phi in this tree sits OUTSIDE every reactive scope.
+			// The real reason, measured: every phi in this tree sits outside every reactive scope.
 			// On a fixture with a multi-operand phi carrying two distinct operand values, phis
 			// inside a scope = 0 and phis outside every scope = 1. `visitDependency` returns early
 			// when the dependency stack is empty, so no phi operand currently reaches the output at
@@ -1279,7 +1279,7 @@ func (collector *dependencyCollector) walk(
 			//
 			// The fixed order is kept anyway, for the reason `Sets` sorts in `scopes.go`: the
 			// alternative is a latent nondeterminism that appears the day the scopes widen. This
-			// verdict EXPIRES the moment a scope contains a phi -- which `AlignReactiveScopes`
+			// verdict expires the moment a scope contains a phi -- which `AlignReactiveScopes`
 			// widening a scope across a control-flow join would produce.
 			for _, predecessor := range PhiOperandsInOrder(phi) {
 				collector.visitDependency(collector.temporaries.resolve(phi.Operands.At(predecessor)))
@@ -1312,11 +1312,11 @@ func (collector *dependencyCollector) walk(
 
 // handleInstruction visits one instruction, upstream's `handleInstruction`.
 //
-// The per-kind arms are upstream's and the order within each matters: a store visits its VALUE
+// The per-kind arms are upstream's and the order within each matters: a store visits its value
 // before declaring its lvalue, so `x = x + 1` reads the old `x` as a dependency rather than seeing
 // its own definition.
 //
-// The DECLARATION is recorded before the deferral check, and before the visit, because a deferred
+// The declaration is recorded before the deferral check, and before the visit, because a deferred
 // instruction still defines its lvalue -- `checkValidDependency` compares against that order, so
 // skipping the declare would make every later read of the temporary look undeclared.
 func (collector *dependencyCollector) handleInstruction(instruction *Instruction) {
@@ -1329,16 +1329,16 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 
 	switch instructionValue := instruction.Value.(type) {
 	case *FunctionExpression:
-		// The recursion REPLACES the bare capture visit: `EachPlace` would record each capture as
+		// The recursion replaces the bare capture visit: `EachPlace` would record each capture as
 		// a rootless access, and that bare root prunes away every deeper path in the same subtree.
 		collector.visitNestedFunction(instructionValue.Function, instructionValue.Captures)
 	case *StartMemoize:
-		// The marker's operands are the dependencies the developer WROTE, and reading them as
+		// The marker's operands are the dependencies the developer wrote, and reading them as
 		// dependencies of the enclosing scope is what makes writing `[x]` change what we infer.
 		//
 		// `EachPlace` visits `dep.Root.Place` for every entry (`visitor.go:175`), so
 		// `useMemo(() => [x.y.z], [x])` visits bare `x` here. That bare access marks the dependency
-		// tree's ROOT, and `collectMinimalInSubtree` then prunes every deeper path beneath a node
+		// tree's root, and `collectMinimalInSubtree` then prunes every deeper path beneath a node
 		// already marked -- correct pruning, given the root is there. The result is that the
 		// developer's own dependency array determines the inference it is supposed to be checked
 		// against, and the rule reports a disagreement it manufactured.
@@ -1392,7 +1392,7 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *Destructure:
 		collector.visitDependency(collector.temporaries.resolve(instructionValue.Value))
-		// The shared `eachPatternPlace` yields defaults and computed keys as USES alongside the
+		// The shared `eachPatternPlace` yields defaults and computed keys as uses alongside the
 		// bindings, which is richer than upstream's `eachPatternOperand` and exactly right here: a
 		// default value is read by the destructure and is a genuine dependency.
 		eachPatternPlace(instructionValue.LValue, func(place Place, role PlaceRole) {
@@ -1417,7 +1417,7 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 
 // visitNestedFunction records what a nested function reads through its captures.
 //
-// PROTOTYPE. The dependency a closure creates lives inside the closure body: `useCallback(() =>
+// Prototype. The dependency a closure creates lives inside the closure body: `useCallback(() =>
 // ref.current)` produces the `.current` load only in the nested function's instruction table, and
 // nothing else in this file walks in there.
 //
@@ -1435,7 +1435,7 @@ func (collector *dependencyCollector) visitNestedFunction(id FunctionId, capture
 		return
 	}
 
-	// Inner identifier -> the place in THIS function naming the same binding.
+	// Inner identifier -> the place in this function naming the same binding.
 	translate := map[static_single_assignment.IdentifierId]Place{}
 	for index := range captures {
 		translate[nested.Context[index].Identifier] = captures[index]
@@ -1476,7 +1476,7 @@ func (collector *dependencyCollector) visitNestedFunction(id FunctionId, capture
 	if collector.assumedInvoked == nil {
 		collector.assumedInvoked = CollectAssumedInvokedFunctions(collector.function)
 	}
-	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
+	// A root is suppressed only when some other access names it with a deeper path: that bare
 	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
 	deepRoots := map[static_single_assignment.IdentifierId]bool{}
 	for _, dep := range accesses {
@@ -1610,7 +1610,7 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 // real `x?.y?.z` dependency. A non-optional continuation is deliberately different. Upstream's
 // current inference keeps the prefix in `propB?.x.y` and in the known-bug `x.a.b?.c.d?.e` case;
 // those prefixes are what make preserved-memoization validation reject the less-specific inferred
-// dependency. Only an immediate OPTIONAL extension is therefore deferred here.
+// dependency. Only an immediate optional extension is therefore deferred here.
 func nestedOptionalInstructionsToDefer(function *Function,
 	optional *OptionalChainSidemap) map[InstructionId]bool {
 	result := map[InstructionId]bool{}
@@ -1681,7 +1681,7 @@ func (temporaries temporaries) resolveWithPath(place Place, suffix []DependencyP
 	return base
 }
 
-// isDeferredDependency reports whether this instruction's accesses are recorded at the site of USE
+// isDeferredDependency reports whether this instruction's accesses are recorded at the site of use
 // rather than here, upstream's `isDeferredDependency`.
 //
 // # Why an instruction that produces a dependency is skipped entirely
@@ -1689,7 +1689,7 @@ func (temporaries temporaries) resolveWithPath(place Place, suffix []DependencyP
 // An instruction whose lvalue is in the temporaries sidemap is not a value in its own right, it is
 // one link in an access path that some later instruction will read whole. `t = propA` records
 // `t -> propA`, and the instruction that reads `t` resolves through the sidemap and records the
-// FULL path. Visiting the operands here as well would record the prefix a second time, as a bare
+// full path. Visiting the operands here as well would record the prefix a second time, as a bare
 // root with an empty path.
 //
 // That double-recording is what truncated every path in this tree. `addDependency` submits both
@@ -1723,7 +1723,7 @@ func (collector *dependencyCollector) copyScopeStack() []ScopeId {
 //
 // This is the second half of upstream's entry point: build a tree per scope, add every access, take
 // the minimal set, and append each candidate that is not already present. The dedup predicate is
-// upstream's -- same DECLARATION and equal paths -- so two values of one reassigned binding
+// upstream's -- same declaration and equal paths -- so two values of one reassigned binding
 // deduplicate against each other, which comparing identifiers would not do.
 func (collector *dependencyCollector) reduce(identity ScopeIdentity) {
 	if collector.result.dependencies == nil {
@@ -1734,7 +1734,7 @@ func (collector *dependencyCollector) reduce(identity ScopeIdentity) {
 		if len(accesses) == 0 {
 			continue
 		}
-		// The hoistable set for this scope decides how DEEP each dependency path may go. An explicit
+		// The hoistable set for this scope decides how deep each dependency path may go. An explicit
 		// caller can still omit it, in which case the dependency tree conservatively truncates paths
 		// to their roots; the production entry point supplies `CollectHoistablePropertyLoads`.
 		seed := collector.hoistable[scope]
@@ -1785,7 +1785,7 @@ func (collector *dependencyCollector) alreadyPresent(existing []ReactiveScopeDep
 // source dependency is rooted at what the developer wrote. Comparing the two without this step
 // compares a temporary against a name and reports every dependency as a root difference.
 //
-// When the root is a known temporary, its path is PREPENDED to the inferred path, which is what
+// When the root is a known temporary, its path is prepended to the inferred path, which is what
 // reassembles `t = props.a; t.b` into `props.a.b`. Otherwise the dependency is already rooted at a
 // real binding and only needs rewrapping.
 //
@@ -1841,7 +1841,7 @@ func (dependencies *ScopeDependencies) NormalizeInferredDependency(function *Fun
 // Measured: with the nested seed disabled the corpus reports zero conflicts, with it enabled and
 // unguarded eleven. Every conflict is this seam rather than the collector.
 //
-// The comparison is per PREFIX rather than per whole path, which is what the tree keys on. Two
+// The comparison is per prefix rather than per whole path, which is what the tree keys on. Two
 // paths can share a prefix and diverge after it -- `[a][b?]` against `[a][b][c?]` -- and the tree
 // walks entry by entry, so it sees `b` twice with different nullability while a whole-path key sees
 // two unrelated strings. Measured: keying on the whole path took conflicts 11 to 5, and every

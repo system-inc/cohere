@@ -240,7 +240,7 @@ func (configuration *Config) RuleKeys() []string {
 // # Why this is a table rather than a computation
 //
 // oxlint's mechanism is `warn_correctness(plugins)` in `config_builder.rs:570`: every rule whose
-// category is `Correctness` AND whose plugin is declared, at severity `Warn`. Reproducing that
+// category is `Correctness` and whose plugin is declared, at severity `Warn`. Reproducing that
 // directly needs each rule's category, and neither this registry nor the captured inventory carried
 // one -- adding categories for 214 rules would be a fresh transcription of oxc's metadata, which is
 // a larger and less trustworthy job than the one this solves.
@@ -287,7 +287,7 @@ func pluginContributing(ruleName string) string {
 // Ruled 2026-08-25 that they stay, and the reasoning is recorded here because this is where the next
 // cleanup pass will look before deleting them:
 //
-//   - Parity is the acceptance criterion for WHICH rules run, not for how loudly. Those are separable
+//   - Parity is the acceptance criterion for which rules run, not for how loudly. Those are separable
 //     and only the first is what this migration promised.
 //   - The set does not contain a rule whose violation is arguably fine, which is what `warn` would
 //     assert. `no-const-assign` is a runtime TypeError, `no-this-before-super` is a crash,
@@ -297,7 +297,7 @@ func pluginContributing(ruleName string) string {
 //
 // The choice was originally made by someone who left no note, and `CohereSettings.json` is untracked
 // so there is no author or date to recover. That is a gap in the record rather than evidence the
-// choice was careless: reverting an undocumented decision to a weaker one BECAUSE it is undocumented
+// choice was careless: reverting an undocumented decision to a weaker one because it is undocumented
 // is how a codebase loses hard-won strictness one blameless commit at a time.
 //
 // `TestBothPathsAgreeOnEveryPluginDefault` reports the divergence on every run, so this cannot go

@@ -19,7 +19,7 @@ import (
 // checker-less lowering never emits `StoreContext`, so every count taken through one is a fact about
 // the harness rather than about the code.
 //
-// Note that `forEachFunctionLike` visits only OUTERMOST function-likes, so nested functions are not
+// Note that `forEachFunctionLike` visits only outermost function-likes, so nested functions are not
 // walked. That is the same denominator every measurement in this package uses, and it is stated here
 // because a number taken from a different walk is not comparable to the ones in these comments.
 func forEachCorpusFunction(test *testing.T, limit int,
@@ -130,7 +130,7 @@ func blockNestingViolations(scopes, blocks []nestingItem) int {
 	items = append(items, scopes...)
 	items = append(items, blocks...)
 
-	// Upstream's `rangePreOrderComparator`: earlier start first, then the LONGER item first, so an
+	// Upstream's `rangePreOrderComparator`: earlier start first, then the longer item first, so an
 	// enclosing item is entered before the items it encloses.
 	sort.SliceStable(items, func(left, right int) bool {
 		if items[left].start != items[right].start {

@@ -2072,76 +2072,101 @@ x.n?.a ?? y;
 `,
 		},
 	}},
-	{name: "upstream invalid[232]", source: `
+	{
+		name: "upstream invalid[232]",
+		source: `
 declare let x: string | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: string | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: string | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[233]", source: `
+	},
+	{
+		name: "upstream invalid[233]",
+		source: `
 declare let x: number | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: number | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: number | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[234]", source: `
+	},
+	{
+		name: "upstream invalid[234]",
+		source: `
 declare let x: boolean | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: boolean | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: boolean | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[235]", source: `
+	},
+	{
+		name: "upstream invalid[235]",
+		source: `
 declare let x: bigint | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: bigint | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: bigint | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[241]", source: `
+	},
+	{
+		name: "upstream invalid[241]",
+		source: `
 declare let x: '' | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: '' | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: '' | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
+	},
 	{
 		name:        "upstream invalid[242]",
 		source:      "\ndeclare let x: `` | undefined;\nx ? x : y;\n      ",
@@ -2156,76 +2181,101 @@ x ?? y;
 			},
 		},
 	},
-	{name: "upstream invalid[243]", source: `
+	{
+		name: "upstream invalid[243]",
+		source: `
 declare let x: 0 | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 0 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 0 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[244]", source: `
+	},
+	{
+		name: "upstream invalid[244]",
+		source: `
 declare let x: 0n | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 0n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 0n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[245]", source: `
+	},
+	{
+		name: "upstream invalid[245]",
+		source: `
 declare let x: false | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: false | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: false | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[251]", source: `
+	},
+	{
+		name: "upstream invalid[251]",
+		source: `
 declare let x: 'a' | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 'a' | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 'a' | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[252]", source: `
+	},
+	{
+		name: "upstream invalid[252]",
+		source: `
 declare let x: 'a' | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 'a' | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 'a' | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
+	},
 	{
 		name:        "upstream invalid[253]",
 		source:      "\ndeclare let x: `hello${'string'}` | undefined;\nx ? x : y;\n      ",
@@ -2254,118 +2304,158 @@ x ?? y;
 			},
 		},
 	},
-	{name: "upstream invalid[255]", source: `
+	{
+		name: "upstream invalid[255]",
+		source: `
 declare let x: 1 | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 1 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 1 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[256]", source: `
+	},
+	{
+		name: "upstream invalid[256]",
+		source: `
 declare let x: 1 | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 1 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 1 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[257]", source: `
+	},
+	{
+		name: "upstream invalid[257]",
+		source: `
 declare let x: 1n | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[258]", source: `
+	},
+	{
+		name: "upstream invalid[258]",
+		source: `
 declare let x: 1n | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[259]", source: `
+	},
+	{
+		name: "upstream invalid[259]",
+		source: `
 declare let x: true | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: true | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: true | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[260]", source: `
+	},
+	{
+		name: "upstream invalid[260]",
+		source: `
 declare let x: true | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: true | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: true | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[268]", source: `
+	},
+	{
+		name: "upstream invalid[268]",
+		source: `
 declare let x: 'a' | 'b' | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 'a' | 'b' | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 'a' | 'b' | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[269]", source: `
+	},
+	{
+		name: "upstream invalid[269]",
+		source: `
 declare let x: 'a' | 'b' | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 'a' | 'b' | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":true,\"string\":false}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 'a' | 'b' | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
+	},
 	{
 		name:        "upstream invalid[270]",
 		source:      "\ndeclare let x: 'a' | `b` | undefined;\nx ? x : y;\n      ",
@@ -2394,202 +2484,272 @@ x ?? y;
 			},
 		},
 	},
-	{name: "upstream invalid[272]", source: `
+	{
+		name: "upstream invalid[272]",
+		source: `
 declare let x: 0 | 1 | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 0 | 1 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 0 | 1 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[273]", source: `
+	},
+	{
+		name: "upstream invalid[273]",
+		source: `
 declare let x: 0 | 1 | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 0 | 1 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 0 | 1 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[274]", source: `
+	},
+	{
+		name: "upstream invalid[274]",
+		source: `
 declare let x: 1 | 2 | 3 | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 1 | 2 | 3 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 1 | 2 | 3 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[275]", source: `
+	},
+	{
+		name: "upstream invalid[275]",
+		source: `
 declare let x: 1 | 2 | 3 | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 1 | 2 | 3 | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 1 | 2 | 3 | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[276]", source: `
+	},
+	{
+		name: "upstream invalid[276]",
+		source: `
 declare let x: 0n | 1n | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 0n | 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 0n | 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[277]", source: `
+	},
+	{
+		name: "upstream invalid[277]",
+		source: `
 declare let x: 0n | 1n | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 0n | 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 0n | 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[278]", source: `
+	},
+	{
+		name: "upstream invalid[278]",
+		source: `
 declare let x: 1n | 2n | 3n | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 1n | 2n | 3n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 1n | 2n | 3n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[279]", source: `
+	},
+	{
+		name: "upstream invalid[279]",
+		source: `
 declare let x: 1n | 2n | 3n | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 1n | 2n | 3n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 1n | 2n | 3n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[280]", source: `
+	},
+	{
+		name: "upstream invalid[280]",
+		source: `
 declare let x: true | false | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: true | false | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: true | false | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[281]", source: `
+	},
+	{
+		name: "upstream invalid[281]",
+		source: `
 declare let x: true | false | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: true | false | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: true | false | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[284]", source: `
+	},
+	{
+		name: "upstream invalid[284]",
+		source: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: 0 | 1 | 0n | 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: 0 | 1 | 0n | 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[285]", source: `
+	},
+	{
+		name: "upstream invalid[285]",
+		source: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":false,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: 0 | 1 | 0n | 1n | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":false,\"boolean\":true,\"number\":false,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: 0 | 1 | 0n | 1n | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[286]", source: `
+	},
+	{
+		name: "upstream invalid[286]",
+		source: `
 declare let x: true | false | null | undefined;
 x ? x : y;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `x ? x : y`,
-			suggested: `declare let x: true | false | null | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `x ? x : y`,
+				suggested: `declare let x: true | false | null | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
-	{name: "upstream invalid[287]", source: `
+	},
+	{
+		name: "upstream invalid[287]",
+		source: `
 declare let x: true | false | null | undefined;
 !x ? y : x;
-      `, optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}", findings: []preferNullishCoalescingReplayed{
-		{
-			id:       "preferNullishOverTernary",
-			line:     2,
-			column:   1,
-			reported: `!x ? y : x`,
-			suggested: `declare let x: true | false | null | undefined;
+      `,
+		optionsJson: "{\"ignorePrimitives\":{\"bigint\":true,\"boolean\":false,\"number\":true,\"string\":true}}",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:       "preferNullishOverTernary",
+				line:     2,
+				column:   1,
+				reported: `!x ? y : x`,
+				suggested: `declare let x: true | false | null | undefined;
 x ?? y;
 `,
+			},
 		},
-	}},
+	},
 	{name: "upstream invalid[303]", source: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;

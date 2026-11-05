@@ -191,7 +191,7 @@ export function Component(props: {n: number}) {
 	assertNotReactive(test, names, "constant")
 }
 
-// TestReactiveJoinsAtPhi pins the merge: reactive on ANY path means reactive after the join.
+// TestReactiveJoinsAtPhi pins the merge: reactive on any path means reactive after the join.
 //
 // This is the case that cannot be answered from the syntax tree without re-deriving control flow,
 // and it is why this pass is in the representation rather than in a rule.
@@ -210,12 +210,12 @@ export function Component(props: {c: boolean, n: number}) {
 	assertReactive(test, names, "props", "value")
 }
 
-// phiResultIsReactive reports whether the phi DEFINING the named binding is itself reactive.
+// phiResultIsReactive reports whether the phi defining the named binding is itself reactive.
 //
 // `reactiveNames` cannot answer this and the difference is the whole reason this helper exists. That
-// collector records every place naming a reactive value, and a phi's OPERANDS are places. So a phi
+// collector records every place naming a reactive value, and a phi's operands are places. So a phi
 // whose operand is reactive puts the binding's name in the collected set whether or not the phi
-// RESULT was ever marked, and an assertion built on it passes while the merge rule is disabled.
+// result was ever marked, and an assertion built on it passes while the merge rule is disabled.
 //
 // Found by a surviving mutant. Disabling the phi operand join left every name-based assertion green
 // because the operand `value$25` carries the name `value` on its own. The layer being asserted was
@@ -266,14 +266,14 @@ func phiResultIsReactive(test *testing.T, source string, binding string) bool {
 	return found
 }
 
-// TestReactivePhiResultIsMarkedByOperandJoin asserts the MERGE rather than the name.
+// TestReactivePhiResultIsMarkedByOperandJoin asserts the merge rather than the name.
 //
 // This is the fixture that kills the phi-operand-join mutant, and the second attempt at it. The
 // first asserted through `reactiveNames` and stayed green under the mutation for the reason
 // `phiResultIsReactive` documents: the operands carry the binding's name themselves.
 //
-// The branch test is a local constant, so the block is NOT reactive-controlled — checked directly,
-// the controlled set is empty for this input — which means the operand join is the only rule that
+// The branch test is a local constant, so the block is not reactive-controlled (checked directly,
+// the controlled set is empty for this input), which means the operand join is the only rule that
 // can mark this phi. That isolates the two phi rules from each other, which mutating them
 // separately proved was necessary.
 func TestReactivePhiResultIsMarkedByOperandJoin(test *testing.T) {
@@ -320,13 +320,13 @@ export function Component(props: {c: boolean}) {
 
 // TestReactiveJoinsReactiveOperandUnderConstantBranch separates the phi's two marking rules.
 //
-// This exists because a mutant disabling the phi OPERAND join survived the whole suite while a
-// mutant disabling the phi CONTROL rule was caught. Reading rather than adding a fixture blind, the
+// This exists because a mutant disabling the phi operand join survived the whole suite while a
+// mutant disabling the phi control rule was caught. Reading rather than adding a fixture blind, the
 // cause was subsumption: in every phi fixture written first, the branch test was `props.c`, so the
 // joined value was reactive-controlled as well as having a reactive operand, and the control rule
 // alone produced the same answer.
 //
-// The distinguishing input is a phi with a reactive OPERAND under a NON-reactive test. `flag` is a
+// The distinguishing input is a phi with a reactive operand under a non-reactive test. `flag` is a
 // local constant, so the block is not reactive-controlled and only the operand join can mark
 // `value`. Confirmed by re-scoring: with this case present the operand mutant is caught.
 func TestReactiveJoinsReactiveOperandUnderConstantBranch(test *testing.T) {
@@ -349,7 +349,7 @@ export function Component(props: {n: number}) {
 // TestReactiveMarksValueAssignedUnderReactiveBranch pins the control-dominator rule.
 //
 // Both operands are constants, so the operand rule alone leaves `value` non-reactive. It is
-// reactive because WHICH constant it holds depends on a reactive test, which is what the
+// reactive because which constant it holds depends on a reactive test, which is what the
 // post-dominator frontier computes. A pass missing this reports a stale dependency array as
 // correct.
 func TestReactiveMarksValueAssignedUnderReactiveBranch(test *testing.T) {
@@ -414,10 +414,10 @@ export function Component(props: {n: number}) {
 	assertReactive(test, names, "props", "value")
 }
 
-// TestReactiveMarksValueUnderReactiveSwitchCase covers a switch whose CASE TEST is reactive.
+// TestReactiveMarksValueUnderReactiveSwitchCase covers a switch whose case test is reactive.
 //
 // Upstream's control-dominator test asks three terminal kinds, and for a `switch` it asks both the
-// discriminant AND every case test. The case-test half is a separate branch, and a mutant disabling
+// discriminant and every case test. The case-test half is a separate branch, and a mutant disabling
 // it survived every other fixture here.
 //
 // The discriminant is a local constant and only the case test is reactive, which is what isolates
@@ -474,7 +474,7 @@ export function Component() {
 // not an exotic spelling: it is what `import * as React from 'react'` produces, which is one of the
 // two shapes real code is written in.
 //
-// Upstream tests the call's PROPERTY rather than its receiver, which is what makes
+// Upstream tests the call's property rather than its receiver, which is what makes
 // `React.useState(0)` a hook call while a receiver named `useThing` would not be. Probed on our own
 // lowering: the property's identifier carries an empty Name and a node whose text is `useState`,
 // which is the same shape the plain-call arm sees.
@@ -500,7 +500,7 @@ export function Component() {
 // three names are the three the checker can actually see: Dispatch, ActionDispatch, RefObject.
 //
 // `count` is asserted reactive in the same input as the control: it comes out of the same call, so
-// a pass that exempted the whole call rather than the stable ELEMENTS would pass the negative
+// a pass that exempted the whole call rather than the stable elements would pass the negative
 // assertions and fail this one.
 func TestReactiveExemptsStableHookValues(test *testing.T) {
 	test.Parallel()
@@ -536,7 +536,7 @@ export function Component() {
 	assertNotReactive(test, names, "setCount", "aliased")
 }
 
-// TestReactiveDistinguishesHookNameFromOrdinaryCall pins the hook NAME test in both directions.
+// TestReactiveDistinguishesHookNameFromOrdinaryCall pins the hook name test in both directions.
 //
 // A call to `notAHook` with constant arguments is not a source; a call to `useThing` with the same
 // arguments is. Asserting only the positive would be satisfied by a pass that treated every call as
@@ -561,7 +561,7 @@ export function Component() {
 //
 // Upstream's convention is `use` followed by a capital or a digit, which `classifyFunction` already
 // applies. A function named `used` or `user` must not read as a hook. This is also the reason the
-// `use` OPERATOR is not reachable by this pass, recorded as a divergence at `isHookCallee`.
+// `use` operator is not reachable by this pass, recorded as a divergence at `isHookCallee`.
 func TestReactiveRequiresCapitalAfterUse(test *testing.T) {
 	test.Parallel()
 
@@ -646,7 +646,7 @@ export function Component(props: {c: boolean, n: number}) {
 // TestReactiveWithoutCheckerStillMarksParameters pins the documented degradation.
 //
 // With no checker the stable exemption and the hook test cannot be made, so the answer shrinks to
-// parameters and what derives from them. It must SHRINK rather than become wrong, and it must not
+// parameters and what derives from them. It must shrink rather than become wrong, and it must not
 // panic: `stableTypeName` returning early on a nil checker is the guard, and a rule handed a nil
 // checker going vacuously green is a failure mode this tree has shipped three times.
 func TestReactiveWithoutCheckerStillMarksParameters(test *testing.T) {
@@ -694,7 +694,7 @@ export function Component(props: {n: number}) {
 //
 // The fixpoint's value is a set keyed on IdentifierId alone, and the whole reason for that choice is
 // that a comparison including spans or freshly-minted identifiers never settles. The failure mode is
-// a HANG rather than a wrong answer, so it is worth an assertion that would catch a future edit
+// a hang rather than a wrong answer, so it is worth an assertion that would catch a future edit
 // making the value richer.
 //
 // Measured over 685 lowered functions of real TypeScript: max 4 rounds, with 508 settling in 2 and
@@ -782,7 +782,7 @@ func TestReactiveGapsAreNamed(test *testing.T) {
 	}
 }
 
-// TestReactiveIsAnUnderApproximation pins the DIRECTION of the mutation gap.
+// TestReactiveIsAnUnderApproximation pins the direction of the mutation gap.
 //
 // Upstream marks `sink` reactive here: `sink` is passed to a call alongside a reactive argument, so
 // its mutable operand is marked. This pass cannot, because every Place.Effect is EffectUnknown.

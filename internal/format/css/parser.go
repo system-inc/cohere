@@ -276,7 +276,7 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 		raws["params"] = parameters
 	}
 
-	// Ignore LESS mixin declaration
+	// Ignore less mixin declaration
 	if trim(selector) != "" {
 		// TODO: confirm this code is dead
 		/* c8 ignore next 3 */

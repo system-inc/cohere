@@ -44,7 +44,7 @@ func trackedIn(test *testing.T, code string, traceMap map[string]*reference.Trac
 }
 
 // decodeTraceMap reads a trace map written as JSON, with `$read`, `$call` and `$construct` standing
-// for eslint-utils' READ, CALL and CONSTRUCT symbols.
+// for eslint-utils' read, call and construct symbols.
 func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap {
 	test.Helper()
 	var decoded map[string]json.RawMessage

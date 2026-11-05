@@ -195,7 +195,8 @@ var attentionFixtures = []string{
 	"«*a*»",
 	"“_a_”",
 	"a_«b»_c",
-	"—*a*—",
+	// The em-dash is the punctuation under test, so it is data, spelled as its escape.
+	"\u2014*a*\u2014",
 	"*¿a?*",
 	"*£*bravo.\n\n*€*charlie.\n",
 	"_£_a",

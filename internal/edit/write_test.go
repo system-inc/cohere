@@ -11,7 +11,7 @@ import (
 // Atomicity is the one guard whose absence is invisible in a single-threaded test: writing in place
 // produces the same final bytes as temp-plus-rename, so every assertion about the result passes
 // either way. The difference only appears to a concurrent reader, which is exactly the situation
-// this repo is in — several agents editing one tree, where a half-written file failing to build and
+// this repo is in: several agents editing one tree, where a half-written file failing to build and
 // then healing two minutes later was observed rather than imagined.
 //
 // So the test reads the file continuously while it is rewritten, and asserts that every read saw a
@@ -58,8 +58,8 @@ func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
 					continue
 				}
 				text := string(contents)
-				// A complete file is exactly one of the two versions. Anything else — a prefix, a
-				// mixture, an empty file — is a partial write reaching a reader.
+				// A complete file is exactly one of the two versions. Anything else (a prefix, a
+				// mixture, an empty file) is a partial write reaching a reader.
 				if text != oldBody && text != newBody {
 					mutex.Lock()
 					torn = append(torn, describeTear(text, len(oldBody)))
@@ -121,7 +121,7 @@ func itoa(value int) string {
 }
 
 // The temp file must be created beside the target rather than in the system temp directory. A
-// rename across filesystems is not atomic — it degrades to copy-and-delete — so a temp file on
+// rename across filesystems is not atomic (it degrades to copy-and-delete), so a temp file on
 // another device silently removes the guarantee this function exists to provide.
 func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 	test.Parallel()

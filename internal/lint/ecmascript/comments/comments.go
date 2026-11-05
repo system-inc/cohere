@@ -204,9 +204,9 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 		if list == nil {
 			return
 		}
-		// A NON-EMPTY list names one position nothing else does: its `End()`, which sits past a
+		// A non-empty list names one position nothing else does: its `End()`, which sits past a
 		// trailing comma that the last element's own `End()` stops short of. So
-		// `['a', // one\n 'b', // two\n]` loses the SECOND comment, because nothing probes between
+		// `['a', // one\n 'b', // two\n]` loses the second comment, because nothing probes between
 		// the comma and the bracket.
 		//
 		// Measured, with a control: the same array written without a trailing comma on the last
@@ -277,9 +277,9 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 		// a comment -- but it is not a NodeList, so `offer` cannot express it. A JsxExpression with
 		// a nil Expression spans exactly `{` and `}`, so its interior begins one byte past `Pos()`.
 		//
-		// Measured before adding: the scanner returns ZERO comments for `<div>{/*c*/}</div>` in a
+		// Measured before adding: the scanner returns zero comments for `<div>{/*c*/}</div>` in a
 		// .tsx file, while the same comment written anywhere else in the same file is found. The
-		// container's `Pos()` sits ON the brace, and `GetTrailingCommentRanges` at `Pos()+1` returns
+		// container's `Pos()` sits on the brace, and `GetTrailingCommentRanges` at `Pos()+1` returns
 		// the comment, so this is a position nothing probed rather than trivia the scanner cannot
 		// classify. Controlled against an ordinary trailing comment through the same call, which
 		// returns 1.

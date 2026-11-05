@@ -1,6 +1,6 @@
 // The conversion itself: walking the graph once and emitting a tree.
 //
-// Split from `reactive_function.go` so the TYPES a consumer reads are separable from the ALGORITHM
+// Split from `reactive_function.go` so the types a consumer reads are separable from the algorithm
 // that produces them. See that file's package comment for what a ReactiveFunction is and for the
 // three-level input check that preceded this work.
 package high_level_intermediate_representation
@@ -22,7 +22,7 @@ const (
 
 // controlFlowTarget is one entry on the stack of enclosing constructs.
 //
-// `Block` is where control transfers when this construct finishes. The INNERMOST entry is where
+// `Block` is where control transfers when this construct finishes. The innermost entry is where
 // control goes implicitly, which is what lets a `goto` to it be elided entirely rather than printed
 // as a break.
 type controlFlowTarget struct {
@@ -76,7 +76,7 @@ type reactiveContext struct {
 	nextScheduleId    int
 	// unmatchedGotos counts gotos whose target was not on the control-flow stack.
 	unmatchedGotos int
-	// nonImplicitScopeBreaks counts breaks to a scope fallthrough that were NOT implicit, which is
+	// nonImplicitScopeBreaks counts breaks to a scope fallthrough that were not implicit, which is
 	// the condition upstream asserts cannot happen. Counted rather than raised.
 	nonImplicitScopeBreaks int
 	// elidedScopeBreaks counts the breaks omitted because their target is a scope fallthrough.
@@ -86,7 +86,7 @@ type reactiveContext struct {
 	doubleEmit int
 	// blockIndex maps a BlockId to its slice position, built once.
 	//
-	// `BlockId` is explicitly NOT an index into `Blocks` -- the slice is in reverse postorder and
+	// `BlockId` is explicitly not an index into `Blocks` -- the slice is in reverse postorder and
 	// the two move independently, per the doc on `BlockId`. A linear scan per lookup would make this
 	// pass quadratic in block count, so the index is built once up front.
 	blockIndex map[static_single_assignment.BlockId]*BasicBlock
@@ -135,7 +135,7 @@ func (reactiveContext *reactiveContext) schedule(block static_single_assignment.
 
 // scheduleLoop pushes a loop, which owns two targets: the fallthrough and the continue block.
 //
-// `ownsBlock` is upstream's, and it matters: a loop whose fallthrough was ALREADY scheduled by an
+// `ownsBlock` is upstream's, and it matters: a loop whose fallthrough was already scheduled by an
 // enclosing construct must not unschedule it on the way out, or the parent's break target vanishes.
 func (reactiveContext *reactiveContext) scheduleLoop(fallthrough_, continueBlock static_single_assignment.BlockId) int {
 	id := reactiveContext.nextScheduleId
@@ -246,7 +246,7 @@ func (reactiveContext *reactiveContext) continueTarget(
 //
 // The zero value is the correct answer for a nil function: nothing converted.
 type ReactiveBuildResult struct {
-	// Blocks is how many HIR blocks the walk emitted.
+	// Blocks is how many `HIR` blocks the walk emitted.
 	Blocks int
 	// Statements is how many statements the resulting tree holds, at every depth.
 	Statements int
@@ -277,7 +277,7 @@ type ReactiveBuildResult struct {
 // BuildReactiveFunction converts a lowered function's control-flow graph into a tree.
 //
 // Requires evaluation order and single-assignment form: call `Construct` first, or take a function
-// from `ForFunction`, which does. Scopes are OPTIONAL -- a graph with no `Scope` terminals converts
+// from `ForFunction`, which does. Scopes are optional -- a graph with no `Scope` terminals converts
 // fine and simply carries no scope blocks -- so this can run before or after
 // `BuildReactiveScopeTerminals`, and a caller wanting scope blocks in the tree runs that first.
 //
@@ -341,7 +341,7 @@ func measureBlock(block ReactiveBlock, depth int, result *ReactiveBuildResult) {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
 			result.Instructions++
-			// Only composite values carry NESTED instructions; a plain instruction statement's own
+			// Only composite values carry nested instructions; a plain instruction statement's own
 			// value is the instruction already counted above, so descending into it here would
 			// double count.
 			if _, plain := shape.Instruction.Value.(*ReactiveInstructionValue); !plain {
@@ -362,7 +362,7 @@ func measureBlock(block ReactiveBlock, depth int, result *ReactiveBuildResult) {
 	}
 }
 
-// measureValue counts instructions nested INSIDE a value, which a statement walk cannot see.
+// measureValue counts instructions nested inside a value, which a statement walk cannot see.
 //
 // # Why this exists, and the false alarm it resolved
 //
@@ -372,8 +372,8 @@ func measureBlock(block ReactiveBlock, depth int, result *ReactiveBuildResult) {
 // "losing" instructions.
 //
 // That reading was wrong and the counterfactual is what showed it: on a `for-of` fixture all five
-// HIR blocks were emitted while only 9 of 12 instructions were counted -- an impossible combination
-// for a walk that had genuinely dropped a block. The instructions were preserved and the INSTRUMENT
+// `HIR` blocks were emitted while only 9 of 12 instructions were counted -- an impossible combination
+// for a walk that had genuinely dropped a block. The instructions were preserved and the instrument
 // could not see them. Recorded because a measurement that under-reports looks exactly like a pass
 // that under-converts, and the two demand opposite responses.
 //
@@ -448,7 +448,7 @@ func eachNestedBlock(terminal ReactiveTerminal, visit func(ReactiveBlock)) {
 //
 // Only the loop terminals hold values; `if` and `switch` test a bare `Place`, which is not a value
 // block and carries no instructions.
-// A value that is a bare `ReactiveInstructionValue` IS one instruction, collapsed. `valueOf` returns
+// A value that is a bare `ReactiveInstructionValue` is one instruction, collapsed. `valueOf` returns
 // the value directly rather than a one-element sequence, so the count has to attribute it here or
 // under-report by one per value block -- which is exactly the residue that remained after the
 // sequence descent landed, 10 of 12 rather than 12 of 12 on the `for-of` fixture.
@@ -474,7 +474,7 @@ func eachTerminalValue(terminal ReactiveTerminal, visit func(ReactiveValue)) {
 
 // visitBlock emits one block's instructions and then dispatches on its terminal.
 //
-// The single most important property here is that a block is visited ONCE. `emitted` is the check on
+// The single most important property here is that a block is visited once. `emitted` is the check on
 // that and `scheduled` is the mechanism: a block a parent has committed to emitting is not emitted
 // by a child, which emits a break to it instead.
 //
@@ -513,9 +513,9 @@ func (reactiveContext *reactiveContext) visitBlock(block *BasicBlock, into *Reac
 
 // visitTerminal dispatches one block's terminal, emitting a tree terminal and recursing into arms.
 //
-// Exhaustive over the HIR's terminal set. The shape of every arm is upstream's: schedule the
+// Exhaustive over the `HIR`'s terminal set. The shape of every arm is upstream's: schedule the
 // fallthrough so nested blocks emit a break rather than re-emitting it, walk the arms, unschedule,
-// then visit the fallthrough as a SIBLING rather than as a child -- which is what flattens
+// then visit the fallthrough as a sibling rather than as a child -- which is what flattens
 // `if (a) {...} rest` into two statements instead of nesting `rest` inside the if.
 //
 // Mutates: into the walk appends each statement it emits to the caller's block, so one block gathers a region
@@ -587,19 +587,19 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 			controlFlowSwitch,
 			&scheduleIds,
 		)
-		// # Cases are walked in REVERSE, and each is scheduled AFTER it is traversed
+		// # Cases are walked in reverse, and each is scheduled after it is traversed
 		//
 		// Both halves are upstream's and both are load-bearing. A `switch` with fallthrough has
-		// several case labels sharing one block, and the LAST label owning it is the one whose body
+		// several case labels sharing one block, and the last label owning it is the one whose body
 		// should carry the statements -- so the walk runs backwards and an earlier label finds the
 		// block already scheduled and contributes an empty arm.
 		//
-		// The first spelling here iterated forwards and scheduled BEFORE traversing, which made a
+		// The first spelling here iterated forwards and scheduled before traversing, which made a
 		// shared block reachable from two arms and emitted it twice. Measured: 8 functions on the
 		// corpus double-emitted, and every one of them contained a `Switch` -- which is what
 		// identified the arm rather than a fixture, since the attribution was 100%%.
 		//
-		// A case already scheduled that is NOT the fallthrough is upstream's invariant; here it is
+		// A case already scheduled that is not the fallthrough is upstream's invariant; here it is
 		// simply an empty arm, because a linter must not raise and an empty arm is the honest
 		// reading of "this label falls through to the next one".
 		reversed := make([]ReactiveSwitchCase, 0, len(terminal.Cases))
@@ -787,7 +787,7 @@ type reactiveValueTerminalResult struct {
 
 // emitStructuredValueTerminal reconstructs value-producing control flow as one reactive
 // instruction. This is the `visitValueBlockTerminal` path upstream uses for logical, optional and
-// ternary expressions: their branch blocks are implementation detail in HIR, not statement-level
+// ternary expressions: their branch blocks are implementation detail in `HIR`, not statement-level
 // `if`s in the reactive tree.
 //
 // A malformed or already-emitted value subtree declines without changing the walk. The caller can
@@ -891,7 +891,7 @@ func (reactiveContext *reactiveContext) visitValueBlockTerminal(terminal Termina
 			return reactiveValueTerminalResult{}, false
 		}
 
-		// Branch is a truthy/falsy CFG terminal in this HIR. For `&&` the truthy arm computes
+		// Branch is a truthy/falsy CFG terminal in this `HIR`. For `&&` the truthy arm computes
 		// the right operand; for `||` and `??` the lowering swaps the arms. ReactiveLogicalValue,
 		// however, always stores source-order left and right values.
 		shortCircuitBlock, rightBlock := branch.Alternate, branch.Consequent
@@ -957,7 +957,7 @@ func (reactiveContext *reactiveContext) visitValueBlockTerminal(terminal Termina
 	return reactiveValueTerminalResult{}, false
 }
 
-// valueJoinPlace translates the SSA shape this HIR carries into the phi-free shape upstream hands
+// valueJoinPlace translates the SSA shape this `HIR` carries into the phi-free shape upstream hands
 // to BuildReactiveFunction. Each arm result is an operand of a phi in the value terminal's
 // continuation; the reconstructed composite instruction defines that phi's place directly, so
 // instructions after the expression read a value the reactive tree actually declares.
@@ -1150,7 +1150,7 @@ func (reactiveContext *reactiveContext) scheduleLoopTargets(
 	return fallthrough_
 }
 
-// visitFallthrough emits the block control resumes at, as a SIBLING of the construct.
+// visitFallthrough emits the block control resumes at, as a sibling of the construct.
 //
 // This is what keeps the tree flat where the source was flat: statements after an `if` are siblings
 // of it, not children. A zero id means the fallthrough belongs to an enclosing construct.
@@ -1234,11 +1234,11 @@ func (reactiveContext *reactiveContext) emitValueTerminal(
 	test static_single_assignment.BlockId,
 ) {
 	blockId, _ := reactiveContext.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
-	// The test block, walked while the fallthrough is SCHEDULED.
+	// The test block, walked while the fallthrough is scheduled.
 	//
 	// That block ends in a `Branch`, which already nests both arms under a `ReactiveIf` and
 	// schedules nothing of its own precisely because this terminal owns the fallthrough. So the
-	// whole construct arrives as ONE statement, and a jump out of an arm becomes a break to the
+	// whole construct arrives as one statement, and a jump out of an arm becomes a break to the
 	// fallthrough rather than a walk that emits it twice.
 	//
 	// Without this the arms are never traversed: `terminal.Test` was not read, so a value terminal's
@@ -1259,18 +1259,18 @@ func (reactiveContext *reactiveContext) traverse(block static_single_assignment.
 	return built
 }
 
-// valueOf reads a value block down to the expression it computes, KEEPING its instructions.
+// valueOf reads a value block down to the expression it computes, keeping its instructions.
 //
 // Upstream's `visitValueBlock` plus `valueBlockResultToSequence`. A value block -- a loop's `test`,
 // a `for`'s `init`, the arms of a ternary -- is a block whose purpose is to compute one value, and
-// in the tree it becomes an EXPRESSION rather than a sequence of statements.
+// in the tree it becomes an expression rather than a sequence of statements.
 //
 // # The defect this replaced, and how it was found
 //
-// The first spelling returned only the block's LAST instruction value. That is the right answer for
+// The first spelling returned only the block's last instruction value. That is the right answer for
 // a block holding a single computation, and it silently discarded everything else: measured over the
 // corpus, 380 of 677 functions came out with fewer instructions than they went in with. Attribution
-// separated the two causes -- 353 of those had a value TERMINAL, which is the declared
+// separated the two causes -- 353 of those had a value terminal, which is the declared
 // `ReactiveFunctionGapValueExpressions`, but 27 did not, and every one of them held a `ForOf` whose
 // `Test` and `Init` are value blocks read through here.
 //
@@ -1309,7 +1309,7 @@ func (reactiveContext *reactiveContext) valueOf(block static_single_assignment.B
 		return nil
 	}
 
-	// The last instruction IS the value; everything before it runs for effect. A block with a single
+	// The last instruction is the value; everything before it runs for effect. A block with a single
 	// instruction needs no sequence wrapper, which keeps the ordinary case flat.
 	result := instructions[len(instructions)-1]
 	if len(instructions) == 1 {

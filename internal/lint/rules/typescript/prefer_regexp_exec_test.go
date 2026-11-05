@@ -11,7 +11,7 @@ import (
 const preferRegexpExecFile = "/repository/source/PreferRegexpExec.ts"
 
 // preferRegexpExecPointer spells an expected rewrite in a fixture row.
-func preferRegexpExecPointer(value string) *string { return &value }
+func preferRegexpExecPointer(value string) *string { return new(value) }
 
 // preferRegexpExecCase is one imported corpus row.
 type preferRegexpExecCase struct {

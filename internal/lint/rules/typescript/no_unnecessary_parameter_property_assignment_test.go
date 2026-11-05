@@ -448,19 +448,20 @@ func applyEveryParameterPropertySuggestion(test *testing.T, source string, resul
 
 	sort.Slice(edits, func(left, right int) bool { return edits[left].start > edits[right].start })
 
+	edited := source
 	for _, edit := range edits {
-		if edit.start < 0 || edit.end > len(source) || edit.start > edit.end {
+		if edit.start < 0 || edit.end > len(edited) || edit.start > edit.end {
 			test.Fatalf(
 				"suggestion range [%d,%d) is outside the source of length %d",
 				edit.start,
 				edit.end,
-				len(source),
+				len(edited),
 			)
 		}
-		source = source[:edit.start] + edit.text + source[edit.end:]
+		edited = edited[:edit.start] + edit.text + edited[edit.end:]
 	}
 
-	return source
+	return edited
 }
 
 // A parameter property written as a destructuring pattern, which crashes the rule without a guard.

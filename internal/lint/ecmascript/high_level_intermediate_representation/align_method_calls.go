@@ -36,8 +36,8 @@ import (
 //
 // # Two mechanisms, and they are not interchangeable
 //
-// When both sides carry a scope, the two scopes MERGE: the survivor's range grows to cover both.
-// When only one side carries one, the other side's scope ASSIGNMENT changes -- the property joins
+// When both sides carry a scope, the two scopes merge: the survivor's range grows to cover both.
+// When only one side carries one, the other side's scope assignment changes -- the property joins
 // the call's scope, or loses its own. Upstream keeps these apart with a disjoint set for the first
 // and a mapping for the second, and the distinction matters because a merge changes a range while a
 // mapping changes membership.

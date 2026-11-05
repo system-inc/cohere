@@ -54,12 +54,13 @@ func writeResolvedConfig(
 	if buildError != nil {
 		return buildError
 	}
+	absolutePath := path
 	if !tspath.IsRootedDiskPath(path) {
-		path = absoluteFrom(lintConfiguration.Root, path)
+		absolutePath = absoluteFrom(lintConfiguration.Root, path)
 	}
-	source := graph.Program.GetSourceFile(tspath.RootedFilePath(path))
+	source := graph.Program.GetSourceFile(tspath.RootedFilePath(absolutePath))
 	if source == nil {
-		return fmt.Errorf("%s does not belong to %s", path, graph.ConfigFileName)
+		return fmt.Errorf("%s does not belong to %s", absolutePath, graph.ConfigFileName)
 	}
 	sourceType := "script"
 	if ast.IsExternalModule(source) {

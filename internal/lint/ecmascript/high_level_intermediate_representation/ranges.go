@@ -79,7 +79,7 @@ const (
 	MutationSiteStoreContext
 	// MutationSiteCall is a call, whose arguments may be mutated by the callee.
 	//
-	// This is the shape effects exist to resolve and the reason the count below is a CEILING rather
+	// This is the shape effects exist to resolve and the reason the count below is a ceiling rather
 	// than a measurement of real mutations: most calls mutate nothing, and only an effect table can
 	// say which.
 	MutationSiteCall
@@ -102,13 +102,13 @@ func (kind MutationSiteKind) String() string {
 
 // MutationSites returns the instructions whose range widening this pass cannot perform.
 //
-// Computed from the instruction SHAPE alone, which is exactly what is available without effects. It
+// Computed from the instruction shape alone, which is exactly what is available without effects. It
 // is the count the package comment reports and the list a Stage 1 consumer walks.
 //
 // # Calls are included and they are the reason this is a ceiling
 //
 // A `PropertyStore` definitely mutates its receiver, so its presence here is a real missing
-// widening. A `CallExpression` only MIGHT mutate an argument, and upstream decides which by reading
+// widening. A `CallExpression` only might mutate an argument, and upstream decides which by reading
 // the callee's signature into an effect. Counting calls here would overstate the gap by an order of
 // magnitude, so they are returned as their own kind and the package comment reports the two totals
 // separately rather than summing them into one misleading number.

@@ -23,7 +23,7 @@ const DefaultMaxPasses = 10
 // FileResult is what the engine did to one file.
 //
 // Passes and Applied are separate numbers on purpose. A file fixed in one pass and a file fixed in
-// six have the same diff and very different meanings — the second says two rules are arguing, or a
+// six have the same diff and very different meanings: the second says two rules are arguing, or a
 // rule proposes one repair at a time where it could propose all of them.
 type FileResult struct {
 	FileName string
@@ -76,7 +76,7 @@ type FileResult struct {
 	// TransformSkipReason is why, in the transform's own words. Empty when it did not say.
 	TransformSkipReason string
 
-	// Failed is set when the engine could not process the file at all — unreadable, unwritable, or
+	// Failed is set when the engine could not process the file at all: unreadable, unwritable, or
 	// already unparseable before anything was applied.
 	//
 	// Distinct from Changed being false, which is a file the engine looked at and correctly left
@@ -88,7 +88,7 @@ type FileResult struct {
 // Propose is asked for the fixes that apply to a file's current text.
 //
 // The engine re-asks after every pass rather than reusing the first answer, and that is not an
-// optimization to remove later — it is the correctness requirement. Offsets from the previous pass
+// optimization to remove later. It is the correctness requirement. Offsets from the previous pass
 // are measured against text that no longer exists, so reusing them is exactly the silent corruption
 // this package exists to prevent. Re-running rules against the rewritten text is how every surviving
 // proposal is guaranteed to be measured against the bytes it will be applied to.
@@ -101,7 +101,7 @@ type Propose func(fileName string, text string) ([]Proposal, error)
 // or the budget runs out.
 //
 // Refusal is per pass and whole. When the rewritten text does not parse, the entire pass is
-// discarded and the previous text stands — not the subset of fixes that were individually fine.
+// discarded and the previous text stands, not the subset of fixes that were individually fine.
 // Bisecting to find which fix broke it would be a nicer result and a worse guarantee: it means
 // writing text assembled from a combination no rule proposed and nothing verified. The file is left
 // alone and every proposal in the pass is reported as refused, so the reader learns which file and
@@ -137,7 +137,7 @@ func fixText(
 	result := FileResult{FileName: fileName, Text: text}
 
 	// The starting text must parse, or nothing downstream means anything. A file that is already
-	// broken is not this package's problem to report — the types phase does that, loudly — but it is
+	// broken is not this package's problem to report (the types phase does that, loudly), but it is
 	// this package's problem not to make worse, and "the result parses" is a guarantee that says
 	// nothing if the input did not.
 	var parses bool
@@ -219,7 +219,7 @@ func fixText(
 		//
 		// The failure directions are not symmetric, which is what decides it. Refusing costs a run
 		// where autofix did nothing and said why. Writing costs a developer a file worse than they
-		// left it, carrying a rejection line beside it that a hurried review passes over — and a
+		// left it, carrying a rejection line beside it that a hurried review passes over. And a
 		// mangled file that parses survives review far more easily than an unfixed one does.
 		result.Rejected = append(result.Rejected, Rejection{
 			Proposal: Proposal{RuleName: "fix-engine"},
@@ -273,7 +273,7 @@ func ruleNamesOf(proposals []Proposal) []string {
 //
 // Reading the file here rather than taking the text from the already-parsed program is deliberate.
 // The program's copy was read when the graph was built, and in a tree where several agents edit at
-// once that copy can be minutes stale — applying offsets from a stale parse to a file that moved
+// once that copy can be minutes stale. Applying offsets from a stale parse to a file that moved
 // underneath is precisely the corruption shape this package exists to refuse. Re-reading costs one
 // syscall and removes the whole class.
 //
@@ -284,7 +284,7 @@ func FixFile(fileName string, propose Propose, maximumPasses int) (FileResult, e
 	return FixAndTransformFile(fileName, propose, nil, maximumPasses)
 }
 
-// Transform is a whole-text rewrite applied after fixes have converged — formatting, in practice.
+// Transform is a whole-text rewrite applied after fixes have converged: formatting, in practice.
 //
 // It is deliberately not a Propose. A proposal is a claim to some bytes, and the engine arbitrates
 // between competing claims; a transform is the new value of all of them, and there is nothing to
@@ -341,7 +341,7 @@ func skipReasonOf(transformError error) string {
 }
 
 // FixAndTransformFile drives a file to a fixpoint, applies a whole-text transform, and writes the
-// result — once, atomically, behind the same parse guard.
+// result: once, atomically, behind the same parse guard.
 //
 // One phase, one parse guard, one write. Two components that both wrote the same file in one run is
 // precisely the failure this package exists to prevent, so formatting arrives here rather than
@@ -555,7 +555,7 @@ func applyTransform(
 	transformed, transformError := transform(fileName, result.Text, offeredTree)
 	switch {
 	case errors.Is(transformError, ErrSkipped):
-		// The transform declined this file on purpose — a file type it does not handle, or one it
+		// The transform declined this file on purpose: a file type it does not handle, or one it
 		// handles incorrectly today. Recorded rather than treated as a failure, because the two
 		// mean different things to a reader: a failure says the formatter broke, a skip says it
 		// chose not to look, and a run where a formatter skipped four hundred files must not read
@@ -653,13 +653,13 @@ type Summary struct {
 	// and was not, which is a bug in that rule's fix.
 	FilesRefused []RefusedFile
 
-	// FilesFailed names the files the engine could not process at all — unreadable, unwritable, or
+	// FilesFailed names the files the engine could not process at all: unreadable, unwritable, or
 	// already unparseable before anything was applied.
 	//
 	// Separate from FilesRefused and FilesNotConverged because the three send a reader somewhere
 	// different. Refused means a rule proposed something wrong. Not converged means two rules are
 	// arguing. Failed means the file never entered the loop, and folding it into either of the
-	// others reports a real number under the wrong heading — which reads as a finding about the
+	// others reports a real number under the wrong heading, which reads as a finding about the
 	// rules when it is actually a finding about the file.
 	FilesFailed []string
 
@@ -902,7 +902,7 @@ func (summary Summary) String() string {
 
 	// The refusal breakdown attaches to the refusal count and must stay adjacent to it. It was
 	// written when nothing sat between the two, and adding the reformat and skip clauses moved it
-	// away — producing "2 not formatted (2 markdown) (1 overlaps another fix)", where
+	// away, producing "2 not formatted (2 markdown) (1 overlaps another fix)", where
 	// the second parenthetical reads as a second skip reason. A true number under the wrong heading,
 	// found by reading the rendered line rather than by any assertion, because every fixture checked
 	// for the presence of its own substring and none checked what the whole line said.

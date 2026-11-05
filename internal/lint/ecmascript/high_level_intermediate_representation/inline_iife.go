@@ -21,7 +21,7 @@
 // A fused scope reads exactly like a broken memo. The rule compares inferred memoization against
 // the `useMemo` the programmer wrote, and when one scope spans what the programmer wrote as three,
 // the dependencies disagree for all three -- so the rule fires three times on correct code. That is
-// why this pass has to run BEFORE `InferMutableRanges` and not merely somewhere in the pipeline;
+// why this pass has to run before `InferMutableRanges` and not merely somewhere in the pipeline;
 // running it afterwards inlines a body whose damage has already been recorded.
 package high_level_intermediate_representation
 
@@ -42,7 +42,7 @@ import (
 // parameter this pass does not lower, and an async body's `await` points would need the caller's
 // continuation to become a suspension point.
 //
-// The callee must also be a TEMPORARY -- an unnamed value. A named binding can be read again later,
+// The callee must also be a temporary -- an unnamed value. A named binding can be read again later,
 // and upstream's `functions` map is keyed on that: a `FunctionExpression` stored into a name is
 // never entered, and any use of a function-valued temporary that is not the callee of a call
 // removes it from the map. That last part is the one a reader skips, and it is what keeps
@@ -332,7 +332,7 @@ func spliceInlinedCall(function *Function, block *BasicBlock, index int,
 //
 // `direct` selects between the two forms. On the single-exit path the return's value is loaded
 // straight into the call's lvalue, which is a definition of that value and needs no prior
-// declaration. On the labeled path the lvalue was declared before the body, so a return REASSIGNS
+// declaration. On the labeled path the lvalue was declared before the body, so a return reassigns
 // it: several returns are several stores to one binding, which is precisely what a `let` plus
 // reassignments expresses and what a `const` would not.
 //

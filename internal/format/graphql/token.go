@@ -58,7 +58,7 @@ type token struct {
 	hasValue bool
 
 	// Tokens exist as nodes in a double-linked-list amongst all tokens including ignored tokens.
-	// <SOF> is always the first node and <EOF> the last.
+	// `<SOF>` is always the first node and `<EOF>` the last.
 	prev *token
 	next *token
 }

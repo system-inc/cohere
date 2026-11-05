@@ -415,15 +415,16 @@ func preferIncludesRegexReplacement(
 	// A loop rather than a single step, because `((x))` nests, and written out rather than reaching
 	// for `ast.SkipParentheses`, which dereferences its argument and is how this project lost 167
 	// files to a nil panic.
-	for argument.Kind == ast.KindParenthesizedExpression {
-		inner := argument.AsParenthesizedExpression().Expression
+	unwrapped := argument
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		inner := unwrapped.AsParenthesizedExpression().Expression
 		if inner == nil {
 			return "", false
 		}
-		argument = inner
+		unwrapped = inner
 	}
 
-	argumentText, readable := preferIncludesNodeText(ruleContext, argument)
+	argumentText, readable := preferIncludesNodeText(ruleContext, unwrapped)
 	if !readable {
 		return "", false
 	}
@@ -431,7 +432,7 @@ func preferIncludesRegexReplacement(
 	// Upstream parenthesizes an argument that is not one of five shapes, because the rewrite puts
 	// the argument in receiver position where a comma or a conditional would bind wrongly.
 	needsParentheses := true
-	switch argument.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindNoSubstitutionTemplateLiteral,
 		ast.KindTemplateExpression, ast.KindIdentifier,
 		ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,

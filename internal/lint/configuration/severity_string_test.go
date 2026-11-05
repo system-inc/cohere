@@ -4,7 +4,7 @@ import "testing"
 
 // A severity that renders as a control character is the failure this method exists to prevent.
 // Severity is an iota, so SeverityOff is 0, and any diagnostic that formats one with %s or %q
-// without a String method prints '\x00' — illegible in exactly the output a reader consults to
+// without a String method prints '\x00', illegible in exactly the output a reader consults to
 // find out whether their config is being honored.
 func TestSeverityRendersAsTheConfigSpellsIt(test *testing.T) {
 	test.Parallel()

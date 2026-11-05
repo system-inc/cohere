@@ -135,7 +135,7 @@ func lastSeparator(filePath string) int {
 //	components/_document.tsx       reports upstream    IsDocumentFile exempts it
 //	pages/_documentation.tsx       exempt upstream     IsDocumentFile reports it
 //
-// The mechanism is a split on the bare word `pages` keeping the LAST segment, so only the immediate
+// The mechanism is a split on the bare word `pages` keeping the last segment, so only the immediate
 // child of a `pages` directory is the document and a path with no `pages` in it at all is never the
 // document. `pagesapp/src/pages/_document.js` is upstream's own probe of the `.last()`: splitting
 // gives `["", "app/src/", "/_document.js"]` and the last one exempts.
@@ -145,7 +145,7 @@ func lastSeparator(filePath string) int {
 // the backslash. oxc is strictly more correct there and oxc is the port target.
 //
 // One further ESLint divergence is reproduced in oxc's direction rather than ESLint's: ESLint
-// carries a leading emptiness guard, so a path ENDING in `pages` splits to an empty last segment and
+// carries a leading emptiness guard, so a path ending in `pages` splits to an empty last segment and
 // exempts, where oxc reports. Unreachable in practice, since a lintable file needs an extension, but
 // it is asserted in the tests below so the choice is visible rather than incidental.
 func IsDocumentPage(filePath string) bool {
@@ -183,7 +183,7 @@ func IsDocumentPage(filePath string) bool {
 // `"/api"`. oxc is the port target and it is also simply right, so no note is needed at any call
 // site.
 //
-// Only the FIRST `pages` segment decides, matching oxc's walk: it sets a flag on the first match and
+// Only the first `pages` segment decides, matching oxc's walk: it sets a flag on the first match and
 // returns on the very next component. So `pages/api/pages/x.tsx` is false, because the segment after
 // the first `pages` is `api`, and the second `pages` is never consulted.
 //

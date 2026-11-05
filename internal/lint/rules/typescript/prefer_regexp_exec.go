@@ -617,10 +617,11 @@ func preferRegexpExecInnerText(ruleContext rule.Context, node *ast.Node) string 
 // Measured against the installed build, since upstream's corpus has no case in this shape.
 func preferRegexpExecOuterFix(ruleContext rule.Context, call *ast.Node, replacement string) rule.Fix {
 	callRange := rule.TokenRange(ruleContext.SourceFile, call)
+	fixText := replacement
 	if preferRegexpExecHasWeakPrecedenceParent(call) && !preferRegexpExecIsParenthesized(ruleContext, call) {
-		replacement = "(" + replacement + ")"
+		fixText = "(" + replacement + ")"
 	}
-	return rule.ReplaceRange(core.NewTextRange(callRange.Pos(), callRange.End()), replacement)
+	return rule.ReplaceRange(core.NewTextRange(callRange.Pos(), callRange.End()), fixText)
 }
 
 // preferRegexpExecHasWeakPrecedenceParent is upstream's `isWeakPrecedenceParent`.

@@ -38,8 +38,8 @@ func TestResolveFrozenRefusesWhenTheCacheIsEmpty(test *testing.T) {
 func TestResolveFrozenRefusesWhenTheCacheIsMissing(test *testing.T) {
 	test.Parallel()
 
-	// A cache directory that was never created is a different failure from an empty one — it means
-	// no build has ever run here — and it must be just as loud rather than treated as "no results".
+	// A cache directory that was never created is a different failure from an empty one (it means
+	// no build has ever run here), and it must be just as loud rather than treated as "no results".
 	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: filepath.Join(test.TempDir(), "absent")}
 
 	if _, resolveFrozenError := ResolveFrozen(paths); resolveFrozenError == nil {

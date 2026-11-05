@@ -13,7 +13,7 @@ const consistentTypeDefinitionsFile = "/repository/source/ConsistentTypeDefiniti
 // consistentTypeDefinitionsPointer spells an expected rewrite in a fixture row. A nil expectation
 // means the rule proposed no fix, which for this rule is a real verdict rather than an absence:
 // upstream deliberately declines to repair an interface inside `declare global`.
-func consistentTypeDefinitionsPointer(value string) *string { return &value }
+func consistentTypeDefinitionsPointer(value string) *string { return new(value) }
 
 // consistentTypeDefinitionsCase is one imported corpus row.
 type consistentTypeDefinitionsCase struct {

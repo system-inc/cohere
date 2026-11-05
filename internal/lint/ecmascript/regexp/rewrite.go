@@ -33,7 +33,7 @@ const (
 )
 
 // wordCharacters is the set ECMAScript builds `\w` and a word boundary out of.
-// It is ASCII whatever the flags say, where .NET — and so regexp2 — reaches
+// It is ASCII whatever the flags say, where .NET, and so regexp2, reaches
 // for a Unicode word set, which is why both have to be spelled out.
 func wordCharacters(options rewriteOptions) string {
 	return writeClass(wordClassAtoms(options), false, rewriteOptions{})
@@ -143,7 +143,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			case escapeRune:
 				// An escape that resolves to a character is written as that
 				// character. Passed through as written, one .NET reads
-				// differently — `\A`, `\a`, `\e` — would keep its .NET meaning,
+				// differently (`\A`, `\a`, `\e`) would keep its .NET meaning,
 				// and one .NET does not know at all would refuse to compile.
 				if current.ignoreCase {
 					if class, widened := CaseClass(escape.r, current.unicode); widened {
@@ -409,8 +409,8 @@ func namedBackreference(source string) (string, int, bool) {
 	return source[:width], width, true
 }
 
-// modifierGroup reads a `(?flags:` or `(?flags-flags:` opener — the syntax
-// JavaScript spells turning `i`, `m` or `s` on or off over one group with — and
+// modifierGroup reads a `(?flags:` or `(?flags-flags:` opener (the syntax
+// JavaScript spells turning `i`, `m` or `s` on or off over one group with) and
 // returns the flags that hold inside it. A modifier may be named once across
 // both sides, and naming none at all is `(?:`, an ordinary group.
 func modifierGroup(source string, current rewriteOptions) (rewriteOptions, int, bool) {
@@ -457,8 +457,8 @@ func modifierGroup(source string, current rewriteOptions) (rewriteOptions, int, 
 }
 
 // checkGroupConstruct rejects a `(?…` opener JavaScript has no syntax for.
-// regexp2 follows .NET, which reads several more — `(?i)` sets a flag there
-// and is a syntax error in JavaScript — so accepting them would quietly give
+// regexp2 follows .NET, which reads several more (`(?i)` sets a flag there
+// and is a syntax error in JavaScript), so accepting them would quietly give
 // a pattern a meaning its author never wrote.
 func checkGroupConstruct(source string) error {
 	if !strings.HasPrefix(source, "(?") {

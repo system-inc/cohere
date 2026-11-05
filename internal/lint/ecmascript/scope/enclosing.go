@@ -19,7 +19,7 @@ import (
 // `EnclosingNamedFunction`, which is a different question rather than a subset: a getter has a name
 // and is still not a function anyone calls by it.
 //
-// # What this deliberately does NOT answer
+// # What this deliberately does not answer
 //
 // A static block and the source file are absent. `no-useless-assignment` includes both, because it
 // is asking which flow graph a node belongs to rather than which function encloses it: its set is

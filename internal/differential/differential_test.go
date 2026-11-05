@@ -1,7 +1,7 @@
 // Tests for the instrument that decides whether cohere agrees with the gate.
 //
 // The thing being defended here is one level up from the usual. This package exists to refuse
-// untrustworthy results, so a bug in it does not produce a wrong answer that someone notices — it
+// untrustworthy results, so a bug in it does not produce a wrong answer that someone notices: it
 // produces a clean, confident answer that nobody questions, about a comparison that never happened.
 // Every test below is therefore written as "prove this can fail", not "prove this passes on good
 // input". A detector that has never returned a positive has not been shown to work.
@@ -17,7 +17,7 @@ import (
 //
 // The two gates decorate rule names in opposite directions. If normalization breaks, every finding
 // is keyed under a different rule name on each side, so every finding becomes one-sided and the
-// report is a total mismatch — which is indistinguishable, in shape, from a real 130-finding
+// report is a total mismatch, which is indistinguishable, in shape, from a real 130-finding
 // disagreement. A well-formed report of a comparison that did not happen.
 func TestRuleNamesFromBothGatesCollapseToTheSameName(test *testing.T) {
 	test.Parallel()
@@ -130,7 +130,7 @@ func TestMatchingFindingsAreNotDifferences(test *testing.T) {
 // The three classifications are three different facts and must not collapse into each other.
 //
 // Getting this wrong is not cosmetic. Most of the current gap is rules cohere has never claimed,
-// and reporting those as disagreements reports noise as signal — while reporting a genuine
+// and reporting those as disagreements reports noise as signal, while reporting a genuine
 // disagreement as a coverage gap hides the only class that blocks the claim.
 func TestClassificationSeparatesCoverageFromCorrectness(test *testing.T) {
 	test.Parallel()
@@ -153,9 +153,9 @@ func TestClassificationSeparatesCoverageFromCorrectness(test *testing.T) {
 	}
 
 	expected := map[string]Classification{
-		// cohere has no such rule, so it cannot disagree — a coverage fact.
+		// cohere has no such rule, so it cannot disagree: a coverage fact.
 		"react-component-no-multiple-primary": ClassificationNotPorted,
-		// cohere has the rule, nobody enabled it, so it ran over no files — neither a port gap nor
+		// cohere has the rule, nobody enabled it, so it ran over no files: neither a port gap nor
 		// a defect.
 		"import-require-path-alias": ClassificationNotConfigured,
 		// Both sides had it and both had it on. Somebody is wrong, and this is the only class that
@@ -255,8 +255,8 @@ func TestAnEmptyDiffWithoutControlsIsNotAgreement(test *testing.T) {
 		test.Fatalf("an unproven run must not render a pass mark: %q", rendered.String())
 	}
 
-	// And the same comparison, once the controls have fired, must reach the opposite verdict —
-	// otherwise this test would pass against a harness that can never say ✓ at all.
+	// And the same comparison, once the controls have fired, must reach the opposite verdict.
+	// Otherwise this test would pass against a harness that can never say ✓ at all.
 	proven := unproven
 	proven.Provenance = provenProvenance()
 	if !proven.Agreed() {
@@ -327,7 +327,7 @@ func provenProvenance() Provenance {
 //
 // A nil ConfiguredRules means the caller never read the lint config, not that the config enables
 // nothing. Go returns false for any read of a nil map, so without an explicit check every rule
-// would classify as not-configured — silently converting every genuine disagreement into an excused
+// would classify as not-configured, silently converting every genuine disagreement into an excused
 // non-finding, and reporting a clean tree with the highest possible confidence.
 //
 // The degradation is deliberate: fall back to the two-way split, which is honest about what the
@@ -347,7 +347,9 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(test *testing.T) {
 	}
 	if got := report.Differences[0].Classification; got != ClassificationBothActive {
 		test.Fatalf(
-			"with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"with configuration unknown, a rule cohere implements and reported must stay %q, got %q \u2014 "+
+				"nil must not read as disabled",
 			ClassificationBothActive,
 			got,
 		)

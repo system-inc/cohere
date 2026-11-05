@@ -62,12 +62,12 @@ func (finding Finding) Key() string {
 // The two formats decorate in opposite directions. The gate prints `structure(rule-name)` or
 // `nexus(rule-name)`, putting the plugin outside. cohere prints `rule-name/messageId`, putting the
 // message identifier after. Neither decoration is part of the rule's identity, and comparing
-// decorated names would report every single rule as a disagreement — a total mismatch that still
+// decorated names would report every single rule as a disagreement: a total mismatch that still
 // looks like well-formed output, which is the failure this whole package is built to refuse.
 func NormalizeRuleName(raw string) string {
 	name := strings.TrimSpace(raw)
 
-	// `plugin(rule-name)` — take what is inside the parentheses.
+	// `plugin(rule-name)`: take what is inside the parentheses.
 	if open := strings.IndexByte(name, '('); open >= 0 && strings.HasSuffix(name, ")") {
 		name = name[open+1 : len(name)-1]
 	}
@@ -231,8 +231,8 @@ type Report struct {
 	// difference at all.
 	//
 	// This does not overlap Comparable and neither substitutes for the other, which is the reason
-	// both are here. Comparable answers "did both sides report coverage" — a property of this run's
-	// population. Provenance answers "has this instrument been demonstrated to work" — a property
+	// both are here. Comparable answers "did both sides report coverage": a property of this run's
+	// population. Provenance answers "has this instrument been demonstrated to work": a property
 	// of the instrument, which a healthy population says nothing about. A run over 3,407 files by a
 	// harness that parses one side's format wrong is perfectly Comparable and completely blind.
 	Provenance Provenance
@@ -428,7 +428,7 @@ func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
 	configured := inputs.ConfiguredRules[ruleName]
 
 	// A nil map means the caller never read the lint config, which is not the same as a config that
-	// enables nothing — and Go cannot tell them apart, because reading any key of a nil map returns
+	// enables nothing, and Go cannot tell them apart, because reading any key of a nil map returns
 	// false. Without this the not-configured branch would swallow every rule and quietly excuse
 	// every genuine disagreement, producing a clean tree with maximum confidence. So absent
 	// knowledge degrades to the two-way split, which is honest about what the caller actually has.
@@ -505,7 +505,9 @@ func Write(out *strings.Builder, report Report) {
 	plantedCount := len(report.Differences) - len(observed)
 	fmt.Fprintf(
 		out,
-		"\ndifferences: %d observed, %d planted by this harness — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
+		// The dash is written as its escape, the same bytes, so the line prints exactly what it always has.
+		"\ndifferences: %d observed, %d planted by this harness \u2014 %d both-active, %d not-ported, "+
+			"%d not-configured, %d unclassified\n",
 		len(observed),
 		plantedCount,
 		byClassification[ClassificationBothActive],
@@ -566,7 +568,7 @@ func Write(out *strings.Builder, report Report) {
 		// compared. Silence about them reads as coverage.
 		//
 		// This matters more than it looks. Every finding the gate produces on this tree today comes
-		// from a rule cohere already has, and the 138 unported rules find nothing — not because
+		// from a rule cohere already has, and the 138 unported rules find nothing: not because
 		// they are worthless, but because the gate has been enforcing them for months and the tree
 		// is clean of what they prevent. A clean diff therefore cannot be the signal to remove the
 		// old tool: it would keep reading clean right up until somebody wrote a violation of an

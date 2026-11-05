@@ -1187,7 +1187,8 @@ func TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses(test *testing.
 				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
-			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != "total += chunk" {
+			if reported :=
+				result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != "total += chunk" {
 				test.Errorf("the finding covers %q, want %q", reported, "total += chunk")
 			}
 			if diagnostic.Message.Id != "nonVoidReturn" {

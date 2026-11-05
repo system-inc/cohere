@@ -48,14 +48,15 @@ func applyPreferEnumInitializersSuggestion(test *testing.T, source string, sugge
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
+	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
-		if start < 0 || end > len(source) || start > end {
-			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+		if start < 0 || end > len(edited) || start > end {
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(edited))
 		}
-		source = source[:start] + fix.Text + source[end:]
+		edited = edited[:start] + fix.Text + edited[end:]
 	}
-	return source
+	return edited
 }
 
 // TestPreferEnumInitializersStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -577,7 +578,8 @@ func TestPreferEnumInitializersReportsAComputedKeyUpstreamCannotParse(test *test
 	result := rule_testing.Run(test, PreferEnumInitializers, preferEnumInitializersFile,
 		"enum D {\n  ['computed'],\n}")
 	rule_testing.ExpectFindings(test, result, "defineInitializer")
-	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' should be explicitly defined." {
+	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' "+
+		"should be explicitly defined." {
 		test.Fatalf("message: got %q", got)
 	}
 }

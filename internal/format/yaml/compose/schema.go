@@ -56,7 +56,7 @@ type Schema struct {
 	Tags []*Tag
 }
 
-// Upstream's schema[MAP], schema[SCALAR] and schema[SEQ] are the common map, string and seq tags,
+// Upstream's `schema[MAP]`, `schema[SCALAR]` and `schema[SEQ]` are the common map, string and seq tags,
 // whatever the schema.
 func (schema *Schema) scalarTag() *Tag { return stringTag }
 

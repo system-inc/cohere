@@ -130,10 +130,11 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 }
 
 func stripRoot(text string, root string) string {
+	stripped := text
 	if resolved, resolveSymlinksError := filepath.EvalSymlinks(root); resolveSymlinksError == nil {
-		text = strings.ReplaceAll(text, resolved, "ROOT")
+		stripped = strings.ReplaceAll(text, resolved, "ROOT")
 	}
-	return strings.ReplaceAll(text, root, "ROOT")
+	return strings.ReplaceAll(stripped, root, "ROOT")
 }
 
 // The pass's own sorting: a file with proposals is never attempted, a file whose attempt asked for its

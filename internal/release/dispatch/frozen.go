@@ -27,7 +27,7 @@ type FrozenBinary struct {
 // ResolveFrozen returns the most recently built cached binary, without recomputing the input hash.
 //
 // This is the escape hatch for a tree that cannot compile: during a dependency migration the source
-// does not build, so the ordinary path — hash the inputs, rebuild on a miss — fails even though a
+// does not build, so the ordinary path (hash the inputs, rebuild on a miss) fails even though a
 // working binary is sitting in the cache. Freezing lets the instrument keep measuring while the
 // floor is being replaced under it.
 //
@@ -127,7 +127,7 @@ func isCohereBinaryName(name string) bool {
 // hashFromBinaryName reads the input hash back out of a cached binary's filename.
 //
 // The name is `cohere-<goos>-<goarch>-<hash>`, so the hash is the last segment. A name that does
-// not carry one — the stable development binary, for instance — reports that rather than an empty
+// not carry one (the stable development binary, for instance) reports that rather than an empty
 // string, because the caller prints this and a blank would read as a missing value rather than as
 // a binary that never had a hash in its name.
 func hashFromBinaryName(name string) string {

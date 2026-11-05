@@ -96,7 +96,7 @@ func TestReads(test *testing.T) {
 		"({[a]: b} = o);",
 		// A key merely names a property.
 		"({a: b} = o);",
-		// The NAME side of a property access. `o.a = 1` writes to a property of `o`; the identifier
+		// The name side of a property access. `o.a = 1` writes to a property of `o`; the identifier
 		// `a` names a member and no binding called `a` is touched. Note `a.x = 1` above covers the
 		// object side, which is a read; this is the other half and it was missing.
 		//
@@ -191,7 +191,7 @@ func TestNilIsNotAWrite(test *testing.T) {
 // A shorthand carries the identifier in Name() or in ObjectAssignmentInitializer, and the two mean
 // opposite things. The six rules list the shorthand as a transparent wrapper with no position test
 // and therefore call the default-value read a write; ast.IsWriteAccess distinguishes them, so this
-// function gets both right by NOT listing the shorthand as a wrapper.
+// function gets both right by not listing the shorthand as a wrapper.
 //
 // Verified with node: `let a = "ORIGINAL"; ({ files = a } = {})` leaves a untouched. It is also
 // upstream's own clean case for no-const-assign.
@@ -261,7 +261,7 @@ func TestIsUpdateOperator(test *testing.T) {
 // justify. Without it the climb would sit there forever, correct but unexplainable, and the next
 // reader would have no way to learn whether it still does anything.
 //
-// The assertion is deliberately on the SHIM's answer rather than on ours. Asserting our answer would
+// The assertion is deliberately on the shim's answer rather than on ours. Asserting our answer would
 // pass either way and prove nothing about why the wrapper exists.
 func TestShelfAccessorStillDeclinesRestElements(test *testing.T) {
 	test.Parallel()

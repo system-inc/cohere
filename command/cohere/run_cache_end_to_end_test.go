@@ -104,10 +104,10 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	// cache answered for, which a warm run and a cold one differ in by design.
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
-		output = foldNodeCounts(missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), ""))
+		folded := foldNodeCounts(missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), ""))
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(
 			cacheOffLine.ReplaceAllString(
-				layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""),
+				layerTwoClause.ReplaceAllString(durations.ReplaceAllString(folded, "T"), ""),
 				"",
 			),
 			"",
@@ -520,7 +520,8 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 	)
 	fixture.write(
 		"CohereSettings.json",
-		`{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off",`+
+		`{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off",`+
+			`"@typescript-eslint/no-inferrable-types":"off",`+
 			`"no-debugger":"error","@next/next/no-html-link-for-pages":["error","custom"]}}`,
 	)
 	// Without React's types an intrinsic element is a type error, and a run whose types bail never lints.
@@ -538,9 +539,9 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 	finding := "@next/next/no-html-link-for-pages"
 	// The lint line and the footer are the invocation's; every other line is the tree's verdict.
 	verdict := func(output string) string {
-		output = lintLine.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
+		withoutLintLine := lintLine.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
 		kept := []string{}
-		for _, line := range strings.Split(output, "\n") {
+		for _, line := range strings.Split(withoutLintLine, "\n") {
 			if !strings.HasPrefix(line, "  ") &&
 				!strings.HasPrefix(line, "✓") &&
 				!strings.HasPrefix(line, "✗") &&

@@ -8,7 +8,7 @@ import (
 
 // `Targets` is the largest hand-written claim in this package: six platforms, asserted rather than
 // derived. Every other test here iterates it, which means they cohere consistency *with* the list
-// and never the list itself — they would all pass green if it named one platform, or named a
+// and never the list itself: they would all pass green if it named one platform, or named a
 // platform Go cannot build.
 //
 // That was measured, not supposed. Adding `plan9/sparc64` to `Targets` passed the entire suite, and
@@ -77,7 +77,7 @@ func TestTargetsHasNoDuplicates(test *testing.T) {
 //
 // This is the whole point of the file: the answer comes from `go tool dist list` rather than from a
 // second list written here, because a hand-written expectation would drift exactly the way the one
-// it checks does. The control below is what makes the result trustworthy — a probe that cannot
+// it checks does. The control below is what makes the result trustworthy: a probe that cannot
 // return "absent" would pass every target including impossible ones.
 func supportedPlatforms(test *testing.T) map[string]bool {
 	test.Helper()

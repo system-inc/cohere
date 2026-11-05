@@ -253,14 +253,14 @@ func remapNestedFunctionIds(value InstructionValue, functionRemap map[FunctionId
 //
 // This was written as a one-level copy on the reasoning that a terminal's fields are "places, block
 // ids and evaluation orders, all values". Two are not. `Switch.Cases` is a `[]SwitchCase`, and a
-// struct copy duplicates the slice HEADER while both headers keep pointing at one backing array --
+// struct copy duplicates the slice header while both headers keep pointing at one backing array --
 // so a rewrite through a copied case writes into the original. Each `SwitchCase.Test` is a `*Place`,
 // and a copied pointer is the same place.
 //
 // The measured symptom was in the sibling instruction path, which had the same shallow shape: after
 // a copy, ten of nineteen places in the nested body had been renamed to the parent's ids, and
 // printing the nested function panicked on an identifier past the end of its table. Nothing in the
-// remap's own mutation sweep saw it, because that sweep asserted only over block REFERENCES and
+// remap's own mutation sweep saw it, because that sweep asserted only over block references and
 // this damage is to places.
 //
 // So the copy follows pointers and slices to the bottom. `deepCopyValue` is the one implementation
@@ -288,7 +288,7 @@ func copyInstructionValue(value InstructionValue) InstructionValue {
 // exactly that shape one level down -- a `[]SwitchCase` the copier's own comment claimed could not
 // exist.
 //
-// `*ast.Node` and the checker types reachable from it are deliberately NOT followed: they are the
+// `*ast.Node` and the checker types reachable from it are deliberately not followed: they are the
 // syntax tree, shared by every consumer in the process and never rewritten by a remap. Following
 // them would copy the program. The stop condition is therefore structural rather than a type list:
 // a pointer to a struct declared outside this package is kept as-is.

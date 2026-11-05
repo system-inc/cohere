@@ -2,7 +2,7 @@
 //
 // Upstream lowers `a?.b` to an `Optional` terminal with a value block per link and a join, so the
 // chain becomes real control flow and each join carries a phi. The optionality lives on the
-// TERMINAL, not on the `PropertyLoad` inside the block: the load is an ordinary one, and what makes
+// terminal, not on the `PropertyLoad` inside the block: the load is an ordinary one, and what makes
 // the access optional is the branch that guarded reaching it. `optional_chains.go` reads
 // `terminal.Optional` when it recovers the path, which is why that is the faithful place for it.
 package high_level_intermediate_representation
@@ -13,7 +13,7 @@ import (
 
 // isOptionalChainLink reports whether an access participates in an optional chain.
 //
-// A link participates when it carries `?.` itself OR when its object does, because `a?.b.c` is one
+// A link participates when it carries `?.` itself or when its object does, because `a?.b.c` is one
 // chain: the second access rides the same short circuit even though it has no `?.` of its own. That
 // is the distinction `Optional.Optional` records -- "whether this specific link is the one that
 // tests" -- and getting it wrong here would lower `a?.b.c` as a chain plus a stray load.
@@ -45,7 +45,7 @@ func isOptionalChainLink(node *ast.Node) bool {
 // This is `lowerOptionalMemberExpression` (`BuildHIR.ts:2820`), and the shape is the reason it
 // exists rather than a preference. `PropertyLoad.Optional` was carrying optionality as a flag on the
 // instruction, which is not what the analyses downstream read: `collectOptionalChainSidemap` matches
-// on an `Optional` TERMINAL and the branching around it, so with none it returned empty and the
+// on an `Optional` terminal and the branching around it, so with none it returned empty and the
 // optional half of dependency collection never ran. This closes the dot-property portion of
 // `DependencyGapOptionalChains`; computed links and optional calls remain declared there.
 //
@@ -56,7 +56,7 @@ func isOptionalChainLink(node *ast.Node) bool {
 //	consequent   performs the load, stores into the result, breaks to the continuation
 //	terminal     Optional{Optional: this link tests, Test: test, Fallthrough: continuation}
 //
-// `parentAlternate` is what makes a nested chain ONE chain. Upstream's comment: "we only create an
+// `parentAlternate` is what makes a nested chain one chain. Upstream's comment: "we only create an
 // alternate when first entering an optional subtree of the ast: if this is a child of an optional
 // node, we use the alternate created by the parent". Both links of `a?.b?.c` short circuit to the
 // same place, and creating a second alternate would lower them as two independent chains.
@@ -65,7 +65,7 @@ func (builder *builder) lowerOptionalChain(node *ast.Node, parentAlternate *Basi
 
 	object, name, computed, tests := optionalChainParts(node)
 
-	// The continuation INHERITS the current block's kind rather than forcing `BlockKindBlock`.
+	// The continuation inherits the current block's kind rather than forcing `BlockKindBlock`.
 	// Upstream reserves `builder.currentBlockKind()` here (`BuildHIR.ts:2825`), where its `Logical`
 	// and `Ternary` lowerings reserve a literal `'block'`.
 	//
@@ -107,7 +107,7 @@ func (builder *builder) lowerOptionalChain(node *ast.Node, parentAlternate *Basi
 		Fallthrough: continuation.Id,
 	}, testBlock)
 
-	// A nested link lowers into its own blocks and leaves the builder in ITS continuation, not in
+	// A nested link lowers into its own blocks and leaves the builder in its continuation, not in
 	// the test block reserved above. The branch has to close whichever block the object's lowering
 	// ended in, or it closes an empty one and the test never runs there. Measured on `props?.a?.b`
 	// before this: the inner test block held no instructions and carried a `Branch` anyway, which

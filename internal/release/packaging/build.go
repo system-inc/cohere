@@ -21,7 +21,7 @@ import (
 // published artifact should not carry.
 var BuildFlags = []string{"-trimpath"}
 
-// StripFlags remove the symbol table and DWARF from a released binary.
+// StripFlags remove the symbol table and `DWARF` from a released binary.
 //
 // Named rather than inlined so that DescribeBuild reports the flags a release actually used. A
 // hand-written description drifts from the build it claims to describe, and a size label that names
@@ -32,7 +32,7 @@ var StripFlags = []string{"-s", "-w"}
 //
 // A size without its build is not a measurement. The same commit measures 43.1 MB stripped and
 // 61.9 MB from a plain `go build`, an 18 MB spread, so two people quoting sizes from different
-// builds can both be right and still disagree — which is exactly what happened here, and cost two
+// builds can both be right and still disagree, which is exactly what happened here, and cost two
 // messages to reconcile. The same trap has a sharper form for anyone attributing those bytes:
 // `go tool nm` reports every symbol as size zero on a stripped binary, so an attribution run
 // against a release build sums to zero rather than failing.
@@ -212,7 +212,7 @@ var releaseVersionPattern = regexp.MustCompile(
 //
 // cohere's versions start at 0.1.0, by Kirk's ruling of 2026-11-03, which replaced the 1.0.0 of #ed2dp27:
 // a 0.x says the configuration and the rule sets are still settling, and semver gives 0.x its own
-// contract for that (CONTRIBUTING.md, "Versioning and the changelog"). A 0.0.x would read as a toy, so it
+// contract for that (`CONTRIBUTING.md`, "Versioning and the changelog"). A 0.0.x would read as a toy, so it
 // stays refused. The version is typed by hand into the release workflow, so the floor is enforced here
 // rather than left to an example someone has to remember, and npm cannot take a published version back.
 func requireReleaseVersion(version string) error {
@@ -350,8 +350,8 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 //
 // Nothing is compiled here, which is the point. The dispatcher is one package every machine
 // installs regardless of platform, so it cannot be a Go binary without becoming a seventh platform
-// package and defeating the single-install premise. It is a Node script instead — Node is present
-// by construction in an npm install — and it resolves the platform package through the package
+// package and defeating the single-install premise. It is a Node script instead (Node is present
+// by construction in an npm install), and it resolves the platform package through the package
 // manager rather than by guessing at directory layouts.
 //
 // It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
@@ -500,7 +500,7 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
 	const packagePath = "github.com/system-inc/cohere/internal/release/packaging"
 
-	// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to link
+	// Strip the symbol table and `DWARF`. Measured on a comparable binary: marginally faster to link
 	// and 29% smaller, with nothing traded away that a released binary needs.
 	stamps := append([]string{}, StripFlags...)
 	stamps = append(stamps,
@@ -582,7 +582,7 @@ func cohereBinary(path string, target Target) (int64, error) {
 
 // executableMagic is the leading byte sequence of each executable format we ship.
 //
-// Keyed by GOOS because that is what decides the format: both darwin targets are Mach-O and both
+// Keyed by `GOOS` because that is what decides the format: both darwin targets are Mach-O and both
 // windows targets are PE, so the architecture is carried inside the file rather than in its first
 // bytes. That means this catches a binary built for the wrong operating system and not one built
 // for the wrong architecture of the right system, which is a real limit and is stated in the test
@@ -590,7 +590,7 @@ func cohereBinary(path string, target Target) (int64, error) {
 var executableMagic = map[string][]byte{
 	// Mach-O 64-bit, little-endian. Go emits this for both darwin targets.
 	"darwin": {0xcf, 0xfa, 0xed, 0xfe},
-	// ELF.
+	// `ELF`.
 	"linux": {0x7f, 'E', 'L', 'F'},
 	// PE, which still begins with the DOS stub's "MZ".
 	"windows": {'M', 'Z'},
@@ -622,7 +622,7 @@ func requireExecutableFormat(path string, target Target) error {
 	if !bytes.Equal(header, magic) {
 		// The observation and the likely cause are stated as separate claims, because they are: the
 		// bytes are measured and the cause is a guess. A message that asserts one explanation sends
-		// a reader hunting that bug, and several things produce these bytes — another target's
+		// a reader hunting that bug, and several things produce these bytes: another target's
 		// build staged here, a truncated write that kept the path, a file that was never a program.
 		// Naming the most likely one while marking it a guess costs nothing and misdirects nobody.
 		return fmt.Errorf(
@@ -635,7 +635,7 @@ func requireExecutableFormat(path string, target Target) error {
 
 // compilerPin is which commit of which repository the vendored compiler is pinned to.
 type compilerPin struct {
-	// Commit is the gitlink HEAD records for the submodule, which the submodule's checkout was
+	// Commit is the gitlink `HEAD` records for the submodule, which the submodule's checkout was
 	// required to match.
 	Commit string
 
@@ -657,7 +657,7 @@ type compilerPin struct {
 // whatever the checkout holds, so a checkout moved without a commit would ship a compiler that no
 // cohere commit names, and the release could not be rebuilt from history. `--version` would name it
 // accurately and still point at nothing. Commits are compared and trees are not: the compiler patches
-// change files in the checkout without moving its HEAD, so a tree comparison would refuse every
+// change files in the checkout without moving its `HEAD`, so a tree comparison would refuse every
 // patched release, which is every correct one.
 func readCompilerPin(moduleDirectory string) (compilerPin, error) {
 	recorded, pinnedCompilerCommitError := PinnedCompilerCommit(moduleDirectory, "HEAD")
@@ -683,7 +683,7 @@ func readCompilerPin(moduleDirectory string) (compilerPin, error) {
 // PinnedCompilerCommit reads the vendored compiler's commit from a commit's tree. Exported because the
 // launcher builds from a commit too, and two readers of one gitlink would drift.
 //
-// The gitlink recorded in the commit is the pin. The submodule's own HEAD is what the working tree
+// The gitlink recorded in the commit is the pin. The submodule's own `HEAD` is what the working tree
 // has checked out, and it differs exactly when someone has moved it without committing.
 func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error) {
 	command := exec.Command("git", "-C", moduleDirectory, "ls-tree", commit, "TypeScript")
@@ -714,7 +714,7 @@ func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error)
 // checkedOutCompilerCommit reads the commit the compiler's checkout is at.
 //
 // The checkout has to be a repository of its own first. A submodule that was never initialized is an
-// empty directory, and `git -C` from an empty directory walks up and answers with cohere's own HEAD,
+// empty directory, and `git -C` from an empty directory walks up and answers with cohere's own `HEAD`,
 // which would be reported as a moved compiler naming a commit that is not a compiler at all.
 func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
@@ -752,7 +752,7 @@ func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 	return commit, nil
 }
 
-// readCompilerUpstream names the compiler's repository from the `.gitmodules` HEAD commits.
+// readCompilerUpstream names the compiler's repository from the `.gitmodules` `HEAD` commits.
 //
 // The committed file and not the submodule's `origin` remote, which is local configuration no commit
 // records. The pin moved to the fork in a commit, and a checkout cloned before that still has an
@@ -810,8 +810,8 @@ func CompilerUpstreamFromGitmodules(contents string) string {
 // compiler's repository from the same kind of url, read from a committed `.gitmodules`, and two parsers
 // of one url would drift.
 //
-// The two url shapes git accepts — the ssh `git@github.com:owner/name.git` and the https
-// `https://github.com/owner/name.git` — have to produce the same label, because otherwise the same
+// The two url shapes git accepts (the ssh `git@github.com:owner/name.git` and the https
+// `https://github.com/owner/name.git`) have to produce the same label, because otherwise the same
 // pin reads differently depending on how the build machine happened to clone, and a reader
 // comparing two reports would see a difference that is not one.
 //
@@ -835,7 +835,7 @@ func NormalizeUpstream(remoteUrl string) string {
 
 	// Both halves have to be non-empty, not just present. A count alone passes for
 	// `https://github.com/`, whose segments are ["https:", "", "github.com", ""], and the last two
-	// join to "/github.com" — a label that is not a repository, printed by `--version` as though it
+	// join to "/github.com": a label that is not a repository, printed by `--version` as though it
 	// were one. A guard on position says the pieces exist; this says they mean something.
 	owner, name := segments[len(segments)-2], segments[len(segments)-1]
 	if owner == "" || name == "" {

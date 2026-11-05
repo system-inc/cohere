@@ -1,4 +1,4 @@
-// Lowering: TypeScript AST to HIR.
+// Lowering: TypeScript AST to `HIR`.
 //
 // This is a proving implementation, not a complete one. It covers the statement and expression
 // forms the design had to be tested against - blocks, conditionals, all four loop forms, switch,
@@ -15,7 +15,7 @@
 //
 // A terminal names its successors by id, and lowering discovers a construct's successors before it
 // has lowered them: an `if` needs the ids of its consequent, alternate, and fallthrough at the
-// moment it writes the terminal, and only one of those has been walked. So blocks are RESERVED -
+// moment it writes the terminal, and only one of those has been walked. So blocks are reserved -
 // allocated with an id and no contents - then filled, then completed with a terminal. The pattern
 // is upstream's and it is the reason the builder is a small state machine rather than a
 // straightforward recursive descent.
@@ -29,15 +29,15 @@
 // what every fixture below it is evidence about: a rule can only fire on code that reached it, so
 // an abort condition silently redefines the corpus. Upstream's lowering aborts on `try`/`finally`
 // with no `catch`, and a sibling porting `react/error-boundaries` lost real time to that, because
-// the fixtures named for the rule never reached the validator at all and the fixture NAME gave no
+// the fixtures named for the rule never reached the validator at all and the fixture name gave no
 // sign of it.
 //
 // So, completely, the places this lowering does not produce a faithful result:
 //
-//  1. `Lower` returns NIL for a node with no body - an overload signature, an ambient declaration,
+//  1. `Lower` returns nil for a node with no body - an overload signature, an ambient declaration,
 //     an abstract method. Nothing was lost, because nothing runs. Callers must handle nil.
 //
-//  2. Everything else produces a function. There is NO condition under which lowering abandons a
+//  2. Everything else produces a function. There is no condition under which lowering abandons a
 //     function it started, and that is a deliberate divergence from upstream, which aborts on
 //     several constructs. An unmodelled construct becomes `UnsupportedNode`: a value with unknown
 //     effects, which is conservative rather than absent. A pass that must refuse such a function
@@ -50,17 +50,17 @@
 //     semantics are not modelled; decorators; and any statement or expression kind not named in the
 //     switches in this file and lower_expression.go.
 //
-//  4. Known imprecision that is NOT an abort, listed because it will mislead a pass that assumes
+//  4. Known imprecision that is not an abort, listed because it will mislead a pass that assumes
 //     otherwise:
 //     - `var` is lowered as `let`. Function-scoped hoisting is not modelled, so a `var` used before
 //     its declaration in a different block resolves as though it were block-scoped.
 //     - A free identifier becomes `LoadGlobal` whether it is a true global, an import, or a
 //     module-scope binding. `GlobalBindingKind`, Source and Imported now retain that distinction
-//     when declarations are available. A CAPTURE is no longer in this list: see `captureOf`.
+//     when declarations are available. A capture is no longer in this list: see `captureOf`.
 //     Note what this entry originally claimed and what was measured. It said resolution "needs the
 //     checker", which was right, but `Lower` took no checker and `symbolOf` read `node.Symbol()` -
-//     a field the binder writes only onto DECLARATION nodes, and only when a binder has run at
-//     all. Parsing alone runs none. So the fallback caught not just free identifiers but EVERY
+//     a field the binder writes only onto declaration nodes, and only when a binder has run at
+//     all. Parsing alone runs none. So the fallback caught not just free identifiers but every
 //     identifier: over 4,333 functions of real TypeScript, 0 `LoadLocal` instructions named a
 //     source variable against 43,137 `LoadGlobal`. `Lower` now takes a checker, and this entry is
 //     true again only for names that checker cannot resolve.
@@ -71,19 +71,19 @@
 //     - Hoisting of `let`/`const` forward references, which upstream models with `DeclareContext`
 //     for temporal-dead-zone correctness, is not modelled.
 //
-//  5. Instruction values and terminals that are DECLARED but that lowering never produces. They are
+//  5. Instruction values and terminals that are declared but that lowering never produces. They are
 //     in the sets because a later pass needs them, and because adding a variant later invalidates
 //     every existing exhaustive switch, so the shape is fixed now. A pass must not read the absence
 //     of one as evidence about the source:
 //     `Optional` (terminal) - an optional chain currently lowers to a `PropertyLoad` or
-//     `ComputedLoad` with the `Optional` flag set, which records the optionality but NOT the
+//     `ComputedLoad` with the `Optional` flag set, which records the optionality but not the
 //     short-circuit control flow, so a pass asking "does this run on every path" gets the wrong
 //     answer for `a?.b.c`; this is the likeliest of these to mislead.
 //     `Sequence` (terminal) - a comma expression lowers both operands into one block, which is
 //     correct for evaluation order and loses the construct.
 //     `MaybeThrow` (terminal) - see above.
 //     `DeclareContext` - hoisting of a binding a nested function captures is not modelled, so the
-//     temporal dead zone is not visible. `LoadContext` and `StoreContext` ARE produced, for every
+//     temporal dead zone is not visible. `LoadContext` and `StoreContext` are produced, for every
 //     read and write of a binding an enclosing function declared.
 //     `StartMemoize`, `FinishMemoize` - inserted by a later pass by design, never by lowering.
 package high_level_intermediate_representation
@@ -96,7 +96,7 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-// Lower lowers one function to HIR.
+// Lower lowers one function to `HIR`.
 //
 // node must be a function-like node: a function declaration, function expression, arrow function,
 // method, or accessor. Returns nil for anything else, and for a function with no body such as an
@@ -104,7 +104,7 @@ import (
 //
 // # The checker is what makes variable references resolve, and it is not optional in practice
 //
-// typeChecker may be nil, and a nil one still produces a well-formed graph. What it does NOT
+// typeChecker may be nil, and a nil one still produces a well-formed graph. What it does not
 // produce is a graph where a variable reference names the binding it reads: every such reference
 // falls back to `LoadGlobal`, carrying a name rather than a value. That fallback is correct for a
 // true global and wrong for everything else.
@@ -114,7 +114,7 @@ import (
 // `LoadLocal` instructions named a source variable, 43,137 variable reads became `LoadGlobal`, and
 // single-assignment construction over that mints zero phis while passing every structural test.
 //
-// So a pass that reasons about VALUES - single-assignment form, effect inference, anything asking
+// So a pass that reasons about values - single-assignment form, effect inference, anything asking
 // what a binding holds - must pass a real checker. A pass that only walks control flow need not.
 // See `lowerIdentifier` for the resolution itself.
 func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
@@ -209,7 +209,7 @@ type builder struct {
 	// can use. Read and cleared immediately by `lowerNestedFunction`.
 	lastNested *builder
 
-	// captured maps an enclosing function's symbol to the value THIS function names it by.
+	// captured maps an enclosing function's symbol to the value this function names it by.
 	//
 	// A capture gets a fresh identifier in this function rather than reusing the enclosing one,
 	// because the two functions have separate identifier tables and a Place is only meaningful
@@ -228,7 +228,7 @@ type builder struct {
 
 	// handlers is the stack of enclosing catch blocks, innermost last.
 	//
-	// Maintained but NOT YET READ. It is the input `MaybeThrow` needs: emitting one requires knowing
+	// Maintained but not yet read. It is the input `MaybeThrow` needs: emitting one requires knowing
 	// which handler a throw from the current position would reach, which is exactly the top of this
 	// stack. It is kept correct now rather than added later because the maintenance is threaded
 	// through try lowering, and retrofitting a stack into a recursive lowering is where off-by-one
@@ -307,11 +307,11 @@ func (builder *builder) newTemporary(node *ast.Node) Place {
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
-// newTemporaryUnder mints a value sharing an existing value's DECLARATION.
+// newTemporaryUnder mints a value sharing an existing value's declaration.
 //
 // Construction merges two writes only when they name one binding, keyed on the declaration rather
 // than the identifier (`ssa.go:316`). Two arms of a logical each writing a fresh temporary give a
-// join unrelated declarations and nothing to merge; both writing the SAME identifier give it one
+// join unrelated declarations and nothing to merge; both writing the same identifier give it one
 // definition and nothing to version. Distinct identifiers under one declaration are what make them
 // versions of one thing.
 //
@@ -350,7 +350,7 @@ func (builder *builder) declarationOf(symbol *ast.Symbol) static_single_assignme
 //
 // The second result is this function's view of the captures, in the same order as the nested
 // function's `Context`. Index i of the two slices name the same source binding seen from the two
-// sides of the boundary: `Captures[i]` is a value in THIS function's identifier table,
+// sides of the boundary: `Captures[i]` is a value in this function's identifier table,
 // `nested.Context[i]` is a value in the nested one's. That pairing is the edge a pass walks to
 // follow a value into a closure, and it is why the order is fixed rather than incidental.
 //
@@ -378,7 +378,7 @@ func (builder *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place)
 			captures = append(captures, Place{})
 			continue
 		}
-		// The value THIS function names the binding by: a local if this function declared it, or a
+		// The value this function names the binding by: a local if this function declared it, or a
 		// capture of its own if an enclosing one did.
 		if identifier, ok := builder.identifiers[symbol]; ok {
 			captures = append(captures, Place{Identifier: identifier})
@@ -393,7 +393,7 @@ func (builder *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place)
 	return nested, captures
 }
 
-// captureOf reports whether a symbol names a binding declared in an ENCLOSING function, and if so
+// captureOf reports whether a symbol names a binding declared in an enclosing function, and if so
 // returns the value this function refers to it by.
 //
 // # Why this replaces a scope walk rather than implementing one
@@ -404,7 +404,7 @@ func (builder *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place)
 // a function boundary.
 //
 // cohere does not need any of it, and the reason was measured rather than assumed. The resident
-// checker returns the SAME `*ast.Symbol` pointer for a declaration and for every reference to it,
+// checker returns the same `*ast.Symbol` pointer for a declaration and for every reference to it,
 // including references inside a nested function: for `const C = ...; const r = () => <C/>` it
 // answers one distinct symbol across both occurrences. Symbol identity therefore already encodes
 // "same binding" across the boundary, and the enclosing builder's `identifiers` map already records
@@ -417,7 +417,7 @@ func (builder *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place)
 //
 // # What counts as a capture, and what deliberately does not
 //
-// Only a binding an enclosing LOWERED function declared. A module-scope `const`, an import, and a
+// Only a binding an enclosing lowered function declared. A module-scope `const`, an import, and a
 // true global are all absent from every enclosing builder's map and stay `LoadGlobal`, which is the
 // answer the `globals` rule already depends on. The walk goes outward through every enclosing
 // builder, so a binding captured through two function boundaries is found at the depth that
@@ -443,7 +443,7 @@ func (builder *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
 		return Place{}, false
 	}
 
-	// A fresh identifier in THIS function's table, grouped under a declaration of its own. The
+	// A fresh identifier in this function's table, grouped under a declaration of its own. The
 	// declaration is local because DeclarationIds are per-function too, and a pass correlating a
 	// capture with the outer binding does so through `FunctionExpression.Captures`, which pairs the
 	// two places explicitly.
@@ -1005,7 +1005,7 @@ func (builder *builder) lowerSwitchStatement(node *ast.Node, label string) {
 //
 // # The finally divergence
 //
-// The finally body is lowered ONCE and every path that must run it jumps to it. cohere's
+// The finally body is lowered once and every path that must run it jumps to it. cohere's
 // `controlflow` lays it out twice, once per completion path, and both copies carry the same source
 // positions. See the Try terminal's comment for why this IR cannot do that: two layouts give a
 // value two definitions that are not a merge, and single-assignment construction over that mints a
@@ -1246,14 +1246,14 @@ func rangeOf(node *ast.Node) core.TextRange {
 //
 // # Why the checker is consulted rather than the node's own field
 //
-// `node.Symbol()` is the DECLARATION symbol: a field the binder writes onto a declaration node. A
+// `node.Symbol()` is the declaration symbol: a field the binder writes onto a declaration node. A
 // reference - the `y` in `y > 1` - is not a declaration and its field is nil, so resolving a
 // reference through it always fails. Worse, the field is nil on declaration names too unless a
 // binder has run over the file, and parsing alone does not run one.
 //
 // Both failures are silent: the caller sees nil and treats the name as a global.
 //
-// `GetSymbolAtLocation` answers for references and declarations alike, and returns the SAME symbol
+// `GetSymbolAtLocation` answers for references and declarations alike, and returns the same symbol
 // pointer for a binding and every reference to it, which is the identity `declarationOf` groups on.
 // It distinguishes shadowed bindings of one name, verified rather than assumed: in
 // `let y = 2; { let y = 99; }` it returns two distinct symbols, four occurrences against two.
@@ -1263,7 +1263,7 @@ func (builder *builder) symbolOf(node *ast.Node) *ast.Symbol {
 	}
 	if builder.typeChecker != nil {
 		// At the identifier in `{value}`, the generic accessor returns the symbol for the
-		// object's `value` PROPERTY. The lowering is reading the expression side, whose symbol is
+		// object's `value` property. The lowering is reading the expression side, whose symbol is
 		// the local binding. TypeScript exposes that binding through a dedicated accessor.
 		if parent := node.Parent; parent != nil &&
 			parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == node {

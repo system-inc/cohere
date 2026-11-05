@@ -64,7 +64,7 @@ func describeIslands(report *Report) string {
 
 // TestClosureFindsTheIsland is the firing half. The planted cluster is one abandoned export and the
 // two private declarations that existed only to serve it, and the whole point of the closure is
-// that it reports them as ONE cluster rather than as an export the flat view can see and two
+// that it reports them as one cluster rather than as an export the flat view can see and two
 // private declarations the flat view cannot see at all.
 func TestClosureFindsTheIsland(test *testing.T) {
 	test.Parallel()
@@ -182,13 +182,13 @@ func TestClosureIsOptIn(test *testing.T) {
 
 // TestReExportIsAPassThrough pins the judgment call that was assumed wrong before it was measured.
 //
-// A re-export does NOT mark its target referenced, so an export reachable only through a barrel
+// A re-export does not mark its target referenced, so an export reachable only through a barrel
 // nobody imports is reported dead. The mechanism is that `isDeclarationName` classifies an
 // ExportSpecifier's identifier as a declaring name, so the walk never records it as a use.
 //
 // This is pinned rather than left to the code because it is the single answer most likely to be
 // changed by someone who reads it as a bug, and changing it makes every barrel an unconditional
-// root — which protects everything behind it and makes the report go quiet. On the real tree this
+// root, which protects everything behind it and makes the report go quiet. On the real tree this
 // rule is what correctly reports four abandoned payment icons whose only mention anywhere is a
 // barrel nothing imports.
 func TestReExportIsAPassThrough(test *testing.T) {
@@ -227,7 +227,7 @@ func TestReExportIsAPassThrough(test *testing.T) {
 	}
 }
 
-// TestDeadCodeReferenceStillCountsAsAUse contradicts a JUDGMENT claim in `roots.go`.
+// TestDeadCodeReferenceStillCountsAsAUse contradicts a judgment claim in `roots.go`.
 //
 // The claim reads: "A reference from inside code that is ITSELF dead does not count, and this is
 // what the closure buys. In the flat set it counts, which is why the flat set cannot see an island."
@@ -235,15 +235,15 @@ func TestReExportIsAPassThrough(test *testing.T) {
 // The closure does not do this. It has no reachability input at all -- `closure.go` contains no
 // mention of reachability, and `Unreachable` is a report field that is collected and printed and
 // never read back into the reference walk. `roots.go`'s own header says the two questions are
-// "separable on purpose", which is exactly right about the design and is why the JUDGMENT entry
+// "separable on purpose", which is exactly right about the design and is why the judgment entry
 // describing the closure as consuming one of them cannot be true.
 //
-// The fixture is built so reachability is the ONLY difference. Both constants are imported by the
+// The fixture is built so reachability is the only difference. Both constants are imported by the
 // same file, each referenced exactly once, from two exported functions that a framework-spared page
 // calls. If the claim held, `ReachedOnlyAfterReturn` would be reported and `ReachedNormally` spared.
 // Both are spared.
 //
-// Written as a test asserting what the code DOES rather than what the comment says it does, and the
+// Written as a test asserting what the code does rather than what the comment says it does, and the
 // comment is corrected alongside it. A doc comment making a falsifiable claim needs a test or it
 // needs deleting -- this one survived being labelled considered judgment for exactly as long as
 // nothing checked it.
@@ -288,7 +288,7 @@ func TestDeadCodeReferenceStillCountsAsAUse(test *testing.T) {
 	}
 
 	// The unreachable statement is still reported, by the separate analysis that owns that question.
-	// Asserted here so the two cannot be conflated: the reference survives AND the statement is
+	// Asserted here so the two cannot be conflated: the reference survives and the statement is
 	// named, which is the design `roots.go`'s header describes.
 	unreachableInUses := 0
 	for _, unreachable := range report.Unreachable {

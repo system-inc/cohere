@@ -11,7 +11,7 @@ import (
 const noInferrableTypesFile = "/repository/source/NoInferrableTypes.ts"
 
 // noInferrableTypesPointer spells an expected rewrite in a fixture row.
-func noInferrableTypesPointer(value string) *string { return &value }
+func noInferrableTypesPointer(value string) *string { return new(value) }
 
 // noInferrableTypesCase is one imported corpus row.
 type noInferrableTypesCase struct {

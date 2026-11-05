@@ -6,7 +6,7 @@ import (
 
 // TestOptionalLoadsProveNothingAboutTheirObject pins that `a?.b` does not make `a` hoistable.
 //
-// An optional load is the guard AGAINST its object being null, so reading it is not evidence the
+// An optional load is the guard against its object being null, so reading it is not evidence the
 // object is non-null -- it is evidence the program expects it might be. Recording it as non-null
 // makes the dependency tree's cursor non-null at that step, which takes the
 // `hoistableCursor.nonNull` arm in `addDependency` and flattens `arg?.items` to `arg.items`. The
@@ -15,10 +15,10 @@ import (
 //
 // # Why this is read from a flag rather than ported
 //
-// Upstream keys its hoistable set by optional BLOCK: `collectOptionalChainSidemap` builds
+// Upstream keys its hoistable set by optional block: `collectOptionalChainSidemap` builds
 // `optionalBlock -> baseObject?.a` (`CollectHoistablePropertyLoads.ts:94`), so the guard survives
 // into the tree and the optional arm fires. That pass is 418 lines and is driven by `Optional`
-// TERMINALS. This lowering does not produce them -- measured on the fixture below, the only
+// terminals. This lowering does not produce them -- measured on the fixture below, the only
 // terminals are `Return` -- so the same fact is read from `PropertyLoad.Optional`, which upstream
 // does not have because its optionality lives in control flow.
 //

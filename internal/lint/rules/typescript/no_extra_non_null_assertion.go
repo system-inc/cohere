@@ -124,8 +124,9 @@ func nonNullAssertionOperatorRange(node *ast.Node) core.TextRange {
 // inside a ParenthesizedExpression inside a non-null, and a guard reading `node.Parent` finds the
 // paren and stops.
 func outermostParenthesizedExpression(node *ast.Node) *ast.Node {
-	for node != nil && node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
-		node = node.Parent
+	outermost := node
+	for outermost != nil && outermost.Parent != nil && outermost.Parent.Kind == ast.KindParenthesizedExpression {
+		outermost = outermost.Parent
 	}
-	return node
+	return outermost
 }

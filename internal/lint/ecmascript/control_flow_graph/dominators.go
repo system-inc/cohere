@@ -1,6 +1,6 @@
 package control_flow_graph
 
-// This file is a LOCAL ADDITION, not vendored. See the change list in cfg.go's header.
+// This file is a local addition, not vendored. See the change list in cfg.go's header.
 //
 // It exposes two things the graph already computed and threw away: the predecessor edges that
 // `findFinalPathDominators` built into a scratch array, and the immediate-dominator array that
@@ -12,7 +12,7 @@ package control_flow_graph
 // bearing for `PathAnalysis.IsOnEveryFinalPath`, which `rules_of_hooks` consumes. Editing it to
 // hand its array outward would put a second caller's requirements on a function whose current
 // caller needs one boolean per block, and the two want different graphs: it dominates over a graph
-// with ONE SYNTHETIC EXIT reached only by non-throwing final blocks, deliberately excluding thrown
+// with one synthetic exit reached only by non-throwing final blocks, deliberately excluding thrown
 // exits, because that is the question ESLint asks. A consumer asking "what dominates this block" in
 // general does not want thrown paths excluded.
 //
@@ -33,8 +33,8 @@ package control_flow_graph
 // than a walk. It is owned by the analysis and must not be mutated: two callers see the same slice.
 //
 // Unreachable blocks have no predecessors here even when a successor edge points at them. That
-// mirrors what every existing consumer already does — each one skips `!successor.Reachable` at its
-// own loop — and it is the definition dominance needs, since a block nothing arrives at cannot
+// mirrors what every existing consumer already does (each one skips `!successor.Reachable` at its
+// own loop), and it is the definition dominance needs, since a block nothing arrives at cannot
 // dominate anything.
 func (analysis *DominatorAnalysis[E]) Predecessors(block *Block[E]) []*Block[E] {
 	if analysis == nil || block == nil || block.Index() >= len(analysis.predecessorStart)-1 {
@@ -104,7 +104,7 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 	// Counting sort over in-degree, so the predecessor groups land in one array.
 	//
 	// The entry block's own reachability is not read from Blocks[0].Reachable. Every other block's
-	// is, but the entry is reachable by construction — `Build` sets it before laying anything out —
+	// is, but the entry is reachable by construction (`Build` sets it before laying anything out),
 	// and reading the field here would make this depend on a field the builder sets rather than on
 	// the definition.
 	counts := make([]int, blockCount+1)

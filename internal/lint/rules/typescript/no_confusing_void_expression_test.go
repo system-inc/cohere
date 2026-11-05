@@ -32,7 +32,7 @@ type noConfusingVoidExpressionCase struct {
 	messageIds  []string
 }
 
-func noConfusingVoidExpressionStringPointer(value string) *string { return &value }
+func noConfusingVoidExpressionStringPointer(value string) *string { return new(value) }
 
 // decodeNoConfusingVoidExpressionOptionsForTest routes a case's options through the decoder.
 func decodeNoConfusingVoidExpressionOptionsForTest(
@@ -724,7 +724,8 @@ var noConfusingVoidExpressionFiringCases = []noConfusingVoidExpressionCase{
 // Declared ambiently rather than by widening the harness's lib, which would change every other
 // rule's fixtures in this package. `Math.random` is the corpus's stand-in for a non-void call, so
 // it is here too and is deliberately typed as returning a number rather than void.
-const noConfusingVoidExpressionAmbientGlobals = "declare const console: { log(...data: unknown[]): void; error(...data: unknown[]): void };\n" +
+const noConfusingVoidExpressionAmbientGlobals = "declare const console: { log(...data: unknown[]): void; " +
+	"error(...data: unknown[]): void };\n" +
 	"declare const Math: { random(): number };\n"
 
 // noConfusingVoidExpressionJsxIntrinsics declares the one JSX element the corpus uses.

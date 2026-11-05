@@ -97,10 +97,11 @@ func placeSiblingEngine(test *testing.T, binary string) string {
 // temporary directory when parent is empty.
 func swiftPackage(test *testing.T, parent string) string {
 	test.Helper()
+	parentDirectory := parent
 	if parent == "" {
-		parent = test.TempDir()
+		parentDirectory = test.TempDir()
 	}
-	root := filepath.Join(parent, "Toy")
+	root := filepath.Join(parentDirectory, "Toy")
 	writeTree(test, root, map[string]string{
 		"Package.swift":         "// swift-tools-version:6.0\nimport PackageDescription\nlet package = Package(name: \"Toy\")\n",
 		"Sources/Toy/Toy.swift": "let toy = 1\n",

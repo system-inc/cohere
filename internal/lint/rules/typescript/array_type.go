@@ -428,12 +428,12 @@ func arrayTypeSkipParentheses(node *ast.Node) *ast.Node {
 // node because it has none, so without the skip every `(string)` would answer false where upstream
 // answers true.
 func arrayTypeIsSimple(node *ast.Node) bool {
-	node = arrayTypeSkipParentheses(node)
-	if node == nil {
+	unparenthesized := arrayTypeSkipParentheses(node)
+	if unparenthesized == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindIdentifier,
 		ast.KindAnyKeyword,
 		ast.KindBooleanKeyword,
@@ -453,7 +453,7 @@ func arrayTypeIsSimple(node *ast.Node) bool {
 		return true
 
 	case ast.KindTypeReference:
-		reference := node.AsTypeReferenceNode()
+		reference := unparenthesized.AsTypeReferenceNode()
 		typeName := reference.TypeName
 		if typeName == nil {
 			return false
@@ -496,14 +496,14 @@ func arrayTypeIsSimple(node *ast.Node) bool {
 // parenthesized union arrives here as a real node and would answer false, where TSESTree hands
 // upstream the union itself.
 func arrayTypeNeedsParentheses(node *ast.Node) bool {
-	node = arrayTypeSkipParentheses(node)
-	if node == nil {
+	unparenthesized := arrayTypeSkipParentheses(node)
+	if unparenthesized == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindTypeReference:
-		typeName := node.AsTypeReferenceNode().TypeName
+		typeName := unparenthesized.AsTypeReferenceNode().TypeName
 		if typeName == nil {
 			return false
 		}
@@ -519,7 +519,7 @@ func arrayTypeNeedsParentheses(node *ast.Node) bool {
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "ReadonlyArray"
+		return unparenthesized.Text() == "ReadonlyArray"
 	}
 
 	return false

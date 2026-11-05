@@ -223,7 +223,8 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 		if finding.Message.Id != "unaryMinus" {
 			test.Errorf("message id is %q", finding.Message.Id)
 		}
-		if finding.Message.Description != "Argument of unary negation should be assignable to number | bigint but is string instead." {
+		if finding.Message.Description != "Argument of unary negation should be assignable to number | bigint "+
+			"but is string instead." {
 			test.Errorf("message text is %q", finding.Message.Description)
 		}
 	})
@@ -269,7 +270,8 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 		if len(result.Diagnostics) != 1 {
 			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
-		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to number | bigint but is string instead." {
+		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to "+
+			"number | bigint but is string instead." {
 			test.Errorf("message text is %q, want the union PART named", result.Diagnostics[0].Message.Description)
 		}
 	})
@@ -285,7 +287,8 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 		if len(result.Diagnostics) != 1 {
 			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
-		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to number | bigint but is false instead." {
+		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to "+
+			"number | bigint but is false instead." {
 			test.Errorf(
 				"message text is %q, want the first union part named",
 				result.Diagnostics[0].Message.Description,
@@ -355,7 +358,8 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(test *testing.T) {
 		if statement.Kind != ast.KindVariableStatement {
 			continue
 		}
-		for _, declarator := range statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
+		declarationList := statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList()
+		for _, declarator := range declarationList.Declarations.Nodes {
 			if initializer := declarator.Initializer(); initializer != nil {
 				listener(initializer)
 			}

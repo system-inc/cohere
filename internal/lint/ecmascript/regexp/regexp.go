@@ -15,7 +15,7 @@
 //     alone where JavaScript breaks on all four line terminators; ignoring
 //     case folds by Unicode's rules rather than JavaScript's; `\b` is drawn
 //     over .NET's Unicode word set where ECMAScript keeps it to ASCII; an
-//     escape .NET reads for itself — `\A`, `\a`, `\e` — is a plain character
+//     escape .NET reads for itself (`\A`, `\a`, `\e`) is a plain character
 //     to JavaScript, and one .NET does not know at all makes it refuse a
 //     pattern JavaScript accepts; and `y` says where a match may start, which
 //     regexp2 has no flag for.
@@ -32,8 +32,8 @@
 //   - Comparing a backreference without regard to case. JavaScript uses the same
 //     canonicalization as for literals; the fallback uses regexp2's case-insensitivity.
 //   - Exhaustive syntax validation under `u`. The `u` flag makes JavaScript
-//     reject constructs it otherwise tolerates — a bare `]` outside a class is
-//     the usual one — and those still compile here. Every pattern JavaScript
+//     reject constructs it otherwise tolerates (a bare `]` outside a class is
+//     the usual one) and those still compile here. Every pattern JavaScript
 //     accepts is read correctly; some it rejects are read rather than refused.
 package regexp
 
@@ -47,8 +47,8 @@ import (
 )
 
 // MatchTimeout bounds how long one subject may spend in one pattern. A pattern
-// written by a user can backtrack exponentially — `(a|aa)+$` against a long
-// run of `a` is the shape of it — and a linter that hangs on a config typo is
+// written by a user can backtrack exponentially (`(a|aa)+$` against a long
+// run of `a` is the shape of it) and a linter that hangs on a config typo is
 // worse than one that answers no. A pattern that matches settles in
 // microseconds, so a match still running after this has found nothing.
 const MatchTimeout = time.Second
@@ -129,13 +129,13 @@ func Compile(source string, flags string) (*RegExp, error) {
 	if set.sticky {
 		// A sticky regexp matches only at `lastIndex`, which is 0 for one just
 		// compiled and never moves here, since nothing this package exposes
-		// advances it. So it anchors at the start — around the whole pattern,
+		// advances it. So it anchors at the start: around the whole pattern,
 		// or a top-level `|` would anchor only its first branch.
 		rewritten = inputStart + `(?:` + rewritten + `)`
 	}
 
 	// Multiline, Singleline and IgnoreCase are all handled by the rewrite, so
-	// regexp2 is never told about them — being told twice would undo the work.
+	// regexp2 is never told about them: being told twice would undo the work.
 	options := regexp2.RegexOptions(regexp2.ECMAScript)
 	if set.unicode {
 		options |= regexp2.Unicode
@@ -203,7 +203,7 @@ func (exp *RegExp) TestOrError(text string) (bool, error) {
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype
-// .source` does — not the rewritten form handed to regexp2.
+// .source` does, not the rewritten form handed to regexp2.
 func (exp *RegExp) Source() string { return exp.source }
 
 // Flags returns the flags as they were written.

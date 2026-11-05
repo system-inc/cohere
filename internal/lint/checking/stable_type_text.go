@@ -32,7 +32,7 @@ var stableTypeLimits = []struct{ members, depth int }{{8, 5}, {4, 4}, {3, 3}, {2
  *     adds when it normalizes a union of object literals borrow the declaration of whichever sibling property the
  *     checker first made one from (getUndefinedProperty caches it by name, per checker).
  * With the walk and the type check sharing checkers concurrently, the same literal printed its members in
- * another order from run to run on www-phi-health at GOMAXPROCS=16, while single-threaded runs agreed.
+ * another order from run to run on www-phi-health at `GOMAXPROCS=16`, while single-threaded runs agreed.
  *
  * The order here uses no type id and no checker history, all the way down:
  *   - an anonymous object's own members (declared directly in the literal, namespace or file it came from) by

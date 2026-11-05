@@ -6,7 +6,7 @@
 // captured every free name including true globals, which is a worse answer than capturing nothing:
 // it would make `react/globals` silent on real global writes. So the negative cases carry equal
 // weight here, and there are more of them than positive ones. A global, an import, a module-scope
-// binding, and a parameter of the nested function itself must all stay OUT of the capture set.
+// binding, and a parameter of the nested function itself must all stay out of the capture set.
 package high_level_intermediate_representation
 
 import (
@@ -47,7 +47,7 @@ func lowerTypedFunctions(test *testing.T, name string, code string) []*Function 
 	return lowered
 }
 
-// captureNames returns the names of the values a function expression captures, as the ENCLOSING
+// captureNames returns the names of the values a function expression captures, as the enclosing
 // function names them.
 func captureNames(function *Function, expression *FunctionExpression) []string {
 	names := make([]string, 0, len(expression.Captures))
@@ -75,7 +75,7 @@ func instructionNames(function *Function) string {
 
 // TestCaptureSymbolIdentityCrossesFunctions pins the property the whole capture mechanism rests on.
 //
-// `captureOf` finds captures by asking whether an ENCLOSING builder knows the symbol, which is only
+// `captureOf` finds captures by asking whether an enclosing builder knows the symbol, which is only
 // correct if the checker returns the same `*ast.Symbol` for a declaration and for a reference to it
 // from inside a nested function. That is measured here rather than assumed, because if it ever
 // stopped holding, every capture would silently revert to `LoadGlobal` and every test below would
@@ -171,7 +171,7 @@ export function Outer() {
 //
 // The failure mode this guards is the opposite of the one above: a lowering that treated every
 // unresolved name as a capture would make a real global write invisible. Each name here is free in
-// the nested function and must NOT become a capture.
+// the nested function and must not become a capture.
 func TestCaptureDoesNotClaimGlobals(test *testing.T) {
 	test.Parallel()
 
@@ -250,7 +250,7 @@ export function Outer() {
 	}
 }
 
-// TestCaptureShadowingIsNotCaptured checks that a nested binding of the same NAME is not a capture.
+// TestCaptureShadowingIsNotCaptured checks that a nested binding of the same name is not a capture.
 //
 // This is the case a name-based implementation gets wrong and a symbol-based one gets right for
 // free, which is the argument for resolving through the checker rather than by string.
@@ -276,7 +276,7 @@ export function Outer() {
 
 // TestCaptureThroughTwoBoundaries checks that the capture chain is complete at every level.
 //
-// An inner function reading a variable two functions up must produce a capture in the MIDDLE
+// An inner function reading a variable two functions up must produce a capture in the middle
 // function too. Without that, the middle function's `Captures` would name an identifier that does
 // not exist in its own table, which is a malformed graph rather than merely an imprecise one.
 func TestCaptureThroughTwoBoundaries(test *testing.T) {
@@ -311,7 +311,7 @@ export function Outer() {
 		test.Fatalf("the inner function should capture deep from the middle function, got %v", names)
 	}
 
-	// The pairing must be valid IN THE MIDDLE FUNCTION'S table: the capture the middle function
+	// The pairing must be valid in the middle function's table: the capture the middle function
 	// hands down has to be a value the middle function actually holds.
 	capture := middleExpression.Captures[0]
 	if int(capture.Identifier) >= len(middle.Identifiers) {
@@ -333,7 +333,7 @@ export function Outer() {
 //
 // `Captures[i]` and `nested.Context[i]` must name the same source binding seen from the two sides.
 // If the two orders ever diverged, a pass following a value into a closure would silently follow
-// the WRONG value, which no structural check would catch.
+// the wrong value, which no structural check would catch.
 func TestCaptureIndicesPairAcrossTheBoundary(test *testing.T) {
 	test.Parallel()
 
@@ -378,7 +378,7 @@ export function Outer() {
 
 // TestCaptureKeepsSSAValid runs construction over functions that capture and verifies the result.
 //
-// A capture introduces a value with NO defining instruction in the nested function, which is
+// A capture introduces a value with no defining instruction in the nested function, which is
 // exactly the shape that breaks a use-must-be-dominated-by-its-definition checker if the value is
 // not treated as live on entry. That it passes is asserted here; that the checker could still fail
 // is asserted by TestCaptureVerifierStillDetectsAViolation below.

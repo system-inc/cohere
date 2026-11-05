@@ -26,9 +26,9 @@ import (
 // is pruned -- a first version of this test asserted against an untyped lowering and reported zero
 // pruned scopes, which would have passed whichever arm ran.
 //
-// # What this does NOT catch, stated because a guard that cannot fail is worse than none
+// # What this does not catch, stated because a guard that cannot fail is worse than none
 //
-// It pins the SHAPE the defect needs, not the behaviour. Every call site passes nil for the
+// It pins the shape the defect needs, not the behaviour. Every call site passes nil for the
 // dependency table, so `compareInferredDependencies` returns immediately and moving it back above
 // the `Pruned` check changes no output -- measured, that mutation survives. The behavioural assertion
 // becomes possible when the third firing condition is ungated, and belongs in the score test at that

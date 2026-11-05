@@ -124,9 +124,9 @@ func run() error {
 	// The fix phase narrowed to formatting, the way --types and --lint narrow the run to theirs, for a gate
 	// whose question is formatting alone: a lint finding has no say in its exit.
 	formatOnly := flag.Bool("format-only", false,
-		"format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's "+
-			"format check: every file formatting would change here or in a nested repository is a finding, and so is "+
-			"one the formatter could not read, and the exit is 0 only when there are none")
+		"format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit "+
+			"gate's format check: every file formatting would change here or in a nested repository is a finding, and "+
+			"so is one the formatter could not read, and the exit is 0 only when there are none")
 	// A cold run on purpose: for measuring one, and for anyone who suspects a cache. Every cache cohere
 	// keeps for a project is named here, so a cold number cannot be read as a warm one: the cache table
 	// (the run replay, the per-file findings, the signatures, the format record) and the tsconfig's

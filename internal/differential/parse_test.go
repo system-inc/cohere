@@ -7,7 +7,7 @@
 // The gap matters more than it looks. Every parse failure in this layer is silent by construction:
 // a regex that stops matching yields zero findings, and zero findings on one side makes every
 // finding on the other look one-sided while the diff stays perfectly well-formed. A path
-// normalization bug does the same thing — cohere prints absolute paths, the gate prints relative
+// normalization bug does the same thing: cohere prints absolute paths, the gate prints relative
 // ones, and if they fail to reconcile then two identical findings never match and the harness
 // reports total disagreement in a shape that looks like a working result.
 //
@@ -25,11 +25,12 @@ const ahraTreeRoot = "/Users/kirkouimet/Projects/ahra"
 // lines have to be recognized as summaries rather than counted as unparsed findings.
 func TestParsesRealVerifyOutput(test *testing.T) {
 	test.Parallel()
-	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims.
-	output := `graph built in 1.752s — 9973 files in the program, 3407 of them ours
+	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims. Its dashes are
+	// spelled as escapes between the raw pieces, since a raw string cannot hold one, so the bytes stay verbatim.
+	output := "graph built in 1.752s \u2014" + ` 9973 files in the program, 3407 of them ours
 /Users/kirkouimet/Projects/ahra/modules/mcp/McpApi.ts:240:16 - Identifier "params" should not be abbreviated. Use "parameters" or a more descriptive name. [consistency-no-abbreviated-identifier/noParams]
-lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
-  note: rule consistency-no-utils-folder listened to no files — it ran, but it never looked
+lint: 1 findings ` + "\u2014" + ` 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
+  note: rule consistency-no-utils-folder listened to no files ` + "\u2014" + ` it ran, but it never looked
   suppressed: 279 findings silenced by a disable comment, 264 of them without a stated reason
   config: rule consistency-require-type-suffix scoped off for 6 files by the config`
 
@@ -54,7 +55,9 @@ lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
 	finding := result.Findings[0]
 	if finding.File != "modules/mcp/McpApi.ts" {
 		test.Errorf(
-			"path is %q, want it relative to the tree root — an absolute-versus-relative mismatch makes every finding look one-sided",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"path is %q, want it relative to the tree root \u2014 "+
+				"an absolute-versus-relative mismatch makes every finding look one-sided",
 			finding.File,
 		)
 	}
@@ -100,7 +103,7 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 //
 // The same defect is fed in both formats. If parsing is right, the two produce equal keys and the
 // comparison reports no difference. If either path or rule normalization is wrong, the keys differ
-// and one finding becomes two one-sided differences — which is exactly what a total mismatch looks
+// and one finding becomes two one-sided differences, which is exactly what a total mismatch looks
 // like, and it looks like working output.
 func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 	test.Parallel()
@@ -162,7 +165,9 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 	}
 	if len(result.UnparsedLines) != 1 {
 		test.Error(
-			"an unrecognized line was dropped silently — a finding the harness cannot read must not look like a finding that is not there",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"an unrecognized line was dropped silently \u2014 " +
+				"a finding the harness cannot read must not look like a finding that is not there",
 		)
 	}
 }
@@ -171,7 +176,7 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 //
 // NormalizeRuleName strips everything after the first slash, to turn cohere's
 // `rule-name/messageId` into `rule-name`. Oxlint's own catalog writes rules as `plugin/rule-name`
-// — `typescript/no-explicit-any` — where the part after the slash is the rule and the part before
+// (`typescript/no-explicit-any`), where the part after the slash is the rule and the part before
 // it is the plugin. The two conventions collide, and the collision is silent: the name still
 // parses, still compares, and simply refers to the wrong thing.
 //

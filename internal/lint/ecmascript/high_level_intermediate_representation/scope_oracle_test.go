@@ -19,9 +19,9 @@
 // # The stage question, which had to be settled before any number here meant anything
 //
 // Our pipeline holds two different scope populations, and upstream's guards correspond to only one
-// of them. Scopes are ASSIGNED by `AssignReactiveScopes`, then a chain of prune passes dissolves
+// of them. Scopes are assigned by `AssignReactiveScopes`, then a chain of prune passes dissolves
 // the ones that turn out not to be worth memoizing. Upstream's output is emitted after their
-// equivalent chain, so their guards are the SURVIVORS.
+// equivalent chain, so their guards are the survivors.
 //
 // Measured both ways over the same fixtures, one pipeline run counted twice:
 //
@@ -31,7 +31,7 @@
 //
 // The totals alone do not settle it -- 114 is closer to 97 than 160 is, but a stage could get the
 // aggregate right while being wrong on every individual fixture. The per-fixture agreement is what
-// settles it: EXACT more than doubles, 11 of 48 to 25 of 48. A stage that merely netted out would
+// settles it: exact more than doubles, 11 of 48 to 25 of 48. A stage that merely netted out would
 // leave that flat. So this oracle scores the survived population, and the assigned count is
 // reported alongside it as context rather than pinned.
 //
@@ -41,10 +41,10 @@
 //
 // # Three numbers, because one would have lied
 //
-// At the survived stage the total improved AND per-fixture agreement doubled AND `under` got worse
+// At the survived stage the total improved and per-fixture agreement doubled and `under` got worse
 // (4 fixtures to 5). A single-number oracle reports that as an unambiguous win. It is not: `under`
 // is the correctness direction. An extra scope memoizes something upstream did not, which costs
-// performance; a MISSING scope drops a memoization the developer wrote, which changes behaviour.
+// performance; a missing scope drops a memoization the developer wrote, which changes behaviour.
 // Two of the five are our prune chain dissolving scopes upstream keeps.
 //
 // So `under` is pinned as a ceiling that fails loudly, and it is the number that outranks the other
@@ -68,8 +68,8 @@ import (
 
 // upstreamScopeGuard matches a changing-input cache guard in upstream's compiled output.
 //
-// Anchored on `!==` rather than on `$[` alone, because a cache WRITE (`$[0] = propA`) and a cache
-// READ (`t2 = $[2]`) both name a slot and neither opens a scope. Constant-cache guards are omitted.
+// Anchored on `!==` rather than on `$[` alone, because a cache write (`$[0] = propA`) and a cache
+// read (`t2 = $[2]`) both name a slot and neither opens a scope. Constant-cache guards are omitted.
 var upstreamScopeGuard = regexp.MustCompile(`if \(\$\[\d+\] !==`)
 
 // scopeStageCounts is one fixture's scope count at each of the two pipeline stages.
@@ -113,7 +113,7 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	// Counted by walking the tree rather than by subtracting a pruned count, because a scope block
-	// can appear in the tree more than once and the question is how many DISTINCT scopes survive --
+	// can appear in the tree more than once and the question is how many distinct scopes survive --
 	// which is what one of upstream's guards represents.
 	surviving := map[ScopeId]bool{}
 	VisitReactiveFunction(tree, ReactiveVisitor{
@@ -283,7 +283,7 @@ func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
 	//
 	// `under` first. It is the correctness direction and it outranks the other two whenever they
 	// disagree -- which they already have: at the survived stage the total improved and per-fixture
-	// agreement doubled while `under` got WORSE than at the assigned stage.
+	// agreement doubled while `under` got worse than at the assigned stage.
 	//
 	// Zero once the memo callbacks are counted. All five under-producing fixtures were the same
 	// bookkeeping error rather than a missing scope: their scopes sit in the callback, which

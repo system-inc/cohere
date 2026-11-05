@@ -20,7 +20,7 @@ import (
 // This is the refusal guard, and it is the single reason autofix can be trusted at all. A rule
 // proposes bytes; nothing about a byte range guarantees the result is a program. A range computed
 // one token off, a replacement missing a closing brace, two fixes that are individually fine and
-// jointly nonsense — all of them produce text that looks plausible in a diff and does not compile.
+// jointly nonsense: all of them produce text that looks plausible in a diff and does not compile.
 // Parsing before writing turns every one of those into a refusal instead of a corrupted file.
 //
 // The check is syntax only, deliberately. A fix that leaves the file parseable but ill-typed is a
@@ -158,7 +158,7 @@ func guardScriptKind(fileName string) core.ScriptKind {
 // be on a different filesystem, where rename degrades to copy-and-delete and the atomicity is
 // silently lost.
 //
-// Five agents work in this tree at once, and a half-written file is worse than an unfixed one — an
+// Five agents work in this tree at once, and a half-written file is worse than an unfixed one: an
 // unfixed file still compiles. The failure this prevents is not theoretical here: a half-written
 // file failing to build and then healing two minutes later was observed in this repo tonight.
 //
@@ -197,7 +197,7 @@ func WriteAtomically(fileName string, text string) error {
 	//
 	// This is the one guard in this package with no fixture behind it, and it is called out rather
 	// than left quiet. Removing this call passes every test here, because the failure it prevents
-	// needs the machine to lose power between the rename and the writeback — which no in-process
+	// needs the machine to lose power between the rename and the writeback, which no in-process
 	// test can induce. Every other guard was verified by deliberately breaking it and watching a
 	// fixture go red; this one rests on the argument alone. Treat it accordingly: it is load-bearing
 	// and unverified, so do not remove it because the tests stay green.

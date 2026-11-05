@@ -301,17 +301,18 @@ func consistentReturnIsPromiseVoid(ruleContext rule.Context, node *ast.Node, sub
 	// over resolved type arguments which terminate; the bound is here because a self-referential
 	// alias would otherwise be a hang rather than a finding, and 32 is far past any real promise
 	// nesting.
+	currentType := subject
 	for depth := 0; depth < 32; depth++ {
-		if subject == nil {
+		if currentType == nil {
 			return false
 		}
-		if !type_checking.IsThenableType(ruleContext.TypeChecker, node, subject) {
+		if !type_checking.IsThenableType(ruleContext.TypeChecker, node, currentType) {
 			return false
 		}
-		if !consistentReturnIsTypeReference(subject) {
+		if !consistentReturnIsTypeReference(currentType) {
 			return false
 		}
-		arguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject)
+		arguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, currentType)
 		if len(arguments) == 0 {
 			return false
 		}
@@ -322,7 +323,7 @@ func consistentReturnIsPromiseVoid(ruleContext rule.Context, node *ast.Node, sub
 		if consistentReturnUnionFlagSet(awaited, checker.TypeFlagsVoid) {
 			return true
 		}
-		subject = awaited
+		currentType = awaited
 	}
 	return false
 }

@@ -77,7 +77,7 @@ type Character struct {
 // syntax error the parser has already refused, so a second opinion here would be noise on a file
 // that does not compile.
 //
-// # What this does NOT report, measured
+// # What this does not report, measured
 //
 // Four limits, each found by a caller that needed the missing thing. They are stated here rather
 // than left in the rule that discovered them, because the next caller will otherwise measure them a
@@ -87,7 +87,7 @@ type Character struct {
 //     `\b`/`\B` outside a class all match a set or a position rather than a single character, so
 //     they have no value to report and are skipped. `no-useless-escape` has to answer about every
 //     one of them.
-//   - **WHICH class a character sits in is not reported.** `ClassDepth` is a counter, not a stack,
+//   - **which class a character sits in is not reported.** `ClassDepth` is a counter, not a stack,
 //     so a caller needing the enclosing class's own start and end cannot use this. The caret rule
 //     and the hyphen rule both need exactly that: a caret means negation only as a class's first
 //     character, and a hyphen opens a range only away from a class's edges.

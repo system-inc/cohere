@@ -22,7 +22,7 @@
 //
 // Two consequences the next reader should hold:
 //
-//   - Fallthrough is NOT a control-flow edge. Control reaches it through the arms, not from the
+//   - Fallthrough is not a control-flow edge. Control reaches it through the arms, not from the
 //     terminal directly. `EachSuccessor` therefore does not yield it by default, and
 //     `MarkPredecessors` does not lay an edge to it. A dataflow analysis that treated it as an edge
 //     would propagate values along a path that does not exist.
@@ -245,8 +245,8 @@ type Label struct {
 //
 // # The finally divergence, stated where it will be found
 //
-// cohere's `controlflow` lays a `finally` body out TWICE - once for normal completion, once for the
-// abrupt path - and both copies carry the same source positions. This IR does NOT. The finally body
+// cohere's `controlflow` lays a `finally` body out twice - once for normal completion, once for the
+// abrupt path - and both copies carry the same source positions. This IR does not. The finally body
 // is lowered once, and the paths that must run it jump to it.
 //
 // The divergence is deliberate and it is the main reason this package does not reuse that graph.
@@ -273,8 +273,8 @@ type Try struct {
 //
 // # Why this exists rather than an edge from every throwable instruction
 //
-// `controlflow` forks to the handler at the FIRST throwable node in a try body, so later statements
-// are bypassed on the throwing path, and gives a body that cannot throw NO edge to its catch at all.
+// `controlflow` forks to the handler at the first throwable node in a try body, so later statements
+// are bypassed on the throwing path, and gives a body that cannot throw no edge to its catch at all.
 // Both are right for reachability and wrong for a mutation lattice, which needs the handler to
 // observe the state the body actually left behind - including from a body the analysis believes
 // cannot throw, because "cannot throw" is a judgement that a later, more precise pass may revise.
@@ -300,8 +300,8 @@ type MaybeThrow struct {
 //
 // # Why this variant exists now, when the package comment said it might never
 //
-// `high_level_intermediate_representation.go` records the rule: a variant belongs in the core set when LOWERING must
-// produce it, and behind a seam when only a LATER PASS would, and it names the moment to pay the cost as "if
+// `high_level_intermediate_representation.go` records the rule: a variant belongs in the core set when lowering must
+// produce it, and behind a seam when only a later pass would, and it names the moment to pay the cost as "if
 // reactive scopes are ever built". They are built. Four stages before this one declined to add the
 // variant early and were right to: a terminal nothing constructs is worse than no terminal, because
 // consumers switch on it and get an arm that never fires. `Optional` is the standing example in this
@@ -310,7 +310,7 @@ type MaybeThrow struct {
 //
 // # The shape, and the one divergence from React
 //
-// Upstream's terminal embeds the scope OBJECT (`scope: ReactiveScope`); oxc holds a `ScopeId`
+// Upstream's terminal embeds the scope object (`scope: ReactiveScope`); oxc holds a `ScopeId`
 // (`react_compiler_hir/mod.rs:452`). This holds the id, matching oxc, for a reason that is about
 // this tree rather than a preference between them: reactive scopes live in a side table here
 // (`ReactiveScopes`, `AlignedScopes`, `MergedScopes`) precisely so a widening is one write rather
@@ -319,7 +319,7 @@ type MaybeThrow struct {
 // holds. Recorded as a divergence because a reader diffing against the bundle will see it.
 //
 // `Block` is where the scope's body begins and is a real successor. `Fallthrough` is where control
-// resumes after the scope completes, and is NOT an edge, exactly as for every other structured
+// resumes after the scope completes, and is not an edge, exactly as for every other structured
 // terminal. See this file's header.
 type Scope struct {
 	Scope       ScopeId

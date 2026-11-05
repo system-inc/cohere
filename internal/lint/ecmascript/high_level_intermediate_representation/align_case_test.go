@@ -104,7 +104,7 @@ func buildAlignCaseWithTerminal(test *testing.T, testCase alignCase,
 	return function, scopes
 }
 
-// buildNestedGotoCase builds two nested constructs and a goto that leaves BOTH at once, which is the
+// buildNestedGotoCase builds two nested constructs and a goto that leaves both at once, which is the
 // only shape reaching the goto back-reference mechanism.
 //
 // Layout, with evaluation orders in brackets:
@@ -179,12 +179,12 @@ func buildNestedGotoCase(test *testing.T) (*Function, *ReactiveScopes) {
 	return function, scopes
 }
 
-// buildInnermostGotoCase builds one construct and a goto targeting its OWN fallthrough, which is the
+// buildInnermostGotoCase builds one construct and a goto targeting its own fallthrough, which is the
 // innermost open one.
 //
 // This is the shape that separates upstream's `start !== at(-1)` test from its absence. Upstream
-// SKIPS this case, because the fallthrough pop on the very next block applies the same start
-// widening. The pop does not touch the END, so a scope whose end falls short of the fallthrough is
+// skips this case, because the fallthrough pop on the very next block applies the same start
+// widening. The pop does not touch the end, so a scope whose end falls short of the fallthrough is
 // where skipping and not-skipping produce different answers.
 //
 //	bb0  `if` [5]                 fallthrough bb1

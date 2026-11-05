@@ -55,7 +55,7 @@ func containsName(names []string, want string) bool {
 // The input this pass reads, which is the graph rather than the scope table
 // ---------------------------------------------------------------------------
 
-// TestDependenciesRequireScopeTerminals pins that this pass reads Scope TERMINALS, not the table.
+// TestDependenciesRequireScopeTerminals pins that this pass reads Scope terminals, not the table.
 //
 // This is the distinction that made three earlier stages necessary, and it is worth a test because
 // the failure it guards is silent: a caller that has scopes in the side table but has not built
@@ -77,7 +77,7 @@ func TestDependenciesRequireScopeTerminals(test *testing.T) {
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 
-	// Terminals NOT built: the table is populated but the graph carries no Scope terminal.
+	// Terminals not built: the table is populated but the graph carries no Scope terminal.
 	before := CollectScopeDependencies(function, identity)
 	if before.Len() != 0 {
 		test.Errorf("collected %d scopes' dependencies before terminals were built; this pass is "+
@@ -111,7 +111,7 @@ func TestDependenciesFindTheRootOfAnAccessPath(test *testing.T) {
 
 // TestDependenciesExcludeValuesTheScopeItselfProduces pins the core predicate.
 //
-// A value created INSIDE a scope is not an input to it. This is `checkValidDependency`'s whole job,
+// A value created inside a scope is not an input to it. This is `checkValidDependency`'s whole job,
 // and a pass that skipped it would report a scope as depending on its own output.
 func TestDependenciesExcludeValuesTheScopeItselfProduces(test *testing.T) {
 	test.Parallel()
@@ -272,7 +272,7 @@ func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(test *tes
 	}
 }
 
-// TestDependencyTreeTruncatesWithoutAHoistableSet pins the documented truncation AND its cause.
+// TestDependencyTreeTruncatesWithoutAHoistableSet pins the documented truncation and its cause.
 //
 // This is the counterfactual that identifies the mechanism rather than merely observing the result.
 // The same access path is added to two trees differing only in whether the hoistable set is
@@ -389,7 +389,7 @@ func TestDependencyCollectionIsDeterministic(test *testing.T) {
 
 // TestDependencyCollectionIsASinglePass pins the termination argument empirically.
 //
-// The claim in the package comment is that this is ONE ordered walk with no fixpoint: every block,
+// The claim in the package comment is that this is one ordered walk with no fixpoint: every block,
 // instruction and operand visited exactly once. Counted here rather than argued, because the passes
 // upstream of this one each needed a different termination story and a reader should not have to
 // assume this one inherited any of them.
@@ -442,10 +442,10 @@ func TestDependencyCollectionIsASinglePass(test *testing.T) {
 
 // TestScopesCloseAtTheirFallthrough pins that a scope stops collecting when its body ends.
 //
-// Added because a mutation neutralising the traversal's fallthrough entry SURVIVED the first sweep,
+// Added because a mutation neutralising the traversal's fallthrough entry survived the first sweep,
 // and the reading rather than a reflexive extra fixture found why. Removing it does not make scopes
-// unreachable -- all three end-blocks are still visited -- it makes them never CLOSE, so each scope
-// keeps accumulating every later scope's reads. The distinguishing quantity is the RAW access count
+// unreachable -- all three end-blocks are still visited -- it makes them never close, so each scope
+// keeps accumulating every later scope's reads. The distinguishing quantity is the raw access count
 // before reduction, not the reduced output: on the fixture below the real walk collects 4 and the
 // mutant collects 12, while the reduced dependency lists happened to coincide. That is why the
 // earlier tests missed it, and why this asserts on the pre-reduction count.
@@ -543,7 +543,7 @@ func TestDependenciesHandleANilFunction(test *testing.T) {
 // TestDependencyDistributionIsReal is this stage's headline, pinned as a test.
 //
 // A count cannot separate a working pass from one that collects nothing, and an empty output that
-// looks plausible is this pass's characteristic failure. So the measurement is a CROSS-TABULATION of
+// looks plausible is this pass's characteristic failure. So the measurement is a cross-tabulation of
 // dependencies-per-scope against scope member count, over 400 corpus files and 677 functions:
 //
 //	                members=1   members=2-3   members=4+
@@ -556,7 +556,7 @@ func TestDependenciesHandleANilFunction(test *testing.T) {
 // is neither, and the dependency-bearing scopes spread across every member bucket rather than
 // clustering in one, which is what distinguishes real structure from an artifact of scope size.
 //
-// The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
+// The thresholds below are far looser than those numbers. This guards the shape, not the corpus,
 // which moves when the tree does.
 func TestDependencyDistributionIsReal(test *testing.T) {
 	test.Parallel()
@@ -655,7 +655,7 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 // TestDeclarationOriginDiffersFromHoldingScope is why the origin is recorded at all.
 //
 // `declarations` writes a value into every enclosing scope on its stack, so the map key names a
-// scope that HOLDS a declaration rather than the one that produced it. If those never differed the
+// scope that holds a declaration rather than the one that produced it. If those never differed the
 // origin table would be pure overhead and `hasOwnDeclaration` -- the predicate `pruneUnusedScopes`
 // uses to prune a scope whose declarations all bubbled up -- would be answerable from the key alone.
 //

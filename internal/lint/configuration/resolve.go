@@ -363,7 +363,7 @@ func (resolved Resolved) MatchedOverrideIndices() []int {
 // file, slash-separated, with no leading dot.
 //
 // Getting this wrong is silent in the dangerous direction. An absolute path never matches
-// `modules/**`, so every override quietly stops applying and the rules they scoped off come back —
+// `modules/**`, so every override quietly stops applying and the rules they scoped off come back,
 // which is exactly the 336 findings this package exists to remove.
 func (configuration *Config) relativePath(path string) string {
 	normalized := filepath.ToSlash(path)

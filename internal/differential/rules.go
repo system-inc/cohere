@@ -1,7 +1,7 @@
 // Asking the measured binary which rules it has, rather than assuming they match this one's.
 //
 // The classification split turns on whether cohere implements a rule, and that fact was read from
-// `registry.All()` — the registry linked into the harness, not into the binary under measurement.
+// `registry.All()`, the registry linked into the harness, not into the binary under measurement.
 // When the two differ, every classification describes the wrong tool, and it does so silently.
 //
 // It happened. A run at 03:22 measured a binary built before `react-component-no-multiple-primary`
@@ -41,8 +41,11 @@ var unconfiguredRulePattern = regexp.MustCompile(`^\s*([a-z][a-z0-9-]*) did not 
 // ruleCountPattern reads the rule count from the coverage line, which is the total this parse must
 // account for:
 //
-//	lint: 128 findings — 33 rules over 3407 files, ...
-var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over`)
+//	lint: 128 findings <em-dash> 33 rules over 3407 files, ...
+//
+// where <em-dash> stands for the em-dash cohere prints there. The dash is cohere's own output, so the pattern holds
+// its exact bytes, spelled as an escape between the raw pieces because a raw string cannot hold one.
+var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? ` + "\u2014" + ` (\d+) rules? over`)
 
 // CompiledRulesOf asks the binary which rules it has.
 //

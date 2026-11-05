@@ -201,7 +201,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 	}
 }
 
-// invokedWithinNested reports which of THIS function's nested functions an inner one invokes.
+// invokedWithinNested reports which of this function's nested functions an inner one invokes.
 //
 // The inner function numbers its own children from zero, so its answer cannot be read directly in
 // the parent's space. What survives the boundary is a capture: a function the inner one calls, that

@@ -36,7 +36,8 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 	}
 	common := map[string]string{
 		"tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
-		"CohereSettings.json": `{"rules":{"@typescript-eslint/no-floating-promises":"error","@typescript-eslint/no-unsafe-assignment":"error",` +
+		"CohereSettings.json": `{"rules":{"@typescript-eslint/no-floating-promises":"error",` +
+			`"@typescript-eslint/no-unsafe-assignment":"error",` +
 			`"@typescript-eslint/no-misused-promises":"error","@typescript-eslint/no-redundant-type-constituents":"error"}}`,
 	}
 	findingsTree := map[string]string{}
@@ -47,7 +48,16 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 	// Enough files that every checker has a group, each reaching types through an import.
 	for index := range 48 {
 		name := filepath.Join("source", "f"+string(rune('a'+index%26))+string(rune('a'+index/26))+".ts")
-		findingsTree[name] = "import { load } from './shared';\nexport async function run(): Promise<void> {\n    load();\n    const value: any = JSON.parse('1');\n    const kept: number = value;\n    if (load()) {\n        void kept;\n    }\n}\nexport type Either = string | 'literal';\n"
+		findingsTree[name] = "import { load } from './shared';\n" +
+			"export async function run(): Promise<void> {\n" +
+			"    load();\n" +
+			"    const value: any = JSON.parse('1');\n" +
+			"    const kept: number = value;\n" +
+			"    if (load()) {\n" +
+			"        void kept;\n" +
+			"    }\n" +
+			"}\n" +
+			"export type Either = string | 'literal';\n"
 		typeErrorTree[name] = "import { load } from './shared';\nexport const wrong: number = load();\n"
 	}
 	findingsTree["source/shared.ts"] = "export async function load(): Promise<number> {\n    return 1;\n}\n"

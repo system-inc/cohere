@@ -21,12 +21,12 @@ import (
 //
 // # What it asserts, and what it deliberately does not
 //
-// It does NOT assert that all 33 pass. Scoring a fresh port against a golden set and demanding a
+// It does not assert that all 33 pass. Scoring a fresh port against a golden set and demanding a
 // perfect number is how a rule ends up shaped like its fixtures: the failures get patched
 // individually until the count is right, and the result matches the corpus rather than the
 // specification.
 //
-// What it asserts is that the rule RUNS on the corpus and produces a non-degenerate answer -- it
+// What it asserts is that the rule runs on the corpus and produces a non-degenerate answer -- it
 // fires on some fixtures and not others -- plus the current pass count as a floor, so the number can
 // only be driven up. The count is logged rather than pinned exactly, and the floor moves when
 // someone improves it.
@@ -47,24 +47,24 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 		if !strings.Contains(fixture.Expected.Raw, ruleMessage) {
 			continue
 		}
-		// Flow's `component Component(id) { ... }` declaration form is EXCLUDED, deliberately,
+		// Flow's `component Component(id) { ... }` declaration form is excluded, deliberately,
 		// because the vendored TypeScript parser does not model it and no work in this package can
 		// recover it.
 		//
 		// # What the parser actually produces, measured rather than assumed
 		//
 		// There is no `KindComponentDeclaration` anywhere in `typescript-go`, and the parser does
-		// not reject the syntax either -- it RECOVERS, into three unrelated top-level nodes:
+		// not reject the syntax either -- it recovers, into three unrelated top-level nodes:
 		//
 		//	component            ->  ExpressionStatement(Identifier)
 		//	Component(id)        ->  ExpressionStatement(CallExpression)
 		//	{ ... }              ->  Block                       (a detached block, not a body)
 		//
 		// So `ForEachFunctionLike` finds no function for the component. It descends into that
-		// detached `Block` and reaches the `useMemo`/`useCallback` CALLBACKS, which are ordinary
+		// detached `Block` and reaches the `useMemo`/`useCallback` callbacks, which are ordinary
 		// arrow functions, and lowers each one as though it were itself a top-level component. That
 		// is why these two fixtures report `lowered=true` with reactive scopes and yet record zero
-		// written dependencies: the `useMemo` CALL SITES live in the detached block, which is never
+		// written dependencies: the `useMemo` call sites live in the detached block, which is never
 		// lowered, so `DropManualMemoization` is never handed a call to recognise and no
 		// `StartMemoize` marker is ever constructed. The identical program written as
 		// `function Component(id)` lowers to one function with two markers carrying their deps,
@@ -75,7 +75,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 		// Lowering is keyed on `*ast.Symbol` identity throughout -- `builder.declarations`,
 		// `.identifiers` and `.captured` are all symbol-keyed. The binder never created a parameter
 		// binding for `id`, because there is no function to bind one into, so
-		// `GetSymbolAtLocation(id)` returns nil at its declaration site AND at its use inside the
+		// `GetSymbolAtLocation(id)` returns nil at its declaration site and at its use inside the
 		// dependency array, while resolving at an unrelated use. A dependency-array entry with no
 		// symbol cannot be built into a `ManualMemoDependency` and cannot be compared against an
 		// inferred dependency, so synthesising a function node here would produce a marker whose
@@ -93,7 +93,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 		// chain widening a mutable range through an invoked function -- work `#t28gsec` addresses --
 		// so it would likely stay silent even with a parser that handled the declaration.
 		//
-		// `RequiresFlow` is upstream's own test (the substring `@flow`), and on THIS population it
+		// `RequiresFlow` is upstream's own test (the substring `@flow`), and on this population it
 		// is exact: it selects these two fixtures and no others.
 		if fixture.RequiresFlow() {
 			flowOnly++
@@ -108,7 +108,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	fired, silent, unsupported, disowned := 0, 0, 0, 0
 	divergences := react_conformance.StatedDivergenceNames()
 	for _, fixture := range mine {
-		// The Flow-declaration exclusion documented above. This is checked BEFORE lowering rather
+		// The Flow-declaration exclusion documented above. This is checked before lowering rather
 		// than after, because these fixtures do lower -- into the wrong thing -- and so the `!ok`
 		// decline below cannot see them.
 		if fixture.RequiresFlow() {
@@ -158,7 +158,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	}
 
 	// The exclusion is pinned to the exact population it was measured against. If the corpus is
-	// re-vendored and a THIRD Flow fixture appears -- or one of these two is rewritten in the
+	// re-vendored and a third Flow fixture appears -- or one of these two is rewritten in the
 	// ordinary `function` form -- this fires, and whoever sees it has to re-make the judgment above
 	// rather than inherit it. An exclusion that silently widens is how a denominator rots.
 	const knownFlowDeclarationFixtures = 2
@@ -179,7 +179,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	//
 	// The clean-fixture rate below is pinned exactly and this side was not, so the two instruments
 	// were asymmetric in the one direction that matters: a change trading true positives away for
-	// false-positive removals moved the pinned number DOWN, which reads as the rule improving, while
+	// false-positive removals moved the pinned number down, which reads as the rule improving, while
 	// this side stayed green because it only asked for a non-zero.
 	//
 	// That is not hypothetical. Freezing component parameters in the aliasing graph took the clean
@@ -189,14 +189,14 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	//
 	// The six were `error.useMemo-aliased-var` plus five optional-member-expression fixtures, and
 	// what they show is that the repair was in the wrong pass. Freezing a parameter suppressed the
-	// walk that carries a mutation ONWARD, so `x.push(props?.items)` stopped widening `x`, which is
+	// walk that carries a mutation onward, so `x.push(props?.items)` stopped widening `x`, which is
 	// mutated, rather than `props`, which is not. Upstream does not do this: oxc's `NodeValue` in
 	// `infer_mutation_aliasing_ranges.rs:72` is `Object | Phi` with no third element, and the
-	// parameter freeze lives in `InferMutationAliasingEffects` as a `MutateFrozen` EFFECT rather
+	// parameter freeze lives in `InferMutationAliasingEffects` as a `MutateFrozen` effect rather
 	// than as a node value this pass reads.
 	//
 	// So both directions are pinned, and a change moving either one has to say which it moved and
-	// why. Silence is not the right answer on ANY of these 33: each is a program where upstream
+	// why. Silence is not the right answer on any of these 33: each is a program where upstream
 	// reports a lost memoization.
 	// Raised from 15 by turning on the third firing condition, which had been gated since it was
 	// written. The gate's own unblock instruction was "turn this on when the hoistable analysis
@@ -263,7 +263,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	// False positives are unmoved at 11, `under` holds at 0 fixtures / 0 scopes, and the dependency
 	// oracle is byte-identical at 74 matched with ours 119.
 	//
-	// 28 once a ref's STABILITY is seeded only by a hook call, separately from its shape. The one
+	// 28 once a ref's stability is seeded only by a hook call, separately from its shape. The one
 	// that closes is `error.preserve-use-memo-ref-missing-reactive.ts`, whose `ref` is a phi of two
 	// `useRef` results and is named `ref`. False positives hold at 11, `under` at 0 fixtures / 0
 	// scopes, and the dependency oracle is byte-identical at 74 matched with ours 119. Memo blocks
@@ -284,7 +284,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	//
 	// Taken because the trade is measured and one-sided everywhere else: false positives 11 to 8
 	// with three real fixtures closing and none added, dependency `matched` 74 to 75 -- a golden row
-	// GAINED on the strongest oracle -- and `under` held at 0 fixtures / 0 scopes.
+	// gained on the strongest oracle -- and `under` held at 0 fixtures / 0 scopes.
 	const knownTruePositives = 28
 	if fired != knownTruePositives {
 		test.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
@@ -337,7 +337,7 @@ func TestPreserveManualMemoizationFalsePositiveRate(test *testing.T) {
 		}
 		if upstreamReportsInLogs(test, fixture.ExpectPath, ruleMessage) {
 			// Upstream reports this rule on the fixture, in its `## Logs` block rather than in a
-			// `## Error` section. The population above is chosen by FILENAME, and `Expectation`
+			// `## Error` section. The population above is chosen by filename, and `Expectation`
 			// parses only `## Error`, so neither route can see it: the fixture reads as clean while
 			// upstream reports on it, and firing here was scored as a false positive.
 			//
@@ -392,13 +392,13 @@ func TestPreserveManualMemoizationFalsePositiveRate(test *testing.T) {
 	//
 	// The move is smaller than the measured ceiling of 23 and that is the informative part rather
 	// than a shortfall. Forcing every marker to read as pruned reaches 23, so 7 of those 8 belong to
-	// fixtures that ALSO fire the `StartMemoize` condition and stay in the count on that other
+	// fixtures that also fire the `StartMemoize` condition and stay in the count on that other
 	// finding. The marker pass itself prunes 36 of 68 markers on this corpus and leaves zero
 	// unpruned markers whose value carries no scope, so it is not under-firing.
 	// Lowered from 30 by declaring the four `Object` statics in the effect table. Three fixtures,
 	// exactly the three whose subject they are: `object-keys`, `object-values` and
 	// `repro-object-fromEntries-entries`, all now silent.
-	// The DENOMINATOR moved from 70 to 69 without this number moving, which is worth stating
+	// The denominator moved from 70 to 69 without this number moving, which is worth stating
 	// because the two are usually read together. `gating/dynamic-gating-bailout-nopanic.js` is now
 	// excluded: upstream reports this rule on it, in `## Logs` rather than in a `## Error` section,
 	// so it was counted as clean while both compilers agree it is a violation. It was not firing

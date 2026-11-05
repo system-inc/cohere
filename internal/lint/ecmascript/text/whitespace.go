@@ -9,7 +9,7 @@ import "strings"
 // Go's `unicode.IsSpace` is a different set, and a port of a JavaScript tool that trims with it
 // answers differently from the tool it ports. The two disagree on two characters: Go counts the
 // next-line character (U+0085) as space and JavaScript does not, and JavaScript counts the byte order
-// mark (U+FEFF) as space and Go does not. @system_adamic's stream P2 found it porting cohere's
+// mark (`U+FEFF`) as space and Go does not. @system_adamic's stream P2 found it porting cohere's
 // suppression index: 6 of 8 directive comments holding one of the two got a different answer from
 // cohere than from ESLint 10.12.0 (#z4nssqs).
 //

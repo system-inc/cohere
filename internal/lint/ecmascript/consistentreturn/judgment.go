@@ -8,7 +8,7 @@
 //
 // The extension rule delegates rather than re-deriving this, which is what upstream does
 // (`baseRule.create(context)`), and the reason is not style: two implementations of one question
-// give the two rules two chances to disagree about it. This rule in particular renders THREE
+// give the two rules two chances to disagree about it. This rule in particular renders three
 // messages whose only difference in a fixture is a function name assembled from nine modifiers, and
 // computes a different report span per node kind. Re-deriving that would be re-deriving the part
 // most likely to drift.
@@ -16,7 +16,7 @@
 // # What the extension needs, and why it is two hooks rather than a filter over the output
 //
 // typescript-eslint's wrapper does not filter findings. It intercepts the ReturnStatement listener
-// BEFORE the core sees it, and does two things a post-filter cannot express:
+// before the core sees it, and does two things a post-filter cannot express:
 //
 //	a bare `return` in a function typed `void` is dropped entirely, so it never sets the
 //	  expectation the first return sets, and never contradicts a later one
@@ -60,7 +60,7 @@ type Hooks struct {
 	SuppressBareReturn func(scope *ast.Node, returnStatement *ast.Node) bool
 
 	// TreatsArgumentAsUnspecified is asked about a `return <expr>` when TreatUndefinedAsUnspecified
-	// is set, after the syntactic test has already declined. Upstream reads the ARGUMENT's type and
+	// is set, after the syntactic test has already declined. Upstream reads the argument's type and
 	// treats an exactly-undefined one as a bare return, which catches `return undef` for a
 	// `declare const undef: undefined` that the syntactic test cannot see.
 	//
@@ -91,7 +91,7 @@ const (
 // `sourceFile` is the file node, which is itself a scope: upstream treats the Program as a function
 // for this purpose and its corpus asserts a finding named "Program".
 //
-// # Findings come out in SOURCE order, which is not the order the scopes are judged in
+// # Findings come out in source order, which is not the order the scopes are judged in
 //
 // Each scope is judged as a whole, because the end-of-function question needs every return in it,
 // and the scopes are walked outermost-first. Upstream instead fires a listener per return statement
@@ -169,7 +169,7 @@ func judgeScope(scope *ast.Node, settings Settings, hooks Hooks, reporter Report
 			return false
 		}
 		if current.Kind == ast.KindReturnStatement {
-			// The extension's first hook, and it is asked HERE rather than at report time. A
+			// The extension's first hook, and it is asked here rather than at report time. A
 			// suppressed bare return must not be recorded at all: recorded, it would be the first
 			// return and would set the expectation every later return is measured against, which
 			// is a different answer from dropping the finding it produces.
@@ -204,7 +204,7 @@ func judgeReturns(scope *ast.Node, returns []*ast.Node, settings Settings, hooks
 	// both judgments for one. Checked before anything is reported rather than only at the
 	// end-of-function judgment, because upstream's ReturnStatement listener also runs inside a
 	// constructor and its first return simply sets an expectation nothing later contradicts... and
-	// measured, `class A { constructor() { if (a) return true; else return; } }` DOES report the
+	// measured, `class A { constructor() { if (a) return true; else return; } }` does report the
 	// per-return finding upstream. So only the end-of-function judgment is exempt, which is where
 	// upstream's isClassConstructor test actually sits.
 	firstReturnHasValue := HasValue(returns[0], settings, hooks)
@@ -223,8 +223,8 @@ func judgeReturns(scope *ast.Node, returns []*ast.Node, settings Settings, hooks
 	}
 
 	// The end-of-function judgment. Upstream reads `funcInfo.hasReturnValue`, which is set from the
-	// FIRST return alone and never updated, so a function whose first return is bare and whose
-	// later return carries a value is NOT reported here even though a value does escape it. That
+	// first return alone and never updated, so a function whose first return is bare and whose
+	// later return carries a value is not reported here even though a value does escape it. That
 	// looks like a defect and it is upstream's behaviour; its own corpus case
 	// `function foo() { if (true) return; else return false; }` reports only the per-return
 	// finding. Reproduced by reading the first return rather than any return.
@@ -255,7 +255,7 @@ func HasValue(returnStatement *ast.Node, settings Settings, hooks Hooks) bool {
 	if !settings.TreatUndefinedAsUnspecified {
 		return true
 	}
-	// NOT unwrapping parentheses here, because upstream does not either: its parser folds them away
+	// Not unwrapping parentheses here, because upstream does not either: its parser folds them away
 	// so `return (undefined)` arrives as a bare identifier there and is treated as unspecified,
 	// while ours keeps the node and treats it as a value. Recorded as a divergence rather than
 	// corrected, because correcting it would be a silent improvement on a rule whose whole option
@@ -296,7 +296,7 @@ func IsScope(node *ast.Node) bool {
 func isExemptFromEndJudgment(node *ast.Node) bool {
 	// A class constructor. Our parser gives it its own kind where upstream reads a
 	// FunctionExpression whose parent is a MethodDefinition of kind "constructor", which is why an
-	// object literal's method named `constructor` is NOT caught by this and does report.
+	// object literal's method named `constructor` is not caught by this and does report.
 	if node.Kind == ast.KindConstructor {
 		return true
 	}
@@ -304,7 +304,7 @@ func isExemptFromEndJudgment(node *ast.Node) bool {
 	// An ES5 constructor: `astUtils.isES5Constructor` is a function whose own name starts with an
 	// upper case letter. Upstream tests `node.id && node.id.name[0] !== node.id.name[0].toLowerCase()`,
 	// which is a case comparison rather than an ASCII range, so a name with no case distinction at
-	// all -- a digit cannot start an identifier, but `_foo` and `$foo` can -- is NOT a constructor.
+	// all -- a digit cannot start an identifier, but `_foo` and `$foo` can -- is not a constructor.
 	// The corpus asserts `function _foo()` reports, which is the case that separates the two
 	// readings.
 	if node.Kind != ast.KindFunctionDeclaration && node.Kind != ast.KindFunctionExpression {
@@ -334,7 +334,7 @@ func isExemptFromEndJudgment(node *ast.Node) bool {
 // # A measured over-report, in the shelf rather than in this judgment
 //
 // A dry run over the ahra tree reported 141 findings where the installed rule reports 130. The 130
-// agree exactly, same file, same line, same column, same message id, and there are ZERO findings
+// agree exactly, same file, same line, same column, same message id, and there are zero findings
 // the installed rule produces that this one misses. All 11 extra come from one shape, isolated by
 // bisection down to a minimal pair:
 //
@@ -423,7 +423,7 @@ func Name(node *ast.Node, capitalise bool) string {
 		}
 		tokens = append(tokens, "function")
 		// A function expression assigned to a property or a class field is a `method` upstream,
-		// because it reads the PARENT's node type rather than the function's. Measured:
+		// because it reads the parent's node type rather than the function's. Measured:
 		// `var o = { foo: function() {...} }` renders "method 'foo'", not "function 'foo'".
 		if node.Kind == ast.KindFunctionExpression && node.Parent != nil {
 			switch node.Parent.Kind {
@@ -530,7 +530,7 @@ func ReportRange(node *ast.Node, tokenRange func(*ast.Node) core.TextRange) core
 		//
 		// A mutation removing this arm survives, and it is equivalent rather than untested:
 		// `TokenRange` on a source file also begins at offset 0, so both paths report at the same
-		// position. Its INVERSE, moving the range to offset 1, fails five lines, which proves the
+		// position. Its inverse, moving the range to offset 1, fails five lines, which proves the
 		// fixtures can see the program span. Kept because it states the intent -- upstream reports
 		// the head of the program rather than the whole file -- and because it does not depend on
 		// what `TokenRange` happens to answer for a construct with no leading token.
@@ -548,12 +548,12 @@ func ReportRange(node *ast.Node, tokenRange func(*ast.Node) core.TextRange) core
 
 	// A method, an accessor or a constructor points at its key, which upstream reads as
 	// `node.parent.key`. There is deliberately no arm for those kinds here, because the fallback at
-	// the end of this function already reads `node.Name()` and a method's name IS its key, so an
+	// the end of this function already reads `node.Name()` and a method's name is its key, so an
 	// explicit arm would call the same accessor and return the same range.
 	//
 	// This was measured rather than assumed. An arm was written first, and a mutation neutralising
 	// it survived the whole fixture set including five cases asserting a method's span against a
-	// modifier. Its INVERSE -- returning the whole node from that arm -- fails nine lines, which
+	// modifier. Its inverse -- returning the whole node from that arm -- fails nine lines, which
 	// proves the fixtures can see the span and that the arm was simply subsumed rather than
 	// untested. Removed, with the reasoning here so it is not helpfully restored.
 	//

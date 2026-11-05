@@ -8,7 +8,7 @@ import (
 
 // The defect these guard is quiet by construction. A manifest whose `os` or `cpu` disagrees with
 // the binary beside it installs on the wrong machine or on none, and either way what a user sees is
-// "no binary for this platform" — the same message a genuinely unsupported platform produces. So
+// "no binary for this platform", the same message a genuinely unsupported platform produces. So
 // the fields are asserted against the same target that builds the binary, which is the only way the
 // two cannot drift.
 
@@ -37,7 +37,8 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 		}
 		if got := singleString(test, encoded, "os"); got != testCase.expectedOperatingSystem {
 			test.Errorf(
-				"%s declared os %q, wanted %q — npm would install it on the wrong machine",
+				// The dash is written as its escape, the same bytes, so the message reads as it always has.
+				"%s declared os %q, wanted %q \u2014 npm would install it on the wrong machine",
 				testCase.target,
 				got,
 				testCase.expectedOperatingSystem,
@@ -45,7 +46,8 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 		}
 		if got := singleString(test, encoded, "cpu"); got != testCase.expectedArchitecture {
 			test.Errorf(
-				"%s declared cpu %q, wanted %q — npm would install it on the wrong machine",
+				// The dash is written as its escape, the same bytes, so the message reads as it always has.
+				"%s declared cpu %q, wanted %q \u2014 npm would install it on the wrong machine",
 				testCase.target,
 				got,
 				testCase.expectedArchitecture,
@@ -222,7 +224,7 @@ func TestLauncherHoldsTheNoFallbackRule(test *testing.T) {
 func TestLauncherDoesNotReportSuccessForASignalledRun(test *testing.T) {
 	test.Parallel()
 
-	// spawnSync reports a null status when the child is killed by a signal, and null is falsy — so
+	// spawnSync reports a null status when the child is killed by a signal, and null is falsy, so
 	// the obvious implementation exits zero for a run that was terminated. That is a green gate over
 	// a killed process.
 	launcher := DispatcherLauncher()

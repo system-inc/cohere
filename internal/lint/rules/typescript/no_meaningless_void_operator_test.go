@@ -67,14 +67,15 @@ func applyNoMeaninglessVoidOperatorSuggestion(test *testing.T, source string, su
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
+	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
-		if start < 0 || end > len(source) || start > end {
-			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+		if start < 0 || end > len(edited) || start > end {
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(edited))
 		}
-		source = source[:start] + fix.Text + source[end:]
+		edited = edited[:start] + fix.Text + edited[end:]
 	}
-	return source
+	return edited
 }
 
 // The corpus is typescript-eslint 8.71.0's own, extracted mechanically, plus rows added here.

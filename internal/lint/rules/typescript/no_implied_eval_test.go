@@ -607,7 +607,8 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T
 		trimmed := strings.TrimSpace(sourceText)
 		want := []string{"'x = 1'", "new Function('a')"}
 		for index, expected := range want {
-			if reported := trimmed[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]; reported != expected {
+			diagnostic := result.Diagnostics[index]
+			if reported := trimmed[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != expected {
 				test.Errorf("finding %d span: want %q, got %q", index, expected, reported)
 			}
 		}

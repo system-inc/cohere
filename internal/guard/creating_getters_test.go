@@ -37,7 +37,7 @@ func TestRulesCallNoCompilerGetterThatWrites(test *testing.T) {
 
 // creatingGetterCalls lists every call to a creating getter in the rule packages, read with overlay in
 // place of the files it names. The loader reads files itself, so `go test -overlay` never reaches
-// this scan; the guard hands in the overlay GOFLAGS names (guardOverlay), and a probe hands in its own.
+// this scan; the guard hands in the overlay `GOFLAGS` names (guardOverlay), and a probe hands in its own.
 func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 	test.Helper()
 	loaded := lintPackages(test, overlay)

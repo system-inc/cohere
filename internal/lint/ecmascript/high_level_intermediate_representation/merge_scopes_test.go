@@ -94,9 +94,9 @@ func buildMergeCase(test *testing.T, testCase mergeCase) (*Function, *ReactiveSc
 // export inside its IIFE, and linking the four peer dependencies that live only in the pnpm store --
 // and the expectations below are the output that produced, transcribed.
 //
-// The cases exist to SEPARATE implementations rather than to confirm one, and `nestedButInterleaved`
+// The cases exist to separate implementations rather than to confirm one, and `nestedButInterleaved`
 // is the whole reason this table is here. Two scopes that nest perfectly, [1,9) and [3,5), still
-// merge, because the outer one is READ at instruction 4 while the inner is open. No pairwise
+// merge, because the outer one is read at instruction 4 while the inner is open. No pairwise
 // range-overlap rule can produce that answer: the ranges nest, so a comparison of the two intervals
 // says nothing is wrong. A port written from the natural description of this pass -- "union any two
 // scopes that overlap without nesting" -- passes `overlapNonNested`, `properlyNested`, `disjoint`
@@ -146,7 +146,7 @@ func TestMergeMatchesReact(test *testing.T) {
 			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 2, End: 6}},
 		},
 		{
-			// Three scopes ending at the SAME position with different starts. The closing order is
+			// Three scopes ending at the same position with different starts. The closing order is
 			// start-descending, so scope 3 closes first, then 2, then 1 -- and each of them is
 			// buried under the ones that started later, so all three union. This is the case that
 			// exercises `sortByStartDescending` on a real multi-scope group: 11 end positions on
@@ -175,15 +175,15 @@ func TestMergeMatchesReact(test *testing.T) {
 			},
 		},
 		{
-			// The case that makes the CLOSING ORDER load-bearing, minimised from the one function on
+			// The case that makes the closing order load-bearing, minimised from the one function on
 			// the corpus where reversing it changes an answer (two scopes ending at 292, starting at
 			// 30 and 24). Both scopes end at 9. The later-started one is pushed second, so it sits
-			// ON TOP. Closing start-descending pops it first, while it is on top, so nothing unions
+			// on top. Closing start-descending pops it first, while it is on top, so nothing unions
 			// and both survive. Closing in the other order pops the earlier-started one out from
 			// underneath, which unions them spuriously.
 			//
 			// React's own answer is that they stay separate. Without this case a mutation reversing
-			// `sortByStartDescending` SURVIVES the entire rest of this table, because every other
+			// `sortByStartDescending` survives the entire rest of this table, because every other
 			// shared-end case here either unions under both orderings or holds one scope per
 			// position.
 			name:         "sharedEndReversedStack",
@@ -194,12 +194,12 @@ func TestMergeMatchesReact(test *testing.T) {
 			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 5, End: 9}, 2: {Start: 3, End: 9}},
 		},
 		{
-			// The union arrives through the TERMINAL rather than through an instruction. Scope 1 is
+			// The union arrives through the terminal rather than through an instruction. Scope 1 is
 			// open across the whole function and scope 2 opens inside it; the terminal at 6 reads
 			// scope 1's value while scope 2 sits above it on the stack, so `visitPlace` on the
 			// terminal operand is the only thing that can union them.
 			//
-			// Without this case a mutation deleting the terminal-place visit entirely SURVIVES. It
+			// Without this case a mutation deleting the terminal-place visit entirely survives. It
 			// is reachable on the corpus -- 990 scoped terminal places over 400 files -- but inert
 			// there, because every one of those unions is already produced by an instruction visit.
 			// So this is a genuine blind spot rather than an unreachable branch, and only a
@@ -253,7 +253,7 @@ func TestMergeMatchesReact(test *testing.T) {
 //
 // It asserts the specific input on which the stack discipline and the natural pairwise description
 // disagree, so a reader who simplifies this pass into "union scopes whose ranges overlap without
-// nesting" cannot do it silently. The two ranges here NEST, so a pairwise rule finds nothing to do
+// nesting" cannot do it silently. The two ranges here nest, so a pairwise rule finds nothing to do
 // and leaves two scopes; React unions them because of the use at instruction 4.
 func TestMergeIsNotAPairwiseOverlapRule(test *testing.T) {
 	test.Parallel()
@@ -353,7 +353,7 @@ func TestMergeConservesMembership(test *testing.T) {
 // The claim in the doc comment is that this pass never revisits anything: one pass over the blocks,
 // each instruction and each terminal handled exactly once. That is a stronger claim than "it
 // terminates" and it is the one worth pinning, because the natural pairwise spelling of this pass
-// DOES iterate and a reader carrying that model would add a loop.
+// does iterate and a reader carrying that model would add a loop.
 func TestMergeIsASingleSweep(test *testing.T) {
 	test.Parallel()
 
@@ -510,7 +510,7 @@ func countNonNestedPairs(ranges map[ScopeId]mutation_aliasing.MutableRange) int 
 // pass that silently declined every function would fail the before-count rather than passing the
 // after-count vacuously.
 //
-// The thresholds below are looser than those numbers. This guards the SHAPE, not the corpus, which
+// The thresholds below are looser than those numbers. This guards the shape, not the corpus, which
 // moves when the tree does.
 func TestMergeDrivesNonNestedOverlapToZero(test *testing.T) {
 	test.Parallel()
@@ -553,7 +553,7 @@ func TestMergeDrivesNonNestedOverlapToZero(test *testing.T) {
 //
 // `AssignReactiveScopes` proved its scopes were real with a cross-tabulation of scope width against
 // scope membership, whose empty cell -- no multi-member scope of width one -- is what rules out
-// over-merging. This pass DELIBERATELY merges scopes, so that same table is the instrument that says
+// over-merging. This pass deliberately merges scopes, so that same table is the instrument that says
 // whether it merged too many. Over the same 400 files:
 //
 //	                       width 1      width > 1              width 1      width > 1
@@ -616,7 +616,7 @@ func TestMergePreservesScopeWidthAndMembership(test *testing.T) {
 	// The frozen-capture rule in `ranges.go` changed the shape: values that used to be swallowed by a
 	// wide hull now form their own narrow scopes, and 8 of them sit inside a hull that still exists,
 	// so they merge back into it. Traced on all eight before this was relaxed: every one merges into
-	// a scope that CONTAINS it, and the containing scope is byte-identical before and after. On
+	// a scope that contains it, and the containing scope is byte-identical before and after. On
 	// `pos=5163` scope 3 is `[15,382)` in both, holding 135 members before and 73 after -- the
 	// frozen values left it, formed their own scopes, and rejoined. Nothing is grouped that was not
 	// grouped before.
@@ -655,10 +655,10 @@ func classify(width, members int, oneNarrow, oneWide, manyNarrow, manyWide *int)
 	}
 }
 
-// TestMergeLeavesBlockScopeAlignmentUnclosed measures the gap this pass does NOT close.
+// TestMergeLeavesBlockScopeAlignmentUnclosed measures the gap this pass does not close.
 //
 // `assertValidBlockNesting` is the assertion `buildReactiveScopeTerminalsHIR` is blocked on, and it
-// checks scopes against PROGRAM BLOCK SUBTREES as well as against each other. This pass closes the
+// checks scopes against program block subtrees as well as against each other. This pass closes the
 // scope-against-scope half completely and leaves the other half open, so the number is recorded here
 // rather than left as a claim in a comment, and the next stage can read it as a precondition.
 //
@@ -704,7 +704,7 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(test *testing.T) {
 // TestMergeFunctionOperandSkipUpperBound bounds MergeGapPrimitiveOperandSkip.
 //
 // Upstream skips a primitive operand of a function expression or object method, and the IR carries
-// no type, so the real gate cannot be asked. This measures the UPPER BOUND instead: skipping
+// no type, so the real gate cannot be asked. This measures the upper bound instead: skipping
 // every use-operand of every function expression, which is strictly more than the gate would skip.
 // The control is asserted in the same test, because a small delta from a probe that barely fires
 // would not be a useful bound.
@@ -756,12 +756,12 @@ func TestMergeFunctionOperandSkipUpperBound(test *testing.T) {
 	// InputText. Each contributes one union, so the upper-bound probe now removes three: 118 without
 	// the gate, 115 with it.
 	//
-	// Three is the UPPER bound rather than the real size. The probe skips every use-operand of every
+	// Three is the upper bound rather than the real size. The probe skips every use-operand of every
 	// `FunctionExpression`, which is strictly more than upstream's gate, since upstream skips only
 	// the primitive ones. So the true divergence is at most three unions and may still be zero.
 	//
 	// The direction is unchanged and is the one already stated on `MergeGapPrimitiveOperandSkip`:
-	// not skipping visits operands upstream skips, and visiting an operand can only ever ADD a
+	// not skipping visits operands upstream skips, and visiting an operand can only ever add a
 	// union, so this errs toward merging more than upstream rather than less. State freezing raises
 	// the bound to seven, attributed to three input components in STATE_EFFECTS.md. Effect freezing
 	// adds one AnimatedButton reference capture; EFFECT_HOOK_EFFECTS.md attributes the bound of eight.
@@ -965,7 +965,7 @@ func TestMergeSortComparatorReachability(test *testing.T) {
 // mutation, and asserts the mechanism directly rather than through the sweep's output.
 //
 // Deleting that line survives the fixture set because 0 of 3,306 corpus scopes are registered only
-// through a terminal place. The synthetic half of this test asserts the line WORKS anyway, by
+// through a terminal place. The synthetic half of this test asserts the line works anyway, by
 // building a scope whose sole appearance is a terminal operand and checking it reaches the tables.
 func TestMergeRegistersScopesFromTerminals(test *testing.T) {
 	test.Parallel()

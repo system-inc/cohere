@@ -27,7 +27,7 @@ type Tables struct {
 	Aliases    map[string]string
 }
 
-// ECMAScript's table of binary Unicode properties, not every binary UCD property.
+// ECMAScript's table of binary Unicode properties, not every binary `UCD` property.
 // https://tc39.es/ecma262/#table-binary-unicode-properties
 const binaryNames = `ASCII ASCII_Hex_Digit Alphabetic Any Assigned Bidi_Control Bidi_Mirrored Case_Ignorable Cased Changes_When_Casefolded Changes_When_Casemapped Changes_When_Lowercased Changes_When_NFKC_Casefolded Changes_When_Titlecased Changes_When_Uppercased Dash Default_Ignorable_Code_Point Deprecated Diacritic Emoji Emoji_Component Emoji_Modifier Emoji_Modifier_Base Emoji_Presentation Extended_Pictographic Extender Grapheme_Base Grapheme_Extend Hex_Digit ID_Continue ID_Start Ideographic IDS_Binary_Operator IDS_Trinary_Operator Join_Control Logical_Order_Exception Lowercase Math Noncharacter_Code_Point Pattern_Syntax Pattern_White_Space Quotation_Mark Radical Regional_Indicator Sentence_Terminal Soft_Dotted Terminal_Punctuation Unified_Ideograph Uppercase Variation_Selector White_Space XID_Continue XID_Start`
 
@@ -183,7 +183,7 @@ func Build() (Tables, error) {
 		}
 	}
 	for _, row := range fields(files["PropertyValueAliases.txt"]) {
-		// Hrkt is a UCD aggregate alias, excluded by ECMAScript's Script/Script_Extensions table.
+		// Hrkt is a `UCD` aggregate alias, excluded by ECMAScript's Script/Script_Extensions table.
 		if row[0] != "sc" || row[1] == "Hrkt" {
 			continue
 		}

@@ -8,8 +8,8 @@
 //
 // # How coverage is established, and how it was got wrong first
 //
-// Terminals are counted out of the LOWERED IR rather than grepped out of the source text. The first
-// version of this grepped for "while (" and reported ZERO across 1,272 files, which is not credible
+// Terminals are counted out of the lowered IR rather than grepped out of the source text. The first
+// version of this grepped for "while (" and reported zero across 1,272 files, which is not credible
 // and was not true: this codebase writes "while(", with no space. That is the same wrong-by-a-
 // pattern answer lower_corpus_test.go documents finding for "switch", arrived at independently a
 // second time. A terminal count cannot make that mistake, because it is reading what was built.
@@ -98,7 +98,7 @@ func TestSSAOverRealCodebase(test *testing.T) {
 								// Coverage measured from the IR, not from grepping source text.
 								// A text grep for "while (" reports zero on this corpus because it
 								// is written "while(", which is the same wrong-by-a-pattern answer
-								// the HIR corpus test documents. Terminals cannot lie about this.
+								// the `HIR` corpus test documents. Terminals cannot lie about this.
 								for _, blk := range f.Blocks {
 									switch blk.Terminal.(type) {
 									case *While:

@@ -46,11 +46,11 @@ const (
 
 // EachPlace calls visit for every place the instruction value touches, with the role it plays.
 //
-// The instruction's own LValue is NOT included; it is on the Instruction rather than the value, and
+// The instruction's own LValue is not included; it is on the Instruction rather than the value, and
 // `EachInstructionPlace` is the version that includes it.
 //
 // Places inside a nested function are not visited. A FunctionExpression yields its captures, which
-// are places in THIS function, and the nested body is reached through Function.Functions.
+// are places in this function, and the nested body is reached through Function.Functions.
 func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) {
 	switch typed := value.(type) {
 	case *LoadLocal:
@@ -176,7 +176,7 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		// No places.
 	case *StartMemoize:
 		for _, dep := range typed.Deps {
-			// A global-rooted dependency carries a NAME rather than a place, so it holds a zero
+			// A global-rooted dependency carries a name rather than a place, so it holds a zero
 			// `Place` that names no identifier. Visiting it would hand every operand consumer an
 			// identifier id of zero, which single-assignment renaming would then treat as a real
 			// binding.
@@ -268,7 +268,7 @@ func EachTerminalPlace(terminal Terminal, visit func(place Place, role PlaceRole
 
 // EachSuccessor calls visit for every block control can reach directly from this terminal.
 //
-// Fallthrough is NOT yielded. It is not an edge: control reaches it through the construct's arms,
+// Fallthrough is not yielded. It is not an edge: control reaches it through the construct's arms,
 // not from the terminal. `EachSuccessorAndFallthrough` is the version for a caller that wants the
 // structural link as well, such as a printer or a pass rebuilding syntax.
 //
@@ -296,7 +296,7 @@ func EachSuccessor(terminal Terminal, visit func(block static_single_assignment.
 		for _, kase := range typed.Cases {
 			visitReal(kase.Block)
 		}
-		// A switch with no default can fall past every case, so the fallthrough IS an edge here.
+		// A switch with no default can fall past every case, so the fallthrough is an edge here.
 		if !hasDefaultCase(typed.Cases) {
 			visitReal(typed.Fallthrough)
 		}

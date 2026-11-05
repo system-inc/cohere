@@ -781,10 +781,11 @@ func preferNullishCoalescingParentSkippingParentheses(node *ast.Node) *ast.Node 
 // A loop, because `((a))` nests. Not `ast.SkipParentheses`, which dereferences its argument and is
 // how this project lost 167 files to a nil panic; every caller here holds an optional node.
 func preferNullishCoalescingUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // preferNullishCoalescingIsMixed is upstream's `isMixedLogicalExpression`.

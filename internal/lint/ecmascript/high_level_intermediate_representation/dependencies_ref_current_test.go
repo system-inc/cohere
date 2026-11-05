@@ -8,7 +8,7 @@ import (
 //
 // Upstream's `visitDependency` truncates such a path to empty with the comment "ref.current access
 // is not a valid dep" (`PropagateScopeDependenciesHIR.ts:536`). A scope must depend on the ref
-// OBJECT rather than on the mutable slot inside it: `ref.current` changes without the ref changing,
+// object rather than on the mutable slot inside it: `ref.current` changes without the ref changing,
 // so a dependency naming it would claim a stability React does not offer.
 //
 // # This diverges from upstream and the divergence is deliberate

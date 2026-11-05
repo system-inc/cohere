@@ -107,7 +107,7 @@ func widenedTableFrom(scopes *ReactiveScopes, aligned *AlignedScopes) *ReactiveS
 // TestAlignClosesTheFullBlockNestingAssertion is the headline, and it asserts the assertion upstream
 // actually runs rather than the scope-against-scope half of it.
 //
-// `assertValidBlockNesting` traverses scopes AND block subtrees together. Measuring only scopes
+// `assertValidBlockNesting` traverses scopes and block subtrees together. Measuring only scopes
 // against scopes reports zero for a graph that still stops upstream's compiler, which is why the
 // merge shipped with 166 outstanding and this pass exists.
 //
@@ -206,7 +206,7 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 	// That distinction was invisible while `DeclarationId` collisions were fusing scopes, and it
 	// matters now: with the collisions fixed, the corpus reports one `ScopeInBlock` violation, in
 	// `drawHighlightedCountryOutlines`, a canvas drawing helper. Measured over the same corpus split
-	// by `Function.Kind`: 318 components and hooks, ZERO violations; 677 functions, one.
+	// by `Function.Kind`: 318 components and hooks, zero violations; 677 functions, one.
 	//
 	// So the assertion below is stated over components and hooks, which is upstream's own domain,
 	// and the whole-corpus figure is logged rather than asserted. Asserting it would hold this pass
@@ -400,10 +400,10 @@ func TestAlignExcludesBranchTerminals(test *testing.T) {
 }
 
 // TestAlignPushFilterDeclinesAScopeThatEndedBeforeTheTerminal covers the `end > terminal.id` test on
-// the fallthrough push, which is a FILTER rather than a cost optimisation.
+// the fallthrough push, which is a filter rather than a cost optimisation.
 //
 // A scope reaches that line only if it was still active at the block's first instruction, so the
-// distinguishing input is a scope that is active at the top of the block and has ENDED by the time
+// distinguishing input is a scope that is active at the top of the block and has ended by the time
 // the sweep reaches the terminal. Without the filter such a scope is dragged forward across a
 // construct it never entered.
 //
@@ -432,10 +432,10 @@ func TestAlignPushFilterDeclinesAScopeThatEndedBeforeTheTerminal(test *testing.T
 
 // TestAlignRecordsAScopeOnceCoversTheSeenGate pins the `seen` gate on the value-block widening.
 //
-// The gate is what makes the fourth mechanism fire once per SCOPE rather than once per place. It is
+// The gate is what makes the fourth mechanism fire once per scope rather than once per place. It is
 // heavily exercised on the corpus -- 47,476 places arrive with their scope already seen -- and the
 // mutant removing it still survived the corpus suite, because widening to the same value range twice
-// is idempotent. The distinguishing input needs the scope to meet TWO DIFFERENT value ranges, so
+// is idempotent. The distinguishing input needs the scope to meet two different value ranges, so
 // that applying the second one is not a no-op.
 //
 // Built synthetically rather than found, because that shape does not occur in the corpus: a scope
@@ -450,7 +450,7 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(test *testing.T) {
 		fallthroughs: 9,
 	})
 
-	// Two value-block nodes of different spans, both reached by the same scope. Only the FIRST may
+	// Two value-block nodes of different spans, both reached by the same scope. Only the first may
 	// be applied; the second must be ignored because the scope has already been seen.
 	state := &alignSweepState{
 		activeSet:       map[ScopeId]bool{},
@@ -487,13 +487,13 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(test *testing.T) {
 
 // TestAlignGotoWidensAcrossSeveralOpenConstructs covers the goto back-reference, the third mechanism.
 //
-// A goto whose target is an open fallthrough that is NOT the innermost one is leaving several
-// constructs at once, and every still-active scope has to be widened at BOTH ends to span the outer
-// construct. When the target IS the innermost open construct the pop on the next block handles it,
+// A goto whose target is an open fallthrough that is not the innermost one is leaving several
+// constructs at once, and every still-active scope has to be widened at both ends to span the outer
+// construct. When the target is the innermost open construct the pop on the next block handles it,
 // which is why upstream tests for it and why removing that test is not obviously wrong.
 //
 // This is a genuine rarity rather than a fabricated case: instrumenting the sweep found 2,642 gotos
-// targeting an open fallthrough and exactly ONE of them reaching a non-innermost target. So the
+// targeting an open fallthrough and exactly one of them reaching a non-innermost target. So the
 // corpus exercises the branch once and no assertion over totals could see it move, which is why this
 // fixture is synthetic and the measurement is recorded here.
 func TestAlignGotoWidensAcrossSeveralOpenConstructs(test *testing.T) {
@@ -504,7 +504,7 @@ func TestAlignGotoWidensAcrossSeveralOpenConstructs(test *testing.T) {
 
 	// The scope reads at 21, inside the inner construct, and both constructs are open when the goto
 	// at 22 jumps past the inner fallthrough to the outer one. Its start must be pulled back to the
-	// OUTER construct's terminal at 5, and its end pushed out to the outer fallthrough at 40.
+	// outer construct's terminal at 5, and its end pushed out to the outer fallthrough at 40.
 	got := aligned.RangeOf(1)
 	if got.Start != 5 {
 		test.Errorf("the scope's start is %d, want 5; the goto back-reference should have pulled it "+
@@ -517,16 +517,16 @@ func TestAlignGotoWidensAcrossSeveralOpenConstructs(test *testing.T) {
 }
 
 // TestAlignGotoSkipsTheInnermostOpenConstruct covers the other half of the goto back-reference: the
-// `start !== activeBlockFallthroughRanges.at(-1)` test that DECLINES a goto to the innermost target.
+// `start !== activeBlockFallthroughRanges.at(-1)` test that declines a goto to the innermost target.
 //
 // The first fixture for this mutant was wrong even though the mechanism was understood, which is the
 // hazard the port brief names: a fixture written for a survivor is a hypothesis. A goto to a
-// NON-innermost target takes the same path with the test and without it, so it cannot see the
+// non-innermost target takes the same path with the test and without it, so it cannot see the
 // mutation at all, and the mutant survived a re-score.
 //
-// What separates them is that the fallthrough pop on the following block reproduces the START
-// widening and not the END one. So the distinguishing input is a scope active at an
-// innermost-targeting goto whose end falls SHORT of that fallthrough: upstream leaves it alone and
+// What separates them is that the fallthrough pop on the following block reproduces the start
+// widening and not the end one. So the distinguishing input is a scope active at an
+// innermost-targeting goto whose end falls short of that fallthrough: upstream leaves it alone and
 // the pop then widens only its start, while removing the test drags its end forward too.
 func TestAlignGotoSkipsTheInnermostOpenConstruct(test *testing.T) {
 	test.Parallel()
@@ -554,16 +554,16 @@ func TestAlignGotoSkipsTheInnermostOpenConstruct(test *testing.T) {
 // TestAlignDeclinesAPlaceReadOutsideItsScope covers upstream's `getPlaceScope` containment test.
 //
 // It is not subsumed by the activity filter, which is the plausible reading and the reason the
-// mutant removing it survived at first. The filter retires a scope whose END has passed the current
+// mutant removing it survived at first. The filter retires a scope whose end has passed the current
 // block; this declines a place whose read position its own scope never covered, which can happen at
 // any point.
 //
 // Choosing the range is the whole difficulty and the first attempt was wrong. A scope of [2,4) read
-// at 7 also comes back unchanged, and it CANNOT see this line: its end has already passed the
+// at 7 also comes back unchanged, and it cannot see this line: its end has already passed the
 // block's first instruction, so the activity filter would have excluded it anyway and both spellings
 // reach the same verdict by different routes. That fixture passed against the mutant.
 //
-// The range has to sit AFTER the read instead. A scope of [9,12) read at 7 has an end beyond the
+// The range has to sit after the read instead. A scope of [9,12) read at 7 has an end beyond the
 // block start, so nothing retires it, and only the containment test declines it. The expectation is
 // React's own output on that graph rather than a derivation.
 func TestAlignDeclinesAPlaceReadOutsideItsScope(test *testing.T) {
@@ -751,7 +751,7 @@ func TestAlignPreservesScopeWidthAndMembership(test *testing.T) {
 // names this pass as exactly the producer that would void both, and says whoever ports it must
 // re-take the measurement rather than inherit the zero. This is that measurement.
 //
-// The union COUNT is identical in both spellings, which is why this compares groups and ranges: a
+// The union count is identical in both spellings, which is why this compares groups and ranges: a
 // count-only assertion would report the reversed comparator as still equivalent and inherit a
 // verdict that has actually expired.
 func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
@@ -778,7 +778,7 @@ func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
 		ranges *mutation_aliasing.MutableRanges,
 		scopes *ReactiveScopes,
 	) {
-		// The control: on the UNALIGNED table the two spellings must agree, which is what makes a
+		// The control: on the unaligned table the two spellings must agree, which is what makes a
 		// difference on the aligned table attributable to the comparator rather than to the local
 		// copy of the sweep having drifted from the real one.
 		if differs(MergeOverlappingReactiveScopes(function, scopes),
@@ -885,7 +885,7 @@ func TestAlignGapsAreDeclared(test *testing.T) {
 // The claim is that every block is visited exactly once, so the visit count must equal the block
 // count. A pass that iterated to a fixpoint would exceed it, which is the failure this catches.
 //
-// The denominator is blocks in functions that HAVE scopes, not blocks overall, and getting that
+// The denominator is blocks in functions that have scopes, not blocks overall, and getting that
 // wrong is how this test first failed. A function with no scopes returns before the sweep begins, so
 // counting its blocks measures the early return rather than the sweep. Measured on the corpus: 49 of
 // 677 functions have no scope at all, carrying 217 blocks between them, which is exactly the gap.

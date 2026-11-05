@@ -369,7 +369,7 @@ func consistentTypeDefinitionsUnwrapParentheses(node *ast.Node) *ast.Node {
 }
 
 // consistentTypeDefinitionsPtr is a small helper so a computed int can be taken by address inline.
-func consistentTypeDefinitionsPtr(value int) *int { return &value }
+func consistentTypeDefinitionsPtr(value int) *int { return new(value) }
 
 // consistentTypeDefinitionsHeritageTypes returns the types an interface extends, in source order.
 func consistentTypeDefinitionsHeritageTypes(declaration *ast.InterfaceDeclaration) []*ast.Node {

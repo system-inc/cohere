@@ -17,15 +17,15 @@
 //
 // The third is the one a reader does not expect, and it is not incidental. Upstream writes
 // `identifier.mutableRange = scope.range` on the line after it writes `identifier.scope`
-// (line 32261), so after this pass every member of a class reports the CLASS's range rather than
+// (line 32261), so after this pass every member of a class reports the class's range rather than
 // its own. A consumer asking "how long is this value alive" gets the entangled answer, which is the
 // point: two values in one scope are memoized as one unit and therefore live as one unit.
 //
-// # DIVERGENCE FROM React: the hull is a VALUE here and an ALIAS there
+// # Divergence from React: the hull is a value here and an alias there
 //
-// React's `range: identifier.mutableRange` binds the first member's range OBJECT into the scope,
+// React's `range: identifier.mutableRange` binds the first member's range object into the scope,
 // and `identifier.mutableRange = scope.range` then points every member at that same object. The
-// aliasing is load-bearing THERE: five later passes widen `scope.range`
+// aliasing is load-bearing there: five later passes widen `scope.range`
 // (`alignReactiveScopesToBlockScopes`, `alignMethodCallScopes`, `alignObjectMethodScopes`,
 // `mergeOverlappingReactiveScopes`, and the fbt/macro pass), and each widening retroactively
 // updates every member's `mutableRange` through the shared reference.
@@ -39,14 +39,14 @@
 // it, and named here because a reader diffing against the bundle would otherwise see the alias
 // missing with no explanation.
 //
-// # Upstream's invariant is an INVARIANT, not a filter, and it holds on this corpus
+// # Upstream's invariant is an invariant, not a filter, and it holds on this corpus
 //
 // React ends with a hard `CompilerError.invariant` (line 32271) rejecting any scope whose range
 // starts at zero, ends at zero, or ends past `maxInstruction + 1`. There is no branch that skips
 // such a scope: upstream considers it a compiler bug and stops.
 //
 // That is a genuine risk here rather than a formality, because `RangeGapLoopCarriedInversion` leaves
-// 48 values across 400 files with an UNSET range, and a class composed entirely of those would hull
+// 48 values across 400 files with an unset range, and a class composed entirely of those would hull
 // to [0,0) and trip the invariant. Measured before this file was written, over 400 corpus files and
 // 685 outermost functions:
 //
@@ -67,7 +67,7 @@
 // # The distribution that proves these scopes are real
 //
 // A count cannot distinguish genuine structure from catastrophic over-merging, so the headline is a
-// CROSS-TABULATION of scope width against scope membership. Over the same 400 files:
+// cross-tabulation of scope width against scope membership. Over the same 400 files:
 //
 //	                       width 1      width > 1
 //	one member               1,903             80
@@ -85,7 +85,7 @@
 //
 // # Termination is a single pass with no iteration at all
 //
-// There is no worklist, no fixpoint, and no recursion. `AssignReactiveScopes` makes ONE pass over
+// There is no worklist, no fixpoint, and no recursion. `AssignReactiveScopes` makes one pass over
 // the classes `DisjointSet.Sets()` returns, and one pass over the members of each. Every class is
 // visited exactly once and every member exactly once, so the work is linear in the number of
 // members and terminates because both loops are over finite slices fixed before the walk begins.
@@ -98,7 +98,7 @@
 //
 // Scope ids are assigned in the order `Sets()` returns classes, and that order is sorted by first
 // member rather than being a Go map's randomised iteration. Upstream's ids come from a counter on
-// the Environment (`fn.env.nextScopeId`, a post-increment shared across nested functions), so ITS
+// the Environment (`fn.env.nextScopeId`, a post-increment shared across nested functions), so its
 // ids are stable because its backing `Map` is insertion-ordered. Ours are stable because `Sets()`
 // sorts. Without that, the same function would produce different scope ids on different runs, which
 // is the shape that makes a cache non-reproducible without ever producing a wrong answer.
@@ -138,11 +138,11 @@ const (
 	// passes that widen a scope range afterwards -- block-scope alignment, method-call alignment,
 	// object-method alignment, overlap merging, and the fbt/macro pass -- retroactively widen every
 	// member too. None of those passes exists here, so no widening is missed today; what is missing
-	// is the MECHANISM that would propagate one. A consumer that later adds an alignment pass must
+	// is the mechanism that would propagate one. A consumer that later adds an alignment pass must
 	// re-derive member ranges from `ScopeRanges` rather than assuming this pass already agreed with
 	// it.
 	//
-	// This is a gap in the OUTPUT's durability rather than in its current value: measured today,
+	// This is a gap in the output's durability rather than in its current value: measured today,
 	// every member's range equals its scope's hull, which is exactly what upstream reports at this
 	// point in its own pipeline.
 	ScopeGapPostAlignmentWidening ScopeGap = iota
@@ -161,8 +161,8 @@ func ScopeGaps() []ScopeGap {
 //
 // # Why a side table rather than a field on Identifier
 //
-// Upstream stores the scope ON the identifier. This keeps it in a table instead, because a value's
-// scope is not a property of the value: it is a property of the CLASS the value belongs to, and there
+// Upstream stores the scope on the identifier. This keeps it in a table instead, because a value's
+// scope is not a property of the value: it is a property of the class the value belongs to, and there
 // are 3,306 classes over 26,962 members. Storing the scope per identifier stores the same answer 8.16
 // times on average and invites the two copies to drift. The table below stores each scope once and
 // indexes into it, so widening a scope is one write rather than a fan-out, which is exactly the
@@ -194,7 +194,7 @@ func (scopes *ReactiveScopes) ScopeOf(id static_single_assignment.IdentifierId) 
 
 // RangeOf returns a scope's range, or the unset range for a scope that does not exist.
 //
-// This is the HULL of the member ranges, and after this pass it is also every member's own range.
+// This is the hull of the member ranges, and after this pass it is also every member's own range.
 // See the package comment for why the two are equal here and are not guaranteed to stay equal.
 func (scopes *ReactiveScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
 	if scopes == nil || scopes.ranges == nil {
@@ -239,7 +239,7 @@ func (scopes *ReactiveScopes) Len() int {
 // from `ForFunction`, which does. Infers ranges and the disjoint set for itself; a caller holding
 // either already passes them to `AssignReactiveScopesWithSets` and avoids the repeat.
 //
-// Nested functions are NOT included, for the reason `FindDisjointMutableValues` records: an
+// Nested functions are not included, for the reason `FindDisjointMutableValues` records: an
 // IdentifierId names one value in this function and a different value in a nested one. Upstream runs
 // this per function too, and separately for function expressions inside `lowerWithMutationAliasing`
 // (line 42315).
@@ -253,11 +253,11 @@ func AssignReactiveScopes(function *Function) *ReactiveScopes {
 
 // AssignReactiveScopesWithSets is the pass, taking the range table and disjoint set a caller has.
 //
-// The range table and the set must have been computed from the SAME function and from each other:
+// The range table and the set must have been computed from the same function and from each other:
 // passing a set built over different ranges produces hulls that describe neither. `AssignReactiveScopes`
 // is the safe spelling and this is the one that avoids recomputing.
 //
-// The member ranges this returns are the REWRITTEN ones -- each member reports its scope's hull --
+// The member ranges this returns are the rewritten ones -- each member reports its scope's hull --
 // which is upstream's `identifier.mutableRange = scope.range`. The input table is not modified;
 // `MemberRanges` below is the rewritten view, kept separate so a caller can still see what a value's
 // range was before entanglement widened it.
@@ -287,12 +287,12 @@ func AssignReactiveScopesWithSets(
 	for _, class := range classes {
 		if len(class) == 0 {
 			// `Sets` never returns an empty class, so this cannot fire today, and a mutation
-			// neutralising it SURVIVES for that reason rather than because a fixture is missing.
+			// neutralising it survives for that reason rather than because a fixture is missing.
 			//
 			// The callers enumerated when that verdict was taken: `DisjointSet.Sets` is the only
 			// producer of the slice this ranges over, and it builds each class by appending at
 			// least one member before the class exists as a key. There is no other path into this
-			// loop. That verdict EXPIRES if a second producer of classes is added, or if `Sets`
+			// loop. That verdict expires if a second producer of classes is added, or if `Sets`
 			// ever returns a key with no members.
 			//
 			// Kept rather than deleted because the alternative is a hull computed from no members,
@@ -304,12 +304,12 @@ func AssignReactiveScopesWithSets(
 		scope := next
 
 		// The hull, in upstream's own spelling rather than a tidier min/max pair. The two branches
-		// are NOT a plain minimum and the difference is load-bearing.
+		// are not a plain minimum and the difference is load-bearing.
 		//
 		// Zero is the sentinel for an unset range, so a member with no recorded definition point
 		// must not drag the hull's start down to zero. Upstream's `scope.range.start === 0` branch
-		// ADOPTS the next member's start outright rather than taking a minimum, and its `else if`
-		// then SKIPS any member whose own start is zero. Together those mean an unset member is
+		// adopts the next member's start outright rather than taking a minimum, and its `else if`
+		// then skips any member whose own start is zero. Together those mean an unset member is
 		// invisible to the start unless every member before it was also unset.
 		//
 		// Verified against React itself rather than read off the source, by running the merge loop
@@ -320,12 +320,12 @@ func AssignReactiveScopesWithSets(
 		//	unset, unset, [5,7)                     ->  [5,7)   adoption survives a run of unsets
 		//	every member unset                      ->  [0,0)   stays unset, trips the invariant
 		//
-		// The end has NO such guard upstream and none here: `max(end, 0)` is the identity, so an
+		// The end has no such guard upstream and none here: `max(end, 0)` is the identity, so an
 		// unset member cannot move it. Reproduced as written rather than simplified, because the
 		// asymmetry between the two fields is upstream's and a reader diffing them should find it.
-		// # The index-zero seed is EQUIVALENT to starting from the zero range, proven exhaustively
+		// # The index-zero seed is equivalent to starting from the zero range, proven exhaustively
 		//
-		// A mutation stopping the seed from ever firing SURVIVES, and it is a genuine equivalence
+		// A mutation stopping the seed from ever firing survives, and it is a genuine equivalence
 		// rather than a fixture gap. A zero-initialised hull takes the first member's start through
 		// the `Start == 0` adoption branch and its end through the max, so the seed reproduces what
 		// the merge branch would have done anyway.
@@ -376,7 +376,7 @@ func AssignReactiveScopesWithSets(
 // hull; a value with no scope is absent, and `Get` answers the unset range for it exactly as
 // `MutableRanges` does.
 //
-// Kept separate from the input table on purpose. Upstream OVERWRITES the value's own range and the
+// Kept separate from the input table on purpose. Upstream overwrites the value's own range and the
 // pre-entanglement range is unrecoverable afterwards; here both are available, which costs one map
 // and lets a consumer ask which of the two it wants. Nothing upstream needs the old value, so this
 // is a capability rather than a divergence in what the pass decides.
@@ -396,7 +396,7 @@ func (scopes *ReactiveScopes) MemberRanges() *mutation_aliasing.MutableRanges {
 
 // ValidateScopes returns the scopes whose range violates upstream's invariant.
 //
-// React asserts this and STOPS (`CompilerError.invariant`, line 32271); oxc returns a diagnostic
+// React asserts this and stops (`CompilerError.invariant`, line 32271); oxc returns a diagnostic
 // (`infer_reactive_scope_variables.rs:119`). This returns the offenders, because a linter that
 // panics on a graph it dislikes is worse than one that declines a function, and because a caller
 // that wants upstream's behaviour can raise on a non-empty result while a caller that wants to skip
@@ -404,7 +404,7 @@ func (scopes *ReactiveScopes) MemberRanges() *mutation_aliasing.MutableRanges {
 //
 // The four conditions are upstream's, in order: a start of zero, an end of zero, a function with no
 // instructions at all, and a range extending past the last instruction. The third is upstream's
-// `maxInstruction === 0` and it is a property of the FUNCTION rather than of any scope, so it
+// `maxInstruction === 0` and it is a property of the function rather than of any scope, so it
 // condemns every scope at once -- reproduced rather than hoisted, because upstream's message names
 // a scope and a caller reporting per scope needs the same granularity.
 //

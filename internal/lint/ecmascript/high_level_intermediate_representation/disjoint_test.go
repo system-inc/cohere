@@ -25,7 +25,7 @@ func disjointFor(test *testing.T, source string) (*Function, *DisjointSet) {
 	return function, FindDisjointMutableValuesWithRanges(function, ranges)
 }
 
-// classOfName returns the sorted class containing the LAST value a named binding takes.
+// classOfName returns the sorted class containing the last value a named binding takes.
 func classOfName(
 	test *testing.T,
 	function *Function,
@@ -64,12 +64,12 @@ func classOfName(
 //
 // These nine cases were not invented. They were run through React 7.1.1's own `DisjointSet`, reached
 // by copying the development bundle and appending an export inside its IIFE, and this table is the
-// output that produced. All nine agreed on the partition AND on the representative, which is the
+// output that produced. All nine agreed on the partition and on the representative, which is the
 // half that would otherwise differ silently: a union-find that picks a different root still answers
 // "are these two together" correctly while handing every consumer a different key.
 //
 // The cases are chosen to separate implementations rather than to confirm one. `twoRootsMerge` and
-// `longChainMerge` merge two ALREADY-ESTABLISHED classes, which is the only path that exercises the
+// `longChainMerge` merge two already-established classes, which is the only path that exercises the
 // chain-rewriting loop inside `Union`; a naive implementation that simply repoints the item and not
 // its ancestors passes every other case here.
 func TestDisjointSetMatchesReact(test *testing.T) {
@@ -123,7 +123,7 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a},
 		},
 		{
-			// The first element is already a NON-ROOT member of a class, so the root the union
+			// The first element is already a non-root member of a class, so the root the union
 			// adopts under is not the element passed first.
 			name:     "first element is not a root",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {b, d}},
@@ -282,7 +282,7 @@ func TestDisjointSetDoesNotMutateTheCallersSlice(test *testing.T) {
 // A union-find whose path compression is wrong does not give a wrong answer, it exhausts the stack,
 // which is a silent-failure shape rather than a visible one. This builds a 10,000-long chain by
 // hand -- longer than any real function produces -- and requires the walk to return. It also asserts
-// compression actually happened, by requiring the SECOND walk to see a flat structure: without
+// compression actually happened, by requiring the second walk to see a flat structure: without
 // compression the chain would still be 10,000 deep on the way back.
 func TestDisjointFindTerminatesOnALongChain(test *testing.T) {
 	test.Parallel()
@@ -352,7 +352,7 @@ export function build(seed: number) {
 
 // TestDisjointLeavesIndependentValuesApart is the two-sided half of the test above.
 //
-// Without this, a pass that unioned EVERYTHING would pass the aliasing test and read as correct. Two
+// Without this, a pass that unioned everything would pass the aliasing test and read as correct. Two
 // values that never meet must land in different classes.
 func TestDisjointLeavesIndependentValuesApart(test *testing.T) {
 	test.Parallel()
@@ -383,7 +383,7 @@ export function separate() {
 // instruction: re-running `{}` produces a new identity and defeats every downstream comparison. The
 // range gate alone would leave it out, so this is what separates the two halves of that condition.
 //
-// # The allocation lands on the TEMPORARY, not on the named binding, and the first version of this
+// # The allocation lands on the temporary, not on the named binding, and the first version of this
 // # test asserted the wrong one
 //
 // Written first as "the class containing `value`", it failed, and the pass was right. Lowering emits
@@ -396,7 +396,7 @@ export function separate() {
 //
 // Asserting on the name would have been a fixture encoding the same wrong belief as a port that
 // looked for allocations on named bindings, and both would have agreed. So this anchors on the
-// instruction VALUE rather than on a name.
+// instruction value rather than on a name.
 func TestDisjointAllocationGetsItsOwnClass(test *testing.T) {
 	test.Parallel()
 
@@ -420,7 +420,7 @@ export function make() {
 			}
 			allocations++
 
-			// The range is one wide, so the FIRST half of the gate is false here and only
+			// The range is one wide, so the first half of the gate is false here and only
 			// mayAllocate can put this value in a class. That is what makes this a test of the
 			// allocation half rather than of the range half.
 			lvalueRange := ranges.Get(instruction.LValue.Identifier)
@@ -683,7 +683,7 @@ export function call(target: {run(): void}) {
 // TestDisjointPhiUsesReactsTwoTermTest pins the phi predicate and the divergence from oxc.
 //
 // React's test is `start + 1 !== end && end > firstInstr`. The first term is written that way rather
-// than as `end > start + 1` because on an UNSET range, both fields zero, `start + 1 !== end` is true
+// than as `end > start + 1` because on an unset range, both fields zero, `start + 1 !== end` is true
 // while `end > start + 1` is false; the second term is what rejects it. Transcribing the tidier form
 // would change which phis are considered, so both spellings are exercised here.
 func TestDisjointPhiUsesReactsTwoTermTest(test *testing.T) {
@@ -781,17 +781,17 @@ export function count(limit: number) {
 //
 // `appendMutableOperand` is `isMutable(instr, operand) && operand.mutableRange.start > 0`, and a
 // mutation sweep found that neither half was pinned by any other test here. Both survived, and they
-// survived for OPPOSITE reasons, which is why they are separated below rather than covered by one
+// survived for opposite reasons, which is why they are separated below rather than covered by one
 // assertion.
 //
-// Dropping `Start > 0` is EQUIVALENT on this tree, measured rather than argued: the two halves
+// Dropping `Start > 0` is equivalent on this tree, measured rather than argued: the two halves
 // disagree in that direction on 0 of 26,006 operand reads across 200 corpus files, because `Contains`
 // is already false for an unset range and this lowering opens no range at order zero. It is kept
 // because upstream carries it and because a range legitimately starting at zero would separate them,
 // but no fixture can catch its removal and inventing one would be a test asserting nothing.
 //
-// Dropping `Contains` is NOT equivalent: the two disagree in that direction on 11,105 of the same
-// 26,006 reads, and it changes the answer. The check below is on the PARTITION rather than on any
+// Dropping `Contains` is not equivalent: the two disagree in that direction on 11,105 of the same
+// 26,006 reads, and it changes the answer. The check below is on the partition rather than on any
 // single membership, because that is the layer where the difference appears -- the loop fixture
 // above already reaches the mutation and cannot see it, since it asserts phi membership and never
 // the shape of the whole result. Measured on this input: the real pass produces 16 members in 2
@@ -812,7 +812,7 @@ export function loopy(limit: number) {
 `)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-	// An operand that is settled by this point must NOT be dragged into a class through this
+	// An operand that is settled by this point must not be dragged into a class through this
 	// instruction. Dropping `Contains` admits exactly those, which both inflates the member count
 	// and fragments the partition into more, smaller classes. React's reverse-postorder traversal
 	// puts loop bodies before their continuations. Immutable Assign refinement then leaves the two
@@ -845,15 +845,15 @@ export function loopy(limit: number) {
 
 // TestDisjointPhiUnionIncludesTheDeclaration pins the declaration operand of the phi union.
 //
-// A firing phi unions itself, its operands, AND the value its source binding was first declared as
+// A firing phi unions itself, its operands, and the value its source binding was first declared as
 // (React line 32393). That third member is the one a reader is most likely to drop as redundant,
 // because the declaration is usually already pulled into the class through some other instruction.
 //
-// It is NOT always redundant, and the measurement is what pins that. A mutation removing it survived
+// It is not always redundant, and the measurement is what pins that. A mutation removing it survived
 // every other test here. Across 200 corpus files the branch is reached by 60 firing phis, and on
-// exactly ONE function of 343 the partition differs by the declaration member. That is a real
+// exactly one function of 343 the partition differs by the declaration member. That is a real
 // distinguishing case rather than an equivalence, and this reproduces its shape minimally: a
-// binding DECLARED without an initializer, assigned separately, then reassigned in a loop. The
+// binding declared without an initializer, assigned separately, then reassigned in a loop. The
 // declared value is a member no other path contributes.
 //
 // Assert that relationship directly rather than pinning the size of the whole partition. Call
@@ -977,12 +977,12 @@ export function gather(limit: number) {
 // TestDisjointDeclarationKeepsTheFirstValue pins that the declarations map is first-writer-wins.
 //
 // `declareIdentifier` writes only when the key is absent (React line 32381), so a binding assigned
-// several times records the value it took FIRST. A mutation making it last-writer-wins survived
+// several times records the value it took first. A mutation making it last-writer-wins survived
 // every other test here, and it is reachable: across 200 corpus files the map sees 1,753 first
 // writes and 216 further attempts that the guard declines.
 //
 // The direction matters because the recorded value is what a firing phi unions in. Recording the
-// last value would union the phi with a value defined AFTER it in evaluation order, which is a
+// last value would union the phi with a value defined after it in evaluation order, which is a
 // different claim about what the scope owns than upstream makes.
 func TestDisjointDeclarationKeepsTheFirstValue(test *testing.T) {
 	test.Parallel()
@@ -1094,7 +1094,7 @@ export function repeat(seed: number) {
 
 // TestDisjointIsDeterministic pins that the answer does not depend on Go's map iteration order.
 //
-// `DisjointSet.parent` is a Go map. The PARTITION is order-independent by construction, but the
+// `DisjointSet.parent` is a Go map. The partition is order-independent by construction, but the
 // representative and the ordering of `Sets` are not, and a consumer keying a table on the
 // representative would get a different table per run. Repeated here rather than argued, because a
 // randomised map is exactly the input that makes a single run look stable.
@@ -1169,13 +1169,13 @@ func TestDisjointGapsAreDeclared(test *testing.T) {
 
 // TestDisjointClassSizesAreNotAllSingletons is this stage's headline, pinned as a test.
 //
-// Stage 3 was dispatched once before and DECLINED, correctly, on the measurement that the input was
+// Stage 3 was dispatched once before and declined, correctly, on the measurement that the input was
 // uniformly degenerate: every mutable range had width one, so every gate was false for a structural
 // reason and the pass produced 23,256 members in 23,256 singleton classes. That is an identity
 // function, and it would have compiled, passed every hand-written fixture above, and told every
 // consumer that nothing is entangled with anything.
 //
-// So the non-degeneracy is a TEST rather than a number in a report. If a future change to
+// So the non-degeneracy is a test rather than a number in a report. If a future change to
 // `InferMutableRanges` narrows ranges back toward width one, this fails and names what happened,
 // instead of the pass quietly reverting to an identity function that still passes its unit tests.
 //
@@ -1187,7 +1187,7 @@ func TestDisjointGapsAreDeclared(test *testing.T) {
 //	largest class                  527   in a 672-instruction hook
 //	mean class size               8.16
 //
-// The thresholds below are deliberately far looser than those numbers. This guards the SHAPE -- that
+// The thresholds below are deliberately far looser than those numbers. This guards the shape -- that
 // real multi-member classes are being formed -- not the exact corpus, which moves when the tree does.
 func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 	test.Parallel()

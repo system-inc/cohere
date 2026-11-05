@@ -77,7 +77,7 @@ func MinimumEditDistance(left string, right string) int {
 // BestMatch returns the candidate nearest to needle within threshold, and whether one was found.
 //
 // **An exact match is not a match here.** A needle equal to some candidate returns false, because
-// every caller is asking "is this a near miss of one of these names", and a name that IS one of
+// every caller is asking "is this a near miss of one of these names", and a name that is one of
 // these names is correct rather than nearly correct. Getting this backwards turns the rule into one
 // that flags every correct spelling, which is the loudest possible failure and therefore the one
 // most likely to be caught; the quieter risk is a caller that expects a hit and reads the false as
@@ -89,7 +89,7 @@ func MinimumEditDistance(left string, right string) int {
 // candidate sets in use here no such pair exists, so it is reproduced for fidelity rather than
 // because a case reaches it.
 //
-// On a tie, the FIRST candidate in slice order wins, so the caller's ordering is part of its meaning.
+// On a tie, the first candidate in slice order wins, so the caller's ordering is part of its meaning.
 //
 // The length prefilter is oxc's and is preserved. It skips the distance computation when the lengths
 // alone put a candidate out of range, which is sound: a distance can never be less than the

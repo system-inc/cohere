@@ -15,9 +15,9 @@ var topLevelDescriptions = map[string]string{
 		"outermost.",
 
 	"rules": "Each rule's severity, or [severity, ...options] for a rule that takes options. Inside our tiers (a " +
-		"chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must be " +
-		"named under departures with the reason, and a rule it turns off otherwise says why under reasons. Outside " +
-		"them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule.",
+		"chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must " +
+		"be named under departures with the reason, and a rule it turns off otherwise says why under reasons. " +
+		"Outside them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule.",
 
 	"departures": "For each rule this file sets differently from the file it extends, the reason why, in a " +
 		"sentence. Required inside our tiers, optional outside them. cohere reports every departure on every run, " +

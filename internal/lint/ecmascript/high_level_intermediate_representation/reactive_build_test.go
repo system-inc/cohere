@@ -12,7 +12,7 @@ import (
 // once: a branch with a join, a ternary and a logical (both value terminals), and a loop with a
 // back edge.
 //
-// The assertion is instruction CONSERVATION rather than a printed shape. A golden string would fail
+// The assertion is instruction conservation rather than a printed shape. A golden string would fail
 // on every cosmetic change to the printer and would not notice the one failure that matters, which
 // is an instruction entering the graph and not arriving in the tree. Conservation is the property
 // upstream's own conversion has and the property every downstream pass depends on: a pass that reads
@@ -23,7 +23,7 @@ func TestBuildReactiveFunctionShapes(test *testing.T) {
 	for _, testCase := range []struct {
 		name           string
 		valueTerminals int
-		// A reconstructed value terminal introduces one reactive instruction for the HIR terminal
+		// A reconstructed value terminal introduces one reactive instruction for the `HIR` terminal
 		// itself. Its test and arms remain nested values, so this is one structural instruction
 		// beyond the graph's instruction table rather than a duplicated block.
 		reactiveExtra int
@@ -338,9 +338,9 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(test *testing.T) {
 // cases localise a failure to one construct, and this one is the only thing that would notice a
 // construct nobody thought to write a case for.
 //
-// # The input is the graph the PIPELINE hands this pass, and that is load-bearing
+// # The input is the graph the pipeline hands this pass, and that is load-bearing
 //
-// `BuildReactiveScopeTerminals` runs before this stage and REWRITES the graph, so a measurement
+// `BuildReactiveScopeTerminals` runs before this stage and rewrites the graph, so a measurement
 // taken on a graph without scope terminals is not a measurement of this pass's real input. The
 // difference is not cosmetic and it was measured rather than assumed: over the same 400 files the
 // converter reports `doubleEmitted=0 unmatchedGotos=0` before terminals are built and
@@ -349,7 +349,7 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(test *testing.T) {
 // 82 findings.
 //
 // The corpus numbers in this file's comments were taken at 400 files with the same walk
-// `forEachCorpusFunction` performs, WITH terminals built. A number taken from a different
+// `forEachCorpusFunction` performs, with terminals built. A number taken from a different
 // denominator, or from a graph at a different pipeline stage, is not comparable to them.
 func TestBuildReactiveFunctionCorpusConservation(test *testing.T) {
 	test.Parallel()

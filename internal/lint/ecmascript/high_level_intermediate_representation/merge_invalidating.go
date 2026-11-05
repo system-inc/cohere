@@ -6,11 +6,11 @@
 // # Not the merge this package already has, and the distinction is load-bearing
 //
 // `merge_scopes.go` is `mergeOverlappingReactiveScopesHIR`, upstream pipeline position 394. It runs
-// on the GRAPH and exists as a precondition: it unions scopes whose ranges overlap without nesting,
+// on the graph and exists as a precondition: it unions scopes whose ranges overlap without nesting,
 // so that every scope can become a block. Without it `assertValidBlockNesting` fails outright.
 //
-// This is pipeline position 482, runs on the TREE, and is an optimisation rather than a
-// precondition. It fuses ADJACENT scopes whose invalidation conditions are identical and removes
+// This is pipeline position 482, runs on the tree, and is an optimisation rather than a
+// precondition. It fuses adjacent scopes whose invalidation conditions are identical and removes
 // nested scopes that repeat their enclosing scope's dependency set. Both affect memo validation.
 //
 // Confusing the two is easy and the names encourage it. The first asks "do these ranges overlap",
@@ -129,7 +129,7 @@ func AreEqualDependencies(a, b []ReactiveScopeDependency) bool {
 // scope merged forward, because the merged scope would extend past the point where that value must
 // already be settled.
 //
-// A declaration with no recorded usage answers FALSE, which is the conservative direction and
+// A declaration with no recorded usage answers false, which is the conservative direction and
 // differs from upstream only in that upstream would throw. A value never read is not a value proven
 // safe to merge; it is a value this pass has no information about.
 func AreLValuesLastUsedByScope(

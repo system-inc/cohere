@@ -8,7 +8,7 @@
 // # Why this pass exists, which is a precondition rather than an optimisation
 //
 // `assertValidBlockNesting` does not compare scopes against each other. It builds one combined item
-// list -- every scope, PLUS a `ProgramBlockSubtree` for every block that has a fallthrough, spanning
+// list -- every scope, plus a `ProgramBlockSubtree` for every block that has a fallthrough, spanning
 // from that block's terminal to the first instruction of the fallthrough -- and asserts that every
 // pair in that list is disjoint or nested (bundle lines 20954-20969). A scope that begins inside an
 // `if` and ends after it crosses the construct's boundary without containing it, and the assertion
@@ -24,7 +24,7 @@
 // The counts differ slightly from the ones `merge_scopes.go` records -- it measured 40, 226 and 166
 // over 685 functions -- because the corpus is a live tree that moved between the two measurements.
 // Both are correct about the tree they saw, which is why this file states its own denominator rather
-// than inheriting one. The SHAPE is identical and that is the part that matters.
+// than inheriting one. The shape is identical and that is the part that matters.
 //
 // The 163 attributed by kind before this pass runs: 87 `ProgramBlockSubtree` inside a `Scope`, 75
 // `Scope` inside a `ProgramBlockSubtree`, and 1 `ProgramBlockSubtree` against itself. This pass
@@ -34,11 +34,11 @@
 // scopes in plain helper functions; components and hooks, which are this pass's upstream domain,
 // remain at zero.
 //
-// # ORDER IS LOAD-BEARING: this pass MUST run BEFORE the merge, and measuring that is how it was found
+// # Order is load-bearing: this pass must run before the merge, and measuring that is how it was found
 //
 // Upstream's order is alignment (line 50201) then merge (line 50207) then the assertion (50213), and
 // oxc agrees (`pipeline.rs:289/291`). Our merge shipped first, so the obvious thing was to land this
-// behind it and the obvious thing is WRONG. Measured over 400 corpus files and 685 functions, both
+// behind it and the obvious thing is wrong. Measured over 400 corpus files and 685 functions, both
 // orders run side by side against the same assertion:
 //
 //	order                          FULL assertion   scope-vs-scope   merge unions   scopes widened
@@ -46,7 +46,7 @@
 //	align then merge (upstream)                 1                0            412              652
 //
 // Only upstream's order reaches the residue. The mechanism is not subtle once the numbers are in
-// front of you: this pass WIDENS ranges, and widening CREATES overlaps. Running the merge first
+// front of you: this pass widens ranges, and widening creates overlaps. Running the merge first
 // resolves the overlaps that exist before any widening, and then this pass introduces four new
 // scope-against-scope violations that nothing is left to close -- the merge's own output is no longer
 // a fixpoint of the merge. Running it second, the merge sweeps over already-widened ranges and its
@@ -54,7 +54,7 @@
 // its own algorithm arriving one level up: a pass measured in isolation can be correct and still be
 // wrong about what it composes with.
 //
-// So the merge MUST be re-run behind this pass rather than reused. `AlignThenMergeReactiveScopes`
+// So the merge must be re-run behind this pass rather than reused. `AlignThenMergeReactiveScopes`
 // below is the composed spelling and is what a consumer should call.
 // `TestAlignMustRunBeforeTheMerge` pins both rows of that table, so a future reordering fails loudly
 // rather than silently costing 30 violations.
@@ -73,7 +73,7 @@
 //	the value-block RANGE      a scope first seen inside a value block (a ternary arm, a logical
 //	                           right-hand side) is widened to that whole value block's span
 //
-// # DIVERGENCE FROM React: `branch` is excluded, and here that exclusion is what makes our graph legal
+// # Divergence from React: `branch` is excluded, and here that exclusion is what makes our graph legal
 //
 // Upstream widens on `fallthrough !== null && terminal.kind !== 'branch'`. Measured against React
 // itself rather than read off the source, by running the pass out of the 7.1.1 development bundle on
@@ -90,23 +90,23 @@
 //
 // It is also load-bearing for a reason upstream states as an invariant. React asserts
 // `!valueBlockNodes.has(fallthrough)` -- "Expect hir blocks to have unique fallthroughs" -- and that
-// assertion sits INSIDE the non-branch guard. Our lowering pairs each `If`, `Ternary` and `Logical`
-// with a `Branch` carrying the SAME fallthrough id, so a fallthrough is reached twice. Measured:
+// assertion sits inside the non-branch guard. Our lowering pairs each `If`, `Ternary` and `Logical`
+// with a `Branch` carrying the same fallthrough id, so a fallthrough is reached twice. Measured:
 // 1,723 fallthroughs are reused by two terminals, and 0 of those reuses involve a non-branch
 // terminal. So excluding `branch` is exactly what makes upstream's uniqueness invariant hold here.
 // React's own lowering does the same thing (bundle line 23129 lowers a `for` test to a `branch`
 // whose fallthrough is the shared continuation block), so this is agreement rather than divergence.
 // `TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded` pins both halves.
 //
-// # DIVERGENCE FROM React: the widening MINIMISES here, and it is safe for a DIFFERENT reason than
+// # Divergence from React: the widening minimises here, and it is safe for a different reason than
 // # the merge's
 //
 // Three adjacent passes have now given three different answers to adopt-versus-minimise, so this one
-// was established by RUNNING React rather than by reading it. `AssignReactiveScopes` uses a guarded
+// was established by running React rather than by reading it. `AssignReactiveScopes` uses a guarded
 // adopt-or-minimise because zero is the unset sentinel. `MergeOverlappingReactiveScopes` uses a plain
 // min/max, safe only because `collectScopeInfo` refuses a scope whose start equals its end.
 //
-// This pass uses a plain `Math.min`/`Math.max` with NO guard anywhere, and there is no upstream
+// This pass uses a plain `Math.min`/`Math.max` with no guard anywhere, and there is no upstream
 // filter standing in front of it either. Running the arithmetic out of the bundle:
 //
 //	[7,15) inside a construct terminating at 5   ->  [5,15)   start genuinely MINIMISED
@@ -116,14 +116,14 @@
 //
 // So a zero start is not poisoned by this pass, and the reason is structural rather than a guard:
 // the operation is `min(start, constructStart)` and a construct start is always non-zero, so zero is
-// ABSORBING here rather than poisoning. That is the opposite direction from the hull in
+// absorbing here rather than poisoning. That is the opposite direction from the hull in
 // `AssignReactiveScopes`, where the danger was a zero dragging a real start down. A fully unset scope
 // never becomes active at all, because activity is `scope.range.end > startingId` and an end of zero
 // fails that for every block. `TestAlignMinimisesWithoutAGuard` pins all four rows.
 //
-// # DIVERGENCE FROM React: `placeScopes` is written and never read, so it is not reproduced
+// # Divergence from React: `placeScopes` is written and never read, so it is not reproduced
 //
-// `recordPlace` populates a `placeScopes` map keyed on the PLACE OBJECT (bundle lines 43262-43265).
+// `recordPlace` populates a `placeScopes` map keyed on the place object (bundle lines 43262-43265).
 // Nothing in this function ever reads it; the only reader of a map by that name is
 // `mergeOverlappingReactiveScopesHIR`'s own separate one at line 32487. `Place` is a value type in
 // this package and has no object identity to key on, so reproducing it would have required a
@@ -133,7 +133,7 @@
 //
 // One pass over the blocks in the order `Function.Blocks` already holds, visiting each instruction
 // once and each terminal once. `activeBlockFallthroughRanges` is a stack that is pushed at most once
-// per terminal carrying a fallthrough and popped only when the sweep ENTERS the matching fallthrough
+// per terminal carrying a fallthrough and popped only when the sweep enters the matching fallthrough
 // block, which happens at most once per block, so its total churn is bounded by the block count.
 // `activeScopes` is a set filtered at each block boundary and added to only from places the sweep is
 // already visiting. Nothing revisits anything and there is no fixpoint, so the structure forbids
@@ -144,7 +144,7 @@
 // `TestMergeAssumesMonotoneEvaluationOrder` already pins that at 0 non-monotone steps, and this pass
 // inherits it rather than re-measuring the same table.
 //
-// The visit count is measured against the blocks of functions that HAVE scopes rather than against
+// The visit count is measured against the blocks of functions that have scopes rather than against
 // every block, because a function with no scope returns before the sweep begins: 49 of 677 corpus
 // functions, carrying 217 blocks. Getting that denominator wrong is how `TestAlignIsASingleSweep`
 // first failed, on a pass that was already correct.
@@ -186,12 +186,12 @@ func AlignGaps() []AlignGap {
 // # Why this carries member ranges, which is `ScopeGapPostAlignmentWidening` coming due
 //
 // `AssignReactiveScopes` records that React aliases every member's `mutableRange` to the scope's own
-// range OBJECT, so a later widening of the scope retroactively widens every member. `MutableRange` is
+// range object, so a later widening of the scope retroactively widens every member. `MutableRange` is
 // a value type here and that pass stores a copy, which was indistinguishable from the alias for
 // exactly as long as nothing widened a scope range afterwards. This pass is the first thing that
 // does, so the alias and the copy are now distinguishable and the gap is live.
 //
-// Member ranges are therefore RE-DERIVED from the widened ranges rather than inherited from
+// Member ranges are therefore RE-derived from the widened ranges rather than inherited from
 // `ReactiveScopes.MemberRanges()`, which still reports the pre-alignment hull. A consumer reading
 // member ranges after this pass must take them from here. `TestAlignReDerivesMemberRanges` measures
 // the two tables against each other and asserts they differ, because a re-derivation that changed
@@ -253,7 +253,7 @@ func (scopes *AlignedScopes) Widened() int {
 
 // MemberRanges returns every scoped value's range after alignment, as a table.
 //
-// This is upstream's aliasing made explicit: every member of a scope reports that scope's WIDENED
+// This is upstream's aliasing made explicit: every member of a scope reports that scope's widened
 // range. See the doc comment on `AlignedScopes` for why this cannot be taken from
 // `ReactiveScopes.MemberRanges()` once this pass has run.
 func (scopes *AlignedScopes) MemberRanges() *mutation_aliasing.MutableRanges {
@@ -303,7 +303,7 @@ type alignSweepState struct {
 
 // AlignReactiveScopesToBlockScopes widens each scope out to the block constructs it straddles.
 //
-// Requires scopes: call `AssignReactiveScopes` first. This runs BEFORE the merge, so it takes the
+// Requires scopes: call `AssignReactiveScopes` first. This runs before the merge, so it takes the
 // unmerged scope table; `AlignThenMergeReactiveScopes` is the composed spelling and is what a
 // consumer should call. A nil or empty scope table produces an empty result rather than an error,
 // which is the ordinary answer for a function with no entangled values.
@@ -429,8 +429,8 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 	}
 	state.activeScopes = kept
 
-	// MECHANISM ONE, the fallthrough POP. Entering the block that closes the innermost open construct
-	// pulls every still-active scope's START back to that construct's terminal id, so a scope that
+	// Mechanism one, the fallthrough pop. Entering the block that closes the innermost open construct
+	// pulls every still-active scope's start back to that construct's terminal id, so a scope that
 	// began inside the construct now contains it rather than crossing its boundary.
 	if len(state.activeFallthroughs) > 0 {
 		top := state.activeFallthroughs[len(state.activeFallthroughs)-1]
@@ -472,11 +472,11 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 		fallthroughBlock := byId[fallthroughId]
 		nextId := startingIdOf(function, fallthroughBlock)
 
-		// MECHANISM TWO, the fallthrough PUSH. A scope still open at this terminal has its END pushed
+		// Mechanism two, the fallthrough push. A scope still open at this terminal has its end pushed
 		// out to the fallthrough's first instruction, so it contains the whole construct rather than
 		// ending somewhere inside it.
 		//
-		// The `scope.range.end > terminal.id` test is upstream's and it is a FILTER rather than a
+		// The `scope.range.end > terminal.id` test is upstream's and it is a filter rather than a
 		// cost optimisation: a scope whose end has already passed this terminal would otherwise be
 		// dragged forward across a construct it never entered.
 		for _, id := range state.activeScopes {
@@ -503,11 +503,11 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 			}
 		}
 	} else if gotoTerminal, ok := block.Terminal.(*Goto); ok {
-		// MECHANISM THREE, the goto BACK-REFERENCE. A goto whose target is an open fallthrough that
-		// is NOT the innermost one is leaving several constructs at once, so every still-active scope
-		// is widened at BOTH ends to span from the outer construct's terminal to its fallthrough.
+		// Mechanism three, the goto back-reference. A goto whose target is an open fallthrough that
+		// is not the innermost one is leaving several constructs at once, so every still-active scope
+		// is widened at both ends to span from the outer construct's terminal to its fallthrough.
 		//
-		// The `start !== activeBlockFallthroughRanges.at(-1)` test is upstream's: when the target IS
+		// The `start !== activeBlockFallthroughRanges.at(-1)` test is upstream's: when the target is
 		// the innermost open construct, the pop above will handle it on the next block.
 		index := -1
 		for activeFallthroughIndex, candidate := range state.activeFallthroughs {
@@ -541,7 +541,7 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 
 // recordPlace is upstream's `recordPlace`, minus the `placeScopes` map it writes and never reads.
 //
-// MECHANISM FOUR, the value-block RANGE: the FIRST time a scope is seen, if it is seen inside a value
+// Mechanism four, the value-block range: the first time a scope is seen, if it is seen inside a value
 // block, the scope is widened to that whole value block's span. `seen` is what makes this fire once
 // per scope rather than once per place, and it is upstream's.
 func (state *alignSweepState) recordPlace(
@@ -576,7 +576,7 @@ func (state *alignSweepState) recordPlace(
 
 // activeScopeOf is upstream's `getPlaceScope`: the place's scope, but only while it is open.
 //
-// The containment test is a real discrimination rather than a formality, and it is NOT subsumed by
+// The containment test is a real discrimination rather than a formality, and it is not subsumed by
 // the activity filter in `visitBlock`: that filter retires a scope whose end has passed the block,
 // while this declines a place read at a position its own scope does not cover at all. Measured
 // against React on a scope of [2,4) read at 7 inside a construct terminating at 8, whose fallthrough
@@ -598,7 +598,7 @@ func (state *alignSweepState) activeScopeOf(id static_single_assignment.Evaluati
 // assignValueBlockNodes is upstream's `mapTerminalSuccessors` callback, which builds the value-block
 // tree the fourth mechanism reads.
 //
-// Upstream returns each successor unchanged, so the call is a WALK rather than a rewrite despite the
+// Upstream returns each successor unchanged, so the call is a walk rather than a rewrite despite the
 // name. Reproduced as a walk.
 func (state *alignSweepState) assignValueBlockNodes(
 	function *Function,

@@ -77,10 +77,11 @@ func prettierLike() *fakeEngine {
 	return &fakeEngine{
 		handled: []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".md", ".css", ".json"},
 		format: func(_ string, text string) (string, error) {
-			for strings.Contains(text, "  ") {
-				text = strings.ReplaceAll(text, "  ", " ")
+			collapsed := text
+			for strings.Contains(collapsed, "  ") {
+				collapsed = strings.ReplaceAll(collapsed, "  ", " ")
 			}
-			return text, nil
+			return collapsed, nil
 		},
 	}
 }

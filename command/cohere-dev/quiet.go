@@ -135,6 +135,7 @@ func quietOff(directory string, output *bufio.Writer) int {
 
 func quietOn(directory string, arguments []string, now time.Time) int {
 	length := quietDefault
+	reasonWords := arguments
 	if len(arguments) > 0 && arguments[0] == "--for" {
 		if len(arguments) < 2 {
 			fmt.Fprintf(streams.Errors, "cohere-dev: --for wants a duration, like 30m\n")
@@ -151,9 +152,9 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 			return 2
 		}
 		length = parsed
-		arguments = arguments[2:]
+		reasonWords = arguments[2:]
 	}
-	why := strings.Join(arguments, " ")
+	why := strings.Join(reasonWords, " ")
 	if why == "" {
 		why = "no reason given"
 	}

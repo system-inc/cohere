@@ -3,7 +3,7 @@
 //
 // The two halves answer the two questions a bug report has to answer. `Provenance` says what was
 // running, so a report names a version, a toolchain, and a pinned compiler commit rather than
-// "latest". `Resolve` says which file ran, and refuses to guess — a resolver that falls through to
+// "latest". `Resolve` says which file ran, and refuses to guess: a resolver that falls through to
 // something plausible is how the gate this tool replaces printed green over zero files for days.
 //
 // `Build` here stages the published packages, which is the other end of the same path: it is what
@@ -34,7 +34,7 @@ var (
 	// It is stamped rather than written down because the upstream has already moved once: the
 	// vendored compiler was `microsoft/typescript-go` until that repository was archived, and is
 	// now `microsoft/TypeScript`. A hardcoded label survives a migration like that while silently
-	// becoming false, which is the worst outcome available here — a bug report would name a commit
+	// becoming false, which is the worst outcome available here: a bug report would name a commit
 	// against a repository it does not exist in, and the reader would have no way to tell.
 	compilerUpstream = "unknown"
 
@@ -62,7 +62,7 @@ type Provenance struct {
 	// Version is the published version, or "dev" for a local build.
 	Version string
 
-	// SelfCommit is the commit of THIS repository the binary was built from, or "" when the build
+	// SelfCommit is the commit of this repository the binary was built from, or "" when the build
 	// carried no version-control stamp.
 	//
 	// Separate from CompilerCommit, which names the vendored compiler and moves independently. A
@@ -184,7 +184,7 @@ func (provenance Provenance) String() string {
 // describeCompiler renders the vendored compiler as a repository and a commit in it.
 //
 // The repository is printed alongside the hash rather than assumed, because the vendored compiler
-// has already moved once — `microsoft/typescript-go` was archived and the pin is now against
+// has already moved once: `microsoft/typescript-go` was archived and the pin is now against
 // `microsoft/TypeScript`. Two pins from either side of that migration are both forty hex characters
 // and resolve in different places, so a hash alone is not enough to look one up.
 func (provenance Provenance) describeCompiler() string {

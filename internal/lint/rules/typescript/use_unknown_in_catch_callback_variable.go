@@ -214,21 +214,21 @@ var UseUnknownInCatchCallbackVariable = rule.Rule[rule.NoOptions]{
 		// logical or a conditional do.
 		var collectFlaggedCallbacks func(node *ast.Node, into []*ast.Node) []*ast.Node
 		collectFlaggedCallbacks = func(node *ast.Node, into []*ast.Node) []*ast.Node {
-			node = useUnknownSkipParentheses(node)
-			if node == nil {
+			unwrapped := useUnknownSkipParentheses(node)
+			if unwrapped == nil {
 				return into
 			}
 
 			switch {
-			case ast.IsBinaryExpression(node):
-				binary := node.AsBinaryExpression()
+			case ast.IsBinaryExpression(unwrapped):
+				binary := unwrapped.AsBinaryExpression()
 				switch binary.OperatorToken.Kind {
 				case ast.KindAmpersandAmpersandToken,
 					ast.KindBarBarToken,
 					ast.KindQuestionQuestionToken:
 					// ESTree's LogicalExpression. Either side can be the handler that runs.
-					into = collectFlaggedCallbacks(binary.Left, into)
-					return collectFlaggedCallbacks(binary.Right, into)
+					collected := collectFlaggedCallbacks(binary.Left, into)
+					return collectFlaggedCallbacks(binary.Right, collected)
 				case ast.KindCommaToken:
 					// ESTree's SequenceExpression, which our parser spells as a comma operator and
 					// nests to the left, so the last element is the rightmost operand. Only that
@@ -238,14 +238,14 @@ var UseUnknownInCatchCallbackVariable = rule.Rule[rule.NoOptions]{
 				}
 				return into
 
-			case ast.IsConditionalExpression(node):
-				conditional := node.AsConditionalExpression()
-				into = collectFlaggedCallbacks(conditional.WhenTrue, into)
-				return collectFlaggedCallbacks(conditional.WhenFalse, into)
+			case ast.IsConditionalExpression(unwrapped):
+				conditional := unwrapped.AsConditionalExpression()
+				collected := collectFlaggedCallbacks(conditional.WhenTrue, into)
+				return collectFlaggedCallbacks(conditional.WhenFalse, collected)
 
-			case ast.IsArrowFunction(node), ast.IsFunctionExpression(node):
-				if isFlaggableHandlerType(ruleContext.TypeChecker.GetTypeAtLocation(node)) {
-					return append(into, node)
+			case ast.IsArrowFunction(unwrapped), ast.IsFunctionExpression(unwrapped):
+				if isFlaggableHandlerType(ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)) {
+					return append(into, unwrapped)
 				}
 				return into
 			}

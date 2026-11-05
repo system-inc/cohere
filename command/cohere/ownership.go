@@ -433,9 +433,9 @@ func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.
 
 // yieldsFile reports whether a file lies in one of the yielded directories, or is one of them.
 func yieldsFile(directories []string, fileName string) bool {
-	fileName = filepath.Clean(fileName)
+	cleanFileName := filepath.Clean(fileName)
 	for _, directory := range directories {
-		if strings.HasPrefix(fileName, directory+string(filepath.Separator)) {
+		if strings.HasPrefix(cleanFileName, directory+string(filepath.Separator)) {
 			return true
 		}
 	}

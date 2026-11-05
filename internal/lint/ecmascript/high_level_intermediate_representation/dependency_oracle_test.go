@@ -150,11 +150,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 			scored++
 			// Compared with the optional guards removed as well as with them.
 			//
-			// Upstream's dependency and upstream's PRINTED expression are not the same object. The
+			// Upstream's dependency and upstream's printed expression are not the same object. The
 			// dependency is flattened by `addDependency`, whose own comment says so: "for an
 			// optional chain dep `a?.b`: if the hoistable tree only contains `a`, we can keep either
 			// `a?.b` or `a.b` as a dependency (note that we currently do the latter for perf)".
-			// Codegen then prints the guard back because the SOURCE expression was optional.
+			// Codegen then prints the guard back because the source expression was optional.
 			//
 			// So a golden reading `arg?.items` is upstream printing a dependency it holds as
 			// `arg.items`, which is exactly what this tree produces. Scored strictly, seven of
@@ -193,7 +193,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	// Truncating every path to its root scores 61 against 70, so the 9-point gap is what path depth
 	// is currently worth and the test is shown able to fail rather than assumed to work.
 	//
-	// Upstream's `isDeferredDependency` guard, ported and measured, scores IDENTICALLY. It moves the
+	// Upstream's `isDeferredDependency` guard, ported and measured, scores identically. It moves the
 	// corpus distribution from 171 deep to 322 and matches no additional upstream answer. A movement
 	// detector reported a large win on a change worth nothing, which is why this exists and why that
 	// guard stayed reverted.
@@ -246,7 +246,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	//
 	// The three rows lost are all a bare root: `handleLogout` in
 	// `hoisting-setstate-captured-indirectly-jsx.js`, and `object` in the two
-	// `preserve-memo-deps-conditional-property-chain` fixtures. All three were produced BY the
+	// `preserve-memo-deps-conditional-property-chain` fixtures. All three were produced by the
 	// collision. Traced on the second: `object` is read inside the next `useMemo`'s callback, which
 	// this tree keeps nested where upstream lowers it inline, so the outer collector never sees the
 	// read at all. Before the fix `object` shared a declaration with a temporary declared outside
@@ -258,7 +258,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	// a scope, which is the mechanism recorded on `#z8n858s`: whichever value claims a declaration
 	// first wins it, and the real binding is dropped with the losing scope stack.
 	//
-	// Raised to 75 by the local zero-argument callee resolution in `effects.go`. A floor going UP is
+	// Raised to 75 by the local zero-argument callee resolution in `effects.go`. A floor going up is
 	// the improvement this number names, and it is the first time it has moved up since the
 	// declaration-id fix lowered it.
 	//
@@ -282,7 +282,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 			"shallower or lost a path", matched, scored, knownMatched)
 	}
 	// A floor cannot catch the failure that produced the 72: a pattern that reads upstream's answer
-	// SHORTER than upstream wrote it hands our shallow answers something to match, and the score
+	// shorter than upstream wrote it hands our shallow answers something to match, and the score
 	// rises for a reason that has nothing to do with collection.
 	//
 	// Not hypothetical, and it is why this ceiling exists. Mutating the path above to require the
@@ -308,7 +308,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	//
 	// Measured: we produce 151 dependencies where upstream produces 115, on the same fixtures. 25
 	// fixtures over-produce, 6 under-produce, 17 agree exactly. Every session before this one
-	// treated the shortfall as missing depth and built toward producing MORE, which is the wrong
+	// treated the shortfall as missing depth and built toward producing more, which is the wrong
 	// direction for two thirds of the disagreements.
 	//
 	// This matters for the rule rather than only for tidiness. A dependency we infer and upstream
@@ -319,7 +319,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	//
 	// # The two sides count different scope populations, and some of the 36 are that
 	//
-	// This scores `DependenciesOf` over every ASSIGNED scope. Upstream's cache slots are emitted
+	// This scores `DependenciesOf` over every assigned scope. Upstream's cache slots are emitted
 	// after the whole prune chain, so they name only surviving scopes. Traced on
 	// `useCallback-nonescaping.js`: we produce three dependencies across three scopes, our pipeline
 	// prunes two of them exactly as upstream does, and the rule therefore sees the one dependency
@@ -338,11 +338,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	//
 	// That last question -- which population upstream's slots correspond to -- was recorded here as
 	// unsettled and is now settled, in `scope_oracle_test.go`: upstream's output is emitted after
-	// their prune chain, so it corresponds to our SURVIVING scopes. Counted there, our scope total
+	// their prune chain, so it corresponds to our surviving scopes. Counted there, our scope total
 	// is 114 against upstream's 97 rather than 160, and per-fixture exact agreement more than
 	// doubles. The over-production this file measures is therefore mostly scopes that our own prune
 	// chain later dissolves, which is why `ours` here is 158 against 115 while the survived
-	// populations are 108 against 115 -- an UNDER-production of seven, in the other direction.
+	// populations are 108 against 115 -- an under-production of seven, in the other direction.
 	//
 	// Raised from 115 to 116 when the pattern above learned the optional step: `arg?.items.edges?.
 	// nodes` and `arg?.items` are now one slot each rather than two truncated readings of `arg`.
@@ -384,13 +384,13 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	// the `LoadContext` a captured read lowers to unless both are present.
 	//
 	// `matched` holds at 74 while `ours` rises 2, so both added rows are ones upstream also
-	// produces rather than invented ones. Recorded because this pair measured as a REGRESSION on
+	// produces rather than invented ones. Recorded because this pair measured as a regression on
 	// `8dcfed9`, driving `ours` 121 to 123 away from 116, and was reverted for it. The declaration-
 	// id collision fixed in `7a48d68` was inflating the count; with that gone the same two edges
 	// land on the number. The earlier reading was correct about the measurement and wrong about the
 	// cause.
 	//
-	// And to 119 by the frozen-capture rule in `ranges.go`, which moves AWAY from upstream's 116.
+	// And to 119 by the frozen-capture rule in `ranges.go`, which moves away from upstream's 116.
 	// Taken because the board says otherwise: false positives fall 13 to 11, and the two that close
 	// are `useMemo-constant-prop` and `todo-ensure-constant-prop-decls-get-removed`, the fixture
 	// family whose scopes stop fusing. `matched` holds at 74, so no golden row was lost.

@@ -14,7 +14,7 @@ import (
 
 // TestEachPlaceCoversEveryInstructionValue is the exhaustiveness check Go's type switch cannot do.
 //
-// It parses THIS PACKAGE'S OWN SOURCE to find every type implementing InstructionValue, then reads
+// It parses this package's own source to find every type implementing InstructionValue, then reads
 // the case labels out of EachPlace's type switch and compares the two sets. A variant added without
 // a case appears as a missing name and the test names it.
 //
@@ -129,7 +129,7 @@ func TestPrintTerminalCoversEveryTerminal(test *testing.T) {
 // and 22 terminals of which 2 are React. If the sets drift without the reasoning being revisited,
 // the package comment becomes a claim about a program that no longer exists.
 //
-// The terminal count is 21 rather than upstream's 22 BY DESIGN: `PrunedScope` is deliberately
+// The terminal count is 21 rather than upstream's 22 by design: `PrunedScope` is deliberately
 // absent. `Scope` was absent for the same reason until `scope_terminals.go` landed to construct it,
 // and was added in that same commit -- which is what this guard is for. It went red, was read, and
 // the count was moved deliberately rather than by a compiler error. See the terminal.go header.
@@ -325,7 +325,7 @@ func TestClassifyFunction(test *testing.T) {
 	}{
 		{"Component", FunctionKindComponent},
 		{"useState", FunctionKindHook},
-		// React's own convention is `use` followed by a capital OR a digit, so `use2` is a hook.
+		// React's own convention is `use` followed by a capital or a digit, so `use2` is a hook.
 		// Asserting the digit case explicitly because it is the half a reimplementation forgets.
 		{"use2", FunctionKindHook},
 		{"useSomething", FunctionKindHook},

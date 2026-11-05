@@ -79,11 +79,11 @@ func isLiteral(word string) bool {
 
 // isOrdinaryWord reports whether a word is letters alone, allowing the punctuation that ends a clause.
 func isOrdinaryWord(word string) bool {
-	word = strings.TrimRight(word, ":;,")
-	if word == "" {
+	trimmedWord := strings.TrimRight(word, ":;,")
+	if trimmedWord == "" {
 		return false
 	}
-	for _, character := range word {
+	for _, character := range trimmedWord {
 		if !unicode.IsLetter(character) {
 			return false
 		}

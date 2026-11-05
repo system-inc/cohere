@@ -5,7 +5,7 @@ package cst
 import "iter"
 
 /*
-START -> stream
+`START` -> stream
 
 stream
   directive -> line-end -> stream
@@ -15,7 +15,7 @@ stream
 line-end
   comment -> line-end
   newline -> .
-  input-end -> END
+  input-end -> `END`
 
 line-start
   doc-start -> doc

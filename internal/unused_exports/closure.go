@@ -9,7 +9,7 @@ import (
 // Island is a cluster of declarations that are dead together.
 //
 // The cluster is the finding, not the individual line. An abandoned export drags a private world
-// behind it — the helper only it called, the table only that helper read — and a flat list prints
+// behind it (the helper only it called, the table only that helper read), and a flat list prints
 // those as three unrelated findings in three places. Grouping them says the thing a reader actually
 // needs to know: this is one abandoned direction, and here is all of it.
 type Island struct {
@@ -59,7 +59,7 @@ type declarationRecord struct {
 //
 // # Why this is opt-in
 //
-// The transitive claim is strictly stronger than the flat one and it FAILS DIFFERENTLY. A wrong
+// The transitive claim is strictly stronger than the flat one and it fails differently. A wrong
 // root in the flat report mis-reports one file. A wrong root here cascades: everything that was
 // alive only through that root goes dark at once, and the report gets dramatically bigger in a way
 // that looks like a discovery rather than like a bug. Keeping the flat view as the default means
@@ -71,8 +71,8 @@ type declarationRecord struct {
 // A worklist rather than a repeat-until-stable sweep, so termination is structural rather than
 // hoped for: a symbol is pushed only on the transition from unmarked to marked, so each is pushed at
 // most once and the loop is bounded by the number of declarations. There is no fixpoint to miss and
-// no pass count to tune. The pass count is reported anyway — as the longest chain the marking
-// followed — because that number is the one that says whether the graph is deep or the closure quit
+// no pass count to tune. The pass count is reported anyway, as the longest chain the marking
+// followed, because that number is the one that says whether the graph is deep or the closure quit
 // early.
 func computeIslands(
 	index *referenceIndex,
@@ -90,13 +90,13 @@ func computeIslands(
 		known[record.symbol] = true
 	}
 
-	// Forward edges: marking a symbol alive must mark what IT references. The index is keyed the
+	// Forward edges: marking a symbol alive must mark what it references. The index is keyed the
 	// other way, so it is inverted once here rather than searched repeatedly.
 	reaches := make(map[*ast.Symbol][]*ast.Symbol, len(index.referencedBy))
 	for target, referrers := range index.referencedBy {
 		for _, referrer := range referrers {
 			if referrer == nil {
-				// Module top level. Not an edge — a root, handled below.
+				// Module top level. Not an edge. A root, handled below.
 				continue
 			}
 			reaches[referrer] = append(reaches[referrer], target)
@@ -150,7 +150,7 @@ func computeIslands(
 	}
 
 	// Everything the marking never reached is dead. Grouping it into islands is a connected-component
-	// walk over the SAME edges, ignoring direction: two dead declarations belong together when one
+	// walk over the same edges, ignoring direction: two dead declarations belong together when one
 	// references the other, whichever way the reference points, because a reader deleting one will be
 	// looking at the other.
 	deadBySymbol := make(map[*ast.Symbol]DeadDeclaration, len(inventory))
@@ -250,7 +250,7 @@ func computeIslands(
 // after it. Only the first of those three is an export, and a report that inventoried exports alone
 // would print one line where the truth is a cluster of three.
 //
-// This deliberately does NOT use the checker. `node.Symbol()` is the same symbol pointer the index
+// This deliberately does not use the checker. `node.Symbol()` is the same symbol pointer the index
 // is keyed on, established by the same probe that established the referrer path, and reaching for a
 // checker call per declaration would put back exactly the cost the referrer path avoided.
 func fileDeclarations(file *ast.SourceFile, text string) []declarationRecord {
@@ -313,8 +313,8 @@ func fileDeclarations(file *ast.SourceFile, text string) []declarationRecord {
 
 // collectRootSymbols marks every top-level declaration in a spared file as a closure root.
 //
-// A file the root set spares is alive by convention — a Next.js route, a test, a locale loaded by a
-// computed `import()` — so anything it declares is alive and anything it reaches is alive. This is
+// A file the root set spares is alive by convention (a Next.js route, a test, a locale loaded by a
+// computed `import()`), so anything it declares is alive and anything it reaches is alive. This is
 // the single most load-bearing input to the closure: on this tree 1,228 files are spared, and
 // omitting their declarations would darken most of the application in one stroke while looking like
 // a discovery.

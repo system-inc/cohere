@@ -148,7 +148,7 @@ func caretCeiling(version semanticVersion) semanticVersion {
 	}
 }
 
-// parseSemanticVersion reads MAJOR.MINOR.PATCH with an optional prerelease and build, as semver.org
+// parseSemanticVersion reads `MAJOR.MINOR.PATCH` with an optional prerelease and build, as semver.org
 // defines them. Build metadata is read and dropped, because it does not order versions.
 func parseSemanticVersion(text string) (semanticVersion, error) {
 	core, _, _ := strings.Cut(text, "+")

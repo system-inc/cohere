@@ -892,7 +892,8 @@ func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(test *testing.
 	if got := diagnostic.Suggestions[0].Message.Id; got != "replaceUsagesWithConstraint" {
 		test.Errorf("expected suggestion id replaceUsagesWithConstraint, got %q", got)
 	}
-	if got := diagnostic.Suggestions[0].Message.Description; got != "Replace all usages of type parameter with its constraint." {
+	if got := diagnostic.Suggestions[0].Message.Description; got != "Replace all usages of type parameter "+
+		"with its constraint." {
 		test.Errorf("unexpected suggestion text %q", got)
 	}
 }

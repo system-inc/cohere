@@ -26,7 +26,7 @@
 //	const str = "s"       flags=StringLiteral                         callSignatures=0
 //
 // The four invalidating shapes are separable and the primitives are separable from all of them,
-// which is the whole requirement. The two internal symbol names are deliberately NOT matched on:
+// which is the whole requirement. The two internal symbol names are deliberately not matched on:
 // `\xfeobject` and `\xfefunction` are the checker's own anonymous-type placeholders and are not a
 // documented surface. Object-ness is read from the type flag and function-ness from the presence of
 // a call signature, both of which are stable API.
@@ -71,7 +71,7 @@ func IsAlwaysInvalidatingType(function *Function, id static_single_assignment.Id
 	// # One flag answers all four shapes, and the function arm upstream needs is redundant here
 	//
 	// Upstream tests `type.kind === 'Function'` separately from its four object shapes, because its
-	// registry models functions as their own kind. In TypeScript's type system a function IS an
+	// registry models functions as their own kind. In TypeScript's type system a function is an
 	// object type: measured across an arrow, a function declaration, a type-alias callback, a
 	// callable interface and an overloaded signature, every one reports the Object flag set, with
 	// call signature counts of 1, 1, 1, 1 and 2. A separate call-signature arm was written first

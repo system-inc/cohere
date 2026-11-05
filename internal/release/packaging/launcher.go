@@ -9,6 +9,9 @@ import (
 // It is CommonJS rather than an ES module because a `bin` script has no package.json of its own to
 // declare a type, and a `.js` file inside a package without `"type": "module"` is CommonJS. Writing
 // it as ESM would work until someone added a type field, which is a trap rather than a design.
+//
+// Its dashes are spelled as escapes between the raw pieces, since a raw string cannot hold one, so the
+// script ships the same bytes.
 const launcherSource = `#!/usr/bin/env node
 'use strict';
 
@@ -72,7 +75,7 @@ function resolveOverride(requested) {
 // require.resolve is used rather than a walk up node_modules because it is the package manager's
 // own answer: it understands pnpm's isolated store, npm's hoisting, and yarn's layouts without this
 // file having to model any of them. The package.json is resolved rather than the package itself
-// because the platform packages have no entry point — they are a binary and a manifest.
+// because the platform packages have no entry point ` + "\u2014" + ` they are a binary and a manifest.
 function resolvePlatformPackage() {
     let manifestPath;
     try {
@@ -107,7 +110,7 @@ function verifyPlatformPackage(packageDirectory) {
     } catch {
         fail(
             checksumsPath + ' is missing, so ' + platformPackage + ' cannot be checked against the release.\n' +
-            '  The ' + dispatcherPackage + ' package is incomplete — reinstall it.',
+            '  The ' + dispatcherPackage + ' package is incomplete ` + "\u2014" + ` reinstall it.',
         );
     }
 
@@ -135,7 +138,7 @@ function verifyPlatformPackage(packageDirectory) {
         } catch {
             fail(
                 platformPackage + ' is installed but ' + entry.file + ', which the release shipped, is missing.\n' +
-                '  The package is incomplete — reinstall it.',
+                '  The package is incomplete ` + "\u2014" + ` reinstall it.',
             );
         }
         return [entry.hash, information.dev, information.ino, information.size, information.mtimeNs, information.ctimeNs].join(' ');
@@ -242,7 +245,7 @@ function resolveBinary() {
         // unsupported platform, and it is named separately so nobody goes hunting the wrong bug.
         fail(
             platformPackage + ' is installed but its binary is missing at ' + candidate + '.\n' +
-            '  The package is incomplete — reinstall it.',
+            '  The package is incomplete ` + "\u2014" + ` reinstall it.',
         );
     }
 
@@ -286,7 +289,7 @@ process.exit(result.status);
 //
 // The launcher is Node rather than Go, which is a deliberate reversal of the obvious design. A Go
 // dispatcher would have to be cross-compiled per platform, which makes it a seventh platform
-// package rather than one package everyone installs — and the whole point of the dispatcher package
+// package rather than one package everyone installs, and the whole point of the dispatcher package
 // is that a consumer runs one `pnpm add -D @system-inc/cohere` and gets the right binary. Node is
 // already present by construction (this is an npm install), and `require.resolve` asks the package
 // manager where a package actually is, which is more reliable than any filesystem walk: it

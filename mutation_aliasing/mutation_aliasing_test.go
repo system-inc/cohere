@@ -452,7 +452,7 @@ func TestRangesPhiOpensBeforeItsBlockWhenWidened(test *testing.T) {
 // TestPhiOpensOneBeforeItsBlock pins the offset upstream uses.
 //
 // React writes `makeInstructionId(firstInstructionIdOfBlock - 1)`. The minus one is what puts the
-// merge point itself inside the range: a phi's value exists at the TOP of the block, before its
+// merge point itself inside the range: a phi's value exists at the top of the block, before its
 // first instruction runs, so opening at the instruction would make `Contains` answer false at the
 // position the phi is definitionally live.
 //

@@ -374,18 +374,20 @@ func typeReferenceNamed(name string, typeNode *ast.Node) *ast.Node {
 // `ast.SkipParentheses` dereferences its argument, and every caller here holds something optional:
 // a concise body, a return argument. Written as a loop because `((this))` nests.
 func skipParenthesesSafely(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // skipParenthesesInTypeSafely is the type-position counterpart: `(Foo | undefined) | null`.
 func skipParenthesesInTypeSafely(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedType {
+		unwrapped = unwrapped.AsParenthesizedTypeNode().Type
 	}
-	return node
+	return unwrapped
 }
 
 // thisTypeOf reads the `thisType` off a class's instance type.

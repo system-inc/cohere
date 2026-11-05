@@ -364,8 +364,9 @@ func applySuggestionFixes(sourceText string, suggestion rule.Suggestion) string 
 	sort.SliceStable(ordered, func(left int, right int) bool {
 		return ordered[left].Range.Pos() > ordered[right].Range.Pos()
 	})
+	edited := sourceText
 	for _, fix := range ordered {
-		sourceText = sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
+		edited = edited[:fix.Range.Pos()] + fix.Text + edited[fix.Range.End():]
 	}
-	return sourceText
+	return edited
 }

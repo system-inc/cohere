@@ -28,8 +28,8 @@ import (
 // right; the gate was still running code nobody had committed, which is the honesty doctrine failing
 // inside the toolchain that enforces it.
 //
-// So a gate run builds from a snapshot of HEAD: this repository extracted with `git archive`, and the
-// vendored compiler extracted at the commit HEAD pins it to. Nothing in either comes from a working
+// So a gate run builds from a snapshot of `HEAD`: this repository extracted with `git archive`, and the
+// vendored compiler extracted at the commit `HEAD` pins it to. Nothing in either comes from a working
 // tree, the compiler submodule's included. Testing uncommitted work is still possible, and it is
 // explicit: `--dev` builds the working tree and says so on every run.
 
@@ -87,7 +87,7 @@ func (paths Paths) CompilerDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "compiler")
 }
 
-// ResolveCommitted returns a cohere binary built from the checkout's HEAD, building it when the
+// ResolveCommitted returns a cohere binary built from the checkout's `HEAD`, building it when the
 // cache has none.
 //
 // The returned string is the commit the binary was built from, so the caller can say which one ran,
@@ -118,8 +118,8 @@ func ResolveCommitted(
 	return binaryPath, build.Commit, true, nil
 }
 
-// readCommittedBuild reads HEAD and the toolchain, which is everything a binary's name depends on. The
-// compiler commit HEAD pins is read only when a build needs it; see ResolveCommitted.
+// readCommittedBuild reads `HEAD` and the toolchain, which is everything a binary's name depends on. The
+// compiler commit `HEAD` pins is read only when a build needs it; see ResolveCommitted.
 func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 	commit, readHeadError := readHead(moduleDirectory)
 	if readHeadError != nil {
@@ -313,7 +313,7 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 // its own and sits inside this checkout, so with stamping on Go walks up to the checkout and records
 // the working tree's revision and its dirty state, which is the state this build exists to exclude.
 //
-// GOWORK is set to the snapshot's own workspace file. An inherited GOWORK pointing at the checkout
+// `GOWORK` is set to the snapshot's own workspace file. An inherited `GOWORK` pointing at the checkout
 // would build the checkout's modules from inside the snapshot without any error.
 func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build committedBuild, outputPath string) error {
 	const packagingPath = "github.com/system-inc/cohere/internal/release/packaging"

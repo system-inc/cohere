@@ -61,7 +61,7 @@ type Settings struct {
 
 // CompileAllowPattern compiles an allowPattern option, and an empty one allows nothing.
 //
-// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which reports MORE rather
+// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which reports more rather
 // than less. Upstream's `new RegExp` throws and takes every other rule's verdict on that file with it.
 func CompileAllowPattern(source string) *regexp.Regexp {
 	if source == "" {
@@ -88,7 +88,7 @@ func Listeners(ruleContext rule.Context, settings Settings) rule.Listeners {
 			// upstream never sees, and without the unwrap it costs two of upstream's own
 			// reporting cases. Measured: cases invalid[17] and invalid[18] report nothing
 			// until the key is unwrapped, while invalid[19] `(foo)['bar']` passes either way
-			// because the parentheses are on the RECEIVER rather than the key.
+			// because the parentheses are on the receiver rather than the key.
 			//
 			// A loop rather than one step, because `((x))` nests. Not `ast.SkipParentheses`:
 			// it dereferences its argument, and this project lost 167 files to that on an
@@ -142,7 +142,7 @@ var validIdentifier = regexp.MustCompile(`^[a-zA-Z_$][\w$]*$`)
 
 // decimalInteger is upstream's `DECIMAL_INTEGER_PATTERN`, used by `isDecimalInteger`.
 //
-// It decides whether the fixer must insert a SPACE before the dot. `5['prop']` becomes `5 .prop`
+// It decides whether the fixer must insert a space before the dot. `5['prop']` becomes `5 .prop`
 // rather than `5.prop`, because the latter re-lexes as the number `5.` followed by `prop`, which is
 // a syntax error -- a fixer writing broken source into a file it was asked to repair.
 //
@@ -226,7 +226,7 @@ func checkComputed(
 
 // computedFix builds the repair that turns `a['b']` into `a.b`.
 //
-// Returns false where upstream returns without yielding, which is a DECLINE rather than an absent
+// Returns false where upstream returns without yielding, which is a decline rather than an absent
 // repair: the finding is still reported, only the fix is withheld. Two corpus cases are `output:
 // null` for the comment reason below.
 //
@@ -334,9 +334,9 @@ func isOptionalAccess(source string, from int, to int) bool {
 // The third return separates "not a convertible key" from "an empty key", which matters because an
 // empty string is a real literal and simply fails the identifier test rather than being skipped.
 //
-// A NUMERIC literal is deliberately absent, and it is the shape a reader adds back. `a[0]` must stay
+// A numeric literal is deliberately absent, and it is the shape a reader adds back. `a[0]` must stay
 // bracketed: `a.0` is a syntax error, and upstream's `literalTypesToCheck` is `{string, boolean}`
-// precisely to exclude it. Corpus case `a['1']` is CLEAN for the same reason once it reaches the
+// precisely to exclude it. Corpus case `a['1']` is clean for the same reason once it reaches the
 // identifier pattern, which rejects a leading digit.
 func literalKey(argument *ast.Node) (key string, formatted string, readable bool) {
 	switch argument.Kind {
@@ -422,7 +422,7 @@ func hasCommentBetween(ruleContext rule.Context, start int, end int) bool {
 //	                            declaration rather than a member access, so bracketing changes
 //	                            what the statement IS
 //
-// The second is the sharper one, and it is narrower than it looks: `let?.true` IS repaired, to
+// The second is the sharper one, and it is narrower than it looks: `let?.true` is repaired, to
 // `let?.["true"]`, because the optional-chaining token keeps the form unambiguous. Upstream guards
 // with `node.object.name === 'let' && !node.optional`, and both halves are load-bearing -- corpus
 // cases 22 and 37 sit on either side of that `&&`.

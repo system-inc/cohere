@@ -72,8 +72,8 @@ func (atom classAtom) write() string {
 
 // wordClassAtoms spells `\w` as class members, in ascending order. ECMAScript
 // builds the set out of ASCII whatever the flags say, and under `u` and `i`
-// together it gains the two characters that fold into it: U+017F LATIN SMALL
-// LETTER LONG S onto `s`, U+212A KELVIN SIGN onto `k`.
+// together it gains the two characters that fold into it:
+// `U+017F LATIN SMALL LETTER LONG S` onto `s`, `U+212A KELVIN SIGN` onto `k`.
 func wordClassAtoms(options rewriteOptions) []classAtom {
 	atoms := []classAtom{
 		{kind: classRange, lo: '0', hi: '9'},

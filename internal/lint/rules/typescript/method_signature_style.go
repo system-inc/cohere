@@ -425,10 +425,8 @@ func methodSignatureParametersText(
 // for. The floor keeps the scan inside the member so a malformed signature cannot walk off into the
 // file.
 func methodSignatureScanBackFor(sourceText string, from int, floor int, want byte) int {
-	if from > len(sourceText) {
-		from = len(sourceText)
-	}
-	for offset := from - 1; offset >= floor && offset >= 0; offset-- {
+	clampedFrom := min(from, len(sourceText))
+	for offset := clampedFrom - 1; offset >= floor && offset >= 0; offset-- {
 		if sourceText[offset] == want {
 			return offset
 		}
@@ -438,10 +436,8 @@ func methodSignatureScanBackFor(sourceText string, from int, floor int, want byt
 
 // methodSignatureScanForwardFor finds the first occurrence of a byte at or after an offset, or -1.
 func methodSignatureScanForwardFor(sourceText string, from int, ceiling int, want byte) int {
-	if ceiling > len(sourceText) {
-		ceiling = len(sourceText)
-	}
-	for offset := from; offset < ceiling; offset++ {
+	clampedCeiling := min(ceiling, len(sourceText))
+	for offset := from; offset < clampedCeiling; offset++ {
 		if sourceText[offset] == want {
 			return offset
 		}

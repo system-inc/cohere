@@ -1,7 +1,7 @@
 // Mutating place visitors: the write-side mirror of visitor.go.
 //
 // `EachPlace` and friends hand out a Place by value, which is right for every pass that only reads.
-// Renaming needs to WRITE one back, and a value copy cannot. So this file mirrors the same variant
+// Renaming needs to write one back, and a value copy cannot. So this file mirrors the same variant
 // switches with `*Place` instead of `Place`.
 //
 // # Why this is a mirror rather than a rewrite of visitor.go to use pointers
@@ -21,7 +21,7 @@ import "github.com/system-inc/cohere/static_single_assignment"
 // EachPlacePointer calls visit for every place the instruction value touches, with the role it
 // plays, handing each one out by pointer so the caller can rename it in place.
 //
-// The instruction's own LValue is NOT included; see EachInstructionPlacePointer.
+// The instruction's own LValue is not included; see EachInstructionPlacePointer.
 func EachPlacePointer(value InstructionValue, visit func(place *Place, role PlaceRole)) {
 	switch typed := value.(type) {
 	case *LoadLocal:
@@ -237,7 +237,7 @@ func eachPatternPlacePointer(pattern Pattern, visit func(place *Place, role Plac
 
 // EachBlockReferencePointer visits every block id a terminal names, by pointer so it can be rewritten.
 //
-// The read-only pair is `EachSuccessor` plus `Fallthrough`, and this is deliberately BOTH of them at
+// The read-only pair is `EachSuccessor` plus `Fallthrough`, and this is deliberately both of them at
 // once rather than a mutating mirror of either. A pass that renames blocks has to rewrite every
 // reference a terminal holds, and a fallthrough is a reference even where it is not an edge: a
 // `Switch` with a default reaches its fallthrough only through a case, and `EachSuccessor` correctly

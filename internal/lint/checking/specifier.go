@@ -157,7 +157,7 @@ func typeMatchesSpecifier(
 	specifier TypeOrValueSpecifier,
 	program rule.Program,
 ) bool {
-	// A UNION matches only when EVERY member matches, and an INTERSECTION when ANY member does.
+	// A union matches only when every member matches, and an intersection when any member does.
 	//
 	// Both recursions are upstream's (`TypeOrValueSpecifier.ts`) and neither was here: this file
 	// was ported from a tsgolint revision that predates them, so a specifier tested against a
@@ -194,7 +194,7 @@ func typeMatchesSpecifier(
 	return false
 }
 
-// wholeTypeMatchesSpecifier tests ONE type, without descending into a union or an intersection.
+// wholeTypeMatchesSpecifier tests one type, without descending into a union or an intersection.
 //
 // Upstream writes this as an immediately-invoked closure inside `typeMatchesSpecifier`; it is a
 // named function here because Go has no such expression and because the caller reads better with
@@ -260,7 +260,7 @@ func TypeMatchesSomeSpecifier(
 	})
 }
 
-// typeMatchesInlineSpecifier tests the bare-string specifier form, which matches on NAME alone.
+// typeMatchesInlineSpecifier tests the bare-string specifier form, which matches on name alone.
 //
 // Upstream expresses this as one branch of `typeMatchesSpecifier`, whose parameter is
 // `string | TypeOrValueSpecifier`, so the union and intersection recursions above it apply to the
@@ -268,7 +268,7 @@ func TypeMatchesSomeSpecifier(
 // inline form is a separate function and the two recursions have to be written here too.
 //
 // Getting that wrong is invisible from the object form's tests. `only-throw-error` valid case 36
-// is `allow: ["Promise"]` over `Promise<T1> | Promise<T2>`, which is the INLINE form over a union:
+// is `allow: ["Promise"]` over `Promise<T1> | Promise<T2>`, which is the inline form over a union:
 // without the `every` recursion here the case reports, and no fixture using the object form can
 // see it.
 func typeMatchesInlineSpecifier(subjectType *checker.Type, name string) bool {
@@ -314,10 +314,10 @@ func staticNameOfNode(node *ast.Node) (string, bool) {
 	return "", false
 }
 
-// valueMatchesSpecifier tests ONE specifier against the value at a node.
+// valueMatchesSpecifier tests one specifier against the value at a node.
 //
 // This is the value half of the option surface, and it asks a different question from the type half
-// above. `typeMatchesSpecifier` asks where a TYPE was declared; this asks whether the NAME written
+// above. `typeMatchesSpecifier` asks where a type was declared; this asks whether the name written
 // at this node is on the list, and then, for a package specifier, whether the thing that name refers
 // to came from that package.
 //
@@ -345,7 +345,7 @@ func valueMatchesSpecifier(
 		return false
 	}
 	// Upstream is `type.getSymbol() ?? type.aliasSymbol`, so the type's own symbol wins and the
-	// alias is the fallback. The two functions above this one ask alias FIRST, because each needs a
+	// alias is the fallback. The two functions above this one ask alias first, because each needs a
 	// different value in the else branch; the order only matters for an aliased type that also
 	// carries its own symbol, and this reproduces upstream's.
 	//

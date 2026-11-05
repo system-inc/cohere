@@ -513,7 +513,8 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
 					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}

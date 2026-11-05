@@ -32,7 +32,7 @@ import (
 //
 // It is a checkout rather than vendored files because vendoring would freeze the corpus, and the value
 // here is precisely that the code keeps changing under the lowering. Structure is private, so the
-// checkout is the structure corpus (corpus.Structure, COHERE_CORPUS_STRUCTURE), and the test SKIPS where
+// checkout is the structure corpus (corpus.Structure, COHERE_CORPUS_STRUCTURE), and the test skips where
 // it is not set, naming the variable, and the gate counts it as not covered (#sycrdr6). A skipping test proves nothing
 // on CI, and that is accepted deliberately: this test is a development instrument for finding the
 // constructs a hand-written suite forgot, and every defect it finds gets a hand-written test of its
@@ -190,7 +190,7 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 
 // TestLowerRealCodebase lowers every function in a real TypeScript tree and checks the invariants.
 //
-// It asserts nothing about what the IR SAYS, only that what it produces is well-formed: terminals
+// It asserts nothing about what the IR says, only that what it produces is well-formed: terminals
 // set, successors existing, predecessors agreeing in both directions, evaluation order assigned and
 // increasing, every place naming a real identifier. Those are the properties every pass built on
 // this will assume, and they are the ones a construct nobody anticipated will break.

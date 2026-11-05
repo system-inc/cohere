@@ -23,7 +23,8 @@ type NoFloatingPromisesOptions struct {
 
 var noFloatingPromisesMessageBase = "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler."
 
-var noFloatingPromisesMessageBaseVoid = "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler" +
+var noFloatingPromisesMessageBaseVoid = "Promises must be awaited, end with a call to .catch, " +
+	"end with a call to .then with a rejection handler" +
 	" or be explicitly marked as ignored with the `void` operator."
 
 var noFloatingPromisesMessageRejectionHandler = "A rejection handler that is not a function will be ignored."
@@ -59,7 +60,8 @@ func buildFloatingPromiseArrayMessage() rule.Message {
 func buildFloatingPromiseArrayVoidMessage() rule.Message {
 	return rule.Message{
 		Id: "floatingPromiseArrayVoid",
-		Description: "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar," +
+		Description: "An array of Promises may be unintentional. " +
+			"Consider handling the promises' fulfillment or rejection with Promise.all or similar," +
 			" or explicitly marking the expression as ignored with the `void` operator.",
 	}
 }

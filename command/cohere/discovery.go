@@ -315,8 +315,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				names[entry.Name()] = true
 			}
 		}
+		directoryScope := scope
 		if relative != "." {
-			if scope, err = scope.Enter(fromRepository(relative)); err != nil {
+			if directoryScope, err = scope.Enter(fromRepository(relative)); err != nil {
 				fail(err)
 				return
 			}
@@ -330,7 +331,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			filePath := path.Join(relative, entry.Name())
-			if scope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
+			if directoryScope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
 			swiftFileCount++
@@ -386,7 +387,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				}
 				continue
 			}
-			if scope.Ignored(fromRepository(child), true) {
+			if directoryScope.Ignored(fromRepository(child), true) {
 				found.Ignored++
 				continue
 			}
@@ -396,7 +397,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 
 		for _, child := range candidates {
 			group.Add(1)
-			go visit(child, scope)
+			go visit(child, directoryScope)
 		}
 	}
 	group.Add(1)

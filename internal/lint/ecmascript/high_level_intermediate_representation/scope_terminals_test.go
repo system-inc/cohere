@@ -39,7 +39,7 @@ func scopeTerminalsIn(function *Function) []*Scope {
 }
 
 // ---------------------------------------------------------------------------
-// The variant is CONSTRUCTED, which is the whole reason it was added
+// The variant is constructed, which is the whole reason it was added
 // ---------------------------------------------------------------------------
 
 // TestScopeTerminalsAreBuilt is the guard against this variant becoming a second `Optional`.
@@ -126,7 +126,7 @@ func TestScopeTerminalIsReachableThroughFallthrough(test *testing.T) {
 }
 
 // TestScopeTerminalPrints pins the printer arm, which has no default and would have gone red, but
-// whose OUTPUT nothing else asserts.
+// whose output nothing else asserts.
 func TestScopeTerminalPrints(test *testing.T) {
 	test.Parallel()
 
@@ -145,12 +145,12 @@ func TestScopeTerminalPrints(test *testing.T) {
 // TestScopeTerminalsKeyOnTheMergedGroup pins the fix for the one real defect this pass shipped and
 // then corrected.
 //
-// `ReactiveScopes.ScopeOf` returns the PRE-MERGE id. Keying on it while reading the MERGED range
+// `ReactiveScopes.ScopeOf` returns the pre-merge id. Keying on it while reading the merged range
 // produces a coherent-looking wrong graph: every range is plausible, nothing is empty or inverted,
 // and the nesting precondition still passes. Measured on the corpus it built 3,286 terminals for
 // 2,874 scopes, 412 of them duplicates wrapping a range another terminal already owned.
 //
-// The tell was that the built count EXCEEDED the control, which is why the corpus test below asserts
+// The tell was that the built count exceeded the control, which is why the corpus test below asserts
 // against the merged count rather than merely asserting the count is non-zero.
 func TestScopeTerminalsKeyOnTheMergedGroup(test *testing.T) {
 	test.Parallel()
@@ -180,7 +180,7 @@ func TestScopeTerminalsKeyOnTheMergedGroup(test *testing.T) {
 		}
 	}
 
-	// Every terminal must name a SURVIVING scope: one that is its own group.
+	// Every terminal must name a surviving scope: one that is its own group.
 	for scope := range seen {
 		if group := identity.GroupOf(scope); group != scope {
 			test.Errorf("terminal names scope %d, which merged into %d", scope, group)
@@ -303,10 +303,10 @@ func TestScopeTerminalsAreASinglePass(test *testing.T) {
 // TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition pins the ordering property, and it
 // exists because getting this wrong is what this pass actually got wrong.
 //
-// The queue is the traversal's own output, REVERSED so the sweep can pop from the end. It is
+// The queue is the traversal's own output, reversed so the sweep can pop from the end. It is
 // deliberately not sorted. An earlier draft sorted by position with a start-versus-end tiebreak,
 // which reads as a harmless normalisation; two mutants of that comparator survived the sweep, and
-// the fixture written to kill one of them FAILED against the unmutated code. That failure was the
+// the fixture written to kill one of them failed against the unmutated code. That failure was the
 // finding: the comparator was deciding something the traversal had already decided, and position
 // alone cannot reconstruct nesting.
 //
@@ -349,7 +349,7 @@ func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(test *testing
 
 // TestAScopeEndingWhereAnotherBeginsClosesFirst pins the behaviour at a position collision.
 //
-// Two scopes can meet at a point: one ends at position 7, the next begins at 7. They are DISJOINT --
+// Two scopes can meet at a point: one ends at position 7, the next begins at 7. They are disjoint --
 // `curr.start >= parent.end` -- so the traversal exits the first before entering the second, and the
 // end rewrite is queued before the start with no comparison between them.
 //
@@ -455,7 +455,7 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(test *testing.T) {
 // TestScopeEndJumpsWithBreak pins the goto variant on the terminal that closes a scope.
 //
 // React writes `variant: GotoVariant.Break` (bundle 26326) and oxc writes `GotoVariant::Break`
-// (`build_reactive_scope_terminals_hir.rs:140`), independently. `GotoVariant` records WHY a jump
+// (`build_reactive_scope_terminals_hir.rs:140`), independently. `GotoVariant` records why a jump
 // exists so a later pass reconstructing structure can tell a loop's back edge from an exit, and
 // `Continue` on a scope's closing jump would read as the head of a loop that does not exist.
 //
@@ -502,18 +502,18 @@ func TestScopeEndJumpsWithBreak(test *testing.T) {
 	}
 }
 
-// TestScopeTerminalsRenumberTheGraph pins that the rewrite re-establishes ALL THREE invariants
+// TestScopeTerminalsRenumberTheGraph pins that the rewrite re-establishes ALL three invariants
 // `Finalize` maintains, not just the predecessor edges.
 //
 // Splitting blocks appends new ones to the end of `Function.Blocks` with no evaluation order at all.
 // `Finalize` is `ReversePostorder` then `MarkPredecessors` then `MarkEvaluationOrder`, and a mutant
-// replacing it with `MarkPredecessors` alone SURVIVED the first sweep: the graph still verified in
+// replacing it with `MarkPredecessors` alone survived the first sweep: the graph still verified in
 // single-assignment form and every edge still resolved, because predecessors were the only thing
 // those assertions read.
 //
 // The distinguishing output, measured: with `Finalize` the corpus source below yields zero
 // non-monotone order steps; with the mutant it yields six, and the new blocks carry terminal order
-// ZERO -- which `MarkEvaluationOrder` documents as meaning the finalizer never reached them. Any
+// zero -- which `MarkEvaluationOrder` documents as meaning the finalizer never reached them. Any
 // pass reading evaluation order after this one would silently compare against zero.
 func TestScopeTerminalsRenumberTheGraph(test *testing.T) {
 	test.Parallel()
@@ -568,7 +568,7 @@ func TestScopeTerminalsGapsAreDeclared(test *testing.T) {
 	}
 }
 
-// TestPrunedScopeIsNotDeclared pins the decision NOT to add the second variant.
+// TestPrunedScopeIsNotDeclared pins the decision not to add the second variant.
 //
 // `PrunedScope` is constructed only by `pruneUnusedScopes`, `flattenReactiveLoopsHIR`,
 // `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes`. All four are ported and
@@ -595,7 +595,7 @@ func TestPrunedScopeIsNotDeclared(test *testing.T) {
 //
 // `propagate_scope_dependencies_hir` does not read the scope side table. It recovers scopes by
 // walking blocks for a Scope terminal -- React's `keyByScopeId` is six lines of
-// `if (block.terminal.kind === 'scope')`. Before this pass, that walk found ZERO scopes on every
+// `if (block.terminal.kind === 'scope')`. Before this pass, that walk found zero scopes on every
 // function in the corpus, so a dependency pass ported onto this graph would have produced empty
 // dependencies by construction while looking correct.
 //

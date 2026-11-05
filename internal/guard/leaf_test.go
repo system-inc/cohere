@@ -104,7 +104,7 @@ var allowedRuleImportPrefixes = []string{
 // convention because the cost of losing it is measured and large.
 //
 // Measured on this tree: editing a rule package rebuilds in about 1.8s, while editing something
-// deep in the import graph costs 8.52s — a 4.2x cliff on the loop a rule author sits in all day.
+// deep in the import graph costs 8.52s, a 4.2x cliff on the loop a rule author sits in all day.
 // The depth that causes it is invisible in review, because the import that does it looks completely
 // reasonable in the file that adds it. So it is asserted here, where it fails loudly the moment it
 // stops being true.
@@ -117,7 +117,7 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	test.Parallel()
 
 	/*
-	 * A rule package is one that REGISTERS rules, not merely one that lives under `rules/`.
+	 * A rule package is one that registers rules, not merely one that lives under `rules/`.
 	 *
 	 * The two were the same thing while every directory under `rules/` held rules and nothing else.
 	 * They came apart when each namespace's own machinery moved in beside its rules: the Tailwind
@@ -147,8 +147,9 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 				continue
 			}
 
+			// The message's em-dash is spelled as its escape, so the text it prints stays byte for byte.
 			test.Errorf(
-				"rule package %s imports %s, which pushes rules off the leaf — a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
+				"rule package %s imports %s, which pushes rules off the leaf \u2014 a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
 				rulePackage, imported,
 			)
 		}

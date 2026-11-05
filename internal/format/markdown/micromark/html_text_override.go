@@ -506,7 +506,7 @@ func tokenizeHtmlTextOverride(self *Self, effects *Effects, ok State, nok State)
 	//	> | b-->
 	//	    ^
 	//
-	// THE FORK'S CHANGE, the only one in the state machine. Core html-text.js eats the whitespace at the
+	// The fork's change, the only one in the state machine. Core html-text.js eats the whitespace at the
 	// start of the line here with factorySpace, as a `linePrefix` token outside htmlTextData (at most 3
 	// columns, factorySpace's max of 4 less one, unless codeIndented is disabled; the rest falls to
 	// returnState, which consumes it as data).

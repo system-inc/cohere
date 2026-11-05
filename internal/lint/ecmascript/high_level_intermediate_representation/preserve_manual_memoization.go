@@ -133,7 +133,7 @@ type manualMemoValidator struct {
 	liveScopes map[ScopeId]bool
 	// prunedScopes are scopes the walk has passed that were pruned.
 	prunedScopes map[ScopeId]bool
-	// prunedByChain are scopes the prune chain REPLACED, which leaves no block for the walk to see.
+	// prunedByChain are scopes the prune chain replaced, which leaves no block for the walk to see.
 	prunedByChain map[ScopeId]bool
 	// walkedScopes are scopes the walk entered at all, whether they survived or were pruned.
 	//
@@ -175,7 +175,7 @@ func (validator *manualMemoValidator) walk(block ReactiveBlock) {
 		case *ReactiveScopeBlock:
 			validator.walkedScopes[shape.Scope] = true
 			validator.walk(shape.Instructions)
-			// A pruned scope is recorded and NOT compared, which is upstream's split into two
+			// A pruned scope is recorded and not compared, which is upstream's split into two
 			// methods: `visitScope` runs `validateInferredDep` over the scope's dependencies,
 			// `visitPrunedScope` only adds the id to `prunedScopes`
 			// (`ValidatePreservedManualMemoization.ts:413` and `:441`).
@@ -381,7 +381,7 @@ func (validator *manualMemoValidator) check(
 	// `matched` 77, `ours` 120, `under` 5 fixtures / 7 scopes -- and every structural invariant
 	// intact.
 	//
-	// A mutation dropping the `kind` gate SURVIVES: the value condition checks a memoized value
+	// A mutation dropping the `kind` gate survives: the value condition checks a memoized value
 	// rather than a written dependency, and no corpus fixture memoizes a bare parameter, so it never
 	// asks about one. Kept narrow because the two conditions ask different questions and an
 	// exemption argued from the dependency side should not silently answer the other.
@@ -488,7 +488,7 @@ func AnalyzePreservedManualMemoization(function *Function,
 
 	// The third firing condition, on. This gate was closed and the reason it was closed is gone.
 	//
-	// It read: "the comparison itself is built and tested. Its INPUT is not ready:
+	// It read: "the comparison itself is built and tested. Its input is not ready:
 	// `CollectScopeDependencies` truncates a path to its root wherever the hoistable set is empty,
 	// and the hoistable analysis is `DependencyGapNullPropagation`, declined." That analysis landed.
 	// `CollectHoistablePropertyLoads` populates the tree, the collector descends into nested
@@ -534,11 +534,11 @@ func ForEachFunctionLike(root *ast.Node, visit func(*ast.Node)) {
 //
 // Upstream's `validateInferredDep` (`ValidatePreservedManualMemoization.ts:228-300`), driven from
 // `visitScope` (:417-433). It reports at most one finding per inferred dependency, and only when
-// that dependency matches NO source dependency, keeping the strongest disagreement seen.
+// that dependency matches no source dependency, keeping the strongest disagreement seen.
 //
 // # Why this runs on scope exit rather than at the marker
 //
-// The dependencies being compared are the SCOPE's, and a scope's dependency set is not complete
+// The dependencies being compared are the scope's, and a scope's dependency set is not complete
 // until its body has been walked. The memo block's own markers sit inside that body, so the source
 // side is available and the inferred side is not until this point. That is also why upstream places
 // the loop before `this.scopes.add`: the comparison belongs to the scope being left, not to the

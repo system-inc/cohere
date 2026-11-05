@@ -549,14 +549,15 @@ func applySuggestion(test *testing.T, source string, suggestion rule.Suggestion)
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(left, right int) bool { return fixes[left].Range.Pos() > fixes[right].Range.Pos() })
+	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
-		if start < 0 || end > len(source) || start > end {
-			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+		if start < 0 || end > len(edited) || start > end {
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(edited))
 		}
-		source = source[:start] + fix.Text + source[end:]
+		edited = edited[:start] + fix.Text + edited[end:]
 	}
-	return source
+	return edited
 }
 
 // TestAwaitThenableRequiresTheTypedHarness asserts the rule declares the checker and that the plain
@@ -734,7 +735,8 @@ func TestAwaitThenableAggregatorShapesTheCorpusDoesNotWrite(test *testing.T) {
 						want,
 					)
 				}
-				if diagnostic.Message.Description != "Unexpected iterable of non-Promise (non-\"Thenable\") values passed to promise aggregator." {
+				if diagnostic.Message.Description != "Unexpected iterable of non-Promise (non-\"Thenable\") values "+
+					"passed to promise aggregator." {
 					test.Errorf("message text is %q", diagnostic.Message.Description)
 				}
 			}

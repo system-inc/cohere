@@ -869,16 +869,16 @@ func (checker *unifiedSignaturesChecker) unifiedTypeText(typeA *ast.Node, typeB 
 // unifiedSignaturesUnionMembers flattens a union type into its members, leaving anything else as a
 // single member.
 func unifiedSignaturesUnionMembers(node *ast.Node) []*ast.Node {
-	node = unifiedSignaturesWithoutParentheses(node)
-	if node == nil {
+	unparenthesized := unifiedSignaturesWithoutParentheses(node)
+	if unparenthesized == nil {
 		return nil
 	}
-	if node.Kind != ast.KindUnionType {
-		return []*ast.Node{node}
+	if unparenthesized.Kind != ast.KindUnionType {
+		return []*ast.Node{unparenthesized}
 	}
-	types := node.AsUnionTypeNode().Types
+	types := unparenthesized.AsUnionTypeNode().Types
 	if types == nil {
-		return []*ast.Node{node}
+		return []*ast.Node{unparenthesized}
 	}
 	var members []*ast.Node
 	for _, member := range types.Nodes {
@@ -969,8 +969,9 @@ func unifiedSignaturesValueRange(ruleContext rule.Context, signature *ast.Node) 
 // Both measured against the installed build over four shapes, including a nested `((string))`, which
 // is why this loops rather than unwrapping once.
 func unifiedSignaturesWithoutParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedType {
+		unwrapped = unwrapped.AsParenthesizedTypeNode().Type
 	}
-	return node
+	return unwrapped
 }

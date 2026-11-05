@@ -5,14 +5,14 @@
 // property is checked directly, over whatever function is handed in:
 //
 //  1. Every value is defined at most once.
-//  2. EVERY USE IS DOMINATED BY ITS DEFINITION.
+//  2. Every use is dominated by its definition.
 //
 // The second is the real one. It is what makes SSA worth having: a pass that sees a use can reach
 // the single definition and know it has already executed. A construction that places a phi at the
 // wrong block, or renames a use to a definition sitting on a sibling branch, breaks exactly this
 // and breaks nothing that a structural well-formedness check would notice.
 //
-// # Phi operands are checked against the PREDECESSOR, not the phi's own block
+// # Phi operands are checked against the predecessor, not the phi's own block
 //
 // A phi is not an ordinary instruction. Its operand for predecessor P is read on the edge from P,
 // so the definition must dominate P's exit, not the block holding the phi. Checking it the naive
@@ -64,7 +64,7 @@ const (
 
 // VerifySSA checks that a function is in single static assignment form and returns every violation.
 //
-// An empty result means the property holds. It does NOT mean the function was worth checking: a
+// An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to globals has almost nothing to check and passes
 // trivially. `CollectSSAStats` is how a caller tells a real pass from a vacuous one.
 //
@@ -206,7 +206,7 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	for _, block := range blocks {
 		blockId = graph.Id(block)
 		// A phi operand is read on the edge from its predecessor, so it must be dominated by the
-		// PREDECESSOR's exit rather than by the phi's own block. See the file comment.
+		// predecessor's exit rather than by the phi's own block. See the file comment.
 		for _, phi := range graph.Phis(block) {
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
 				operand := phi.Operands.At(predecessorId)

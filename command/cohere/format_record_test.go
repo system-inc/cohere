@@ -107,11 +107,12 @@ func aged(test *testing.T, path string) {
 
 func assertScope(test *testing.T, got []string, want ...string) {
 	test.Helper()
+	expected := want
 	if want == nil {
-		want = []string{}
+		expected = []string{}
 	}
-	if !reflect.DeepEqual(got, want) {
-		test.Fatalf("in scope %v, expected %v", got, want)
+	if !reflect.DeepEqual(got, expected) {
+		test.Fatalf("in scope %v, expected %v", got, expected)
 	}
 }
 

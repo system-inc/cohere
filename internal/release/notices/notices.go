@@ -1,4 +1,4 @@
-// Package notices writes cohere's third-party notices: NOTICE, which carries the TypeScript compiler's
+// Package notices writes cohere's third-party notices: `NOTICE`, which carries the TypeScript compiler's
 // Apache-2.0 notice, and THIRD_PARTY_NOTICES.md, which credits every other project cohere is built on
 // with its license in full.
 //
@@ -48,7 +48,7 @@ func isCohere(path string) bool {
 }
 
 // compilerModulePrefix is the vendored TypeScript compiler and the shim modules over it. The compiler is
-// credited in NOTICE and its own entry, and the shims are cohere's generated code.
+// credited in `NOTICE` and its own entry, and the shims are cohere's generated code.
 const compilerModulePrefix = "github.com/microsoft/TypeScript/"
 
 // licenseTexts are the curated upstreams' license texts, one file each, named in upstreams.go.
@@ -228,7 +228,7 @@ func readModuleLicense(module Module) (string, error) {
 
 // moduleThirdPartyFileNames are the names a Go module ships its own credit for code it includes under,
 // beside its license: the spellings the module cache holds at a module's root, honnef.co/go/tools'
-// LICENSE-THIRD-PARTY and github.com/mholt/acmez's THIRD-PARTY.
+// `LICENSE-THIRD-PARTY` and github.com/mholt/acmez's `THIRD-PARTY`.
 var moduleThirdPartyFileNames = []string{"LICENSE-THIRD-PARTY", "THIRD-PARTY"}
 
 // readModuleThirdPartyCredit reads a module's own credit for the code it includes, and the name it was

@@ -1,7 +1,7 @@
 // Recovering optional chains from the control flow they lower to.
 //
 // This is React's `collectOptionalChainSidemap` (`HIR/CollectOptionalChainDependencies.ts`), which
-// answers a question the instruction stream cannot: `a?.b.c` is ONE dependency path with one
+// answers a question the instruction stream cannot: `a?.b.c` is one dependency path with one
 // optional step, but by the time it reaches the dependency collector it is a tree of blocks -- an
 // `Optional` terminal per link, a `Branch` per test, a consequent holding the load, and one shared
 // alternate storing undefined.
@@ -77,12 +77,12 @@ func CollectOptionalChainSidemap(function *Function) *OptionalChainSidemap {
 // recordOptionalChainJoinPhis maps a chain's join phi to the path its resolved operand carries.
 //
 // This is deliberately not part of CollectOptionalChainSidemap. Upstream's optional-chain sidemap
-// records the property and store values, then dependency collection observes matching phi OPERANDS;
+// records the property and store values, then dependency collection observes matching phi operands;
 // it does not resolve the phi output back to the chain. Keeping the output local is load-bearing for
 // values such as `propB?.x.y`: the resulting phi is declared inside the memo block and is therefore
 // not a dependency the developer could have written.
 //
-// The Go pipeline does need this extra projection while reading the developer's dependency ARRAY.
+// The Go pipeline does need this extra projection while reading the developer's dependency array.
 // DropManualMemoization runs after SSA construction here, where an array element names the join phi;
 // upstream runs that pass before SSA and reads the StoreLocal directly. The caller therefore applies
 // this helper only to its source-dependency sidemap and never to inferred scope dependencies.
@@ -103,7 +103,7 @@ func recordOptionalChainJoinPhis(function *Function, result *OptionalChainSidema
 			if _, known := result.TemporariesReadInOptional[phi.Place.Identifier]; known {
 				continue
 			}
-			// Every operand that resolves must resolve to the SAME access. A join whose arms carry
+			// Every operand that resolves must resolve to the same access. A join whose arms carry
 			// different paths is not one chain's short circuit -- it is a real branch, and naming it
 			// after either arm claims a dependency the other arm never reads.
 			var resolved *ReactiveScopeDependency
@@ -194,7 +194,7 @@ func (traversal *optionalTraversal) matchOptionalTestBlock(branch *Branch) *opti
 	if !isLoad || !isStore {
 		return nil
 	}
-	// The load must be OF the value the branch tested, and the store must be OF the load. Upstream
+	// The load must be of the value the branch tested, and the store must be of the load. Upstream
 	// asserts both; declining is the same claim without the crash.
 	if load.Object.Identifier != branch.Test.Identifier {
 		return nil
@@ -264,7 +264,7 @@ func (traversal *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		if firstInstruction == nil {
 			return 0
 		}
-		// `LoadContext` as well as `LoadLocal`, which is a DIVERGENCE and is forced.
+		// `LoadContext` as well as `LoadLocal`, which is a divergence and is forced.
 		//
 		// Upstream's base case accepts only `LoadLocal` because its dependency traversal runs after
 		// memo callbacks are inlined and captures have become ordinary locals. This pass also runs

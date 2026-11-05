@@ -8,10 +8,10 @@
 // # Why this pass exists, which is a precondition rather than an optimisation
 //
 // `AssignReactiveScopes` produces one scope per equivalence class with a range that is the hull of
-// its members. Nothing in that construction makes two scopes NEST. Two classes can easily produce
+// its members. Nothing in that construction makes two scopes nest. Two classes can easily produce
 // ranges like [5,12) and [9,20): they overlap, and neither contains the other.
 //
-// That is fatal downstream. A reactive scope eventually becomes a BLOCK in the output -- a
+// That is fatal downstream. A reactive scope eventually becomes a block in the output -- a
 // `<scope>` terminal wrapping a range of instructions -- and blocks nest or they are disjoint.
 // There is no way to emit two overlapping-but-not-nested spans as nested blocks. So upstream calls
 // `assertValidBlockNesting` on the line immediately before `buildReactiveScopeTerminalsHIR`
@@ -21,11 +21,11 @@
 // This pass is what makes that assertion pass, by unioning any two scopes that would violate it and
 // widening the survivor to cover both.
 //
-// # The algorithm is a STACK DISCIPLINE, not a pairwise overlap fixpoint
+// # The algorithm is a stack discipline, not a pairwise overlap fixpoint
 //
 // This is the single most important thing to know about this pass, and the natural mental model is
 // wrong. "Union any two scopes whose ranges overlap without nesting, widen to the hull, repeat until
-// nothing changes" is a plausible description, it reaches zero violations, and it is NOT what
+// nothing changes" is a plausible description, it reaches zero violations, and it is not what
 // upstream does. Measured over 400 corpus files, both spellings run side by side:
 //
 //	                              unions   scopes after   non-nested scope pairs after
@@ -36,8 +36,8 @@
 // pairwise description would look correct while merging half as much. The difference is real: 47
 // scopes that upstream merges stay separate under the pairwise rule.
 //
-// What upstream actually does is sweep the function in evaluation order maintaining a STACK of
-// active scopes, `activeScopes`, ordered so that the scope ending LAST sits deepest. Three events
+// What upstream actually does is sweep the function in evaluation order maintaining a stack of
+// active scopes, `activeScopes`, ordered so that the scope ending last sits deepest. Three events
 // drive it, and each one is a union:
 //
 //	a scope ENDS while it is not the top of the stack
@@ -52,7 +52,7 @@
 // opened inside it and has not closed -- a genuine interleaving that a range comparison cannot see,
 // because the two ranges may nest perfectly and still interleave through a use.
 //
-// # DIVERGENCE FROM React: the Primitive gate cannot fire, because the IR carries no type
+// # Divergence from React: the Primitive gate cannot fire, because the IR carries no type
 //
 // `getOverlappingReactiveScopes` skips an operand of a `FunctionExpression` or `ObjectMethod` whose
 // `place.identifier.type.kind === 'Primitive'` (bundle line 32570). This IR carries no type, exactly
@@ -60,11 +60,11 @@
 // gate is unreachable rather than omitted.
 //
 // The direction of the error is stated rather than guessed. Not skipping means visiting operands
-// upstream skips, and visiting an operand can only ever ADD a union, so this errs toward merging
+// upstream skips, and visiting an operand can only ever add a union, so this errs toward merging
 // more than upstream rather than less.
 //
-// The size of that error is measured at its UPPER BOUND rather than estimated, because the gate's
-// real condition cannot be evaluated here at all. Skipping EVERY use-operand of every
+// The size of that error is measured at its upper bound rather than estimated, because the gate's
+// real condition cannot be evaluated here at all. Skipping every use-operand of every
 // `FunctionExpression` -- which is strictly more than the Primitive gate would skip, since the gate
 // skips only the primitive ones -- changes the union count from 118 to 115. The real divergence is
 // therefore at most three unions and may still be zero; without types, the probe cannot distinguish
@@ -76,10 +76,10 @@
 // Recorded as `MergeGapPrimitiveOperandSkip` so a consumer can decline on it.
 // `TestMergeFunctionOperandSkipUpperBound` pins the bound together with its control.
 //
-// # DIVERGENCE FROM React: the widening MINIMISES here, and upstream's own guard is why that is safe
+// # Divergence from React: the widening minimises here, and upstream's own guard is why that is safe
 //
 // `AssignReactiveScopes` uses a guarded adopt-or-minimise for its hull, because zero is the unset
-// sentinel and a plain minimum would drag a hull's start to zero. This pass uses a PLAIN min/max,
+// sentinel and a plain minimum would drag a hull's start to zero. This pass uses a plain min/max,
 // because that is what upstream writes (`Math.min(groupScope.range.start, scope.range.start)`,
 // bundle line 32474), and it is safe for a structural reason rather than by luck.
 //
@@ -100,11 +100,11 @@
 // start. That zero is a fact about this corpus rather than about the algorithm, which is why the
 // guard is reproduced rather than simplified away. `TestMergeSkipsDegenerateScopes` pins it.
 //
-// # What this pass does NOT close, measured, because the next stage is blocked on the difference
+// # What this pass does not close, measured, because the next stage is blocked on the difference
 //
 // `assertValidBlockNesting` does not check scopes against each other. It builds items from the
-// scopes AND from every block that has a fallthrough -- a `ProgramBlockSubtree` spanning from the
-// terminal to the first instruction of its fallthrough -- and asserts nesting over the COMBINED
+// scopes and from every block that has a fallthrough -- a `ProgramBlockSubtree` spanning from the
+// terminal to the first instruction of its fallthrough -- and asserts nesting over the combined
 // list (bundle lines 20954-20969). Over 400 corpus files:
 //
 //	                                 before merge   after merge
@@ -120,7 +120,7 @@
 // The first two are what `alignReactiveScopesToBlockScopes` exists to fix, and it runs immediately
 // before this pass upstream (line 50201) for exactly that reason: it widens each scope out to the
 // block boundaries it straddles, so a scope and a block subtree can no longer cross. It is now
-// ported, in `align_scopes.go`, and running it IN FRONT of this pass takes the full assertion to 1.
+// ported, in `align_scopes.go`, and running it in front of this pass takes the full assertion to 1.
 // Running it behind instead reaches only 30, because widening creates overlaps that this pass is no
 // longer there to close. `MergeGapBlockScopeAlignment` records what that means for a caller.
 //
@@ -132,7 +132,7 @@
 // # Termination is a single sweep, and the bound is exact rather than empirical
 //
 // There is no fixpoint here, which is worth stating because the pairwise description this file warns
-// about DOES iterate and a reader carrying that model will look for a loop bound. One pass over the
+// about does iterate and a reader carrying that model will look for a loop bound. One pass over the
 // blocks, in the order `Function.Blocks` already holds, visiting each instruction once and each
 // terminal once. Both `scopeStarts` and `scopeEnds` are consumed by popping, never appended to, so
 // the two inner `for` bodies run at most once per distinct instruction position over the whole
@@ -179,7 +179,7 @@ const (
 	// expression or object method.
 	//
 	// This IR carries no type, so there is no primitive predicate to consult. Not skipping visits operands upstream
-	// skips, and a visit can only add a union, so this errs toward merging MORE than upstream rather than less.
+	// skips, and a visit can only add a union, so this errs toward merging more than upstream rather than less.
 	// Skipping every function-expression operand, a strict superset of upstream's primitive-only skip, removes
 	// three of 118 unions on the measured corpus. The real divergence is therefore at most three.
 	MergeGapPrimitiveOperandSkip MergeGap = iota
@@ -187,8 +187,8 @@ const (
 	// MergeGapBlockScopeAlignment is `alignReactiveScopesToBlockScopes`, which upstream runs
 	// immediately before this pass.
 	//
-	// It is now ported, as `AlignReactiveScopesToBlockScopes`, so this gap is about ORDER rather
-	// than absence. Run this pass ALONE and a scope can still cross a program block boundary:
+	// It is now ported, as `AlignReactiveScopesToBlockScopes`, so this gap is about order rather
+	// than absence. Run this pass alone and a scope can still cross a program block boundary:
 	// measured, it takes scope-against-scope violations to 0 and leaves 163 scope-against-block
 	// ones. Run alignment in front of it -- `AlignThenMergeReactiveScopes` is the composed spelling
 	// -- and the full assertion reaches 1, which is a block-against-block residue neither pass can
@@ -292,7 +292,7 @@ func (scopes *MergedScopes) Unions() int {
 // insertion-ordered iteration.
 //
 // `DisjointSet` in this package is keyed on IdentifierId and cannot be reused: this pass unions
-// SCOPES rather than values, and the two id spaces are unrelated. Generics were the other option and
+// scopes rather than values, and the two id spaces are unrelated. Generics were the other option and
 // were declined because `DisjointSet`'s doc comment is written entirely about values and mutation
 // aliasing, and making it generic would leave that comment describing one of two instantiations.
 //
@@ -397,7 +397,7 @@ type mergeSweepState struct {
 // A nil or empty scope table produces an empty result rather than an error, which is the ordinary
 // answer for a function with no entangled values.
 //
-// The member ranges this reads are the REWRITTEN ones -- `ReactiveScopes.MemberRanges` -- because
+// The member ranges this reads are the rewritten ones -- `ReactiveScopes.MemberRanges` -- because
 // upstream reads `place.identifier.mutableRange` at a point in its pipeline where
 // `inferReactiveScopeVariables` has already written the scope hull back onto every member. Reading
 // the pre-entanglement ranges instead would make `isMutable` answer a different question and is the
@@ -444,7 +444,7 @@ func MergeOverlappingReactiveScopes(function *Function, scopes *ReactiveScopes) 
 
 // collectScopeInfo builds the start and end tables, transcribing upstream's `collectScopeInfo`.
 //
-// Both are returned sorted DESCENDING by position, because upstream reads them with `.at(-1)` and
+// Both are returned sorted descending by position, because upstream reads them with `.at(-1)` and
 // pops -- so the last element is the next position the sweep will reach. Written the same way rather
 // than sorted ascending and read from the front, so that a reader diffing against the bundle finds
 // the same shape.
@@ -485,15 +485,15 @@ func collectScopeInfo(function *Function, scopes *ReactiveScopes) (starts, ends 
 			}
 		}
 		// Upstream records terminal operands here too (bundle line 32507). A mutation deleting this
-		// line SURVIVES, and the reason is measured rather than assumed: over 400 corpus files, 0 of
-		// 3,306 scopes are registered ONLY through a terminal place -- every one of them also
+		// line survives, and the reason is measured rather than assumed: over 400 corpus files, 0 of
+		// 3,306 scopes are registered only through a terminal place -- every one of them also
 		// appears on an instruction operand or lvalue, which registers the same start and end.
 		//
 		// So the line is reachable and currently redundant rather than unreachable. It is kept
 		// because it is upstream's and because the redundancy is a property of what this lowering
 		// happens to emit rather than of the algorithm: a terminal whose operand is the sole
 		// appearance of a value is well-formed, and the sweep would silently stop seeing that scope.
-		// The verdict EXPIRES if lowering gains a terminal form that can hold a value no instruction
+		// The verdict expires if lowering gains a terminal form that can hold a value no instruction
 		// touches. `TestMergeRegistersScopesFromTerminals` pins the zero so the expiry is visible.
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) { record(place) })
 	}
@@ -534,7 +534,7 @@ func (state *mergeSweepState) visitInstructionId(id static_single_assignment.Eva
 		top := state.ends[len(state.ends)-1]
 		state.ends = state.ends[:len(state.ends)-1]
 
-		// Sorted by start descending: the scope that started LATEST is closed first, so that when
+		// Sorted by start descending: the scope that started latest is closed first, so that when
 		// several scopes end together the unions below see the stack in the order upstream does.
 		closing := append([]ScopeId(nil), top.scopes...)
 		sortByStartDescending(closing, state.rangeOf)
@@ -548,11 +548,11 @@ func (state *mergeSweepState) visitInstructionId(id static_single_assignment.Eva
 			// later and has not ended, so it interleaves with this one rather than nesting inside
 			// it. Union them all.
 			//
-			// The `index != len-1` test is upstream's and it is a COST OPTIMISATION rather than a
+			// The `index != len-1` test is upstream's and it is a cost optimisation rather than a
 			// filter. When the scope is already on top the suffix is empty, so the call reduces to
 			// `union([scope])`, which inserts the scope as its own representative and nothing else;
 			// `apply` then skips it because `group == scope`. Both a neutralised and a
-			// forced-always-on mutation of this guard SURVIVE, and that is the correct verdict
+			// forced-always-on mutation of this guard survive, and that is the correct verdict
 			// rather than a fixture gap.
 			//
 			// Proven rather than argued, because "equivalent" is the verdict most likely to be
@@ -572,27 +572,27 @@ func (state *mergeSweepState) visitInstructionId(id static_single_assignment.Eva
 		top := state.starts[len(state.starts)-1]
 		state.starts = state.starts[:len(state.starts)-1]
 
-		// Sorted by end descending, so the scope ending LAST goes deepest on the stack. That is the
+		// Sorted by end descending, so the scope ending last goes deepest on the stack. That is the
 		// ordering every union above depends on: "everything above me" is then exactly "everything
 		// that ends before me".
 		opening := append([]ScopeId(nil), top.scopes...)
 		sortByEndDescending(opening, state.rangeOf)
 		state.activeScopes = append(state.activeScopes, opening...)
 
-		// Two scopes starting together AND ending together cannot nest either way, so they are
+		// Two scopes starting together and ending together cannot nest either way, so they are
 		// unioned outright. Adjacent comparison suffices because the slice is sorted by end.
 		//
-		// A mutation inverting this comparison SURVIVES, and the reason is SUBSUMPTION rather than a
+		// A mutation inverting this comparison survives, and the reason is subsumption rather than a
 		// fixture gap. Two scopes sharing a start and an end also share the end, so the end branch
 		// above reaches them at that position with one of them not on top of the stack and unions
 		// them there. Measured on the synthetic case that exercises it: with this union removed
 		// entirely, `sameStartSameEnd` still collapses to one scope with one union.
 		//
-		// The corpus half of that verdict has now EXPIRED, exactly as predicted. It fired 0 times
+		// The corpus half of that verdict has now expired, exactly as predicted. It fired 0 times
 		// when it was written, because no two scopes shared both endpoints. `AlignReactiveScopesToBlockScopes`
 		// landed as the producer this paragraph named and runs in front of this pass, and over the
 		// aligned table 251 adjacent pairs share both a start and an end. So the branch is now
-		// REACHABLE on the corpus and only the subsumption argument still explains the survival --
+		// reachable on the corpus and only the subsumption argument still explains the survival --
 		// which is the stronger of the two reasons anyway, and it rests on the end branch's
 		// ordering rather than on what the corpus happens to contain.
 		//
@@ -665,7 +665,7 @@ func indexOfScope(stack []ScopeId, scope ScopeId) int {
 
 // apply widens each group representative and builds the result, transcribing upstream's apply loop.
 //
-// The widening is a PLAIN min/max, which is upstream's spelling and is safe because `collectScopeInfo`
+// The widening is a plain min/max, which is upstream's spelling and is safe because `collectScopeInfo`
 // refuses a scope whose start equals its end. See the doc comment above for the measurement.
 func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{
@@ -730,7 +730,7 @@ func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 // scopes sharing one position. Extracted so the probes in the tests can reuse them rather than
 // restating the comparators and accidentally measuring a different ordering.
 //
-// The two have DIFFERENT reachability on this corpus and it is worth stating, because a reader
+// The two have different reachability on this corpus and it is worth stating, because a reader
 // seeing one mutation caught and the other surviving would otherwise suspect the fixtures.
 //
 // `sortByStartDescending` is load-bearing. 11 end positions over 400 files hold more than one
@@ -739,20 +739,20 @@ func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 // order and union spuriously under the reverse. `sharedEndReversedStack` is that case minimised, and
 // it is the only fixture in the table that can see this comparator.
 //
-// `sortByEndDescending` is UNREACHABLE here, and this is a measurement rather than an argument:
-// every one of the 3,306 start positions on the corpus holds exactly ONE scope, so the slice it
+// `sortByEndDescending` is unreachable here, and this is a measurement rather than an argument:
+// every one of the 3,306 start positions on the corpus holds exactly one scope, so the slice it
 // sorts always has length one and no comparator can be called. A mutation reversing it therefore
 // survives correctly. It is kept rather than deleted because it is upstream's and because it is what
 // makes the stack ordering meaningful the moment two scopes can start together.
 //
-// That verdict has now EXPIRED, exactly as predicted, and this note is the re-measurement rather
+// That verdict has now expired, exactly as predicted, and this note is the re-measurement rather
 // than an inherited zero. `AlignReactiveScopesToBlockScopes` landed as the producer this paragraph
-// named, and it runs IN FRONT of this pass, so the table this sorts is the aligned one. Measured
+// named, and it runs in front of this pass, so the table this sorts is the aligned one. Measured
 // over the same corpus after alignment: 92 start positions hold several scopes, the widest holding
-// 29, against 0 before. `sortByEndDescending` is therefore REACHABLE and load-bearing now.
+// 29, against 0 before. `sortByEndDescending` is therefore reachable and load-bearing now.
 //
 // It also changes real answers, and the check that shows it is not the obvious one. Reversing the
-// comparator leaves the union COUNT identical at 412, so a count assertion still reads as equivalent;
+// comparator leaves the union count identical at 412, so a count assertion still reads as equivalent;
 // the scope partition differs in 5 functions, which is only visible by comparing groups and ranges.
 // `TestAlignVoidsTheMergesComparatorVerdicts` runs that comparison with the unaligned table as its
 // control, where the two spellings still agree on every function.
