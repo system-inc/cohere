@@ -31,7 +31,10 @@ struct SymbolProvider {
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
             stores = scratchPaths.compactMap {
-                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
+                try? IndexStore(
+                    libraryPath: library,
+                    storePath: IndexStore.storePath(layout: .swiftPackage(scratchPath: $0)),
+                )
             }
         }
         var needSourcekitd: [ParsedFile] = []
@@ -47,7 +50,7 @@ struct SymbolProvider {
         }
         guard !needSourcekitd.isEmpty else { return result }
 
-        let tables = scratchPaths.compactMap { try? CompileCommands.read(scratchPath: $0) }
+        let tables = scratchPaths.compactMap { try? CompileCommands.read(layout: .swiftPackage(scratchPath: $0)) }
         let session: Sourcekitd
         do {
             session = try Sourcekitd.shared(runner: runner)

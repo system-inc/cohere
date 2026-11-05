@@ -8,7 +8,8 @@ import Foundation
  The build is the oracle because it is the compiler's own verdict on the package as `swift build` compiles
  it. sourcekitd is the same compiler, but it is fed the arguments read back from the build's task store,
  and a flag lost on the way (a define, a search path, an upcoming feature) changes what it reports. Only
- agreement on whole real packages shows the arguments arrived intact.
+ agreement on whole real packages shows the arguments arrived intact. An Xcode root is built the way a run
+ builds it (`XcodeTypesPhase`), and its arguments are read from the derived data's task store.
 
  A comparison that could not fail proves nothing, so the oracle also asks one file again with an injected
  type error and requires that error back at its line. Coverage comes first in the report: files asked,
@@ -68,18 +69,40 @@ public struct TypesOracle {
     public func run() throws -> Report {
         let toolchain = EngineVersion.toolchain(runner: runner)
         let scratchPath = Pipeline.scratchPath(for: root)
-        let package = try PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
+        /* A Package.swift wins over an Xcode project beside it, the choice `Pipeline` makes. */
+        let xcodeSource =
+            FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path)
+            ? nil : try XcodeProject.source(at: root)
+        let xcodeProject = try xcodeSource.map {
+            try XcodeProject.load(source: $0, root: root, scratchPath: scratchPath, runner: runner)
+        }
+        let package =
+            try xcodeProject?.model
+            ?? PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
         let files = try FileSet.build(package: package).owned
+        let xcodePhase = xcodeProject.map { project in
+            XcodeTypesPhase(
+                package: package,
+                project: project,
+                files: files,
+                scratchPath: scratchPath,
+                resolutionAllowed: false,
+                toolchain: toolchain,
+                runner: runner,
+            )
+        }
 
         let buildStart = Date()
-        let types = try TypesPhase(
-            package: package,
-            files: files,
-            scratchPath: scratchPath,
-            resolutionAllowed: false,
-            toolchain: toolchain,
-            runner: runner,
-        ).run()
+        let types =
+            try xcodePhase?.run()
+            ?? TypesPhase(
+                package: package,
+                files: files,
+                scratchPath: scratchPath,
+                resolutionAllowed: false,
+                toolchain: toolchain,
+                runner: runner,
+            ).run()
         let buildMilliseconds = Pipeline.milliseconds(since: buildStart)
         var buildGroups: [Diagnostic: String] = [:]
         let build = types.findings.filter { $0.messageId != "buildFailed" }.map { finding in
@@ -94,15 +117,22 @@ public struct TypesOracle {
             return diagnostic
         }
 
-        /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
-        var commandTables = [try CompileCommands.read(scratchPath: scratchPath)]
-        for local in package.localPackages {
-            let localScratch = scratchPath.appendingPathComponent(
-                "local/\(local.root.lastPathComponent)",
-                isDirectory: true,
-            )
-            if FileManager.default.fileExists(atPath: localScratch.path) {
-                commandTables.append(try CompileCommands.read(scratchPath: localScratch))
+        var commandTables: [CompileCommands] = []
+        if let xcodePhase {
+            /* Every target of the project builds into the one derived data, so one task store holds every command. */
+            commandTables.append(try CompileCommands.read(layout: .xcode(derivedData: xcodePhase.derivedData)))
+        }
+        else {
+            commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath)))
+            /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
+            for local in package.localPackages {
+                let localScratch = scratchPath.appendingPathComponent(
+                    "local/\(local.root.lastPathComponent)",
+                    isDirectory: true,
+                )
+                if FileManager.default.fileExists(atPath: localScratch.path) {
+                    commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: localScratch)))
+                }
             }
         }
 

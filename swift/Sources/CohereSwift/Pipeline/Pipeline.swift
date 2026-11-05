@@ -575,7 +575,10 @@ public struct Pipeline {
         do {
             let library = try IndexStore.toolchainLibraryPath(runner: runner)
             stores = Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)).compactMap {
-                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
+                try? IndexStore(
+                    libraryPath: library,
+                    storePath: IndexStore.storePath(layout: .swiftPackage(scratchPath: $0)),
+                )
             }
             demangler = try SwiftDemangler.shared(runner: runner)
         }

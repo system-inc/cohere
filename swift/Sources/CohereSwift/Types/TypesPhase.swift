@@ -176,7 +176,7 @@ struct TypesPhase {
     private func pruneScratch() -> ScratchPrune.Outcome {
         guard let library = try? IndexStore.toolchainLibraryPath(runner: runner) else { return ScratchPrune.Outcome() }
         let stores = builds.compactMap { build -> (store: IndexStore, storePath: URL)? in
-            let storePath = IndexStore.storePath(scratchPath: build.scratchPath)
+            let storePath = IndexStore.storePath(layout: .swiftPackage(scratchPath: build.scratchPath))
             return (try? IndexStore(libraryPath: library, storePath: storePath)).map { ($0, storePath) }
         }
         return ScratchPrune.run(
@@ -211,9 +211,9 @@ struct TypesPhase {
             edited.append((resolved, file))
         }
         do {
-            var tables = [try CompileCommands.read(scratchPath: scratchPath)]
+            var tables = [try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath))]
             for build in builds.dropFirst() where FileManager.default.fileExists(atPath: build.scratchPath.path) {
-                tables.append(try CompileCommands.read(scratchPath: build.scratchPath))
+                tables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: build.scratchPath)))
             }
             let session = try Sourcekitd.shared(runner: runner)
             var answered: [String: [FindingRecord]] = [:]

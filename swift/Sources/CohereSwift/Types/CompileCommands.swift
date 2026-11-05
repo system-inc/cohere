@@ -10,7 +10,8 @@ import Foundation
  `["builtin-SwiftDriver", "--", <swiftc>, <arguments>...]`. That file is undocumented, so this reader
  trusts only that shape: it finds each array by its first string, decodes nothing but strings, and keeps a
  command only when it names a module and lists its files. Anything else is a loud failure, never an empty
- answer, because a command table that silently came back empty would leave every file unchecked.
+ answer, because a command table that silently came back empty would leave every file unchecked. xcodebuild
+ writes the same store, under its derived data rather than the scratch (`BuildLayout`).
 
  Measured on ahraos-macos: 24 arrays for 13 modules. The store repeats a command once per task that
  carries it, and an executable compiles twice (once normally, once testable for its tests, the testable
@@ -51,9 +52,19 @@ struct CompileCommands {
         commandForFile[file.resolvingSymlinksInPath().path].map { commands[$0] }
     }
 
-    /* The commands of the newest build description under this scratch path. */
-    static func read(scratchPath: URL) throws -> CompileCommands {
-        let buildData = scratchPath.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
+    /* The folder holding the build descriptions a build into this layout writes, in the one format both build systems share. */
+    static func buildData(in layout: BuildLayout) -> URL {
+        switch layout {
+            case .swiftPackage(let scratchPath):
+                return scratchPath.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
+            case .xcode(let derivedData):
+                return derivedData.appendingPathComponent("Build/Intermediates.noindex/XCBuildData", isDirectory: true)
+        }
+    }
+
+    /* The commands of the newest build description in this layout. */
+    static func read(layout: BuildLayout) throws -> CompileCommands {
+        let buildData = buildData(in: layout)
         let priors = buildData.appendingPathComponent("prior-build-descriptions.txt")
         let listing: String
         do {

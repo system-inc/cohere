@@ -9,7 +9,8 @@ import Foundation
      cohere-swift-parity --types-oracle [--package <dir>] [--examples <n>]
 
  `--types-oracle` compares a different incumbent: the build's own compiler records against sourcekitd in
- this process, file by file (see `TypesOracle`). It builds the package into the engine's scratch.
+ this process, file by file (see `TypesOracle`). It builds the package, or an Xcode root's project, into the
+ engine's scratch.
 
  The file set is the engine's own (`FileSet`), so the incumbents read exactly the files cohere checks: the
  same vendored, git-ignored and generated exclusions, with no second list to drift. Nothing is written to
