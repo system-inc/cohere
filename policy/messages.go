@@ -475,6 +475,7 @@ func resolveTerms(
 	if placeholderNamesError != nil {
 		return "", placeholderNamesError
 	}
+	resolved := text
 	for _, name := range names {
 		words, defined := terms[name][language]
 		if !defined {
@@ -486,10 +487,10 @@ func resolveTerms(
 			strings.Contains(words, ">>") {
 			return "", fmt.Errorf("the term %q holds a term or a phrase, and nothing nests", name)
 		}
-		text = strings.ReplaceAll(text, "[["+name+"]]", words)
+		resolved = strings.ReplaceAll(resolved, "[["+name+"]]", words)
 		used[name] = true
 	}
-	return text, nil
+	return resolved, nil
 }
 
 // placeholderNames returns the names between each open and close in text, sorted and once each,

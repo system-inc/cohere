@@ -40,14 +40,14 @@ import (
 // Only a boundary strictly inside the project counts. The project's own `.git` is its root, and a
 // project that is not a repository at all (a test fixture, a tarball) writes where it always did.
 func writeRepositoryRoot(start string, projectRoot string) string {
-	projectRoot = filepath.Clean(projectRoot)
+	cleanProjectRoot := filepath.Clean(projectRoot)
 	for directory := filepath.Clean(start); ; directory = filepath.Dir(directory) {
-		relative, relativePathError := filepath.Rel(projectRoot, directory)
+		relative, relativePathError := filepath.Rel(cleanProjectRoot, directory)
 		if relativePathError != nil ||
 			relative == "." ||
 			relative == ".." ||
 			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return projectRoot
+			return cleanProjectRoot
 		}
 		if formatfiles.HasOwnRepository(directory) {
 			return directory

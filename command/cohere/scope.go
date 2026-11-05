@@ -411,15 +411,17 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 	// named path fell out of scope and the run checked nothing while reporting success. That is the
 	// green-over-zero-files failure this binary exists to have stopped making, and it was one
 	// `filepath.Join` away from shipping.
+	resolvedWorkingDirectory := workingDirectory
 	if workingDirectory == "" {
 		current, workingDirectoryError := os.Getwd()
 		if workingDirectoryError != nil {
 			return formatScope{}, fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
 		}
-		workingDirectory = current
+		resolvedWorkingDirectory = current
 	}
+	resolvedRoot := root
 	if root == "" {
-		root = workingDirectory
+		resolvedRoot = resolvedWorkingDirectory
 	}
 
 	absolute := make([]string, 0, len(names))
@@ -427,7 +429,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 	for _, name := range names {
 		path := name
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(workingDirectory, name)
+			path = filepath.Join(resolvedWorkingDirectory, name)
 		}
 		path = filepath.Clean(path)
 
@@ -444,7 +446,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 			continue
 		}
 
-		if path == filepath.Clean(root) {
+		if path == filepath.Clean(resolvedRoot) {
 			return wholeTreeScope(), nil
 		}
 
@@ -472,7 +474,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 
 	description := fmt.Sprintf("%d named path%s", len(absolute), plural(len(absolute)))
 	if len(absolute) == 0 {
-		description = fmt.Sprintf("0 files under the named paths in %s", workingDirectory)
+		description = fmt.Sprintf("0 files under the named paths in %s", resolvedWorkingDirectory)
 	}
 
 	request := strings.Join(names, ", ")

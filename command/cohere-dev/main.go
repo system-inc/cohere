@@ -116,7 +116,7 @@ func niceness() (int, error) {
 
 // run runs a heavy command, niced, through a token: go test, go build, go vet, or any command with exec.
 func run(verb string, arguments []string) int {
-	arguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
+	commandArguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
 	if !fullPriority {
 		level, nicenessError := niceness()
 		if nicenessError != nil {
@@ -131,59 +131,61 @@ func run(verb string, arguments []string) int {
 
 	switch verb {
 	case "land":
-		return land(arguments)
+		return land(commandArguments)
 	case "exec":
-		if len(arguments) > 0 && arguments[0] == "--" {
-			arguments = arguments[1:]
+		commandLine := commandArguments
+		if len(commandArguments) > 0 && commandArguments[0] == "--" {
+			commandLine = commandArguments[1:]
 		}
-		if len(arguments) == 0 {
+		if len(commandLine) == 0 {
 			return usage()
 		}
-		return withToken(strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, arguments[0], arguments[1:])
+		return withToken(strings.Join(commandLine, " "), func(environment []string) int {
+			return runCommand(environment, commandLine[0], commandLine[1:])
 		})
 	case "build":
-		return withToken("go build "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, "go", append([]string{"build"}, arguments...))
+		return withToken("go build "+strings.Join(commandArguments, " "), func(environment []string) int {
+			return runCommand(environment, "go", append([]string{"build"}, commandArguments...))
 		})
 	case "vet":
-		return withToken("go vet "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, arguments...))
+		return withToken("go vet "+strings.Join(commandArguments, " "), func(environment []string) int {
+			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, commandArguments...))
 		})
 	}
 
-	fast := len(arguments) > 0 && arguments[0] == "--fast"
+	fast := len(commandArguments) > 0 && commandArguments[0] == "--fast"
+	unvettedArguments := commandArguments
 	if fast {
-		arguments = arguments[1:]
+		unvettedArguments = commandArguments[1:]
 	}
-	arguments = withEveryVetCheck(arguments)
+	testArguments := withEveryVetCheck(unvettedArguments)
 	if fast {
 		// The fast tier rests on Go's test cache, and runs nearly every package, so -count=1 here is the
 		// costliest run there is on a loaded machine (@system_cohere_build's catch).
-		if countsOnce(arguments) {
+		if countsOnce(testArguments) {
 			refuseCountOnce()
 			return 2
 		}
-		return withToken("go test --fast "+strings.Join(arguments, " "), func(environment []string) int {
-			return fastTest(withoutVCSStamping(environment), arguments)
+		return withToken("go test --fast "+strings.Join(testArguments, " "), func(environment []string) int {
+			return fastTest(withoutVCSStamping(environment), testArguments)
 		})
 	}
-	if wholeModule(arguments) && countsOnce(arguments) {
+	if wholeModule(testArguments) && countsOnce(testArguments) {
 		refuseCountOnce()
 		return 2
 	}
 	// A whole-module run from the root covers what the landing gate covers: every module go.work names
 	// outside a submodule (workspace.go).
-	if wholeModule(arguments) {
-		expanded, withWorkspaceModulesError := withWorkspaceModules(arguments)
+	if wholeModule(testArguments) {
+		expanded, withWorkspaceModulesError := withWorkspaceModules(testArguments)
 		if withWorkspaceModulesError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: reading the modules to test: %v\n", withWorkspaceModulesError)
 			return 2
 		}
-		arguments = expanded
+		testArguments = expanded
 	}
-	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
-		return goTest(withoutVCSStamping(environment), arguments)
+	return withToken("go test "+strings.Join(testArguments, " "), func(environment []string) int {
+		return goTest(withoutVCSStamping(environment), testArguments)
 	})
 }
 

@@ -46,10 +46,10 @@ func exitProcess(code int) {
 	// The streams are flushed before the caller is answered, and the answer is 1 in place of a 0 when they
 	// could not be, since a report that never arrived is not a clean run (see package streams). A run cache
 	// that finished first has flushed them already, and then this changes nothing.
-	code = streams.Finish(code)
+	exitCode := streams.Finish(code)
 	// Every exit answers the caller, if a run cache has not already: what follows, keeping what the run read
 	// in the content pack and the heap's teardown, is nothing the caller waits for. See sendVerdict.
-	sendVerdict(code)
+	sendVerdict(exitCode)
 	saveContentPack()
-	os.Exit(code)
+	os.Exit(exitCode)
 }
