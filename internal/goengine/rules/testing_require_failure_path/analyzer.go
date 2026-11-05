@@ -1,8 +1,8 @@
-// Package testing_require_failure_path is the Go engine's rule that a test has some way to fail.
+// Package testing_require_failure_path is the Go engine's rule that a test can fail on a wrong result.
 //
-// go test reports a test that never fails as passing, so a test whose body computes a result and checks nothing
-// prints ok whatever the code under it does. Its silence reads as a proof it never gave, and the next reader trusts
-// a pass that was never at risk.
+// A test whose body computes a result and checks nothing fails only when the code under it crashes, so go test
+// prints ok whatever result that code returns. Its silence reads as a proof it never gave, and the next reader
+// trusts a pass that was never at risk.
 package testing_require_failure_path
 
 import (
@@ -24,9 +24,10 @@ const Name = "cohere-go/testing-require-failure-path"
 // Analyzer runs the rule over one package.
 var Analyzer = &analysis.Analyzer{
 	Name: "testing_require_failure_path",
-	Doc: "Flags a test in a _test.go file whose body, its function literals and subtests included, has no way to " +
-		"fail: no Error, Errorf, Fatal, Fatalf, Fail or FailNow on a *testing.T, no panic, and no test or reporter " +
-		"handed to code that could fail it. A test that skips unconditionally before doing anything is not judged.",
+	Doc: "Flags a test in a _test.go file whose body, its function literals and subtests included, cannot fail on " +
+		"a wrong result: no Error, Errorf, Fatal, Fatalf, Fail or FailNow on a *testing.T, no panic, and no test or " +
+		"reporter handed to code that could fail it, so only a crash in the code under test fails it. A test that " +
+		"skips unconditionally before doing anything is not judged.",
 	Run: run,
 }
 
