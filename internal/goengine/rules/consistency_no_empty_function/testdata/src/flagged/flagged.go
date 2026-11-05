@@ -32,6 +32,16 @@ func slashesOnly() {
 // The only comment sits before the opening brace, outside the body.
 func commentBefore()/* outside */ {} // want "body is empty"
 
+// A doc comment tells a caller what the function is for, and the body still says nothing about why it is empty.
+
+type sealed struct{}
+
+// Close does nothing: a sealed value holds no file.
+func (sealed *sealed) Close() {} // want "body is empty"
+
+// node marks sealed as a node of the tree, so no type outside this package can be one.
+func (sealed *sealed) node() {} // want "body is empty"
+
 // The only comment trails the closing brace, outside the body.
 // want +1 "body is empty"
 func commentAfter() {
