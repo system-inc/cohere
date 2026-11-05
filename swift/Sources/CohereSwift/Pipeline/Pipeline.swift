@@ -152,7 +152,7 @@ public struct Pipeline {
                 )
             }
         }
-        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
+        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary, configuration: configuration)
 
         let describeStart = Date()
         let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)

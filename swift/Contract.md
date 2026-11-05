@@ -434,6 +434,12 @@ it where a run that did not finish prints green.
 Rules are configured in the `swift` block of `CohereSettings.json`. Keys are `cohere-swift/<rule>`,
 and values are severities and strictness options, never allow lists or ignore names.
 
+A value is a severity, or an array of a severity and one object of options. Only a rule that reads an
+option may be given it: today that is `cohere-swift/file-length`'s `max`, a whole number at or below the
+house's 2,000, which the rule then judges by. An option no rule reads, a value of the wrong type, a `max`
+above the house's (an allowance) and more than one object are each refused by name with exit 2, never
+dropped (#4x9h976).
+
 **Formatting is not configured.** Swift has one house format, built into the engine
 (`Sources/CohereSwift/Format/HouseSwiftFormat.swift`, ruled 2026-10-03 in #mg4dgjm), the way
 TypeScript's Prettier options live in one block of the Nexus tier. Every file the engine owns is

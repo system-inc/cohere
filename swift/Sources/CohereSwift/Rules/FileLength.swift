@@ -26,15 +26,21 @@ public struct FileLength: FileRule {
     public let origin = RuleOrigin.swiftLint
     public let upstreamName: String? = "file_length"
 
+    /* The house limit, and the most a project's settings may set: a `max` above it would be an allowance (`RuleConfiguration`). */
     public static let maximumLines = 2_000
 
-    public init() {}
+    /* The limit this run judges by: the house's, or a stricter `max` from the project's settings. */
+    public let maximum: Int
+
+    public init(maximum: Int = FileLength.maximumLines) {
+        self.maximum = maximum
+    }
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
         /* Kirk's convention (2026-10-03), shared with TypeScript: a generated file is named `*.generated.swift`, gets every other rule and the formatter, and is exempt from this one alone, because its length is the generator's, not a reader's. */
         guard !file.url.lastPathComponent.hasSuffix(".generated.swift") else { return [] }
         let lines = Self.lineCount(of: file.source)
-        guard lines > Self.maximumLines else { return [] }
+        guard lines > maximum else { return [] }
         return [
             FindingRecord(
                 source: .rule,
@@ -47,7 +53,7 @@ public struct FileLength: FileRule {
                 rule: name,
                 messageId: "tooManyLines",
                 message:
-                    "This file is \(lines) lines, over the \(Self.maximumLines) a file may hold. Split it along its seams, an extension per concern in Type+Purpose.swift or a helper type in its own file, so each part is one a reader can hold whole.",
+                    "This file is \(lines) lines, over the \(maximum) a file may hold. Split it along its seams, an extension per concern in Type+Purpose.swift or a helper type in its own file, so each part is one a reader can hold whole.",
             )
         ]
     }
