@@ -91,25 +91,26 @@ func isModuleHookCall(function *Function, producers *calleeProducers, instructio
 		}
 		seen[identifier] = true
 		defer delete(seen, identifier)
-		switch value := producers.producer(identifier).(type) {
+		switch definition := producers.producer(identifier).(type) {
 		case *LoadGlobal:
-			if value.BindingKind == GlobalBindingKindGlobal || value.Source == "react" {
+			if definition.BindingKind == GlobalBindingKindGlobal || definition.Source == "react" {
 				return false
 			}
-			return !requireHook || isHookName(value.Name) || isHookName(value.Imported)
+			return !requireHook || isHookName(definition.Name) || isHookName(definition.Imported)
 		case *LoadLocal:
-			return resolve(value.Place.Identifier, requireHook)
+			return resolve(definition.Place.Identifier, requireHook)
 		case *StoreLocal:
-			return resolve(value.Value.Identifier, requireHook)
+			return resolve(definition.Value.Identifier, requireHook)
 		case *PropertyLoad:
-			return (!requireHook || isHookName(string(value.Property))) && resolve(value.Object.Identifier, false)
+			return (!requireHook || isHookName(string(definition.Property))) &&
+				resolve(definition.Object.Identifier, false)
 		case *ComputedLoad:
-			property, ok := producers.producer(value.Property.Identifier).(*Primitive)
+			property, ok := producers.producer(definition.Property.Identifier).(*Primitive)
 			if !ok {
 				return false
 			}
 			name, ok := property.Value.(string)
-			return ok && (!requireHook || isHookName(name)) && resolve(value.Object.Identifier, false)
+			return ok && (!requireHook || isHookName(name)) && resolve(definition.Object.Identifier, false)
 		default:
 			return false
 		}
