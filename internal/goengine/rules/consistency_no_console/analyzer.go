@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/policy"
@@ -25,10 +26,11 @@ const Name = "cohere-go/consistency-no-console"
 // Analyzer runs the rule over one package.
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_console",
-	Doc: "Flags fmt.Print, Printf and Println, the builtins print and println, and the standard logger's log.Print, " +
-		"log.Fatal and log.Panic functions in a package other than main, outside a _test.go file, since only a " +
-		"command knows where the process's standard output and error go. A write to a writer, fmt.Fprintln or a " +
-		"*log.Logger's method, is left alone.",
+	Doc: "Flags fmt.Print, Printf and Println, fmt.Fprint, Fprintf and Fprintln handed os.Stdout or os.Stderr, the " +
+		"builtins print and println, and the standard logger's log.Print, log.Fatal and log.Panic functions in a " +
+		"package other than main, outside a _test.go file, since only a command knows where the process's " +
+		"standard output and error go. A write to any other writer, fmt.Fprintln given one or a *log.Logger's " +
+		"method, is left alone.",
 	Run: run,
 }
 
@@ -50,6 +52,14 @@ var standardOutputFunctions = map[string]map[string]bool{
 	},
 }
 
+// writerFunctions are fmt's writes to the writer they are handed first, judged only when that writer is the process's
+// own standard output or error: then the writer is no choice the caller made, and the write is fmt.Println spelled
+// longer.
+var writerFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln": true}
+
+// standardStreams are os's package-level variables for the process's own standard output and error.
+var standardStreams = map[string]bool{"Stdout": true, "Stderr": true}
+
 func run(pass *analysis.Pass) (any, error) {
 	// package main is the command entry point, the one place whose standard output is the program's own.
 	if pass.Pkg.Name() == "main" {
@@ -65,6 +75,12 @@ func run(pass *analysis.Pass) (any, error) {
 		// report that route clean.
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch expression := node.(type) {
+			case *ast.CallExpr:
+				// The writer is an argument, so only a call is judged here, and its children are still visited, since
+				// an argument may itself be a print.
+				if call, found := standardStreamWrite(pass, expression); found {
+					report(pass, expression, call)
+				}
 			case *ast.SelectorExpr:
 				if call, found := standardOutputCall(pass, expression.Sel); found {
 					report(pass, expression, call)
@@ -105,6 +121,39 @@ func standardOutputCall(pass *analysis.Pass, identifier *ast.Ident) (string, boo
 		}
 	}
 	return "", false
+}
+
+// standardStreamWrite is how the message names call, `fmt.Fprintln(os.Stderr, ...)`, and whether it is one of fmt's
+// writes to a writer handed os.Stdout or os.Stderr itself. The callee and the writer are both resolved by object, so
+// a writer the caller passed in, a local value with a field named Stdout, and os.Stderr given as a value to print
+// rather than as the writer are none of them.
+func standardStreamWrite(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
+	if len(call.Args) == 0 {
+		return "", false
+	}
+	function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "fmt" || !writerFunctions[function.Name()] {
+		return "", false
+	}
+	var writer *ast.Ident
+	switch argument := ast.Unparen(call.Args[0]).(type) {
+	case *ast.Ident:
+		// A dot import of os leaves the variable's name bare.
+		writer = argument
+	case *ast.SelectorExpr:
+		writer = argument.Sel
+	default:
+		return "", false
+	}
+	variable, isVariable := pass.TypesInfo.Uses[writer].(*types.Var)
+	if !isVariable || variable.Pkg() == nil || variable.Pkg().Path() != "os" || !standardStreams[variable.Name()] {
+		return "", false
+	}
+	// Only the package's own variable is the process's stream, never a field or local that shares its name.
+	if variable.Pkg().Scope().Lookup(variable.Name()) != variable {
+		return "", false
+	}
+	return "fmt." + function.Name() + "(os." + variable.Name() + ", ...)", true
 }
 
 // report flags node, naming call as the message's call.
