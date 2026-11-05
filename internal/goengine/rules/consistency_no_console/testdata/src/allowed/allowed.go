@@ -13,11 +13,6 @@ func render(writer io.Writer, total int) error {
 	return writeError
 }
 
-// A writer chosen by name is a decision written down, and the handled-error rule reads what it returns.
-func warn(message string) {
-	_, _ = fmt.Fprintln(os.Stderr, message)
-}
-
 // Formatting to a string or an error writes nothing.
 func describe(total int) (string, error) {
 	return fmt.Sprintf("%d done", total), fmt.Errorf("stopping after %d", total)
