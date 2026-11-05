@@ -1,0 +1,34 @@
+package testing_require_parallel_test
+
+import (
+	"testing"
+
+	"golang.org/x/tools/go/analysis/analysistest"
+
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_require_parallel"
+)
+
+// The flagged fixtures carry a // want on every test and subtest the rule must report, and analysistest fails on a
+// finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule
+// stays quiet on a parallel test, a reasoned marker, and a Parallel or Run that is not testing.T's.
+func TestAnalyzer(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(
+		errorsOnly{test},
+		analysistest.TestData(),
+		testing_require_parallel.Analyzer,
+		"flagged",
+		"allowed",
+		"lookalike",
+	)
+}
+
+// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
+// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
+// Loading the fixtures needs only go list.
+type errorsOnly struct{ test *testing.T }
+
+func (reporter errorsOnly) Errorf(format string, arguments ...any) {
+	reporter.test.Helper()
+	reporter.test.Errorf(format, arguments...)
+}
