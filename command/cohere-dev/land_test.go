@@ -272,6 +272,134 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	}
 }
 
+// gitlinkRepository is a repository with one commit, and the git that runs in it, with no one's settings.
+func gitlinkRepository(test *testing.T) (string, func(directory string, arguments ...string) string) {
+	test.Helper()
+	environment := append(
+		os.Environ(),
+		"GIT_AUTHOR_NAME=test",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_NOSYSTEM=1",
+	)
+	git := func(directory string, arguments ...string) string {
+		test.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir, command.Env = directory, environment
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("git %v in %s: %v\n%s", arguments, directory, outputError, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	repository := test.TempDir()
+	git(repository, "init", "-q", "-b", "main")
+	if writeError := os.WriteFile(filepath.Join(repository, "base.txt"), []byte("base\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	git(repository, "add", "base.txt")
+	git(repository, "commit", "-q", "-m", "add base.txt")
+	return repository, git
+}
+
+// A commit that records a submodule as its gitlink passes, and one that replaces the gitlink with a symlink to
+// another checkout's, as a merge did with TypeScript on 2026-11-05 (ee1660af), is refused naming the path, the
+// mode it found and the fix, whose command, run as given, makes a commit that passes again. The symlink is
+// planted the way it was then: the submodule's directory replaced on disk, and `git add` of the path.
+func TestTheGateRefusesACommitThatRecordsASubmoduleAsASymlink(test *testing.T) {
+	test.Parallel()
+	repository, git := gitlinkRepository(test)
+	library := test.TempDir()
+	git(library, "init", "-q", "-b", "main")
+	git(library, "commit", "-q", "--allow-empty", "-m", "the library")
+	pinned := git(library, "rev-parse", "HEAD")
+	git(repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
+	git(repository, "commit", "-q", "-m", "pin library")
+	if checkGitlinksError := checkGitlinks(repository, "HEAD"); checkGitlinksError != nil {
+		test.Fatalf("a commit that records its submodule as a gitlink was refused: %v", checkGitlinksError)
+	}
+
+	if removeError := os.RemoveAll(filepath.Join(repository, "library")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if symlinkError := os.Symlink(library, filepath.Join(repository, "library")); symlinkError != nil {
+		test.Fatal(symlinkError)
+	}
+	git(repository, "add", "library")
+	git(repository, "commit", "-q", "-m", "the symlink in the submodule's place")
+	if entry := git(repository, "ls-tree", "HEAD", "--", "library"); !strings.HasPrefix(entry, "120000 ") {
+		test.Fatalf("the planted commit records %q, want the symlink, mode 120000", entry)
+	}
+	refusal := checkGitlinks(repository, "HEAD")
+	fix := "git update-index --cacheinfo 160000," + pinned + ",library"
+	if refusal == nil ||
+		!strings.Contains(refusal.Error(), "records library, which .gitmodules names a submodule, as mode 120000") ||
+		!strings.Contains(refusal.Error(), fix) {
+		test.Fatalf(
+			"a commit that records its submodule as a symlink was not refused by path, mode and fix: %v",
+			refusal,
+		)
+	}
+
+	git(repository, strings.Fields(fix)[1:]...)
+	git(repository, "commit", "-q", "-m", "the gitlink restored")
+	if checkGitlinksError := checkGitlinks(repository, "HEAD"); checkGitlinksError != nil {
+		test.Errorf("the commit the refusal's fix made was refused: %v", checkGitlinksError)
+	}
+}
+
+// The gitlink check runs before any test, in the two gates that read a tree whose symlink resolves: a whole-module
+// run from the root, as the Square runs on every merge, and a landing whose merge of main brings the symlink in.
+func TestAWholeModuleRunAndALandingRefuseASubmoduleRecordedAsASymlink(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	library := fixture.pinLibrary()
+	if removeError := os.RemoveAll(library); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if symlinkError := os.Symlink(test.TempDir(), library); symlinkError != nil {
+		test.Fatal(symlinkError)
+	}
+	fixture.git(fixture.repository, "add", "library")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "the symlink in the submodule's place")
+
+	whole := exec.Command(fixture.wrapper, "test", "./...")
+	whole.Dir, whole.Env = fixture.repository, fixture.environment
+	if output, outputError := whole.CombinedOutput(); outputError == nil ||
+		!strings.Contains(string(output), "records library, which .gitmodules names a submodule, as mode 120000") {
+		test.Errorf(
+			"a whole-module run of a symlinked submodule was not refused by name (%v):\n%s",
+			outputError,
+			output,
+		)
+	}
+	landing := exec.Command(fixture.wrapper, "land")
+	landing.Dir, landing.Env = fixture.worktree("a"), fixture.environment
+	if output, outputError := landing.CombinedOutput(); outputError == nil ||
+		!strings.Contains(string(output), "after merging main at") ||
+		!strings.Contains(string(output), "as mode 120000") {
+		test.Errorf(
+			"a landing that merged in a symlinked submodule was not refused by name (%v):\n%s",
+			outputError,
+			output,
+		)
+	}
+	if contents := readMaybeMissing(test, fixture.log); len(contents) > 0 {
+		test.Errorf("go ran before the refusal:\n%s", contents)
+	}
+}
+
+// A repository with no .gitmodules has no submodule to check, and passes.
+func TestTheGitlinkCheckPassesARepositoryWithNoSubmodules(test *testing.T) {
+	test.Parallel()
+	repository, _ := gitlinkRepository(test)
+	if checkGitlinksError := checkGitlinks(repository, "HEAD"); checkGitlinksError != nil {
+		test.Errorf("a repository with no .gitmodules was refused: %v", checkGitlinksError)
+	}
+}
+
 // The gate runs the same for every landing, whatever the caller's shell sets: `GOFLAGS` carries only the pool's
 // -p and -buildvcs=false. A caller's -trimpath once failed a land gate on tests that find their fixtures by
 // their source path.
