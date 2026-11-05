@@ -1,43 +1,28 @@
 package goengine
 
 import (
-	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/parser"
 	"go/token"
-	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/mod/modfile"
 
 	"github.com/system-inc/cohere/internal/goengine/contract"
+	"github.com/system-inc/cohere/internal/goengine/load"
 	"github.com/system-inc/cohere/internal/goengine/project"
 )
 
 // generatedReason is why a generated file is not ours: its output is its generator's to fix.
 const generatedReason = "generated, marked // Code generated ... DO NOT EDIT"
-
-// leadingUnderscoreReason is why go builds a file no package holds that no constraint excluded either.
-const leadingUnderscoreReason = "ignored by go, which builds no file whose name starts with _ or ."
-
-// buildTarget is what go builds for under the run's environment, which decides the files build constraints
-// leave out.
-type buildTarget struct {
-	operatingSystem string
-	architecture    string
-	cgoEnabled      bool
-}
 
 // moduleDescription is one owned module as the project record names it.
 type moduleDescription struct {
@@ -51,6 +36,11 @@ type moduleDescription struct {
 // refuse the run and a refusal must come before any record.
 type describedProject struct {
 	workspace project.Workspace
+
+	// readableOurs are the census's files that are ours and could be read, before the build constraints and
+	// generated files narrow them: what the load accounts for. An unreadable file is left out, since the load
+	// reads each file it accounts for and one it cannot open fails it whole; the file is already a record.
+	readableOurs []string
 
 	// manifest is the root's go.work, or its go.mod for a module root: where a diagnostic that names no file
 	// is placed, since the front door refuses a finding with no position.
@@ -105,10 +95,6 @@ func describeProject(request invocation) (*describedProject, error) {
 	if modulesError != nil {
 		return nil, modulesError
 	}
-	target, targetError := readBuildTarget(root, workspace.Environment())
-	if targetError != nil {
-		return nil, targetError
-	}
 	scope, scopeDescription, scopeError := readScope(root, request.paths)
 	if scopeError != nil {
 		return nil, scopeError
@@ -133,30 +119,53 @@ func describeProject(request invocation) (*describedProject, error) {
 			contract.ExcludedFile{File: exclusion.File, Reason: exclusion.Reason})
 	}
 
+	contents := map[string][]byte{}
+	var readable []string
 	for _, file := range census.Ours {
-		contents, readError := os.ReadFile(file)
-		inScope := insideScope(file, scope)
+		fileContents, readError := os.ReadFile(file)
 		if readError != nil {
 			// A file nothing could read is ours until something says otherwise; inside the scope it is a gap
 			// the run names, and outside it the load says what it makes of the file.
-			if inScope {
+			if insideScope(file, scope) {
 				described.unreadable = append(described.unreadable,
 					contract.UnreadableRecord{File: file, Error: unreadableSentence(readError)})
-				described.addInScope(file)
+				described.inScope = append(described.inScope, file)
 			}
 			described.record.FilesOurs++
 			continue
 		}
-		if reason, excluded := exclusionOf(target, file, contents); excluded {
+		contents[file] = fileContents
+		readable = append(readable, file)
+	}
+	described.readableOurs = readable
+	// Only the files read are judged, since the judging reads each again and a file it cannot open refuses all.
+	constrained, constraintsError := load.ExcludedByConstraints(root, workspace.Environment(), readable)
+	if constraintsError != nil {
+		return nil, fmt.Errorf("describing %s: %w", root, constraintsError)
+	}
+	constraintReasons := map[string]string{}
+	for _, excluded := range constrained {
+		constraintReasons[excluded.File] = excluded.Reason
+	}
+	for _, file := range readable {
+		reason, excluded := constraintReasons[file]
+		if !excluded && isGenerated(file, contents[file]) {
+			reason, excluded = generatedReason, true
+		}
+		if excluded {
 			described.record.Excluded = append(described.record.Excluded,
 				contract.ExcludedFile{File: file, Reason: reason})
 			continue
 		}
 		described.record.FilesOurs++
-		if inScope {
-			described.addInScope(file)
-			described.contents[file] = contents
+		if insideScope(file, scope) {
+			described.inScope = append(described.inScope, file)
+			described.contents[file] = contents[file]
 		}
+	}
+	slices.Sort(described.inScope)
+	for _, file := range described.inScope {
+		described.inScopeSet[file] = true
 	}
 	slices.SortFunc(described.record.Excluded, func(left contract.ExcludedFile, right contract.ExcludedFile) int {
 		return cmp.Compare(left.File, right.File)
@@ -164,12 +173,6 @@ func describeProject(request invocation) (*describedProject, error) {
 	described.record.FilesInScope = len(described.inScope)
 	described.record.ElapsedMilliseconds = int(time.Since(started).Milliseconds())
 	return described, nil
-}
-
-// addInScope records one file as in scope. census.Ours is sorted, so inScope stays sorted.
-func (described *describedProject) addInScope(file string) {
-	described.inScope = append(described.inScope, file)
-	described.inScopeSet[file] = true
 }
 
 // readable are the in-scope files that could be read, in order: the files a phase that reads source is given.
@@ -287,71 +290,13 @@ func insideScope(file string, scope []string) bool {
 	return false
 }
 
-// readBuildTarget asks go what it builds for in root under the workspace's environment. Read here rather than
-// taken from the load's, because the load runs after the fix phase and the project record comes first.
-func readBuildTarget(root string, environment []string) (buildTarget, error) {
-	command := exec.Command("go", "env", "GOOS", "GOARCH", "CGO_ENABLED")
-	command.Dir = root
-	command.Env = append(os.Environ(), environment...)
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil {
-		return buildTarget{}, fmt.Errorf("reading GOOS, GOARCH and CGO_ENABLED with go env in %s: %w: %s", root,
-			runError, strings.TrimSpace(standardError.String()))
-	}
-	values := strings.Split(strings.TrimRight(string(output), "\n"), "\n")
-	if len(values) != 3 {
-		return buildTarget{}, fmt.Errorf("reading GOOS, GOARCH and CGO_ENABLED with go env in %s: want three "+
-			"lines, got %q", root, output)
-	}
-	cgoEnabled, parseError := strconv.ParseBool(values[2])
-	if parseError != nil {
-		return buildTarget{}, fmt.Errorf("reading CGO_ENABLED with go env in %s: %w", root, parseError)
-	}
-	return buildTarget{operatingSystem: values[0], architecture: values[1], cgoEnabled: cgoEnabled}, nil
-}
-
-// exclusionOf says why a file that is ours is left out anyway, from the contents already read: go would not
-// build it for this target, or a generator wrote it.
-func exclusionOf(target buildTarget, file string, contents []byte) (string, bool) {
-	name := filepath.Base(file)
-	if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
-		return leadingUnderscoreReason, true
-	}
-	buildContext := build.Default
-	buildContext.GOOS = target.operatingSystem
-	buildContext.GOARCH = target.architecture
-	buildContext.CgoEnabled = target.cgoEnabled
-	buildContext.OpenFile = func(string) (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(contents)), nil
-	}
-	constraintsReason := fmt.Sprintf("excluded by build constraints on %s/%s", target.operatingSystem,
-		target.architecture)
-	matched, matchError := buildContext.MatchFile(filepath.Dir(file), name)
-	// A constraint go cannot read is an error the load reports against the file, so the file stays in.
-	if matchError == nil && !matched {
-		return constraintsReason, true
-	}
-
-	// The package clause, the imports and the comments above them are all that is read here. A file that does
-	// not get that far is the fix and types phases' to report, so it stays in.
-	header, parseError := parser.ParseFile(token.NewFileSet(), file, contents, parser.ImportsOnly|parser.ParseComments)
-	if parseError != nil {
-		return "", false
-	}
-	if ast.IsGenerated(header) {
-		return generatedReason, true
-	}
-	// MatchFile keeps a cgo file whatever CGO_ENABLED says; go's own import leaves it out when cgo is off.
-	if !target.cgoEnabled {
-		for _, imported := range header.Imports {
-			if imported.Path.Value == `"C"` {
-				return constraintsReason + " with cgo off", true
-			}
-		}
-	}
-	return "", false
+// isGenerated reports whether a file is a generator's, by the rule go/ast.IsGenerated reads from the comments
+// above the package clause. A file that does not get that far is the fix and types phases' to report, so it is
+// not called generated.
+func isGenerated(file string, contents []byte) bool {
+	headerMode := parser.PackageClauseOnly | parser.ParseComments
+	header, parseError := parser.ParseFile(token.NewFileSet(), file, contents, headerMode)
+	return parseError == nil && ast.IsGenerated(header)
 }
 
 // unreadableSentence says why a file could not be read, without the path the record already names.

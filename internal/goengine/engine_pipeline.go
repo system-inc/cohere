@@ -76,7 +76,7 @@ func (engine *pipeline) run() int {
 	// The load runs once, after the fix phase so it reads the formatted tree, whenever a phase needs types.
 	if engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint) {
 		loaded, loadError = load.Packages(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-			engine.described.workspace.Environment())
+			engine.described.workspace.Environment(), engine.described.readableOurs)
 		if loadError != nil {
 			engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 		}
