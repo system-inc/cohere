@@ -456,7 +456,7 @@ struct SortedFirstLastTests {
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { SortedFirstLast().applies(to: $0) }
         let symbols = SymbolProvider(
-            scratchPaths: Pipeline.symbolScratchPaths(package: package, scratch: Pipeline.scratchPath(for: root)),
+            layouts: Pipeline.symbolLayouts(package: package, scratch: Pipeline.scratchPath(for: root)),
             runner: ProcessRunner(),
         ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")

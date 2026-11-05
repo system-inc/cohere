@@ -102,6 +102,26 @@ struct CompileCommandsTests {
         #expect(commands.command(for: URL(fileURLWithPath: "/App/Other.swift")) == nil)
     }
 
+    /* An Xcode target's module is named for its product (CapturePhone's is `Capture`), so the modules our files are in are the ones their compiles name. */
+    @Test func theModulesOfFilesAreTheOnesTheirCompilesName() {
+        let commands = CompileCommands(commands: [
+            CompileCommands.Command(
+                moduleName: "Capture",
+                arguments: [],
+                files: ["/App/Phone.swift"],
+                testable: false,
+            ),
+            CompileCommands.Command(
+                moduleName: "CaptureWire",
+                arguments: [],
+                files: ["/Wire/Wire.swift"],
+                testable: false,
+            ),
+        ])
+        let files = [URL(fileURLWithPath: "/App/Phone.swift"), URL(fileURLWithPath: "/App/Uncompiled.swift")]
+        #expect(commands.modules(compiling: files) == ["Capture"])
+    }
+
     @Test func aScratchWithNoBuildDescriptionIsAFailure() {
         let empty = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-no-build-\(UUID().uuidString)",

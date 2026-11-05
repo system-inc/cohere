@@ -52,6 +52,11 @@ struct CompileCommands {
         commandForFile[file.resolvingSymlinksInPath().path].map { commands[$0] }
     }
 
+    /* The modules these files were compiled into, as the compiler named them. */
+    func modules(compiling files: [URL]) -> Set<String> {
+        Set(files.compactMap { command(for: $0)?.moduleName })
+    }
+
     /* The folder holding the build descriptions a build into this layout writes, in the one format both build systems share. */
     static func buildData(in layout: BuildLayout) -> URL {
         switch layout {

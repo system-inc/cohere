@@ -82,13 +82,15 @@ struct XcodeProjectPipelineTests {
 
         """
 
-    /*
-     What lint says of a file a typed rule applies to at an Xcode root, until block C (#9ktapz2) reads an Xcode
-     build's index: it cannot vouch for it, so the file is a lint crash and the run is incomplete. The warning source
-     holds a `:` and an `=`, so `redundant-type-annotation` applies to it.
-     */
-    static let typedRulesUnread =
-        "the build's index does not describe it as it stands, and no build recorded how to compile it, so the rules that read what its names resolve to could not judge it (cohere-swift/redundant-type-annotation); every other rule ran on it"
+    /* Line 3 compares an array's count with zero, which `empty-count` finds only from the type the build's index gives `items`. */
+    static let emptyCountSource = """
+        struct Counter {
+            func isBare(_ items: [Int]) -> Bool {
+                items.count == 0
+            }
+        }
+
+        """
 
     static let cleanCounter = cleanSource.replacingOccurrences(of: "Greeter", with: "Counter")
 
@@ -319,9 +321,9 @@ struct XcodeProjectPipelineTests {
     }
 
     /*
-     A warning is a finding, but the code still means what it says, so lint runs. The types phase vouches for every
-     file; the run is incomplete for one reason only, the typed rules' crash on Counter.swift, which block C removes.
-     When it does, this test goes red, and its last expectations become a complete run with no crash.
+     A warning is a finding, but the code still means what it says, so lint runs. The warning source holds a `:` and
+     an `=`, so `redundant-type-annotation` applies to it and reads its names from the xcodebuild's index (block C,
+     #9ktapz2): every file is recorded and judged, so the run is complete.
      */
     @Test func aCompilerWarningIsAFindingAndLintStillRuns() async throws {
         try Self.requireXcodegen()
@@ -333,9 +335,83 @@ struct XcodeProjectPipelineTests {
         #expect(run.compilerFindings == ["Counter.swift:3:warning"])
         #expect(run.filesWithoutRecord.isEmpty)
         #expect(run.phase("lint")?.outcome == "ran")
-        #expect(run.lintCrashes == ["Counter.swift: \(Self.typedRulesUnread)"])
-        #expect(run.complete == false)
+        #expect(run.lintCrashes.isEmpty)
+        #expect(run.complete == true, "\(run.records)")
         #expect(run.exitCode == 1)
+    }
+
+    /* A typed rule finds its violation at an Xcode root, from what the xcodebuild's index says `items` is. */
+    @Test func aTypedRuleFindsItsViolationAtAnXcodeRoot() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.emptyCountSource)
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.findings == ["cohere-swift/empty-count:3"], "\(run.records)")
+        #expect(run.lintCrashes.isEmpty)
+        #expect(run.complete == true)
+        #expect(run.exitCode == 1)
+    }
+
+    /*
+     Both sources the typed rules read at an Xcode root, exactly as for a package: the xcodebuild's index for every
+     file it compiled as it stands, and sourcekitd fed the derived data's task store for a file edited since, which
+     the index cannot vouch for. Either missing turns this red even where the other would cover for it in a run.
+     */
+    @Test func theTypedRulesReadTheXcodeIndexThenSourcekitd() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.emptyCountSource)
+        defer { Self.remove(fixture.repository) }
+        let built = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        #expect(built.complete == true, "\(built.records)")
+
+        let scratch = Pipeline.scratchPath(for: fixture.root)
+        let source = try #require(try XcodeProject.source(at: fixture.root))
+        /* The project read afresh for each ask, as a run reads it: a URL keeps the modification date it was first asked for. */
+        func symbols() async throws -> SymbolProvider.Result {
+            let project = try XcodeProject.load(
+                source: source,
+                root: fixture.root,
+                scratchPath: scratch,
+                runner: ProcessRunner(),
+            )
+            let files = await SourceParser().parse(try FileSet.build(package: project.model).owned).files
+            return SymbolProvider(
+                layouts: Pipeline.symbolLayouts(package: project.model, scratch: scratch),
+                runner: ProcessRunner(),
+            )
+            .symbols(for: files)
+        }
+        let fromBuild = try await symbols()
+        #expect(fromBuild.fromIndex == 3, "\(fromBuild.unavailable)")
+        #expect(fromBuild.unavailable.isEmpty)
+
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(60)],
+            ofItemAtPath: fixture.root.appendingPathComponent("Sources/Counter.swift").path,
+        )
+        let edited = try await symbols()
+        #expect(edited.fromIndex == 2)
+        #expect(edited.fromSourcekitd == 1, "\(edited.unavailable)")
+        #expect(edited.unavailable.isEmpty)
+    }
+
+    /*
+     The same violation under `--lint` alone, where the build is lint's input rather than a types phase (e877e8f4),
+     so the typed rule reads an index the run built for it.
+     */
+    @Test func aLintOnlyRunAtAnXcodeRootBuildsForItsTypedRules() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.emptyCountSource)
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--lint"])
+
+        #expect(run.findings == ["cohere-swift/empty-count:3"], "\(run.records)")
+        #expect(run.phase("types")?.outcome == "skipped")
+        #expect(run.lintCrashes.isEmpty)
+        #expect(run.complete == true)
     }
 
     /*
@@ -350,6 +426,7 @@ struct XcodeProjectPipelineTests {
         let cold = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
         #expect(cold.typesBuild.hasPrefix("xcodebuild of 1 targets"), "\(cold.typesBuild)")
         #expect(cold.compilerFindings == ["Counter.swift:3:warning"])
+        #expect(cold.complete == true)
 
         let warm = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
         #expect(
@@ -358,6 +435,7 @@ struct XcodeProjectPipelineTests {
         )
         #expect(warm.compilerFindings == ["Counter.swift:3:warning"])
         #expect(warm.filesWithoutRecord.isEmpty)
+        #expect(warm.complete == true)
 
         try Self.typeErrorSource.write(
             to: fixture.root.appendingPathComponent("Sources/Counter.swift"),

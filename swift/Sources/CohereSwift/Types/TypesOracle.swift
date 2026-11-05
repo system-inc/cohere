@@ -13,8 +13,15 @@ import Foundation
 
  A comparison that could not fail proves nothing, so the oracle also asks one file again with an injected
  type error and requires that error back at its line. Coverage comes first in the report: files asked,
- files no compile command listed, and files sourcekitd could not answer for are all counted, so a run that
- compared nothing never reads as agreement.
+ files no compile command listed, files sourcekitd could not answer for, and files the build left without a
+ fresh record are all counted, so a run that compared nothing never reads as agreement.
+
+ The build's side has a gap of its own. An error at file scope fails the module's emit-module job, and the
+ build then compiles none of its files one by one, so their warnings are never recorded and the build's
+ side holds only what that job saw. Measured 2026-11-05 on a CapturePhone copy, where sourcekitd rightly
+ reported a warning the build never reached, and on a two-file package, where neither file had a record
+ and the comparison read as agreement. A file without a fresh record is one the build did not vouch for, so
+ it is named, and there is no agreement while there is one.
  */
 public struct TypesOracle {
     /* One compiler diagnostic, compared by where it is, how severe, and what it says. */
@@ -35,6 +42,8 @@ public struct TypesOracle {
         public var filesAsked: Int
         public var filesWithoutCommand: [String]
         public var filesUnanswered: [String: String]
+        /* Owned files the build left no record newer than the file for, as the types record names them. */
+        public var filesWithoutRecord: [String]
         public var build: [Diagnostic]
         public var sourcekitd: [Diagnostic]
         /* Diagnostics both sides report whose warning group differs: the build's name, then the one sourcekitd's documentation link gives. */
@@ -48,9 +57,10 @@ public struct TypesOracle {
         public var onlyBuild: [Diagnostic] { Set(build).subtracting(sourcekitd).sorted() }
         public var onlySourcekitd: [Diagnostic] { Set(sourcekitd).subtracting(build).sorted() }
 
-        /* Agreement means every owned file was asked and answered, the two sides match, and the control was caught. */
+        /* Agreement means every owned file was recorded by the build, asked and answered, the two sides match, and the control was caught. */
         public var agrees: Bool {
-            filesWithoutCommand.isEmpty && filesUnanswered.isEmpty && onlyBuild.isEmpty && onlySourcekitd.isEmpty
+            filesWithoutRecord.isEmpty && filesWithoutCommand.isEmpty && filesUnanswered.isEmpty
+                && onlyBuild.isEmpty && onlySourcekitd.isEmpty
                 && groupDifferences.isEmpty && controlFound && filesAsked == filesOwned
         }
     }
@@ -200,6 +210,7 @@ public struct TypesOracle {
             filesAsked: asked,
             filesWithoutCommand: withoutCommand.sorted(),
             filesUnanswered: unanswered,
+            filesWithoutRecord: types.record.filesWithoutRecord,
             build: build.sorted(),
             sourcekitd: sourcekitd.sorted(),
             groupDifferences: groupDifferences,
