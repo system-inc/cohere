@@ -5,6 +5,7 @@ package allowed
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"hash"
@@ -125,6 +126,18 @@ func hashes(data []byte) {
 	// A maphash.Hash value is addressable, so its Write is the pointer's, which implements hash.Hash.
 	var seeded maphash.Hash
 	seeded.Write(data)
+	// maphash.Hash's WriteString and crypto/rand's Read are documented never to fail.
+	seeded.WriteString("text")
+	_, _ = seeded.WriteString("text")
+	rand.Read(data)
+	_, _ = rand.Read(data)
+}
+
+// A deferred closure that hands the close's error to a named result handles it, and the deferred call itself
+// returns nothing.
+func closeReporting(file *os.File) (closeError error) {
+	defer func() { closeError = file.Close() }()
+	return nil
 }
 
 // Calls that return no error, builtins and conversions drop nothing the rule is about.
