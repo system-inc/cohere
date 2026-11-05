@@ -284,15 +284,15 @@ type toyCase struct {
 }
 
 type toyResult struct {
-	Formatted string  `json:"formatted"`
-	Attached  [][]any `json:"attached"`
-	Error     string  `json:"error"`
+	Formatted string       `json:"formatted"`
+	Attached  []attachment `json:"attached"`
+	Error     string       `json:"error"`
 }
 
-func attachedSummary(root *toyNode) [][]any {
+func attachedSummary(root *toyNode) []attachment {
 	// Empty, not nil: a nil slice encodes as null and upstream's empty array as [], and every comment-free
 	// program read as a mismatch until this said so.
-	attached := [][]any{}
+	attached := []attachment{}
 	var walk func(*toyNode)
 	walk = func(node *toyNode) {
 		for _, comment := range node.Comments {
@@ -302,7 +302,12 @@ func attachedSummary(root *toyNode) [][]any {
 			} else if comment.Trailing {
 				kind = "trailing"
 			}
-			attached = append(attached, []any{float64(comment.From), kind, node.Kind, float64(node.From)})
+			attached = append(attached, attachment{
+				CommentStart: comment.From,
+				Kind:         kind,
+				NodeType:     node.Kind,
+				NodeStart:    node.From,
+			})
 		}
 		if node.Label != nil {
 			walk(node.Label)
@@ -313,22 +318,11 @@ func attachedSummary(root *toyNode) [][]any {
 	}
 	walk(root)
 	for left := 1; left < len(attached); left++ {
-		for right := left; right > 0 && attachedStart(attached[right]) < attachedStart(attached[right-1]); right-- {
+		for right := left; right > 0 && attached[right].CommentStart < attached[right-1].CommentStart; right-- {
 			attached[right], attached[right-1] = attached[right-1], attached[right]
 		}
 	}
 	return attached
-}
-
-// attachedStart is the comment offset that opens an attachedSummary entry.
-func attachedStart(entry []any) float64 {
-	start, isNumber := entry[0].(float64)
-	if !isNumber {
-		// Invariant: attachedSummary's walk is the only writer of entries, and it opens each with
-		// float64(comment.From), the number JSON gives upstream's side.
-		panic(fmt.Sprintf("printing: an attached entry opens with a %T, not a float64", entry[0]))
-	}
-	return start
 }
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
