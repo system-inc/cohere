@@ -40,6 +40,11 @@ const (
 	SeverityOff Severity = "off"
 )
 
+// SeveritySpellings are the severities parseSeverity accepts, exactly as written, for the settings schema
+// (internal/settingsschema) to read rather than copy, so the schema never allows a spelling the engine
+// refuses. TestTheSeveritySpellingsAreTheLoaders holds the list to parseSeverity.
+var SeveritySpellings = []string{"error", "warn", "warning", "off"}
+
 // RuleSetting is one rule's severity and the options the config gave it.
 type RuleSetting struct {
 	Severity Severity

@@ -260,6 +260,22 @@ func TestEveryAcceptedShapeLoads(test *testing.T) {
 	}
 }
 
+// TestTheSeveritySpellingsAreTheLoaders: the schema offers SeveritySpellings, so each must load and a
+// spelling outside them, the TypeScript loader's extra ones and a capitalized one among them, must not.
+func TestTheSeveritySpellingsAreTheLoaders(test *testing.T) {
+	test.Parallel()
+	for _, spelling := range SeveritySpellings {
+		if _, severityError := parseSeverity(json.RawMessage(`"` + spelling + `"`)); severityError != nil {
+			test.Errorf("the schema offers %q and the loader refuses it: %v", spelling, severityError)
+		}
+	}
+	for _, refused := range []string{"allow", "deny", "Error", "fatal", ""} {
+		if _, severityError := parseSeverity(json.RawMessage(`"` + refused + `"`)); severityError == nil {
+			test.Errorf("the loader accepts %q, which the schema does not offer", refused)
+		}
+	}
+}
+
 // TestEveryBadShapeIsRefusedByName: each refusal names the file and the key, so the fix is one edit.
 func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 	test.Parallel()
