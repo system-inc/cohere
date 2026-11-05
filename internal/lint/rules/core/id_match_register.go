@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // non-empty name matches, so an unconfigured rule reporting nothing is upstream's own behaviour
 // rather than an inert-rule defect.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[IdMatchSettings]{
 		Rule:             IdMatch,
 		DecodeOptionList: DecodeIdMatchOptions,
 	})

@@ -63,9 +63,9 @@ var messagePreferTemplateUnexpectedStringConcatenation = rule.Message{
 // an operand counts as the string
 // half -- accepts a template literal too. So a chain of nothing but templates and strings is clean,
 // while one template plus an identifier reports. 14 corpus cases exercise this.
-var PreferTemplate = rule.Rule{
+var PreferTemplate = rule.Rule[rule.NoOptions]{
 	Name: "prefer-template",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Upstream's `done` map, keyed on the top expression. Both a string literal and a template
 		// literal operand reach the same chain, so without this a two-literal concatenation reports
 		// twice.

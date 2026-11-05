@@ -1982,21 +1982,17 @@ func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) 
 	if decodeNoRestrictedImportsOptionsError != nil {
 		test.Fatalf("could not decode: %v", decodeNoRestrictedImportsOptionsError)
 	}
-	options, ok := decoded.(NoRestrictedImportsOptions)
-	if !ok {
-		test.Fatalf("expected NoRestrictedImportsOptions, got %T", decoded)
-	}
-	if len(options.Patterns) != 1 {
-		test.Fatalf("expected the two strings folded into 1 entry, got %d", len(options.Patterns))
+	if len(decoded.Patterns) != 1 {
+		test.Fatalf("expected the two strings folded into 1 entry, got %d", len(decoded.Patterns))
 	}
 
 	// The control that the folding actually changes a verdict, rather than merely a shape.
 	excluded := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
-		"import { a } from 'foo/bar';", options)
+		"import { a } from 'foo/bar';", decoded)
 	rule_testing.ExpectClean(test, excluded)
 
 	included := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
-		"import { a } from 'foo/baz';", options)
+		"import { a } from 'foo/baz';", decoded)
 	rule_testing.ExpectFindings(test, included, "patterns")
 }
 

@@ -2679,13 +2679,9 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(test *testing.T) {
 			if err != nil {
 				test.Fatalf("decoding %s: %v", testCase.rawJson, err)
 			}
-			options, ok := decoded.(NoExtraBooleanCastOptions)
-			if !ok {
-				test.Fatalf("decoded to %T, wanted NoExtraBooleanCastOptions", decoded)
-			}
-			if options.EnforceForInnerExpressions != testCase.want {
+			if decoded.EnforceForInnerExpressions != testCase.want {
 				test.Fatalf("EnforceForInnerExpressions was %v, wanted %v",
-					options.EnforceForInnerExpressions, testCase.want)
+					decoded.EnforceForInnerExpressions, testCase.want)
 			}
 		})
 	}

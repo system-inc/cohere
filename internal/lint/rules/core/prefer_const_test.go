@@ -991,12 +991,8 @@ func TestPreferConstDecodesItsOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding %s: %v", testCase.raw, err)
 		}
-		options, ok := decoded.(PreferConstOptions)
-		if !ok {
-			test.Fatalf("decoding %s gave a %T, not PreferConstOptions", testCase.raw, decoded)
-		}
-		if options.Destructuring != testCase.want {
-			test.Fatalf("decoding %s gave destructuring %d, want %d", testCase.raw, options.Destructuring,
+		if decoded.Destructuring != testCase.want {
+			test.Fatalf("decoding %s gave destructuring %d, want %d", testCase.raw, decoded.Destructuring,
 				testCase.want)
 		}
 	}
@@ -1005,11 +1001,7 @@ func TestPreferConstDecodesItsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding the boolean option: %v", err)
 	}
-	options, ok := decoded.(PreferConstOptions)
-	if !ok {
-		test.Fatalf("decoding the boolean option gave a %T, not PreferConstOptions", decoded)
-	}
-	if !options.IgnoreReadBeforeAssign {
+	if !decoded.IgnoreReadBeforeAssign {
 		test.Fatal("ignoreReadBeforeAssign decoded as false")
 	}
 

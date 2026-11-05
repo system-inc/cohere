@@ -62,13 +62,13 @@ import (
 // `let Object; Object.defineProperty(foo, 'bar', { set(val) { return 1; } })` as clean: a local with
 // the global's spelling is somebody else's method. An arrow written `set: val => val` returns its
 // expression body, so that body is what reports, where ESLint reports it.
-var NoSetterReturn = rule.Rule{
+var NoSetterReturn = rule.Rule[rule.NoOptions]{
 	Name: "no-setter-return",
 
 	// Whether the `Object` or `Reflect` of a descriptor call is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		isGlobal := func(identifier *ast.Node) bool {
 			return ruleContext.TypeChecker != nil &&
 				rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))

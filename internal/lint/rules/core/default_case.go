@@ -87,11 +87,11 @@ var messageDefaultCaseMissingDefaultCase = rule.Message{
 // A rule scanning the file itself is invisible to that cache and pays the whole cost alone; the
 // shelf's own doc comment records three rules that each rescanned the file through one well-factored
 // helper before it existed.
-var DefaultCase = rule.Rule{
+var DefaultCase = rule.Rule[DefaultCaseOptions]{
 	Name: "default-case",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DefaultCaseOptions]) rule.Listeners {
 		pattern := defaultCaseDefaultCommentPattern
-		if resolved, isDefaultCaseOptions := rule.OptionsAs[DefaultCaseOptions](options); isDefaultCaseOptions &&
+		if resolved, isDefaultCaseOptions := options.Read(); isDefaultCaseOptions &&
 			resolved.CommentPattern != "" {
 			// Upstream builds `new RegExp(options.commentPattern, "u")`, which throws on a bad
 			// pattern and takes the lint run down naming the rule. The pattern is read as JavaScript
@@ -212,7 +212,7 @@ func DefaultDefaultCaseOptions() DefaultCaseOptions {
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring.
-func DecodeDefaultCaseOptions(raw []byte) (any, error) {
+func DecodeDefaultCaseOptions(raw []byte) (DefaultCaseOptions, error) {
 	options := DefaultDefaultCaseOptions()
 	if len(raw) == 0 {
 		return options, nil

@@ -147,15 +147,15 @@ type skippedRegion struct {
 // string is sometimes deliberate, a byte order mark mid-file is an encoding accident rather than a
 // typo, and deleting versus replacing changes the token stream differently. An unattended rewrite
 // that picks wrong here edits characters nobody can see, which is the worst place to be wrong.
-var NoIrregularWhitespace = rule.Rule{
+var NoIrregularWhitespace = rule.Rule[NoIrregularWhitespaceOptions]{
 	Name: "no-irregular-whitespace",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoIrregularWhitespaceOptions]) rule.Listeners {
 		// ESLint's defaults, which are also this tree's resolved configuration. Only SkipStrings defaults
 		// to on: irregular whitespace inside a string is usually data rather than a typo, and
 		// reporting it would flag every file that holds a no-break space on purpose.
 		skipComments, skipStrings, skipTemplates := false, true, false
 		skipRegExps, skipJsxText := false, false
-		if settings, hasSettings := rule.OptionsAs[NoIrregularWhitespaceOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			if settings.SkipComments != nil {
 				skipComments = *settings.SkipComments
 			}

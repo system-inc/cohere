@@ -318,11 +318,7 @@ func TestDecodeNoMultiAssignOptions(test *testing.T) {
 			if decodeNoMultiAssignOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoMultiAssignOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiAssignOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than NoMultiAssignOptions", decoded)
-			}
-			got := options.IgnoreNonDeclaration != nil && *options.IgnoreNonDeclaration
+			got := decoded.IgnoreNonDeclaration != nil && *decoded.IgnoreNonDeclaration
 			if got != testCase.want {
 				test.Errorf("ignoreNonDeclaration decodes to %v, want %v", got, testCase.want)
 			}

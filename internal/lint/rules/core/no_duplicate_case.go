@@ -44,9 +44,9 @@ var messageDuplicateCase = rule.Message{
 //
 // No fix. Which arm is the mistake and what its test should have been is the author's knowledge,
 // and deleting the wrong one deletes a body that was meant to run.
-var NoDuplicateCase = rule.Rule{
+var NoDuplicateCase = rule.Rule[rule.NoOptions]{
 	Name: "no-duplicate-case",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

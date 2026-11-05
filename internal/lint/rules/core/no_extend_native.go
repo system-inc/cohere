@@ -142,7 +142,7 @@ type NoExtendNativeOptions struct {
 // approach rather than an accident: `o = Object; o.prototype.toString = 0` is silent upstream
 // because `o` is a different variable, and `global.Object.prototype.toString = 0` is silent because
 // the receiver is a member access rather than the global identifier.
-var NoExtendNative = rule.Rule{
+var NoExtendNative = rule.Rule[NoExtendNativeOptions]{
 	Name: "no-extend-native",
 
 	// See the doc above: half the clean cases are a local binding shadowing a builtin name, and
@@ -150,13 +150,13 @@ var NoExtendNative = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoExtendNativeOptions]) rule.Listeners {
 		// A rule configured as a bare `"error"` is handed `nil` rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. The zero
 		// value is the right default here, and naming it makes that a decision rather than an
 		// accident. `TestNoExtendNativeDefaultsWithoutTheDecoder` bypasses the decoder to pin it.
 		settings := NoExtendNativeOptions{}
-		if decoded, ok := rule.OptionsAs[NoExtendNativeOptions](options); ok {
+		if decoded, ok := options.Read(); ok {
 			settings = decoded
 		}
 		excepted := make(map[string]bool, len(settings.Exceptions))

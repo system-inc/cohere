@@ -9,5 +9,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // generic helper would decode an absent option to false, dropping every class-field finding; see
 // DecodeClassMethodsUseThisOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: ClassMethodsUseThis, Decode: DecodeClassMethodsUseThisOptions})
+	rule.Register(rule.Registration[ClassMethodsUseThisOptions]{
+		Rule:   ClassMethodsUseThis,
+		Decode: DecodeClassMethodsUseThisOptions,
+	})
 }

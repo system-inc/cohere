@@ -1238,27 +1238,19 @@ func TestNoRestrictedGlobalsRequiresTheTypedHarness(test *testing.T) {
 func TestDecodeNoRestrictedGlobalsOptions(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(
+	settings, err := DecodeNoRestrictedGlobalsOptions([]byte(
 		`["event", {"name": "fdescribe", "message": "Do not commit fdescribe."}]`))
 	if err != nil {
 		test.Fatalf("upstream's variadic spelling was refused: %v", err)
-	}
-	settings, ok := decoded.(NoRestrictedGlobalsSettings)
-	if !ok {
-		test.Fatalf("decoded options are not NoRestrictedGlobalsSettings: got %T", decoded)
 	}
 	if len(settings.GlobalsOrder) != 2 || settings.Globals["fdescribe"] != "Do not commit fdescribe." {
 		test.Errorf("both elements must be read, the second with its message: %+v", settings)
 	}
 
-	decoded, err = DecodeNoRestrictedGlobalsOptions([]byte(
+	settings, err = DecodeNoRestrictedGlobalsOptions([]byte(
 		`[{"globals": ["event"], "checkGlobalObject": true, "globalObjects": ["myGlobal"]}]`))
 	if err != nil {
 		test.Fatalf("the object form was refused: %v", err)
-	}
-	settings, ok = decoded.(NoRestrictedGlobalsSettings)
-	if !ok {
-		test.Fatalf("decoded options are not NoRestrictedGlobalsSettings: got %T", decoded)
 	}
 	if !settings.CheckGlobalObject || len(settings.GlobalObjects) != 1 || len(settings.GlobalsOrder) != 1 {
 		test.Errorf("the object form's flags must be read: %+v", settings)

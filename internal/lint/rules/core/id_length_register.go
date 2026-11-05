@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `RequiresOptions` is deliberately not set: upstream's default is a minimum length of 2, so an
 // unconfigured rule enforces that rather than doing nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[IdLengthSettings]{
 		Rule:   IdLength,
 		Decode: DecodeIdLengthOptions,
 	})

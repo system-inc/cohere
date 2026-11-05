@@ -223,11 +223,7 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 		if decodeMaximumClassesPerFileOptionsError != nil {
 			test.Fatalf("the decoder refused %s: %v", raw, decodeMaximumClassesPerFileOptionsError)
 		}
-		options, isOptions := decoded.(MaxClassesPerFileOptions)
-		if !isOptions {
-			test.Fatalf("expected MaxClassesPerFileOptions, got %T", decoded)
-		}
-		return options
+		return decoded
 	}
 
 	test.Run("empty input defaults to a maximum of one", func(test *testing.T) {

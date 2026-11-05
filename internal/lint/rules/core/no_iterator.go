@@ -55,9 +55,9 @@ var messageUseSymbolIterator = rule.Message{
 // The replaced span runs from the end of the object expression to the end of the member expression,
 // which is what deletes the dot in `test.__iterator__` and the brackets in `test['__iterator__']`
 // without either case needing its own arm.
-var NoIterator = rule.Rule{
+var NoIterator = rule.Rule[rule.NoOptions]{
 	Name: "no-iterator",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// Both access kinds, because `staticPropertyName` answers for both and a rule watching
 			// only the dotted form is silent on `test['__iterator__']`, which upstream reports.

@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `RequiresOptions` is deliberately not set: the one option defaults false and the rule enforces
 // sorting without it.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[SortVarsSettings]{
 		Rule:   SortVars,
 		Decode: DecodeSortVarsOptions,
 	})

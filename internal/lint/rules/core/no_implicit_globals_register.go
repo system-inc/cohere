@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // costs nothing today, since upstream's default for `lexicalBindings` is already false, and it is
 // what keeps the shape correct if the default ever moves.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoImplicitGlobalsSettings]{
 		Rule:   NoImplicitGlobals,
 		Decode: DecodeNoImplicitGlobalsOptions,
 	})

@@ -76,9 +76,9 @@ var messageUnnecessaryBind = rule.Message{
 // A trailing comment after the call survives, because it is outside both spans:
 // `function(){}.bind(b)/**/` becomes `function(){}/**/`. That falls out of the spans rather than
 // being handled, and it is stated because it looks like an oversight.
-var NoExtraBind = rule.Rule{
+var NoExtraBind = rule.Rule[rule.NoOptions]{
 	Name: "no-extra-bind",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

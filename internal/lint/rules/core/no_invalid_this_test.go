@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -965,19 +966,14 @@ func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(test *testing.T) {
 			test.Errorf("%s: decode returned %v", testCase.name, decodeNoInvalidThisOptionsError)
 			continue
 		}
-		settings, ok := decoded.(noInvalidThisSettings)
-		if !ok {
-			test.Errorf("%s: decode produced %T, not noInvalidThisSettings", testCase.name, decoded)
-			continue
-		}
-		if settings.CapIsConstructor != testCase.want {
+		if decoded.CapIsConstructor != testCase.want {
 			test.Errorf("%s: capIsConstructor is %v, want %v",
-				testCase.name, settings.CapIsConstructor, testCase.want)
+				testCase.name, decoded.CapIsConstructor, testCase.want)
 		}
 	}
 
 	// Nil options is what a rule configured as a bare "error" actually receives.
-	if got := noInvalidThisSettingsFrom(nil); !got.CapIsConstructor {
+	if got := noInvalidThisSettingsFrom(rule.Given[noInvalidThisSettings]{}); !got.CapIsConstructor {
 		test.Error("nil options gave capIsConstructor false, so a bare \"error\" would invert the default")
 	}
 

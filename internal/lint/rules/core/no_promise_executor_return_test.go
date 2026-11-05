@@ -346,11 +346,7 @@ func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
 			if decodeNoPromiseExecutorReturnOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoPromiseExecutorReturnOptionsError)
 			}
-			options, isOptions := decoded.(NoPromiseExecutorReturnOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than NoPromiseExecutorReturnOptions", decoded)
-			}
-			got := options.AllowVoid != nil && *options.AllowVoid
+			got := decoded.AllowVoid != nil && *decoded.AllowVoid
 			if got != testCase.want {
 				test.Errorf("allowVoid decodes to %v, want %v", got, testCase.want)
 			}

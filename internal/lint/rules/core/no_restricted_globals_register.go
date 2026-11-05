@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // an object carrying that list plus two flags. Each entry is itself either a string or an object,
 // and the generic helper expresses none of those alternatives.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoRestrictedGlobalsSettings]{
 		Rule:             NoRestrictedGlobals,
 		DecodeOptionList: DecodeNoRestrictedGlobalsOptions,
 	})

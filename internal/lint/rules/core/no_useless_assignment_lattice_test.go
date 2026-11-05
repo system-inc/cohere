@@ -112,10 +112,10 @@ func TestDeadStoreBitsetSolvesAsTheMapDid(test *testing.T) {
 		"  return later() + total;\n" +
 		"}\n"
 	solved := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "dead-store-bitset",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				symbols, occupied := collectSymbolFacts(ruleContext, node)
 				for _, root := range codePathRoots(ruleContext, node) {

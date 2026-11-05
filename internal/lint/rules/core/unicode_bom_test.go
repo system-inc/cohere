@@ -186,12 +186,8 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		if decodeUnicodeBomOptionsError != nil {
 			test.Fatalf("empty input should decode, got %v", decodeUnicodeBomOptionsError)
 		}
-		options, isOptions := decoded.(UnicodeBomOptions)
-		if !isOptions {
-			test.Fatalf("expected UnicodeBomOptions, got %T", decoded)
-		}
-		if options.Require == nil || *options.Require != UnicodeBomNever {
-			test.Fatalf("expected never, got %v", options.Require)
+		if decoded.Require == nil || *decoded.Require != UnicodeBomNever {
+			test.Fatalf("expected never, got %v", decoded.Require)
 		}
 	})
 
@@ -201,12 +197,8 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		if decodeUnicodeBomOptionsError != nil {
 			test.Fatalf("expected always to decode, got %v", decodeUnicodeBomOptionsError)
 		}
-		options, ok := decoded.(UnicodeBomOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not UnicodeBomOptions", decoded)
-		}
-		if options.Require == nil || *options.Require != UnicodeBomAlways {
-			test.Fatalf("expected always, got %v", options.Require)
+		if decoded.Require == nil || *decoded.Require != UnicodeBomAlways {
+			test.Fatalf("expected always, got %v", decoded.Require)
 		}
 	})
 

@@ -204,12 +204,8 @@ func TestNoExtendNativeDecodesItsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding failed: %v", err)
 	}
-	settings, ok := decoded.(NoExtendNativeOptions)
-	if !ok {
-		test.Fatalf("decoded to %T", decoded)
-	}
-	if len(settings.Exceptions) != 1 || settings.Exceptions[0] != "Object" {
-		test.Fatalf("exceptions decoded as %#v", settings.Exceptions)
+	if len(decoded.Exceptions) != 1 || decoded.Exceptions[0] != "Object" {
+		test.Fatalf("exceptions decoded as %#v", decoded.Exceptions)
 	}
 
 	// And the decoded value reaches the rule: the same input reports without the exception.

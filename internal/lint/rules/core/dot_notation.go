@@ -79,11 +79,11 @@ type DotNotationOptions struct {
 // object is a plain decimal integer, which is `decimalInteger` in `ecmascript/dotnotation`;
 // `5.000_000` and `0b1010_1010` and `01` all take the no-space branch. Ten corpus cases pin the two
 // branches against each other.
-var DotNotation = rule.Rule{
+var DotNotation = rule.Rule[DotNotationOptions]{
 	Name: "dot-notation",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DotNotationOptions]) rule.Listeners {
 		settings := dotnotation.Settings{AllowKeywords: true}
-		if resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options); isDotNotationOptions {
+		if resolved, isDotNotationOptions := options.Read(); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
 				settings.AllowKeywords = *resolved.AllowKeywords
 			}
@@ -108,7 +108,7 @@ func DefaultDotNotationOptions() DotNotationOptions {
 // generic helper would ship: `allowKeywords` defaults to true, so decoding an absent option into a
 // plain bool would invert the rule and start reporting every `a.class` in the tree. The second is
 // that a bare `"error"` configuration arrives as empty input, which the generic decoder errors on.
-func DecodeDotNotationOptions(raw []byte) (any, error) {
+func DecodeDotNotationOptions(raw []byte) (DotNotationOptions, error) {
 	options := DefaultDotNotationOptions()
 	if len(raw) == 0 {
 		return options, nil

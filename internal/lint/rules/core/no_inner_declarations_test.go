@@ -382,19 +382,15 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 			if decodeNoInnerDeclarationsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoInnerDeclarationsOptionsError)
 			}
-			settings, isSettings := decoded.(NoInnerDeclarationsOptions)
-			if !isSettings {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if settings.Both == nil || settings.BlockScopedFunctions == nil {
+			if decoded.Both == nil || decoded.BlockScopedFunctions == nil {
 				test.Fatalf("a nil field would leave the rule reading a default it did not choose")
 			}
-			if *settings.Both != testCase.wantBoth {
-				test.Errorf("both: got %v, want %v", *settings.Both, testCase.wantBoth)
+			if *decoded.Both != testCase.wantBoth {
+				test.Errorf("both: got %v, want %v", *decoded.Both, testCase.wantBoth)
 			}
-			if *settings.BlockScopedFunctions != testCase.wantBlockScopedFunctions {
+			if *decoded.BlockScopedFunctions != testCase.wantBlockScopedFunctions {
 				test.Errorf("blockScopedFunctions: got %v, want %v",
-					*settings.BlockScopedFunctions, testCase.wantBlockScopedFunctions)
+					*decoded.BlockScopedFunctions, testCase.wantBlockScopedFunctions)
 			}
 		})
 	}

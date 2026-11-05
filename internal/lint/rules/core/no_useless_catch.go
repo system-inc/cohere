@@ -57,9 +57,9 @@ var messageUnnecessaryCatchClause = rule.Message{
 //
 // No fix. Removing a `try` is a structural edit whose correct form depends on what the author meant
 // the clause to become.
-var NoUselessCatch = rule.Rule{
+var NoUselessCatch = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-catch",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

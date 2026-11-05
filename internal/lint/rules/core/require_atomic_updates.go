@@ -241,7 +241,7 @@ type RequireAtomicUpdatesOptions struct {
 // expression sees, which is the entire point and is not something a linter may do unattended. There
 // is also no single right answer, since the author may have meant to re-read, to lock, or to hold
 // the value deliberately.
-var RequireAtomicUpdates = rule.Rule{
+var RequireAtomicUpdates = rule.Rule[RequireAtomicUpdatesOptions]{
 	Name: "require-atomic-updates",
 
 	// Symbol identity is what makes two occurrences the same binding, and it is what separates a
@@ -257,14 +257,14 @@ var RequireAtomicUpdates = rule.Rule{
 	// unexplained survivor; the guard that can see it is the dry run against the real tree.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RequireAtomicUpdatesOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil options, which `options.(T)` turns into
 		// the zero value. The zero value is the right default here (upstream defaults
 		// `allowProperties` to false) but the fallback is written explicitly rather than relied on,
 		// because a rule whose default arrives by accident is one field rename away from silently
 		// inverting.
 		settings := RequireAtomicUpdatesOptions{AllowProperties: false}
-		if decoded, configured := rule.OptionsAs[RequireAtomicUpdatesOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 

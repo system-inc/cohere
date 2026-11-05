@@ -212,17 +212,17 @@ var builtInErrorTypes = map[string]bool{
 // `new Error<() => void>()`, ESLint inserts at the first parenthesis after the callee, which is the
 // one inside the type arguments, and writes `new Error<("", { cause: err }) => void>()`. This inserts
 // at the argument list the parser found, which is the code ESLint meant to write.
-var PreserveCaughtError = rule.Rule{
+var PreserveCaughtError = rule.Rule[PreserveCaughtErrorOptions]{
 	Name: "preserve-caught-error",
 
 	// Whether a constructor is the global and whether a `cause` names the caught binding are both
 	// symbol questions.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreserveCaughtErrorOptions]) rule.Listeners {
 		// A rule configured as bare `"error"` is handed nil options, and the zero struct is the
 		// documented default for both options.
-		parsed, _ := rule.OptionsAs[PreserveCaughtErrorOptions](options)
+		parsed, _ := options.Read()
 
 		// Later entries win, as ESLint's Map.set does: naming one class twice with two positions
 		// takes the second.

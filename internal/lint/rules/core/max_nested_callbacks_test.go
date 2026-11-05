@@ -305,17 +305,13 @@ func TestDecodeMaxNestedCallbacksOptions(test *testing.T) {
 			if decodeMaximumNestedCallbacksOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeMaximumNestedCallbacksOptionsError)
 			}
-			settings, isSettings := decoded.(MaxNestedCallbacksOptions)
-			if !isSettings {
-				test.Fatalf("decoded to %T, want MaxNestedCallbacksOptions", decoded)
-			}
-			if settings.Maximum == nil {
+			if decoded.Maximum == nil {
 				test.Fatalf("maximum is nil, which would leave the rule inert")
 			}
-			if *settings.Maximum != testCase.wantMaximum {
-				test.Errorf("maximum: got %d, want %d", *settings.Maximum, testCase.wantMaximum)
+			if *decoded.Maximum != testCase.wantMaximum {
+				test.Errorf("maximum: got %d, want %d", *decoded.Maximum, testCase.wantMaximum)
 			}
-			got := settings.CheckConstructorCallCallbacks != nil && *settings.CheckConstructorCallCallbacks
+			got := decoded.CheckConstructorCallCallbacks != nil && *decoded.CheckConstructorCallCallbacks
 			if got != testCase.wantCheckConstructorCallCallbacks {
 				test.Errorf("checkConstructorCallCallbacks: got %v, want %v", got,
 					testCase.wantCheckConstructorCallCallbacks)

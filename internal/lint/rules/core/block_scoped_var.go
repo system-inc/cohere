@@ -46,11 +46,11 @@ import (
 // and each is outside the other declaration's block. That reads like over-reporting and it is
 // upstream's behaviour, measured; a port checking only non-declaration references reports zero here,
 // on a case upstream reports six findings for at three branches.
-var BlockScopedVar = rule.Rule{
+var BlockScopedVar = rule.Rule[rule.NoOptions]{
 	Name:             "block-scoped-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
 				if ruleContext.TypeChecker == nil {

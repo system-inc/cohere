@@ -581,15 +581,11 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdMatchOptions([]byte(
+	settings, err := DecodeIdMatchOptions([]byte(
 		`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`,
 	))
 	if err != nil {
 		test.Fatalf("decoding a full option tuple: %v", err)
-	}
-	settings, ok := decoded.(IdMatchSettings)
-	if !ok {
-		test.Fatalf("expected IdMatchSettings, got %T", decoded)
 	}
 	if settings.PatternText != "^[a-z]+$" || settings.Pattern == nil {
 		test.Errorf("expected the pattern to be read, got %q", settings.PatternText)
@@ -600,11 +596,10 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	}
 
 	// A pattern alone leaves every flag off, which is upstream's defaultOptions.
-	decoded, err = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
+	settings, err = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
 	if err != nil {
 		test.Fatalf("decoding a pattern-only tuple: %v", err)
 	}
-	settings, _ = decoded.(IdMatchSettings)
 	if settings.CheckProperties || settings.CheckClassFields ||
 		settings.OnlyDeclarations || settings.IgnoreDestructuring {
 		test.Errorf("expected every flag off by default, got %+v", settings)
@@ -889,12 +884,11 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 	if decodeIdMatchOptionsError != nil {
 		test.Fatalf("decoding the option list: %v", decodeIdMatchOptionsError)
 	}
-	settings, _ := decoded.(IdMatchSettings)
-	if settings.PatternText != "^[a-z]+$" {
-		test.Errorf("expected the pattern to be read, got %q", settings.PatternText)
+	if decoded.PatternText != "^[a-z]+$" {
+		test.Errorf("expected the pattern to be read, got %q", decoded.PatternText)
 	}
-	if !settings.CheckProperties || !settings.CheckClassFields {
-		test.Errorf("expected the second element's flags to be read, got %+v", settings)
+	if !decoded.CheckProperties || !decoded.CheckClassFields {
+		test.Errorf("expected the second element's flags to be read, got %+v", decoded)
 	}
 
 	// Shapes the config layer does not deliver, or that upstream's schema refuses, are refused

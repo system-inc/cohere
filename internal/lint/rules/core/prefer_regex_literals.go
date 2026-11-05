@@ -156,7 +156,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 // tables with the version that decides them. The direction is worth stating: offering a
 // suggestion is the safe side of this divergence, because a suggestion is never applied
 // without a human, and the code it proposes is valid in every edition this codebase targets.
-var PreferRegexLiterals = rule.Rule{
+var PreferRegexLiterals = rule.Rule[PreferRegexLiteralsOptions]{
 	TypeReach: rule.TypeReachShapes,
 	Name:      "prefer-regex-literals",
 
@@ -164,7 +164,7 @@ var PreferRegexLiterals = rule.Rule{
 	// by where its symbol is declared: eleven of upstream's clean cases are exactly that shadow.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreferRegexLiteralsOptions]) rule.Listeners {
 		// Declining once per file rather than once per node, following `await_thenable`: the
 		// registration path will not hand a typed rule a file with no checker, but a Context built
 		// by hand can, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds one.
@@ -172,7 +172,7 @@ var PreferRegexLiterals = rule.Rule{
 			return nil
 		}
 
-		settings, _ := rule.OptionsAs[PreferRegexLiteralsOptions](options)
+		settings, _ := options.Read()
 
 		check := func(node *ast.Node) {
 			argumentNodes := node.Arguments()

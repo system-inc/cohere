@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The generic decoder is safe here because the rule's single option defaults to false, so a rule
 // handed nil options gets a zero value that already behaves correctly.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[PreferPromiseRejectErrorsOptions]{
 		Rule:   PreferPromiseRejectErrors,
 		Decode: rule.DecodeOptionsInto[PreferPromiseRejectErrorsOptions](),
 	})

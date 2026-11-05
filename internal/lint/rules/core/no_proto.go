@@ -54,9 +54,9 @@ var messageNoProto = rule.Message{
 //
 // Optional chaining reports: `test?.__proto__` and `test?.[`__proto__`]` both fired on the same
 // build. Our parser hangs the question off the same two access kinds, so no arm is needed for it.
-var NoProto = rule.Rule{
+var NoProto = rule.Rule[rule.NoOptions]{
 	Name: "no-proto",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// Both access kinds, because the shelf helper answers for both and a rule watching only
 			// the dotted form is silent on `test['__proto__']`, which upstream reports.

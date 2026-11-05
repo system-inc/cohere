@@ -65,7 +65,7 @@ import (
 // parameter to the enclosing function and rewrite every use, which changes the signature, is not a
 // single-span edit, and has to pick a parameter name. Under this tree's rule that is not even a
 // suggestion: it is a change of meaning at a site the rule does not own.
-var PreferRestParams = rule.Rule{
+var PreferRestParams = rule.Rule[rule.NoOptions]{
 	Name: "prefer-rest-params",
 
 	// See the doc above: telling the implicit binding from a declared one is name resolution, and
@@ -73,7 +73,7 @@ var PreferRestParams = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if node.Text() != "arguments" {

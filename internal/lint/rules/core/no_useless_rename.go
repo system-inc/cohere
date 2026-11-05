@@ -36,7 +36,7 @@ type noUselessRenameWireShape struct {
 }
 
 // DecodeNoUselessRenameOptions reads the option object off the config.
-func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
+func DecodeNoUselessRenameOptions(raw []byte) (NoUselessRenameSettings, error) {
 	if len(raw) == 0 {
 		return DefaultNoUselessRenameSettings(), nil
 	}
@@ -103,10 +103,10 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 // being kept survives the rewrite, so `({foo: foo /**/} = {})` still fixes while
 // `({foo /**/: foo} = {})` does not. Upstream compares the comments inside the whole node against
 // those inside the replacement, and that comparison is what draws the line.
-var NoUselessRename = rule.Rule{
+var NoUselessRename = rule.Rule[NoUselessRenameSettings]{
 	Name: "no-useless-rename",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoUselessRenameSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUselessRenameSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoUselessRenameSettings()
 		}

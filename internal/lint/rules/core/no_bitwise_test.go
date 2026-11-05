@@ -363,15 +363,11 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 			if decodeNoBitwiseOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeNoBitwiseOptionsError)
 			}
-			options, ok := decoded.(NoBitwiseOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than NoBitwiseOptions", decoded)
+			if decoded.Int32Hint != testCase.wantHint {
+				test.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, decoded.Int32Hint)
 			}
-			if options.Int32Hint != testCase.wantHint {
-				test.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, options.Int32Hint)
-			}
-			if strings.Join(options.Allow, ",") != strings.Join(testCase.wantAllow, ",") {
-				test.Errorf("allow: expected %v, got %v", testCase.wantAllow, options.Allow)
+			if strings.Join(decoded.Allow, ",") != strings.Join(testCase.wantAllow, ",") {
+				test.Errorf("allow: expected %v, got %v", testCase.wantAllow, decoded.Allow)
 			}
 		})
 	}

@@ -49,11 +49,11 @@ type PreferPromiseRejectErrorsOptions struct {
 //	Promise.reject('failed')
 //	Promise.reject()
 //	new Promise((resolve, reject) => reject({ code: 1 }))
-var PreferPromiseRejectErrors = rule.Rule{
+var PreferPromiseRejectErrors = rule.Rule[PreferPromiseRejectErrorsOptions]{
 	Name:             "prefer-promise-reject-errors",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreferPromiseRejectErrorsOptions]) rule.Listeners {
 		// Declining the file once rather than once per node. `NeedsTypeChecker` governs the
 		// registration path only, and the harness builds a context by hand, so this is the guard
 		// that actually runs.
@@ -61,7 +61,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 			return nil
 		}
 
-		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
+		settings, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

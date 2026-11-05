@@ -516,11 +516,7 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if decodeEqeqeqOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
-		options, ok := decoded.(EqeqeqOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
-		}
-		settings := options.resolve()
+		settings := decoded.resolve()
 		if settings.mode != EqeqeqAlways || settings.null != EqeqeqNullAlways {
 			test.Errorf("defaults resolved to %+v, wanted Always and Always", settings)
 		}
@@ -532,11 +528,7 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if decodeEqeqeqOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
-		options, ok := decoded.(EqeqeqOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
-		}
-		if settings := options.resolve(); settings.mode != EqeqeqAlways ||
+		if settings := decoded.resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
 			test.Errorf("resolved to %+v, wanted Always and Ignore", settings)
 		}
@@ -548,11 +540,7 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if decodeEqeqeqOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
-		options, ok := decoded.(EqeqeqOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
-		}
-		if settings := options.resolve(); settings.mode != EqeqeqAlways ||
+		if settings := decoded.resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
 			test.Errorf("resolved to %+v, wanted Always and Ignore", settings)
 		}

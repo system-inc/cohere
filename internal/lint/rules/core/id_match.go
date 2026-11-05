@@ -78,7 +78,7 @@ type idMatchRawOptions struct {
 // would throw at `new RegExp(pattern, "u")`, and a rule that quietly matched everything instead
 // would be inert while looking configured, which is the worst of the two failures. So is a flag key
 // upstream's schema does not declare, which `additionalProperties: false` refuses there.
-func DecodeIdMatchOptions(list []byte) (any, error) {
+func DecodeIdMatchOptions(list []byte) (IdMatchSettings, error) {
 	settings := DefaultIdMatchSettings()
 	elements, err := rule.OptionElements(list, 2)
 	if err != nil || len(elements) == 0 {
@@ -117,8 +117,8 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 }
 
 // idMatchSettingsFrom recovers the settings from whatever the config layer handed over.
-func idMatchSettingsFrom(options any) IdMatchSettings {
-	if settings, ok := rule.OptionsAs[IdMatchSettings](options); ok {
+func idMatchSettingsFrom(options rule.Given[IdMatchSettings]) IdMatchSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultIdMatchSettings()
@@ -252,14 +252,14 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 // Upstream offers none, and none is possible: the repair is to rename, and nothing here knows what
 // the author meant. Renaming would also have to reach every reference, which is a refactor rather
 // than a lint fix.
-var IdMatch = rule.Rule{
+var IdMatch = rule.Rule[IdMatchSettings]{
 	Name: "id-match",
 
 	// Telling a global reference from a name the source declared is name resolution.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[IdMatchSettings]) rule.Listeners {
 		settings := idMatchSettingsFrom(options)
 		if settings.Pattern == nil {
 			// Upstream's default pattern `^.+$` matches every non-empty name, so an unconfigured

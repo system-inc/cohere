@@ -64,9 +64,9 @@ var messageNoAsyncPromiseExecutor = rule.Message{
 // `Promise(async () => {})` without `new` is not reported, because upstream matches `NewExpression`
 // only. The call form throws at runtime regardless, so the executor is not the interesting defect
 // there.
-var NoAsyncPromiseExecutor = rule.Rule{
+var NoAsyncPromiseExecutor = rule.Rule[rule.NoOptions]{
 	Name: "no-async-promise-executor",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpression := node.AsNewExpression()

@@ -788,11 +788,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		options, ok := decoded.(NoRestrictedPropertiesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
-		}
-		if len(options.Restrictions) != 0 {
+		if len(decoded.Restrictions) != 0 {
 			test.Error("nil input produced restrictions")
 		}
 	})
@@ -828,11 +824,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		options, ok := decoded.(NoRestrictedPropertiesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
-		}
-		restrictions := options.Restrictions
+		restrictions := decoded.Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
 			test.Errorf("the second element was not read as a restriction: %+v", restrictions)
 		}

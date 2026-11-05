@@ -43,7 +43,7 @@ func (options NoUnneededTernaryOptions) resolve() bool {
 // the config layer turns the error into nil, so a rule reached through it cannot tell "no options
 // were written" from "the option was written as false". This option defaults to `true`, so that
 // distinction turns the second judgment on rather than merely narrowing it.
-func DecodeNoUnneededTernaryOptions(raw []byte) (any, error) {
+func DecodeNoUnneededTernaryOptions(raw []byte) (NoUnneededTernaryOptions, error) {
 	var options NoUnneededTernaryOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -109,11 +109,11 @@ var messageNoUnneededTernaryConditionalAssignment = rule.Message{
 // for. `a ? a : b as any` becomes `a || (b as any)`, measured; a port inheriting upstream's table
 // unchanged would give them the tightest precedence and emit `a || b as any`, which parses as
 // `(a || b) as any` and asserts the type of the wrong thing.
-var NoUnneededTernary = rule.Rule{
+var NoUnneededTernary = rule.Rule[NoUnneededTernaryOptions]{
 	Name: "no-unneeded-ternary",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnneededTernaryOptions]) rule.Listeners {
 		allowDefaultAssignment := noUnneededTernaryDefaultAssignment
-		if decoded, configured := rule.OptionsAs[NoUnneededTernaryOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			allowDefaultAssignment = decoded.resolve()
 		}
 		return rule.Listeners{

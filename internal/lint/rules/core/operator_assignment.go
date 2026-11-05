@@ -70,7 +70,7 @@ func DefaultOperatorAssignmentSettings() OperatorAssignmentOptions {
 // config layer strips the severity tuple before dispatch, and the default is not the zero value.
 // An unrecognised string is an error rather than a quiet fallback, because falling back would
 // enforce a mode nobody asked for and say nothing.
-func DecodeOperatorAssignmentOptions(raw []byte) (any, error) {
+func DecodeOperatorAssignmentOptions(raw []byte) (OperatorAssignmentOptions, error) {
 	if len(raw) == 0 {
 		return DefaultOperatorAssignmentSettings(), nil
 	}
@@ -198,10 +198,10 @@ var operatorAssignmentLongForm = func() map[ast.Kind]struct {
 //
 // The unwrap is a loop rather than one step, because `((x))` nests, and it is written here rather
 // than reaching for `ast.SkipParentheses`, which dereferences its argument.
-var OperatorAssignment = rule.Rule{
+var OperatorAssignment = rule.Rule[OperatorAssignmentOptions]{
 	Name: "operator-assignment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[OperatorAssignmentOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[OperatorAssignmentOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		if settings.Require == nil {
 			settings = DefaultOperatorAssignmentSettings()
 		}

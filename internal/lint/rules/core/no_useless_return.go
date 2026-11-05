@@ -94,11 +94,11 @@ type noUselessReturnEvent struct {
 // the finally runs on every exit including this return's own. The first case rules out asking
 // whether a statement merely follows; the second rules out asking whether it is contained in the
 // try. What answers both is comparing the statement's position against the try statement's end.
-var NoUselessReturn = rule.Rule{
+var NoUselessReturn = rule.Rule[rule.NoOptions]{
 	Name:             "no-useless-return",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// One code path per root, as upstream runs one per function. A nested function's

@@ -92,13 +92,11 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 // is a `JSXEmptyExpression` -- an expression container holding nothing but the comment. Ours has no
 // such node kind: an empty JSX expression is `KindJsxExpression` with a nil `Expression`, which is
 // the same shape under a different name.
-var NoInlineComments = rule.Rule{
+var NoInlineComments = rule.Rule[NoInlineCommentsOptions]{
 	Name: "no-inline-comments",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInlineCommentsOptions]) rule.Listeners {
 		var ignorePattern *esregexp.RegExp
-		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](
-			options,
-		); isNoInlineCommentsOptions &&
+		if resolved, isNoInlineCommentsOptions := options.Read(); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
 			// Upstream's `new RegExp(ignorePattern, "u")`, read as JavaScript reads it: RE2 refuses a
 			// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
@@ -273,7 +271,7 @@ func DefaultNoInlineCommentsOptions() NoInlineCommentsOptions {
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring.
-func DecodeNoInlineCommentsOptions(raw []byte) (any, error) {
+func DecodeNoInlineCommentsOptions(raw []byte) (NoInlineCommentsOptions, error) {
 	options := DefaultNoInlineCommentsOptions()
 	if len(raw) == 0 {
 		return options, nil

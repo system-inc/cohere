@@ -11224,12 +11224,8 @@ func TestDecodeNoEmptyFunctionOptions(test *testing.T) {
 			if decodeNoEmptyFunctionOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoEmptyFunctionOptionsError)
 			}
-			options, isOptions := decoded.(NoEmptyFunctionOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than NoEmptyFunctionOptions", decoded)
-			}
-			if strings.Join(options.Allow, ",") != strings.Join(testCase.want, ",") {
-				test.Errorf("allow decodes to %v, want %v", options.Allow, testCase.want)
+			if strings.Join(decoded.Allow, ",") != strings.Join(testCase.want, ",") {
+				test.Errorf("allow decodes to %v, want %v", decoded.Allow, testCase.want)
 			}
 		})
 	}

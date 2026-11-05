@@ -85,9 +85,9 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // Upstream declares none, and the repair is a design decision: whether the iterations are actually
 // independent is not visible from the syntax, and rewriting a dependent loop into
 // `Promise.all` changes what the program does.
-var NoAwaitInLoop = rule.Rule{
+var NoAwaitInLoop = rule.Rule[rule.NoOptions]{
 	Name: "no-await-in-loop",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(waitingNode *ast.Node, reportNode *ast.Node) {
 			if !awaitInLoopIsInsideALoop(waitingNode) {
 				return

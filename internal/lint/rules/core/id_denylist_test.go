@@ -791,13 +791,9 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
+	settings, err := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
 	if err != nil {
 		test.Fatalf("decoding a name array: %v", err)
-	}
-	settings, ok := decoded.(IdDenylistSettings)
-	if !ok {
-		test.Fatalf("expected IdDenylistSettings, got %T", decoded)
 	}
 	for _, name := range []string{"data", "err", "cb"} {
 		if !settings.Denied[name] {
@@ -810,11 +806,10 @@ func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 
 	// An empty array denies nothing rather than erroring, which is what an explicitly empty
 	// configuration means.
-	decoded, err = DecodeIdDenylistOptions([]byte(`[]`))
+	settings, err = DecodeIdDenylistOptions([]byte(`[]`))
 	if err != nil {
 		test.Fatalf("decoding an empty array: %v", err)
 	}
-	settings, _ = decoded.(IdDenylistSettings)
 	if len(settings.Denied) != 0 {
 		test.Errorf("expected an empty configuration to deny nothing, got %+v", settings.Denied)
 	}
@@ -978,19 +973,14 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.raw, decodeIdDenylistOptionsError)
 			continue
 		}
-		settings, ok := decoded.(IdDenylistSettings)
-		if !ok {
-			test.Errorf("decoding %s: expected IdDenylistSettings, got %T", testCase.raw, decoded)
-			continue
-		}
-		if len(settings.Denied) != len(testCase.denied) {
+		if len(decoded.Denied) != len(testCase.denied) {
 			test.Errorf("decoding %s: expected %d denied names, got %v",
-				testCase.raw, len(testCase.denied), settings.Denied)
+				testCase.raw, len(testCase.denied), decoded.Denied)
 			continue
 		}
 		for _, name := range testCase.denied {
-			if !settings.Denied[name] {
-				test.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, settings.Denied)
+			if !decoded.Denied[name] {
+				test.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, decoded.Denied)
 			}
 		}
 	}

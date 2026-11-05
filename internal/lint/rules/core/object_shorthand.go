@@ -82,7 +82,7 @@ func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 //
 // A mode that is not one of the six is an error rather than a silent fallback to "always". A typo
 // in a mode name would otherwise produce a rule that looks configured and enforces the default.
-func DecodeObjectShorthandOptions(list []byte) (any, error) {
+func DecodeObjectShorthandOptions(list []byte) (ObjectShorthandSettings, error) {
 	settings := DefaultObjectShorthandSettings()
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -173,8 +173,8 @@ func objectShorthandModeFor(text string) (ObjectShorthandMode, bool) {
 }
 
 // objectShorthandSettingsFrom recovers the settings from whatever the config layer handed over.
-func objectShorthandSettingsFrom(options any) ObjectShorthandSettings {
-	if settings, ok := rule.OptionsAs[ObjectShorthandSettings](options); ok && settings.Mode != "" {
+func objectShorthandSettingsFrom(options rule.Given[ObjectShorthandSettings]) ObjectShorthandSettings {
+	if settings, ok := options.Read(); ok && settings.Mode != "" {
 		return settings
 	}
 	return DefaultObjectShorthandSettings()
@@ -253,10 +253,10 @@ var messageObjectShorthandUnexpectedMix = rule.Message{
 // Upstream attaches a fix only to the per-property modes. Making an object consistent means
 // choosing which style to convert everything to, and only the author knows which. Reported without
 // a repair, which is the subset that can be shown correct.
-var ObjectShorthand = rule.Rule{
+var ObjectShorthand = rule.Rule[ObjectShorthandSettings]{
 	Name: "object-shorthand",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ObjectShorthandSettings]) rule.Listeners {
 		settings := objectShorthandSettingsFrom(options)
 
 		return rule.Listeners{

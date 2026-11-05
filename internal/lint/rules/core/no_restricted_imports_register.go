@@ -6,7 +6,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // option surface is variadic: each restricted path is its own element, `["error", "fs", "os"]`, or a
 // single element is the `{paths, patterns}` object.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoRestrictedImportsOptions]{
 		Rule:             NoRestrictedImports,
 		DecodeOptionList: DecodeNoRestrictedImportsOptions,
 	})

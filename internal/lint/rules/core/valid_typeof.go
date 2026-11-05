@@ -83,14 +83,14 @@ var typeofResults = map[string]bool{
 // Nothing else gets a repair: the rule knows the comparison is dead and cannot know which of the
 // eight was meant, and the two most common cases want a different check entirely, `'array'` wants
 // Array.isArray and `'null'` wants `value === null`.
-var ValidTypeof = rule.Rule{
+var ValidTypeof = rule.Rule[ValidTypeofOptions]{
 	Name: "valid-typeof",
 	// Asked only whether an `undefined` operand is declared in this file, so its findings key on the
 	// closure's shapes. A typeof compared to undefined is rare, so the checker is consulted rarely.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ValidTypeofOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ValidTypeofOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

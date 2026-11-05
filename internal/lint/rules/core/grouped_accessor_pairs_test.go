@@ -534,12 +534,8 @@ func TestDecodeGroupedAccessorPairsOptions(test *testing.T) {
 			if decodeGroupedAccessorPairsOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeGroupedAccessorPairsOptionsError)
 			}
-			options, isOptions := decoded.(GroupedAccessorPairsOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than GroupedAccessorPairsOptions", decoded)
-			}
-			if string(options.Order) != testCase.want {
-				test.Errorf("the order decodes to %q, want %q", options.Order, testCase.want)
+			if string(decoded.Order) != testCase.want {
+				test.Errorf("the order decodes to %q, want %q", decoded.Order, testCase.want)
 			}
 		})
 	}

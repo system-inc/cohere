@@ -833,12 +833,8 @@ func TestNoUnusedExpressionsReadsOptionsFromJson(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding the full option object failed: %v", err)
 	}
-	options, ok := decoded.(NoUnusedExpressionsOptions)
-	if !ok {
-		test.Fatalf("decoded to %T rather than NoUnusedExpressionsOptions", decoded)
-	}
-	if !options.AllowShortCircuit || !options.AllowTernary || !options.AllowTaggedTemplates ||
-		!options.EnforceForJsx || !options.IgnoreDirectives {
-		test.Errorf("some option did not survive the round trip: %+v", options)
+	if !decoded.AllowShortCircuit || !decoded.AllowTernary || !decoded.AllowTaggedTemplates ||
+		!decoded.EnforceForJsx || !decoded.IgnoreDirectives {
+		test.Errorf("some option did not survive the round trip: %+v", decoded)
 	}
 }

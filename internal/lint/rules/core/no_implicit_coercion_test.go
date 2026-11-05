@@ -830,11 +830,7 @@ func TestDecodeNoImplicitCoercionOptions(test *testing.T) {
 		if decodeNoImplicitCoercionOptionsError != nil {
 			test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 		}
-		options, isOptions := decoded.(NoImplicitCoercionOptions)
-		if !isOptions {
-			test.Fatalf("expected NoImplicitCoercionOptions, got %T", decoded)
-		}
-		return options
+		return decoded
 	}
 
 	test.Run("empty input enables the three default-true judgments", func(test *testing.T) {

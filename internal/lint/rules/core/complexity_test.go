@@ -666,25 +666,20 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.optionJson, decodeComplexityOptionsError)
 			continue
 		}
-		settings, ok := decoded.(ComplexitySettings)
-		if !ok {
-			test.Errorf("decoding %s: expected ComplexitySettings, got %T", testCase.optionJson, decoded)
-			continue
-		}
-		if settings.Variant != testCase.variant {
+		if decoded.Variant != testCase.variant {
 			test.Errorf("decoding %s: expected variant %q, got %q",
-				testCase.optionJson, testCase.variant, settings.Variant)
+				testCase.optionJson, testCase.variant, decoded.Variant)
 		}
 		if testCase.silent {
-			if settings.Maximum != complexityNeverReports {
+			if decoded.Maximum != complexityNeverReports {
 				test.Errorf("decoding %s: expected the silencing threshold, got %d",
-					testCase.optionJson, settings.Maximum)
+					testCase.optionJson, decoded.Maximum)
 			}
 			continue
 		}
-		if settings.Maximum != testCase.maximum {
+		if decoded.Maximum != testCase.maximum {
 			test.Errorf("decoding %s: expected a threshold of %d, got %d",
-				testCase.optionJson, testCase.maximum, settings.Maximum)
+				testCase.optionJson, testCase.maximum, decoded.Maximum)
 		}
 	}
 
@@ -849,9 +844,9 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 
 	for _, testCase := range cases {
 		var located *ast.Node
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name: "probe/complexity-name",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(file *ast.Node) {
 						var walk func(*ast.Node)

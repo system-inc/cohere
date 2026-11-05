@@ -641,11 +641,7 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if !settings.AllowElseIf {
+		if !decoded.AllowElseIf {
 			test.Error("expected allowElseIf to default to true")
 		}
 	})
@@ -656,11 +652,7 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an empty object: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if !settings.AllowElseIf {
+		if !decoded.AllowElseIf {
 			test.Error("expected allowElseIf to stay true")
 		}
 	})
@@ -671,11 +663,7 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an explicit false: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if settings.AllowElseIf {
+		if decoded.AllowElseIf {
 			test.Error("expected allowElseIf to be false")
 		}
 	})

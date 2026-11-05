@@ -353,11 +353,7 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
 		if decodeNoSequencesOptionsError != nil {
 			test.Fatalf("decoding empty input: %v", decodeNoSequencesOptionsError)
 		}
-		options, ok := decoded.(NoSequencesOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoSequencesOptions", decoded)
-		}
-		if !options.allowInParentheses() {
+		if !decoded.allowInParentheses() {
 			test.Error("empty input decoded to disallowing parentheses, which inverts the rule")
 		}
 	})

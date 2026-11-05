@@ -311,11 +311,7 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		options, ok := decoded.(ArrayCallbackReturnOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ArrayCallbackReturnOptions", decoded)
-		}
-		if !options.AllowImplicit {
+		if !decoded.AllowImplicit {
 			test.Fatalf("decoded %#v", decoded)
 		}
 		result := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
@@ -386,12 +382,8 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		settings, ok := decoded.(ArrayCallbackReturnOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ArrayCallbackReturnOptions", decoded)
-		}
-		if settings.AllowImplicit || settings.CheckForEach || settings.AllowVoid {
-			test.Fatalf("empty object did not default every option off: %#v", settings)
+		if decoded.AllowImplicit || decoded.CheckForEach || decoded.AllowVoid {
+			test.Fatalf("empty object did not default every option off: %#v", decoded)
 		}
 	})
 }

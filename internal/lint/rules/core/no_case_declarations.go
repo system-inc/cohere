@@ -55,9 +55,9 @@ var messageAddBraces = rule.Message{
 // whether some arm was doing that on purpose. Following ESLint, the braces wrap the entire clause
 // body rather than the reported statement, so several declarations in one clause all offer the same
 // whole-clause repair rather than proposing nested blocks that would fight each other.
-var NoCaseDeclarations = rule.Rule{
+var NoCaseDeclarations = rule.Rule[rule.NoOptions]{
 	Name: "no-case-declarations",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

@@ -14,5 +14,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // Deliberately not enabled in `CohereSettings.json`. See `one_var.md` and the entry in
 // `internal/lint/registry/live_wiring_test.go`.
 func init() {
-	rule.Register(rule.Registration{Rule: OneVar, Decode: DecodeOneVarOptions})
+	rule.Register(rule.Registration[OneVarSettings]{Rule: OneVar, Decode: DecodeOneVarOptions})
 }

@@ -45,7 +45,7 @@ type maxLinesObjectShape struct {
 
 // DecodeMaxLinesOptions reads `300`, `{max: 300, skipBlankLines, skipComments}`, or nothing, which is
 // the default of 300. An object without `max` keeps 300, as upstream's `Object.hasOwn` test does.
-func DecodeMaxLinesOptions(raw []byte) (any, error) {
+func DecodeMaxLinesOptions(raw []byte) (MaxLinesOptions, error) {
 	options := DefaultMaxLinesOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -99,14 +99,14 @@ func DecodeMaxLinesOptions(raw []byte) (any, error) {
 //
 // From the first line past the maximum to the end of the file, upstream's location, so a
 // suppression or a reader lands where the excess begins.
-var MaxLines = rule.Rule{
+var MaxLines = rule.Rule[MaxLinesOptions]{
 	Name:       "max-lines",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxLinesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		settings, hasSettings := rule.OptionsAs[MaxLinesOptions](options)
+		settings, hasSettings := options.Read()
 		if !hasSettings {
 			settings = DefaultMaxLinesOptions()
 		}

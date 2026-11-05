@@ -872,12 +872,8 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 			if decodePreferDestructuringOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferDestructuringOptionsError)
 			}
-			options, ok := decoded.(PreferDestructuringOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than PreferDestructuringOptions", decoded)
-			}
 			if testCase.check != nil {
-				testCase.check(test, options)
+				testCase.check(test, decoded)
 			}
 		})
 	}

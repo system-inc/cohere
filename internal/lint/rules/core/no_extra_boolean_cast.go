@@ -107,15 +107,15 @@ func (options *NoExtraBooleanCastOptions) UnmarshalJSON(raw []byte) error {
 // The unwrapped expression lands where a call or a `!!` used to sit, and those bind tighter than
 // most operators, so `!Boolean(a && b)` becomes `!(a && b)` rather than `!a && b`, which would mean
 // something else entirely. The precedence comparison below is the whole of that decision.
-var NoExtraBooleanCast = rule.Rule{
+var NoExtraBooleanCast = rule.Rule[NoExtraBooleanCastOptions]{
 	Name: "no-extra-boolean-cast",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoExtraBooleanCastOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		enforceForInnerExpressions := false
-		if parsed, ok := rule.OptionsAs[NoExtraBooleanCastOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			enforceForInnerExpressions = parsed.EnforceForInnerExpressions
 		}
 

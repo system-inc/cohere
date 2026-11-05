@@ -75,11 +75,11 @@ func buildNoUndefInitMessage(name string) rule.Message {
 // of them purely about comment placement. `let a = undefined/* comment */;` fixes to
 // `let a/* comment */;` while `let a/**/ = undefined;` does not fix at all, and the difference is
 // only which side of the equals sign the comment sits on.
-var NoUndefInit = rule.Rule{
+var NoUndefInit = rule.Rule[rule.NoOptions]{
 	Name:             "no-undef-init",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

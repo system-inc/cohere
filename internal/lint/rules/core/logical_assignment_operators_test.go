@@ -41,12 +41,7 @@ func logicalAssignmentAlwaysIfOptions() LogicalAssignmentOperatorsOptions {
 	if decodeLogicalAssignmentOperatorsOptionsError != nil {
 		panic(decodeLogicalAssignmentOperatorsOptionsError)
 	}
-	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-	if !ok {
-		// Invariant: every return in the decoder hands back LogicalAssignmentOperatorsOptions.
-		panic(fmt.Sprintf("decoded options are a %T, not LogicalAssignmentOperatorsOptions", decoded))
-	}
-	return options
+	return decoded
 }
 
 // logicalAssignmentNeverOptions is ["never"], also routed through the decoder.
@@ -57,12 +52,7 @@ func logicalAssignmentNeverOptions() LogicalAssignmentOperatorsOptions {
 	if decodeLogicalAssignmentOperatorsOptionsError != nil {
 		panic(decodeLogicalAssignmentOperatorsOptionsError)
 	}
-	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-	if !ok {
-		// Invariant: every return in the decoder hands back LogicalAssignmentOperatorsOptions.
-		panic(fmt.Sprintf("decoded options are a %T, not LogicalAssignmentOperatorsOptions", decoded))
-	}
-	return options
+	return decoded
 }
 
 // logicalAssignmentCleanCase is one input upstream accepts.
@@ -2026,16 +2016,12 @@ func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
 			if decodeLogicalAssignmentOperatorsOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeLogicalAssignmentOperatorsOptionsError)
 			}
-			settings, ok := decoded.(LogicalAssignmentOperatorsOptions)
-			if !ok {
-				test.Fatalf("decoded options are not LogicalAssignmentOperatorsOptions: got %T", decoded)
+			if decoded.Require == nil || *decoded.Require != *testCase.wantMode {
+				test.Errorf("mode is %v, want %v", decoded.Require, *testCase.wantMode)
 			}
-			if settings.Require == nil || *settings.Require != *testCase.wantMode {
-				test.Errorf("mode is %v, want %v", settings.Require, *testCase.wantMode)
-			}
-			if settings.EnforceForIfStatements != testCase.wantIf {
+			if decoded.EnforceForIfStatements != testCase.wantIf {
 				test.Errorf("enforceForIfStatements is %v, want %v",
-					settings.EnforceForIfStatements, testCase.wantIf)
+					decoded.EnforceForIfStatements, testCase.wantIf)
 			}
 		})
 	}
@@ -2387,11 +2373,7 @@ func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *te
 		if decodeLogicalAssignmentOperatorsOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeLogicalAssignmentOperatorsOptionsError)
 		}
-		options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-		if !ok {
-			test.Fatalf("decoding %s gave a %T, not LogicalAssignmentOperatorsOptions", raw, decoded)
-		}
-		return options
+		return decoded
 	}
 	compilerOn := decode(`["always", {"enforceForIfStatements": true}]`)
 	compilerOff := decode(`["always", {"enforceForIfStatements": true, "reactCompiler": false}]`)

@@ -139,18 +139,14 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding both spellings failed: %v", err)
 	}
-	options, ok := decoded.(PreserveCaughtErrorOptions)
-	if !ok {
-		test.Fatalf("the decoder returned %T, not PreserveCaughtErrorOptions", decoded)
-	}
 	want := []PreserveCaughtErrorClassName{
 		{Name: "AppError", ArgumentPosition: 2},
 		{Name: "WideError", ArgumentPosition: 3},
 	}
-	if len(options.ErrorClassNames) != 2 ||
-		options.ErrorClassNames[0] != want[0] ||
-		options.ErrorClassNames[1] != want[1] {
-		test.Errorf("decoded %#v, want %#v", options.ErrorClassNames, want)
+	if len(decoded.ErrorClassNames) != 2 ||
+		decoded.ErrorClassNames[0] != want[0] ||
+		decoded.ErrorClassNames[1] != want[1] {
+		test.Errorf("decoded %#v, want %#v", decoded.ErrorClassNames, want)
 	}
 
 	// The same name twice takes the later position, as ESLint's Map does. Position 3 reads the third

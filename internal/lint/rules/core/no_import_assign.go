@@ -98,7 +98,7 @@ var messageNoImportAssign = rule.Message{
 //
 // No fix. The repair is to change the exporting module or to introduce a local, and the rule cannot
 // know which was meant.
-var NoImportAssign = rule.Rule{
+var NoImportAssign = rule.Rule[rule.NoOptions]{
 	Name: "no-import-assign",
 
 	// See the doc above: three of upstream's clean cases shadow an imported name with a local and are
@@ -107,7 +107,7 @@ var NoImportAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Each import declaration on the shared walk, including one inside a `declare module` block,
 		// which can hold its own. The writes to its names are read from the file's identifier index.
 		//

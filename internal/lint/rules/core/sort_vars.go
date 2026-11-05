@@ -28,7 +28,7 @@ func DefaultSortVarsSettings() SortVarsSettings {
 // It is hand rolled anyway for one reason: `rule.DecodeOptionsInto` errors on empty input, and a
 // rule configured as a bare "error" is handed nil. Upstream's default is a working configuration
 // rather than a disabled one, so nil has to decode rather than fail.
-func DecodeSortVarsOptions(raw []byte) (any, error) {
+func DecodeSortVarsOptions(raw []byte) (SortVarsSettings, error) {
 	settings := DefaultSortVarsSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -44,8 +44,8 @@ func DecodeSortVarsOptions(raw []byte) (any, error) {
 }
 
 // sortVarsSettingsFrom recovers the settings from whatever the config layer handed over.
-func sortVarsSettingsFrom(options any) SortVarsSettings {
-	if settings, ok := rule.OptionsAs[SortVarsSettings](options); ok {
+func sortVarsSettingsFrom(options rule.Given[SortVarsSettings]) SortVarsSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultSortVarsSettings()
@@ -98,10 +98,10 @@ var messageSortVarsSortVars = rule.Message{
 // they can disagree only where a surrogate pair meets a character in U+E000..U+FFFF, which no
 // identifier in the corpus reaches. Recorded rather than papered over, since it is the one place
 // this port could differ on an input nobody has written.
-var SortVars = rule.Rule{
+var SortVars = rule.Rule[SortVarsSettings]{
 	Name: "sort-vars",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[SortVarsSettings]) rule.Listeners {
 		settings := sortVarsSettingsFrom(options)
 
 		return rule.Listeners{

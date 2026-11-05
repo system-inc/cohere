@@ -210,11 +210,7 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		options, ok := decoded.(RequireAtomicUpdatesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not RequireAtomicUpdatesOptions", decoded)
-		}
-		if options.AllowProperties != true {
+		if decoded.AllowProperties != true {
 			test.Fatalf("decoded %#v", decoded)
 		}
 
@@ -255,11 +251,7 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		options, ok := decoded.(RequireAtomicUpdatesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not RequireAtomicUpdatesOptions", decoded)
-		}
-		if options.AllowProperties != false {
+		if decoded.AllowProperties != false {
 			test.Fatalf("empty object did not default AllowProperties to false: %#v", decoded)
 		}
 	})

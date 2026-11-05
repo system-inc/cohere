@@ -75,9 +75,9 @@ func buildNoUselessCallMessage(methodName string) rule.Message {
 // Upstream ships none, and the rewrite is not mechanical: removing `.call(obj, ...)` from
 // `a[i++].foo.call(a[i++], 1)` changes how many times the side effect runs, and the array-literal
 // `.apply()` form has to be unpacked into an argument list whose spacing carries intent.
-var NoUselessCall = rule.Rule{
+var NoUselessCall = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-call",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

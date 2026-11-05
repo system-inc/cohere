@@ -705,12 +705,8 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 			if decodeNoUnderscoreDangleOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeNoUnderscoreDangleOptionsError)
 			}
-			options, ok := decoded.(NoUnderscoreDangleOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than NoUnderscoreDangleOptions", decoded)
-			}
 			if testCase.check != nil {
-				testCase.check(test, options)
+				testCase.check(test, decoded)
 			}
 		})
 	}

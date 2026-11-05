@@ -35,7 +35,7 @@ const (
 //
 // A bare severity decodes to the zero mode. The rule ignores the mode either way, so there is no
 // default to get wrong.
-func DecodeRadixOptions(raw []byte) (any, error) {
+func DecodeRadixOptions(raw []byte) (RadixMode, error) {
 	if len(raw) == 0 {
 		return RadixMode(""), nil
 	}
@@ -146,14 +146,14 @@ var messageRadixAddRadixParameter10 = rule.Message{
 // radix, and `parseInt("10")` reports `missingRadix` under `"as-needed"` as it does under
 // `"always"`. Both values are accepted here by `DecodeRadixOptions` and ignored the same way, since
 // refusing them would stop a whole run over a config ESLint accepts.
-var Radix = rule.Rule{
+var Radix = rule.Rule[RadixMode]{
 	Name: "radix",
 
 	// The shadow question is which file declares the name, which only resolution can answer.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RadixMode]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

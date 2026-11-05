@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // because of those shapes and because its default mode is "always", so a zero-value struct would
 // carry an empty mode matching none of the six and silently report nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ObjectShorthandSettings]{
 		Rule:             ObjectShorthand,
 		DecodeOptionList: DecodeObjectShorthandOptions,
 	})

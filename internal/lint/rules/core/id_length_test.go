@@ -682,15 +682,11 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	test.Parallel()
 
-	decoded, decodeIdLengthOptionsError := DecodeIdLengthOptions(
+	settings, decodeIdLengthOptionsError := DecodeIdLengthOptions(
 		[]byte(`{"min": 3, "max": 9, "properties": "never", "exceptions": ["x"], "exceptionPatterns": ["^_"]}`),
 	)
 	if decodeIdLengthOptionsError != nil {
 		test.Fatalf("decoding a full option object: %v", decodeIdLengthOptionsError)
-	}
-	settings, ok := decoded.(IdLengthSettings)
-	if !ok {
-		test.Fatalf("expected IdLengthSettings, got %T", decoded)
 	}
 	if settings.Minimum != 3 || settings.Maximum != 9 || !settings.HasMaximum {
 		test.Errorf("expected min 3 and max 9, got %+v", settings)
@@ -703,11 +699,10 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	}
 
 	// The defaults, which the zero value does not supply.
-	decoded, decodeError := DecodeIdLengthOptions(nil)
+	settings, decodeError := DecodeIdLengthOptions(nil)
 	if decodeError != nil {
 		test.Fatalf("expected no options to decode to the defaults, got %v", decodeError)
 	}
-	settings, _ = decoded.(IdLengthSettings)
 	if settings.Minimum != 2 || !settings.CheckProperties || settings.HasMaximum {
 		test.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)
 	}

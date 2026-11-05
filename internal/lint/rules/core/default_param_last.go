@@ -107,9 +107,9 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // by attaching both parameters and a body. The installed core build reports all four such shapes.
 // This was found on the namespaced sibling by a mutation that emptied both arms and survived its
 // entire corpus; the same measurement holds here and four fixtures pin it.
-var DefaultParamLast = rule.Rule{
+var DefaultParamLast = rule.Rule[rule.NoOptions]{
 	Name: "default-param-last",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream
 			// gives every such construct a node type outside its three listeners. See the doc

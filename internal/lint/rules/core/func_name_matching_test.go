@@ -1149,12 +1149,7 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 			test.Errorf("%s was refused: %v", testCase.raw, decodeFuncNameMatchingOptionsError)
 			continue
 		}
-		options, ok := decoded.(FuncNameMatchingOptions)
-		if !ok {
-			test.Errorf("%s decoded to a %T, want FuncNameMatchingOptions", testCase.raw, decoded)
-			continue
-		}
-		if options != testCase.want {
+		if decoded != testCase.want {
 			test.Errorf("%s decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
 		}
 	}

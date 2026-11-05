@@ -52,9 +52,9 @@ var messageNoNegatedCondition = rule.Message{
 // what the code says rather than to how it is spelled, and the repair is not even mechanical: the
 // negation has to be removed correctly, which for `!(a && b)` means either double-negating or
 // applying De Morgan.
-var NoNegatedCondition = rule.Rule{
+var NoNegatedCondition = rule.Rule[rule.NoOptions]{
 	Name: "no-negated-condition",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				statement := node.AsIfStatement()

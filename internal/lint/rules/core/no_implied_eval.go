@@ -90,7 +90,7 @@ var impliedEvalGlobalObjectNames = map[string]bool{
 //
 // The checker is asked only after the callee's name has already matched one of three spellings, so
 // the question is asked on almost no files. The per-file lock is taken once rather than per node.
-var NoImpliedEval = rule.Rule{
+var NoImpliedEval = rule.Rule[rule.NoOptions]{
 	Name: "no-implied-eval",
 
 	// The rule's central discrimination is whether a name is the global or a local shadowing it,
@@ -99,7 +99,7 @@ var NoImpliedEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Declared as well as needed. NeedsTypeChecker governs the registration path, so a
 		// Context built by hand still arrives with a nil checker, and every listener below reads
 		// it. Declining the file once here rather than per node.

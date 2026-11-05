@@ -34,7 +34,7 @@ func DefaultNoSelfAssignOptions() NoSelfAssignOptions {
 // Hand-rolled rather than `rule.DecodeOptionsInto` for two reasons, both about the default being
 // true. A bare `"error"` arrives as empty input and must resolve to the default rather than error,
 // and `{}` must keep `props` on, which decoding into a zero struct would silently turn off.
-func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
+func DecodeNoSelfAssignOptions(raw []byte) (NoSelfAssignOptions, error) {
 	options := DefaultNoSelfAssignOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -75,11 +75,11 @@ func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
 //
 // Only the four assignment operators that write the whole value are considered: `=`, `&&=`, `||=`,
 // and `??=`. `a += a` doubles a, which is a different statement and not this rule's business.
-var NoSelfAssign = rule.Rule{
+var NoSelfAssign = rule.Rule[NoSelfAssignOptions]{
 	Name: "no-self-assign",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoSelfAssignOptions]) rule.Listeners {
 		properties := DefaultNoSelfAssignOptions().Props
-		if resolved, isNoSelfAssignOptions := rule.OptionsAs[NoSelfAssignOptions](options); isNoSelfAssignOptions {
+		if resolved, isNoSelfAssignOptions := options.Read(); isNoSelfAssignOptions {
 			properties = resolved.Props
 		}
 

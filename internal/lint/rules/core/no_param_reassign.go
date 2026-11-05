@@ -97,7 +97,7 @@ type NoParamReassignOptions struct {
 // No fix. The repair for a reassigned parameter is a new local binding, which means choosing a name
 // and deciding which later reads meant the parameter; the repair for a property write is not an edit
 // at all, since the point of the finding is that the mutation reaches the caller.
-var NoParamReassign = rule.Rule{
+var NoParamReassign = rule.Rule[NoParamReassignOptions]{
 	Name: "no-param-reassign",
 
 	// See the doc above: four clean cases are textually identical to failing ones and differ only in
@@ -106,13 +106,13 @@ var NoParamReassign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoParamReassignOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		var settings NoParamReassignOptions
-		if parsed, ok := rule.OptionsAs[NoParamReassignOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			settings = parsed
 		}
 		ignored := compileIgnoredNames(settings)
@@ -570,7 +570,7 @@ func compileIgnoredNames(options NoParamReassignOptions) ignoredParameterNames {
 // rather than erroring into a nil the caller reads as a zero value. Every option here defaults to
 // its zero value, so nothing inverts, but the two shapes should still not be told apart by whether
 // the decoder happened to run.
-func DecodeNoParamReassignOptions(raw []byte) (any, error) {
+func DecodeNoParamReassignOptions(raw []byte) (NoParamReassignOptions, error) {
 	var options NoParamReassignOptions
 	if len(raw) == 0 {
 		return options, nil

@@ -1739,11 +1739,7 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 		if decodeAccessorPairsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeAccessorPairsOptionsError)
 		}
-		options, ok := decoded.(AccessorPairsOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not AccessorPairsOptions", decoded)
-		}
-		settings := options.resolve()
+		settings := decoded.resolve()
 		if settings.getWithoutSet != false || settings.setWithoutGet != true ||
 			settings.enforceForClassMembers != true || settings.enforceForTsTypes != false {
 			test.Fatalf("defaults came back as %+v", settings)
@@ -1756,11 +1752,7 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 		if decodeAccessorPairsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeAccessorPairsOptionsError)
 		}
-		options, ok := decoded.(AccessorPairsOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not AccessorPairsOptions", decoded)
-		}
-		settings := options.resolve()
+		settings := decoded.resolve()
 		if settings.setWithoutGet != false {
 			test.Error("an explicit false was read as the default true")
 		}

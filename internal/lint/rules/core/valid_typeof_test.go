@@ -207,21 +207,16 @@ func TestValidTypeofOptionsDecode(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ValidTypeofOptions]()
-	decoded, err := decode([]byte(`{}`))
+	options, err := decode([]byte(`{}`))
 	if err != nil {
 		test.Fatalf("an empty object should decode: %v", err)
-	}
-	options, ok := decoded.(ValidTypeofOptions)
-	if !ok {
-		test.Fatalf("decoded options are not ValidTypeofOptions: got %T", decoded)
 	}
 	if options.RequireStringLiterals {
 		test.Fatalf("requireStringLiterals should default to false")
 	}
-	decoded, err = decode([]byte(`{"requireStringLiterals": true}`))
-	options, ok = decoded.(ValidTypeofOptions)
-	if err != nil || !ok || !options.RequireStringLiterals {
-		test.Fatalf("requireStringLiterals should decode true, got %v, %v", decoded, err)
+	options, err = decode([]byte(`{"requireStringLiterals": true}`))
+	if err != nil || !options.RequireStringLiterals {
+		test.Fatalf("requireStringLiterals should decode true, got %v, %v", options, err)
 	}
 	if _, err := decode([]byte(`{"requireStringLiteral": true}`)); err == nil {
 		test.Fatalf("an unknown key should be refused")

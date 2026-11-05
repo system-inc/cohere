@@ -70,14 +70,14 @@ var objectAssignCallTraceMap = map[string]*reference.TraceMap{
 // arrow body is the case that makes it load bearing: `() => Object.assign({}, foo)` must become
 // `() => ({ ...foo})` and not `() => { ...foo}`, which parses as a block and returns nothing.
 // Measured against the installed rule.
-var PreferObjectSpread = rule.Rule{
+var PreferObjectSpread = rule.Rule[rule.NoOptions]{
 	Name: "prefer-object-spread",
 
 	// Telling the global `Object` from a shadow is name resolution, which the tracker asks the
 	// checker for.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every trace starts at a reference to Object, so a file that never spells it has

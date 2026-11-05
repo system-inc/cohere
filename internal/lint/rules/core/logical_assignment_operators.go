@@ -147,7 +147,7 @@ func DefaultLogicalAssignmentOperatorsSettings() LogicalAssignmentOperatorsOptio
 // An unrecognised mode is an error rather than a quiet fallback, because falling back would
 // enforce a mode nobody asked for and say nothing about it. So is a key the second element's schema
 // does not declare, and a third element.
-func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
+func DecodeLogicalAssignmentOperatorsOptions(list []byte) (LogicalAssignmentOperatorsOptions, error) {
 	positional, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil {
 		return DefaultLogicalAssignmentOperatorsSettings(), optionElementsError
@@ -290,7 +290,7 @@ var logicalAssignmentLongForm = map[ast.Kind]string{
 // a JavaScript value, so the rule takes it as its own `reactCompiler` option, on by default. Every
 // tree we lint runs the compiler, and the fixer applies `||=` to a bare identifier unattended, so
 // the default is the side where an unattended rewrite cannot cost a component its compilation.
-var LogicalAssignmentOperators = rule.Rule{
+var LogicalAssignmentOperators = rule.Rule[LogicalAssignmentOperatorsOptions]{
 	Name: "logical-assignment-operators",
 	// Two judgments resolve a name: whether `undefined` is the global rather than a local shadowing
 	// it, and whether `Boolean` is. Upstream asks eslint-scope; the same question is asked here
@@ -302,8 +302,8 @@ var LogicalAssignmentOperators = rule.Rule{
 	// and is why the untyped fixtures agree on everything else.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[LogicalAssignmentOperatorsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[LogicalAssignmentOperatorsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		if settings.Require == nil {
 			settings = DefaultLogicalAssignmentOperatorsSettings()
 		}

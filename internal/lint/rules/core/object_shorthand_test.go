@@ -1485,12 +1485,8 @@ func TestDecodeObjectShorthandOptions(test *testing.T) {
 	if decodeObjectShorthandOptionsError != nil {
 		test.Fatalf("a legal mode and flags were refused: %v", decodeObjectShorthandOptionsError)
 	}
-	settings, ok := decoded.(ObjectShorthandSettings)
-	if !ok {
-		test.Fatalf("the decoder returned %T, not ObjectShorthandSettings", decoded)
-	}
-	if settings.Mode != ObjectShorthandMethods || !settings.IgnoreConstructors || !settings.AvoidQuotes {
-		test.Errorf("the second element was not read: %+v", settings)
+	if decoded.Mode != ObjectShorthandMethods || !decoded.IgnoreConstructors || !decoded.AvoidQuotes {
+		test.Errorf("the second element was not read: %+v", decoded)
 	}
 
 	for _, raw := range []string{

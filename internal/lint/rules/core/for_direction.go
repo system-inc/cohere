@@ -37,9 +37,9 @@ var messageIncorrectDirection = rule.Message{
 // it would flag a correct loop. ESLint reaches for its scope analysis here and resolves a `const`
 // binding to its value; ours reads only literals and their unary negations, which is a deliberate
 // narrowing recorded below.
-var ForDirection = rule.Rule{
+var ForDirection = rule.Rule[rule.NoOptions]{
 	Name: "for-direction",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindForStatement: func(node *ast.Node) {
 				forStatement := node.AsForStatement()

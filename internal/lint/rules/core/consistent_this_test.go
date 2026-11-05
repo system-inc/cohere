@@ -271,12 +271,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("expected ConsistentThisSettings, got %T", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "that" {
+			test.Errorf("expected the default alias list [that], got %v", decoded.Aliases)
 		}
 	})
 
@@ -297,12 +293,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused one alias: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "self" {
-			test.Errorf("expected [self], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "self" {
+			test.Errorf("expected [self], got %v", decoded.Aliases)
 		}
 	})
 
@@ -312,12 +304,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused two aliases: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 2 || settings.Aliases[0] != "self" || settings.Aliases[1] != "vm" {
-			test.Errorf("expected [self vm], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 2 || decoded.Aliases[0] != "self" || decoded.Aliases[1] != "vm" {
+			test.Errorf("expected [self vm], got %v", decoded.Aliases)
 		}
 	})
 
@@ -350,12 +338,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused an empty list: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "that" {
+			test.Errorf("expected the default alias list [that], got %v", decoded.Aliases)
 		}
 	})
 }

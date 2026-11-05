@@ -27,13 +27,17 @@ func TestCodePathRootsAreIndexedOncePerFile(test *testing.T) {
 		"  console.log(sum);\n" +
 		"}\n"
 	fills := -1
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "code-path-roots",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-				for _, gated := range []rule.Rule{NoUselessReturn, NoUnreachableLoop, NoUselessAssignment} {
-					if listener := gated.Run(ruleContext, nil)[ast.KindSourceFile]; listener != nil {
+				for _, gated := range []rule.Bound{
+					rule.Bind(NoUselessReturn, rule.Given[rule.NoOptions]{}),
+					rule.Bind(NoUnreachableLoop, rule.Given[NoUnreachableLoopOptions]{}),
+					rule.Bind(NoUselessAssignment, rule.Given[rule.NoOptions]{}),
+				} {
+					if listener := gated.Run(ruleContext)[ast.KindSourceFile]; listener != nil {
 						listener(node)
 					}
 				}

@@ -65,7 +65,7 @@ type NoUnderscoreDangleOptions struct {
 // four of them start with `allow` and two with `enforce`, and `allowInMethodNames` is a plausible
 // thing to type for `enforceInMethodNames`. Silently ignoring it would leave a project believing it
 // had turned an arm off when it had never been on.
-func DecodeNoUnderscoreDangleOptions(raw []byte) (any, error) {
+func DecodeNoUnderscoreDangleOptions(raw []byte) (NoUnderscoreDangleOptions, error) {
 	var options NoUnderscoreDangleOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -148,10 +148,10 @@ var messageNoUnderscoreDangle = rule.Message{
 //
 // `meta.fixable` is unset and the rule is `frozen`. Renaming an identifier is a refactor across
 // every reference, which a span-local repair cannot do.
-var NoUnderscoreDangle = rule.Rule{
+var NoUnderscoreDangle = rule.Rule[NoUnderscoreDangleOptions]{
 	Name: "no-underscore-dangle",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoUnderscoreDangleOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnderscoreDangleOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		reportNamed := func(node *ast.Node, identifier string) {
 			ruleContext.ReportNode(node, rule.Message{

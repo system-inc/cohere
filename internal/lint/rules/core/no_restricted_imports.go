@@ -106,7 +106,7 @@ type noRestrictedImportsRawPattern = NoRestrictedImportsPattern
 //
 // The config layer used to keep only the first element after the severity, so upstream's variadic
 // `["error", "foo", "bar"]` arrived here as the bare string "foo" and restricted one module of two.
-func DecodeNoRestrictedImportsOptions(list []byte) (any, error) {
+func DecodeNoRestrictedImportsOptions(list []byte) (NoRestrictedImportsOptions, error) {
 	var options NoRestrictedImportsOptions
 	if len(list) == 0 {
 		return options, nil
@@ -371,10 +371,10 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 // no case for it, so this arm is ported from the source rather than from a measured verdict, and its
 // fixtures are written rather than imported. That distinction is stated here because everything else
 // in this rule's tests came out of upstream's corpus and was replayed against the installed build.
-var NoRestrictedImports = rule.Rule{
+var NoRestrictedImports = rule.Rule[NoRestrictedImportsOptions]{
 	Name: "no-restricted-imports",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoRestrictedImportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedImportsOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured || (len(settings.Paths) == 0 && len(settings.Patterns) == 0) {
 			// Upstream's `if (Object.keys(restrictedPaths).length === 0 &&
 			// restrictedPatternGroups.length === 0) return {}`.

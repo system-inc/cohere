@@ -83,9 +83,9 @@ var messageOctalEscape = rule.Message{
 // mechanical (write `A` for `\101`) but it is only correct when the escape is the whole story:
 // in `\400` the trailing `0` is a plain digit that the rewritten escape must keep, and in `\08` the
 // `8` is likewise data. A fixer getting that wrong changes the string unattended.
-var NoOctalEscape = rule.Rule{
+var NoOctalEscape = rule.Rule[rule.NoOptions]{
 	Name: "no-octal-escape",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				literalRange := rule.TokenRange(ruleContext.SourceFile, node)

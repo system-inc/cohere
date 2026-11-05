@@ -157,7 +157,7 @@ var messageNoLoopFunc = rule.Message{
 // The repair is either changing a `var` to `let`, which changes the binding's scope and is not
 // always what was meant, or restructuring to pass the value in. Both are judgment, and upstream
 // ships no fixer either.
-var NoLoopFunc = rule.Rule{
+var NoLoopFunc = rule.Rule[rule.NoOptions]{
 	Name: "no-loop-func",
 
 	// The whole discrimination is name resolution. Four clean cases write a name spelled exactly
@@ -166,7 +166,7 @@ var NoLoopFunc = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Recorded across the file, because a skipped immediately-invoked function has to stay
 		// transparent to the loop search of every function nested inside it. Upstream keeps the
 		// same set for the same reason.

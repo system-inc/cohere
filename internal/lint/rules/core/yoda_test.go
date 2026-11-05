@@ -850,12 +850,8 @@ func TestDecodeYodaOptions(test *testing.T) {
 	if decodeYodaOptionsError != nil {
 		test.Fatalf("upstream's spelling was refused: %v", decodeYodaOptionsError)
 	}
-	settings, ok := decoded.(YodaSettings)
-	if !ok {
-		test.Fatalf("decoded options are not YodaSettings: got %T", decoded)
-	}
-	if !settings.Always || !settings.ExceptRange || !settings.OnlyEquality {
-		test.Errorf("the second element was not read: %+v", settings)
+	if !decoded.Always || !decoded.ExceptRange || !decoded.OnlyEquality {
+		test.Errorf("the second element was not read: %+v", decoded)
 	}
 
 	for _, raw := range []string{

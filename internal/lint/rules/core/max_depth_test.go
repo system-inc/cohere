@@ -287,19 +287,14 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.optionJson, decodeMaximumDepthOptionsError)
 			continue
 		}
-		settings, ok := decoded.(MaxDepthSettings)
-		if !ok {
-			test.Errorf("decoding %s: expected MaxDepthSettings, got %T", testCase.optionJson, decoded)
-			continue
-		}
-		if settings.Disabled != testCase.disabled {
+		if decoded.Disabled != testCase.disabled {
 			test.Errorf("decoding %s: expected disabled=%v, got %v",
-				testCase.optionJson, testCase.disabled, settings.Disabled)
+				testCase.optionJson, testCase.disabled, decoded.Disabled)
 			continue
 		}
-		if !testCase.disabled && settings.Maximum != testCase.maximum {
+		if !testCase.disabled && decoded.Maximum != testCase.maximum {
 			test.Errorf("decoding %s: expected a limit of %d, got %d",
-				testCase.optionJson, testCase.maximum, settings.Maximum)
+				testCase.optionJson, testCase.maximum, decoded.Maximum)
 		}
 	}
 

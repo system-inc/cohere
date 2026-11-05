@@ -808,11 +808,7 @@ func TestNoParamReassignOptions(test *testing.T) {
 		if decodeNoParameterReassignOptionsError != nil {
 			test.Fatalf("decoding empty input: %v", decodeNoParameterReassignOptionsError)
 		}
-		options, ok := decoded.(NoParamReassignOptions)
-		if !ok {
-			test.Fatalf("decoded to %T", decoded)
-		}
-		if options.Props {
+		if decoded.Props {
 			test.Error("empty input decoded to props on, which widens the rule by default")
 		}
 	})

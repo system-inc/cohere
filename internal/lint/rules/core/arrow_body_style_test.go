@@ -664,12 +664,8 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if decodeArrowBodyStyleOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
-		options, ok := decoded.(ArrowBodyStyleOptions)
-		if !ok {
-			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
-		}
-		if options.Mode != ArrowBodyStyleAsNeeded {
-			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
+		if decoded.Mode != ArrowBodyStyleAsNeeded {
+			test.Errorf("mode came back %q, wanted AsNeeded", decoded.Mode)
 		}
 	})
 
@@ -680,14 +676,10 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if decodeArrowBodyStyleOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
-		options, ok := decoded.(ArrowBodyStyleOptions)
-		if !ok {
-			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
+		if decoded.Mode != ArrowBodyStyleAsNeeded {
+			test.Errorf("mode came back %q, wanted AsNeeded", decoded.Mode)
 		}
-		if options.Mode != ArrowBodyStyleAsNeeded {
-			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
-		}
-		if !options.RequireReturnForObjectLiteral {
+		if !decoded.RequireReturnForObjectLiteral {
 			test.Error("the second element was handed over and not read")
 		}
 	})

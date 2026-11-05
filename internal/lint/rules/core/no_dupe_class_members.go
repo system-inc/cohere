@@ -8,9 +8,9 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var NoDupeClassMembers = rule.Rule{
+var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "no-dupe-class-members",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The collision judgment lives in `classmembers` rather than here, because
 		// `@typescript-eslint/no-dupe-class-members` needs the same answer and a rule package may
 		// not import another rule package. This rule owns the wording and the message id; the

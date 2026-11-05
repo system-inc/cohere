@@ -72,9 +72,9 @@ var messageUnusedLabel = rule.Message{
 // pre-order and a source-file listener fires before its children, so a listener collecting labels
 // and a separate one reading them would see an empty list. Gathering and judging therefore happen in
 // the same place, which is what an exit hook would otherwise buy.
-var NoUnusedLabels = rule.Rule{
+var NoUnusedLabels = rule.Rule[rule.NoOptions]{
 	Name: "no-unused-labels",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				labeledStatements := []*ast.Node{}
