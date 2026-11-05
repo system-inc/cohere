@@ -36,7 +36,10 @@ struct TypesPhaseRecordTests {
             ],
             in: root,
         )
-        #expect(FileManager.default.fileExists(atPath: record.path), "the compiler wrote no record, so nothing below is checked")
+        #expect(
+            FileManager.default.fileExists(atPath: record.path),
+            "the compiler wrote no record, so nothing below is checked",
+        )
 
         let describe =
             #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["A.swift","B.swift"]}]}"#
@@ -46,7 +49,11 @@ struct TypesPhaseRecordTests {
             package: package,
             files: [
                 FileSet.OwnedFile(url: broken, targetName: "A", targetKind: "library"),
-                FileSet.OwnedFile(url: sources.appendingPathComponent("B.swift"), targetName: "A", targetKind: "library"),
+                FileSet.OwnedFile(
+                    url: sources.appendingPathComponent("B.swift"),
+                    targetName: "A",
+                    targetKind: "library",
+                ),
             ],
             scratchPath: root.appendingPathComponent("scratch", isDirectory: true),
             resolutionAllowed: false,
@@ -64,8 +71,13 @@ struct TypesPhaseRecordTests {
     }
 
     static func findings(_ fixture: (phase: TypesPhase, target: URL, broken: URL, record: URL)) throws -> [String] {
-        try fixture.phase.read(targetDirectories: [("A", fixture.target)], failedBuilds: [], start: Date(), build: "test")
-            .findings.map { "\(URL(fileURLWithPath: $0.file).lastPathComponent):\($0.line)" }
+        try fixture.phase.read(
+            targetDirectories: [("A", fixture.target)],
+            failedBuilds: [],
+            start: Date(),
+            build: "test",
+        )
+        .findings.map { "\(URL(fileURLWithPath: $0.file).lastPathComponent):\($0.line)" }
     }
 
     /* The control: a record newer than the file it names is the current compile's word on it, whichever file the record is named for. */
