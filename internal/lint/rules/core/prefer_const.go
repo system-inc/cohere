@@ -314,6 +314,8 @@ var PreferConst = rule.Rule{
 // Split out from the listener because the `destructuring` option changes the *unit* of the
 // judgment, not the judgment itself: under "any" each bound name answers for itself, and under
 // "all" the pattern answers as a whole. Both arms call the same predicate.
+//
+// Mutates: fixAlreadyOffered the flag is shared by the whole list, so only its first finding carries the fix
 func reportConstCandidates(ruleContext rule.Context, settings PreferConstOptions, list *ast.Node,
 	declaration *ast.Node, isLoopHead bool, listIsFixable bool, fixAlreadyOffered *bool) {
 	name := declaration.AsVariableDeclaration().Name()

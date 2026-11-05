@@ -133,14 +133,15 @@ var NoInvalidRegexp = rule.Rule{
 		allowedFlags := allowedConstructorFlags(options)
 
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
-			callee = ast.SkipParentheses(callee)
-			if callee == nil || callee.Kind != ast.KindIdentifier {
+			unwrapped := ast.SkipParentheses(callee)
+			if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 				return
 			}
-			if callee.AsIdentifier().Text != "RegExp" {
+			if unwrapped.AsIdentifier().Text != "RegExp" {
 				return
 			}
-			if ruleContext.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(callee)) {
+			if ruleContext.TypeChecker == nil ||
+				!rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)) {
 				return
 			}
 			// `RegExp()` with no arguments produces the empty pattern and cannot fail.

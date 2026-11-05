@@ -25,7 +25,7 @@ func sortVarsOf(optionJson string) any {
 // Shared by every fixable rule's fixture table in this package, declared here because sort-vars
 // was the first to need it. A Go package is one namespace, so a second declaration in another
 // rule's test file is a build error rather than a local helper.
-func pointerTo(value string) *string { return &value }
+func pointerTo(value string) *string { return new(value) }
 
 // The corpus is ESLint's own, taken from
 // /tmp/lint-sources-fresh/eslint/tests/lib/rules/sort-vars.js by running that file with RuleTester

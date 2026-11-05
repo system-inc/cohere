@@ -267,6 +267,11 @@ func bitsPerDigit(radix int) int {
 	}
 }
 
+// maximumComparableSignificantDigits is the largest significant-digit count the comparison can be
+// performed at. It matches the ceiling upstream applies for the same reason: past this the stored
+// side cannot be rendered to the requested width.
+const maximumComparableSignificantDigits = 100
+
 // baseTenLiteralLosesPrecision answers for a decimal literal.
 //
 // The literal is parsed to the float the program will run with, then that float is formatted back
@@ -314,11 +319,6 @@ func baseTenLiteralLosesPrecision(raw string) bool {
 	return storedDigits != writtenDigits || storedExponent != writtenExponent
 }
 
-// maximumComparableSignificantDigits is the largest significant-digit count the comparison can be
-// performed at. It matches the ceiling upstream applies for the same reason: past this the stored
-// side cannot be rendered to the requested width.
-const maximumComparableSignificantDigits = 100
-
 // scientificFormOfDecimal reduces a decimal literal to its significant digits and an exponent, so
 // that two spellings of one number compare equal.
 //
@@ -348,9 +348,10 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	}
 
 	integerPart, fractionPart := significand, ""
+	pointWritten := false
 	if index := strings.IndexByte(significand, '.'); index >= 0 {
 		integerPart, fractionPart = significand[:index], significand[index+1:]
-		keepTrailingZeros = true
+		pointWritten = true
 	}
 
 	digits := integerPart + fractionPart
@@ -367,7 +368,8 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	exponent += len(integerPart) - leadingZeros - 1
 	digits = digits[leadingZeros:]
 
-	if !keepTrailingZeros {
+	// A written point keeps the trailing zeros on its own, as the doc comment says.
+	if !keepTrailingZeros && !pointWritten {
 		digits = strings.TrimRight(digits, "0")
 	}
 

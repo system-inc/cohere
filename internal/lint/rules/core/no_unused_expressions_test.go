@@ -721,13 +721,13 @@ func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(test *testing.T) {
 		rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
 }
 
-// TestNoUnusedExpressionsReadsOptionsFromJSON pins the wire names.
+// TestNoUnusedExpressionsReadsOptionsFromJson pins the wire names.
 //
 // The struct fields are Go-cased and the config is JSON, so a missing or misspelled tag reads as the
 // option being absent, which is silent: the rule runs with defaults and every fires case still
 // fires. The five names below are ESLint's meta.schema verbatim, which is the authoritative surface
 // and which the inventory got wrong for this rule, recording "options": "no" for a rule with five.
-func TestNoUnusedExpressionsReadsOptionsFromJSON(test *testing.T) {
+func TestNoUnusedExpressionsReadsOptionsFromJson(test *testing.T) {
 	test.Parallel()
 
 	decoded, err := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(

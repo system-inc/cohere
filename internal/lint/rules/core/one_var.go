@@ -864,6 +864,8 @@ func (checker *oneVarChecker) groupFor(kind oneVarKind) oneVarGroup {
 // Only an `always` half records. A `never` or `consecutive` half leaves the scope flags untouched,
 // which is why a `consecutive` rule's verdict depends on the immediately preceding statement rather
 // than on anything the scope accumulated.
+//
+// Mutates: scope the flags are the scope's running record, which later statements in it read back
 func (checker *oneVarChecker) recordTypes(kind oneVarKind, declarators []*ast.Node,
 	scope *oneVarStateFlags) {
 	group := checker.groupFor(kind)

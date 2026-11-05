@@ -38,7 +38,7 @@ type noRestrictedGlobalsCase struct {
 	findings    []noRestrictedGlobalsExpectation
 }
 
-func noRestrictedGlobalsStringPointer(value string) *string { return &value }
+func noRestrictedGlobalsStringPointer(value string) *string { return new(value) }
 
 // decodeNoRestrictedGlobalsOptionsForTest routes a case's options through the shipped decoder.
 func decodeNoRestrictedGlobalsOptionsForTest(test *testing.T, optionsJson string) any {
@@ -280,12 +280,12 @@ func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCas
 		decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
 
 	wantIds := make([]string, len(testCase.findings))
-	for i, finding := range testCase.findings {
-		wantIds[i] = finding.id
+	for index, finding := range testCase.findings {
+		wantIds[index] = finding.id
 	}
 	rule_testing.ExpectFindings(test, result, wantIds...)
 
-	for i, finding := range testCase.findings {
+	for index, finding := range testCase.findings {
 		// Upstream's two templates: `Unexpected use of '{{name}}'.` and
 		// `Unexpected use of '{{name}}'. {{customMessage}}`. Asserted as an exact prefix rather
 		// than with a substring test, because the custom message is interpolated and a
@@ -294,8 +294,8 @@ func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCas
 		if finding.customMessage != "" {
 			want += " " + finding.customMessage
 		}
-		if got := result.Diagnostics[i].Message.Description; !strings.HasPrefix(got, want) {
-			test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+		if got := result.Diagnostics[index].Message.Description; !strings.HasPrefix(got, want) {
+			test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 		}
 	}
 }

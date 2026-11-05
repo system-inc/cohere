@@ -312,10 +312,11 @@ var PreferDestructuring = rule.Rule{
 // A loop rather than one step, because `((x))` nests. `ast.SkipParentheses` is not used: it
 // dereferences its argument and every caller here holds an optional node.
 func preferDestructuringUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferDestructuringMemberParts returns the accessed property and whether the access is computed.
