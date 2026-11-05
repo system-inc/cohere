@@ -13,36 +13,36 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// swiftContractVersion is the version of swift/Contract.md this front door speaks.
-const swiftContractVersion = 3
+// engineContractVersion is the version of swift/Contract.md this front door speaks.
+const engineContractVersion = 3
 
 // versionReport is what `cohere --version` prints about cohere itself: its provenance, then the Swift
 // contract it speaks, on every platform and every build, since it is true of each. The release reads
 // that line from the cohere it stages and refuses a cohere-swift that will not speak the same version,
 // so the number comes from the binary that ships rather than from a copy that could drift.
 func versionReport() string {
-	return fmt.Sprintf("%s\n  swift contract: %d", release.Current(), swiftContractVersion)
+	return fmt.Sprintf("%s\n  swift contract: %d", release.Current(), engineContractVersion)
 }
 
-// swiftMode is which question a Swift run answers, and so which records it may carry.
+// engineMode is which question an engine run answers, and so which records it may carry.
 //
 // The listing modes end without a summary by design: `--version` prints one provenance record and
 // `--rules` prints rule records, as the contract says. A run in the checking mode that ends without a
 // summary is a crash. The mode is what lets one absence mean two different things without the front
 // door guessing which.
-type swiftMode string
+type engineMode string
 
 const (
-	swiftModeCheck        swiftMode = "Check"
-	swiftModeVersion      swiftMode = "Version"
-	swiftModeRules        swiftMode = "Rules"
-	swiftModeRulesEnabled swiftMode = "RulesEnabled"
+	engineModeCheck        engineMode = "Check"
+	engineModeVersion      engineMode = "Version"
+	engineModeRules        engineMode = "Rules"
+	engineModeRulesEnabled engineMode = "RulesEnabled"
 )
 
 // The records, as swift/Contract.md defines them. Fields the contract does not list are ignored by
 // leaving them out of these types, which is what the contract asks of the front door.
 
-type swiftProvenanceRecord struct {
+type engineProvenanceRecord struct {
 	Contract           *int   `json:"contract"`
 	Engine             string `json:"engine"`
 	Version            string `json:"version"`
@@ -53,7 +53,7 @@ type swiftProvenanceRecord struct {
 	SwiftFormat        string `json:"swiftFormat"`
 }
 
-type swiftProjectRecord struct {
+type engineProjectRecord struct {
 	Root                string `json:"root"`
 	Package             string `json:"package"`
 	ElapsedMilliseconds int    `json:"elapsedMilliseconds"`
@@ -67,15 +67,15 @@ type swiftProjectRecord struct {
 	} `json:"excluded"`
 }
 
-// swiftUnreadableRecord is a file the engine could not read, so nothing in it was checked. Contract 2
+// engineUnreadableRecord is a file the engine could not read, so nothing in it was checked. Contract 2
 // made it a record: before, the engine said only on stderr that it had fallen short, and the front door
 // could believe it but not say which files.
-type swiftUnreadableRecord struct {
+type engineUnreadableRecord struct {
 	File  string `json:"file"`
 	Error string `json:"error"`
 }
 
-type swiftFindingRecord struct {
+type engineFindingRecord struct {
 	Source    string `json:"source"`
 	File      string `json:"file"`
 	Line      int    `json:"line"`
@@ -86,10 +86,10 @@ type swiftFindingRecord struct {
 	Message   string `json:"message"`
 }
 
-// swiftUnusedRecord is one item of the --unused report. It carries a finding's place and words but is
+// engineUnusedRecord is one item of the --unused report. It carries a finding's place and words but is
 // not a finding: the report is not a gate, so it is never counted and never moves the exit code, as the
 // TypeScript unused report never does.
-type swiftUnusedRecord struct {
+type engineUnusedRecord struct {
 	File      string `json:"file"`
 	Line      int    `json:"line"`
 	Column    int    `json:"column"`
@@ -99,9 +99,9 @@ type swiftUnusedRecord struct {
 	Subject   string `json:"subject"`
 }
 
-// swiftUnusedCoverageRecord is what one rule of the --unused report looked at, so a report that checked
+// engineUnusedCoverageRecord is what one rule of the --unused report looked at, so a report that checked
 // nothing never reads like one that found nothing.
-type swiftUnusedCoverageRecord struct {
+type engineUnusedCoverageRecord struct {
 	Rule                string         `json:"rule"`
 	FilesChecked        int            `json:"filesChecked"`
 	FilesNotChecked     map[string]int `json:"filesNotChecked"`
@@ -111,7 +111,7 @@ type swiftUnusedCoverageRecord struct {
 	ElapsedMilliseconds int            `json:"elapsedMilliseconds"`
 }
 
-type swiftFixRecord struct {
+type engineFixRecord struct {
 	FilesConsidered     int            `json:"filesConsidered"`
 	FilesRewritten      int            `json:"filesRewritten"`
 	FixesApplied        int            `json:"fixesApplied"`
@@ -123,25 +123,25 @@ type swiftFixRecord struct {
 	FormatScope         string         `json:"formatScope"`
 	// ChangedFiles is every file the phase wrote, once each. Additive within contract 3: an engine from
 	// before it sends none, which is "not listed", never "no files changed", so it is a pointer.
-	ChangedFiles *[]swiftChangedFile `json:"changedFiles"`
+	ChangedFiles *[]engineChangedFile `json:"changedFiles"`
 }
 
-// swiftChangedFile is one file the fix phase wrote: its fixes by the rule that made them, and whether the
+// engineChangedFile is one file the fix phase wrote: its fixes by the rule that made them, and whether the
 // formatter changed it.
-type swiftChangedFile struct {
+type engineChangedFile struct {
 	File      string         `json:"file"`
 	FixedBy   map[string]int `json:"fixedBy"`
 	Formatted bool           `json:"formatted"`
 }
 
-type swiftTypesRecord struct {
+type engineTypesRecord struct {
 	Diagnostics         int      `json:"diagnostics"`
 	Files               int      `json:"files"`
 	ElapsedMilliseconds int      `json:"elapsedMilliseconds"`
 	FilesWithoutRecord  []string `json:"filesWithoutRecord"`
 }
 
-type swiftLintRecord struct {
+type engineLintRecord struct {
 	Findings             int            `json:"findings"`
 	RulesRun             int            `json:"rulesRun"`
 	FilesWalked          int            `json:"filesWalked"`
@@ -159,66 +159,70 @@ type swiftLintRecord struct {
 	} `json:"crashes"`
 }
 
-type swiftPhaseRecord struct {
+type enginePhaseRecord struct {
 	Name                string `json:"name"`
 	Outcome             string `json:"outcome"`
 	ElapsedMilliseconds int    `json:"elapsedMilliseconds"`
 	Detail              string `json:"detail"`
 }
 
-type swiftRuleRecord struct {
+type engineRuleRecord struct {
 	Name     string `json:"name"`
 	Severity string `json:"severity"`
 }
 
-type swiftSummaryRecord struct {
+type engineSummaryRecord struct {
 	Findings *int  `json:"findings"`
 	Complete *bool `json:"complete"`
 	ExitCode *int  `json:"exitCode"`
 }
 
-// swiftOutcomes maps the contract's camelCase outcomes onto the ones phases.go prints.
-var swiftOutcomes = map[string]phaseOutcome{
+// engineOutcomes maps the contract's camelCase outcomes onto the ones phases.go prints.
+var engineOutcomes = map[string]phaseOutcome{
 	"ran":        outcomeRan,
 	"skipped":    outcomeSkipped,
 	"notReached": outcomeNotReached,
 	"reused":     outcomeReused,
 }
 
-// swiftRun renders one engine run's records as they arrive, through the printers a TypeScript run
+// engineRun renders one engine run's records as they arrive, through the printers a TypeScript run
 // uses, and refuses any stream that breaks the contract.
 //
 // Every refusal is an error rather than a skipped line, for the reason the contract gives: a skipped
 // record is a finding nobody sees. And every count the stream states twice is compared, because two
 // numbers that should agree and do not are a defect in one of them, and printing either would be
 // printing a number nobody can vouch for.
-type swiftRun struct {
+type engineRun struct {
 	out  io.Writer
-	mode swiftMode
+	mode engineMode
+
+	// language is the words this run prints for its engine, so a sentence never names a language the run
+	// is not checking.
+	language engineLanguage
 
 	// details is `--coverage`: name every rule once under its coverage fact rather than only counting.
 	// A front-door flag, never forwarded: the engine's records already carry what it names.
 	details bool
 
 	// engineSourceCommit is the commit whose Swift sources the engine is guaranteed to be built from,
-	// or empty when nothing vouches for it. Set only when the engine came through the launcher's
-	// committed path, whose cache key is the object ids of that commit's Swift inputs. The engine itself
-	// says `commit dev` and must: one cached engine serves every commit with identical Swift inputs, so a
-	// commit baked into it would name whichever commit built it first, true of the build and false of
-	// the run. The front door knows the run.
+	// or empty when nothing vouches for it, and only the Swift engine's version lines print it. Set only
+	// when the engine came through the launcher's committed path, whose cache key is the object ids of
+	// that commit's Swift inputs. The engine itself says `commit dev` and must: one cached engine serves
+	// every commit with identical Swift inputs, so a commit baked into it would name whichever commit
+	// built it first, true of the build and false of the run. The front door knows the run.
 	engineSourceCommit string
 
 	// requested is which phases the caller asked for, by the flags the TypeScript run reads the same way
-	// (swiftRequestedPhases). An engine that reports one of them skipped as not requested is refused: it
+	// (engineRequestedPhases). An engine that reports one of them skipped as not requested is refused: it
 	// would turn a phase that was asked for and never ran into a run that looks complete. Nil, as in a test
 	// that renders a stream with no command line, checks nothing.
 	requested map[phaseName]bool
 
-	provenance *swiftProvenanceRecord
-	project    *swiftProjectRecord
-	summary    *swiftSummaryRecord
+	provenance *engineProvenanceRecord
+	project    *engineProjectRecord
+	summary    *engineSummaryRecord
 	report     *pipelineReport
-	rules      []swiftRuleRecord
+	rules      []engineRuleRecord
 
 	// findings is every finding record received; findingsInPhase only those since the last phase
 	// record, which is how the types and lint records' own counts are checked.
@@ -232,7 +236,7 @@ type swiftRun struct {
 	// files a rule crashed on. Each is already printed as a note; these count them for the summary.
 	filesWithoutRecord int
 	crashes            int
-	unreadable         []swiftUnreadableRecord
+	unreadable         []engineUnreadableRecord
 
 	excludedPrinted bool
 
@@ -240,25 +244,34 @@ type swiftRun struct {
 	// section prints with its count first, in the TypeScript report's shape. unusedCoverage counts the
 	// coverage records, which an unused phase that ran must have.
 	unusedHeadingPrinted bool
-	unusedPending        []swiftUnusedRecord
+	unusedPending        []engineUnusedRecord
 	unusedCoverage       int
 }
 
-func newSwiftRun(out io.Writer, mode swiftMode, rootNote string, processStart time.Time) *swiftRun {
-	return &swiftRun{
-		out:  out,
-		mode: mode,
+// newEngineRun starts rendering one engine's run, naming the step nothing can skip by what the engine
+// describes first, its package, module or workspace.
+func newEngineRun(
+	out io.Writer,
+	mode engineMode,
+	language engineLanguage,
+	rootNote string,
+	processStart time.Time,
+) *engineRun {
+	return &engineRun{
+		out:      out,
+		mode:     mode,
+		language: language,
 		report: &pipelineReport{
 			processStart:          processStart,
 			rootNote:              rootNote,
-			graphLabel:            "package",
-			graphNotBuiltSentence: "no package was described and no phase ran",
+			graphLabel:            language.Container,
+			graphNotBuiltSentence: fmt.Sprintf("no %s was described and no phase ran", language.Container),
 		},
 	}
 }
 
 // accept renders one line of the engine's stdout.
-func (r *swiftRun) accept(line []byte) error {
+func (r *engineRun) accept(line []byte) error {
 	var envelope struct {
 		Kind string `json:"kind"`
 	}
@@ -275,29 +288,29 @@ func (r *swiftRun) accept(line []byte) error {
 
 	switch envelope.Kind {
 	case "provenance":
-		return decodeRecord(line, &swiftProvenanceRecord{}, r.acceptProvenance)
+		return decodeRecord(line, &engineProvenanceRecord{}, r.acceptProvenance)
 	case "project":
-		return decodeRecord(line, &swiftProjectRecord{}, r.acceptProject)
+		return decodeRecord(line, &engineProjectRecord{}, r.acceptProject)
 	case "unreadable":
-		return decodeRecord(line, &swiftUnreadableRecord{}, r.acceptUnreadable)
+		return decodeRecord(line, &engineUnreadableRecord{}, r.acceptUnreadable)
 	case "finding":
-		return decodeRecord(line, &swiftFindingRecord{}, r.acceptFinding)
+		return decodeRecord(line, &engineFindingRecord{}, r.acceptFinding)
 	case "fix":
-		return decodeRecord(line, &swiftFixRecord{}, r.acceptFix)
+		return decodeRecord(line, &engineFixRecord{}, r.acceptFix)
 	case "types":
-		return decodeRecord(line, &swiftTypesRecord{}, r.acceptTypes)
+		return decodeRecord(line, &engineTypesRecord{}, r.acceptTypes)
 	case "lint":
-		return decodeRecord(line, &swiftLintRecord{}, r.acceptLint)
+		return decodeRecord(line, &engineLintRecord{}, r.acceptLint)
 	case "phase":
-		return decodeRecord(line, &swiftPhaseRecord{}, r.acceptPhase)
+		return decodeRecord(line, &enginePhaseRecord{}, r.acceptPhase)
 	case "rule":
-		return decodeRecord(line, &swiftRuleRecord{}, r.acceptRule)
+		return decodeRecord(line, &engineRuleRecord{}, r.acceptRule)
 	case "unused":
-		return decodeRecord(line, &swiftUnusedRecord{}, r.acceptUnused)
+		return decodeRecord(line, &engineUnusedRecord{}, r.acceptUnused)
 	case "unusedCoverage":
-		return decodeRecord(line, &swiftUnusedCoverageRecord{}, r.acceptUnusedCoverage)
+		return decodeRecord(line, &engineUnusedCoverageRecord{}, r.acceptUnusedCoverage)
 	case "summary":
-		return decodeRecord(line, &swiftSummaryRecord{}, r.acceptSummary)
+		return decodeRecord(line, &engineSummaryRecord{}, r.acceptSummary)
 	default:
 		// An unknown kind is refused rather than ignored: it is a record this front door cannot render,
 		// so whatever it carried would reach nobody.
@@ -313,26 +326,26 @@ func decodeRecord[Record any](line []byte, record *Record, accept func(*Record) 
 	return accept(record)
 }
 
-func (r *swiftRun) acceptProvenance(record *swiftProvenanceRecord) error {
+func (r *engineRun) acceptProvenance(record *engineProvenanceRecord) error {
 	if r.provenance != nil {
 		return fmt.Errorf("a second provenance record")
 	}
 	// Checked here as well as by the engine against `--contract`, because the flag and the record are
 	// two independent ways for the versions to disagree, and the contract asks for both.
-	if record.Contract == nil || *record.Contract != swiftContractVersion {
+	if record.Contract == nil || *record.Contract != engineContractVersion {
 		spoken := "none"
 		if record.Contract != nil {
 			spoken = fmt.Sprint(*record.Contract)
 		}
-		return fmt.Errorf("the engine speaks contract %s and this front door speaks contract %d", spoken, swiftContractVersion)
+		return fmt.Errorf("the engine speaks contract %s and this front door speaks contract %d", spoken, engineContractVersion)
 	}
 	r.provenance = record
 	r.report.engineSourceTreeModified = record.SourceTreeModified
 	return nil
 }
 
-func (r *swiftRun) acceptProject(record *swiftProjectRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptProject(record *engineProjectRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a project record in a %s run", r.mode)
 	}
 	if r.project != nil {
@@ -341,8 +354,9 @@ func (r *swiftRun) acceptProject(record *swiftProjectRecord) error {
 	r.project = record
 
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	line := fmt.Sprintf("package described in %s — %d Swift files in the package, %d of them ours",
-		round(elapsed), record.FilesInPackage, record.FilesOurs)
+	line := fmt.Sprintf("%s described in %s — %d %s in the %s, %d of them ours",
+		r.language.Container, round(elapsed), record.FilesInPackage, r.language.FileNoun, r.language.Container,
+		record.FilesOurs)
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
@@ -359,8 +373,8 @@ func (r *swiftRun) acceptProject(record *swiftProjectRecord) error {
 // acceptUnreadable holds a file nothing checked, to be named with the excluded files and counted as a
 // gap. Its place is fixed, after the project and before the first phase, so the files a run could not
 // read are all known before any phase reports on the files it could.
-func (r *swiftRun) acceptUnreadable(record *swiftUnreadableRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptUnreadable(record *engineUnreadableRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("an unreadable record in a %s run", r.mode)
 	}
 	if r.project == nil {
@@ -376,8 +390,8 @@ func (r *swiftRun) acceptUnreadable(record *swiftUnreadableRecord) error {
 	return nil
 }
 
-func (r *swiftRun) acceptFinding(record *swiftFindingRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptFinding(record *engineFindingRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a finding record in a %s run", r.mode)
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 {
@@ -397,24 +411,24 @@ func (r *swiftRun) acceptFinding(record *swiftFindingRecord) error {
 		if rule != "" {
 			rule = "#" + rule
 		} else {
-			rule = "swiftc"
+			rule = r.language.CompilerLabel
 		}
 	} else {
 		activeSummary.Findings++
 	}
 	printFinding(r.out,
 		runFinding{Path: record.File, Line: record.Line, Column: record.Column, Severity: severity, Rule: rule, MessageID: messageID, Message: singleLineDescription(record.Message)},
-		swiftFindingLine(record)+"\n")
+		engineFindingLine(record)+"\n")
 	return nil
 }
 
-// swiftFindingLine is one finding as one line, in the shape the TypeScript printers use.
+// engineFindingLine is one finding as one line, in the shape the TypeScript printers use.
 //
-// A compiler finding reads like tsc's `file:line:col - error TS2322: message`, with the warning group
-// where the code goes, as swiftc writes it. A rule or format finding reads like a TypeScript rule
-// finding, `[rule/messageId]` at the end. Newlines in the message are collapsed, for the reason
-// printRuleDiagnostic gives.
-func swiftFindingLine(record *swiftFindingRecord) string {
+// A compiler finding reads like tsc's `file:line:col - error TS2322: message`, with the compiler's group
+// where the code goes, as swiftc writes its warning groups. A rule or format finding reads like a
+// TypeScript rule finding, `[rule/messageId]` at the end. Newlines in the message are collapsed, for the
+// reason printRuleDiagnostic gives.
+func engineFindingLine(record *engineFindingRecord) string {
 	position := fmt.Sprintf("%s:%d:%d", record.File, record.Line, record.Column)
 	message := singleLineDescription(record.Message)
 	if record.Source == "compiler" {
@@ -429,8 +443,8 @@ func swiftFindingLine(record *swiftFindingRecord) string {
 
 // unusedPlace refuses an --unused report record anywhere but between the lint phase record and the
 // unused one, where the contract puts the report.
-func (r *swiftRun) unusedPlace(kind string) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) unusedPlace(kind string) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("an %s record in a %s run", kind, r.mode)
 	}
 	if r.nextPhase >= len(phaseOrder) || phaseOrder[r.nextPhase] != phaseUnused {
@@ -439,7 +453,7 @@ func (r *swiftRun) unusedPlace(kind string) error {
 	return nil
 }
 
-func (r *swiftRun) acceptUnused(record *swiftUnusedRecord) error {
+func (r *engineRun) acceptUnused(record *engineUnusedRecord) error {
 	if err := r.unusedPlace("unused"); err != nil {
 		return err
 	}
@@ -453,14 +467,14 @@ func (r *swiftRun) acceptUnused(record *swiftUnusedRecord) error {
 
 // acceptUnusedCoverage prints one rule's section of the report: its items, counted and sorted, then what
 // it looked at and what it could not.
-func (r *swiftRun) acceptUnusedCoverage(record *swiftUnusedCoverageRecord) error {
+func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) error {
 	if err := r.unusedPlace("unusedCoverage"); err != nil {
 		return err
 	}
 	if record.Rule == "" || record.Found == nil {
 		return fmt.Errorf("an unusedCoverage record missing its rule or found count")
 	}
-	items := []swiftUnusedRecord{}
+	items := []engineUnusedRecord{}
 	for _, pending := range r.unusedPending {
 		if pending.Rule == record.Rule {
 			items = append(items, pending)
@@ -538,8 +552,8 @@ func sortedKeys(counts map[string]int) []string {
 	return keys
 }
 
-func (r *swiftRun) acceptFix(record *swiftFixRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptFix(record *engineFixRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a fix record in a %s run", r.mode)
 	}
 	// The engine's numbers fed to the summary the TypeScript run prints, so the line and its rules
@@ -572,10 +586,10 @@ func (r *swiftRun) acceptFix(record *swiftFixRecord) error {
 	return nil
 }
 
-// changedFiles turns the fix record's list into the summary's, each path relative to the package root as a
+// changedFiles turns the fix record's list into the summary's, each path relative to the project root as a
 // TypeScript run's are. It refuses a list whose length differs from the count the record states, a file
 // named twice, and a file that neither a fix nor the formatter changed, since "N cohered" must be the list.
-func (r *swiftRun) changedFiles(files []swiftChangedFile, rewritten int) ([]changedFile, error) {
+func (r *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]changedFile, error) {
 	if len(files) != rewritten {
 		return nil, fmt.Errorf("the fix record counts %d files rewritten and lists %d", rewritten, len(files))
 	}
@@ -607,8 +621,8 @@ func (r *swiftRun) changedFiles(files []swiftChangedFile, rewritten int) ([]chan
 	return changed, nil
 }
 
-func (r *swiftRun) acceptTypes(record *swiftTypesRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptTypes(record *engineTypesRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a types record in a %s run", r.mode)
 	}
 	if record.Diagnostics != r.findingsInPhase {
@@ -620,7 +634,8 @@ func (r *swiftRun) acceptTypes(record *swiftTypesRecord) error {
 	// The compiler checks the whole module whatever the scope, so a scoped run's types line covers more
 	// than the scope does. Said, so the larger number does not read as a scope that leaked.
 	if r.project != nil && record.Files != r.project.FilesInScope {
-		fmt.Fprintf(accountOutput(r.out), "  types: covered the whole package, not only the %d files in scope\n", r.project.FilesInScope)
+		fmt.Fprintf(accountOutput(r.out), "  types: covered the whole %s, not only the %d files in scope\n",
+			r.language.Container, r.project.FilesInScope)
 	}
 	for _, file := range record.FilesWithoutRecord {
 		fmt.Fprintf(accountOutput(r.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
@@ -629,8 +644,8 @@ func (r *swiftRun) acceptTypes(record *swiftTypesRecord) error {
 	return nil
 }
 
-func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptLint(record *engineLintRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a lint record in a %s run", r.mode)
 	}
 	if record.Findings != r.findingsInPhase {
@@ -651,7 +666,7 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	// The same coverage block a TypeScript run prints, from the same writer, so one fact reads the same
 	// whichever engine states it: one counted line whose terms add up, crashes in full, and each rule
 	// named once behind --coverage.
-	summary, err := classifySwiftCoverage(record)
+	summary, err := classifyEngineCoverage(record)
 	if err != nil {
 		return err
 	}
@@ -665,7 +680,7 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	return nil
 }
 
-// classifySwiftCoverage puts every rule the lint record accounts for into exactly one category.
+// classifyEngineCoverage puts every rule the lint record accounts for into exactly one category.
 //
 // The record names its silent rules and only counts the rest: rulesRun is every rule, of which
 // rulesWatchedAndQuiet listened and reported nothing and rulesSilent listened to no file, so what
@@ -676,7 +691,7 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 //
 // A record whose parts add up to more than its whole is refused, for the reason every count stated
 // twice is compared: the counted line would print arithmetic nobody can vouch for.
-func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
+func classifyEngineCoverage(record *engineLintRecord) (coverageSummary, error) {
 	notConfigured := make(map[string]bool, len(record.RulesNotConfigured))
 	for _, name := range record.RulesNotConfigured {
 		notConfigured[name] = true
@@ -736,7 +751,7 @@ func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
 // excludedNamedLimit is how many excluded files of one reason are named before they are counted.
 const excludedNamedLimit = 5
 
-// writeExcluded says which files the package description left out, once, under the lint line when
+// writeExcluded says which files the project record left out, once, under the lint line when
 // there is one and above the phase line when there is not: a file nobody checked is a coverage fact
 // whether or not lint got to run.
 //
@@ -744,7 +759,7 @@ const excludedNamedLimit = 5
 // `vendored under Vendor/` between the lint line and the verdict, which buries the two lines a reader
 // must act on under a hundred that say one thing. A few files are named, because one file left out
 // for a surprising reason is the case worth seeing; a hundred for the same reason are one fact.
-func (r *swiftRun) writeExcluded() {
+func (r *engineRun) writeExcluded() {
 	if r.excludedPrinted || r.project == nil {
 		return
 	}
@@ -779,8 +794,8 @@ func (r *swiftRun) writeExcluded() {
 	}
 }
 
-func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptPhase(record *enginePhaseRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a phase record in a %s run", r.mode)
 	}
 	if r.nextPhase >= len(phaseOrder) || string(phaseOrder[r.nextPhase]) != record.Name {
@@ -790,7 +805,7 @@ func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
 		}
 		return fmt.Errorf("a phase record for %q where the pipeline order expects %s", record.Name, expected)
 	}
-	outcome, known := swiftOutcomes[record.Outcome]
+	outcome, known := engineOutcomes[record.Outcome]
 	if !known {
 		return fmt.Errorf("phase %s has outcome %q, which is not one of ran, skipped, notReached, reused", record.Name, record.Outcome)
 	}
@@ -812,12 +827,12 @@ func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
 	return nil
 }
 
-// swiftRequestedPhases is which phases a command line asks for, read as the TypeScript run reads it: no
+// engineRequestedPhases is which phases a command line asks for, read as the TypeScript run reads it: no
 // phase flag asks for fix, types and lint; `--fix`, `--types` or `--lint` asks for only the ones named;
 // and any `--unused` flag asks for unused as well. `--format-only` asks for fix alone, narrowed to
 // formatting, so the engine's types and lint skipped as not requested are no gap. Takes the flag reader as
 // a parameter so a test can state its flags, as swiftEngineArguments does.
-func swiftRequestedPhases(given map[string]bool, value func(string) string) map[phaseName]bool {
+func engineRequestedPhases(given map[string]bool, value func(string) string) map[phaseName]bool {
 	named := func(flag string) bool { return given[flag] && value(flag) == "true" }
 	if named("format-only") {
 		return map[phaseName]bool{phaseFix: true}
@@ -831,16 +846,16 @@ func swiftRequestedPhases(given map[string]bool, value func(string) string) map[
 	}
 }
 
-func (r *swiftRun) acceptRule(record *swiftRuleRecord) error {
-	if r.mode != swiftModeRules && r.mode != swiftModeRulesEnabled {
+func (r *engineRun) acceptRule(record *engineRuleRecord) error {
+	if r.mode != engineModeRules && r.mode != engineModeRulesEnabled {
 		return fmt.Errorf("a rule record in a %s run", r.mode)
 	}
 	r.rules = append(r.rules, *record)
 	return nil
 }
 
-func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
-	if r.mode != swiftModeCheck {
+func (r *engineRun) acceptSummary(record *engineSummaryRecord) error {
+	if r.mode != engineModeCheck {
 		return fmt.Errorf("a summary record in a %s run", r.mode)
 	}
 	if record.Findings == nil || record.Complete == nil || record.ExitCode == nil {
@@ -869,10 +884,11 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	if !*record.Complete && r.report.checkedEveryRequestedPhase() {
 		if namedGaps {
 			r.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
-			activeSummary.Gaps.Unread = swiftUncheckedFiles(r.filesWithoutRecord, len(r.unreadable))
+			activeSummary.Gaps.Unread = engineUncheckedFiles(r.filesWithoutRecord, len(r.unreadable))
 		} else {
-			r.report.incompleteBeyondPhases = "the Swift engine reported that it fell short without a record saying where"
-			activeSummary.Gaps.Unread = "the Swift engine fell short without saying where"
+			r.report.incompleteBeyondPhases = r.language.theEngine() +
+				" reported that it fell short without a record saying where"
+			activeSummary.Gaps.Unread = r.language.theEngine() + " fell short without saying where"
 		}
 	}
 
@@ -899,37 +915,30 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 // Every path that is not a validated summary, or a listing mode's expected ending, is a failure that
 // says nothing was checked. There is no path through here where a run that did not finish prints
 // green.
-func (r *swiftRun) finish(engineExit int, ended string) (int, error) {
+func (r *engineRun) finish(engineExit int, ended string) (int, error) {
 	if engineExit == 2 {
 		// The engine's own sentence is already on stderr, passed through untouched.
-		return 1, fmt.Errorf("the Swift engine did not run, so nothing was checked")
+		return 1, fmt.Errorf("%s did not run, so nothing was checked", r.language.theEngine())
 	}
 
 	switch r.mode {
-	case swiftModeVersion:
+	case engineModeVersion:
 		if engineExit != 0 || r.provenance == nil {
-			return 1, fmt.Errorf("the Swift engine %s without stating its version", ended)
+			return 1, fmt.Errorf("%s %s without stating its version", r.language.theEngine(), ended)
 		}
 		fmt.Fprintln(r.out, versionReport())
-		fmt.Fprintf(r.out, "swift engine: %s %s (commit %s, %s, swift-syntax %s, swift-format %s)\n",
-			r.provenance.Engine, r.provenance.Version, r.provenance.Commit,
-			r.provenance.Toolchain, r.provenance.SwiftSyntax, r.provenance.SwiftFormat)
-		if r.provenance.SourceTreeModified {
-			fmt.Fprintln(r.out, "  the Swift engine was built from a modified tree, so no commit reproduces it")
-		}
-		if r.engineSourceCommit != "" {
-			fmt.Fprintf(r.out, "  the Swift engine was built from Swift sources identical to commit %s, as the launcher's cache key requires\n",
-				release.ShortCommit(r.engineSourceCommit))
+		for _, line := range r.language.VersionLines(r.provenance, r.engineSourceCommit) {
+			fmt.Fprintln(r.out, line)
 		}
 		return 0, nil
 
-	case swiftModeRules, swiftModeRulesEnabled:
+	case engineModeRules, engineModeRulesEnabled:
 		if engineExit != 0 || r.provenance == nil {
-			return 1, fmt.Errorf("the Swift engine %s before listing its rules", ended)
+			return 1, fmt.Errorf("%s %s before listing its rules", r.language.theEngine(), ended)
 		}
 		sort.Slice(r.rules, func(first, second int) bool { return r.rules[first].Name < r.rules[second].Name })
 		for _, listed := range r.rules {
-			if r.mode == swiftModeRulesEnabled {
+			if r.mode == engineModeRulesEnabled {
 				fmt.Fprintf(r.out, "%s\t%s\n", listed.Name, listed.Severity)
 			} else {
 				fmt.Fprintln(r.out, listed.Name)
@@ -939,19 +948,20 @@ func (r *swiftRun) finish(engineExit int, ended string) (int, error) {
 	}
 
 	if r.summary == nil {
-		r.writeUnfinished(fmt.Sprintf("the Swift engine %s before finishing", ended))
-		return 1, fmt.Errorf("the Swift engine %s without a summary, so nothing was checked", ended)
+		r.writeUnfinished(fmt.Sprintf("%s %s before finishing", r.language.theEngine(), ended))
+		return 1, fmt.Errorf("%s %s without a summary, so nothing was checked", r.language.theEngine(), ended)
 	}
 	if engineExit != *r.summary.ExitCode {
-		return 1, fmt.Errorf("the Swift engine %s, and its summary said it would exit %d", ended, *r.summary.ExitCode)
+		return 1, fmt.Errorf("%s %s, and its summary said it would exit %d",
+			r.language.theEngine(), ended, *r.summary.ExitCode)
 	}
 	return *r.summary.ExitCode, nil
 }
 
 // writeUnfinished prints the phase line for a run that stopped early, every phase the engine never
 // recorded marked not reached, so the last line a reader sees is never a clean bill of health.
-func (r *swiftRun) writeUnfinished(reason string) {
-	if r.mode != swiftModeCheck || r.summary != nil {
+func (r *engineRun) writeUnfinished(reason string) {
+	if r.mode != engineModeCheck || r.summary != nil {
 		return
 	}
 	for ; r.nextPhase < len(phaseOrder); r.nextPhase++ {
@@ -972,10 +982,10 @@ func truncateForError(line []byte) string {
 	return string(line[:limit]) + "…"
 }
 
-// swiftUncheckedFiles says, for the footer, how many files nothing checked and why, since the notes naming
+// engineUncheckedFiles says, for the footer, how many files nothing checked and why, since the notes naming
 // them are --verbose's. A crashed file is counted apart, as the footer's own marker. Empty when the only
 // gaps were crashes.
-func swiftUncheckedFiles(withoutRecord, unreadable int) string {
+func engineUncheckedFiles(withoutRecord, unreadable int) string {
 	total := withoutRecord + unreadable
 	if total == 0 {
 		return ""

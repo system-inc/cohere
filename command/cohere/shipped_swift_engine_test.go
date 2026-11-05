@@ -148,7 +148,7 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 	// engine that will not speak it, so the line is held here in the shape it parses.
 	version, exitCode := runInstalled(t, binary, t.TempDir(), "--version")
 	if exitCode != 0 || !strings.HasPrefix(version, "cohere 1.0.0\n") ||
-		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(swiftContractVersion)+"\n") {
+		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(engineContractVersion)+"\n") {
 		t.Fatalf("a released cohere's --version does not state its Swift contract (exit %d):\n%s", exitCode, version)
 	}
 }
