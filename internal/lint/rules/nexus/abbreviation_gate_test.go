@@ -31,7 +31,7 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 
 	falseNegatives := []string{}
 	for _, name := range corpus {
-		if _, reported := vocabulary.find(name); reported && !isAbbreviationCandidate(name) {
+		if _, reported := findAbbreviation(name); reported && !isAbbreviationCandidate(name) {
 			falseNegatives = append(falseNegatives, name)
 		}
 	}
@@ -62,7 +62,7 @@ func TestAbbreviationGateStaysSelective(t *testing.T) {
 		if isAbbreviationCandidate(name) {
 			admitted++
 		}
-		if _, found := vocabulary.find(name); found {
+		if _, found := findAbbreviation(name); found {
 			reported++
 		}
 	}
@@ -101,7 +101,7 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, reported := vocabulary.find(name); !reported {
+			if _, reported := findAbbreviation(name); !reported {
 				t.Fatalf("the vocabulary does not report %q, so it proves nothing", name)
 			}
 			if !isAbbreviationCandidate(name) {

@@ -1,5 +1,7 @@
 package nexus
 
+import "github.com/system-inc/cohere/internal/naming/abbreviation"
+
 // The candidate gate, expressed as lookups rather than as a regular expression.
 //
 // This decides whether a name is worth spending the rest of the rule on, and it runs once per
@@ -47,30 +49,30 @@ type abbreviationGate struct {
 
 var gate = buildAbbreviationGate(vocabulary)
 
-func buildAbbreviationGate(vocabulary *abbreviationVocabulary) abbreviationGate {
+func buildAbbreviationGate(vocabulary *abbreviation.Vocabulary) abbreviationGate {
 	built := abbreviationGate{
 		wholeWords: map[string]bool{},
 		prefixes:   map[string]bool{},
 		suffixes:   map[string]bool{},
 		segments:   map[string]bool{},
 	}
-	for name := range vocabulary.wholeByName {
+	for name := range vocabulary.WholeByName {
 		built.wholeWords[name] = true
 	}
-	for _, entry := range append(append([]*abbreviationEntry{}, vocabulary.earlyPrefixes...), vocabulary.latePrefixes...) {
+	for _, entry := range append(append([]*abbreviation.Entry{}, vocabulary.EarlyPrefixes...), vocabulary.LatePrefixes...) {
 		built.prefixes[entry.Abbreviation] = true
 		built.longestPrefix = max(built.longestPrefix, len(entry.Abbreviation))
 	}
-	for _, entry := range vocabulary.suffixes {
+	for _, entry := range vocabulary.Suffixes {
 		if entry.Suffix.Matcher == "millisecondWord" {
 			built.millisecond = true
 			continue
 		}
-		built.suffixes[capitalizeAbbreviation(entry.Abbreviation)] = true
+		built.suffixes[abbreviation.Capitalize(entry.Abbreviation)] = true
 		built.longestSuffix = max(built.longestSuffix, len(entry.Abbreviation))
 	}
-	for _, entry := range vocabulary.segments {
-		built.segments[capitalizeAbbreviation(entry.Abbreviation)] = true
+	for _, entry := range vocabulary.Segments {
+		built.segments[abbreviation.Capitalize(entry.Abbreviation)] = true
 		built.longestSegment = max(built.longestSegment, len(entry.Abbreviation))
 	}
 	return built
