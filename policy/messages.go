@@ -392,7 +392,7 @@ func readOptionText(value json.RawMessage, rules map[string]string) (map[string]
 }
 
 // strictUnmarshal decodes JSON into target, refusing a value of another shape.
-func strictUnmarshal(data []byte, target any) error {
+func strictUnmarshal[Target any](data []byte, target *Target) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(target)
@@ -436,6 +436,9 @@ func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases 
 }
 
 // resolveTerms puts each `[[term]]` in text in its words for language, recording the terms it used.
+//
+// Mutates: used is the caller's record of the terms any language's text used, so a term in no text is refused
+// once every language is read
 func resolveTerms(text string, terms map[string]map[string]string, language string, used map[string]bool) (string, error) {
 	names, placeholderNamesError := placeholderNames(text, "[[", "]]")
 	if placeholderNamesError != nil {

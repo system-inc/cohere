@@ -292,6 +292,8 @@ func checkRuleCPU(worktree string, environment func() []string) int {
 		return 0
 	}
 	started := time.Now()
+	// Uncached: the budget is thread CPU measured on this machine now, which the cache does not key on, so a
+	// cached pass would replay an old measurement as this landing's.
 	check := exec.Command("go", "test", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v", "./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)))
 	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr

@@ -176,6 +176,9 @@ func classify(before string, after string) map[string]string {
 	return found
 }
 
+// record keeps the first example of a kind in found, so a kind seen again on a later line adds nothing.
+//
+// Mutates: found is classify's tally of the kinds in one file, and recording a kind into it is this helper's job
 func record(found map[string]string, kind string, example string) {
 	if _, seen := found[kind]; !seen {
 		found[kind] = example

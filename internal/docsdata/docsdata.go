@@ -225,8 +225,9 @@ func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 
 // encode writes a value with four-space indentation and no HTML escaping, so a regeneration diffs
 // cleanly. Every value Build encodes is a struct or a slice in a fixed order, and a map only where
-// encoding/json sorts its keys, so two runs give the same bytes.
-func encode(value any) ([]byte, error) {
+// encoding/json sorts its keys, so two runs give the same bytes. Value is whichever of those types a file
+// holds.
+func encode[Value any](value Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
