@@ -7,7 +7,6 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -35,7 +34,11 @@ func ExcludedByConstraints(directory string, environment []string, files []strin
 	if len(files) == 0 {
 		return nil, nil
 	}
-	buildContext, contextError := constraintContext(workspace, append(os.Environ(), environment...))
+	fullEnvironment, environmentError := goEnvironment(workspace, environment)
+	if environmentError != nil {
+		return nil, environmentError
+	}
+	buildContext, contextError := constraintContext(workspace, fullEnvironment)
 	if contextError != nil {
 		return nil, contextError
 	}

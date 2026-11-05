@@ -7,8 +7,10 @@
 package load
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -59,9 +61,10 @@ func Packages(directory string, patterns []string, environment []string, census 
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
-	// go/packages reads a non-nil Env as the whole environment, so the extra values go after the current ones,
-	// where the last value of each key wins.
-	fullEnvironment := append(os.Environ(), environment...)
+	fullEnvironment, environmentError := goEnvironment(workspace, environment)
+	if environmentError != nil {
+		return nil, environmentError
+	}
 	roots, loadError := packages.Load(&packages.Config{
 		// ForTest is what tells a test variant from the package it tests without reading the opaque ID.
 		Mode:  packages.LoadAllSyntax | packages.NeedForTest,
@@ -99,6 +102,42 @@ func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) in
 		}
 	}
 	return len(seen)
+}
+
+// goEnvironment is the whole environment every go command here runs with in workspace: the current one, then
+// environment, then `GOFLAGS` as go reads it there (from the environment, or the go env file when that is
+// empty) with every `-trimpath` taken out and `-trimpath=false` put last. Analysis needs real source paths:
+// under -trimpath go keys a cgo package's translation without its directory, so a load is served the
+// translation cached for the same bytes in another directory, whose `//line` paths name that directory's files,
+// gone once it is, and cgocall, which reads the raw file those paths name, fails. The value is never empty,
+// since an empty `GOFLAGS` would hand go the go env file's flags, -trimpath among them.
+func goEnvironment(workspace string, environment []string) ([]string, error) {
+	given := append(os.Environ(), environment...)
+	command := exec.Command("go", "env", "GOFLAGS")
+	command.Dir = workspace
+	command.Env = given
+	var standardError bytes.Buffer
+	command.Stderr = &standardError
+	output, runError := command.Output()
+	if runError != nil {
+		return nil, fmt.Errorf("reading GOFLAGS with go env in %s: %w: %s",
+			workspace, runError, strings.TrimSpace(standardError.String()))
+	}
+	kept := []string{}
+	for _, flag := range strings.Fields(string(output)) {
+		name, _, _ := strings.Cut(strings.TrimLeft(flag, "-"), "=")
+		if name != "trimpath" {
+			kept = append(kept, flag)
+		}
+	}
+	kept = append(kept, "-trimpath=false")
+	result := []string{}
+	for _, variable := range given {
+		if !strings.HasPrefix(variable, "GOFLAGS=") {
+			result = append(result, variable)
+		}
+	}
+	return append(result, "GOFLAGS="+strings.Join(kept, " ")), nil
 }
 
 // inside reports whether path is in workspace or below it.
