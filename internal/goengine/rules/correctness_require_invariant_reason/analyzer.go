@@ -1,0 +1,361 @@
+// Package correctness_require_invariant_reason is the Go engine's rule that a panic says why it can never happen,
+// and that a Must function, which panics for its caller, runs only while the package initializes.
+//
+// A panic is a claim that a case cannot happen, and when the claim is wrong the process stops with a stack trace
+// instead of a sentence. Written down beside the panic, the claim tells the next reader what they would break; left
+// out, it is a crash nobody can reason about. A Must function makes the same claim about its input, and a package's
+// var initializers run once, at start, so a bad constant there stops the program before it does anything. Called
+// anywhere else, it turns a bad input into a crash at the moment of use.
+package correctness_require_invariant_reason
+
+import (
+	"go/ast"
+	"go/token"
+	"go/types"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/policy"
+)
+
+// Name is what a finding of this rule prints.
+const Name = "cohere-go/correctness-require-invariant-reason"
+
+// Analyzer runs the rule over one package.
+var Analyzer = &analysis.Analyzer{
+	Name: "correctness_require_invariant_reason",
+	Doc: "Flags a call to the builtin panic with no // Invariant: <reason> comment directly above its statement or " +
+		"at the end of its line, except a re-panic of the value recover returned in the same function, and a call " +
+		"to a function or method named Must or Must followed by an upper-case letter anywhere but directly in a " +
+		"package-level var initializer. Files ending in _test.go are not judged.",
+	Run: run,
+}
+
+// Rule is this rule's entry in the Go engine's registry.
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+
+var unexplainedPanicMessage = policy.MessageOf(Name, "unexplainedPanic")
+
+var invariantWithoutReasonMessage = policy.MessageOf(Name, "invariantWithoutReason")
+
+var mustOutsideInitializationMessage = policy.MessageOf(Name, "mustOutsideInitialization")
+
+// invariantMarker opens the comment that says why a panic can never happen, matched as written.
+const invariantMarker = "Invariant:"
+
+// excuse is what the comments beside a panic say about why it cannot happen.
+type excuse int
+
+const (
+	excuseNone excuse = iota
+	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
+	excuseWithoutReason
+	excuseWithReason
+)
+
+func run(pass *analysis.Pass) (any, error) {
+	for _, file := range pass.Files {
+		// The file's own name, not one a //line directive gives it: a test's panic and Must calls fail one test, not
+		// a running program, so test files are not judged.
+		if strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+			continue
+		}
+		judgePanics(pass, file)
+		judgeMustCalls(pass, file)
+	}
+	return nil, nil
+}
+
+// judgePanics reports every builtin panic in file that is not a re-panic and whose comments give no reason.
+func judgePanics(pass *analysis.Pass, file *ast.File) {
+	comments := commentsOf(pass, file)
+	written := writtenVariables(pass, file)
+	ast.Inspect(file, func(node ast.Node) bool {
+		// Each function is judged on its own, so a recover in one never excuses a panic in a closure it holds.
+		switch function := node.(type) {
+		case *ast.FuncDecl:
+			if function.Body != nil {
+				judgeFunctionPanics(pass, function.Body, comments, written)
+			}
+		case *ast.FuncLit:
+			judgeFunctionPanics(pass, function.Body, comments, written)
+		}
+		return true
+	})
+}
+
+// judgeFunctionPanics judges the panics directly in one function's body, leaving the function literals inside it to
+// judgePanics, which reaches each of them on its own.
+func judgeFunctionPanics(
+	pass *analysis.Pass,
+	body *ast.BlockStmt,
+	comments fileComments,
+	written map[*types.Var]bool,
+) {
+	recovered := recoveredVariables(pass, body, written)
+	inspectFunction(body, func(node ast.Node) {
+		// panic returns no value, so a call to it is always a statement of its own, or the call a defer or go runs.
+		var call *ast.CallExpr
+		switch statement := node.(type) {
+		case *ast.ExprStmt:
+			call, _ = ast.Unparen(statement.X).(*ast.CallExpr)
+		case *ast.DeferStmt:
+			call = statement.Call
+		case *ast.GoStmt:
+			call = statement.Call
+		}
+		if call == nil || !isBuiltin(pass, call, "panic") {
+			return
+		}
+		if len(call.Args) == 1 && isRecoveredValue(pass, call.Args[0], recovered) {
+			return
+		}
+		message := unexplainedPanicMessage
+		switch comments.excuseFor(pass, node) {
+		case excuseWithReason:
+			return
+		case excuseWithoutReason:
+			message = invariantWithoutReasonMessage
+		case excuseNone:
+		}
+		pass.Report(analysis.Diagnostic{
+			Pos:      call.Pos(),
+			End:      call.End(),
+			Category: message.Id,
+			Message:  message.Render(map[string]string{}),
+		})
+	})
+}
+
+// inspectFunction visits every node of one function's body without entering the function literals inside it.
+func inspectFunction(body *ast.BlockStmt, visit func(node ast.Node)) {
+	ast.Inspect(body, func(node ast.Node) bool {
+		if _, isLiteral := node.(*ast.FuncLit); isLiteral {
+			return false
+		}
+		if node != nil {
+			visit(node)
+		}
+		return true
+	})
+}
+
+// recoveredVariables is every variable body declares holding what recover returned, `recovered := recover()` or `var
+// recovered = recover()`, that nothing writes again, so a panic of it re-raises the value recover caught.
+func recoveredVariables(pass *analysis.Pass, body *ast.BlockStmt, written map[*types.Var]bool) map[*types.Var]bool {
+	recovered := map[*types.Var]bool{}
+	declare := func(names []*ast.Ident, values []ast.Expr) {
+		// Only one value per name pairs them; `first, second := pair()` assigns from one call's results.
+		if len(names) != len(values) {
+			return
+		}
+		for index, name := range names {
+			variable, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
+			value, isCall := ast.Unparen(values[index]).(*ast.CallExpr)
+			if isVariable && isCall && isBuiltin(pass, value, "recover") && !written[variable] {
+				recovered[variable] = true
+			}
+		}
+	}
+	inspectFunction(body, func(node ast.Node) {
+		switch declaration := node.(type) {
+		case *ast.AssignStmt:
+			if declaration.Tok != token.DEFINE {
+				return
+			}
+			names := make([]*ast.Ident, 0, len(declaration.Lhs))
+			for _, left := range declaration.Lhs {
+				// A define's left side is identifiers only; the compiler refuses anything else.
+				if name, isIdentifier := left.(*ast.Ident); isIdentifier {
+					names = append(names, name)
+				}
+			}
+			declare(names, declaration.Rhs)
+		case *ast.ValueSpec:
+			declare(declaration.Names, declaration.Values)
+		}
+	})
+	return recovered
+}
+
+// writtenVariables is every variable file writes after declaring it: assigned, ranged into with `=`, or given away
+// by its address. Such a variable may hold something other than what it was declared with when a panic reads it.
+func writtenVariables(pass *analysis.Pass, file *ast.File) map[*types.Var]bool {
+	written := map[*types.Var]bool{}
+	mark := func(expression ast.Expr) {
+		// A declaration's own name is in Defs, never Uses, so only a later write is marked.
+		if name, isIdentifier := ast.Unparen(expression).(*ast.Ident); isIdentifier {
+			if variable, isVariable := pass.TypesInfo.Uses[name].(*types.Var); isVariable {
+				written[variable] = true
+			}
+		}
+	}
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch write := node.(type) {
+		case *ast.AssignStmt:
+			for _, left := range write.Lhs {
+				mark(left)
+			}
+		case *ast.RangeStmt:
+			if write.Tok == token.ASSIGN {
+				mark(write.Key)
+				mark(write.Value)
+			}
+		case *ast.UnaryExpr:
+			if write.Op == token.AND {
+				mark(write.X)
+			}
+		}
+		return true
+	})
+	return written
+}
+
+// isRecoveredValue is whether argument is what recover returned in this function: the call itself, or a variable
+// holding it.
+func isRecoveredValue(pass *analysis.Pass, argument ast.Expr, recovered map[*types.Var]bool) bool {
+	switch value := ast.Unparen(argument).(type) {
+	case *ast.CallExpr:
+		return isBuiltin(pass, value, "recover")
+	case *ast.Ident:
+		variable, isVariable := pass.TypesInfo.Uses[value].(*types.Var)
+		return isVariable && recovered[variable]
+	}
+	return false
+}
+
+// isBuiltin is whether call calls the predeclared builtin of that name, found by its object, so a function or
+// variable of the same name declared anywhere is never mistaken for it.
+func isBuiltin(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
+	callee := typeutil.Callee(pass.TypesInfo, call)
+	return callee != nil && callee == types.Universe.Lookup(name)
+}
+
+// fileComments is file's comment groups found by line: the group ending on a line, for a comment directly above a
+// statement, and the groups starting on it, for a comment at the end of one.
+type fileComments struct {
+	endingOn   map[int]*ast.CommentGroup
+	startingOn map[int][]*ast.CommentGroup
+}
+
+func commentsOf(pass *analysis.Pass, file *ast.File) fileComments {
+	comments := fileComments{endingOn: map[int]*ast.CommentGroup{}, startingOn: map[int][]*ast.CommentGroup{}}
+	for _, group := range file.Comments {
+		comments.endingOn[pass.Fset.PositionFor(group.End(), false).Line] = group
+		startLine := pass.Fset.PositionFor(group.Pos(), false).Line
+		comments.startingOn[startLine] = append(comments.startingOn[startLine], group)
+	}
+	return comments
+}
+
+// excuseFor is the best excuse the comments give statement: a group ending on the line above its first line, or one
+// starting after it on its last line.
+func (comments fileComments) excuseFor(pass *analysis.Pass, statement ast.Node) excuse {
+	found := excuseOf(comments.endingOn[pass.Fset.PositionFor(statement.Pos(), false).Line-1])
+	for _, group := range comments.startingOn[pass.Fset.PositionFor(statement.End(), false).Line] {
+		// A comment before the statement on its own line, `/* note */ panic(value)`, is not at the end of it.
+		if group.Pos() >= statement.End() {
+			found = max(found, excuseOf(group))
+		}
+	}
+	return found
+}
+
+// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
+// comment no part of the reason. A nil group says nothing.
+func excuseOf(group *ast.CommentGroup) excuse {
+	if group == nil {
+		return excuseNone
+	}
+	found := excuseNone
+	for _, comment := range group.List {
+		for _, line := range strings.Split(comment.Text, "\n") {
+			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
+			// mentions it, "this held an Invariant: once", excuses nothing.
+			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
+			reason, hasMarker := strings.CutPrefix(opening, invariantMarker)
+			if !hasMarker {
+				continue
+			}
+			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
+				return excuseWithReason
+			}
+			found = excuseWithoutReason
+		}
+	}
+	return found
+}
+
+// judgeMustCalls reports every call to a Must function in file that is not directly in a package-level var's
+// initializer.
+func judgeMustCalls(pass *analysis.Pass, file *ast.File) {
+	for _, declaration := range file.Decls {
+		general, isGeneral := declaration.(*ast.GenDecl)
+		if !isGeneral || general.Tok != token.VAR {
+			judgeMustCallsIn(pass, declaration, false)
+			continue
+		}
+		for _, specification := range general.Specs {
+			// A var declaration holds only value specifications; the parser builds nothing else under one.
+			if value, isValue := specification.(*ast.ValueSpec); isValue {
+				for _, initializer := range value.Values {
+					judgeMustCallsIn(pass, initializer, true)
+				}
+			}
+		}
+	}
+}
+
+// judgeMustCallsIn reports the Must calls under root, unless root is a package-level initializer, where a Must call
+// runs once at start. A function literal there runs whenever it is called, so its body is judged as any other.
+func judgeMustCallsIn(pass *analysis.Pass, root ast.Node, packageInitializer bool) {
+	ast.Inspect(root, func(node ast.Node) bool {
+		if literal, isLiteral := node.(*ast.FuncLit); isLiteral && packageInitializer {
+			judgeMustCallsIn(pass, literal.Body, false)
+			return false
+		}
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall || packageInitializer {
+			return true
+		}
+		function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+		if !isFunction || !isMustName(function.Name()) {
+			return true
+		}
+		pass.Report(analysis.Diagnostic{
+			Pos:      call.Pos(),
+			End:      call.End(),
+			Category: mustOutsideInitializationMessage.Id,
+			Message:  mustOutsideInitializationMessage.Render(map[string]string{"name": calleeName(pass, function)}),
+		})
+		return true
+	})
+}
+
+// isMustName is whether name is Must, as template.Must, or Must followed by an upper-case letter, as
+// regexp.MustCompile, so Mustard and Muster are other words.
+func isMustName(name string) bool {
+	rest, found := strings.CutPrefix(name, "Must")
+	if !found {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	first, _ := utf8.DecodeRuneInString(rest)
+	return unicode.IsUpper(first)
+}
+
+// calleeName is function's name as a reader of this package would write the call: qualified by its package when it
+// is another package's function, and bare when it is this package's or a method, whose receiver the call shows.
+func calleeName(pass *analysis.Pass, function *types.Func) string {
+	if function.Signature().Recv() != nil || function.Pkg() == nil || function.Pkg() == pass.Pkg {
+		return function.Name()
+	}
+	return function.Pkg().Name() + "." + function.Name()
+}
