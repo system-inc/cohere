@@ -276,6 +276,8 @@ func propertyAssignmentHeadedBy(identifier *ast.Node) (*ast.Node, bool) {
 // declared inside is reachable from outside only if some occurrence of it lives in a nested root.
 // Both are computed from `control_flow_graph.RootOf`, which is the same boundary the graph itself uses, so
 // the answer cannot disagree with the graph about what "this function" means.
+//
+// Mutates: memo the computed answer is cached per symbol, so the caller's one map serves the whole root
 func escapesEnclosingFunction(
 	ruleContext rule.Context,
 	symbol *ast.Symbol,

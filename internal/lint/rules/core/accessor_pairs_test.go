@@ -20,7 +20,10 @@ var (
 	accessorPairsFalse = accessorPairsBoolean(false)
 )
 
-func accessorPairsBoolean(value bool) *bool { return &value }
+func accessorPairsBoolean(value bool) *bool {
+	pointed := value
+	return &pointed
+}
 
 // accessorPairsCase is one imported corpus row: the source, the options, and the message ids in the
 // order they are reported.

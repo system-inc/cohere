@@ -211,7 +211,8 @@ func uselessConstructorSiblings(node *ast.Node) (*ast.Node, *ast.Node) {
 		if member != node {
 			continue
 		}
-		var previous, next *ast.Node
+		var previous *ast.Node
+		var next *ast.Node
 		if index > 0 {
 			previous = members[index-1]
 		}

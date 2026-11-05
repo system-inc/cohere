@@ -172,11 +172,12 @@ func TestNoImplicitCoercionFires(test *testing.T) {
 
 // noImplicitCoercionApplyFixes replays a suggestion's edits back to front.
 func noImplicitCoercionApplyFixes(source string, fixes []rule.Fix) string {
+	fixed := source
 	for index := len(fixes) - 1; index >= 0; index-- {
 		fix := fixes[index]
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
 func TestNoImplicitCoercionStaysSilent(test *testing.T) {

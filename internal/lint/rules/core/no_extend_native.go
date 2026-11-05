@@ -174,15 +174,15 @@ var NoExtendNative = rule.Rule{
 			// Fidelity to a parser difference rather than a correctness improvement: ESTree has no
 			// node for a parenthesis and wraps an optional access in a ChainExpression that upstream
 			// reads through. `(Object?.prototype).p = 0` is an upstream corpus case and reports.
-			node = ast.SkipParentheses(node)
-			if node == nil {
+			unwrapped := ast.SkipParentheses(node)
+			if unwrapped == nil {
 				return ""
 			}
-			if name, named := property.AccessedName(node, property.Static); !named ||
+			if name, named := property.AccessedName(unwrapped, property.Static); !named ||
 				name != "prototype" {
 				return ""
 			}
-			receiver := accessedObject(node)
+			receiver := accessedObject(unwrapped)
 			if receiver == nil {
 				return ""
 			}
@@ -273,15 +273,15 @@ func isObjectDefinePropertyCallee(ruleContext rule.Context, callee *ast.Node) bo
 	if callee == nil {
 		return false
 	}
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
-	name, named := property.AccessedName(callee, property.Static)
+	name, named := property.AccessedName(unwrapped, property.Static)
 	if !named || (name != "defineProperty" && name != "defineProperties") {
 		return false
 	}
-	receiver := accessedObject(callee)
+	receiver := accessedObject(unwrapped)
 	if receiver == nil {
 		return false
 	}

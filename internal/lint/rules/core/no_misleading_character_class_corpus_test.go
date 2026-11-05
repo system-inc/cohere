@@ -22,7 +22,7 @@ import (
  * regex literals handed over with and without flags, and flags that are constant, written, or
  * unknowable.
  */
-func TestNoMisleadingCharacterClassAgreesWithESLint(test *testing.T) {
+func TestNoMisleadingCharacterClassAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

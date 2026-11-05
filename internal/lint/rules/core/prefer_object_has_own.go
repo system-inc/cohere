@@ -199,10 +199,11 @@ func preferObjectHasOwnHasLeftHandObject(ruleContext rule.Context, memberAccess 
 // Written out rather than using ast.SkipParentheses, which dereferences its argument and would
 // panic on the optional nodes this is handed.
 func preferObjectHasOwnUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferObjectHasOwnGlobalObjectIsInScopeAt answers whether the name `Object` at this position

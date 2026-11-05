@@ -214,10 +214,11 @@ func preferNumericLiteralsIsParseInt(ruleContext rule.Context, callee *ast.Node)
 // reach its check already bare. Five of its invalid cases write that shape, so without this the
 // port goes silent on inputs the corpus asserts.
 func preferNumericLiteralsUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferNumericLiteralsResolvesToAGlobal answers upstream's `sourceCode.isGlobalReference`.
@@ -258,7 +259,7 @@ func preferNumericLiteralsFix(ruleContext rule.Context, node *ast.Node, prefix s
 	}
 	if callRange.End() < len(text) && scanner.IsIdentifierPart(rune(text[callRange.End()])) {
 		// `0b11` beside `in` would read as `0b11in`.
-		replacement = replacement + " "
+		replacement += " "
 	}
 	return rule.ReplaceRange(core.NewTextRange(callRange.Pos(), callRange.End()), replacement), true
 }

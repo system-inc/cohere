@@ -120,30 +120,32 @@ func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.
 	if left == nil || right == nil {
 		return
 	}
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return
 	}
 
 	switch {
-	case left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier:
-		if left.Text() == right.Text() {
-			ruleContext.ReportNode(right, messageSelfAssignment)
+	case unwrappedLeft.Kind == ast.KindIdentifier && unwrappedRight.Kind == ast.KindIdentifier:
+		if unwrappedLeft.Text() == unwrappedRight.Text() {
+			ruleContext.ReportNode(unwrappedRight, messageSelfAssignment)
 		}
 
-	case left.Kind == ast.KindArrayLiteralExpression && right.Kind == ast.KindArrayLiteralExpression:
-		reportArraySelfAssignments(ruleContext, left, right, props)
+	case unwrappedLeft.Kind == ast.KindArrayLiteralExpression && unwrappedRight.Kind == ast.KindArrayLiteralExpression:
+		reportArraySelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, props)
 
-	case left.Kind == ast.KindObjectLiteralExpression && right.Kind == ast.KindObjectLiteralExpression:
-		reportObjectSelfAssignments(ruleContext, left, right, props)
+	case unwrappedLeft.Kind == ast.KindObjectLiteralExpression &&
+		unwrappedRight.Kind == ast.KindObjectLiteralExpression:
+		reportObjectSelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, props)
 
-	case left.Kind == ast.KindSpreadElement && right.Kind == ast.KindSpreadElement:
-		reportSelfAssignments(ruleContext, left.AsSpreadElement().Expression, right.AsSpreadElement().Expression, props)
+	case unwrappedLeft.Kind == ast.KindSpreadElement && unwrappedRight.Kind == ast.KindSpreadElement:
+		reportSelfAssignments(ruleContext, unwrappedLeft.AsSpreadElement().Expression,
+			unwrappedRight.AsSpreadElement().Expression, props)
 
-	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
-		if isSameReference(left, right) {
-			ruleContext.ReportNode(right, messageSelfAssignment)
+	case props && ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight):
+		if isSameReference(unwrappedLeft, unwrappedRight) {
+			ruleContext.ReportNode(unwrappedRight, messageSelfAssignment)
 		}
 	}
 }
@@ -330,41 +332,45 @@ func noSelfAssignStaticAccessedName(node *ast.Node) (string, bool) {
 // so ignoring it is the comparison upstream's unwrapping arrives at. Anything outside the arms below
 // is false: `f().x = f().x` calls f twice, and `a[i + 1]` is an expression rather than a reference.
 func isSameReference(left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
-	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
+	if ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight) {
 		// When the target's key is static, the value's must be the same static key, which is what
 		// lets a dot and a bracket spelling meet before their kinds are compared.
-		if leftName, leftStatic := noSelfAssignStaticAccessedName(left); leftStatic {
-			rightName, rightStatic := noSelfAssignStaticAccessedName(right)
+		if leftName, leftStatic := noSelfAssignStaticAccessedName(unwrappedLeft); leftStatic {
+			rightName, rightStatic := noSelfAssignStaticAccessedName(unwrappedRight)
 			return rightStatic && leftName == rightName &&
-				isSameReference(accessedObject(left), accessedObject(right))
+				isSameReference(accessedObject(unwrappedLeft), accessedObject(unwrappedRight))
 		}
 
 		// Otherwise both must be written the same way, dotted or bracketed, with the same key
 		// expression: `a[b] = a[b]` and `this.#a = this.#a`.
-		if left.Kind != right.Kind {
+		if unwrappedLeft.Kind != unwrappedRight.Kind {
 			return false
 		}
-		if left.Kind == ast.KindPropertyAccessExpression {
-			return isSameReference(left.AsPropertyAccessExpression().Expression, right.AsPropertyAccessExpression().Expression) &&
-				isSameReference(left.AsPropertyAccessExpression().Name(), right.AsPropertyAccessExpression().Name())
+		if unwrappedLeft.Kind == ast.KindPropertyAccessExpression {
+			return isSameReference(unwrappedLeft.AsPropertyAccessExpression().Expression,
+				unwrappedRight.AsPropertyAccessExpression().Expression) &&
+				isSameReference(unwrappedLeft.AsPropertyAccessExpression().Name(),
+					unwrappedRight.AsPropertyAccessExpression().Name())
 		}
-		return isSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression) &&
-			isSameReference(left.AsElementAccessExpression().ArgumentExpression, right.AsElementAccessExpression().ArgumentExpression)
+		return isSameReference(unwrappedLeft.AsElementAccessExpression().Expression,
+			unwrappedRight.AsElementAccessExpression().Expression) &&
+			isSameReference(unwrappedLeft.AsElementAccessExpression().ArgumentExpression,
+				unwrappedRight.AsElementAccessExpression().ArgumentExpression)
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindThisKeyword, ast.KindSuperKeyword,
 		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
@@ -372,7 +378,7 @@ func isSameReference(left *ast.Node, right *ast.Node) bool {
 		// Upstream compares literal values, and `Text()` is the cooked value for a string and the
 		// canonical rendering for a number. A template is a TemplateLiteral in ESTree rather than a
 		// Literal, so it falls to the default arm there and here.
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	}
 
 	return false
