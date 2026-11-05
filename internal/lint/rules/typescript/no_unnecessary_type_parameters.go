@@ -399,12 +399,12 @@ func bodyNeverYieldsAValue(owner *ast.Node) bool {
 
 // yieldsNoValue reports whether an expression evaluates to null or undefined whatever its type claims.
 func yieldsNoValue(expression *ast.Node) bool {
-	expression = ast.SkipOuterExpressions(expression, ast.OEKParentheses|ast.OEKAssertions)
-	switch expression.Kind {
+	unwrapped := ast.SkipOuterExpressions(expression, ast.OEKParentheses|ast.OEKAssertions)
+	switch unwrapped.Kind {
 	case ast.KindNullKeyword, ast.KindVoidExpression:
 		return true
 	case ast.KindIdentifier:
-		return expression.Text() == "undefined"
+		return unwrapped.Text() == "undefined"
 	default:
 		return false
 	}
@@ -610,10 +610,11 @@ func isUsedAsTypeArgument(identifier *ast.Node) bool {
 
 // skipTypeConstituentsUpward is upstream's `skipConstituentsUpward`.
 func skipTypeConstituentsUpward(node *ast.Node) *ast.Node {
-	for node != nil && (node.Kind == ast.KindUnionType || node.Kind == ast.KindIntersectionType) {
-		node = node.Parent
+	enclosing := node
+	for enclosing != nil && (enclosing.Kind == ast.KindUnionType || enclosing.Kind == ast.KindIntersectionType) {
+		enclosing = enclosing.Parent
 	}
-	return node
+	return enclosing
 }
 
 // containsTypeArgument reports whether `container` passes `argument` as one of its type arguments.

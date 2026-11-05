@@ -70,12 +70,12 @@ func consistentReturnOffsetOf(test *testing.T, source string, line int, column i
 	// not shift would report an off-by-one-line that reads exactly like a defect in the rule's span
 	// computation. Measured: every reported span here already covered the right text while the
 	// arithmetic disagreed, which is the tell.
-	line -= consistentReturnLeadingBlankLines(source)
+	harnessLine := line - consistentReturnLeadingBlankLines(source)
 	offset := 0
-	for current := 1; current < line; current++ {
+	for current := 1; current < harnessLine; current++ {
 		next := strings.IndexByte(text[offset:], '\n')
 		if next < 0 {
-			test.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", harnessLine)
 		}
 		offset += next + 1
 	}

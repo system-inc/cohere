@@ -324,14 +324,14 @@ func isUnnecessaryAssignmentOperator(operator ast.Kind) bool {
 // underneath is matched by kind with no skip, because upstream matches `Expression::ThisExpression`
 // directly and `(this).foo = foo` is silent on the release binary.
 func thisPropertyNameOfAssignmentTarget(target *ast.Node) (string, bool) {
-	target = skipParentheses(target)
-	if target == nil {
+	unparenthesized := skipParentheses(target)
+	if unparenthesized == nil {
 		return "", false
 	}
 
-	switch target.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := target.AsPropertyAccessExpression()
+		access := unparenthesized.AsPropertyAccessExpression()
 		if access.Expression == nil || access.Expression.Kind != ast.KindThisKeyword {
 			return "", false
 		}
@@ -341,7 +341,7 @@ func thisPropertyNameOfAssignmentTarget(target *ast.Node) (string, bool) {
 		return access.Name().Text(), true
 
 	case ast.KindElementAccessExpression:
-		access := target.AsElementAccessExpression()
+		access := unparenthesized.AsElementAccessExpression()
 		if access.Expression == nil || access.Expression.Kind != ast.KindThisKeyword {
 			return "", false
 		}
@@ -357,10 +357,11 @@ func thisPropertyNameOfAssignmentTarget(target *ast.Node) (string, bool) {
 
 // skipParentheses unwraps parenthesized expressions and nothing else.
 func skipParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.Expression()
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.Expression()
 	}
-	return node
+	return unwrapped
 }
 
 // skipOuterExpressions is upstream's `get_inner_expression` on the right of the assignment.
@@ -369,17 +370,18 @@ func skipParentheses(node *ast.Node) *ast.Node {
 // `this.foo = foo!` and `this.foo = foo as any` report while leaving a real expression alone. Both
 // of those are failing cases in the corpus.
 func skipOuterExpressions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression,
 			ast.KindNonNullExpression,
 			ast.KindAsExpression,
 			ast.KindSatisfiesExpression,
 			ast.KindTypeAssertionExpression,
 			ast.KindExpressionWithTypeArguments:
-			node = node.Expression()
+			unwrapped = unwrapped.Expression()
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil
@@ -520,8 +522,8 @@ func propertiesAssignedInClassBody(class *ast.Node) map[string]bool {
 func assignmentsInsideInitializer(expression *ast.Node) []*ast.Node {
 	var assignments []*ast.Node
 
-	expression = skipParentheses(expression)
-	if expression == nil {
+	unparenthesized := skipParentheses(expression)
+	if unparenthesized == nil {
 		return assignments
 	}
 
@@ -545,9 +547,9 @@ func assignmentsInsideInitializer(expression *ast.Node) []*ast.Node {
 		}
 	}
 
-	switch expression.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindCallExpression:
-		callee := skipParentheses(expression.AsCallExpression().Expression)
+		callee := skipParentheses(unparenthesized.AsCallExpression().Expression)
 		if callee == nil {
 			return assignments
 		}
@@ -579,7 +581,7 @@ func assignmentsInsideInitializer(expression *ast.Node) []*ast.Node {
 		}
 
 	case ast.KindBinaryExpression:
-		appendIfAssignment(expression)
+		appendIfAssignment(unparenthesized)
 	}
 
 	return assignments

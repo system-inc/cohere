@@ -487,27 +487,28 @@ func adjacentOverloadNameOf(ruleContext rule.Context, key *ast.Node) (string, ad
 	// A computed key is read through the brackets, because TSESTree's `member.key` for a computed
 	// member is the inner expression rather than the bracket node. Measured: `[k]()` keys as `k` and
 	// `['lit']()` keys as `lit`, so a computed key can collide with a plain one.
+	nameNode := key
 	if key.Kind == ast.KindComputedPropertyName {
-		key = key.AsComputedPropertyName().Expression
-		if key == nil {
+		nameNode = key.AsComputedPropertyName().Expression
+		if nameNode == nil {
 			return "", "", false
 		}
 	}
 
-	switch key.Kind {
+	switch nameNode.Kind {
 	case ast.KindIdentifier:
-		return key.Text(), adjacentOverloadNameNormal, true
+		return nameNode.Text(), adjacentOverloadNameNormal, true
 
 	case ast.KindPrivateIdentifier:
 		// `Text()` already carries the leading hash here, the same way TSESTree's arm prepends one
 		// to a name that does not, so `#p` answers `#p` on both sides.
-		return key.Text(), adjacentOverloadNamePrivate, true
+		return nameNode.Text(), adjacentOverloadNamePrivate, true
 
 	case ast.KindStringLiteral, ast.KindNumericLiteral:
 		// `${member.key.value}` on the JavaScript side, which cooks the literal: a numeric key is
 		// rendered as its canonical number, so `1e1` and `10` are one key. `Text()` on our numeric
 		// literal already holds that same canonical rendering.
-		text := key.Text()
+		text := nameNode.Text()
 		// `requiresQuoting` is exactly "this string is not a valid identifier", so
 		// `IsIdentifierText` answers it inverted. `LanguageVariantStandard` rather than the JSX
 		// variant, because upstream calls `ts.isIdentifierPart` with no variant.
@@ -524,6 +525,6 @@ func adjacentOverloadNameOf(ruleContext rule.Context, key *ast.Node) (string, ad
 	// `Pos()` includes leading trivia, which upstream's `range` does not, so a key written after a
 	// newline would carry the whitespace and stop matching the same key written inline.
 	// `rule.TokenRange` is the same token-start walk `ReportNode` uses.
-	trimmed := rule.TokenRange(ruleContext.SourceFile, key)
+	trimmed := rule.TokenRange(ruleContext.SourceFile, nameNode)
 	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
 }

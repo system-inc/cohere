@@ -251,10 +251,11 @@ var NoImpliedEval = rule.Rule{
 		}
 
 		isBind := func(node *ast.Node) bool {
+			nameNode := node
 			if ast.IsPropertyAccessExpression(node) {
-				node = node.AsPropertyAccessExpression().Name()
+				nameNode = node.AsPropertyAccessExpression().Name()
 			}
-			return ast.IsIdentifier(node) && node.AsIdentifier().Text == "bind"
+			return ast.IsIdentifier(nameNode) && nameNode.AsIdentifier().Text == "bind"
 		}
 
 		isFunction := func(node *ast.Node) bool {

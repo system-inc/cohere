@@ -269,10 +269,11 @@ func applyFixes(sourceText string, fixes []rule.Fix) string {
 	ordered := make([]rule.Fix, len(fixes))
 	copy(ordered, fixes)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Range.Pos() > ordered[j].Range.Pos() })
+	edited := sourceText
 	for _, fix := range ordered {
-		sourceText = sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
+		edited = edited[:fix.Range.Pos()] + fix.Text + edited[fix.Range.End():]
 	}
-	return sourceText
+	return edited
 }
 
 func containsLine(haystack string, needle string) bool {

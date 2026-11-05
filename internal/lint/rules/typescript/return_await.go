@@ -296,16 +296,17 @@ var ReturnAwait = rule.Rule{
 			// A loop rather than one step, because `((x))` nests. Not `ast.SkipParentheses`, which
 			// dereferences its argument and would panic on the nil this function is handed for an
 			// omitted return argument.
-			for node.Kind == ast.KindParenthesizedExpression {
-				inner := node.AsParenthesizedExpression().Expression
+			unwrapped := node
+			for unwrapped.Kind == ast.KindParenthesizedExpression {
+				inner := unwrapped.AsParenthesizedExpression().Expression
 				if inner == nil {
 					return
 				}
-				node = inner
+				unwrapped = inner
 			}
 
-			if node.Kind == ast.KindConditionalExpression {
-				conditional := node.AsConditionalExpression()
+			if unwrapped.Kind == ast.KindConditionalExpression {
+				conditional := unwrapped.AsConditionalExpression()
 				// Upstream builds `[...findPossiblyReturnedNodes(alternate),
 				// ...findPossiblyReturnedNodes(consequent)]` and then reports over that array, so
 				// the alternate's findings are collected first. But the reports come out in source
@@ -319,7 +320,7 @@ var ReturnAwait = rule.Rule{
 				testPossiblyReturned(conditional.WhenFalse)
 				return
 			}
-			test(node)
+			test(unwrapped)
 		}
 
 		return rule.Listeners{

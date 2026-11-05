@@ -355,13 +355,14 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isPromiseLike := func(node *ast.Node, t *checker.Type) bool {
-			if t == nil {
-				t = ruleContext.TypeChecker.GetTypeAtLocation(node)
+			subjectType := t
+			if subjectType == nil {
+				subjectType = ruleContext.TypeChecker.GetTypeAtLocation(node)
 			}
 
 			// The highest priority is to allow anything allowlisted
 			if type_checking.TypeMatchesSomeSpecifier(
-				t,
+				subjectType,
 				opts.AllowForKnownSafePromises,
 				opts.AllowForKnownSafePromisesInline,
 				ruleContext.Program,
@@ -370,7 +371,9 @@ var NoFloatingPromises = rule.Rule{
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := type_checking.UnionTypeParts(checker.Checker_getApparentType(ruleContext.TypeChecker, t))
+			typeParts := type_checking.UnionTypeParts(
+				checker.Checker_getApparentType(ruleContext.TypeChecker, subjectType),
+			)
 			if type_checking.Some(typeParts, func(typePart *checker.Type) bool {
 				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, typePart)
 			}) {

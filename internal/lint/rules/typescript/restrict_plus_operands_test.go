@@ -35,7 +35,7 @@ const restrictPlusOperandsFile = "file.ts"
 //
 // Every `allow` field is a *bool because all five default to true, so a zero-valued struct would
 // mean "forbid everything" and invert the rule.
-func restrictPlusOperandsBool(value bool) *bool { return &value }
+func restrictPlusOperandsBool(value bool) *bool { return new(value) }
 
 // TestRestrictPlusOperandsStaysSilent is upstream's valid list, each under its own options.
 func TestRestrictPlusOperandsStaysSilent(test *testing.T) {

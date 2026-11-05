@@ -200,48 +200,48 @@ func typePartsOf(
 
 // computeTypeParts is upstream's getTypeNodeTypePartFlags.
 func computeTypeParts(ruleContext rule.Context, node *ast.Node) []redundantTypePart {
-	node = unwrapParenthesizedType(node)
-	if node == nil {
+	unparenthesized := unwrapParenthesizedType(node)
+	if unparenthesized == nil {
 		return nil
 	}
 
-	if flags, isKeyword := redundantKeywordFlags(node); isKeyword {
-		return []redundantTypePart{{flags: flags, typeName: describeTypeNodeName(ruleContext, node)}}
+	if flags, isKeyword := redundantKeywordFlags(unparenthesized); isKeyword {
+		return []redundantTypePart{{flags: flags, typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 	}
 
 	// A nested union contributes every member, which is what makes `(a | b) | c` behave like
 	// `a | b | c` for absorption while still reporting at the inner node.
-	if node.Kind == ast.KindUnionType {
+	if unparenthesized.Kind == ast.KindUnionType {
 		parts := []redundantTypePart{}
-		for _, member := range node.AsUnionTypeNode().Types.Nodes {
+		for _, member := range unparenthesized.AsUnionTypeNode().Types.Nodes {
 			parts = append(parts, computeTypeParts(ruleContext, member)...)
 		}
 		return parts
 	}
 
-	if node.Kind == ast.KindLiteralType {
-		literal := node.AsLiteralTypeNode().Literal
+	if unparenthesized.Kind == ast.KindLiteralType {
+		literal := unparenthesized.AsLiteralTypeNode().Literal
 		if literal != nil {
 			switch literal.Kind {
 			case ast.KindStringLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsStringLiteral,
-					typeName: describeTypeNodeName(ruleContext, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindNumericLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsNumberLiteral,
-					typeName: describeTypeNodeName(ruleContext, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindBigIntLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsBigIntLiteral,
-					typeName: describeTypeNodeName(ruleContext, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindTrueKeyword, ast.KindFalseKeyword:
 				return []redundantTypePart{{flags: checker.TypeFlagsBooleanLiteral,
-					typeName: describeTypeNodeName(ruleContext, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			}
 		}
 	}
 
 	// Anything else is asked of the checker and split into its union members, except that `boolean`
 	// is stored as `false | true` and must stay whole.
-	resolved := ruleContext.TypeChecker.GetTypeAtLocation(node)
+	resolved := ruleContext.TypeChecker.GetTypeAtLocation(unparenthesized)
 	if resolved == nil {
 		return nil
 	}

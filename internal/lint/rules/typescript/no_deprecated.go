@@ -267,20 +267,21 @@ func deprecationInAliasChain(ruleContext rule.Context, symbol *ast.Symbol, check
 
 	target := checker.Checker_resolveAlias(ruleContext.TypeChecker, symbol)
 
-	for symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		if reason, found := deprecationOnSymbol(ruleContext, symbol); found {
+	chainSymbol := symbol
+	for chainSymbol != nil && chainSymbol.Flags&ast.SymbolFlagsAlias != 0 {
+		if reason, found := deprecationOnSymbol(ruleContext, chainSymbol); found {
 			return reason, true
 		}
-		if len(symbol.Declarations) == 0 {
+		if len(chainSymbol.Declarations) == 0 {
 			break
 		}
-		next := checker.Checker_getImmediateAliasedSymbol(ruleContext.TypeChecker, symbol)
+		next := checker.Checker_getImmediateAliasedSymbol(ruleContext.TypeChecker, chainSymbol)
 		if next == nil {
 			break
 		}
-		symbol = next
-		if checkTarget && symbol == target {
-			return deprecationOnSymbol(ruleContext, symbol)
+		chainSymbol = next
+		if checkTarget && chainSymbol == target {
+			return deprecationOnSymbol(ruleContext, chainSymbol)
 		}
 	}
 	return "", false

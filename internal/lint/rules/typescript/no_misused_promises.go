@@ -511,10 +511,10 @@ var NoMisusedPromises = rule.Rule{
 			}
 			checkedNodes[node] = struct{}{}
 
-			node = ast.SkipParentheses(node)
+			unparenthesized := ast.SkipParentheses(node)
 
-			if ast.IsBinaryExpression(node) && ast.IsLogicalExpression(node) {
-				expr := node.AsBinaryExpression()
+			if ast.IsBinaryExpression(unparenthesized) && ast.IsLogicalExpression(unparenthesized) {
+				expr := unparenthesized.AsBinaryExpression()
 				// ignore the left operand for nullish coalescing expressions not in a context of a test expression
 				if expr.OperatorToken.Kind != ast.KindQuestionQuestionToken || isTestExpr {
 					checkConditional(expr.Left, isTestExpr)
@@ -526,8 +526,8 @@ var NoMisusedPromises = rule.Rule{
 				return
 			}
 
-			if isAlwaysThenable(node) {
-				ruleContext.ReportNode(node, buildConditionalMessage())
+			if isAlwaysThenable(unparenthesized) {
+				ruleContext.ReportNode(unparenthesized, buildConditionalMessage())
 				return
 			}
 
@@ -535,12 +535,12 @@ var NoMisusedPromises = rule.Rule{
 			// under "strict" only one whose awaited half is the rest, as in `Promise<T> | T`.
 			switch opts.ChecksConditionalsFlagUnions {
 			case "all":
-				if isSometimesThenable(ruleContext.TypeChecker, node) {
-					ruleContext.ReportNode(node, buildConditionalMessage())
+				if isSometimesThenable(ruleContext.TypeChecker, unparenthesized) {
+					ruleContext.ReportNode(unparenthesized, buildConditionalMessage())
 				}
 			case "strict":
-				if hasMatchingPromiseTypeArgument(ruleContext.TypeChecker, node) {
-					ruleContext.ReportNode(node, buildConditionalMessage())
+				if hasMatchingPromiseTypeArgument(ruleContext.TypeChecker, unparenthesized) {
+					ruleContext.ReportNode(unparenthesized, buildConditionalMessage())
 				}
 			}
 		}
