@@ -471,7 +471,7 @@ func run() error {
 		return fmt.Errorf("--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing")
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	// Everything from here checks a project, so standing outside one stops the run, naming where it
 	// looked.
@@ -486,7 +486,7 @@ func run() error {
 		if !*fixOnly || *noFix || *typesOnly || *lintOnly || len(flag.Args()) > 0 {
 			return errStdinNeedsFix
 		}
-		return runStdin(ctx, stdinRequest{
+		return runStdin(backgroundContext, stdinRequest{
 			Location:         location,
 			WorkingDirectory: workingDirectory,
 			FilePath:         *stdinFilePath,
@@ -608,7 +608,7 @@ func run() error {
 		// them. Any phase that runs reads them.
 		if projectFiles := graph.ProjectFiles(); len(projectFiles) > 0 && (runFix || runTypes || runLint) {
 			go func() {
-				_, release := graph.Program.GetTypeCheckerForFile(ctx, projectFiles[0])
+				_, release := graph.Program.GetTypeCheckerForFile(backgroundContext, projectFiles[0])
 				release()
 			}()
 		}
@@ -772,7 +772,7 @@ func run() error {
 	case runTypes && runFix && cacheOff && activeTypesReuse() == nil && !*formatOnly && len(projectFiles) > 0:
 		graph.FusedCheck = program.NewFusedCheck()
 	case runTypes && runFix:
-		earlyTypeCheck = startTypeCheck(ctx, graph, !cacheOff)
+		earlyTypeCheck = startTypeCheck(backgroundContext, graph, !cacheOff)
 	}
 
 	switch {
@@ -977,7 +977,7 @@ func run() error {
 				scope.formatCandidates()
 		}
 		fixSummary, fixWalk, lineEndings, applyProposedFixesError := applyProposedFixes(
-			ctx, graph, fixFiles, fixRules,
+			backgroundContext, graph, fixFiles, fixRules,
 			formatPlan,
 			writeScope,
 			repositoryRoot,
@@ -1158,9 +1158,9 @@ func run() error {
 		// mtime of ahra's tsconfig.tsbuildinfo moved across a `--no-fix` run.
 		check := earlyTypeCheck
 		if check == nil {
-			check = startTypeCheck(ctx, graph, !cacheOff)
+			check = startTypeCheck(backgroundContext, graph, !cacheOff)
 		}
-		typeDiagnostics := finishTypeCheck(ctx, check, projectFiles, !*noFix)
+		typeDiagnostics := finishTypeCheck(backgroundContext, check, projectFiles, !*noFix)
 		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
 		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
 		finishing := check.finished
@@ -1269,7 +1269,7 @@ func run() error {
 			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
 				return errNamedPathsOutsideProgram(location, flag.Args())
 			}
-			walked, walkError := graph.Walk(ctx, projectFiles, rules)
+			walked, walkError := graph.Walk(backgroundContext, projectFiles, rules)
 			if walkError != nil {
 				return fmt.Errorf("running rules: %w", walkError)
 			}
@@ -1336,7 +1336,7 @@ func run() error {
 				// empty explanation reads as a file with nothing to say.
 				fmt.Printf("\nexplain: %s is not in the program, so there is nothing to explain\n", *explainFile)
 			} else {
-				explanation, explainError := graph.Explain(ctx, subject, rules)
+				explanation, explainError := graph.Explain(backgroundContext, subject, rules)
 				if explainError != nil {
 					return fmt.Errorf("explaining %s: %w", *explainFile, explainError)
 				}
@@ -1375,7 +1375,7 @@ func run() error {
 			)
 		}
 
-		unusedResult, runError := unused_exports.Run(ctx, graph, projectFiles, *unusedDeep)
+		unusedResult, runError := unused_exports.Run(backgroundContext, graph, projectFiles, *unusedDeep)
 		if runError != nil {
 			return fmt.Errorf("running the unused report: %w", runError)
 		}

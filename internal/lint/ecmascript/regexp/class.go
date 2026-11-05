@@ -143,8 +143,8 @@ func readClass(source string) (body string, negated bool, width int, err error) 
 
 // classAtoms reads a class body into the members it names. The second result is
 // false when an escape cannot be widened exactly.
-func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]classAtom, bool, error) {
-	ctx.inClass = true
+func classAtoms(body string, options rewriteOptions, escaping escapeContext) ([]classAtom, bool, error) {
+	escaping.inClass = true
 	atoms := []classAtom{}
 	exact := true
 
@@ -160,7 +160,7 @@ func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]class
 			continue
 		}
 
-		escape, decodeEscapeError := decodeEscape(body, i+size, ctx)
+		escape, decodeEscapeError := decodeEscape(body, i+size, escaping)
 		if decodeEscapeError != nil {
 			return nil, false, decodeEscapeError
 		}

@@ -60,8 +60,8 @@ type NoDuplicateClassesOptions struct {
 // did, and only the coverage line's "listened to no files" note caught it.
 var NoDuplicateClasses = rule.Rule{
 	Name: "better-tailwindcss/no-duplicate-classes",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -70,14 +70,14 @@ var NoDuplicateClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportDuplicates(ctx, literal)
+				reportDuplicates(ruleContext, literal)
 			}
 			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
-				reportTemplateDuplicates(ctx, segments)
+				reportTemplateDuplicates(ruleContext, segments)
 			}
 		}
 
@@ -95,7 +95,7 @@ var NoDuplicateClasses = rule.Rule{
 // deletions inside the same string would each be computed against the original offsets, and
 // applying the first invalidates the second. That is the class of bug the edit engine exists to
 // prevent, and not one a rule should be handing it in the first place.
-func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
+func reportDuplicates(ruleContext rule.Context, literal ClassLiteral) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -125,14 +125,14 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 	canFix := !strings.Contains(literal.Text, "${")
 	var tokens []classToken
 	tokenized := false
-	if canFix && ctx.SourceFile != nil {
-		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	if canFix && ruleContext.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ruleContext.SourceFile.Text(), literal.Range, literal.Text)
 	}
 
 	for _, className := range duplicated {
 		message := messageDuplicateClass(className)
 		if !canFix {
-			ctx.ReportRange(literal.Range, message)
+			ruleContext.ReportRange(literal.Range, message)
 			continue
 		}
 
@@ -148,10 +148,10 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 			fixes = repeatDeletions(tokens, className, literal.Edges.Trailing)
 		}
 
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}
@@ -169,10 +169,10 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 // so it is neither counted nor compared, matching the runs `enforce-consistent-class-order` leaves
 // in place. Until this read templates, a repeat in a template run was invisible to every rule here,
 // and the order rule, which leaves a run holding a repeat unordered, left it unordered in silence.
-func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
+func reportTemplateDuplicates(ruleContext rule.Context, segments []ClassSegment) {
 	sourceText := ""
-	if ctx.SourceFile != nil {
-		sourceText = ctx.SourceFile.Text()
+	if ruleContext.SourceFile != nil {
+		sourceText = ruleContext.SourceFile.Text()
 	}
 
 	type repeat struct {
@@ -255,10 +255,10 @@ func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
 		if found.fixable {
 			fixes = found.fixes
 		}
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      found.segment.Range,
 			Message:    messageDuplicateClass(className),
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}

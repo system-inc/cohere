@@ -142,7 +142,7 @@ var NoUnstableNestedComponents = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUnstableNestedComponentsOptions](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil options, which is not this type.
@@ -161,14 +161,14 @@ var NoUnstableNestedComponents = rule.Rule{
 				// per node also means an ancestor's component-hood is known when a descendant is
 				// judged, which a pre-order walk cannot otherwise guarantee for the shapes where
 				// the ancestor is a wrapping call.
-				detected := collectDetectedComponents(ctx, sourceFile)
+				detected := collectDetectedComponents(ruleContext, sourceFile)
 				isComponent := make(map[*ast.Node]bool, len(detected))
 				for _, component := range detected {
 					isComponent[component.node] = true
 				}
 
 				state := &unstableNestedState{
-					ctx:             ctx,
+					ctx:             ruleContext,
 					isComponent:     isComponent,
 					allowAsProps:    settings.AllowAsProps,
 					propNameMatches: propNameMatches,

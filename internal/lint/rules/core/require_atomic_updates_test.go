@@ -9,8 +9,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// requireAtomicUpdatesCorpusProvenance records where the imported cases came from and how they were
-// checked, because a fixture table is only worth what its provenance is.
+// The corpus's provenance: where the imported cases came from and how they were checked, because a
+// fixture table is only worth what its provenance is.
 //
 // Source: ESLint's own tests at `tests/lib/rules/require-atomic-updates.js`, extracted by hooking
 // its `RuleTester` and capturing the case objects rather than by parsing the file, so no case was
@@ -27,7 +27,6 @@ import (
 // One case is imported with a stated difference. Upstream's case 26 declares
 // `globals: { process: "readonly" }`, and measured on the installed rule the SAME source with no
 // such declaration is completely silent. See `TestRequireAtomicUpdatesResolutionDivergence`.
-const requireAtomicUpdatesCorpusProvenance = "eslint/tests/lib/rules/require-atomic-updates.js"
 
 // TestRequireAtomicUpdatesStaysSilent runs every clean case upstream ships.
 //
@@ -211,7 +210,11 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != true {
+		options, ok := decoded.(RequireAtomicUpdatesOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not RequireAtomicUpdatesOptions", decoded)
+		}
+		if options.AllowProperties != true {
 			test.Fatalf("decoded %#v", decoded)
 		}
 
@@ -252,7 +255,11 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != false {
+		options, ok := decoded.(RequireAtomicUpdatesOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not RequireAtomicUpdatesOptions", decoded)
+		}
+		if options.AllowProperties != false {
 			test.Fatalf("empty object did not default AllowProperties to false: %#v", decoded)
 		}
 	})

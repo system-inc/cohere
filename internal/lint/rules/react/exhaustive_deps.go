@@ -407,12 +407,12 @@ type exhaustiveDepsRun struct {
 //
 // Without the option a repair is not offered here at all, as before, because the message already
 // says what to write and this rule never applies one unattended.
-func (run exhaustiveDepsRun) report(ctx rule.Context, node *ast.Node, message rule.Message, fixes ...rule.Fix) {
+func (run exhaustiveDepsRun) report(ruleContext rule.Context, node *ast.Node, message rule.Message, fixes ...rule.Fix) {
 	if run.dangerousAutofix && len(fixes) > 0 {
-		ctx.ReportNodeWithFixes(node, message, fixes...)
+		ruleContext.ReportNodeWithFixes(node, message, fixes...)
 		return
 	}
-	ctx.ReportNode(node, message)
+	ruleContext.ReportNode(node, message)
 }
 
 // hookNames are the Hooks whose dependency array this rule checks, and the argument index the
@@ -439,7 +439,7 @@ var hooksUselessWithoutDependencies = map[string]bool{"useMemo": true, "useCallb
 // `useEffective` is not. oxc spells this as a plain substring test, which disagrees on the second.
 var effectHookNamePattern = regexp.MustCompile(`Effect($|[^a-z])`)
 
-func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
+func runExhaustiveDeps(ruleContext rule.Context, options any) rule.Listeners {
 	settings, _ := rule.OptionsAs[ExhaustiveDepsOptions](options)
 	run := exhaustiveDepsRun{
 		autoDependenciesHooks:     map[string]bool{},
@@ -458,10 +458,10 @@ func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 
 	return rule.Listeners{
 		ast.KindCallExpression: func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			visitHookCall(ctx, node, run)
+			visitHookCall(ruleContext, node, run)
 		},
 	}
 }
@@ -471,7 +471,7 @@ func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 // The order is observable rather than incidental: a Hook with no callback reports about the missing
 // callback and stops, so a `useCallback()` with no arguments never also reports that it has no
 // dependency array.
-func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
+func visitHookCall(ruleContext rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 	call := node.AsCallExpression()
 	if call == nil {
 		return
@@ -499,7 +499,7 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 
 	arguments := call.Arguments.Nodes
 	if callbackIndex >= len(arguments) {
-		ctx.ReportNode(node, messageExhaustiveDepsMissingCallback)
+		ruleContext.ReportNode(node, messageExhaustiveDepsMissingCallback)
 		return
 	}
 	callbackArgument := arguments[callbackIndex]
@@ -519,7 +519,7 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 	// No second argument at all, which an explicit `undefined` is not: it is the author answering.
 	// Upstream reports on the Hook's name and carries on.
 	if run.requireExplicitEffectDeps && isEffect && callbackIndex+1 >= len(arguments) {
-		ctx.ReportNode(call.Expression, messageExhaustiveDepsRequireExplicitEffectDeps)
+		ruleContext.ReportNode(call.Expression, messageExhaustiveDepsRequireExplicitEffectDeps)
 	}
 
 	// For a Hook whose array the compiler fills in, a literal `null` there is the absent array.
@@ -528,7 +528,7 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 
 	if (dependencyArrayNode == nil || autoDependencies) && !isEffect {
 		if hooksUselessWithoutDependencies[hookName] {
-			ctx.ReportNode(node, messageExhaustiveDepsUselessWithoutDependencies)
+			ruleContext.ReportNode(node, messageExhaustiveDepsUselessWithoutDependencies)
 		}
 		return
 	}
@@ -539,7 +539,7 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 	}
 	switch callback.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		visitCallbackWithDependencies(ctx, run, callback, dependencyArrayNode, node, hookName,
+		visitCallbackWithDependencies(ruleContext, run, callback, dependencyArrayNode, node, hookName,
 			componentScope, isEffect)
 
 	case ast.KindIdentifier:
@@ -552,27 +552,27 @@ func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 		if dependencyArrayNamesIdentifier(dependencyArrayNode, callback.Text()) {
 			return
 		}
-		resolved, resolution := resolvedFunctionBody(ctx, callback)
+		resolved, resolution := resolvedFunctionBody(ruleContext, callback)
 		switch resolution {
 		case callbackResolutionNotAFunction:
 			// The name binds to something in the component that is not a function written here —
 			// `const myEffect = debounce(() => {...}, delay)` is upstream's own case. The callback
 			// itself is then the dependency, because it is rebuilt every render, and upstream says
 			// so rather than giving up: the array has to name the callback.
-			run.report(ctx, dependencyArrayNode, messageExhaustiveDepsMissing, rule.Fix{
-				Range: rule.TokenRange(ctx.SourceFile, dependencyArrayNode),
+			run.report(ruleContext, dependencyArrayNode, messageExhaustiveDepsMissing, rule.Fix{
+				Range: rule.TokenRange(ruleContext.SourceFile, dependencyArrayNode),
 				Text:  "[" + callback.Text() + "]",
 			})
 			return
 		case callbackResolutionUnknown:
-			ctx.ReportNode(node, messageExhaustiveDepsUnknownDependencies)
+			ruleContext.ReportNode(node, messageExhaustiveDepsUnknownDependencies)
 			return
 		}
-		visitCallbackWithDependencies(ctx, run, resolved, dependencyArrayNode, node, hookName,
+		visitCallbackWithDependencies(ruleContext, run, resolved, dependencyArrayNode, node, hookName,
 			componentScope, isEffect)
 
 	default:
-		ctx.ReportNode(node, messageExhaustiveDepsUnknownDependencies)
+		ruleContext.ReportNode(node, messageExhaustiveDepsUnknownDependencies)
 	}
 }
 
@@ -609,15 +609,15 @@ type dependencyRead struct {
 }
 
 // visitCallbackWithDependencies is upstream's `visitFunctionWithDependencies`.
-func visitCallbackWithDependencies(ctx rule.Context, run exhaustiveDepsRun, callback *ast.Node,
+func visitCallbackWithDependencies(ruleContext rule.Context, run exhaustiveDepsRun, callback *ast.Node,
 	dependencyArrayNode *ast.Node, hookCall *ast.Node, hookName string, componentScope *ast.Node,
 	isEffect bool) {
 
 	if isEffect && ast.HasSyntacticModifier(callback, ast.ModifierFlagsAsync) {
-		ctx.ReportNode(callback, messageExhaustiveDepsAsyncEffect)
+		ruleContext.ReportNode(callback, messageExhaustiveDepsAsyncEffect)
 	}
 
-	reads := gatherDependencies(ctx, callback, componentScope)
+	reads := gatherDependencies(ruleContext, callback, componentScope)
 
 	isAutoDependenciesHook := run.autoDependenciesHooks[hookName]
 	if dependencyArrayNode == nil {
@@ -625,7 +625,7 @@ func visitCallbackWithDependencies(ctx rule.Context, run exhaustiveDepsRun, call
 		if isAutoDependenciesHook {
 			return
 		}
-		reportSetStateWithoutDependencies(ctx, run, callback, hookCall, reads, componentScope)
+		reportSetStateWithoutDependencies(ruleContext, run, callback, hookCall, reads, componentScope)
 		return
 	}
 	if isAutoDependenciesHook && ast.SkipParentheses(dependencyArrayNode).Kind == ast.KindNullKeyword {
@@ -643,14 +643,14 @@ func visitCallbackWithDependencies(ctx rule.Context, run exhaustiveDepsRun, call
 	// observable: the summary's span starts at the `[` and an entry's starts inside it, so a reader
 	// scanning a file top to bottom meets the summary first. Reporting as the entries are read
 	// inverts it, which every id assertion in the fixtures is blind to and a span-ordered one is not.
-	declared, entryFindings := readDeclaredDependencies(ctx, dependencyArrayNode, componentScope)
+	declared, entryFindings := readDeclaredDependencies(ruleContext, dependencyArrayNode, componentScope)
 
 	recommendation := collectRecommendations(reads, declared, isEffect)
 
 	if len(recommendation.missing) == 0 && len(recommendation.unnecessary) == 0 &&
 		len(recommendation.duplicate) == 0 {
-		reportEveryRenderConstructions(ctx, run, declared, componentScope, callback, dependencyArrayNode)
-		reportEntryFindings(ctx, run, entryFindings)
+		reportEveryRenderConstructions(ruleContext, run, declared, componentScope, callback, dependencyArrayNode)
+		reportEntryFindings(ruleContext, run, entryFindings)
 		return
 	}
 
@@ -667,23 +667,23 @@ func visitCallbackWithDependencies(ctx rule.Context, run exhaustiveDepsRun, call
 
 	message, count := firstNonEmptyWarning(recommendation)
 	if count == 0 {
-		reportEntryFindings(ctx, run, entryFindings)
+		reportEntryFindings(ruleContext, run, entryFindings)
 		return
 	}
 	suggestedArray := formatDependencyArray(suggested, reads)
 	if run.dangerousAutofix {
-		ctx.ReportNodeWithFixes(dependencyArrayNode, message, rule.Fix{
-			Range: rule.TokenRange(ctx.SourceFile, dependencyArrayNode),
+		ruleContext.ReportNodeWithFixes(dependencyArrayNode, message, rule.Fix{
+			Range: rule.TokenRange(ruleContext.SourceFile, dependencyArrayNode),
 			Text:  suggestedArray,
 		})
 	} else {
-		ctx.ReportNodeWithSuggestions(dependencyArrayNode, message,
+		ruleContext.ReportNodeWithSuggestions(dependencyArrayNode, message,
 			rule.Suggestion{Message: rule.Message{
 				Id:          "exhaustiveDepsUpdateArray",
 				Description: "Update the dependency array to " + suggestedArray + ".",
 			}})
 	}
-	reportEntryFindings(ctx, run, entryFindings)
+	reportEntryFindings(ruleContext, run, entryFindings)
 }
 
 // entryFinding is one thing wrong with a single dependency array entry, held until the finding
@@ -695,9 +695,9 @@ type entryFinding struct {
 	fixes []rule.Fix
 }
 
-func reportEntryFindings(ctx rule.Context, run exhaustiveDepsRun, findings []entryFinding) {
+func reportEntryFindings(ruleContext rule.Context, run exhaustiveDepsRun, findings []entryFinding) {
 	for _, finding := range findings {
-		run.report(ctx, finding.node, finding.message, finding.fixes...)
+		run.report(ruleContext, finding.node, finding.message, finding.fixes...)
 	}
 }
 
@@ -726,7 +726,7 @@ func firstNonEmptyWarning(recommendation recommendations) (rule.Message, int) {
 // `scope.references` from `eslint-scope`; this walks the callback's own subtree and resolves each
 // identifier through the checker, which answers the same question — see the rule's doc comment for
 // the measurement that established the two classifications agree.
-func gatherDependencies(ctx rule.Context, callback *ast.Node, componentScope *ast.Node) map[string]*dependencyRead {
+func gatherDependencies(ruleContext rule.Context, callback *ast.Node, componentScope *ast.Node) map[string]*dependencyRead {
 	reads := map[string]*dependencyRead{}
 
 	var walk func(node *ast.Node)
@@ -735,7 +735,7 @@ func gatherDependencies(ctx rule.Context, callback *ast.Node, componentScope *as
 			return
 		}
 		if node.Kind == ast.KindIdentifier && !isNonDependencyIdentifier(node) {
-			recordDependencyRead(ctx, node, callback, componentScope, reads)
+			recordDependencyRead(ruleContext, node, callback, componentScope, reads)
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			walk(child)
@@ -753,10 +753,10 @@ func gatherDependencies(ctx rule.Context, callback *ast.Node, componentScope *as
 
 // recordDependencyRead resolves one identifier and, if it names a value from the component scope,
 // files the property path it was read through.
-func recordDependencyRead(ctx rule.Context, identifier *ast.Node, callback *ast.Node,
+func recordDependencyRead(ruleContext rule.Context, identifier *ast.Node, callback *ast.Node,
 	componentScope *ast.Node, reads map[string]*dependencyRead) {
 
-	symbol := resolveIdentifier(ctx, identifier)
+	symbol := resolveIdentifier(ruleContext, identifier)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		// An unresolved name is a global or a typo, and either way it does not change between
 		// renders of this component. Upstream skips it for the same reason, and its corpus pins the
@@ -812,7 +812,7 @@ func recordDependencyRead(ctx rule.Context, identifier *ast.Node, callback *ast.
 	reads[path] = &dependencyRead{
 		path:     path,
 		node:     chainRoot,
-		stable:   isStableValue(ctx, symbol, callback, componentScope, map[*ast.Symbol]bool{}),
+		stable:   isStableValue(ruleContext, symbol, callback, componentScope, map[*ast.Symbol]bool{}),
 		optional: optional,
 		order:    len(reads),
 	}
@@ -1204,7 +1204,7 @@ func appendOnce(list []string, value string) []string {
 // caller goes on to compare the callback's reads against nothing and says what is missing. That one
 // IS reported here rather than deferred, because it is about the argument rather than about an entry
 // and its span is the same span the summary would use.
-func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
+func readDeclaredDependencies(ruleContext rule.Context, dependencyArrayNode *ast.Node,
 	componentScope *ast.Node) ([]declaredDependency, []entryFinding) {
 
 	array := unwrapExpression(dependencyArrayNode)
@@ -1228,11 +1228,11 @@ func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
 			findings = append(findings, entryFinding{node: element, message: messageExhaustiveDepsSpread})
 			continue
 		}
-		if isEffectEventResult(ctx, element, componentScope) {
+		if isEffectEventResult(ruleContext, element, componentScope) {
 			// Upstream's repair removes the entry's own range and nothing around it, so a separating
 			// comma stays behind: `[a, onEvent]` becomes `[a, ]`.
 			findings = append(findings, entryFinding{node: element, message: messageExhaustiveDepsEffectEvent,
-				fixes: []rule.Fix{{Range: rule.TokenRange(ctx.SourceFile, element)}}})
+				fixes: []rule.Fix{{Range: rule.TokenRange(ruleContext.SourceFile, element)}}})
 			continue
 		}
 		key, readable := analyzePropertyChain(element, nil)
@@ -1248,7 +1248,7 @@ func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
 		declared = append(declared, declaredDependency{
 			key:      key,
 			node:     element,
-			external: !isDeclaredInComponent(ctx, element, componentScope),
+			external: !isDeclaredInComponent(ruleContext, element, componentScope),
 		})
 	}
 	return declared, findings
@@ -1259,7 +1259,7 @@ func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
 //
 // Upstream asks the same question through `componentScope.through`, which is the set of references
 // the component scope does not resolve itself.
-func isDeclaredInComponent(ctx rule.Context, element *ast.Node, componentScope *ast.Node) bool {
+func isDeclaredInComponent(ruleContext rule.Context, element *ast.Node, componentScope *ast.Node) bool {
 	root := unwrapExpression(element)
 	for root != nil && root.Kind == ast.KindPropertyAccessExpression {
 		root = unwrapExpression(root.AsPropertyAccessExpression().Expression)
@@ -1267,7 +1267,7 @@ func isDeclaredInComponent(ctx rule.Context, element *ast.Node, componentScope *
 	if root == nil || root.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := resolveIdentifier(ctx, root)
+	symbol := resolveIdentifier(ruleContext, root)
 	if symbol == nil {
 		return false
 	}
@@ -1361,7 +1361,7 @@ func optionalAtPrefix(prefix string, reads map[string]*dependencyRead) bool {
 // deep, matching React: oxc recurses without limit and treats a cycle as stable, which makes two
 // mutually recursive component-body functions look stable when neither is. The measurement is in
 // the rule's doc comment.
-func isStableValue(ctx rule.Context, symbol *ast.Symbol, callback *ast.Node, componentScope *ast.Node,
+func isStableValue(ruleContext rule.Context, symbol *ast.Symbol, callback *ast.Node, componentScope *ast.Node,
 	visiting map[*ast.Symbol]bool) bool {
 
 	if visiting[symbol] {
@@ -1378,15 +1378,15 @@ func isStableValue(ctx rule.Context, symbol *ast.Symbol, callback *ast.Node, com
 
 	switch declaration.Kind {
 	case ast.KindVariableDeclaration:
-		return isStableVariableDeclaration(ctx, declaration, symbol, callback, componentScope, visiting)
+		return isStableVariableDeclaration(ruleContext, declaration, symbol, callback, componentScope, visiting)
 
 	case ast.KindBindingElement:
-		return isStableDestructuredHookResult(ctx, declaration, componentScope)
+		return isStableDestructuredHookResult(ruleContext, declaration, componentScope)
 
 	case ast.KindFunctionDeclaration:
 		visiting[symbol] = true
 		defer delete(visiting, symbol)
-		return functionReadsOnlyStableValues(ctx, declaration, componentScope, visiting)
+		return functionReadsOnlyStableValues(ruleContext, declaration, componentScope, visiting)
 	}
 	return false
 }
@@ -1409,7 +1409,7 @@ func stableDeclarationOf(symbol *ast.Symbol) *ast.Node {
 	return earliest
 }
 
-func isStableVariableDeclaration(ctx rule.Context, declaration *ast.Node, symbol *ast.Symbol,
+func isStableVariableDeclaration(ruleContext rule.Context, declaration *ast.Node, symbol *ast.Symbol,
 	callback *ast.Node, componentScope *ast.Node, visiting map[*ast.Symbol]bool) bool {
 
 	variable := declaration.AsVariableDeclaration()
@@ -1423,7 +1423,7 @@ func isStableVariableDeclaration(ctx rule.Context, declaration *ast.Node, symbol
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		visiting[symbol] = true
 		defer delete(visiting, symbol)
-		return functionReadsOnlyStableValues(ctx, initializer, componentScope, visiting)
+		return functionReadsOnlyStableValues(ruleContext, initializer, componentScope, visiting)
 	}
 
 	// A `const` bound to a primitive literal cannot change, so it never needs declaring. `let` is
@@ -1450,7 +1450,7 @@ func isStableVariableDeclaration(ctx rule.Context, declaration *ast.Node, symbol
 // expression, so any write found is a genuine reassignment. Upstream's own case for this is
 // `let [count, setCount] = useState(0); setCount = unstableProp`, and without the check that reads
 // as stable and the whole finding disappears.
-func isStableDestructuredHookResult(ctx rule.Context, declaration *ast.Node,
+func isStableDestructuredHookResult(ruleContext rule.Context, declaration *ast.Node,
 	componentScope *ast.Node) bool {
 
 	pattern := declaration.Parent
@@ -1472,7 +1472,7 @@ func isStableDestructuredHookResult(ctx rule.Context, declaration *ast.Node,
 	}
 	switch hookNameWithoutReactNamespace(initializer.AsCallExpression().Expression) {
 	case "useState", "useReducer", "useActionState", "useTransition":
-		return !isReassignedInComponent(ctx, declaration, componentScope)
+		return !isReassignedInComponent(ruleContext, declaration, componentScope)
 	}
 	return false
 }
@@ -1482,8 +1482,8 @@ func isStableDestructuredHookResult(ctx rule.Context, declaration *ast.Node,
 // A walk of the component rather than a reference index, because the question is scoped to one
 // function body and the binding is a local: every occurrence that could write to it is inside the
 // node this rule already holds.
-func isReassignedInComponent(ctx rule.Context, declaration *ast.Node, componentScope *ast.Node) bool {
-	target := ctx.TypeChecker.GetSymbolAtLocation(declaration.Name())
+func isReassignedInComponent(ruleContext rule.Context, declaration *ast.Node, componentScope *ast.Node) bool {
+	target := ruleContext.TypeChecker.GetSymbolAtLocation(declaration.Name())
 	if target == nil {
 		return false
 	}
@@ -1498,7 +1498,7 @@ func isReassignedInComponent(ctx rule.Context, declaration *ast.Node, componentS
 			if binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
 				written := unwrapExpression(binary.Left)
 				if written != nil && written.Kind == ast.KindIdentifier &&
-					ctx.TypeChecker.GetSymbolAtLocation(written) == target {
+					ruleContext.TypeChecker.GetSymbolAtLocation(written) == target {
 					reassigned = true
 					return
 				}
@@ -1515,7 +1515,7 @@ func isReassignedInComponent(ctx rule.Context, declaration *ast.Node, componentS
 
 // functionReadsOnlyStableValues reports whether every component-scope value a function reads is
 // itself stable, so the function's identity changing does not matter.
-func functionReadsOnlyStableValues(ctx rule.Context, function *ast.Node, componentScope *ast.Node,
+func functionReadsOnlyStableValues(ruleContext rule.Context, function *ast.Node, componentScope *ast.Node,
 	visiting map[*ast.Symbol]bool) bool {
 
 	stable := true
@@ -1525,7 +1525,7 @@ func functionReadsOnlyStableValues(ctx rule.Context, function *ast.Node, compone
 			return
 		}
 		if node.Kind == ast.KindIdentifier && !isNonDependencyIdentifier(node) {
-			symbol := resolveIdentifier(ctx, node)
+			symbol := resolveIdentifier(ruleContext, node)
 			if symbol != nil && len(symbol.Declarations) > 0 {
 				inFunction, inComponent := false, false
 				for _, declaration := range symbol.Declarations {
@@ -1538,7 +1538,7 @@ func functionReadsOnlyStableValues(ctx rule.Context, function *ast.Node, compone
 					}
 				}
 				if !inFunction && inComponent &&
-					!isStableValue(ctx, symbol, function, componentScope, visiting) {
+					!isStableValue(ruleContext, symbol, function, componentScope, visiting) {
 					stable = false
 					return
 				}
@@ -1564,7 +1564,7 @@ func functionReadsOnlyStableValues(ctx rule.Context, function *ast.Node, compone
 // the comparison's standards. `const o = {}; useEffect(() => log(o), [o])` names exactly what it
 // reads. The defect is one level down, in what `o` is: a new object each render, so the comparison
 // against the previous render never matches and the effect runs every time.
-func reportEveryRenderConstructions(ctx rule.Context, run exhaustiveDepsRun, declared []declaredDependency,
+func reportEveryRenderConstructions(ruleContext rule.Context, run exhaustiveDepsRun, declared []declaredDependency,
 	componentScope *ast.Node, callback *ast.Node, dependencyArrayNode *ast.Node) {
 
 	for _, dependency := range declared {
@@ -1577,7 +1577,7 @@ func reportEveryRenderConstructions(ctx rule.Context, run exhaustiveDepsRun, dec
 		if root == nil || root.Kind != ast.KindIdentifier {
 			continue
 		}
-		symbol := resolveIdentifier(ctx, root)
+		symbol := resolveIdentifier(ruleContext, root)
 		if symbol == nil {
 			continue
 		}
@@ -1589,8 +1589,8 @@ func reportEveryRenderConstructions(ctx rule.Context, run exhaustiveDepsRun, dec
 		if !isEveryRenderConstruction(declaration) {
 			continue
 		}
-		run.report(ctx, declaration, messageExhaustiveDepsConstruction,
-			wrapConstructionInUseCallback(ctx, declaration, symbol, componentScope, callback, dependencyArrayNode)...)
+		run.report(ruleContext, declaration, messageExhaustiveDepsConstruction,
+			wrapConstructionInUseCallback(ruleContext, declaration, symbol, componentScope, callback, dependencyArrayNode)...)
 	}
 }
 
@@ -1600,7 +1600,7 @@ func reportEveryRenderConstructions(ctx rule.Context, run exhaustiveDepsRun, dec
 //
 // One replacement of the initializer rather than an insertion on each side, because two fixes in one
 // diagnostic are not applied together and half of the pair is broken code.
-func wrapConstructionInUseCallback(ctx rule.Context, declaration *ast.Node, symbol *ast.Symbol,
+func wrapConstructionInUseCallback(ruleContext rule.Context, declaration *ast.Node, symbol *ast.Symbol,
 	componentScope *ast.Node, callback *ast.Node, dependencyArrayNode *ast.Node) []rule.Fix {
 
 	if declaration.Kind != ast.KindVariableDeclaration {
@@ -1615,20 +1615,20 @@ func wrapConstructionInUseCallback(ctx rule.Context, declaration *ast.Node, symb
 	default:
 		return nil
 	}
-	if !isUsedOutsideOfHook(ctx, symbol, declaration, componentScope, callback, dependencyArrayNode) {
+	if !isUsedOutsideOfHook(ruleContext, symbol, declaration, componentScope, callback, dependencyArrayNode) {
 		return nil
 	}
-	initializerRange := rule.TokenRange(ctx.SourceFile, initializer)
+	initializerRange := rule.TokenRange(ruleContext.SourceFile, initializer)
 	return []rule.Fix{{
 		Range: initializerRange,
-		Text:  "useCallback(" + ctx.SourceFile.Text()[initializerRange.Pos():initializerRange.End()] + ")",
+		Text:  "useCallback(" + ruleContext.SourceFile.Text()[initializerRange.Pos():initializerRange.End()] + ")",
 	}}
 }
 
 // isUsedOutsideOfHook is upstream's question of the same name: is the binding read anywhere other
 // than inside the Hook's callback or its dependency array, or written a second time after its
 // declaration. Only then does wrapping it pay, since a value used only by the Hook belongs inside it.
-func isUsedOutsideOfHook(ctx rule.Context, symbol *ast.Symbol, declaration *ast.Node, componentScope *ast.Node,
+func isUsedOutsideOfHook(ruleContext rule.Context, symbol *ast.Symbol, declaration *ast.Node, componentScope *ast.Node,
 	callback *ast.Node, dependencyArrayNode *ast.Node) bool {
 
 	used := false
@@ -1638,7 +1638,7 @@ func isUsedOutsideOfHook(ctx rule.Context, symbol *ast.Symbol, declaration *ast.
 			return
 		}
 		if node.Kind == ast.KindIdentifier && node != declaration.Name() && !isNonDependencyIdentifier(node) &&
-			resolveIdentifier(ctx, node) == symbol {
+			resolveIdentifier(ruleContext, node) == symbol {
 			parent := node.Parent
 			written := parent != nil && parent.Kind == ast.KindBinaryExpression &&
 				parent.AsBinaryExpression().Left == node && ast.IsAssignmentOperator(parent.AsBinaryExpression().OperatorToken.Kind)
@@ -1712,7 +1712,7 @@ func constructsANewValue(node *ast.Node) bool {
 
 // reportSetStateWithoutDependencies reports an effect that calls a state setter and has no array, so
 // it runs after every render and each run causes the next one.
-func reportSetStateWithoutDependencies(ctx rule.Context, run exhaustiveDepsRun, callback *ast.Node,
+func reportSetStateWithoutDependencies(ruleContext rule.Context, run exhaustiveDepsRun, callback *ast.Node,
 	hookCall *ast.Node, reads map[string]*dependencyRead, componentScope *ast.Node) {
 
 	found := false
@@ -1730,7 +1730,7 @@ func reportSetStateWithoutDependencies(ctx rule.Context, run exhaustiveDepsRun, 
 			return
 		}
 		if node.Kind == ast.KindIdentifier && !isNonDependencyIdentifier(node) &&
-			isStateSetterName(ctx, node, componentScope, callback) {
+			isStateSetterName(ruleContext, node, componentScope, callback) {
 			// A MENTION rather than a call. `fetchData.then(setData)` hands the setter off to be
 			// called later and upstream reports it, so testing for a call expression here would miss
 			// two of its own cases.
@@ -1749,7 +1749,7 @@ func reportSetStateWithoutDependencies(ctx rule.Context, run exhaustiveDepsRun, 
 	// Upstream's repair adds the array the effect needs right after the callback. It joins the
 	// paths as they are, without the `?.` formatting the corrected array gets.
 	suggested := collectRecommendations(reads, nil, true).suggested
-	run.report(ctx, hookCall, messageExhaustiveDepsSetStateNoDependencies, rule.Fix{
+	run.report(ruleContext, hookCall, messageExhaustiveDepsSetStateNoDependencies, rule.Fix{
 		Range: core.NewTextRange(callback.End(), callback.End()),
 		Text:  ", [" + strings.Join(suggested, ", ") + "]",
 	})
@@ -1760,10 +1760,10 @@ func reportSetStateWithoutDependencies(ctx rule.Context, run exhaustiveDepsRun, 
 //
 // The setter specifically, not the value: `const [s, setS] = useState()` makes `setS` a setter and
 // `s` not one, and calling `s()` is not a state update.
-func isStateSetterName(ctx rule.Context, identifier *ast.Node, componentScope *ast.Node,
+func isStateSetterName(ruleContext rule.Context, identifier *ast.Node, componentScope *ast.Node,
 	callback *ast.Node) bool {
 
-	symbol := resolveIdentifier(ctx, identifier)
+	symbol := resolveIdentifier(ruleContext, identifier)
 	if symbol == nil {
 		return false
 	}
@@ -1873,14 +1873,14 @@ func nodeContains(ancestor *ast.Node, node *ast.Node) bool {
 // reads, so the read is filed under a symbol nothing else touches. Here that would lose a
 // dependency rather than invent one, which is the direction that hurts: a value read only through a
 // shorthand would look unread and the rule would call declaring it unnecessary.
-func resolveIdentifier(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+func resolveIdentifier(ruleContext rule.Context, identifier *ast.Node) *ast.Symbol {
 	if parent := identifier.Parent; parent != nil &&
 		parent.Kind == ast.KindShorthandPropertyAssignment {
-		if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 			return symbol
 		}
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	return ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 }
 
 // isNonDependencyIdentifier reports whether an identifier occurrence cannot be a value read.
@@ -1976,12 +1976,12 @@ func isConstDeclaration(declaration *ast.Node) bool {
 // always sees the latest render's values, so listing it re-runs the effect for a change that could
 // never have gone stale. The finding is the inverse of every other one in this rule, which is why
 // it is checked before the entry is treated as an ordinary dependency.
-func isEffectEventResult(ctx rule.Context, element *ast.Node, componentScope *ast.Node) bool {
+func isEffectEventResult(ruleContext rule.Context, element *ast.Node, componentScope *ast.Node) bool {
 	root := unwrapExpression(element)
 	if root == nil || root.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := resolveIdentifier(ctx, root)
+	symbol := resolveIdentifier(ruleContext, root)
 	if symbol == nil {
 		return false
 	}
@@ -2031,8 +2031,8 @@ const (
 )
 
 // resolvedFunctionBody follows a callback passed by name to the function it names.
-func resolvedFunctionBody(ctx rule.Context, identifier *ast.Node) (*ast.Node, callbackResolution) {
-	symbol := resolveIdentifier(ctx, identifier)
+func resolvedFunctionBody(ruleContext rule.Context, identifier *ast.Node) (*ast.Node, callbackResolution) {
+	symbol := resolveIdentifier(ruleContext, identifier)
 	if symbol == nil {
 		return nil, callbackResolutionUnknown
 	}

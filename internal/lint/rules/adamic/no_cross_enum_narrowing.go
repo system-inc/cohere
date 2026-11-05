@@ -19,8 +19,8 @@ var crossEnumNarrowingText = policy.MessageOf("adamic/no-cross-enum-narrowing", 
 var NoCrossEnumNarrowing = rule.Rule{
 	Name:             "adamic/no-cross-enum-narrowing",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		compare := func(node, left, right *ast.Node) {
@@ -28,24 +28,24 @@ var NoCrossEnumNarrowing = rule.Rule{
 				return
 			}
 			for _, sides := range [][2]*ast.Node{{left, right}, {right, left}} {
-				comparedType := ctx.TypeChecker.GetTypeAtLocation(sides[0])
-				compared := crossEnumMembers(ctx.TypeChecker, comparedType)
+				comparedType := ruleContext.TypeChecker.GetTypeAtLocation(sides[0])
+				compared := crossEnumMembers(ruleContext.TypeChecker, comparedType)
 				if len(compared) == 0 {
 					continue
 				}
 				singleEnum := true
 				for _, part := range type_checking.UnionTypeParts(comparedType) {
-					if crossEnumOwner(ctx.TypeChecker, part) != compared[0].enum {
+					if crossEnumOwner(ruleContext.TypeChecker, part) != compared[0].enum {
 						singleEnum = false
 					}
 				}
 				if !singleEnum {
 					continue
 				}
-				declaredTypes := crossEnumDeclaredTypes(ctx.TypeChecker, sides[1])
+				declaredTypes := crossEnumDeclaredTypes(ruleContext.TypeChecker, sides[1])
 				var declared []crossEnumMember
 				for _, typ := range declaredTypes {
-					declared = append(declared, crossEnumMembers(ctx.TypeChecker, typ)...)
+					declared = append(declared, crossEnumMembers(ruleContext.TypeChecker, typ)...)
 				}
 				for _, other := range compared {
 					if !crossEnumHasNarrowingConstituent(other, declaredTypes, declared) {
@@ -59,8 +59,8 @@ var NoCrossEnumNarrowing = rule.Rule{
 						if text, ok := other.value.(string); ok {
 							value = strconv.Quote(text)
 						}
-						ctx.ReportNode(node, rule.Message{Id: "crossEnumNarrowing", Description: crossEnumNarrowingText.Render(map[string]string{
-							"other": type_checking.StableTypeText(ctx.TypeChecker, other.typ), "member": type_checking.StableTypeText(ctx.TypeChecker, member.typ), "value": value,
+						ruleContext.ReportNode(node, rule.Message{Id: "crossEnumNarrowing", Description: crossEnumNarrowingText.Render(map[string]string{
+							"other": type_checking.StableTypeText(ruleContext.TypeChecker, other.typ), "member": type_checking.StableTypeText(ruleContext.TypeChecker, member.typ), "value": value,
 						})})
 						return
 					}
@@ -157,7 +157,10 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 		access := node.AsElementAccessExpression()
 		typ := tc.GetTypeAtLocation(access.ArgumentExpression)
 		if typ != nil && typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
-			receiver, key = access.Expression, typ.AsLiteralType().Value().(string)
+			// A string literal type's value is a string; on a miss the receiver stays nil and nothing is recovered
+			if value, isString := typ.AsLiteralType().Value().(string); isString {
+				receiver, key = access.Expression, value
+			}
 		}
 	}
 	if receiver != nil {

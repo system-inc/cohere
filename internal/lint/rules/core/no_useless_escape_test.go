@@ -108,8 +108,8 @@ func TestNoUselessEscapeFires(test *testing.T) {
 		{"`\\a```", 1, nil},
 		{"\"use\\ strict\";", 1, nil},
 		{"var foo = /\\（([^\\）\\（]+)\\）$|\\(([^\\)\\)]+)\\)$/;", 6, nil},
-		{"var stringLiteralWithNextLine = \"line 1\\line 2\";", 1, nil},
-		{"var stringLiteralWithNextLine = `line 1\\line 2`;", 1, nil},
+		{"var stringLiteralWithNextLine = \"line 1\\\u0085line 2\";", 1, nil},
+		{"var stringLiteralWithNextLine = `line 1\\\u0085line 2`;", 1, nil},
 		{"({ foo() { \"foo\"; \"bar\"; \"ba\\z\" } })", 1, nil},
 		{"/[^\\^]/", 1, nil},
 		{"/[^\\^]/u", 1, nil},

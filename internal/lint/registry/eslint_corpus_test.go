@@ -124,6 +124,8 @@ func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCo
 
 	var result rule_testing.Result
 	ran := false
+	// Not parallel: the verdict reads result and ran as soon as Run returns, and a parallel subtest would
+	// not have run by then. The rules' own subtests are what run side by side.
 	test.Run(row.key(), func(test *testing.T) {
 		result = rule_testing.RunTypedVerbatimWithOptions(test, registration.Rule, "Case.ts", row.Code, decoded)
 		ran = true
@@ -154,7 +156,13 @@ func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCo
 	byteOffset := utf16ToByteOffsets(code)
 	expected := make([]string, 0, len(row.ESLint))
 	for _, finding := range row.ESLint {
-		start, end := int(finding[1].(float64)), int(finding[2].(float64))
+		// JSON decodes every number into an any as a float64, so anything else is a vendored file gone wrong
+		startOffset, startIsNumber := finding[1].(float64)
+		endOffset, endIsNumber := finding[2].(float64)
+		if !startIsNumber || !endIsNumber {
+			test.Fatalf("row %s: ESLint's finding %v does not hold two numeric offsets", row.key(), finding)
+		}
+		start, end := int(startOffset), int(endOffset)
 		if firstLineEnd >= 0 {
 			if start >= firstLineEnd {
 				start--
@@ -352,7 +360,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 	probe := func(occurrence int) rule.Registration {
 		return rule.Registration{Rule: rule.Rule{
 			Name: "corpus-place-probe",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				seen := 0
 				return rule.Listeners{
 					ast.KindIdentifier: func(node *ast.Node) {
@@ -361,7 +369,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 						}
 						seen++
 						if seen == occurrence {
-							ctx.ReportNode(node, rule.Message{Id: "probe", Description: "One x."})
+							ruleContext.ReportNode(node, rule.Message{Id: "probe", Description: "One x."})
 						}
 					},
 				}

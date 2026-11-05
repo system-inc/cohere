@@ -56,7 +56,7 @@ func DecodeYodaOptions(list []byte) (any, error) {
 	if err != nil {
 		return settings, err
 	}
-	settings = decoded.(YodaSettings)
+	settings = decoded
 	if len(elements) < 2 {
 		return settings, nil
 	}
@@ -70,7 +70,7 @@ func DecodeYodaOptions(list []byte) (any, error) {
 }
 
 // yodaSettingsFromWhen turns the enum into settings, refusing anything upstream's schema refuses.
-func yodaSettingsFromWhen(when string) (any, error) {
+func yodaSettingsFromWhen(when string) (YodaSettings, error) {
 	switch when {
 	case "never":
 		return YodaSettings{}, nil
@@ -161,7 +161,7 @@ var messageYodaExpected = rule.Message{
 // OPERATOR, so `'red' /* mid */ === color` becomes `color /* mid */ === 'red'`.
 var Yoda = rule.Rule{
 	Name: "yoda",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[YodaSettings](options)
 		if !ok {
 			settings = DefaultYodaSettings()
@@ -169,15 +169,15 @@ var Yoda = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				checkYodaComparison(ctx, node, settings)
+				checkYodaComparison(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkYodaComparison judges one binary expression.
-func checkYodaComparison(ctx rule.Context, node *ast.Node, settings YodaSettings) {
-	if ctx.SourceFile == nil {
+func checkYodaComparison(ruleContext rule.Context, node *ast.Node, settings YodaSettings) {
+	if ruleContext.SourceFile == nil {
 		return
 	}
 	binary := node.AsBinaryExpression()
@@ -216,28 +216,28 @@ func checkYodaComparison(ctx rule.Context, node *ast.Node, settings YodaSettings
 		return
 	}
 
-	if settings.ExceptRange && yodaIsRangeTest(ctx, node.Parent) {
+	if settings.ExceptRange && yodaIsRangeTest(ruleContext, node.Parent) {
 		return
 	}
 
 	// `TokenRange` rather than the token's own Pos, which includes leading trivia: a comment
 	// written between the left operand and the operator would otherwise land inside the message,
 	// which upstream's `{{operator}}` never carries. Two corpus cases write exactly that shape.
-	operatorSpan := rule.TokenRange(ctx.SourceFile, binary.OperatorToken)
-	operatorText := ctx.SourceFile.Text()[operatorSpan.Pos():operatorSpan.End()]
+	operatorSpan := rule.TokenRange(ruleContext.SourceFile, binary.OperatorToken)
+	operatorText := ruleContext.SourceFile.Text()[operatorSpan.Pos():operatorSpan.End()]
 	finding := rule.Message{
 		Id: messageYodaExpected.Id,
 		Description: fmt.Sprintf("Expected literal to be on the %s side of %s. %s",
 			expectedSide, operatorText, messageYodaExpected.Description),
 	}
 
-	flipped, fixable := yodaFlippedString(ctx, node, binary)
+	flipped, fixable := yodaFlippedString(ruleContext, node, binary)
 	if !fixable {
-		ctx.ReportNode(node, finding)
+		ruleContext.ReportNode(node, finding)
 		return
 	}
-	ctx.ReportNodeWithFixes(node, finding,
-		rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), flipped))
+	ruleContext.ReportNodeWithFixes(node, finding,
+		rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), flipped))
 }
 
 // isYodaComparisonOperator is upstream's `/^(?:==|===|!=|!==|<|>|<=|>=)$/u`.
@@ -382,7 +382,7 @@ func yodaParseNumber(text string) (float64, bool) {
 // Four conditions, all load bearing and each stated by the corpus: the parent is a logical `&&` or
 // `||`, both its sides are comparisons using `<` or `<=`, the shared operand is the same reference
 // on both sides, and the whole thing is wrapped in parentheses.
-func yodaIsRangeTest(ctx rule.Context, parent *ast.Node) bool {
+func yodaIsRangeTest(ruleContext rule.Context, parent *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindBinaryExpression {
 		return false
 	}
@@ -423,7 +423,7 @@ func yodaIsRangeTest(ctx rule.Context, parent *ast.Node) bool {
 		return false
 	}
 
-	return yodaIsParenthesised(ctx, parent)
+	return yodaIsParenthesised(ruleContext, parent)
 }
 
 // isYodaRangeOperator is upstream's `["<", "<="].includes(operator)`.
@@ -441,9 +441,9 @@ func isYodaRangeOperator(operator ast.Kind) bool {
 // `0 < a && a < 1` is not -- upstream's own failing case.
 //
 // Read off the source text for that reason, scanning past trivia in each direction.
-func yodaIsParenthesised(ctx rule.Context, node *ast.Node) bool {
-	source := ctx.SourceFile.Text()
-	span := rule.TokenRange(ctx.SourceFile, node)
+func yodaIsParenthesised(ruleContext rule.Context, node *ast.Node) bool {
+	source := ruleContext.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, node)
 
 	before := span.Pos() - 1
 	for before >= 0 && yodaIsSpace(source[before]) {
@@ -608,22 +608,20 @@ func yodaUnwrapParentheses(node *ast.Node) *ast.Node {
 // The spacing halves are upstream's too. A flip can put two tokens against each other that could
 // not be adjacent, `a=1 === x` becoming `a=x === 1` is fine but a bare `-1<x` would not be, so a
 // space is inserted only when the neighbouring token is flush AND the pair would fuse.
-func yodaFlippedString(ctx rule.Context, node *ast.Node,
+func yodaFlippedString(ruleContext rule.Context, node *ast.Node,
 	binary *ast.BinaryExpression) (string, bool) {
 
-	source := ctx.SourceFile.Text()
-	span := rule.TokenRange(ctx.SourceFile, node)
-	operatorStart := binary.OperatorToken.Pos()
-	operatorEnd := binary.OperatorToken.End()
+	source := ruleContext.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, node)
 
 	// The operator token's Pos includes leading trivia, so trim it to the token itself; otherwise
 	// the text before the operator is swallowed into the operator's own slice.
-	trimmedOperator := rule.TokenRange(ctx.SourceFile, binary.OperatorToken)
-	operatorStart = trimmedOperator.Pos()
-	operatorEnd = trimmedOperator.End()
+	trimmedOperator := rule.TokenRange(ruleContext.SourceFile, binary.OperatorToken)
+	operatorStart := trimmedOperator.Pos()
+	operatorEnd := trimmedOperator.End()
 
-	leftSpan := rule.TokenRange(ctx.SourceFile, binary.Left)
-	rightSpan := rule.TokenRange(ctx.SourceFile, binary.Right)
+	leftSpan := rule.TokenRange(ruleContext.SourceFile, binary.Left)
+	rightSpan := rule.TokenRange(ruleContext.SourceFile, binary.Right)
 	if span.Pos() < 0 || rightSpan.End() > len(source) ||
 		leftSpan.End() > operatorStart || operatorEnd > rightSpan.Pos() {
 		return "", false

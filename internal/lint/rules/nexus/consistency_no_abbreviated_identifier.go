@@ -119,10 +119,10 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 	Name:             "nexus/consistency-no-abbreviated-identifier",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[ConsistencyNoAbbreviatedIdentifierOptions](options)
 
-		fileName := imports.NormalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
 		routeContract := nextjs.RouteContractExports(fileName)
@@ -146,7 +146,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 
 			property := abbreviatedPropertyMember(node) != nil
 			if property {
-				if !abbreviatedOwnsProperty(ctx, node) {
+				if !abbreviatedOwnsProperty(ruleContext, node) {
 					return
 				}
 			} else if node.Kind != ast.KindIdentifier || binding.IsForeignName(node) ||
@@ -161,7 +161,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 			// else in the file declares it. A file that shadows an import keeps reporting the
 			// name everywhere, which errs toward a finding rather than away from one.
 			if importedNames == nil {
-				importedNames = importedNamesNeverRedeclared(ctx.SourceFile)
+				importedNames = importedNamesNeverRedeclared(ruleContext.SourceFile)
 			}
 			if !property && importedNames[name] {
 				return
@@ -227,7 +227,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 					return
 				}
 				if !argumentsBindingsRead {
-					argumentsNameRestOnly = nameBoundOnlyAsRest(ctx.SourceFile, "args")
+					argumentsNameRestOnly = nameBoundOnlyAsRest(ruleContext.SourceFile, "args")
 					argumentsBindingsRead = true
 				}
 				if !property && argumentsNameRestOnly {
@@ -242,7 +242,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 			// it cannot cover, since the directive matches the line after itself: `params` in
 			// McpApi.ts reported at line 240 while its suppression sat on 241 covering 242, so a
 			// correctly-suppressed identifier still produced a finding nothing could silence.
-			ctx.ReportRange(rule.TokenRange(ctx.SourceFile, node), finding.message)
+			ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, node), finding.message)
 		}
 		return rule.Listeners{ast.KindIdentifier: judge, ast.KindStringLiteral: judge, ast.KindPrivateIdentifier: judge}
 	},
@@ -580,18 +580,18 @@ func abbreviatedPropertyMember(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func abbreviatedOwnsProperty(ctx rule.Context, name *ast.Node) bool {
+func abbreviatedOwnsProperty(ruleContext rule.Context, name *ast.Node) bool {
 	member := abbreviatedPropertyMember(name)
 	owner := member.Parent
 	if owner == nil {
 		return false
 	}
 	if owner.Kind == ast.KindObjectLiteralExpression {
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return true
 		}
-		contextual := ctx.TypeChecker.GetContextualType(owner, checker.ContextFlagsIgnoreNodeInferences)
-		return !abbreviatedContextDeclaresProperty(ctx, contextual, name.Text(), owner)
+		contextual := ruleContext.TypeChecker.GetContextualType(owner, checker.ContextFlagsIgnoreNodeInferences)
+		return !abbreviatedContextDeclaresProperty(ruleContext, contextual, name.Text(), owner)
 	}
 	if rule.IsDependencyDeclaration(member) {
 		return false
@@ -602,22 +602,22 @@ func abbreviatedOwnsProperty(ctx rule.Context, name *ast.Node) bool {
 			return false
 		}
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return true
 	}
-	if owner.Kind == ast.KindTypeLiteral && abbreviatedCombinedExternal(ctx, owner, name.Text()) {
+	if owner.Kind == ast.KindTypeLiteral && abbreviatedCombinedExternal(ruleContext, owner, name.Text()) {
 		return false
 	}
 	// Declaration merging can add a member to a foreign interface without a module wrapper.
-	if owner.Name() != nil && rule.IsDeclaredByADependency(ctx.TypeChecker.GetSymbolAtLocation(owner.Name())) {
+	if owner.Name() != nil && rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetSymbolAtLocation(owner.Name())) {
 		return false
 	}
-	return !abbreviatedInheritedExternal(ctx, owner, name.Text(), ast.IsStatic(member), make(map[*ast.Node]bool))
+	return !abbreviatedInheritedExternal(ruleContext, owner, name.Text(), ast.IsStatic(member), make(map[*ast.Node]bool))
 }
 
 // A local override can still carry a dependency's contract through another local override.
 // Follow the declarations behind inherited properties, with a cycle guard for erroneous heritage.
-func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string, static bool, seen map[*ast.Node]bool) bool {
+func abbreviatedInheritedExternal(ruleContext rule.Context, owner *ast.Node, name string, static bool, seen map[*ast.Node]bool) bool {
 	if seen[owner] {
 		return false
 	}
@@ -631,9 +631,9 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 			continue
 		}
 		for _, base := range clause.AsHeritageClause().Types.Nodes {
-			baseType := ctx.TypeChecker.GetTypeAtLocation(base)
+			baseType := ruleContext.TypeChecker.GetTypeAtLocation(base)
 			if static {
-				baseType = ctx.TypeChecker.GetTypeAtLocation(base.Expression())
+				baseType = ruleContext.TypeChecker.GetTypeAtLocation(base.Expression())
 			}
 			if rule.IsUnresolvedType(baseType) {
 				return true
@@ -641,7 +641,7 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 			if baseType == nil {
 				continue
 			}
-			symbol := ctx.TypeChecker.GetPropertyOfType(baseType, name)
+			symbol := ruleContext.TypeChecker.GetPropertyOfType(baseType, name)
 			if rule.IsDeclaredByADependency(symbol) {
 				return true
 			}
@@ -649,7 +649,7 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 				continue
 			}
 			for _, declaration := range symbol.Declarations {
-				if declaration.Parent != nil && abbreviatedInheritedExternal(ctx, declaration.Parent, name, static, seen) {
+				if declaration.Parent != nil && abbreviatedInheritedExternal(ruleContext, declaration.Parent, name, static, seen) {
 					return true
 				}
 			}
@@ -661,7 +661,7 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 // A contextual type may be a union whose alternatives do not share the property. A named
 // declaration in any alternative still owns that spelling; a synthetic index/mapped property
 // without a declaration of this name does not. Inferred self-context is not an earlier declaration.
-func abbreviatedContextDeclaresProperty(ctx rule.Context, contextual *checker.Type, name string, literal *ast.Node) bool {
+func abbreviatedContextDeclaresProperty(ruleContext rule.Context, contextual *checker.Type, name string, literal *ast.Node) bool {
 	// A missing contract has no declaration from which to infer ownership.
 	if rule.IsUnresolvedType(contextual) {
 		return true
@@ -671,13 +671,13 @@ func abbreviatedContextDeclaresProperty(ctx rule.Context, contextual *checker.Ty
 	}
 	if contextual.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 		for _, part := range contextual.Types() {
-			if abbreviatedContextDeclaresProperty(ctx, part, name, literal) {
+			if abbreviatedContextDeclaresProperty(ruleContext, part, name, literal) {
 				return true
 			}
 		}
 		return false
 	}
-	symbol := ctx.TypeChecker.GetPropertyOfType(contextual, name)
+	symbol := ruleContext.TypeChecker.GetPropertyOfType(contextual, name)
 	if symbol == nil {
 		return false
 	}
@@ -704,7 +704,7 @@ func abbreviatedHeritage(owner *ast.Node) *ast.NodeList {
 
 // Only union/intersection constituents at this shape's level can share its spelling. Stop at
 // properties and named declarations so a nested shape or an alias used elsewhere stays ours.
-func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name string) bool {
+func abbreviatedCombinedExternal(ruleContext rule.Context, literal *ast.Node, name string) bool {
 	for current := literal; current.Parent != nil; current = current.Parent {
 		parent := current.Parent
 		var constituents *ast.NodeList
@@ -719,7 +719,7 @@ func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name strin
 			return false
 		}
 		for _, constituent := range constituents.Nodes {
-			if constituent != current && abbreviatedTypeHasExternalProperty(ctx, ctx.TypeChecker.GetTypeAtLocation(constituent), name) {
+			if constituent != current && abbreviatedTypeHasExternalProperty(ruleContext, ruleContext.TypeChecker.GetTypeAtLocation(constituent), name) {
 				return true
 			}
 		}
@@ -727,7 +727,7 @@ func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name strin
 	return false
 }
 
-func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Type, name string) bool {
+func abbreviatedTypeHasExternalProperty(ruleContext rule.Context, valueType *checker.Type, name string) bool {
 	// An unresolved constituent may own the spelling once its declaration exists.
 	if rule.IsUnresolvedType(valueType) {
 		return true
@@ -738,11 +738,11 @@ func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Typ
 	// A union need not share the property across every alternative. Each constituent gets a vote.
 	if valueType.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 		for _, part := range valueType.Types() {
-			if abbreviatedTypeHasExternalProperty(ctx, part, name) {
+			if abbreviatedTypeHasExternalProperty(ruleContext, part, name) {
 				return true
 			}
 		}
 		return false
 	}
-	return rule.IsDeclaredByADependency(ctx.TypeChecker.GetPropertyOfType(valueType, name))
+	return rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetPropertyOfType(valueType, name))
 }
