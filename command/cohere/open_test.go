@@ -249,11 +249,11 @@ func TestOpenCrash(t *testing.T) {
 func TestOpenSwiftArguments(t *testing.T) {
 	t.Parallel()
 	location := projectLocation{Root: "/work/project"}
-	baseline, mode, err := swiftEngineArguments(location, map[string]bool{}, func(string) string { return "true" }, nil)
+	baseline, mode, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{}, func(string) string { return "true" }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	arguments, openMode, err := swiftEngineArguments(location, map[string]bool{"open": true}, func(string) string { return "true" }, nil)
+	arguments, openMode, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"open": true}, func(string) string { return "true" }, nil)
 	if err != nil || mode != openMode || !reflect.DeepEqual(arguments, baseline) {
 		t.Fatalf("--open must be handled by the Go front door: %v, %v, %v", arguments, openMode, err)
 	}

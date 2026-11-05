@@ -372,6 +372,10 @@ func (found *discovery) claimWorkspaceModules(workspaces []string) error {
 	running := found.Projects[:0:0]
 	for _, project := range found.Projects {
 		if project.Engine == engineGo && !isWorkspace[project.Directory] {
+			// Any workspace that uses a module claims it, the nearest or not: that workspace's run builds the
+			// module through the use, so running the module alone as well would check its files twice. The walk
+			// up from inside such a module can still stop at the module (goModuleRoot), because go standing
+			// there reads the nearer go.work, which does not use it; both builds are ones go itself would run.
 			if claimed[project.Directory] {
 				continue
 			}

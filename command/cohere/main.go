@@ -251,6 +251,16 @@ func run() error {
 		}
 		return nil
 	}
+	if locateError == nil && location.Engine == engineGo {
+		exitCode, goEngineError := runGoEngine(location, given, flag.Args())
+		if goEngineError != nil {
+			return goEngineError
+		}
+		if exitCode != 0 {
+			exitProcess(exitCode)
+		}
+		return nil
+	}
 
 	if *listRules {
 		// Sorted so two binaries can be diffed directly. The registry's own order is the order rules

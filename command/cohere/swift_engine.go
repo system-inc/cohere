@@ -3,32 +3,29 @@ package main
 import (
 	"flag"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// swiftPassThroughSwitches are the boolean flags the Swift engine reads with the meaning the contract
-// gives them, forwarded only when the caller typed them. The rest are refused by name, by the engine
-// or below, because a flag accepted and ignored reads as a run that did what was asked.
-var swiftPassThroughSwitches = []string{
-	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
-}
-
-// swiftFrontDoorFlags are the flags the front door answers for a Swift run itself: where the package is,
-// the lint config and fix passes it forwards with their values, how the report is printed, and the profile
-// of this process. Any flag given that is in neither list is refused by name (see swiftEngineArguments).
-// It used to be dropped, and `--format-only` dropped meant a format gate that type-checked and linted the
-// whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv). The engine has read
-// `--format-only` and `--no-format` with TypeScript's meaning since c024df4b, so both pass through.
-var swiftFrontDoorFlags = []string{
-	"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
+// swiftFlags are the flags a Swift run takes. The pass-through switches are the ones the Swift engine reads
+// with the meaning the contract gives them. The front door answers the rest itself, forwarding the lint
+// config and fix passes with their values. Any flag given that is in neither list is refused by name (see
+// engineArguments). It used to be dropped, and `--format-only` dropped meant a format gate that type-checked
+// and linted the whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv). The
+// engine has read `--format-only` and `--no-format` with TypeScript's meaning since c024df4b, so both pass
+// through.
+var swiftFlags = engineFlags{
+	PassThroughSwitches: []string{
+		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
+		"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
+	},
+	FrontDoorFlags: []string{
+		"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
+	},
 }
 
 // runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
@@ -43,7 +40,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 			location.Root, swiftProjectMarker)
 	}
 
-	arguments, mode, err := swiftEngineArguments(location, given, flagValue, positionals)
+	arguments, mode, err := engineArguments(swiftLanguage, swiftFlags, location, given, flagValue, positionals)
 	if err != nil {
 		return 1, err
 	}
@@ -166,63 +163,4 @@ func flagValue(name string) string {
 		return found.Value.String()
 	}
 	return ""
-}
-
-// swiftEngineArguments builds the engine's command line, `--contract 1 --root <root> [flags] [paths]`,
-// and says which question the run answers.
-//
-// Every path is made absolute against where the caller typed it, so the engine never has to know what
-// `--directory` meant. Takes the flag reader as a parameter so a test can state the flags it means
-// without touching the process's own.
-func swiftEngineArguments(
-	location projectLocation,
-	given map[string]bool,
-	value func(string) string,
-	positionals []string,
-) ([]string, engineMode, error) {
-	for _, refused := range []string{"explain"} {
-		if given[refused] {
-			// Refused here rather than forwarded for the engine to refuse, because its argument is a
-			// path and the engine's sentence would name the path rather than the flag.
-			return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so nothing was checked", refused)
-		}
-	}
-	// Sorted, so a command line naming two of them is refused for the same one every time.
-	for _, name := range slices.Sorted(maps.Keys(given)) {
-		// A switch turned off asks for nothing, so there is nothing to honor or refuse.
-		if slices.Contains(swiftPassThroughSwitches, name) || slices.Contains(swiftFrontDoorFlags, name) ||
-			name == "tsconfig" || value(name) == "false" {
-			continue
-		}
-		return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so the run was refused rather than run without it, and nothing was checked", name)
-	}
-
-	arguments := []string{"--contract", fmt.Sprint(engineContractVersion), "--root", location.Root}
-	for _, name := range swiftPassThroughSwitches {
-		if given[name] && value(name) == "true" {
-			arguments = append(arguments, "--"+name)
-		}
-	}
-	if given["lint-config"] {
-		arguments = append(arguments, "--lint-config", location.LintConfigFileName)
-	}
-	if given["fix-passes"] {
-		arguments = append(arguments, "--fix-passes", value("fix-passes"))
-	}
-	for _, positional := range positionals {
-		arguments = append(arguments, absoluteFrom(location.ArgumentBase, positional))
-	}
-
-	// The same precedence the TypeScript run gives these, so one command line asks one question
-	// whichever engine answers it.
-	mode := engineModeCheck
-	switch {
-	case given["rules"] && value("rules") == "true":
-		mode = engineModeRules
-	case given["rules-enabled"] && value("rules-enabled") == "true":
-		mode = engineModeRulesEnabled
-	case given["version"] && value("version") == "true":
-		mode = engineModeVersion
-	}
-	return arguments, mode, nil
 }

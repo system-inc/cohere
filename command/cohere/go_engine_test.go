@@ -1,0 +1,168 @@
+//go:build unix
+
+// The stand-in Go engines here are /bin/sh scripts, as the Swift engine's are, so the file builds on Unix.
+
+package main
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+)
+
+// typedTrue reads every flag as given and true, the way a caller who typed it would.
+func typedTrue(string) string { return "true" }
+
+// goTestLocation is a Go module root with a lint config named on the command line.
+func goTestLocation(root string) projectLocation {
+	return projectLocation{
+		Root:               root,
+		Engine:             engineGo,
+		LintConfigFileName: filepath.Join(root, "Settings.json"),
+		ArgumentBase:       root,
+		WorkingDirectory:   root,
+	}
+}
+
+// TestGoEngineArgumentsForwardWhatTheGoEngineReads: the command line is the one agreed with the engine on
+// #a0cgmh6, the contract and the root first, each typed switch it reads, the lint config by its absolute
+// path, and each path made absolute, while the flags the front door answers never reach the engine.
+func TestGoEngineArgumentsForwardWhatTheGoEngineReads(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	given := map[string]bool{
+		"no-fix": true, "lint": true, "single-threaded": true, "lint-config": true,
+		"json": true, "verbose": true, "coverage": true, "phases": true,
+	}
+	arguments, mode, argumentsError := engineArguments(
+		goLanguage("module"), goFlags, goTestLocation(root), given, typedTrue, []string{"a.go", "/elsewhere/b.go"})
+	if argumentsError != nil {
+		test.Fatal(argumentsError)
+	}
+	expected := []string{
+		"--contract", "3", "--root", root, "--no-fix", "--lint", "--single-threaded",
+		"--lint-config", filepath.Join(root, "Settings.json"), filepath.Join(root, "a.go"), "/elsewhere/b.go",
+	}
+	if !slices.Equal(arguments, expected) {
+		test.Errorf("arguments are\n  %q\nexpected\n  %q", arguments, expected)
+	}
+	if mode != engineModeCheck {
+		test.Errorf("mode %s, expected %s", mode, engineModeCheck)
+	}
+	_, mode, _ = engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
+		map[string]bool{"rules-enabled": true, "version": true}, typedTrue, nil)
+	if mode != engineModeRulesEnabled {
+		test.Errorf("--rules-enabled with --version asked mode %s, expected %s, as a TypeScript run reads it",
+			mode, engineModeRulesEnabled)
+	}
+}
+
+// TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement: every flag the Go engine has no meaning for is
+// refused by name, naming Go, rather than dropped into a run that looks like it honored it.
+func TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement(test *testing.T) {
+	test.Parallel()
+	for _, refused := range []string{
+		"unused", "unused-all", "unused-deep", "timing", "explain", "no-cache", "fix-passes", "print-config",
+	} {
+		test.Run(refused, func(test *testing.T) {
+			test.Parallel()
+			_, _, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(test.TempDir()),
+				map[string]bool{"no-fix": true, refused: true}, typedTrue, nil)
+			expected := "--" + refused + " is not implemented for Go"
+			if argumentsError == nil || !strings.Contains(argumentsError.Error(), expected) {
+				test.Fatalf("--%s was not refused by name for Go: %v", refused, argumentsError)
+			}
+		})
+	}
+}
+
+// TestGoContainerNamesAWorkspaceOrAModule: a root holding a go.work is a workspace in the run's words, and
+// one holding only a go.mod is a module.
+func TestGoContainerNamesAWorkspaceOrAModule(test *testing.T) {
+	test.Parallel()
+	module := test.TempDir()
+	moduleFile := filepath.Join(module, goModuleMarker)
+	if writeError := os.WriteFile(moduleFile, []byte("module example.com/a\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if container := goContainer(module); container != "module" {
+		test.Errorf("a go.mod root is a %q, expected a module", container)
+	}
+	workspace := test.TempDir()
+	workspaceFile := filepath.Join(workspace, goWorkspaceMarker)
+	if writeError := os.WriteFile(workspaceFile, []byte("go 1.27\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if container := goContainer(workspace); container != "workspace" {
+		test.Errorf("a go.work root is a %q, expected a workspace", container)
+	}
+}
+
+// TestRunGoEngineRefusesATsconfig: --tsconfig names a TypeScript program, which a Go root does not have.
+func TestRunGoEngineRefusesATsconfig(test *testing.T) {
+	test.Parallel()
+	_, runError := runGoEngine(goTestLocation(test.TempDir()), map[string]bool{"tsconfig": true}, nil)
+	if runError == nil || !strings.Contains(runError.Error(), "is a Go module, so there is no tsconfig to use") {
+		test.Fatalf("--tsconfig at a Go root was not refused: %v", runError)
+	}
+}
+
+// runFakeGoEngine runs a shell script standing in for `cohere go-engine` through the process boundary every
+// Go run crosses, rendered in Go's words.
+func runFakeGoEngine(test *testing.T, body string) (string, int, error) {
+	test.Helper()
+	path := filepath.Join(test.TempDir(), "cohere")
+	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	var out, standardError bytes.Buffer
+	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
+	exitCode, runError := runEngineBinary(path, []string{goEngineVerb, "--contract", "3"}, run, &standardError)
+	return out.String(), exitCode, runError
+}
+
+// Not parallel: its subtests drive check runs through engineRun, whose record acceptors set the
+// package-level activeSummary.
+func TestAGoEngineThatDoesNotFinishChecksNothing(test *testing.T) {
+	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "GoClean.jsonl"))
+	if absoluteError != nil {
+		test.Fatal(absoluteError)
+	}
+
+	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+	test.Run("the control: a whole clean stream is green", func(test *testing.T) {
+		out, exitCode, runError := runFakeGoEngine(test, "cat '"+fixture+"'")
+		if runError != nil || exitCode != 0 {
+			test.Fatalf("a clean Go engine run exited %d, err %v\n%s", exitCode, runError, out)
+		}
+		if !strings.Contains(out, "module described in") || strings.Contains(out, "Swift") {
+			test.Errorf("the run was not rendered in Go's words:\n%s", out)
+		}
+	})
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"a stream cut off after the fix phase", "head -4 '" + fixture + "'"},
+		{"an engine that printed nothing", "exit 0"},
+		{"an engine killed by a signal", "head -2 '" + fixture + "'; kill -9 $$"},
+	}
+	for _, testCase := range cases {
+		// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+		test.Run(testCase.name, func(test *testing.T) {
+			out, exitCode, runError := runFakeGoEngine(test, testCase.body)
+			if exitCode != 1 || runError == nil || !strings.Contains(runError.Error(), "the Go engine") ||
+				!strings.Contains(runError.Error(), "nothing was checked") {
+				test.Fatalf("exit %d, err %v\n%s", exitCode, runError, out)
+			}
+			if strings.Contains(out, "Swift") {
+				test.Errorf("a Go run named Swift:\n%s", out)
+			}
+		})
+	}
+}

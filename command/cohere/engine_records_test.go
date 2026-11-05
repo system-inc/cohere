@@ -446,7 +446,7 @@ func TestSwiftEngineArguments(t *testing.T) {
 	values := map[string]string{"no-fix": "true", "single-threaded": "false", "fix-passes": "4", "rules": "true"}
 	value := func(name string) string { return values[name] }
 
-	arguments, mode, err := swiftEngineArguments(location,
+	arguments, mode, err := engineArguments(swiftLanguage, swiftFlags, location,
 		map[string]bool{"no-fix": true, "single-threaded": true, "fix-passes": true, "lint-config": true},
 		value, []string{"Thing.swift", "/abs/Other.swift"})
 	if err != nil {
@@ -458,12 +458,12 @@ func TestSwiftEngineArguments(t *testing.T) {
 		t.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 
-	_, mode, _ = swiftEngineArguments(location, map[string]bool{"rules": true}, value, nil)
+	_, mode, _ = engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value, nil)
 	if mode != engineModeRules {
 		t.Errorf("--rules ran in mode %s", mode)
 	}
 
-	if _, _, err := swiftEngineArguments(location, map[string]bool{"explain": true}, value, nil); err == nil || !strings.Contains(err.Error(), "--explain") {
+	if _, _, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"explain": true}, value, nil); err == nil || !strings.Contains(err.Error(), "--explain") {
 		t.Errorf("--explain was not refused by name: %v", err)
 	}
 }
@@ -489,7 +489,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 		"stdin-filepath": "--stdin-filepath is not implemented for Swift yet",
 		"cache-dump":     "--cache-dump is not implemented for Swift yet",
 	} {
-		if _, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil); err == nil ||
+		if _, _, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"no-fix": true, flag: true}, value, nil); err == nil ||
 			!strings.Contains(err.Error(), says) || !strings.Contains(err.Error(), "nothing was checked") {
 			t.Errorf("--%s was not refused by name: %v", flag, err)
 		}
@@ -497,7 +497,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 
 	for _, flag := range []string{"format-only", "no-format"} {
 		values[flag] = "true"
-		arguments, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil)
+		arguments, _, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"no-fix": true, flag: true}, value, nil)
 		if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {
 			t.Errorf("--%s did not reach the engine: %q (%v)", flag, strings.Join(arguments, " "), err)
 		}
@@ -505,7 +505,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	values["no-format"] = "false"
 
 	given := map[string]bool{"no-fix": true, "no-format": true, "verbose": true, "phases": true, "coverage": true, "directory": true}
-	arguments, _, err := swiftEngineArguments(location, given, value, nil)
+	arguments, _, err := engineArguments(swiftLanguage, swiftFlags, location, given, value, nil)
 	if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
 		t.Errorf("the flags the front door answers were not passed over: %q (%v)", strings.Join(arguments, " "), err)
 	}
