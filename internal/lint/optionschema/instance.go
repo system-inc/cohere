@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // Violation is the first place an option list departs from upstream's schema: where, as a path into the
@@ -101,7 +103,7 @@ func withoutExtensions(ruleName string, elements []json.RawMessage) []json.RawMe
 
 // Validate checks an option list against the schema and returns its first Violation, or nil.
 func (schema *Schema) Validate(elements []json.RawMessage) error {
-	list := make(JsonArray, len(elements))
+	list := make(json_value.Array, len(elements))
 	for index, element := range elements {
 		// A decoder reads the element's first value and ignores any text after it, as it always has, and its
 		// syntax error is the one this has always returned. The value it read is already checked JSON.
@@ -110,7 +112,7 @@ func (schema *Schema) Validate(elements []json.RawMessage) error {
 		if decodeError := decoder.Decode(&first); decodeError != nil {
 			return fmt.Errorf("element %d is not JSON: %w", index+1, decodeError)
 		}
-		value, parseError := ParseJsonValue(first)
+		value, parseError := json_value.Parse(first)
 		if parseError != nil {
 			return fmt.Errorf("element %d is not JSON: %w", index+1, parseError)
 		}
@@ -122,7 +124,7 @@ func (schema *Schema) Validate(elements []json.RawMessage) error {
 	return nil
 }
 
-func validate(schema *node, value JsonValue, path string) *Violation {
+func validate(schema *node, value json_value.Value, path string) *Violation {
 	if schema.referenceTarget != nil {
 		return validate(schema.referenceTarget, value, path)
 	}
@@ -166,7 +168,7 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 	}
 
 	switch typed := value.(type) {
-	case JsonNumber:
+	case json_value.Number:
 		// Ignored: the decoder only yields a valid number literal, and one past float64's range comes back
 		// as an infinity of its sign with the range error, which still compares truthfully to both bounds.
 		number, _ := json.Number(typed).Float64()
@@ -182,7 +184,7 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 				Expected: fmt.Sprintf("a number of at most %s, got %s", formatNumber(*schema.maximum), typed),
 			}
 		}
-	case JsonString:
+	case json_value.String:
 		length := utf8.RuneCountInString(string(typed))
 		if schema.minLength != nil && length < *schema.minLength {
 			return &Violation{
@@ -204,11 +206,11 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 				Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value)),
 			}
 		}
-	case JsonArray:
+	case json_value.Array:
 		if violation := validateArray(schema, typed, path); violation != nil {
 			return violation
 		}
-	case JsonObject:
+	case json_value.Object:
 		if violation := validateObject(schema, typed, path); violation != nil {
 			return violation
 		}
@@ -271,7 +273,7 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 	return nil
 }
 
-func validateArray(schema *node, list JsonArray, path string) *Violation {
+func validateArray(schema *node, list json_value.Array, path string) *Violation {
 	if schema.minItems != nil && len(list) < *schema.minItems {
 		return &Violation{
 			Path:     pathOrRoot(path),
@@ -324,7 +326,7 @@ func validateArray(schema *node, list JsonArray, path string) *Violation {
 	return nil
 }
 
-func validateObject(schema *node, object JsonObject, path string) *Violation {
+func validateObject(schema *node, object json_value.Object, path string) *Violation {
 	for _, name := range schema.required {
 		if _, present := object[name]; !present {
 			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("the key %q, which is required", name)}
@@ -371,38 +373,38 @@ func validateObject(schema *node, object JsonObject, path string) *Violation {
 }
 
 // hasAnyType is ajv's type check: "integer" is a number with no fractional part.
-func hasAnyType(value JsonValue, types []string) bool {
+func hasAnyType(value json_value.Value, types []string) bool {
 	for _, name := range types {
 		switch name {
 		case "null":
-			if _, is := value.(JsonNull); is {
+			if _, is := value.(json_value.Null); is {
 				return true
 			}
 		case "boolean":
-			if _, is := value.(JsonBoolean); is {
+			if _, is := value.(json_value.Boolean); is {
 				return true
 			}
 		case "string":
-			if _, is := value.(JsonString); is {
+			if _, is := value.(json_value.String); is {
 				return true
 			}
 		case "number":
-			if _, is := value.(JsonNumber); is {
+			if _, is := value.(json_value.Number); is {
 				return true
 			}
 		case "integer":
-			if number, is := value.(JsonNumber); is {
+			if number, is := value.(json_value.Number); is {
 				parsed, float64Error := json.Number(number).Float64()
 				if float64Error == nil && !math.IsInf(parsed, 0) && parsed == math.Trunc(parsed) {
 					return true
 				}
 			}
 		case "array":
-			if _, is := value.(JsonArray); is {
+			if _, is := value.(json_value.Array); is {
 				return true
 			}
 		case "object":
-			if _, is := value.(JsonObject); is {
+			if _, is := value.(json_value.Object); is {
 				return true
 			}
 		}
@@ -411,27 +413,27 @@ func hasAnyType(value JsonValue, types []string) bool {
 }
 
 // equal is ajv's deep equality (fast-deep-equal): numbers by value, objects by key set and values.
-func equal(left JsonValue, right JsonValue) bool {
+func equal(left json_value.Value, right json_value.Value) bool {
 	switch typedLeft := left.(type) {
-	case JsonNull:
-		_, is := right.(JsonNull)
+	case json_value.Null:
+		_, is := right.(json_value.Null)
 		return is
-	case JsonBoolean:
-		typedRight, is := right.(JsonBoolean)
+	case json_value.Boolean:
+		typedRight, is := right.(json_value.Boolean)
 		return is && typedLeft == typedRight
-	case JsonString:
-		typedRight, is := right.(JsonString)
+	case json_value.String:
+		typedRight, is := right.(json_value.String)
 		return is && typedLeft == typedRight
-	case JsonNumber:
-		typedRight, is := right.(JsonNumber)
+	case json_value.Number:
+		typedRight, is := right.(json_value.Number)
 		if !is {
 			return false
 		}
 		leftValue, leftError := json.Number(typedLeft).Float64()
 		rightValue, rightError := json.Number(typedRight).Float64()
 		return leftError == nil && rightError == nil && leftValue == rightValue
-	case JsonArray:
-		typedRight, is := right.(JsonArray)
+	case json_value.Array:
+		typedRight, is := right.(json_value.Array)
 		if !is || len(typedLeft) != len(typedRight) {
 			return false
 		}
@@ -441,8 +443,8 @@ func equal(left JsonValue, right JsonValue) bool {
 			}
 		}
 		return true
-	case JsonObject:
-		typedRight, is := right.(JsonObject)
+	case json_value.Object:
+		typedRight, is := right.(json_value.Object)
 		if !is || len(typedLeft) != len(typedRight) {
 			return false
 		}
@@ -457,8 +459,8 @@ func equal(left JsonValue, right JsonValue) bool {
 	return false
 }
 
-func count(value JsonValue) (*int, error) {
-	number, isNumber := value.(JsonNumber)
+func count(value json_value.Value) (*int, error) {
+	number, isNumber := value.(json_value.Number)
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
@@ -469,8 +471,8 @@ func count(value JsonValue) (*int, error) {
 	return &parsed, nil
 }
 
-func number(value JsonValue) (*float64, error) {
-	typed, isNumber := value.(JsonNumber)
+func number(value json_value.Value) (*float64, error) {
+	typed, isNumber := value.(json_value.Number)
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
@@ -486,7 +488,7 @@ func escapePointer(name string) string {
 }
 
 // pointerTarget follows a JSON pointer reference (`#/items/0/$defs/name`) through the document.
-func pointerTarget(document JsonValue, reference string) (JsonValue, error) {
+func pointerTarget(document json_value.Value, reference string) (json_value.Value, error) {
 	if reference == "#" {
 		return document, nil
 	}
@@ -498,13 +500,13 @@ func pointerTarget(document JsonValue, reference string) (JsonValue, error) {
 	for _, part := range strings.Split(rest, "/") {
 		part = strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
 		switch typed := current.(type) {
-		case JsonObject:
+		case json_value.Object:
 			next, present := typed[part]
 			if !present {
 				return nil, fmt.Errorf("$ref %q names %q, which is not there", reference, part)
 			}
 			current = next
-		case JsonArray:
+		case json_value.Array:
 			index, parseError := strconv.Atoi(part)
 			if parseError != nil || index < 0 || index >= len(typed) {
 				return nil, fmt.Errorf("$ref %q names item %q, which is not there", reference, part)
@@ -535,7 +537,7 @@ func formatNumber(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
-func encode(value JsonValue) string {
+func encode(value json_value.Value) string {
 	var encoded bytes.Buffer
 	if encodeError := writeJson(&encoded, value); encodeError != nil {
 		return fmt.Sprint(value)
@@ -547,17 +549,17 @@ func encode(value JsonValue) string {
 // object's keys sorted, a number in its own spelling, and every string and key escaped by json.Marshal itself.
 //
 // Mutates: encoded the buffer each value is appended to, in order
-func writeJson(encoded *bytes.Buffer, value JsonValue) error {
+func writeJson(encoded *bytes.Buffer, value json_value.Value) error {
 	switch typed := value.(type) {
-	case JsonNull:
+	case json_value.Null:
 		encoded.WriteString("null")
-	case JsonBoolean:
+	case json_value.Boolean:
 		encoded.WriteString(strconv.FormatBool(bool(typed)))
-	case JsonNumber:
+	case json_value.Number:
 		return writeMarshaled(encoded, json.Number(typed))
-	case JsonString:
+	case json_value.String:
 		return writeMarshaled(encoded, string(typed))
-	case JsonArray:
+	case json_value.Array:
 		encoded.WriteByte('[')
 		for index, element := range typed {
 			if index > 0 {
@@ -568,7 +570,7 @@ func writeJson(encoded *bytes.Buffer, value JsonValue) error {
 			}
 		}
 		encoded.WriteByte(']')
-	case JsonObject:
+	case json_value.Object:
 		keys := make([]string, 0, len(typed))
 		for key := range typed {
 			keys = append(keys, key)
@@ -606,7 +608,7 @@ func writeMarshaled[T json.Number | string](encoded *bytes.Buffer, value T) erro
 	return nil
 }
 
-func describe(value JsonValue) string {
+func describe(value json_value.Value) string {
 	encoded := encode(value)
 	if len(encoded) > 60 {
 		encoded = encoded[:57] + "..."
