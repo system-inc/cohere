@@ -1,6 +1,8 @@
 package checker
 
 import (
+	"go/ast"
+	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -122,6 +124,95 @@ func TestAResultIsReleasedWhenItsLastReaderFinishesAndARootsIsKept(test *testing
 	}
 	if collected("rootHeavy") {
 		test.Errorf("want the root's result still held while the graph is, and it was collected")
+	}
+	runtime.KeepAlive(graph)
+}
+
+// declaredAnalyzer exports a declaredFact for every function its package declares and reports each call to a
+// function that has one, so, like printf and ctrlflow, it runs on every dependency of the packages it is given.
+var declaredAnalyzer = &analysis.Analyzer{
+	Name:      "declared",
+	Doc:       "declared reports each call to a function a dependency declared",
+	FactTypes: []analysis.Fact{new(declaredFact)},
+	Run: func(pass *analysis.Pass) (any, error) {
+		for _, file := range pass.Files {
+			ast.Inspect(file, func(node ast.Node) bool {
+				switch typed := node.(type) {
+				case *ast.FuncDecl:
+					if function, isFunction := pass.TypesInfo.Defs[typed.Name].(*types.Func); isFunction {
+						pass.ExportObjectFact(function, new(declaredFact))
+					}
+				case *ast.CallExpr:
+					selector, isSelector := typed.Fun.(*ast.SelectorExpr)
+					if !isSelector {
+						return true
+					}
+					function, isFunction := pass.TypesInfo.Uses[selector.Sel].(*types.Func)
+					if isFunction && pass.ImportObjectFact(function, new(declaredFact)) {
+						pass.Reportf(typed.Pos(), "calls %s, which a dependency declared", function.Name())
+					}
+				}
+				return true
+			})
+		}
+		return nil, nil
+	},
+}
+
+// A dependency the graph was not given is analyzed only for its facts, so once its last action has finished its
+// syntax trees and type information are let go, while the graph that holds every action is still alive, and the
+// facts it exported still reach the package that imports it. A package the graph was given keeps both.
+func TestADependencysSyntaxIsReleasedOnceItsLastActionFinishesAndAGivenPackagesIsKept(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	for name, contents := range map[string]string{
+		"go.mod":         "module example.com/syntax\n\ngo 1.21\n",
+		"lower/lower.go": "package lower\n\nfunc Lower() {}\n",
+		"upper/upper.go": "package upper\n\nimport \"example.com/syntax/lower\"\n\nfunc Upper() { lower.Lower() }\n",
+	} {
+		path := filepath.Join(directory, name)
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatalf("making the directory of %s: %v", name, makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
+		}
+	}
+	loaded, loadError := packages.Load(&packages.Config{
+		Mode: packages.LoadAllSyntax,
+		Dir:  directory,
+		Env:  append(os.Environ(), "GOWORK=off"),
+	}, "./upper")
+	if loadError != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
+		test.Fatalf("loading the fixture: %v, %+v", loadError, loaded)
+	}
+	lower, imported := loaded[0].Imports["example.com/syntax/lower"]
+	if !imported || len(lower.Syntax) != 1 || lower.TypesInfo == nil {
+		test.Fatalf("want lower loaded from source as upper's dependency, got %+v", loaded[0].Imports)
+	}
+	lowerFile := weak.Make(lower.Syntax[0])
+	lowerTypesInfo := weak.Make(lower.TypesInfo)
+
+	graph, analyzeError := Analyze([]*analysis.Analyzer{declaredAnalyzer}, loaded, nil)
+	if analyzeError != nil {
+		test.Fatalf("analyzing: %v", analyzeError)
+	}
+	if len(graph.Roots) != 1 || graph.Roots[0].Err != nil || len(graph.Roots[0].Diagnostics) != 1 ||
+		graph.Roots[0].Diagnostics[0].Message != "calls Lower, which a dependency declared" {
+		test.Fatalf("want one finding on upper, from lower's fact, got %+v", graph.Roots)
+	}
+	if lower.Syntax != nil || lower.TypesInfo != nil {
+		test.Errorf("want lower's syntax and type information let go, got %d files and %v", len(lower.Syntax),
+			lower.TypesInfo)
+	}
+	runtime.GC()
+	if lowerFile.Value() != nil || lowerTypesInfo.Value() != nil {
+		test.Errorf("want lower's syntax tree and type information collected while the graph is alive, and the " +
+			"graph still holds them")
+	}
+	if len(loaded[0].Syntax) != 1 || loaded[0].TypesInfo == nil {
+		test.Errorf("want upper, a package the graph was given, to keep its syntax and type information")
 	}
 	runtime.KeepAlive(graph)
 }

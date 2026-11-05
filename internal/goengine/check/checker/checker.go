@@ -34,7 +34,7 @@
 // file against that upstream path to bump it; every change is marked
 // "cohere:".
 //
-// The changes are two.
+// The changes are three.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -62,8 +62,24 @@
 // spare never works at a limit. The cap is what the engine ships, so
 // the cap regime is the one that decides.
 //
-// When x/tools resolves that TODO, this copy goes away and check imports
-// golang.org/x/tools/go/analysis/checker again.
+// The third is releaseSyntax: a package Analyze was not given, a
+// dependency analyzed only for its facts, lets go of its syntax trees and
+// type information once its last action has finished. On cohere's root the
+// dependencies' syntax and type information are 765 MB of the load's
+// 1.6 GB live heap. Measured under the cap, interleaved, the same 335
+// findings in every run, at a load average of 16 to 128:
+//
+//	without: collector 11.5 to 17.5s CPU (mean 15.7, 4 runs),
+//	         36 to 48s user (mean 44.0, 6 runs)
+//	with:    collector 9.5 to 16.4s CPU (mean 13.1, 4 runs),
+//	         40 to 44s user (mean 41.9, 6 runs)
+//
+// Peak RSS is the cap's either way, about 5.6 GB, since with collection
+// off the heap grows to the limit before the first cycle.
+//
+// When x/tools resolves that TODO and lets a dependency's syntax go, this
+// copy goes away and check imports golang.org/x/tools/go/analysis/checker
+// again.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -140,6 +156,23 @@ type Action struct {
 
 	// cohere: prepared guards prepare, which like exec runs once.
 	prepared sync.Once
+
+	// cohere: syntax is shared by every action on this action's package,
+	// so the last of them to finish can release the package's syntax
+	// (see releaseSyntax).
+	syntax *syntaxReaders
+}
+
+// cohere: syntaxReaders is what the actions on one package share to
+// release its syntax: how many of them are still to finish, and which they
+// are, since each pass holds the package's files and type information too.
+type syntaxReaders struct {
+	unfinished atomic.Int32
+	actions    []*Action
+
+	// given is whether the package was one Analyze was given, whose syntax
+	// the caller still reads once the graph has finished.
+	given bool
 }
 
 func (act *Action) String() string {
@@ -155,6 +188,10 @@ func (act *Action) String() string {
 //
 // On success, it returns a Graph of actions whose Roots hold one
 // item per (a, p) in the cross-product of analyzers and pkgs.
+//
+// cohere: every package below pkgs comes back without its Syntax and
+// TypesInfo, which Analyze let go once it was done with them
+// (releaseSyntax); pkgs themselves keep theirs.
 //
 // If opts is nil, it is equivalent to new(Options).
 func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Options) (*Graph, error) {
@@ -226,6 +263,24 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 				dep.resultReaders.Add(1)
 			}
 		}
+	}
+
+	// cohere: group the actions by package, so the last action on a
+	// package that was not given can release its syntax.
+	given := make(map[*packages.Package]bool, len(pkgs))
+	for _, pkg := range pkgs {
+		given[pkg] = true
+	}
+	readers := make(map[*packages.Package]*syntaxReaders)
+	for _, act := range actions {
+		shared, ok := readers[act.Package]
+		if !ok {
+			shared = &syntaxReaders{given: given[act.Package]}
+			readers[act.Package] = shared
+		}
+		shared.unfinished.Add(1)
+		shared.actions = append(shared.actions, act)
+		act.syntax = shared
 	}
 
 	// Execute the graph in parallel.
@@ -326,7 +381,10 @@ func (act *Action) execOnce() {
 	execAll(horizontal)
 
 	// cohere: however this action ends, a failed prerequisite or an
-	// error from Run included, it has read all it will of its inputs.
+	// error from Run included, it has read all it will of its inputs, and
+	// of its package's syntax. Deferred calls run last first, so the inputs
+	// are released before the syntax.
+	defer act.releaseSyntax()
 	defer act.releaseInputs()
 
 	// Record time spent in this node but not its dependencies.
@@ -469,6 +527,31 @@ func (act *Action) releaseInputs() {
 			dep.Result = nil
 		}
 	}
+}
+
+// cohere: releaseSyntax lets go of a package's syntax trees and type
+// information once the last action on it has finished, unless Analyze was
+// given the package. A dependency is analyzed only by the analyzers that
+// learn facts and what they require, and once those have finished its facts
+// are all that is read of it again: an importer reads its types, which
+// stay. Every finding is the same, since every action ran as it would have.
+//
+// The actions' passes are cleared with the package, since each holds its
+// files and type information. A Result that holds syntax, such as
+// ctrlflow's or buildir's, is released by releaseInputs when its last
+// reader, an action on the same package, has finished, so by now.
+func (act *Action) releaseSyntax() {
+	if act.syntax.unfinished.Add(-1) != 0 || act.syntax.given {
+		return
+	}
+	for _, finished := range act.syntax.actions {
+		if finished.pass != nil {
+			finished.pass.Files = nil
+			finished.pass.TypesInfo = nil
+		}
+	}
+	act.Package.Syntax = nil
+	act.Package.TypesInfo = nil
 }
 
 // inheritFacts populates act.facts with

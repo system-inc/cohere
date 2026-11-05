@@ -127,7 +127,8 @@ type findingKey struct {
 
 // Run runs every rule over the analyzed packages, which are load.Loaded.Packages, loaded with every dependency
 // from source. The rules are the enabled ones. It returns an error only when the rules cannot be run at all;
-// what a rule gets wrong on a package is a Crash.
+// what a rule gets wrong on a package is a Crash. The packages below analyzed come back without their syntax and
+// type information, which the run let go once their facts were learned.
 func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Result, error) {
 	started := time.Now()
 	ruleOf := make(map[*analysis.Analyzer]rule.Rule, len(rules))
