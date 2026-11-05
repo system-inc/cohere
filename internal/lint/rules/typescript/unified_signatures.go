@@ -906,32 +906,22 @@ func (checker *unifiedSignaturesChecker) unionMemberText(node *ast.Node) string 
 // Returns the comment's TEXT rather than a node, since the only question asked of it is equality.
 // A signature with no preceding block comment yields the empty string, so two undocumented overloads
 // compare equal, which is upstream's behaviour when both lookups return undefined.
+//
+// Upstream's `getCommentsBefore` is every comment between the previous token and the signature, which is
+// the signature's leading trivia, and its `.reverse().find(...)` takes the last block comment among them,
+// past any line comment after it: `/** a */ // b` before a signature is documented by `a`. A scan back from
+// the signature that stopped at the first comment it met missed that one, so the ranges are read forwards
+// and the last block comment kept.
 func (checker *unifiedSignaturesChecker) blockCommentFor(signature *ast.Node) string {
 	sourceText := checker.ctx.SourceFile.Text()
-	start := rule.TokenRange(checker.ctx.SourceFile, signature).Pos()
-	// Scan backwards over the trivia between the previous token and this signature, taking the
-	// LAST block comment in it, which is upstream's `.reverse().find(...)`.
-	position := start
-	for position > 0 {
-		// Skip whitespace immediately before the current position.
-		for position > 0 && unifiedSignaturesIsSpace(sourceText[position-1]) {
-			position--
+	var factory ast.NodeFactory
+	text := ""
+	for commentRange := range scanner.GetLeadingCommentRanges(&factory, sourceText, signature.Pos()) {
+		if commentRange.Kind == ast.KindMultiLineCommentTrivia {
+			text = sourceText[commentRange.Pos()+len("/*") : commentRange.End()-len("*/")]
 		}
-		if position >= 2 && sourceText[position-2] == '*' && sourceText[position-1] == '/' {
-			opening := strings.LastIndex(sourceText[:position-2], "/*")
-			if opening < 0 {
-				return ""
-			}
-			return sourceText[opening+2 : position-2]
-		}
-		return ""
 	}
-	return ""
-}
-
-// unifiedSignaturesIsSpace reports whether a byte is source whitespace.
-func unifiedSignaturesIsSpace(character byte) bool {
-	return character == ' ' || character == '\t' || character == '\n' || character == '\r'
+	return text
 }
 
 // unifiedSignaturesValueRange is upstream's `node.value ?? node`, expressed as a range.
