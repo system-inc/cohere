@@ -24,7 +24,7 @@ const sortDefaultPropsFile = "/repository/source/SortDefaultProps.tsx"
 // than an empty payload, so it is mapped to the empty payload the config layer would actually hand
 // a rule configured as a bare "error". Keeping the two distinguishable in the rows makes the
 // generated table readable; collapsing them here keeps the decoder receiving what it will see.
-func sortDefaultPropsDecode(test *testing.T, raw string) any {
+func sortDefaultPropsDecode(test *testing.T, raw string) SortDefaultPropsOptions {
 	test.Helper()
 	payload := raw
 	if raw == `""` {

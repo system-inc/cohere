@@ -38,7 +38,7 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the positional union and the built-in default under test. An empty body is the nil-options case:
 // upstream still checks `a` and `href`, so the answer is the built-in pair rather than an error.
-func jsxNoScriptUrlOptions(test *testing.T, raw string) any {
+func jsxNoScriptUrlOptions(test *testing.T, raw string) JsxNoScriptUrlOptions {
 	test.Helper()
 	decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
 	if decodeJsxNoScriptUrlOptionsError != nil {

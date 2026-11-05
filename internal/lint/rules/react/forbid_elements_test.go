@@ -33,7 +33,7 @@ const forbidElementsFile = "/repository/source/ForbidElements.tsx"
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the string-or-object union under test. An empty body is the nil-options case: upstream reads
 // `configuration.forbid || []`, so the answer is an empty list and the rule declines everything.
-func forbidElementsOptions(test *testing.T, raw string) any {
+func forbidElementsOptions(test *testing.T, raw string) ForbidElementsOptions {
 	test.Helper()
 	decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(raw))
 	if decodeForbidElementsOptionsError != nil {

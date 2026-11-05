@@ -894,7 +894,7 @@ func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
 // This is the whole point of storing raw JSON in the tables: the enum inversion and the `links`
 // default live in that function and nowhere else, so a fixture that built the struct directly would
 // be testing the rule against options no config can produce.
-func decodeTargetBlankOptionsForTest(test *testing.T, raw string) any {
+func decodeTargetBlankOptionsForTest(test *testing.T, raw string) JsxNoTargetBlankOptions {
 	test.Helper()
 	options, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions([]byte(raw))
 	if decodeJsxNoTargetBlankOptionsError != nil {
@@ -989,7 +989,7 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 			if decodeJsxNoTargetBlankOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoTargetBlankOptionsError)
 			}
-			if decoded != any(testCase.want) {
+			if decoded != testCase.want {
 				test.Errorf("got %+v, want %+v", decoded, testCase.want)
 			}
 		})
@@ -1011,14 +1011,14 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 func TestJsxNoTargetBlankHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
-		"<a target=\"_blank\" href=\"http://x.com\"></a>", nil)
+	result := rule_testing.Run(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
+		"<a target=\"_blank\" href=\"http://x.com\"></a>")
 	rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 
 	// And the dynamic-href arm, which is the one the absent enum turns on. A nil-options rule that
 	// read the enum as "never" would be silent here.
-	dynamic := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
-		"<a target=\"_blank\" href={dynamicLink}></a>", nil)
+	dynamic := rule_testing.Run(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
+		"<a target=\"_blank\" href={dynamicLink}></a>")
 	rule_testing.ExpectFindings(test, dynamic, "noTargetBlankWithoutNoreferrer")
 }
 
@@ -1038,7 +1038,7 @@ func TestJsxNoTargetBlankHasNoFileGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, fileName, source, nil)
+			result := rule_testing.Run(test, JsxNoTargetBlank, fileName, source)
 			rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 		})
 	}

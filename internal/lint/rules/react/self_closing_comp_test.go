@@ -747,7 +747,7 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
 	for _, sourceText := range []string{"var a = <div></div>;", "var a = <Foo></Foo>;"} {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, sourceText, nil)
+			result := rule_testing.Run(test, SelfClosingComp, selfClosingCompFile, sourceText)
 			rule_testing.ExpectFindings(test, result, "notSelfClosing")
 		})
 	}

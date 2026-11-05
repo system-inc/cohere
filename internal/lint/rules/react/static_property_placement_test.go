@@ -20,7 +20,7 @@ import (
 const staticPropertyPlacementFile = "/repository/source/StaticPropertyPlacement.tsx"
 
 // staticPropertyPlacementDecode routes a fixture's raw options through the exported decoder.
-func staticPropertyPlacementDecode(test *testing.T, raw string) any {
+func staticPropertyPlacementDecode(test *testing.T, raw string) StaticPropertyPlacementOptions {
 	test.Helper()
 	decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(raw))
 	if decodeStaticPropertyPlacementOptionsError != nil {

@@ -542,7 +542,7 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 // decoder owns the nil path, which is what a bare `"error"` configuration produces, and because a
 // fixture building the struct directly would stop exercising the decoder the moment one of these
 // options grows a non-zero default.
-func decodeJsxKeyOptionsForTest(test *testing.T, raw string) any {
+func decodeJsxKeyOptionsForTest(test *testing.T, raw string) JsxKeyOptions {
 	test.Helper()
 	options, decodeJsxKeyOptionsError := DecodeJsxKeyOptions([]byte(raw))
 	if decodeJsxKeyOptionsError != nil {
@@ -674,7 +674,7 @@ func TestJsxKeyDuplicateOrderIsStable(test *testing.T) {
 func TestJsxKeyHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, "[<App />];", nil)
+	result := rule_testing.Run(test, JsxKey, jsxKeyFile, "[<App />];")
 	rule_testing.ExpectFindings(test, result, "missingArrayKey")
 
 	// And the three option-gated judgments stay off, which is the half a nil-options bug would
@@ -684,7 +684,7 @@ func TestJsxKeyHandlesNilOptions(test *testing.T) {
 		"[<App {...obj} key=\"k\" />];",
 		"[<span key=\"a\"/>, <span key=\"a\"/>];",
 	} {
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, source, nil))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, JsxKey, jsxKeyFile, source))
 	}
 }
 
@@ -704,7 +704,7 @@ func TestJsxKeyHasNoFileGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, JsxKey, fileName, source, nil)
+			result := rule_testing.Run(test, JsxKey, fileName, source)
 			rule_testing.ExpectFindings(test, result, "missingArrayKey")
 		})
 	}

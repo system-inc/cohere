@@ -28,7 +28,7 @@ const noDangerFile = "/repository/source/Danger.tsx"
 // on every row.
 func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	var decoded any
+	var decoded NoDangerOptions
 	if rawOptions == "" {
 		var err error
 		decoded, err = DecodeNoDangerOptions(nil)
@@ -410,21 +410,19 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
 		// produce different output rather than merely take different internal paths.
-		component := rule_testing.RunWithOptions(
+		component := rule_testing.Run(
 			test,
 			NoDanger,
 			noDangerFile,
 			"<App dangerouslySetInnerHTML={{__html:''}} />;",
-			nil,
 		)
 		rule_testing.ExpectClean(test, component)
 
-		element := rule_testing.RunWithOptions(
+		element := rule_testing.Run(
 			test,
 			NoDanger,
 			noDangerFile,
 			"<div dangerouslySetInnerHTML={{__html:''}} />;",
-			nil,
 		)
 		rule_testing.ExpectFindings(test, element, "dangerousProp")
 	})

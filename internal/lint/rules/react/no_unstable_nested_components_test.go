@@ -266,8 +266,8 @@ func TestNoUnstableNestedComponentsNilOptions(test *testing.T) {
 	source := `function ParentComponent() {
   return <SomeComponent renderFooter={() => <div />} />;
 }`
-	result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
-		"Component.tsx", source, nil)
+	result := rule_testing.RunTyped(test, NoUnstableNestedComponents,
+		"Component.tsx", source)
 	rule_testing.ExpectClean(test, result)
 }
 

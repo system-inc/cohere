@@ -92,94 +92,85 @@ func TestNoUnescapedEntitiesFires(test *testing.T) {
 	cases := []struct {
 		name    string
 		source  string
-		options any
+		options rule.Given[NoUnescapedEntitiesOptions]
 		wantIds []string
 	}{
 		// upstream invalid[0]
 		{
 			name:    "upstreamInvalid0",
 			source:  "\n          var Hello = createReactClass({\n            render: function() {\n              return <div>> default parser</div>;\n            }\n          });\n        ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[1]
 		{
 			name:    "upstreamInvalid1",
 			source:  "\n          var Hello = createReactClass({\n            render: function() {\n              return <div>first line is ok\n              so is second\n              and here are some bad entities: ></div>\n            }\n          });\n        ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[2]
 		{
 			name:    "upstreamInvalid2",
 			source:  "\n          var Hello = createReactClass({\n            render: function() {\n              return <div>Multiple errors: '>> default parser</div>;\n            }\n          });\n        ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts", "unescapedEntityAlts", "unescapedEntityAlts"},
 		},
 		// upstream invalid[3]
 		{
 			name:    "upstreamInvalid3",
 			source:  "\n          var Hello = createReactClass({\n            render: function() {\n              return <div>{\"Unbalanced braces - default parser\"}}</div>;\n            }\n          });\n        ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[4], fragment
 		{
 			name:    "upstreamInvalid4",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <>> babel-eslint</>;\n          }\n        });\n      ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[5], fragment
 		{
 			name:    "upstreamInvalid5",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <>first line is ok\n            so is second\n            and here are some bad entities: ></>\n          }\n        });\n      ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[6]
 		{
 			name:    "upstreamInvalid6",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>'</div>;\n          }\n        });\n      ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[7], fragment
 		{
 			name:    "upstreamInvalid7",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <>{\"Unbalanced braces - babel-eslint\"}}</>;\n          }\n        });\n      ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[8], fragment, options {"forbid":["&"]}
 		{
 			name:    "upstreamInvalid8",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <>foo & bar</>;\n          }\n        });\n      ",
-			options: decodeNoUnescapedEntitiesOptionsForTest(test, "{\"forbid\":[\"&\"]}"),
+			options: rule.Configured(decodeNoUnescapedEntitiesOptionsForTest(test, "{\"forbid\":[\"&\"]}")),
 			wantIds: []string{"unescapedEntity"},
 		},
 		// upstream invalid[9], options {"forbid":["&"]}
 		{
 			name:    "upstreamInvalid9",
 			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <span>foo & bar</span>;\n          }\n        });\n      ",
-			options: decodeNoUnescapedEntitiesOptionsForTest(test, "{\"forbid\":[\"&\"]}"),
+			options: rule.Configured(decodeNoUnescapedEntitiesOptionsForTest(test, "{\"forbid\":[\"&\"]}")),
 			wantIds: []string{"unescapedEntity"},
 		},
 		// upstream invalid[10], options {"forbid":[{"char":"&","alternatives":["&amp;"]}]}
 		{
 			name:   "upstreamInvalid10",
 			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <span>foo & bar</span>;\n          }\n        });\n      ",
-			options: decodeNoUnescapedEntitiesOptionsForTest(
+			options: rule.Configured(decodeNoUnescapedEntitiesOptionsForTest(
 				test,
 				"{\"forbid\":[{\"char\":\"&\",\"alternatives\":[\"&amp;\"]}]}",
-			),
+			)),
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[11]
 		{
 			name:    "upstreamInvalid11",
 			source:  "\n        <script>window.foo = \"bar\"</script>\n      ",
-			options: nil,
 			wantIds: []string{"unescapedEntityAlts", "unescapedEntityAlts"},
 		},
 	}
@@ -187,7 +178,7 @@ func TestNoUnescapedEntitiesFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test, NoUnescapedEntities, "component.tsx", testCase.source, testCase.options)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
@@ -200,7 +191,7 @@ func TestNoUnescapedEntitiesFires(test *testing.T) {
 // Building NoUnescapedEntitiesOptions by hand would leave the decoder untested, and the
 // decoder is where this rule's two least upstream-shaped decisions live: the absent-versus-
 // empty distinction on `forbid`, and the dispatch between a string element and an object one.
-func decodeNoUnescapedEntitiesOptionsForTest(test *testing.T, raw string) any {
+func decodeNoUnescapedEntitiesOptionsForTest(test *testing.T, raw string) NoUnescapedEntitiesOptions {
 	test.Helper()
 	decoded, decodeNoUnescapedEntitiesOptionsError := DecodeNoUnescapedEntitiesOptions(json.RawMessage(raw))
 	if decodeNoUnescapedEntitiesOptionsError != nil {
@@ -394,8 +385,8 @@ func TestNoUnescapedEntitiesReportsInSourceOrder(test *testing.T) {
 func TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(
-		test, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;", nil)
+	result := rule_testing.Run(
+		test, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;")
 	rule_testing.ExpectFindings(test, result, "unescapedEntityAlts")
 }
 

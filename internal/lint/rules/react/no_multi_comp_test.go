@@ -924,7 +924,7 @@ func TestNoMultiCompNilOptionsFallsBackToTheDefault(test *testing.T) {
 	test.Parallel()
 
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
-	result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, sourceText, nil)
+	result := rule_testing.RunTyped(test, NoMultiComp, noMultiCompFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 }
 
