@@ -1,6 +1,7 @@
 package goengine
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
@@ -134,5 +135,27 @@ func TestRefusalSentence(test *testing.T) {
 		if got := refusalSentence(sentence.refusal); got != sentence.want {
 			test.Errorf("refusalSentence(%q) is %q, want %q", sentence.refusal, got, sentence.want)
 		}
+	}
+}
+
+// TestMainRefusesASecondRun holds the engine to one run per process, since a run's rule options stay set on the
+// registry's analyzers and a second run would be judged by them.
+//
+// Not parallel: it sets `GOMEMLIMIT`, so Main leaves this test process's memory limit alone, and it spends the one
+// Main this process may call.
+func TestMainRefusesASecondRun(test *testing.T) {
+	test.Setenv("GOMEMLIMIT", "off")
+	versionArguments := append(slices.Clone(contractArguments), "--version")
+	var firstOutput, firstError bytes.Buffer
+	if exitCode := Main(versionArguments, &firstOutput, &firstError); exitCode != exitClean {
+		test.Fatalf("the first run exited %d, want %d; stderr: %s", exitCode, exitClean, firstError.String())
+	}
+	var secondOutput, secondError bytes.Buffer
+	if exitCode := Main(versionArguments, &secondOutput, &secondError); exitCode != exitRefused {
+		test.Fatalf("the second run exited %d, want %d", exitCode, exitRefused)
+	}
+	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second engine run in one process") {
+		test.Errorf("the second run wrote %q to stdout and %q to stderr, want nothing and the refusal",
+			secondOutput.String(), secondError.String())
 	}
 }
