@@ -7,6 +7,12 @@
 // The words are matched as written, in capitals, and only as whole words, so a sentence about TODOS or a lowercase
 // todo is prose. Go's directives are instructions to a tool and are not read, and neither is anything in backticks,
 // which is how a comment mentions the word without deferring anything, as this package's own comments do.
+//
+// Nor is a code block, the lines of a doc comment indented by a tab or further spaces after the slashes, which go/doc
+// shows verbatim as code: a `TODO` there is an example of a comment, and backticks would render literally inside it.
+// Which lines are a code block is judged by internal/shouting's mask, as the shouting rule judges them, so the two
+// rules never disagree about one: a block opens after a blank comment line or at the group's start, and an indented
+// line straight after prose is a paragraph continuation, as in CommonMark, and is read.
 package consistency_no_warning_comment
 
 import (
@@ -20,6 +26,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/shouting"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -30,7 +37,8 @@ const Name = "cohere-go/consistency-no-warning-comment"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_warning_comment",
 	Doc: "Flags TODO, FIXME or XXX written as a whole word in a comment, because a deferred task kept in a comment " +
-		"rots where nobody is reminded of it. Directives and words in backticks are not read.",
+		"rots where nobody is reminded of it. Directives, words in backticks and a doc comment's code blocks are not " +
+		"read.",
 	Run: run,
 }
 
@@ -63,16 +71,20 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// commentSpan is where one comment's text sits in its group's joined text.
+// commentSpan is where one comment's body sits in its group's joined text. cut is how many bytes of the comment's
+// text the body lost from its front, the slashes and the space after them, so an offset in the body plus cut is the
+// same byte's offset in the comment's text.
 type commentSpan struct {
 	comment *ast.Comment
 	start   int
 	end     int
+	cut     int
 }
 
-// judgeGroup reports every warning word in group outside backticks. The group's comments are joined as one text
-// before backticks are blanked, so a backtick pair a doc comment wraps across two of its // lines still hides the
-// word inside it, as the shouting rule reads a group.
+// judgeGroup reports every warning word in group outside a code block and backticks. The group's comment bodies are
+// joined as one text before they are masked, so a code block opens only after a blank comment line, and a backtick
+// pair a doc comment wraps across two of its // lines still hides the word inside it, as the shouting rule reads a
+// group.
 func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGroup) {
 	var joined strings.Builder
 	spans := []commentSpan{}
@@ -85,17 +97,26 @@ func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGr
 		if len(spans) > 0 {
 			joined.WriteByte('\n')
 		}
+		// The body is what the code block mask measures indentation in, the text after the slashes and one space.
+		body := shouting.GoCommentBody(comment.Text)
 		start := joined.Len()
-		joined.WriteString(comment.Text)
-		spans = append(spans, commentSpan{comment: comment, start: start, end: joined.Len()})
+		joined.WriteString(body)
+		spans = append(spans, commentSpan{
+			comment: comment,
+			start:   start,
+			end:     joined.Len(),
+			cut:     len(comment.Text) - len(body),
+		})
 	}
 	text := joined.String()
 	// Most comments hold none of the words, so they skip the masking.
 	if !warningWord.MatchString(text) {
 		return
 	}
-	// Each byte of a span becomes one space and each newline stays, so every offset still points into the source.
-	masked := inlineBackticks.ReplaceAllStringFunc(text, func(match string) string {
+	// Code blocks are masked before backticks, in the order the shouting rule masks them, so a backtick inside a code
+	// block opens no span over the prose after it. Each byte of a span becomes one space and each newline stays, so
+	// every offset still points into the source.
+	masked := inlineBackticks.ReplaceAllStringFunc(shouting.MaskIndentedCodeBlocks(text), func(match string) string {
 		blanked := []byte(match)
 		for index, character := range blanked {
 			if character != '\n' {
@@ -106,11 +127,12 @@ func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGr
 	})
 	for _, span := range spans {
 		for _, location := range warningWord.FindAllStringIndex(masked[span.start:span.end], -1) {
-			if !isWholeWord(span.comment.Text, location[0], location[1]) {
+			start, end := span.cut+location[0], span.cut+location[1]
+			if !isWholeWord(span.comment.Text, start, end) {
 				continue
 			}
-			word := span.comment.Text[location[0]:location[1]]
-			position := positionOf(pass, tokenFile, span.comment, location[0])
+			word := span.comment.Text[start:end]
+			position := positionOf(pass, tokenFile, span.comment, start)
 			pass.Report(analysis.Diagnostic{
 				Pos:      position,
 				End:      position + token.Pos(len(word)),
