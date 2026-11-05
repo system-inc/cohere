@@ -192,21 +192,22 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
+		// The dashes are escaped, not changed: they are the report's bytes, in the TypeScript unused report's shape.
 		requireLines(test, output,
-			"\nunused: a report, not a gate — nothing here fails a build\n",
-			"\n  imports nothing uses — 3\n",
+			"\nunused: a report, not a gate \u2014 nothing here fails a build\n",
+			"\n  imports nothing uses \u2014 3\n",
 			// Two items on one line arrive out of column order and print in it.
-			"    /project/Sources/Example/Main.swift:1:1 — import Foundation\n    /project/Sources/Example/Main.swift:1:20 — import Darwin\n",
-			"    /project/Sources/Example/Tally.swift:2:1 — import Combine\n",
+			"    /project/Sources/Example/Main.swift:1:1 \u2014 import Foundation\n    /project/Sources/Example/Main.swift:1:20 \u2014 import Darwin\n",
+			"    /project/Sources/Example/Tally.swift:2:1 \u2014 import Combine\n",
 			"  looked at 2 files and 6 imports (cohere-swift/correctness-no-unused-import)\n",
 			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
 			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
 			// The second rule's section, from a real run on ahraos-presence: its own heading and count, its
 			// items, and its own coverage lines, every skip reason by name.
-			"\n  declarations nothing uses — 2\n",
-			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 — var deepestAt\n",
-			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 — func after(_:_:)\n",
+			"\n  declarations nothing uses \u2014 2\n",
+			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 \u2014 var deepestAt\n",
+			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 \u2014 func after(_:_:)\n",
 			"  looked at 1092 files and 4311 declarations (cohere-swift/correctness-no-unused-declaration)\n",
 			"  not checked for unused declarations: 156 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  never reported: 358 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
@@ -239,12 +240,13 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
+		// The dashes are escaped, not changed, as in Unused above.
 		requireLines(test, output,
-			"\n  cohere-swift/unused-parameter — 3\n",
+			"\n  cohere-swift/unused-parameter \u2014 3\n",
 			"  looked at 2 files and 6 items (cohere-swift/unused-parameter)\n",
 			"  not checked for unused items: 1 files (the build has not compiled it as it stands)\n",
 			// The known rule beside it keeps its own words.
-			"\n  declarations nothing uses — 2\n",
+			"\n  declarations nothing uses \u2014 2\n",
 		)
 		forbidLines(test, output, "imports nothing uses")
 	})

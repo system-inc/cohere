@@ -169,6 +169,8 @@ type teeStream struct {
 // start points target at a pipe whose every line is copied to the real file and kept for the recording.
 // buffered is the stream that writes to target (see package streams), shown first, so what it held from before
 // the recording reaches the real file and stays out of it.
+//
+// Mutates: target the caller's stream variable is what every write goes through, so it is pointed at the pipe
 func (t *teeStream) start(target **os.File, buffered *bufio.Writer) error {
 	reader, writer, pipeError := os.Pipe()
 	if pipeError != nil {
@@ -220,6 +222,8 @@ func (t *teeStream) copyToReal(line []byte) {
 
 // stop restores the stream and waits for everything written so far to reach both destinations. buffered is
 // the stream that writes to target, shown first, so what it held from during the recording is recorded.
+//
+// Mutates: target the caller's stream variable is pointed back at the real file start took it from
 func (t *teeStream) stop(target **os.File, buffered *bufio.Writer) {
 	if t.writer == nil {
 		return
@@ -984,6 +988,8 @@ func continuesName(next byte) bool {
 // findings and coverage, and only their uncacheable rules are walked. See program.FindingsReuse.
 //
 // Only a run being recorded gets one, so it is exactly as narrow as the run cache.
+//
+// Mutates: graph the caller's graph is what lints and checks, so the caches it reads are attached to it here
 func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	session := activeRunCache
 	if session == nil || graph == nil {
@@ -1031,6 +1037,8 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 // no findings cache, lint walked every rule over every file. Shapes are keyed per file on its bytes
 // (Graph.Signatures), so seeding from the replaced graph's recomputes exactly the rewritten files, and the
 // findings cache is per file on bytes and fingerprints, so the one cache serves both graphs.
+//
+// Mutates: rebuilt the graph the caller lints after the fix is handed the caches the replaced graph had
 func carryCaches(replaced *program.Graph, rebuilt *program.Graph) {
 	rebuilt.FindingsReuse = replaced.FindingsReuse
 	if replaced.Shapes == nil {
@@ -1079,6 +1087,8 @@ type typesRecord struct {
 
 // attachTypesCache gives a run the run cache does not record the types section, and the shapes it is keyed
 // on. A recorded run already has both from attachFindingsCache.
+//
+// Mutates: graph the caller's graph is what checks, so the shapes the types section is keyed on are set on it
 func attachTypesCache(graph *program.Graph, location projectLocation) {
 	if cacheOff || activeRunCache != nil || graph == nil {
 		return

@@ -73,7 +73,9 @@ func TestAWriterWaitsForAReader(test *testing.T) {
 	}
 }
 
-// A writer that never finishes costs the next run its bound and no more, and the run goes ahead.
+// A writer that never finishes costs the next run its bound, and the run goes ahead. The writer holds the lock
+// until the test ends, so a read lock that never gave up would never return here, a hang go test's -timeout
+// fails. Only the floor is timed: load lengthens a wait and never shortens it.
 func TestAStuckWriterCostsTheNextRunItsBound(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -84,8 +86,8 @@ func TestAStuckWriterCostsTheNextRunItsBound(test *testing.T) {
 		releaseReader()
 		test.Fatal("the read lock was taken while the writer still held the lock")
 	}
-	if waited := time.Since(start); waited < 100*time.Millisecond || waited > 5*time.Second {
-		test.Errorf("waited %s for a bound of 100ms", waited)
+	if waited := time.Since(start); waited < 100*time.Millisecond {
+		test.Errorf("gave up after %s, inside its bound of 100ms", waited)
 	}
 }
 

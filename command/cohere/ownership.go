@@ -81,6 +81,8 @@ func (found discovery) configPath(project discoveredProject) string {
 // resolveOwnership reads every TypeScript project's tsconfig, follows references, drops solution roots and
 // projects left with nothing, and decides what each remaining project yields. found.Projects is rewritten
 // to the projects that run.
+//
+// Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveOwnership(found *discovery) (ownership, error) {
 	decided := ownership{Yields: map[string]projectYield{}, SharedDirectory: map[string]bool{}}
 	typeScript := 0

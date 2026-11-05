@@ -198,10 +198,6 @@ func lsofFiles(output []byte) []lsofFile {
 	return files
 }
 
-// heldOutputFiringBound is how long the watch may take to fire on its 2s deadline before the test calls it
-// hung. It is not a speed check: load decides how long a healthy watch takes.
-const heldOutputFiringBound = 2 * time.Minute
-
 // failHeldOutput ends the test binary with the report, since no test can recover from a goroutine that
 // never returns and waiting for -timeout only delays the same failure with less said.
 func failHeldOutput(report string) {
@@ -216,18 +212,18 @@ func failHeldOutput(report string) {
 // the test's wait for output hangs exactly as a leaked descendant would make it. Run in a child test
 // binary, since the watch ends the binary it runs in.
 //
-// No bound here is a speed check, since load stretches the watch (#wwhrpm0). It took 25.27s at the load of
-// the cold rebuilds after a cache clear, which outlasted a 25s sleep and a 20s bound, and failed a healthy
-// run. The sleep is five minutes, so it outlasts the watch at any load seen, and the test kills it by the
-// pid the report names. The bound on firing is two minutes, a hang detector, with go test's -timeout behind
-// it.
+// Nothing here times the watch, since load stretches it (#wwhrpm0). It took 25.27s at the load of the cold
+// rebuilds after a cache clear, which outlasted a 25s sleep and a 20s bound, and failed a healthy run. The
+// sleep never ends within a run, so it outlasts the watch at any load, and the test kills it by the pid the
+// report names. A watch that never fires leaves the helper waiting on the sleep, a hang go test's -timeout
+// fails.
 func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	test.Parallel()
 	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
 		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
 		// Ignored: the command is here to hang on its output. The watch ends this binary first, or the Fatal
 		// below says it did not, so how the command ends is never read.
-		_, _ = exec.Command("/bin/sh", "-c", "sleep 300 & echo started").CombinedOutput()
+		_, _ = exec.Command("/bin/sh", "-c", "sleep 100000 & echo started").CombinedOutput()
 		test.Fatal("the command's output closed while its background sleep still held it")
 	}
 	if runtime.GOOS == "windows" {
@@ -245,7 +241,6 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
 	// would hang this test on the same sleep.
 	helper.Stdout, helper.Stderr = outputFile, outputFile
-	started := time.Now()
 	err = helper.Run()
 	output, readError := os.ReadFile(outputFile.Name())
 	if readError != nil {
@@ -262,11 +257,7 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	if err == nil {
 		test.Fatalf("the helper passed, so the watch never fired:\n%s", output)
 	}
-	if elapsed := time.Since(started); elapsed > heldOutputFiringBound {
-		test.Errorf("the watch took %s to fire on a 2s deadline, past the %s that says it hung rather than ran slow",
-			elapsed, heldOutputFiringBound)
-	}
-	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 300"} {
+	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 100000"} {
 		if !bytes.Contains(output, []byte(want)) {
 			test.Errorf("the report does not say %q:\n%s", want, output)
 		}

@@ -68,6 +68,8 @@ type coveredPackagesRecord struct {
 
 // resolveSwiftCoverage asks each Swift project which packages its run covers, when there is more than one,
 // and drops the projects a running project covers. found.Projects is rewritten to the projects that run.
+//
+// Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveSwiftCoverage(found *discovery) swiftCoverage {
 	decided := swiftCoverage{}
 	var swiftProjects []discoveredProject

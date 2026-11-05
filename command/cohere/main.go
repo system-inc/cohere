@@ -1474,6 +1474,8 @@ func rebuildGraph(
 //
 // ahead, when not nil, is the same config already read beside the graph build (lintConfigAhead), and its
 // load and settings check are taken from it rather than done again here.
+//
+// Mutates: graph the caller's graph is what fixes and lints, so it is handed the config, options and rules here
 func configureLint(graph *program.Graph, location projectLocation, ahead *lintConfigAhead) (*configuration.Config, error) {
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
