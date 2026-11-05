@@ -41,6 +41,12 @@ import (
 // main is the one way out: every verb returns its exit code here, and streams.Finish delivers what was printed
 // and turns a clean exit into 1 when it did not arrive.
 func main() {
+	// Deferred calls run while a panic unwinds, though not on os.Exit, so this delivers what was written before
+	// the panic's own report.
+	defer func() {
+		streams.Show(streams.Errors)
+		streams.Show(streams.Output)
+	}()
 	os.Exit(streams.Finish(runCommandLine()))
 }
 

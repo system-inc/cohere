@@ -22,12 +22,20 @@ import (
 )
 
 func main() {
+	// Deferred calls run while a panic unwinds, though not on os.Exit, so this delivers what was written before
+	// the panic's own report.
+	defer func() {
+		streams.Show(streams.Errors)
+		streams.Show(streams.Output)
+	}()
 	if runError := run(); runError != nil {
 		// The launcher's report writes to stderr itself, so what this process said first is delivered first.
 		streams.Show(streams.Errors)
 		dispatch.Report.Fail("cohere: %s", sentence.FromError(runError))
 		os.Exit(streams.Finish(1))
 	}
+	// Every path out finishes, this one too, so none can leave what was written in the buffers.
+	os.Exit(streams.Finish(0))
 }
 
 func run() error {
