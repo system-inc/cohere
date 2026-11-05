@@ -4,7 +4,7 @@
  */
 enum PolicyAbbreviations {
     /* policy/Abbreviations.json, byte for byte. */
-    static let file = #"""
+    static let file = ##"""
         {
             "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansion` is the word it stands in for, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. ORDER IS OBSERVABLE: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, a `...args` rest, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
             "abbreviations": [
@@ -267,6 +267,100 @@ enum PolicyAbbreviations {
                     "abbreviation": "var",
                     "expansion": "variable",
                     "segment": {}
+                },
+                {
+                    "abbreviation": "buf",
+                    "expansion": "buffer",
+                    "reason": "The thirteen from `buf` to `sb` are Go's everyday abbreviations, added for every engine by @system_cohere's ruling on #ec8mvbg so the house keeps one vocabulary. Each is judged as the whole name, as a prefix followed by a capital, and as a segment, so only a whole camelCase word counts: `Buffer` and `Buffalo` never read as `Buf`.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "tmp",
+                    "expansion": "temporary",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "pkg",
+                    "expansion": "package",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "src",
+                    "expansion": "source",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "dst",
+                    "expansion": "destination",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "conn",
+                    "expansion": "connection",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "cmd",
+                    "expansion": "command",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "cfg",
+                    "expansion": "configuration",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "pos",
+                    "expansion": "position",
+                    "reason": "Every form needs a word boundary after it, so `Posix` and `Post` never read as `Pos`.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "wg",
+                    "expansion": "waitGroup",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "mu",
+                    "expansion": "mutex",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "ch",
+                    "expansion": "channel",
+                    "reason": "Every form needs a word boundary after it, so `Check` and `Change` never read as `Ch`.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "sb",
+                    "expansion": "stringBuilder",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
                 }
             ],
             "allowedNames": [
@@ -280,5 +374,5 @@ enum PolicyAbbreviations {
             ]
         }
 
-        """#
+        """##
 }
