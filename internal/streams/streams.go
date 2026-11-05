@@ -12,6 +12,7 @@ package streams
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,37 +21,62 @@ import (
 	"github.com/system-inc/cohere/internal/sentence"
 )
 
-// Output is stdout, and Errors is stderr, each as a person reads it.
-var Output, Errors = bufio.NewWriter(os.Stdout), bufio.NewWriter(os.Stderr)
+// Output is stdout, and Errors is stderr, each as a person reads it. Each writes to whatever file os.Stdout or
+// os.Stderr names when it flushes, so a command that points those at a pipe, as the run cache does, keeps
+// these; see following.
+//
+// A bufio.Writer is not safe for use from two goroutines, so these are written only from the main one. A
+// goroutine with something to say hands it back to the main goroutine, or writes it unbuffered to the real
+// stream itself and handles that write's error there.
+var Output, Errors = Over(&os.Stdout), Over(&os.Stderr)
+
+// Over is a buffered stream that writes to whatever file *file names when it flushes. Output and Errors are two;
+// a test of code that swaps a file makes its own over a file of its own.
+func Over(file **os.File) *bufio.Writer {
+	return bufio.NewWriter(following{file: file})
+}
+
+// sent is what is known about the run's output reaching its reader by any route beside Output and Errors.
+var sent delivery
 
 // Show flushes a stream at a point where a person must see what was written so far: a line of progress before
-// a wait, a finding as it streams. Its error is not checked here, because a bufio.Writer keeps it, and Finish
-// returns it where the exit code is decided.
+// a wait, a finding as it streams, and anything written before the stream's file is swapped or handed to a
+// child process. Its error is not checked here, because a bufio.Writer keeps it, and Finish returns it where
+// the exit code is decided.
 func Show(stream *bufio.Writer) {
 	// Ignored: a bufio.Writer's error is sticky, and Finish's Flush returns it where the exit code is decided.
 	_ = stream.Flush()
 }
 
-// Finish flushes both streams and returns the exit code the command should end with: the one it was going to
-// end with, or 1 in place of a 0 when either stream failed, since output that never reached the reader is a
-// run that did not finish. A stdout failure is said on stderr when stderr still works.
-func Finish(exitCode int) int {
-	return finish(exitCode, Output, Errors, os.Stderr)
+// Report records that the run's output failed to reach its reader by a route other than Output and Errors, such
+// as a copy to the terminal made on another goroutine, so Finish counts it. Only the first failure is kept,
+// and Report is safe from any goroutine.
+func Report(failure error) {
+	sent.report(failure)
 }
 
-// finish is Finish with its streams handed in, so a test can make one fail. lastResort is where a failure of
-// output is reported, the unbuffered stderr, written once and then nothing more, under the running program's
-// name, since cohere, cohere-dev and cohere-dispatch all finish here.
-func finish(exitCode int, output *bufio.Writer, errorStream *bufio.Writer, lastResort io.Writer) int {
+// Finish flushes both streams and returns the exit code the command should end with: the one it was going to
+// end with, or 1 in place of a 0 when either stream failed or a failure was reported, since output that never
+// reached the reader is a run that did not finish. The failure is said once on stderr, as far as stderr still
+// works, however many times Finish runs, and every later Finish returns the same code for the same exitCode.
+func Finish(exitCode int) int {
+	return finish(exitCode, Output, Errors, following{file: &os.Stderr}, &sent)
+}
+
+// finish is Finish with its streams and its record handed in, so a test can make one fail. lastResort is where
+// a failure of output is said, the unbuffered stderr, under the running program's name, since cohere,
+// cohere-dev and cohere-dispatch all finish here.
+func finish(exitCode int, output *bufio.Writer, errorStream *bufio.Writer, lastResort io.Writer, state *delivery) int {
 	outputError, errorsError := output.Flush(), errorStream.Flush()
-	if outputError == nil && errorsError == nil {
+	failed, unsaid := state.settle(errors.Join(outputError, errorsError))
+	if !failed {
 		return exitCode
 	}
-	if outputError != nil && errorsError == nil {
+	if unsaid != nil && errorsError == nil {
 		// Ignored: this is the report of a failed write; if stderr fails too there is nowhere left to say it,
 		// and the exit code below already says the run did not finish.
 		_, _ = fmt.Fprintf(lastResort, "%s: %s\n", filepath.Base(os.Args[0]),
-			sentence.FromError(fmt.Errorf("writing the output failed, so it may not have reached you: %w", outputError)))
+			sentence.FromError(fmt.Errorf("writing the output failed, so it may not have reached you: %w", unsaid)))
 	}
 	return max(exitCode, 1)
 }

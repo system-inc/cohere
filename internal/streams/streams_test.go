@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -45,7 +47,8 @@ func TestAFailedWriteIsANonzeroExit(test *testing.T) {
 			// Written and never flushed by the test, so only finish's Flush can deliver it or find it failed.
 			output.WriteString("a finding\n")
 			errorsStream.WriteString("a note\n")
-			if exitCode := finish(testCase.exitCode, output, errorsStream, &lastResort); exitCode != testCase.expected {
+			exitCode := finish(testCase.exitCode, output, errorsStream, &lastResort, &delivery{})
+			if exitCode != testCase.expected {
 				test.Fatalf("finish(%d) = %d, expected %d", testCase.exitCode, exitCode, testCase.expected)
 			}
 			reported := strings.Contains(lastResort.String(), "Writing the output failed")
@@ -57,6 +60,65 @@ func TestAFailedWriteIsANonzeroExit(test *testing.T) {
 				test.Errorf("stdout received %q, expected the finding", arrivedOutput.String())
 			}
 		})
+	}
+}
+
+// TestAReportedFailureIsCountedAndSaidOnce: a failure reported from another route turns a clean exit into 1
+// though both streams arrived, it is said once, and a second finish returns the same code without saying it
+// again, since the run cache finishes before its verdict and the exit finishes once more.
+func TestAReportedFailureIsCountedAndSaidOnce(test *testing.T) {
+	test.Parallel()
+	var arrivedOutput, arrivedErrors, lastResort bytes.Buffer
+	output, errorsStream := bufio.NewWriter(&arrivedOutput), bufio.NewWriter(&arrivedErrors)
+	state := &delivery{}
+	state.report(errors.New("copying to the terminal: the reader is gone"))
+	state.report(errors.New("a second failure, which is not the one said"))
+	for round := 1; round <= 2; round++ {
+		if exitCode := finish(0, output, errorsStream, &lastResort, state); exitCode != 1 {
+			test.Fatalf("finish round %d = %d, expected 1", round, exitCode)
+		}
+	}
+	if said := strings.Count(lastResort.String(), "Writing the output failed"); said != 1 {
+		test.Errorf("the failure was said %d times, expected once: %q", said, lastResort.String())
+	}
+	if !strings.Contains(lastResort.String(), "the reader is gone") || strings.Contains(lastResort.String(), "second") {
+		test.Errorf("the failure said is not the first reported: %q", lastResort.String())
+	}
+}
+
+// TestAStreamFollowsItsFileThroughASwap: what a stream writes before a swap of its file, shown before the swap,
+// lands in the first file, and what it writes after lands in the second, as the run cache's recording needs.
+func TestAStreamFollowsItsFileThroughASwap(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	first, firstError := os.Create(filepath.Join(directory, "first"))
+	if firstError != nil {
+		test.Fatal(firstError)
+	}
+	second, secondError := os.Create(filepath.Join(directory, "second"))
+	if secondError != nil {
+		test.Fatal(secondError)
+	}
+	target := first
+	stream := Over(&target)
+	stream.WriteString("before\n")
+	Show(stream)
+	target = second
+	stream.WriteString("after\n")
+	Show(stream)
+	for _, file := range []*os.File{first, second} {
+		if closeError := file.Close(); closeError != nil {
+			test.Fatal(closeError)
+		}
+	}
+	for name, expected := range map[string]string{"first": "before\n", "second": "after\n"} {
+		content, readError := os.ReadFile(filepath.Join(directory, name))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		if string(content) != expected {
+			test.Errorf("%s holds %q, expected %q", name, content, expected)
+		}
 	}
 }
 

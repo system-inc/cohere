@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // Every line written through a taggingWriter starts with the tag, however the writes are split.
@@ -57,7 +59,7 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 
 	target := terminal
 	var tee teeStream
-	if startError := tee.start(&target); startError != nil {
+	if startError := tee.start(&target, streams.Over(&target)); startError != nil {
 		test.Fatal(startError)
 	}
 	fmt.Fprint(target, "fix: 0 of 5 files rewritten\n")
@@ -65,7 +67,7 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 	fmt.Fprint(target, "coverage: 460 rules\n")
 	fmt.Fprint(&taggingWriter{out: target, tag: invocationTag, atLineStart: true}, "phases: fix ran in 2.9s\n  total 4.0s\n")
 	fmt.Fprint(target, "  this binary was built from a modified tree\n")
-	tee.stop(&target)
+	tee.stop(&target, streams.Over(&target))
 
 	if target != terminal {
 		test.Fatal("stop did not restore the real stream")
@@ -88,6 +90,42 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(test *testing.T) {
 	}
 }
 
+// TestTheTeeRecordsWhatTheBufferedStreamHeld: the stream a person reads is buffered over the file the tee swaps
+// (see package streams), so the tee shows it at each swap. A line buffered before the recording starts reaches
+// the terminal and stays out of the replay, and a line still buffered when it stops is recorded, not lost and
+// not written past the recording to the terminal alone.
+func TestTheTeeRecordsWhatTheBufferedStreamHeld(test *testing.T) {
+	test.Parallel()
+	terminal, createError := os.Create(filepath.Join(test.TempDir(), "terminal"))
+	if createError != nil {
+		test.Fatal(createError)
+	}
+	defer terminal.Close()
+
+	target := terminal
+	buffered := streams.Over(&target)
+	fmt.Fprint(buffered, "before the recording\n")
+	var tee teeStream
+	if startError := tee.start(&target, buffered); startError != nil {
+		test.Fatal(startError)
+	}
+	fmt.Fprint(buffered, "coverage: 460 rules\n")
+	tee.stop(&target, buffered)
+	fmt.Fprint(buffered, "after the recording\n")
+	streams.Show(buffered)
+
+	shown, readError := os.ReadFile(terminal.Name())
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if expected := "before the recording\ncoverage: 460 rules\nafter the recording\n"; string(shown) != expected {
+		test.Errorf("the terminal:\n  got      %q\n  expected %q", shown, expected)
+	}
+	if expected := "coverage: 460 rules\n"; tee.buffer.String() != expected {
+		test.Errorf("the recording:\n  got      %q\n  expected %q", tee.buffer.String(), expected)
+	}
+}
+
 // A provenance-tagged line reaches the terminal untagged and stays tagged in the recording, so a replay
 // can say where it came from; and replayLines turns it into "label (from the cached run at T): rest"
 // with no tag left anywhere.
@@ -101,12 +139,12 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 
 	target := terminal
 	var tee teeStream
-	if startError := tee.start(&target); startError != nil {
+	if startError := tee.start(&target, streams.Over(&target)); startError != nil {
 		test.Fatal(startError)
 	}
 	fmt.Fprintln(&taggingWriter{out: target, tag: provenanceTag, atLineStart: true}, "fix: 0 of 5 files rewritten, 5 not formatted")
 	fmt.Fprint(target, "coverage: 460 rules\n")
-	tee.stop(&target)
+	tee.stop(&target, streams.Over(&target))
 
 	shown, err := os.ReadFile(terminal.Name())
 	if err != nil {

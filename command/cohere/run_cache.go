@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -141,11 +142,15 @@ type teeStream struct {
 	done   chan struct{}
 }
 
-func (t *teeStream) start(target **os.File) error {
+// start points target at a pipe whose every line is copied to the real file and kept for the recording.
+// buffered is the stream that writes to target (see package streams), shown first, so what it held from before
+// the recording reaches the real file and stays out of it.
+func (t *teeStream) start(target **os.File, buffered *bufio.Writer) error {
 	reader, writer, pipeError := os.Pipe()
 	if pipeError != nil {
 		return pipeError
 	}
+	streams.Show(buffered)
 	t.real = *target
 	t.writer = writer
 	t.done = make(chan struct{})
@@ -160,13 +165,13 @@ func (t *teeStream) start(target **os.File) error {
 			line, readBytesError := lines.ReadBytes('\n')
 			if len(line) > 0 {
 				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
-					t.real.Write(rest)
+					t.copyToReal(rest)
 				} else if rest, tagged := bytes.CutPrefix(line, provenanceTag); tagged {
 					// Kept tagged in the recording, so a replay knows to say where the line came from.
-					t.real.Write(rest)
+					t.copyToReal(rest)
 					t.buffer.Write(line)
 				} else {
-					t.real.Write(line)
+					t.copyToReal(line)
 					t.buffer.Write(line)
 				}
 			}
@@ -179,11 +184,22 @@ func (t *teeStream) start(target **os.File) error {
 	return nil
 }
 
-// stop restores the stream and waits for everything written so far to reach both destinations.
-func (t *teeStream) stop(target **os.File) {
+// copyToReal copies one line to the real file. The copy runs on the tee's own goroutine, so a failure is
+// reported to package streams rather than returned, and the exit code counts it there: a run whose output never
+// reached the terminal must not exit as though it had.
+func (t *teeStream) copyToReal(line []byte) {
+	if _, writeError := t.real.Write(line); writeError != nil {
+		streams.Report(fmt.Errorf("copying the run's output to %s: %w", t.real.Name(), writeError))
+	}
+}
+
+// stop restores the stream and waits for everything written so far to reach both destinations. buffered is
+// the stream that writes to target, shown first, so what it held from during the recording is recorded.
+func (t *teeStream) stop(target **os.File, buffered *bufio.Writer) {
 	if t.writer == nil {
 		return
 	}
+	streams.Show(buffered)
 	*target = t.real
 	t.writer.Close()
 	<-t.done
@@ -305,11 +321,11 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
 		readSince: runCacheClock,
 	}
-	if startError := session.stdout.start(&os.Stdout); startError != nil {
+	if startError := session.stdout.start(&os.Stdout, streams.Output); startError != nil {
 		return nil
 	}
-	if startError := session.stderr.start(&os.Stderr); startError != nil {
-		session.stdout.stop(&os.Stdout)
+	if startError := session.stderr.start(&os.Stderr, streams.Errors); startError != nil {
+		session.stdout.stop(&os.Stdout, streams.Output)
 		return nil
 	}
 	activeRunCache = session
@@ -618,8 +634,8 @@ func abandonRunCache() {
 		return
 	}
 	activeRunCache = nil
-	session.stdout.stop(&os.Stdout)
-	session.stderr.stop(&os.Stderr)
+	session.stdout.stop(&os.Stdout, streams.Output)
+	session.stderr.stop(&os.Stderr, streams.Errors)
 }
 
 // finishRunCache ends a run whose exit is a verdict about the tree: it records the run if it may, then
@@ -630,13 +646,15 @@ func finishRunCache(exitCode int) {
 	session := activeRunCache
 	if session != nil {
 		activeRunCache = nil
-		session.stdout.stop(&os.Stdout)
-		session.stderr.stop(&os.Stderr)
+		session.stdout.stop(&os.Stdout, streams.Output)
+		session.stderr.stop(&os.Stderr, streams.Errors)
 		// The report is out, so the caller can have its answer while the run is recorded. See sendVerdict.
-		// The table's lock is taken first and held until the table is in place, so a run the caller starts
-		// next waits for this write rather than reading around it. See table_lock.go.
+		// The answer is the code the process will exit with, which is 1 when the report never reached the
+		// terminal, while the record keeps the tree's own code: a replay that prints it whole exits as the tree
+		// does. The table's lock is taken first and held until the table is in place, so a run the caller
+		// starts next waits for this write rather than reading around it. See table_lock.go.
 		release := holdTableLock(session.directory)
-		answered := sendVerdict(exitCode)
+		answered := sendVerdict(streams.Finish(exitCode))
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
@@ -650,7 +668,7 @@ func finishRunCache(exitCode int) {
 		// A run nothing records still leaves the types section for the next, after its caller has the answer.
 		pendingTypes = nil
 		release := holdTableLock(record.directory)
-		if sendVerdict(exitCode) {
+		if sendVerdict(streams.Finish(exitCode)) {
 			record.computedShapes += graduateSignatures(record.directory, record.shapesGraph, record.shapes)
 		}
 		record.write()
