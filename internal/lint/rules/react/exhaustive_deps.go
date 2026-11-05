@@ -114,7 +114,7 @@ var (
 //	invalid: function C() { const local = {}; useEffect(() => {}, [local]); }
 //	invalid: function C() { const o = {}; useEffect(() => { log(o); }, [o]); }
 //
-// # This rule gives ADVICE, and that changes what a defect costs
+// # This rule gives advice, and that changes what a defect costs
 //
 // Every other rule in this catalog decides whether a line is wrong. This one also says what the
 // dependency array should be, and both directions of error land on a person rather than in a
@@ -131,7 +131,7 @@ var (
 //
 // A declared dependency satisfies every path it is a prefix of and no path it is a suffix of:
 // declaring `props.a.b` satisfies a read of `props.a.b.c` because the outer object changing is the
-// only way the inner value can change, while declaring `props.a.b.c` does NOT satisfy a read of
+// only way the inner value can change, while declaring `props.a.b.c` does not satisfy a read of
 // `props.a.b`, because `props.a.b` can be replaced wholesale without `.c` differing.
 //
 // React implements that by building a tree rather than comparing lists. `collectRecommendations`
@@ -143,7 +143,7 @@ var (
 // any list-comparison shortcut gets one of the two directions wrong.
 //
 // The corpus pins both directions directly. `[props.foo]` against a read of `props.foo.bar.baz` is
-// an upstream PASS, and `[props.foo.bar.baz]` against a read of `props.foo` is an upstream FAIL.
+// an upstream pass, and `[props.foo.bar.baz]` against a read of `props.foo` is an upstream fail.
 //
 // # Which implementation this reproduces, and the seven places they disagree
 //
@@ -152,18 +152,18 @@ var (
 // reimplementation, actively maintained (last changed 2026-08-17, a week before this was written),
 // and its disagreements with React are defects rather than a dialect except where noted.
 //
-// Both were read whole and both were RUN, which is not the same thing and mattered here. React's
+// Both were read whole and both were run, which is not the same thing and mattered here. React's
 // rule is executable from `~/Projects/ahra` through the ESLint Linter API, version 7.1.1, and its
 // own test corpus is public: `facebook/react`, `packages/eslint-plugin-react-hooks/__tests__/
 // ESLintRuleExhaustiveDeps-test.js`, 314 cases. oxc's release binary is at
-// `~/Projects/system/oxc/target/release/oxlint`. Each implementation was run against the OTHER's
+// `~/Projects/system/oxc/target/release/oxlint`. Each implementation was run against the other's
 // full corpus, which is the measurement that found every divergence below and is the reason none of
 // them is a guess:
 //
 //	React's rule over oxc's 325 cases     4 disagreements
 //	oxc's binary over React's 298 cases   3 disagreements
 //
-// Running React's rule over oxc's corpus with the default JavaScript parser first reported ELEVEN
+// Running React's rule over oxc's corpus with the default JavaScript parser first reported eleven
 // disagreements. Seven of those were my probe failing to parse TypeScript, not a rule difference at
 // all, and they read as perfectly plausible findings. Re-running through `@typescript-eslint/parser`
 // removed them. A probe that cannot parse its input reports silence, and silence is what a passing
@@ -176,9 +176,9 @@ var (
 //	    oxc    silent
 //	    SHIPPED: react.
 //
-// Mutual recursion between two functions in the component body. oxc decides stability by RECURSING
+// Mutual recursion between two functions in the component body. oxc decides stability by recursing
 // into a function's body and asking whether everything it reads is itself stable, with a `visited`
-// set to stop the cycle — and the `visited` set returns TRUE on re-entry, so a cycle is treated as
+// set to stop the cycle, and the `visited` set returns `true` on re-entry, so a cycle is treated as
 // stable. React's `isFunctionWithoutCapturedValues` looks one level deep at `fnScope.through` and
 // does not recurse, so `foo` captures `bar`, `bar` is not stable-known, and `foo` is not stable.
 // First principles agree with React and it is not close: `foo` and `bar` are both rebuilt on every
@@ -196,7 +196,7 @@ var (
 // caught and turned into "complex expression". So React reports twice on `[props.foo!.bar]`: once
 // saying the entry is unreadable, and once saying the dependency it could not read is missing.
 //
-// First principles say `props.foo!.bar` and `props.foo.bar` denote the same value — `!` is erased
+// First principles say `props.foo!.bar` and `props.foo.bar` denote the same value: `!` is erased
 // entirely at compile time and cannot change what is read at runtime. React's own corpus does not
 // contain the case, and its silence is a consequence of a `throw` in a chain walk rather than a
 // judgment anyone made. oxc unwraps it and is right. Step 1 of the resolution order is "who is
@@ -216,14 +216,14 @@ var (
 // is right: `foo` inside its own initializer is the previous render's `foo`, so listing it makes
 // the callback rebuild every time it rebuilds, which is a self-sustaining loop.
 //
-// The remaining two disagreements are Flow-only syntax — the `hook` keyword and a `({}: any)` cast
-// — which no parser in this tree accepts, so they are out of scope rather than resolved.
+// The remaining two disagreements are Flow-only syntax (the `hook` keyword and a `({}: any)` cast),
+// which no parser in this tree accepts, so they are out of scope rather than resolved.
 //
 // # Why the type checker, and what it changed
 //
 // React uses `eslint-scope` to answer "which binding does this identifier refer to, and is that
 // binding declared between the callback and the component function". `isStableKnownHookValue`
-// (bundle line 170) then decides stability by NAME: a `useRef` result is stable, a `useState`
+// (bundle line 170) then decides stability by name: a `useRef` result is stable, a `useState`
 // tuple's second element is stable, and the rule knows that because the initializer is spelled
 // `useRef(` or `useState(`, not because anything was typed.
 //
@@ -245,10 +245,10 @@ var (
 // nested-component row is the one that proves it, because a rule that walked all the way up would
 // report `a` there and React does not.
 //
-// Stability is deliberately NOT resolved through the type checker, and that is the harder call. A
+// Stability is deliberately not resolved through the type checker, and that is the harder call. A
 // `useRef` container really is stable and the checker could say so from the type, which would let
 // this rule recognize a ref that arrived through an alias or a re-export where React's name test
-// gives up. It would also report on shapes React is silent for, and this rule gives ADVICE: telling
+// gives up. It would also report on shapes React is silent for, and this rule gives advice: telling
 // someone to remove a dependency React would keep is telling them to introduce a stale closure. The
 // name test is what upstream's corpus pins, so the name test is what ships, and the extra reach the
 // checker would give is declined on purpose. Recorded here because the next reader will see the
@@ -256,8 +256,8 @@ var (
 //
 // # The repair, and why it is a suggestion rather than a fix
 //
-// React computes the corrected array and offers it. It offers it as a SUGGESTION, promoted to an
-// automatic fix only under an option spelled `enableDangerousAutofixThisMayCauseInfiniteLoops` —
+// React computes the corrected array and offers it. It offers it as a suggestion, promoted to an
+// automatic fix only under an option spelled `enableDangerousAutofixThisMayCauseInfiniteLoops`,
 // upstream naming the hazard in the identifier. oxc classifies its own version as
 // `DangerousSuggestion` in five of its six dependency-array fix vectors.
 //
@@ -270,10 +270,10 @@ var (
 // One measurement rather than a principle, since the brief asks for it: the rewrite is a single
 // replacement over the dependency array node, so it is one edit per finding and could not hit the
 // overlap refusal in `internal/fix.Resolve` even if it were a fix. The decision is about what the
-// edit MEANS, not about whether the engine would accept it.
+// edit means, not about whether the engine would accept it.
 //
-// oxc's rewrite also formats differently from React's — three or more dependencies come out as
-// `[\n\tx,\n\ty,\n\tz\n]` from its code generator against React's `[x, y, z]` — so there was no
+// oxc's rewrite also formats differently from React's (three or more dependencies come out as
+// `[\n\tx,\n\ty,\n\tz\n]` from its code generator against React's `[x, y, z]`), so there was no
 // single upstream text to reproduce even if the repair were shipped. React's spelling is what the
 // message carries.
 //
@@ -281,14 +281,14 @@ var (
 //
 // Four things, all of them from running the cases rather than from either implementation's prose.
 //
-// The suggested array's ORDER is the read order, not a sort, and getting that wrong is silent.
+// The suggested array's order is the read order, not a sort, and getting that wrong is silent.
 // Upstream keeps its dependencies in a JavaScript Map and its missing paths in a Set, both of which
 // iterate in insertion order, so the order is carried by the container and upstream never mentions
 // it. A Go map has no order at all, so it has to be carried explicitly; sorting instead is the
-// obvious substitute and it is wrong, because the suggestion is sorted LATER and only conditionally.
+// obvious substitute and it is wrong, because the suggestion is sorted later and only conditionally.
 // This rule shipped that bug and no imported fixture could see it, since every corpus case with more
 // than one missing dependency happens to be alphabetical. A mutation sweep found it: a mutant
-// disabling the non-effect recompute survived, and comparing the two paths showed the MUTANT
+// disabling the non-effect recompute survived, and comparing the two paths showed the mutant
 // agreeing with React while the original did not.
 //
 // A dependency array is only sorted when the author already sorted it. `areDeclaredDepsAlphabetized`
@@ -297,15 +297,15 @@ var (
 // implementations do this and neither says why; the effect is that the suggestion preserves an
 // intentional order and tidies an accidental one.
 //
-// A missing dependency in a NON-effect Hook recomputes the whole suggestion from scratch rather
+// A missing dependency in a non-effect Hook recomputes the whole suggestion from scratch rather
 // than adding to what was declared. `useCallback` and `useMemo` drop unnecessary entries while
 // fixing a missing one; `useEffect` keeps them. The tell is the second `collectRecommendations`
 // call guarded by `!isEffect`, and no case in either corpus explains the asymmetry in words.
 //
-// `isEffect` is a REGEX over the hook name, `/Effect($|[^a-z])/`, not a list. So `useMyEffect2`
+// `isEffect` is a regular expression over the hook name, `/Effect($|[^a-z])/`, not a list. So `useMyEffect2`
 // is an effect and `useEffective` is not, and a hook named by the `additionalHooks` option inherits
 // whichever answer its spelling gives. oxc spells the same test as `hook_name.contains("Effect")`,
-// which differs on a name like `useEffectively` — unreachable in both corpora and noted rather than
+// which differs on a name like `useEffectively`, unreachable in both corpora and noted rather than
 // resolved.
 //
 // A read of `ref.current` is attributed to `ref`, but only outside a cleanup function. Inside one it
@@ -330,8 +330,8 @@ var (
 //
 // The stale-assignment finding (7 diagnostics) needs write references to a component-scope binding
 // from inside the callback. That one is reachable from the callback walk alone and is a candidate
-// for a follow-up; it is out here because it also gates the rest of the rule — upstream returns
-// early when it fires — and getting the gate wrong silences everything else.
+// for a follow-up; it is out here because it also gates the rest of the rule (upstream returns
+// early when it fires), and getting the gate wrong silences everything else.
 //
 // # One consequence outside this file, stated because nobody else will notice it
 //
@@ -569,7 +569,7 @@ func visitHookCall(ruleContext rule.Context, node *ast.Node, run exhaustiveDepsR
 		resolved, resolution := resolvedFunctionBody(ruleContext, callback)
 		switch resolution {
 		case callbackResolutionNotAFunction:
-			// The name binds to something in the component that is not a function written here —
+			// The name binds to something in the component that is not a function written here:
 			// `const myEffect = debounce(() => {...}, delay)` is upstream's own case. The callback
 			// itself is then the dependency, because it is rebuilt every render, and upstream says
 			// so rather than giving up: the array has to name the callback.
@@ -602,14 +602,14 @@ type dependencyRead struct {
 	// stable is set when the value cannot change between renders, so it never needs declaring.
 	stable bool
 
-	// order is the position of the FIRST read of this path in the callback's walk.
+	// order is the position of the first read of this path in the callback's walk.
 	//
 	// Upstream never records this because it does not have to: its `dependencies` is a JavaScript
 	// Map, which iterates in insertion order, so the read order is carried by the container. A Go
 	// map has no order at all, so it has to be carried explicitly or the suggested array would
 	// differ between runs of the same input.
 	//
-	// Sorting instead of recording is the obvious substitute and it is WRONG, which cost a round
+	// Sorting instead of recording is the obvious substitute and it is wrong, which cost a round
 	// trip here. The suggested array is sorted only when the author's own array was already sorted,
 	// so imposing a sort at gather time silently sorts every suggestion: an author who wrote
 	// `[props.c, props.b]` gets told to write `[props.a, props.b, props.c]` where React says
@@ -646,13 +646,13 @@ func visitCallbackWithDependencies(ruleContext rule.Context, run exhaustiveDepsR
 		return
 	}
 
-	// A non-array dependency argument reports and then continues with an EMPTY declared list rather
+	// A non-array dependency argument reports and then continues with an empty declared list rather
 	// than stopping. Upstream's own behaviour and it took a probe to see: `useEffect(fn, deps)` where
 	// `deps` is a variable reports twice, once that the list is unreadable and once that everything
 	// the callback reads is missing from it. Returning early here silences the second, which is the
 	// finding that actually tells the reader what to write.
 	//
-	// The per-entry findings are COLLECTED here and reported below rather than as the array is read,
+	// The per-entry findings are collected here and reported below rather than as the array is read,
 	// so that the finding about the array as a whole comes first. That is upstream's order and it is
 	// observable: the summary's span starts at the `[` and an entry's starts inside it, so a reader
 	// scanning a file top to bottom meets the summary first. Reporting as the entries are read
@@ -738,7 +738,7 @@ func firstNonEmptyWarning(recommendation recommendations) (rule.Message, int) {
 //
 // This is upstream's `gatherDependenciesRecursively` reached by a different route. Upstream iterates
 // `scope.references` from `eslint-scope`; this walks the callback's own subtree and resolves each
-// identifier through the checker, which answers the same question — see the rule's doc comment for
+// identifier through the checker, which answers the same question; see the rule's doc comment for
 // the measurement that established the two classifications agree.
 func gatherDependencies(ruleContext rule.Context, callback *ast.Node, componentScope *ast.Node) map[string]*dependencyRead {
 	reads := map[string]*dependencyRead{}
@@ -844,9 +844,9 @@ func recordDependencyRead(ruleContext rule.Context, identifier *ast.Node, callba
 //   - a computed access, `props[key]`, because the key is not statically known;
 //   - a `.current`, because a ref's contents are the mutable part and depending on them is
 //     meaningless;
-//   - a CALL, `props.foo()`, and this one runs opposite to the intuitive reading. Calling a method
-//     depends on the OBJECT rather than on the method: `props.toggleEditMode()` is a dependency on
-//     `props`, not on `props.toggleEditMode`. The walk stops BEFORE taking the member expression,
+//   - a call, `props.foo()`, and this one runs opposite to the intuitive reading. Calling a method
+//     depends on the object rather than on the method: `props.toggleEditMode()` is a dependency on
+//     `props`, not on `props.toggleEditMode`. The walk stops before taking the member expression,
 //     so it keeps the object. Upstream's own reasoning is that a method reads the receiver, so the
 //     receiver is what has to be current, and depending on the bound method alone would miss a
 //     change to the object it closes over.
@@ -855,7 +855,7 @@ func recordDependencyRead(ruleContext rule.Context, identifier *ast.Node, callba
 // names `props.toggleEditMode` where upstream names `props`, so the finding count matches and only
 // the advice is wrong. Four upstream cases separate the two and all four are in the fixtures.
 //
-// A fourth shape has no walk at all: a member expression on the LEFT of an assignment,
+// A fourth shape has no walk at all: a member expression on the left of an assignment,
 // `props.foo = x`, yields the object. Writing to a property is not reading it.
 func outermostDependencyExpression(identifier *ast.Node) *ast.Node {
 	current := identifier
@@ -1056,7 +1056,7 @@ type declaredDependency struct {
 	node *ast.Node
 
 	// external is set when the entry names a binding from outside the component, which changes what
-	// the rule does with an unnecessary one: an outer-scope value in an EFFECT's array is kept in
+	// the rule does with an unnecessary one: an outer-scope value in an effect's array is kept in
 	// the suggestion rather than dropped, because removing it would change when the effect runs for
 	// a reason the reader did not ask for.
 	external bool
@@ -1080,7 +1080,7 @@ func collectRecommendations(reads map[string]*dependencyRead, declared []declare
 
 	tree := newDependencyTreeNode()
 
-	// Reads are entered in the order the callback READ them, which is what upstream's insertion-
+	// Reads are entered in the order the callback read them, which is what upstream's insertion-
 	// ordered map gives it for free. See `dependencyRead.order` for why sorting here is not a
 	// harmless substitute.
 	readPaths := make([]string, 0, len(reads))
@@ -1118,17 +1118,17 @@ func collectRecommendations(reads map[string]*dependencyRead, declared []declare
 		tree.markAncestorsSubtreeUsed(path)
 	}
 
-	// Missing paths are kept in DESCENT order rather than sorted, and the difference is observable.
+	// Missing paths are kept in descent order rather than sorted, and the difference is observable.
 	//
 	// Upstream collects them into a JavaScript `Set`, which iterates in insertion order, and the
 	// suggested array is only sorted later and only when the author's own array was already sorted.
-	// Sorting here instead — which is what this did first, to make a Go map's iteration deterministic
-	// — quietly sorts every suggestion, so an author who wrote `[props.c, props.b]` was told to write
+	// Sorting here instead (which is what this did first, to make a Go map's iteration deterministic)
+	// quietly sorts every suggestion, so an author who wrote `[props.c, props.b]` was told to write
 	// `[props.a, props.b, props.c]` where React says `[props.c, props.b, props.a]`.
 	//
 	// No fixture in the imported corpus could see it, because every corpus case with more than one
 	// missing dependency happens to be alphabetical already. It was found by a mutation that
-	// SURVIVED: disabling the non-effect recompute changed the output on three shapes, and on all
+	// survived: disabling the non-effect recompute changed the output on three shapes, and on all
 	// three the mutant was the one that matched React. A survivor that turns out to be right about
 	// the code is the most useful kind and this brief's categories do not name it.
 	missing := []string{}
@@ -1188,7 +1188,7 @@ func scanDependencyTree(node *dependencyTreeNode, prefix string, missing *[]stri
 		if child.isSatisfiedRecursively {
 			// Satisfied ends the descent and covers everything beneath, which is the half of the
 			// rule that makes `[props.a.b]` cover a read of `props.a.b.c`. It only counts as
-			// SATISFYING something if the callback actually reads inside it; otherwise the entry is
+			// satisfying something if the callback actually reads inside it; otherwise the entry is
 			// declared and unused, and the caller calls that unnecessary.
 			if child.isSubtreeUsed {
 				satisfying[path] = true
@@ -1197,7 +1197,7 @@ func scanDependencyTree(node *dependencyTreeNode, prefix string, missing *[]stri
 		}
 		if child.isUsed {
 			// Read here and not declared here or above. This is the other half of the rule: a
-			// declaration further DOWN, at `props.a.b.c`, never reached this node, so it does not
+			// declaration further down, at `props.a.b.c`, never reached this node, so it does not
 			// stop the descent and the read at `props.a.b` is still missing.
 			if !missingSeen[path] {
 				missingSeen[path] = true
@@ -1224,7 +1224,7 @@ func appendOnce(list []string, value string) []string {
 //
 // An argument that is not an array literal reports immediately and yields an empty list, so the
 // caller goes on to compare the callback's reads against nothing and says what is missing. That one
-// IS reported here rather than deferred, because it is about the argument rather than about an entry
+// is reported here rather than deferred, because it is about the argument rather than about an entry
 // and its span is the same span the summary would use.
 func readDeclaredDependencies(ruleContext rule.Context, dependencyArrayNode *ast.Node,
 	componentScope *ast.Node) ([]declaredDependency, []entryFinding) {
@@ -1232,7 +1232,7 @@ func readDeclaredDependencies(ruleContext rule.Context, dependencyArrayNode *ast
 	array := unwrapExpression(dependencyArrayNode)
 	if array == nil || array.Kind != ast.KindArrayLiteralExpression {
 		// Deferred with the entry findings rather than reported here, even though its span is the
-		// argument rather than an entry inside it. Both findings then carry the SAME span, so source
+		// argument rather than an entry inside it. Both findings then carry the same span, so source
 		// position cannot order them and upstream's own order is the only tie-break: it reports what
 		// is missing first and the unreadable list second.
 		return nil, []entryFinding{{node: dependencyArrayNode, message: messageExhaustiveDepsNotArrayLiteral}}
@@ -1361,7 +1361,7 @@ func optionalAtPrefix(prefix string, reads map[string]*dependencyRead) bool {
 // isStableValue reports whether a binding's value is the same object on every render, so leaving it
 // out of a dependency array cannot cause a stale read.
 //
-// Recognized by the NAME of the Hook that produced it rather than by its type, which is upstream's
+// Recognized by the name of the Hook that produced it rather than by its type, which is upstream's
 // `isStableKnownHookValue`. The rule's doc comment records why the type checker is deliberately not
 // used here even though it could answer more.
 //
@@ -1374,12 +1374,12 @@ func optionalAtPrefix(prefix string, reads map[string]*dependencyRead) bool {
 //	const x = useEffectEvent(...)          stable by construction, that is its purpose
 //	const N = 1                            a const bound to a primitive literal cannot change
 //
-// The array-destructuring shapes are stable only in their SECOND position. `const [s, setS] =
+// The array-destructuring shapes are stable only in their second position. `const [s, setS] =
 // useState()` makes `setS` stable and `s` emphatically not: `s` is the value that changes, and
 // treating it as stable would silence the most common real finding this rule makes.
 //
 // A function declared in the component body is stable when everything it reads is itself stable,
-// which is upstream's `isFunctionWithoutCapturedValues`. That recursion is deliberately ONE level
+// which is upstream's `isFunctionWithoutCapturedValues`. That recursion is deliberately one level
 // deep, matching React: oxc recurses without limit and treats a cycle as stable, which makes two
 // mutually recursive component-body functions look stable when neither is. The measurement is in
 // the rule's doc comment.
@@ -1389,7 +1389,7 @@ func isStableValue(ruleContext rule.Context, symbol *ast.Symbol, callback *ast.N
 	visiting map[*ast.Symbol]bool) bool {
 
 	if visiting[symbol] {
-		// Re-entry means a cycle, and a cycle is NOT stable: two functions that call each other are
+		// Re-entry means a cycle, and a cycle is not stable: two functions that call each other are
 		// both rebuilt on every render. This is the opposite of oxc's answer and it is the
 		// divergence the doc comment records.
 		return false
@@ -1417,7 +1417,7 @@ func isStableValue(ruleContext rule.Context, symbol *ast.Symbol, callback *ast.N
 
 // stableDeclarationOf picks the declaration stability is decided from.
 //
-// The EARLIEST by source position rather than index zero, because a symbol can carry more than one
+// The earliest by source position rather than index zero, because a symbol can carry more than one
 // declaration and the order `Declarations` arrives in is not something this rule should depend on.
 // Upstream reads `defs[0]`, which for the shapes this rule sees is the value declaration, and the
 // earliest-by-position choice reproduces that without inheriting the indexing assumption. A merged
@@ -1470,10 +1470,10 @@ func isStableVariableDeclaration(ruleContext rule.Context, declaration *ast.Node
 // isStableDestructuredHookResult answers the array-destructuring shapes, which are stable only in
 // their second position.
 //
-// React's guarantee is about the value the Hook returns, not about the NAME it was bound to, so a
+// React's guarantee is about the value the Hook returns, not about the name it was bound to, so a
 // setter that gets reassigned is no longer stable. Upstream tracks the binding's write count and
 // gives up past one; this asks whether anything in the component assigns to the name, which is the
-// same question for the shapes that can reach here — the destructuring itself is not an assignment
+// same question for the shapes that can reach here: the destructuring itself is not an assignment
 // expression, so any write found is a genuine reassignment. Upstream's own case for this is
 // `let [count, setCount] = useState(0); setCount = unstableProp`, and without the check that reads
 // as stable and the whole finding disappears.
@@ -1587,7 +1587,7 @@ func functionReadsOnlyStableValues(ruleContext rule.Context, function *ast.Node,
 // call with a missing dependency reports about that instead, because fixing the array is the first
 // step and this warning would be noise until then.
 //
-// The reason it is its own check rather than part of the comparison is that the array IS right by
+// The reason it is its own check rather than part of the comparison is that the array is right by
 // the comparison's standards. `const o = {}; useEffect(() => log(o), [o])` names exactly what it
 // reads. The defect is one level down, in what `o` is: a new object each render, so the comparison
 // against the previous render never matches and the effect runs every time.
@@ -1703,7 +1703,7 @@ func isEveryRenderConstruction(declaration *ast.Node) bool {
 //
 // Object, array, function, class, JSX, `new`, and a regular expression literal all evaluate to a
 // fresh value every time the expression runs. The interesting part is the recursion: a ternary or a
-// logical operator constructs if EITHER side does, because the branch that does is reachable, and an
+// logical operator constructs if either side does, because the branch that does is reachable, and an
 // assignment constructs if its right side does. That recursion is what makes this semantic rather
 // than a list of node kinds, and it is why `cond ? {} : x` is caught.
 func constructsANewValue(node *ast.Node) bool {
@@ -1748,7 +1748,7 @@ func reportSetStateWithoutDependencies(ruleContext rule.Context, run exhaustiveD
 		if node == nil || found {
 			return
 		}
-		// A setter mentioned inside a NESTED function does not count, because that function runs
+		// A setter mentioned inside a nested function does not count, because that function runs
 		// when something calls it rather than on every render. Upstream asks whether the reference's
 		// nearest function scope is the callback itself, and the corpus separates the two directly:
 		// `useEffect(() => { setD(1); })` reports and `useEffect(() => { function g(){ setD(1); } })`
@@ -1758,7 +1758,7 @@ func reportSetStateWithoutDependencies(ruleContext rule.Context, run exhaustiveD
 		}
 		if node.Kind == ast.KindIdentifier && !isNonDependencyIdentifier(node) &&
 			isStateSetterName(ruleContext, node, componentScope, callback) {
-			// A MENTION rather than a call. `fetchData.then(setData)` hands the setter off to be
+			// A mention rather than a call. `fetchData.then(setData)` hands the setter off to be
 			// called later and upstream reports it, so testing for a call expression here would miss
 			// two of its own cases.
 			found = true
@@ -1896,7 +1896,7 @@ func nodeContains(ancestor *ast.Node, node *ast.Node) bool {
 //
 // The shorthand-property case needs its own accessor, for the reason
 // `internal/rules/core/no_useless_assignment.go` measured on real code: in `f({ v })` the identifier
-// resolves through `GetSymbolAtLocation` to the PROPERTY's symbol rather than to the variable it
+// resolves through `GetSymbolAtLocation` to the property's symbol rather than to the variable it
 // reads, so the read is filed under a symbol nothing else touches. Here that would lose a
 // dependency rather than invent one, which is the direction that hurts: a value read only through a
 // shorthand would look unread and the rule would call declaring it unnecessary.
@@ -1912,7 +1912,7 @@ func resolveIdentifier(ruleContext rule.Context, identifier *ast.Node) *ast.Symb
 
 // isNonDependencyIdentifier reports whether an identifier occurrence cannot be a value read.
 //
-// A property NAME shares its spelling with a variable and resolves to something else entirely, so
+// A property name shares its spelling with a variable and resolves to something else entirely, so
 // `o.v` reads `o` and merely names `v`. A shorthand property is deliberately absent: it looks like a
 // name and is a real read, which is what `resolveIdentifier` exists to handle.
 //
@@ -1924,13 +1924,13 @@ func isNonDependencyIdentifier(identifier *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	// The type walk comes FIRST, and the ordering is the whole reason this function has a comment.
+	// The type walk comes first, and the ordering is the whole reason this function has a comment.
 	//
 	// It was written second, after the name-position switch, and three upstream clean cases went red:
 	// `Wrap<target>[]`, `foo<typeof target>()`, and `'a' as keyof typeof target`. In all three the
-	// identifier sits inside a type node whose kind is ALSO in the switch below — `KindTypeReference`
-	// and `KindTypeQuery` — and the switch answers `parent.Name() == identifier`, which is false for
-	// a type ARGUMENT or for the operand of a `typeof`. So the switch returned false and the walk
+	// identifier sits inside a type node whose kind is also in the switch below (`KindTypeReference`
+	// and `KindTypeQuery`), and the switch answers `parent.Name() == identifier`, which is false for
+	// a type argument or for the operand of a `typeof`. So the switch returned false and the walk
 	// below was never reached, and the rule demanded a type be listed in a dependency array.
 	//
 	// This is the direction that hurts. A rule telling someone to add `VirtuosoItem` to their

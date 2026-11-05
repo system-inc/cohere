@@ -122,7 +122,7 @@ const (
 //
 // A second consequence of those goldens is worth stating because it looks like a bug. The fixture
 // `error.invalid-type-provider-nonhook-name-typed-as-hook` imports `notAhookTypedAsHook` and its
-// expected message names `useHookNotTypedAsHook` — a *different* property. That is not a
+// expected message names `useHookNotTypedAsHook`, a *different* property. That is not a
 // transcription slip: the error is raised while installing the whole module object, so the first
 // inconsistent property in declaration order is the one named, whichever property the file went on
 // to import. Reproduced here rather than corrected.
@@ -132,7 +132,7 @@ const (
 // There is nowhere else to point. The configuration has no source location in the file being
 // linted, which is exactly why React threads a `loc` down from the import site and labels the
 // span there. All four fixtures point inside the component body at the *use* of the import rather
-// than at the import statement itself, because React's HIR only consults the provider when a
+// than at the import statement itself, because React's `HIR` only consults the provider when a
 // binding is actually resolved. This port points at the import specifier instead, and that is a
 // stated divergence rather than an oversight: reproducing the use site would require the binding
 // resolution pass this rule deliberately does not build, and the import specifier is the node that
@@ -157,13 +157,13 @@ var Config = rule.Rule{
 					return
 				}
 				properties, configured := moduleTypeProvider(moduleName)
-				// This early return is a COST guard rather than a behavioral one, and a mutation
+				// This early return is a cost guard rather than a behavioral one, and a mutation
 				// sweep is what established that rather than reading. Removing it leaves every
 				// verdict unchanged: an unconfigured module answers a nil `properties` map, and a
 				// nil map lookup in Go returns the zero value with `present == false`, so the
 				// named arm's `continue` and the default arm's `present &&` already decline every
 				// input this line could reach. Verified with a standalone program rather than
-				// assumed, and the mutant correctly SURVIVED the whole suite.
+				// assumed, and the mutant correctly survived the whole suite.
 				//
 				// It is kept anyway, and the reason is measurable on this tree: it returns before
 				// `BindingsOf` walks the import clause, and on Kirk's tree every single import is
@@ -221,14 +221,14 @@ var Config = rule.Rule{
 //
 // # Why removing an entry here is an equivalent mutation, and what proves the table is read
 //
-// A sweep deleting the `react-hook-form` arm SURVIVED the whole suite, and so did one deleting
+// A sweep deleting the `react-hook-form` arm survived the whole suite, and so did one deleting
 // `@tanstack/react-table`. That is equivalence rather than a fixture gap, and it is stateable in
 // one sentence: with the entry present the module is configured and its single property is
 // name-consistent, so the verdict is silence; with the entry removed the module is unconfigured and
 // returns early, so the verdict is silence. Both routes, one verdict, for every possible input.
 //
 // The control that keeps this from being a comfortable excuse is the mutation that *changes* an
-// entry rather than removing it: rewriting `useForm` from a hook to a function was CAUGHT, which
+// entry rather than removing it: rewriting `useForm` from a hook to a function was caught, which
 // proves this table is genuinely consulted and genuinely compared. A table nothing reads and a
 // table whose every row agrees with itself produce the same zero, and only that pair of mutations
 // separates them.

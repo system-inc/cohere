@@ -18,7 +18,7 @@ import (
 // only "something reported" cannot tell the two apart.
 //
 // The truthiness test is upstream's and it is load-bearing at one value. `message ? ... : ...` on an
-// EMPTY string takes the else branch, so `{element: "button", message: ""}` reports the plain id and
+// empty string takes the else branch, so `{element: "button", message: ""}` reports the plain id and
 // not a message id with an empty tail. Measured on the installed build.
 func forbidElementsMessage(element string, message string) rule.Message {
 	if message == "" {
@@ -49,7 +49,7 @@ type ForbidElementsOptions struct {
 	// Forbid is the list of element names to reject, each with an optional replacement note.
 	//
 	// Order matters and later entries win. Upstream builds a lookup keyed by element name and
-	// assigns into it in list order, so a name written twice keeps the LAST entry's message.
+	// assigns into it in list order, so a name written twice keeps the last entry's message.
 	// Measured both ways: `["button", {element:"button", message:"m"}]` reports the message id and
 	// the reverse order reports the plain one. A port storing the first match would answer the
 	// opposite on both.
@@ -88,7 +88,7 @@ type forbidElementsWireOptions struct {
 // under test rather than assumed.
 //
 // A rule configured as a bare severity is handed nil options, and the empty body has to produce
-// upstream's default of an EMPTY forbid list rather than an error. An empty list is the rule doing
+// upstream's default of an empty forbid list rather than an error. An empty list is the rule doing
 // nothing, which is upstream's behaviour with no options: `configuration.forbid || []`. That is the
 // safe direction for this particular rule, since the whole judgment is supplied by the config.
 func DecodeForbidElementsOptions(raw []byte) (any, error) {
@@ -147,12 +147,12 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 // The whole judgment lives in the `forbid` list. With no options, upstream reads
 // `configuration.forbid || []` and matches nothing, so the correct answer for a bare severity is an
 // empty list rather than an error. That is the opposite of the usual hazard, where a zero value
-// silently inverts a rule: here the zero value IS the rule declining, which is what upstream does.
+// silently inverts a rule: here the zero value is the rule declining, which is what upstream does.
 //
 // # Later entries win, and the corpus states it exactly once
 //
 // Upstream builds a lookup keyed by element name and assigns into it in list order, so a name
-// written twice keeps the LAST entry. Corpus case 8 pins it for two objects; measured for the
+// written twice keeps the last entry. Corpus case 8 pins it for two objects; measured for the
 // mixed spellings too, both directions:
 //
 //	["button", {element: "button", message: "m"}]     reports forbiddenElement_message
@@ -162,7 +162,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 //
 // `message ? messages.forbiddenElement_message : messages.forbiddenElement` takes the else branch
 // on an empty string, so `{element: "button", message: ""}` reports the plain id. Measured. A port
-// testing for the key's PRESENCE rather than its truthiness would report the message id with an
+// testing for the key's presence rather than its truthiness would report the message id with an
 // empty tail, and no corpus case writes an empty message.
 //
 // # The three createElement argument shapes, and the two regexes that separate them
@@ -198,7 +198,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 // forbidding "true" is nonsense and the alternative is a port that quietly disagrees with the
 // running rule on an input neither of us expects.
 //
-// The member arm reads SOURCE TEXT rather than a reconstructed name, which is why the spaced and
+// The member arm reads source text rather than a reconstructed name, which is why the spaced and
 // the computed forms report with their spelling intact. A port that rebuilt the name from the AST
 // would answer "a.b" for all three and match on one input where upstream matches on none.
 //
@@ -265,13 +265,13 @@ var ForbidElements = rule.Rule{
 			ruleContext.ReportNode(node, forbidElementsMessage(element, entry.Message))
 		}
 
-		// checkJsxElement handles either opening form. Upstream reports on the NAME node rather
+		// checkJsxElement handles either opening form. Upstream reports on the name node rather
 		// than on the element, so `<button />` spans `button` and not the tag.
 		checkJsxElement := func(node *ast.Node) {
 			// `jsx.ElementParts` rather than this package's `jsxElementTagName`, which answers a
-			// different question: it returns the plain identifier NAME and declines a member or a
+			// different question: it returns the plain identifier name and declines a member or a
 			// namespaced tag, because its caller reads `openingElement.name.name` the way upstream
-			// does there. This rule needs the opposite on both counts. It wants the NODE, so it can
+			// does there. This rule needs the opposite on both counts. It wants the node, so it can
 			// read source text, and a member tag is precisely what it must report, since
 			// `<dotted.component />` is one of upstream's own reporting cases.
 			tagName, _ := jsx.ElementParts(node)
@@ -321,7 +321,7 @@ var ForbidElements = rule.Rule{
 
 				case argument.Kind == ast.KindPropertyAccessExpression ||
 					argument.Kind == ast.KindElementAccessExpression:
-					// Upstream reads the member's SOURCE TEXT, not a reconstructed name, so the
+					// Upstream reads the member's source text, not a reconstructed name, so the
 					// spacing and the bracket spelling survive into the lookup key.
 					reportIfForbidden(sourceTextOf(argument), argument)
 				}
@@ -362,7 +362,7 @@ func forbidElementsIsLowercaseUndotted(value string) bool {
 // forbidElementsIsUpstreamLiteral reports whether a node is what upstream's parser types as Literal.
 //
 // The set is narrower than "any literal-looking node" and wider than "a string". A template literal
-// is NOT one, measured, which is why `React.createElement(`button`)` is clean. A numeric literal is
+// is not one, measured, which is why `React.createElement(`button`)` is clean. A numeric literal is
 // one, though `String(1)` then fails the lowercase regex. The boolean and null keywords are ones,
 // and `true` is the single value in this set that reaches the lookup with matchable text.
 func forbidElementsIsUpstreamLiteral(node *ast.Node) bool {

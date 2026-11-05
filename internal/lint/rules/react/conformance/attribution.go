@@ -6,8 +6,8 @@ package react_conformance
 // # Why an attribution layer has to exist at all
 //
 // The `## Error` block prints a heading and a message. It does not print the `ErrorCategory` that
-// produced them, and the category is the only thing that names a rule. So the obvious join — match
-// a fixture to a rule by its filename — is not available, and the two plausible substitutes are
+// produced them, and the category is the only thing that names a rule. So the obvious join (match
+// a fixture to a rule by its filename) is not available, and the two plausible substitutes are
 // both wrong in ways that read as clean results.
 //
 // Matching on the `error.` filename is wrong because the prefix names the *fixture author's*

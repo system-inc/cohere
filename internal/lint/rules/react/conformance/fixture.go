@@ -4,7 +4,7 @@
 //
 // React's compiler ships 1,810 expectation files under `fixtures/compiler/`. Each pairs an input
 // with a `.expect.md` holding either `## Code` (the transformed output) or `## Error` (the
-// diagnostics) — never both, measured at the pinned sha as 1,485 `## Code` plus 325 `## Error`,
+// diagnostics), never both, measured at the pinned sha as 1,485 `## Code` plus 325 `## Error`,
 // zero overlap and zero neither. The 325 error goldens are plain text: a message, a
 // `file:line:col`, and a caret span. Nothing in them is JavaScript-shaped, so a Go implementation
 // can be scored against them without emitting a byte of JavaScript.
@@ -42,7 +42,7 @@
 // network-dependent. It is neither, and both properties come from the same decision: the corpus is
 // vendored, so there is no fetch, and the work is reading 650 small files and splitting strings.
 // Measured at about 0.3-0.8s for the whole package, which is inside the noise of the ordinary gate.
-// Gating it would cost more than it saves — a suite behind a tag is a suite that stops being run,
+// Gating it would cost more than it saves: a suite behind a tag is a suite that stops being run,
 // and the first thing it would stop catching is a vendored corpus that quietly changed size.
 //
 // `internal/lint/rules/react/tools/vendor_fixtures` is the network-touching half, and it is a command run deliberately
@@ -112,12 +112,12 @@ type ExpectedError struct {
 	// without notice; asserting on them would turn documentation edits into rule regressions.
 	Message string
 
-	// File, Line, Column come from the FIRST `path:line:col` line after the message, which is the
+	// File, Line, Column come from the first `path:line:col` line after the message, which is the
 	// primary span. A diagnostic can carry more than one: 31 of the 429 have a secondary location
 	// underneath the primary, captioned separately (`This modifies `cache``) to point at the
 	// contributing site. Taking the first is what upstream's `file:line:col` header means, and
 	// counting them all would report 427 locations for 429 diagnostics while 31 diagnostics
-	// actually have none — a number that is wrong in both directions at once and looks reasonable.
+	// actually have none, a number that is wrong in both directions at once and looks reasonable.
 	//
 	// Line and Column are 0 with HasLocation false when absent. Measured at the pinned sha: 398 of
 	// the 429 carry a primary location, 31 do not.
@@ -259,8 +259,8 @@ func Load(root string) ([]Fixture, error) {
 // ParseExpectation reads the `## Error` block out of a `.expect.md`.
 //
 // An expectation with no `## Error` section is an error, not an empty result. Error-named fixtures
-// and `## Error` sections are the same set at the pinned sha — verified as exact set equality in
-// both directions, 325 each way, zero counterexamples — so a missing section means the corpus is
+// and `## Error` sections are the same set at the pinned sha (verified as exact set equality in
+// both directions, 325 each way, zero counterexamples), so a missing section means the corpus is
 // not what this runner believes it is, and continuing would score a transform fixture as a rule
 // that found nothing.
 func ParseExpectation(text string) (Expectation, error) {
@@ -330,7 +330,7 @@ func ParseExpectation(text string) (Expectation, error) {
 // one of these or failing to compile.
 //
 // This cost a defect worth recording. The parser first matched `Error: ` only, and read 302 of the
-// 429 diagnostics — a 70% read that produced a fully green parse and a runner that would have
+// 429 diagnostics, a 70% read that produced a fully green parse and a runner that would have
 // scored 37 fixtures as expecting nothing at all. Nothing about the output looked partial. It was
 // caught by `TestDeclaredCountMatchesParsedErrors`, which compares the parser's count against the
 // `Found N errors` header the goldens carry independently, and that test exists solely because two

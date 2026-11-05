@@ -59,7 +59,7 @@ func buttonHasTypeValueMessage(id string, value string) rule.Message {
 // ButtonHasTypeOptions is the decoded option object.
 //
 // Three booleans, one per HTML button type, matching `meta.schema` exactly. All three default to
-// TRUE, which is the opposite of Go's zero value, and that inversion is the whole reason the decoder
+// `true`, which is the opposite of Go's zero value, and that inversion is the whole reason the decoder
 // below is hand-written; see DecodeButtonHasTypeOptions.
 type ButtonHasTypeOptions struct {
 	// Button allows `type="button"`. Default true.
@@ -100,7 +100,7 @@ func (o ButtonHasTypeOptions) allows(value string) (permitted bool, known bool) 
 
 // buttonHasTypeWireOptions is the JSON shape, which is not the struct shape.
 //
-// Pointers so an absent key is distinguishable from an explicit `false`. Every default here is TRUE,
+// Pointers so an absent key is distinguishable from an explicit `false`. Every default here is `true`,
 // so a plain bool field would make `{}` and `{"button": false}` decode identically and silently
 // invert the rule, and every fixture built from a struct rather than routed through this decoder
 // would pass anyway. That is the default-true trap the port brief names, and this is the shape that
@@ -114,7 +114,7 @@ type buttonHasTypeWireOptions struct {
 // DecodeButtonHasTypeOptions decodes the option object over upstream's defaults.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons, either of which alone would be
-// enough. The generic helper errors on EMPTY input, which is what a bare `"error"` configuration
+// enough. The generic helper errors on empty input, which is what a bare `"error"` configuration
 // hands a rule. And its zero value is all-false, which for this rule means every written-out type is
 // forbidden, so a rule that fell back to the zero value would report `forbiddenValue` on correct
 // code rather than going quiet, which is the loud direction of a silent inversion but still wrong.
@@ -163,7 +163,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 // are `missingType`, for no `type` at all, and `complexType`, for a type this rule declines to
 // evaluate.
 //
-// # complexType points at the EXPRESSION, and everything else points at the element
+// # complexType points at the expression, and everything else points at the element
 //
 // Upstream's `reportComplex(expression)` takes the offending expression node while every other
 // report takes the element or the call. That is not cosmetic: on
@@ -177,7 +177,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 //
 // `checkExpression` calls itself on the consequent and the alternate, so a nested ternary is walked
 // to whatever depth it is written at, and `<button type={condition ? "foo" : "bar"}/>` reports
-// TWICE. Measured on the installed build. A rule that stopped at one finding per element would pass
+// twice, once per branch. Measured on the installed build. A rule that stopped at one finding per element would pass
 // every corpus case, because the corpus writes no ternary with two bad branches.
 //
 // # What counts as a static value, measured rather than assumed
@@ -275,7 +275,7 @@ var ButtonHasType = rule.Rule{
 				if buttonHasTypeProvenPermitted(ruleContext, expression, settings) {
 					return
 				}
-				// The complex report anchors on the EXPRESSION rather than on the element, which is
+				// The complex report anchors on the expression rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
 				ruleContext.ReportNode(expression, messageButtonComplexType)
 			}
@@ -357,7 +357,7 @@ func buttonHasTypeCheckElement(
 	typeAttribute := buttonHasTypeFindAttribute(attributes)
 	if typeAttribute == nil {
 		// A spread does not exempt. `<button {...properties}/>` reports, measured on the installed
-		// build, because upstream's `getProp` looks for a NAMED attribute and a spread carries none.
+		// build, because upstream's `getProp` looks for a named attribute and a spread carries none.
 		reportMissing(reported)
 		return
 	}
@@ -404,7 +404,7 @@ func buttonHasTypeFindAttribute(attributes *ast.Node) *ast.Node {
 //
 // Upstream requires `'key' in prop && prop.key && 'name' in prop.key && prop.key.name === 'type'`,
 // which is an Identifier key and nothing else. So `{'type': 'foo'}` and `{['type']: 'foo'}` are both
-// INVISIBLE and the call reports as missing a type rather than as an invalid one, and a spread
+// invisible to it and the call reports as missing a type rather than as an invalid one, and a spread
 // contributes no key at all. All three measured on the installed build.
 func buttonHasTypeFindTypeProperty(object *ast.Node) *ast.Node {
 	properties := object.AsObjectLiteralExpression().Properties
@@ -423,7 +423,7 @@ func buttonHasTypeFindTypeProperty(object *ast.Node) *ast.Node {
 // buttonHasTypePropertyValue returns the value expression of an object member.
 //
 // A shorthand `{type}` has no value node, and upstream passes `undefined` into `checkExpression`,
-// whose `switch` falls through to the default arm and reports complex ON THE PROPERTY. So the
+// whose `switch` falls through to the default arm and reports complex at the property. So the
 // shorthand itself is returned rather than nil, which is what puts the finding in the same place.
 // Measured: `React.createElement('button', {type})` reports complexType spanning `type`.
 func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
@@ -448,7 +448,7 @@ func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
 //
 // Every constituent must be a string literal, so `undefined` (an optional prop with no default, where
 // HTML's `submit` default applies), `string`, `any`, an error type and a type parameter all keep
-// reporting. Every literal must be PERMITTED rather than merely known, so a config that switches
+// reporting. Every literal must be permitted rather than merely known, so a config that switches
 // `reset` off still reports a union that contains it.
 func buttonHasTypeProvenPermitted(ruleContext rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
 	if ruleContext.TypeChecker == nil {

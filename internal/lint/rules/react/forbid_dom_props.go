@@ -12,8 +12,8 @@ import (
 // forbidDomPropsMessage builds the finding for one forbidden prop.
 //
 // Upstream carries one message id and one interpolated slot, plus an escape hatch: an entry may
-// supply its own `message`, in which case the finding carries that text and NO message id at all.
-// The two are told apart by truthiness, so an EMPTY message string takes the default branch rather
+// supply its own `message`, in which case the finding carries that text and no message id at all.
+// The two are told apart by truthiness, so an empty message string takes the default branch rather
 // than reporting an empty finding. Measured on the installed build.
 //
 // A finding with no id would be invisible to `ExpectFindings`, which asserts ids, so the custom
@@ -38,7 +38,7 @@ type ForbidDomPropsOptions struct {
 	// Forbid is the list of prop names to reject on DOM nodes.
 	//
 	// Order matters and later entries win. Upstream builds a lookup keyed by prop name and assigns
-	// into it in list order, so a name written twice keeps the LAST entry's restrictions. Measured.
+	// into it in list order, so a name written twice keeps the last entry's restrictions. Measured.
 	Forbid []ForbidDomPropsEntry
 }
 
@@ -49,10 +49,10 @@ type ForbidDomPropsEntry struct {
 
 	// DisallowedFor narrows the entry to a set of tag names.
 	//
-	// Nil means every DOM tag. An EMPTY non-nil list means NO tag, which is not the same thing and
+	// Nil means every DOM tag. An empty non-nil list means no tag, which is not the same thing and
 	// is the edge this field's pointer-free spelling would lose. Upstream tests the list for
 	// truthiness and an empty array is truthy in JavaScript, so it falls through to a membership
-	// test that nothing can satisfy. `<div className="x" />` with `disallowedFor: []` is CLEAN.
+	// test that nothing can satisfy. `<div className="x" />` with `disallowedFor: []` is clean.
 	// Measured on the installed build. See DisallowedForWasGiven.
 	DisallowedFor []string
 
@@ -85,7 +85,7 @@ type forbidDomPropsWireOptions struct {
 // and the empty-list distinction under test rather than assumed.
 //
 // A rule configured as a bare severity is handed nil options, and the empty body has to produce
-// upstream's default of an EMPTY forbid list rather than an error. An empty list is the rule doing
+// upstream's default of an empty forbid list rather than an error. An empty list is the rule doing
 // nothing, which is upstream's behaviour with no options: it reads the configured list or a shared
 // empty default. That is the safe direction for this rule, since the whole judgment is supplied by
 // the config.
@@ -131,15 +131,15 @@ func DecodeForbidDomPropsOptions(raw []byte) (any, error) {
 // forbidDomPropsIsDomNodeName reports whether a JSX tag name is a DOM node rather than a component.
 //
 // Upstream's test is `tag[0] !== tag[0].toUpperCase()`, which asks whether the first character
-// CHANGES under upper-casing rather than whether it is lowercase. The difference shows on a
-// character with no case: an underscore upper-cases to itself, so `<_div someProp="x" />` is CLEAN.
+// changes under upper-casing rather than whether it is lowercase. The difference shows on a
+// character with no case: an underscore upper-cases to itself, so `<_div someProp="x" />` is clean.
 // Measured on the installed build, and no corpus case writes it.
 //
 // A digit behaves the same way and for the same reason, though the parser will not accept a tag
 // starting with one. The predicate is written as upstream wrote it rather than as "is lowercase",
 // because the two disagree on exactly the characters nobody thinks to test.
 //
-// This is deliberately NOT `jsx.IsIntrinsicElementNamed`, which asks whether a tag is one specific
+// This is deliberately not `jsx.IsIntrinsicElementNamed`, which asks whether a tag is one specific
 // named element. The question here is the general one, and no shelf helper asks it.
 func forbidDomPropsIsDomNodeName(name string) bool {
 	if name == "" {
@@ -187,13 +187,13 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 // # The clone and the installed build disagree, and this port follows the installed build
 //
 // The clone's working tree carries a `disallowedValues` feature and a second message id,
-// `propIsForbiddenWithValue`, that the INSTALLED build does not have. Both claim version 7.37.5;
+// `propIsForbiddenWithValue`, that the installed build does not have. Both claim version 7.37.5;
 // the clone is the unreleased default branch. Verified two ways: the installed rule file contains
 // neither identifier, and replaying upstream's own corpus against the installed build disagrees on
 // exactly the three cases that exercise the feature. Upstream's `valid 8` and `valid 10` report,
 // and its `invalid 10` reports six findings where the corpus says five.
 //
-// This port reproduces the INSTALLED build, because that is the artifact our gate compares against
+// This port reproduces the installed build, because that is the artifact our gate compares against
 // and the one this repository actually runs. The consequence is that a `disallowedValues` key in a
 // configuration is accepted by the schema and ignored, exactly as the installed build ignores it.
 // The three corpus cases are carried at the installed build's verdict with the clone's verdict
@@ -202,7 +202,7 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 // # The value is never read, which is the opposite of a sibling rule
 //
 // `jsx-no-script-url` decides from an attribute's string value and therefore declines a bare prop
-// and an expression container. This rule decides from the NAME alone, so `<div id />` and
+// and an expression container. This rule decides from the name alone, so `<div id />` and
 // `<div id={x} />` both report. Measured on the installed build. Reading the value here would
 // silently narrow the rule to string-valued props.
 //

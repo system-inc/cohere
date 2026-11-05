@@ -12,7 +12,7 @@ import (
 // BooleanPropNamingOptions configures the rule.
 //
 // Upstream's schema declares a `default` for `rule` and `validateNested`, and ESLint applies a
-// schema default only when the options OBJECT is present. With no options at all,
+// schema default only when the options object is present. With no options at all,
 // `context.options[0]` is undefined, `config.rule` is null, and every listener early-returns: the
 // rule is completely inert. Measured on the installed build, one input three ways: no options
 // reports zero, `{}` reports one, and an explicit rule reports one.
@@ -76,7 +76,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 	options := DefaultBooleanPropNamingOptions()
 	if len(raw) == 0 {
 		// Refusing empty input is what makes `RequiresOptions` mean anything. That field only
-		// changes behaviour when the DECODER errors: `OptionsRegistry.Decode` swallows a decode
+		// changes behaviour when the decoder errors: `OptionsRegistry.Decode` swallows a decode
 		// error on empty input for a rule that is not required, and propagates it for one that is.
 		// A decoder returning defaults here would make the flag inert, which an earlier draft did,
 		// and the rule then ran tree-wide on a bare `"error"` exactly as upstream does not.
@@ -85,7 +85,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 
 	// Decoded into a wire struct with pointer-free fields, then defaulted, so an explicitly empty
 	// list is distinguishable from an absent key only where that distinction matters. Upstream
-	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array ALSO falls back, which
+	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array also falls back, which
 	// this reproduces by testing length rather than nil.
 	var wire BooleanPropNamingOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
@@ -115,7 +115,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 // twice had to clean up. A straight apostrophe here would diverge from every other tool's output for
 // the same finding.
 //
-// An earlier draft carried this same comment above a LITERAL curly apostrophe, which is the exact
+// An earlier draft carried this same comment above a literal curly apostrophe, which is the exact
 // shape of claiming something in a comment and citing the comment back as evidence. The byte scan
 // is what caught it.
 func messageBooleanPropNaming(propertyName string, pattern string, override string) rule.Message {
@@ -147,7 +147,7 @@ func messageBooleanPropNaming(propertyName string, pattern string, override stri
 //	invalid: C.propTypes = { enabled: PropTypes.bool }
 //	invalid: interface Props { enabled: boolean }
 //
-// The regex is the easy half. The work is knowing which props are BOOLEAN, and upstream reads that
+// The regex is the easy half. The work is knowing which props are boolean, and upstream reads that
 // from three independent sources: a `propTypes` object, a TypeScript props type, and the prop-type
 // member names in `propTypeNames`.
 //
@@ -301,15 +301,15 @@ func isPropTypesName(name *ast.Node) bool {
 
 // checkPropTypesValue judges the object literal a `propTypes` declaration holds.
 //
-// # A wrapper call is deliberately NOT unwrapped
+// # A wrapper call is deliberately not unwrapped
 //
 // Upstream also accepts `propTypes = forbidExtraProps({...})`, but only when the callee is named in
 // `settings.react.propWrapperFunctions`. That list is a settings surface we do not have, and with it
-// unconfigured upstream unwraps NOTHING: measured on the installed build with no settings,
+// unconfigured upstream unwraps nothing at all: measured on the installed build with no settings,
 // `wrap({...})`, `forbidExtraProps({...})` and `merge({}, x, {...})` all report zero while the same
 // props in a bare object report one. Configuring `forbidExtraProps` flips only that one to one.
 //
-// So declining every call form is not a narrowing of upstream, it IS upstream in the only
+// So declining every call form is not a narrowing of upstream, it is upstream in the only
 // configuration we can express. An earlier draft unwrapped calls unconditionally on the reasoning
 // that a missing gate should fail open; that reported on two of upstream's own passing cases, both
 // of which write a wrapper the corpus deliberately leaves unconfigured.
@@ -329,7 +329,7 @@ func checkPropTypesValue(
 
 // runBooleanPropCheck walks one propTypes object's own properties.
 //
-// Upstream recurses only when `validateNested` is set AND the property's value is a call, which is
+// Upstream recurses only when `validateNested` is set and also the property's value is a call, which is
 // how `PropTypes.shape({...})` is reached. Both halves are load bearing and measured: the same
 // shape input reports zero under the default and one with the option on.
 func runBooleanPropCheck(
@@ -377,7 +377,7 @@ func runBooleanPropCheck(
 // isNestedPropTypesCall reports whether a prop's declared type is a call, which is upstream's
 // `nestedPropTypes` test and is what `PropTypes.shape({...})` matches.
 //
-// Upstream tests only that the value IS a call, not that the callee is `shape`, so
+// Upstream tests only that the value is a call, not that the callee is `shape`, so
 // `PropTypes.oneOfType([...])` and any other call reach the recursion too. Reproduced rather than
 // narrowed: the corpus writes `shape` and `arrayOf` both.
 func isNestedPropTypesCall(value *ast.Node) bool {
@@ -444,7 +444,7 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 //
 // # An upstream defect, reproduced deliberately
 //
-// Upstream reads `node.key.name`, which exists only on an identifier key. A QUOTED key such as
+// Upstream reads `node.key.name`, which exists only on an identifier key. A quoted key such as
 // `'isEnabled'` and a numeric key both yield undefined, the regex is tested against the string
 // "undefined", and the prop reports no matter what it is called. Measured against the installed
 // build on 2026-08-28: `'enabled'`, `'isEnabled'` and `1` all report, and the message for each
@@ -455,7 +455,7 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 // disagree with every other tool on the same file. The second return says whether a real name was
 // read, so the caller can report even when the pattern happens to match the placeholder text.
 //
-// A computed key is different and is NOT a defect: upstream reads `node.key.name` and a computed
+// A computed key is different and is not a defect: upstream reads `node.key.name` and a computed
 // `[k]` has an identifier `k` underneath, so it renders `k` and is judged against it. Measured.
 func propTypesKeyName(key *ast.Node) (string, bool) {
 	if key == nil {
@@ -480,7 +480,7 @@ func propTypesKeyName(key *ast.Node) (string, bool) {
 
 // componentPropsTypeNode returns the type node of a component's first parameter, or nil.
 //
-// Upstream also handles a props type reached through a generic annotation on the BINDING, as in
+// Upstream also handles a props type reached through a generic annotation on the binding, as in
 // `const C: React.FC<Props> = ...`, by reading the type argument list. That form is handled here
 // too, because it is the common modern spelling and the corpus writes it.
 func componentPropsTypeNode(component *ast.Node) *ast.Node {
@@ -523,7 +523,7 @@ func componentPropsTypeNode(component *ast.Node) *ast.Node {
 //	                      there is no body node to step through.
 //	ObjectTypeAnnotation  ABSENT. That is Flow, and this parser produces no Flow nodes.
 //
-// One that reads as vestigial is LIVE and would have been dropped by a port that only followed
+// One that reads as vestigial is live and would have been dropped by a port that only followed
 // upstream's estree shapes:
 //
 //	TSParenthesizedType   PRESENT, at depth two. `type Props = ({ a: boolean } & { b: boolean })`

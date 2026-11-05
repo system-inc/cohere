@@ -8,7 +8,7 @@ import (
 // DefaultPropsMatchPropTypesOptions configures the rule.
 //
 // One key, defaulting to false, so the zero value is the correct default and the decoder stays
-// simple. Stated because two siblings in this package default an option to TRUE, where the same
+// simple. Stated because two siblings in this package default an option to `true`, where the same
 // shape would silently invert the rule.
 type DefaultPropsMatchPropTypesOptions struct {
 	// AllowRequiredDefaults permits a default on a prop declared `isRequired`. Absent means false.
@@ -19,7 +19,7 @@ type DefaultPropsMatchPropTypesOptions struct {
 //
 // Upstream reads `configuration.allowRequiredDefaults || false`, so an absent options object, an
 // empty one, and an explicit false are the same rule. Unlike `boolean-prop-naming`, this rule reads
-// nothing else from its options, so it is NOT inert without them: measured, a bare `"error"` reports
+// nothing else from its options, so it is not inert without them: measured, a bare `"error"` reports
 // exactly as `{}` does.
 func DefaultDefaultPropsMatchPropTypesOptions() DefaultPropsMatchPropTypesOptions {
 	return DefaultPropsMatchPropTypesOptions{}
@@ -43,7 +43,7 @@ func DecodeDefaultPropsMatchPropTypesOptions(raw []byte) (any, error) {
 
 // messageRequiredHasDefault is the arm for a default on a required prop.
 //
-// The finding is reported on the DEFAULT rather than on the propType, because the repair is to drop
+// The finding is reported on the default rather than on the propType, because the repair is to drop
 // one of the two and the default is the half that is redundant. Measured against the installed build
 // by slicing its reported range: the span is `a: 1`, not `a: PropTypes.string.isRequired`.
 func messageRequiredHasDefault(name string) rule.Message {
@@ -76,11 +76,11 @@ func messageDefaultHasNoType(name string) rule.Message {
 //
 // Upstream returns early when propTypes is absent or empty, and when either object carries a
 // spread. Both exist so a component whose props are assembled elsewhere is not judged on a partial
-// view, and both are measured: a spread in EITHER object silences the component entirely.
+// view, and both are measured: a spread in either object silences the component entirely.
 //
 // # One declaration form is deliberately not read, and the reason is a measurement
 //
-// Upstream also reads props from a TYPE ANNOTATION rather than from a `propTypes` object, in two
+// Upstream also reads props from a type annotation rather than from a `propTypes` object, in two
 // spellings that are one question:
 //
 //	class C extends React.Component { props: { foo: string }; }   the Flow-era class property
@@ -93,7 +93,7 @@ func messageDefaultHasNoType(name string) rule.Message {
 // and declaring `NeedsTypeChecker` costs the per-file checker lock on every file in the tree.
 //
 // Measured on 2026-08-28 before deciding, with a seeded control to prove the counter worked: the
-// tree contains ZERO occurrences of `defaultProps`, `propTypes` or `getDefaultProps` across every
+// tree contains zero occurrences of `defaultProps`, `propTypes` or `getDefaultProps` across every
 // TypeScript and JavaScript file, against 56 files naming `React.Component`. React 18.3 deprecated
 // `defaultProps` on function components and this codebase has moved past it entirely.
 //
@@ -153,7 +153,7 @@ type componentPropDeclarations struct {
 // first. Our walk is pre-order, so a source-file listener fires before its children and the
 // gathering has to happen here.
 //
-// # Why declarations are keyed by OWNER rather than by detected component
+// # Why declarations are keyed by owner rather than by detected component
 //
 // Upstream hangs both objects off its component record, so two components in one file keep their
 // props apart. The three shapes that reach this rule all name their owner: a class property belongs
@@ -227,7 +227,7 @@ func checkDefaultPropsAgainstPropTypes(
 				break
 			}
 
-			// `C.defaultProps.baz = "baz"` adds ONE default to an object declared elsewhere, and
+			// `C.defaultProps.baz = "baz"` adds one default to an object declared elsewhere, and
 			// upstream folds it into the same component. The receiver is then itself a
 			// `C.defaultProps` access, so the owner is one level further up and the member name is
 			// the prop rather than the declaration.
@@ -271,7 +271,7 @@ func checkDefaultPropsAgainstPropTypes(
 //
 // An anonymous class expression has no name, and its members are keyed on the empty string, which
 // groups every anonymous class in a file together. That is wider than upstream, which keys on the
-// node, and it can only make the rule QUIETER: two anonymous classes sharing a bucket means one's
+// node, and it can only make the rule quieter: two anonymous classes sharing a bucket means one's
 // propTypes can satisfy the other's defaults. No corpus case writes two anonymous component classes
 // in one file, and the alternative is a per-node key that the assignment arm cannot produce, since
 // `C.defaultProps = ...` names its owner by identifier rather than by node.
@@ -289,7 +289,7 @@ func enclosingClassOwnerName(member *ast.Node) string {
 // readPropDeclaration folds one `propTypes` or `defaultProps` declaration into a component's record.
 //
 // The name is read through `ast.TryGetTextOfPropertyName` rather than `Text()`, which panics on
-// several name shapes. The walk recovers per FILE rather than per rule, so one such call would cost
+// several name shapes. The walk recovers per file rather than per rule, so one such call would cost
 // every rule in this package its verdict on that file.
 //
 // Mutates: declarations records which of the two the component declared, on the record the caller keeps for it
@@ -330,13 +330,13 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 		return
 	}
 
-	// A spread inside propTypes does NOT disqualify the component, unlike a spread inside
+	// A spread inside propTypes does not disqualify the component, unlike a spread inside
 	// defaultProps. Upstream's propTypes reader takes what it can see and moves on, while its
 	// defaults reader returns the string "unresolved" for the whole object.
 	//
 	// The asymmetry is the rule working as intended rather than an oversight. A spread in
 	// defaultProps may supply a name the rule would then call undeclared, which is a false positive;
-	// a spread in propTypes can only DECLARE more, so the worst case is a missed finding. Measured
+	// a spread in propTypes can only declare more, so the worst case is a missed finding. Measured
 	// on 2026-08-28: `{...base, a: PropTypes.string}` beside a default named `b` reports one
 	// finding, while a spread alone reports none because the map is then empty and the
 	// empty-propTypes guard fires.
@@ -363,7 +363,7 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 
 // propTypeIsRequired reports whether a declared prop type ends in `.isRequired`.
 //
-// Upstream's propTypes reader sets the flag from the ANNOTATION rather than from the value, but for
+// Upstream's propTypes reader sets the flag from the annotation rather than from the value, but for
 // the shapes this rule meets the two coincide: a required prop is written `PropTypes.string.isRequired`
 // and the flag is the trailing member name. A shorthand property carries no value at all and is
 // therefore never required.
@@ -592,7 +592,7 @@ func resolveToObjectLiteral(value *ast.Node) *ast.Node {
 // every file in the tree the checker lock. Upstream resolves through scope analysis, which is
 // closer to this than to the checker.
 //
-// The nearest ENCLOSING declaration wins, which is what makes a shadowing binding shadow. A
+// The nearest enclosing declaration wins, which is what makes a shadowing binding shadow. A
 // declaration in a sibling scope is invisible, matching upstream's `findVariableByName`.
 func declarationOfIdentifier(identifier *ast.Node) *ast.Node {
 	wanted := identifier.Text()

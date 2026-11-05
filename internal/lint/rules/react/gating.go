@@ -303,7 +303,7 @@ func parseGatingDirective(value string) (string, bool) {
 // something Babel does not.
 //
 // `scanner.IsValidIdentifier` is the even more inviting name and is worse. Probed directly, it
-// answers **true** for `"true"` — it is `isIdentifierName` with no reserved-word component at all,
+// answers **true** for `"true"`: it is `isIdentifierName` with no reserved-word component at all,
 // so building on it would leave this rule silent on React's only error-named gating fixture, which
 // is precisely `'use memo if(true)'`.
 //

@@ -43,7 +43,7 @@ const (
 	OutcomeDeclined Outcome = "Declined"
 
 	// OutcomeExcluded means the runner itself declined the fixture before the implementation saw
-	// it — today only for requiring a Flow parser. A stated exclusion with a count, never a skip.
+	// it, today only for requiring a Flow parser. A stated exclusion with a count, never a skip.
 	OutcomeExcluded Outcome = "Excluded"
 
 	// OutcomeRefused means an unrecognised pragma stopped the fixture from being scored at all.
@@ -67,7 +67,7 @@ type FixtureScore struct {
 //
 // The counters exist because "0 passed" and "found nothing to run" print the same digit. Considered
 // is the denominator the score is honest about, and every fixture lands in exactly one outcome
-// bucket, asserted rather than assumed — see `Score.Check`.
+// bucket, asserted rather than assumed; see `Score.Check`.
 type Score struct {
 	// Considered is every fixture loaded, including ones never handed to the implementation.
 	Considered int
@@ -269,10 +269,10 @@ func Compare(expected Expectation, result Result) FixtureScore {
 
 // NothingImplemented is the Implementation used until a real one exists.
 //
-// It declines every fixture. It does NOT return an empty result, and the difference is the whole
+// It declines every fixture. It does not return an empty result, and the difference is the whole
 // reason the type is written out rather than left as a nil check: an empty result asserts "no
 // errors here", which is a wrong answer on a corpus where every fixture expects at least one, and
-// would score as 325 failures — a number that looks like a working implementation doing badly
+// would score as 325 failures, a number that looks like a working implementation doing badly
 // rather than an absent one.
 type NothingImplemented struct{}
 
