@@ -24,6 +24,9 @@ const (
 	consistencyRequireMatchingReturnTypeInferred       consistencyRequireMatchingReturnTypeOrigin = "Inferred"
 )
 
+// consistencyRequireMatchingReturnTypeOptions picks a message option by origin, the shape of both tables below.
+type consistencyRequireMatchingReturnTypeOptions = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption
+
 // The rule's two messages and the options they pick from, whose wording lives in
 // `policy/messages/consistency-require-matching-return-type.json`.
 var (
@@ -47,7 +50,7 @@ var (
 
 // consistencyRequireMatchingReturnTypeSources says where a value verdict's type came from, in the
 // bare-return message.
-var consistencyRequireMatchingReturnTypeSources = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
+var consistencyRequireMatchingReturnTypeSources = consistencyRequireMatchingReturnTypeOptions{
 	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeBareText.Option(
 		"source",
 		"annotation",
@@ -65,7 +68,7 @@ var consistencyRequireMatchingReturnTypeSources = map[consistencyRequireMatching
 // consistencyRequireMatchingReturnTypeVoidReasons says why a `void` type makes a verdict void, by where
 // the type came from, in the undefined-return message. One option per source rather than a source
 // inside the reason, since phrases do not nest.
-var consistencyRequireMatchingReturnTypeVoidReasons = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
+var consistencyRequireMatchingReturnTypeVoidReasons = consistencyRequireMatchingReturnTypeOptions{
 	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeUndefinedText.Option(
 		"voidReason",
 		"annotatedVoid",
