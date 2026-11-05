@@ -99,3 +99,24 @@ var (
 	}
 	wrapped = fmt.Sprint(MustLoad("wrapped"))
 )
+
+// A function literal called on the spot in an initializer runs once at start, as do its arguments and the literals
+// it calls on the spot in turn.
+var immediate = func(name string) *regexp.Regexp {
+	return func() *regexp.Regexp {
+		return regexp.MustCompile(name)
+	}()
+}(MustLoad("argument"))
+
+var (
+	compiled *regexp.Regexp
+	named    string
+)
+
+// An init function's body is package initialization, and so is a literal it calls on the spot.
+func init() {
+	compiled = regexp.MustCompile(`^\w+$`)
+	func() {
+		named = MustLoad("in a called literal")
+	}()
+}

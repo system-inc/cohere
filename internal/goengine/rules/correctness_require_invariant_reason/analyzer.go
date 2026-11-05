@@ -4,8 +4,8 @@
 // A panic is a claim that a case cannot happen, and when the claim is wrong the process stops with a stack trace
 // instead of a sentence. Written down beside the panic, the claim tells the next reader what they would break; left
 // out, it is a crash nobody can reason about. A Must function makes the same claim about its input, and a package's
-// var initializers run once, at start, so a bad constant there stops the program before it does anything. Called
-// anywhere else, it turns a bad input into a crash at the moment of use.
+// var initializers and init functions run once, at start, so a bad constant there stops the program before it does
+// anything. Called inside a function that runs later, it stops the process in the middle of its work.
 package correctness_require_invariant_reason
 
 import (
@@ -31,8 +31,9 @@ var Analyzer = &analysis.Analyzer{
 	Name: "correctness_require_invariant_reason",
 	Doc: "Flags a call to the builtin panic with no // Invariant: <reason> comment directly above its statement or " +
 		"at the end of its line, except a re-panic of the value recover returned in the same function, and a call " +
-		"to a function or method named Must or Must followed by an upper-case letter anywhere but directly in a " +
-		"package-level var initializer. Files ending in _test.go are not judged.",
+		"to a function or method named Must or Must followed by an upper-case letter outside package " +
+		"initialization: a package-level var initializer or an init function, and a function literal either calls " +
+		"on the spot. Files ending in _test.go are not judged.",
 	Run: run,
 }
 
@@ -291,10 +292,17 @@ func excuseOf(group *ast.CommentGroup) excuse {
 	return found
 }
 
-// judgeMustCalls reports every call to a Must function in file that is not directly in a package-level var's
-// initializer.
+// judgeMustCalls reports every call to a Must function in file that does not run while the package initializes.
 func judgeMustCalls(pass *analysis.Pass, file *ast.File) {
 	for _, declaration := range file.Decls {
+		// An init function runs once, at start, after the package's vars are set, so its body is initialization.
+		// Only a top-level function without receiver or type parameters named init is one; a method named init is
+		// called like any other.
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Body != nil &&
+			function.Recv == nil && function.Type.TypeParams == nil && function.Name.Name == "init" {
+			judgeMustCallsIn(pass, function.Body, true)
+			continue
+		}
 		general, isGeneral := declaration.(*ast.GenDecl)
 		if !isGeneral || general.Tok != token.VAR {
 			judgeMustCallsIn(pass, declaration, false)
@@ -311,30 +319,52 @@ func judgeMustCalls(pass *analysis.Pass, file *ast.File) {
 	}
 }
 
-// judgeMustCallsIn reports the Must calls under root, unless root is a package-level initializer, where a Must call
-// runs once at start. A function literal there runs whenever it is called, so its body is judged as any other.
+// judgeMustCallsIn reports the Must calls under root, unless root runs while the package initializes, where a Must
+// call runs once at start. A function literal there that is called on the spot runs then too, so it stays
+// initialization; one stored, or started by go, runs whenever it is called, so its body is judged as any other.
 func judgeMustCallsIn(pass *analysis.Pass, root ast.Node, packageInitializer bool) {
 	ast.Inspect(root, func(node ast.Node) bool {
-		if literal, isLiteral := node.(*ast.FuncLit); isLiteral && packageInitializer {
-			judgeMustCallsIn(pass, literal.Body, false)
+		if !packageInitializer {
+			return reportMustCall(pass, node)
+		}
+		switch initialization := node.(type) {
+		case *ast.GoStmt:
+			// A goroutine started during initialization may run after main has begun its work.
+			judgeMustCallsIn(pass, initialization.Call, false)
+			return false
+		case *ast.CallExpr:
+			if literal, isLiteral := ast.Unparen(initialization.Fun).(*ast.FuncLit); isLiteral {
+				judgeMustCallsIn(pass, literal.Body, true)
+				for _, argument := range initialization.Args {
+					judgeMustCallsIn(pass, argument, true)
+				}
+				return false
+			}
+		case *ast.FuncLit:
+			judgeMustCallsIn(pass, initialization.Body, false)
 			return false
 		}
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall || packageInitializer {
-			return true
-		}
-		function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-		if !isFunction || !isMustName(function.Name()) {
-			return true
-		}
-		pass.Report(analysis.Diagnostic{
-			Pos:      call.Pos(),
-			End:      call.End(),
-			Category: mustOutsideInitializationMessage.Id,
-			Message:  mustOutsideInitializationMessage.Render(map[string]string{"name": calleeName(pass, function)}),
-		})
 		return true
 	})
+}
+
+// reportMustCall reports node when it is a call to a Must function, and always lets the walk go on below it.
+func reportMustCall(pass *analysis.Pass, node ast.Node) bool {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return true
+	}
+	function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	if !isFunction || !isMustName(function.Name()) {
+		return true
+	}
+	pass.Report(analysis.Diagnostic{
+		Pos:      call.Pos(),
+		End:      call.End(),
+		Category: mustOutsideInitializationMessage.Id,
+		Message:  mustOutsideInitializationMessage.Render(map[string]string{"name": calleeName(pass, function)}),
+	})
+	return true
 }
 
 // isMustName is whether name is Must, as template.Must, or Must followed by an upper-case letter, as

@@ -138,15 +138,33 @@ func mustCalls(pattern string) {
 	_ = local
 }
 
-func init() {
-	_ = regexp.MustCompile("init") // want "`regexp.MustCompile` panics on a bad input"
-}
-
-// A function literal in a package-level initializer runs whenever it is called, not once at start.
+// A function literal stored by a package-level initializer runs whenever it is called, not once at start.
 var matcher = func(pattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern) // want "`regexp.MustCompile` panics on a bad input"
 }
 
-var immediate = func() *regexp.Regexp {
-	return regexp.MustCompile("immediate") // want "`regexp.MustCompile` panics on a bad input"
-}()
+var build = func() {
+	_ = regexp.MustCompile("stored") // want "`regexp.MustCompile` panics on a bad input"
+}
+
+func useStored() {
+	build()
+	_ = matcher("later")
+}
+
+var handler func()
+
+// An init function runs at start, but a literal it stores or starts as a goroutine runs later.
+func init() {
+	handler = func() {
+		_ = regexp.MustCompile("stored by init") // want "`regexp.MustCompile` panics on a bad input"
+	}
+	go func() {
+		_ = regexp.MustCompile("started by init") // want "`regexp.MustCompile` panics on a bad input"
+	}()
+}
+
+// A method named init is called like any other method, so it is no init function.
+func (loader) init() {
+	_ = regexp.MustCompile("method") // want "`regexp.MustCompile` panics on a bad input"
+}
