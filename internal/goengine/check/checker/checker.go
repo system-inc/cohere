@@ -34,18 +34,35 @@
 // file against that upstream path to bump it; every change is marked
 // "cohere:".
 //
-// The changes are two. The first is the release. Upstream's Analyze
-// keeps every action's Result until the whole graph finishes, under its own
-// "TODO(adonovan): opt: clear them earlier, so we can release large data
-// structures like SSA sooner" (checker.go:210-219 at v0.50.0, :213 at
-// v0.49.0). On cohere's own tree that holds staticcheck's IR of every
-// package in the graph at once. Here an action's Result is released
-// when the last action that reads it has finished (releaseInputs). The
-// second is the order that lets the release free anything in time: an
-// action finishes its vertical work, facts from the packages below,
-// before its horizontal dependencies are built (prepare), which is what
-// keeps the engine under its memory cap. When x/tools resolves that
-// TODO, this copy goes away and check imports
+// The changes are two.
+//
+// The first is the release. Upstream's Analyze keeps every action's
+// Result until the whole graph finishes, under its own "TODO(adonovan):
+// opt: clear them earlier, so we can release large data structures like
+// SSA sooner" (checker.go:210-219 at v0.50.0, :213 at v0.49.0). On
+// cohere's own tree that holds staticcheck's IR of every package in the
+// graph at once. Here an action's Result is released when the last
+// action that reads it has finished (releaseInputs).
+//
+// The second is prepare, the order that lets the release free anything
+// in time: an action finishes its vertical work, facts from the packages
+// below, before its horizontal dependencies are built. Without it an
+// analyzer with a large Result and no facts, such as buildir, starts on
+// every package at once, before any reader of it can finish.
+//
+// Each is needed, measured on cohere's own root under the engine's
+// 5 GiB memory cap (collection off, the limit driving it), three runs
+// each, the same 335 findings both ways:
+//
+//	release only:     6.05 to 6.67 GB peak, 84 to 102s user
+//	release, prepare: 5.57 to 5.65 GB peak, 49 to 51s user
+//
+// At GOGC=100 the two look alike (8.8 GB peak release only, 9.1 to
+// 9.3 GB with prepare), since a collector with twice the live heap to
+// spare never works at a limit. The cap is what the engine ships, so
+// the cap regime is the one that decides.
+//
+// When x/tools resolves that TODO, this copy goes away and check imports
 // golang.org/x/tools/go/analysis/checker again.
 //
 // What else differs, because this module cannot import x/tools'
