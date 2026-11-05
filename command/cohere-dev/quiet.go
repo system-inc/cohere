@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // A quiet window switches the cache trim off (#cqfy7cv).
@@ -82,43 +85,51 @@ func quietHolds(directory string, now time.Time) (bool, string) {
 func quiet(arguments []string) int {
 	directory, poolDirectoryError := poolDirectory()
 	if poolDirectoryError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", poolDirectoryError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
 	if len(arguments) == 0 {
-		fmt.Println(quietStatus(directory, time.Now()))
+		fmt.Fprintln(streams.Output, quietStatus(directory, time.Now()))
 		return 0
 	}
 	switch arguments[0] {
 	case "on":
 		return quietOn(directory, arguments[1:], time.Now())
 	case "off":
-		window, present, _ := readQuiet(directory)
-		if removeError := os.Remove(quietPath(directory)); removeError != nil && !os.IsNotExist(removeError) {
-			fmt.Fprintf(os.Stderr, "cohere-dev: releasing the quiet window: %v\n", removeError)
-			return 1
-		}
-		if present {
-			fmt.Printf("quiet window released; it was %s\n", window.holder)
-		} else {
-			fmt.Println("no quiet window was open")
-		}
-		return 0
+		return quietOff(directory, streams.Output)
 	}
-	usage()
-	return 2
+	return usage()
+}
+
+// quietOff removes the marker, and says to output what it released: the window it was, a marker that could
+// not be read, which off removes all the same, or that none was open.
+func quietOff(directory string, output *bufio.Writer) int {
+	window, present, readQuietError := readQuiet(directory)
+	if removeError := os.Remove(quietPath(directory)); removeError != nil && !os.IsNotExist(removeError) {
+		fmt.Fprintf(streams.Errors, "cohere-dev: releasing the quiet window: %v\n", removeError)
+		return 1
+	}
+	switch {
+	case readQuietError != nil:
+		fmt.Fprintf(output, "quiet window released; its marker could not be read: %v\n", readQuietError)
+	case present:
+		fmt.Fprintf(output, "quiet window released; it was %s\n", window.holder)
+	default:
+		fmt.Fprintln(output, "no quiet window was open")
+	}
+	return 0
 }
 
 func quietOn(directory string, arguments []string, now time.Time) int {
 	length := quietDefault
 	if len(arguments) > 0 && arguments[0] == "--for" {
 		if len(arguments) < 2 {
-			fmt.Fprintf(os.Stderr, "cohere-dev: --for wants a duration, like 30m\n")
+			fmt.Fprintf(streams.Errors, "cohere-dev: --for wants a duration, like 30m\n")
 			return 2
 		}
 		parsed, parseDurationError := time.ParseDuration(arguments[1])
 		if parseDurationError != nil || parsed <= 0 || parsed > quietLongest {
-			fmt.Fprintf(os.Stderr, "cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n", arguments[1], quietLongest)
+			fmt.Fprintf(streams.Errors, "cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n", arguments[1], quietLongest)
 			return 2
 		}
 		length = parsed
@@ -130,18 +141,20 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 	}
 	until := now.Add(length)
 	// No pid: this process ends as soon as the marker is written, and so does the go run that started it.
+	// Ignored: where it was opened only tells a reader of the marker; a window whose directory can't be read
+	// still holds, and still says when it ends and why.
 	working, _ := os.Getwd()
 	holder := fmt.Sprintf("opened in %s at %s: %s", working, now.Format("15:04:05"), why)
 	temporary := filepath.Join(directory, "."+quietFile)
 	if writeError := os.WriteFile(temporary, []byte(until.Format(time.RFC3339)+"\n"+holder+"\n"), 0o644); writeError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", writeError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", writeError)
 		return 1
 	}
 	if renameError := os.Rename(temporary, quietPath(directory)); renameError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", renameError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", renameError)
 		return 1
 	}
-	fmt.Printf("quiet window open until %s: the Go build cache trim holds off; release it with cohere-dev quiet off\n",
+	fmt.Fprintf(streams.Output, "quiet window open until %s: the Go build cache trim holds off; release it with cohere-dev quiet off\n",
 		until.Format("15:04:05"))
 	return 0
 }

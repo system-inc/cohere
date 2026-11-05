@@ -43,7 +43,7 @@ func newSteppedGate(test *testing.T) steppedGate {
 func (gate steppedGate) line(test *testing.T, command string) string {
 	test.Helper()
 	for deadline := time.Now().Add(time.Minute); ; time.Sleep(20 * time.Millisecond) {
-		contents, _ := os.ReadFile(gate.log)
+		contents := readMaybeMissing(test, gate.log)
 		for _, line := range strings.Split(string(contents), "\n") {
 			if strings.HasPrefix(line, command+" ") {
 				return line

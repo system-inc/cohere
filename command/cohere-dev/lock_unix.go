@@ -23,5 +23,7 @@ func tryLockFile(file *os.File) (bool, error) {
 }
 
 func unlockFile(file *os.File) {
-	syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	// Ignored: an unlock fails only on a descriptor that is not open, and every caller closes the file next,
+	// which drops the lock whatever this returned.
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 }

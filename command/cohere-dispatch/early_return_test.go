@@ -64,7 +64,10 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				normalize := func(text string) string {
 					text = invocationLines.ReplaceAllString(text, "")
 					text = bytes.NewBufferString(text).String()
-					resolved, _ := filepath.EvalSymlinks(root)
+					resolved, resolveSymlinksError := filepath.EvalSymlinks(root)
+					if resolveSymlinksError != nil {
+						test.Fatalf("resolving the project's root: %v", resolveSymlinksError)
+					}
 					text = regexp.MustCompile(regexp.QuoteMeta(resolved)).ReplaceAllString(text, "ROOT")
 					text = regexp.MustCompile(regexp.QuoteMeta(root)).ReplaceAllString(text, "ROOT")
 					return clock.ReplaceAllString(durations.ReplaceAllString(text, "D"), "T")
@@ -83,7 +86,11 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 			// rewrote files records no run of its own, and still writes the sections it produced.
 			deadline := time.Now().Add(30 * time.Second)
 			for {
-				if files, _ := filepath.Glob(filepath.Join(early.root, ".cache", "cohere", "*.gob")); len(files) > 0 {
+				files, globError := filepath.Glob(filepath.Join(early.root, ".cache", "cohere", "*.gob"))
+				if globError != nil {
+					test.Fatalf("looking for the cache table: %v", globError)
+				}
+				if len(files) > 0 {
 					break
 				}
 				if time.Now().After(deadline) {
@@ -171,10 +178,14 @@ func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
 		command := earlyReturnCommand(dispatcher, engine, root, "--no-fix", "--profile", profilePath)
 		command.Stdout, command.Stderr = output, output
 		err = command.Run()
-		output.Close()
+		closeError := output.Close()
 		if err != nil {
+			// Ignored: the run already failed, and that is what fails the test; its output is only context.
 			written, _ := os.ReadFile(output.Name())
 			test.Fatalf("round %d: the profiled run failed: %v\n%s", round, err, written)
+		}
+		if closeError != nil {
+			test.Fatalf("round %d: closing the run's output: %v", round, closeError)
 		}
 		file, err := os.Open(profilePath)
 		if err != nil {
@@ -182,11 +193,11 @@ func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
 		}
 		reader, err := gzip.NewReader(file)
 		if err != nil {
-			file.Close()
+			_ = file.Close() // Ignored: a profile only read, and the test fails on what the read found.
 			test.Fatalf("round %d: the profile is not a whole gzip stream when the caller had its answer: %v", round, err)
 		}
 		read, err := io.Copy(io.Discard, reader)
-		file.Close()
+		_ = file.Close() // Ignored: a profile only read, to its end.
 		if err != nil || read == 0 {
 			test.Fatalf("round %d: the profile read %d bytes and then %v when the caller had its answer", round, read, err)
 		}
@@ -228,6 +239,7 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 	if openError != nil {
 		test.Fatalf("the first run left no table lock: %v", openError)
 	}
+	// Ignored: a lock file only locked, never written; its lock is dropped below, or with the descriptor.
 	defer lock.Close()
 	if flockError := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); flockError != nil {
 		test.Fatal(flockError)
@@ -246,7 +258,9 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 		test.Fatalf("the second run finished while the table's lock was held (%v):\n%s", err, output.String())
 	case <-time.After(1500 * time.Millisecond):
 	}
-	syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	if unlockError := syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); unlockError != nil {
+		test.Fatalf("releasing the table's lock: %v", unlockError)
+	}
 	select {
 	case err := <-finished:
 		if err != nil {

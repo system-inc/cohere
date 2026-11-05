@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"slices"
 	"strings"
@@ -41,7 +41,7 @@ func testEnvironment(base []string) ([]string, []corpus.Corpus, error) {
 
 // printUncovered names the corpora a run did not cover, and how to cover them, or nothing when it covered
 // every one.
-func printUncovered(writer io.Writer, uncovered []corpus.Corpus) {
+func printUncovered(writer *bufio.Writer, uncovered []corpus.Corpus) {
 	if len(uncovered) == 0 {
 		return
 	}
@@ -49,6 +49,8 @@ func printUncovered(writer io.Writer, uncovered []corpus.Corpus) {
 	for _, uncoveredCorpus := range uncovered {
 		names = append(names, fmt.Sprintf("%s (%s)", uncoveredCorpus.Name, uncoveredCorpus.Variable))
 	}
+	// Ignored: an uncovered list comes only from testEnvironment, which returns this call's error before there
+	// is one, and the path rests on the environment alone, which nothing changes between the two.
 	path, _ := corpus.ConfigPath()
 	fmt.Fprintf(writer, "cohere-dev: not covered, so their tests skipped: %s. Set the variables, or name the "+
 		"checkouts in %s.\n", strings.Join(names, ", "), path)
