@@ -57,7 +57,7 @@ func applyProposedFixes(
 	ctx context.Context,
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
-	rules []rule.Rule,
+	rules []rule.Entry,
 	formatPlan func() (edit.Transform, []string),
 	writable formatScope,
 	repositoryRoot string,
@@ -567,7 +567,7 @@ func proposalsForText(
 	fileName string,
 	text string,
 	graph *program.Graph,
-	rules []rule.Rule,
+	rules []rule.Entry,
 ) ([]edit.Proposal, error) {
 	// No rules propose nothing, and need no graph to say so: `--format-only` has neither.
 	if len(rules) == 0 {
@@ -603,24 +603,26 @@ func proposalsForText(
 	 * have options. Only passes two and later go through here, and only a file with two overlapping
 	 * fixes ever needs a second pass at all.
 	 */
-	applicable := rules
-	ruleOptions := map[string]any{}
-	if graph.LintConfig != nil {
+	applicable := make([]rule.Bound, 0, len(rules))
+	if graph.LintConfig == nil {
+		// No configuration decodes nothing, so every rule runs as a bare severity would.
+		for _, subject := range rules {
+			applicable = append(applicable, subject.Unconfigured)
+		}
+	} else {
 		resolution := graph.LintConfig.Resolve(fileName)
 		if resolution.Ignored {
 			return nil, nil
 		}
-		applicable = applicable[:0:0]
 		for _, subject := range rules {
 			if !resolution.Enabled(subject.Name) {
 				continue
 			}
-			decoded, decodeError := graph.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
-			if decodeError != nil {
-				return nil, fmt.Errorf("decoding options for %s on %s: %w", subject.Name, fileName, decodeError)
+			bound, bindError := graph.Bind(subject, resolution.RawOptionsFor(subject.Name))
+			if bindError != nil {
+				return nil, fmt.Errorf("decoding options for %s on %s: %w", subject.Name, fileName, bindError)
 			}
-			ruleOptions[subject.Name] = decoded
-			applicable = append(applicable, subject)
+			applicable = append(applicable, bound)
 		}
 	}
 
@@ -684,7 +686,7 @@ func proposalsForText(
 		currentRule := subject
 		context := rule.Context{
 			SourceFile: sourceFile,
-			Program:    rule.ViewProgram(graph.Program, sourceFile, currentRule),
+			Program:    rule.ViewProgram(graph.Program, sourceFile, currentRule.Traits),
 			FileCache:  fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name
@@ -698,7 +700,7 @@ func proposalsForText(
 			},
 		}
 
-		listeners := currentRule.Run(context, ruleOptions[currentRule.Name])
+		listeners := currentRule.Run(context)
 		if len(listeners) == 0 {
 			continue
 		}

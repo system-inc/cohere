@@ -212,7 +212,7 @@ var noListenerReasons = map[rule.NoListenerKind]string{
 // nothing is described by why it was offered nothing, and the config's two reasons are told apart
 // there: a rule turned off and a rule nobody configured are different decisions.
 func classifyTypeScriptCoverage(
-	rules []rule.Rule,
+	rules []rule.Entry,
 	coverage program.Coverage,
 	lintConfiguration *configuration.Config,
 ) coverageSummary {
@@ -658,7 +658,7 @@ const namedRuleGapsSentence = "the notes above name the rules that could not fin
 // and named in no rules block; they are held in `configuration.PluginDefaultRules` and resolved into
 // the config's rules on load, so a denominator taken from the block alone would understate by exactly
 // the rules nobody wrote down.
-func unportedConfiguredRules(rules []rule.Rule, lintConfiguration *configuration.Config) []string {
+func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuration.Config) []string {
 	if lintConfiguration == nil {
 		return nil
 	}
@@ -701,7 +701,7 @@ func wantedConfiguredRules(lintConfiguration *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Config) {
 	if lintConfiguration == nil {
 		return
 	}
@@ -718,7 +718,7 @@ func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfiguration
 // and every category a reader must act on can be tested to print by default.
 type lintReport struct {
 	Result     program.Result
-	Rules      []rule.Rule
+	Rules      []rule.Entry
 	LintConfig *configuration.Config
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string

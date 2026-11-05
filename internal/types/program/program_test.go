@@ -12,6 +12,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -130,14 +131,14 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 	}
 
 	typeNames := []string{}
-	typeReporter := rule.Rule{
+	typeReporter := rule.Rule[rule.NoOptions]{
 		Name: "test-report-initializer-type",
 
 		// Declared, because the walk acquires a checker only for rules that ask. The nil assertion
 		// below is what catches an undeclared rule, and it caught this one.
 		NeedsTypeChecker: true,
 
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if ruleContext.TypeChecker == nil {
 				test.Error("a rule was dispatched without a checker")
 				return nil
@@ -159,7 +160,7 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{typeReporter})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, typeReporter))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -197,9 +198,9 @@ func TestWalkReportsCoverage(test *testing.T) {
 		test.Fatalf("building: %v", err)
 	}
 
-	listening := rule.Rule{
+	listening := rule.Rule[rule.NoOptions]{
 		Name: "test-listening",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				// Listens and reports nothing: the test tells a rule that ran quiet from one that declined.
 			}}
@@ -207,12 +208,16 @@ func TestWalkReportsCoverage(test *testing.T) {
 	}
 	// A rule that declines every file must be visibly distinct from one that ran and found nothing.
 	// Four rules in the gate this tool replaces were dead for months inside that ambiguity.
-	declining := rule.Rule{
+	declining := rule.Rule[rule.NoOptions]{
 		Name: "test-declining",
-		Run:  func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+		Run:  func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil },
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening, declining})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, listening, declining),
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -327,7 +332,11 @@ func TestWalkRefusesAnEmptyRun(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 
-	if _, walkError := graph.Walk(context.Background(), nil, []rule.Rule{{Name: "any"}}); walkError == nil {
+	if _, walkError := graph.Walk(
+		context.Background(),
+		nil,
+		rule_testing.EntriesOf(test, rule.Rule[rule.NoOptions]{Name: "any"}),
+	); walkError == nil {
 		test.Error("walking an empty file set returned a clean result")
 	}
 	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), nil); walkError == nil {
@@ -453,10 +462,10 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 		test.Fatalf("building: %v", err)
 	}
 
-	panicsInAListener := rule.Rule{
+	panicsInAListener := rule.Rule[rule.NoOptions]{
 		Name:             "test-typed-panics-in-a-listener",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -467,16 +476,16 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 			}
 		},
 	}
-	panicsInRun := rule.Rule{
+	panicsInRun := rule.Rule[rule.NoOptions]{
 		Name:             "test-typed-panics-in-run",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			panic("simulated panic before any listener")
 		},
 	}
-	witness := rule.Rule{
+	witness := rule.Rule[rule.NoOptions]{
 		Name: "test-reports-every-declaration",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
 					ruleContext.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
@@ -488,7 +497,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 	result, err := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
-		[]rule.Rule{panicsInAListener, panicsInRun, witness},
+		rule_testing.EntriesOf(test, panicsInAListener, panicsInRun, witness),
 	)
 	if err != nil {
 		test.Fatalf("a panic in one rule ended the whole walk: %v", err)
@@ -547,10 +556,10 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 
 	var keptLock sync.Mutex
 	var kept []rule.Program
-	keeper := rule.Rule{
+	keeper := rule.Rule[rule.NoOptions]{
 		Name:         "test-keeps-its-program",
 		ProgramReads: rule.ReadsCompilerOptions,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if ruleContext.Program.Options() == nil {
 				test.Error("the program view read no options during its own file")
 			}
@@ -563,7 +572,7 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, keeper))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -608,9 +617,9 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 		test.Fatalf("building: %v", err)
 	}
 
-	quiet := rule.Rule{
+	quiet := rule.Rule[rule.NoOptions]{
 		Name: "test-reports-nothing",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
 					// Listens and reports nothing, so the walk runs it and nothing in it can panic.
@@ -619,7 +628,7 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, quiet))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}

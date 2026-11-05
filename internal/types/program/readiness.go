@@ -57,7 +57,7 @@ type fileReadiness struct {
 }
 
 // newFileReadiness starts a file's record over the set rules among the rules about to walk.
-func newFileReadiness(readiness *Readiness, rules []rule.Rule, measureOnly map[string]bool) *fileReadiness {
+func newFileReadiness(readiness *Readiness, rules []rule.Entry, measureOnly map[string]bool) *fileReadiness {
 	if readiness == nil {
 		return nil
 	}

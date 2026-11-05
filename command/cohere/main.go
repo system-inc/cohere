@@ -1963,7 +1963,7 @@ func lintConfigSources(path string) []string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *configuration.Config) {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, config *configuration.Config) {
 	if config == nil {
 		return
 	}

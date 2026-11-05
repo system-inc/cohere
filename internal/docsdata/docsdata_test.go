@@ -61,6 +61,21 @@ func TestTheRenderedFilesAreCurrent(test *testing.T) {
 	}
 }
 
+// unregisteredEntry is a rule that takes no options, as the registry would hold it, for a test that adds it to
+// the inputs without registering it in the process-wide catalog. Its Run is written here, so it reads as a rule
+// of this package.
+func unregisteredEntry(test *testing.T, name string) rule.Entry {
+	test.Helper()
+	entry, entryError := rule.EntryOf(rule.Registration[rule.NoOptions]{Rule: rule.Rule[rule.NoOptions]{
+		Name: name,
+		Run:  func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners { return nil },
+	}})
+	if entryError != nil {
+		test.Fatalf("making the entry for %s: %v", name, entryError)
+	}
+	return entry
+}
+
 // TestCheckSeesARegistryChange is -check's contract for the registry, in both directions: the committed
 // files pass as they are, and fail once a rule is removed or added.
 func TestCheckSeesARegistryChange(test *testing.T) {
@@ -75,18 +90,16 @@ func TestCheckSeesARegistryChange(test *testing.T) {
 	if stale := staleAgainstCommitted(test, built(test, removed)); !slices.Contains(stale, RulesPath) {
 		test.Errorf(
 			"removing %s from the registry left rules.json current: %v",
-			inputs.Registrations[0].Rule.Name,
+			inputs.Registrations[0].Name,
 			stale,
 		)
 	}
 
 	added := inputs
-	added.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
-		Rule: rule.Rule{
-			Name: "nexus/consistency-no-docsdata-test-rule",
-			Run:  func(rule.Context, any) rule.Listeners { return nil },
-		},
-	})
+	added.Registrations = append(
+		slices.Clone(inputs.Registrations),
+		unregisteredEntry(test, "nexus/consistency-no-docsdata-test-rule"),
+	)
 	if stale := staleAgainstCommitted(test, built(test, added)); !slices.Contains(stale, RulesPath) {
 		test.Errorf("adding a rule to the registry left rules.json current: %v", stale)
 	}
@@ -304,9 +317,10 @@ func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
 	}
 
 	misnamed := inputs
-	misnamed.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
-		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
-	})
+	misnamed.Registrations = append(
+		slices.Clone(inputs.Registrations),
+		unregisteredEntry(test, "nexus/docsdata-test-rule"),
+	)
 	if _, buildError := Build(
 		misnamed,
 	); buildError == nil || !strings.Contains(buildError.Error(), "nexus/docsdata-test-rule") {

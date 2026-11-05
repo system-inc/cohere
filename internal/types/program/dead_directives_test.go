@@ -9,18 +9,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-func deadDirectiveRules() []rule.Rule {
-	return []rule.Rule{
-		{Name: "test-quiet", Run: func(ruleContext rule.Context, options any) rule.Listeners {
+func deadDirectiveRules() []rule.Rule[rule.NoOptions] {
+	return []rule.Rule[rule.NoOptions]{
+		{Name: "test-quiet", Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				// Listens and reports nothing, so a directive naming this rule withholds nothing.
 			}}
 		}},
-		{Name: "test-live", Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		{Name: "test-live", Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindDebuggerStatement: func(node *ast.Node) {
 				ruleContext.ReportNode(node, rule.Message{Id: "debugger", Description: "debugger"})
 			}}
@@ -43,7 +44,11 @@ func deadDirectiveGraph(test *testing.T, root, source string) *program.Graph {
 	return graph
 }
 
-func walkDeadDirectiveFixture(test *testing.T, graph *program.Graph, rules []rule.Rule) program.Result {
+func walkDeadDirectiveFixture(
+	test *testing.T,
+	graph *program.Graph,
+	rules []rule.Entry,
+) program.Result {
 	test.Helper()
 	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if walkError != nil {
@@ -147,7 +152,7 @@ func TestDeadDisableFindingsAndFixes(test *testing.T) {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
 			root := test.TempDir()
-			rules := deadDirectiveRules()
+			rules := rule_testing.EntriesOf(test, deadDirectiveRules()...)
 			if fixture.filtered {
 				rules = rules[1:]
 			}
@@ -197,7 +202,7 @@ func TestDeadDisableFindingsSurviveReplay(test *testing.T) {
 	root := test.TempDir()
 	source := "// cohere-disable-next-line test-quiet, test-live -- needed\ndebugger;\n"
 	graph := deadDirectiveGraph(test, root, source)
-	rules := deadDirectiveRules()
+	rules := rule_testing.EntriesOf(test, deadDirectiveRules()...)
 	key := program.HashRuleSet([]string{"dead-directive-fixture"})
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
@@ -252,7 +257,11 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: 2,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: 3,\n};\n"
 	subject := nexus.ConsistencyNoAbbreviatedIdentifier
-	full := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), []rule.Rule{subject})
+	full := walkDeadDirectiveFixture(
+		test,
+		deadDirectiveGraph(test, root, source),
+		[]rule.Entry{rule_testing.EntryOf(test, subject)},
+	)
 	if len(full.Diagnostics) != 3 || full.Coverage.Suppressed != 2 {
 		test.Fatalf(
 			"got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface",
@@ -265,12 +274,20 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 			test.Fatalf("want a fixable dead directive, got %+v", finding)
 		}
 	}
-	filtered := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), deadDirectiveRules()[:1])
+	filtered := walkDeadDirectiveFixture(
+		test,
+		deadDirectiveGraph(test, root, source),
+		rule_testing.EntriesOf(test, deadDirectiveRules()[:1]...),
+	)
 	if len(filtered.Diagnostics) != 0 {
 		test.Fatalf("filtered run reported %d findings, want 0", len(filtered.Diagnostics))
 	}
 	live := "// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- needed\nconst max = 1;\n"
-	suppressed := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, live), []rule.Rule{subject})
+	suppressed := walkDeadDirectiveFixture(
+		test,
+		deadDirectiveGraph(test, root, live),
+		[]rule.Entry{rule_testing.EntryOf(test, subject)},
+	)
 	if len(suppressed.Diagnostics) != 0 || suppressed.Coverage.Suppressed != 1 {
 		test.Fatalf(
 			"live directive: %d findings, %d withheld; want 0 and 1",
@@ -278,7 +295,11 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 			suppressed.Coverage.Suppressed,
 		)
 	}
-	control := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, "const max = 1;\n"), []rule.Rule{subject})
+	control := walkDeadDirectiveFixture(
+		test,
+		deadDirectiveGraph(test, root, "const max = 1;\n"),
+		[]rule.Entry{rule_testing.EntryOf(test, subject)},
+	)
 	if len(control.Diagnostics) != 1 || control.Diagnostics[0].RuleName != subject.Name {
 		test.Fatalf("stripped binding control: want 1 abbreviation finding, got %+v", control.Diagnostics)
 	}

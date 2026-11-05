@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -69,7 +70,7 @@ func TestFixPathHonoursADisableComment(test *testing.T) {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			proposals, proposalsForTextError := proposalsForText("/Probe.ts", testCase.text, &program.Graph{},
-				[]rule.Rule{core.NoDebugger})
+				[]rule.Entry{rule_testing.EntryOf(test, core.NoDebugger)})
 			if proposalsForTextError != nil {
 				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}

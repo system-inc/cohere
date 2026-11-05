@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -37,9 +38,9 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
-	listening := rule.Rule{
+	listening := rule.Rule[rule.NoOptions]{
 		Name: "no-console",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				// Listens and reports nothing, so the rule counts as run.
 			}}
@@ -47,7 +48,11 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 	}
 
 	walk := func() []string {
-		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, listening),
+		)
 		if walkError != nil {
 			test.Fatalf("walking: %v", walkError)
 		}
@@ -77,7 +82,7 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 		test.Fatalf("unknown-rule findings\n got: %q\nwant: %q", got, want)
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, listening))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}

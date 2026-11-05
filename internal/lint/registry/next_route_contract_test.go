@@ -129,7 +129,7 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 
 			sawContractNames := 0
 			for _, subject := range rules {
-				result := rule_testing.RunTyped(test, subject, filePath, sourceText)
+				result := rule_testing.RunTypedBound(test, subject.Unconfigured, filePath, sourceText)
 				contractRanges := contractExportNameRanges(result.SourceFile, contract)
 				if sawContractNames == 0 {
 					sawContractNames = len(contractRanges)

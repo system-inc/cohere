@@ -474,14 +474,14 @@ func (cache *LintCache) Store(entry LintCacheEntry) {
 // The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
 // excluding one wrongly costs a cache miss. A rule that reads other files and the checker both is
 // excluded, since other files are the larger reach.
-func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, design []rule.Rule, derived []rule.Rule,
-	uncacheable []rule.Rule) {
+func CacheClasses(rules []rule.Entry) (pure []rule.Entry, typeAware []rule.Entry, design []rule.Entry,
+	derived []rule.Entry, uncacheable []rule.Entry) {
 	for _, subject := range rules {
 		readsTypes := subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0
 		readsDesignSystem := subject.ProgramReads&rule.ReadsDesignSystem != 0
 		readsOtherFiles := subject.ProgramReads&rule.ReadsOtherFiles != 0
 		switch {
-		case readsOtherFiles && subject.ProgramFingerprint != nil && !readsDesignSystem:
+		case readsOtherFiles && subject.HasProgramFingerprint && !readsDesignSystem:
 			derived = append(derived, subject)
 		case readsOtherFiles, readsDesignSystem && readsTypes:
 			uncacheable = append(uncacheable, subject)
@@ -498,7 +498,7 @@ func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, d
 
 // CacheableRules splits a rule set into the rules whose findings depend on nothing but the file's
 // bytes, and everything else. See CacheClasses for the three-way split the walk uses.
-func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
+func CacheableRules(rules []rule.Entry) (cacheable []rule.Entry, uncacheable []rule.Entry) {
 	pure, typeAware, design, derived, never := CacheClasses(rules)
 	return pure, append(append(append(typeAware, design...), derived...), never...)
 }

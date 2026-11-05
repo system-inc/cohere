@@ -42,7 +42,7 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 	if _, walkError := fused.Walk(
 		context.Background(),
 		fused.ProjectFiles(),
-		[]rule.Rule{typeAwareRule(test)},
+		[]rule.Entry{typeAwareRule(test)},
 	); walkError != nil {
 		test.Fatalf("walk: %v", walkError)
 	}
@@ -87,7 +87,7 @@ func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
 	if _, walkError := fused.Walk(
 		context.Background(),
 		fused.ProjectFiles(),
-		[]rule.Rule{typeAwareRule(test)},
+		[]rule.Entry{typeAwareRule(test)},
 	); walkError != nil {
 		test.Fatalf("walk: %v", walkError)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -15,37 +16,40 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 	test.Parallel()
 	for _, fixture := range []struct {
 		name, source, fixed string
-		rules               []rule.Rule
+		rules               []rule.Entry
 	}{
 		{
 			"dead",
 			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
 			"\nconst a = 1;\n",
-			[]rule.Rule{core.NoDebugger},
+			[]rule.Entry{rule_testing.EntryOf(test, core.NoDebugger)},
 		},
 		{
 			"unselected",
 			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
 			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
-			[]rule.Rule{core.NoSelfCompare},
+			[]rule.Entry{rule_testing.EntryOf(test, core.NoSelfCompare)},
 		},
 		{
 			"live",
 			"// cohere-disable-next-line no-debugger\ndebugger;\n",
 			"// cohere-disable-next-line no-debugger\ndebugger;\n",
-			[]rule.Rule{core.NoDebugger},
+			[]rule.Entry{rule_testing.EntryOf(test, core.NoDebugger)},
 		},
 		{
 			"blanket with skipped type-aware rule",
 			"/* cohere-disable */\nconst a = 1;\n",
 			"/* cohere-disable */\nconst a = 1;\n",
-			[]rule.Rule{core.NoDebugger, {Name: "test-type-aware", NeedsTypeChecker: true}},
+			[]rule.Entry{
+				rule_testing.EntryOf(test, core.NoDebugger),
+				rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{Name: "test-type-aware", NeedsTypeChecker: true}),
+			},
 		},
 		{
 			"mixed",
 			"// cohere-disable-next-line no-self-compare, no-debugger -- needed\ndebugger;\n",
 			"// cohere-disable-next-line no-debugger -- needed\ndebugger;\n",
-			[]rule.Rule{core.NoDebugger, core.NoSelfCompare},
+			[]rule.Entry{rule_testing.EntryOf(test, core.NoDebugger), rule_testing.EntryOf(test, core.NoSelfCompare)},
 		},
 	} {
 		test.Run(fixture.name, func(test *testing.T) {

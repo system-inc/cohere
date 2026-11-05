@@ -15,7 +15,7 @@ import (
 // can prove its name dead; an unselected name stays in the comment, including on a filtered run.
 // Report directly, so a blanket disable cannot silence a finding about itself. These findings are
 // rebuilt even on a findings-cache hit, after its withheld findings have been marked by rule.
-func reportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, ran []rule.Rule,
+func reportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, ran []rule.Entry,
 	measureOnly map[string]bool, crashes []RuleCrash, report func(rule.Diagnostic)) {
 	if len(index.Directives()) == 0 {
 		return

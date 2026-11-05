@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -45,8 +46,8 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		"test-set-enabled": nil, "test-set-off": nil, "test-set-skips": nil,
 	}}
 
-	eachConstant := func(id string, fix bool) func(ruleContext rule.Context, options any) rule.Listeners {
-		return func(ruleContext rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string, fix bool) func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+		return func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				message := rule.Message{Id: id, Description: id}
 				if fix {
@@ -57,11 +58,11 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 			}}
 		}
 	}
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		{Name: "test-other", Run: eachConstant("other", false)},
 		{Name: "test-set-enabled", Run: eachConstant("enabled", false)},
 		{Name: "test-set-off", Run: eachConstant("off", true)},
-		{Name: "test-set-skips", Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		{Name: "test-set-skips", Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 			if filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "b.ts" {
 				ruleContext.Skip("b.ts lacks what this rule needs")
 				return nil
@@ -69,7 +70,7 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 			return nil
 		}, NoListener: rule.NoListenerAnswersInRun},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -147,19 +148,22 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 		test.Fatalf("loading the config: %v", err)
 	}
 	ran := false
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		{
 			Name:       "test-other",
-			Run:        func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+			Run:        func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners { return nil },
 			NoListener: rule.NoListenerAnswersInRun,
 		},
 		{
 			Name:       "test-set-off",
-			Run:        func(ruleContext rule.Context, options any) rule.Listeners { ran = true; return nil },
+			Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+				ran = true
+				return nil
+			},
 			NoListener: rule.NoListenerAnswersInRun,
 		},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -191,13 +195,16 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{"test-set-enabled": nil}}
 
 	var runs atomic.Int32
-	rules := []rule.Rule{{Name: "test-set-enabled", Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	rules := []rule.Rule[rule.NoOptions]{{Name: "test-set-enabled", Run: func(
+		ruleContext rule.Context,
+		_ rule.Given[rule.NoOptions],
+	) rule.Listeners {
 		runs.Add(1)
 		return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 			ruleContext.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
 		}}
 	}}}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -242,24 +249,28 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 	})
 
 	var runs atomic.Int32
-	counted := func(subject rule.Rule) rule.Rule {
-		run := subject.Run
-		subject.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	// Counts the runs of a rule's Unconfigured, which is what this walk runs: the config gives no rule options.
+	counted := func(subject rule.Entry) rule.Entry {
+		run := subject.Unconfigured.Run
+		subject.Unconfigured.Run = func(ruleContext rule.Context) rule.Listeners {
 			runs.Add(1)
-			return run(ruleContext, options)
+			return run(ruleContext)
 		}
 		return subject
 	}
-	eachConstant := func(id string) func(ruleContext rule.Context, options any) rule.Listeners {
-		return func(ruleContext rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string) func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		return func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				ruleContext.ReportNode(node, rule.Message{Id: id, Description: id})
 			}}
 		}
 	}
-	rules := []rule.Rule{
-		counted(rule.Rule{Name: "test-set-enabled", Run: eachConstant("enabled")}),
-		counted(rule.Rule{Name: "test-set-off", Run: eachConstant("off")}),
+	rules := []rule.Entry{
+		counted(rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{
+			Name: "test-set-enabled",
+			Run:  eachConstant("enabled"),
+		})),
+		counted(rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{Name: "test-set-off", Run: eachConstant("off")})),
 		counted(typeAware),
 	}
 

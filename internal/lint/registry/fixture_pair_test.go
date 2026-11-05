@@ -126,7 +126,7 @@ func harnessAssertionsIn(test *testing.T, path string) harnessAssertions {
 
 // ruleDeclarationsByFile returns the exported rule.Rule declarations in each rules file.
 //
-// Only package-level `var X = rule.Rule{...}` counts, which is what separates a rule from the
+// Only package-level `var X = rule.Rule[Options]{...}` counts, which is what separates a rule from the
 // adapter that builds one at runtime.
 func ruleDeclarationsByFile(test *testing.T) map[string][]string {
 	test.Helper()

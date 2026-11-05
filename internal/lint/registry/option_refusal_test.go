@@ -46,7 +46,7 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
 	test.Parallel()
 	probed, lenient, skipped := 0, 0, []string{}
 	for _, registration := range rule.Registered() {
-		name := registration.Rule.Name
+		name := registration.Name
 		baseline, probe, decode := topLevelProbe(registration)
 		if decode == nil {
 			continue
@@ -95,26 +95,39 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
 
 // topLevelProbe builds a registration's baseline and probe, and the decoder to run them through, or a
 // nil decoder for a rule that takes no options or reads paths and so needs a real config to decode.
-func topLevelProbe(registration rule.Registration) (baseline []byte, probe []byte, decode func([]byte) (any, error)) {
+func topLevelProbe(registration rule.Entry) (baseline []byte, probe []byte, decode func([]byte) (rule.Bound, error)) {
 	object := `{}`
 	probeObject := `{"` + unknownOptionKey + `": true}`
-	switch {
-	case registration.Decode != nil:
-		return []byte(object), []byte(probeObject), registration.Decode
-	case registration.DecodeOptionList != nil:
-		if _, err := registration.DecodeOptionList([]byte(`[` + object + `]`)); err == nil {
-			return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), registration.DecodeOptionList
+	decode = decoderOf(registration)
+	switch registration.Arity {
+	case rule.OptionArityOne:
+		return []byte(object), []byte(probeObject), decode
+	case rule.OptionArityList:
+		if _, err := decode([]byte(`[` + object + `]`)); err == nil {
+			return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), decode
 		}
 		for _, mode := range optionListModes {
-			if _, err := registration.DecodeOptionList([]byte(`[` + mode + `, ` + object + `]`)); err == nil {
+			if _, err := decode([]byte(`[` + mode + `, ` + object + `]`)); err == nil {
 				return []byte(
 					`[` + mode + `, ` + object + `]`,
-				), []byte(`[` + mode + `, ` + probeObject + `]`), registration.DecodeOptionList
+				), []byte(`[` + mode + `, ` + probeObject + `]`), decode
 			}
 		}
-		return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), registration.DecodeOptionList
+		return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), decode
+	case rule.OptionArityNone, rule.OptionArityAt:
 	}
 	return nil, nil, nil
+}
+
+// decoderOf is a registration's decoder as these probes call it, binding its rule to what it decodes, or nil
+// for a rule that takes no options or reads paths and so needs a real config to decode.
+func decoderOf(registration rule.Entry) func(raw []byte) (rule.Bound, error) {
+	switch registration.Arity {
+	case rule.OptionArityOne, rule.OptionArityList:
+		return func(raw []byte) (rule.Bound, error) { return registration.Bind(raw, rule.OptionsBase{}) }
+	case rule.OptionArityNone, rule.OptionArityAt:
+	}
+	return nil
 }
 
 // nestedOptionCase is one object below the top level, whose schema closes it too.
@@ -267,9 +280,9 @@ var nestedOptionCases = []nestedOptionCase{
 
 func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
 	test.Parallel()
-	registrations := map[string]rule.Registration{}
+	registrations := map[string]rule.Entry{}
 	for _, registration := range rule.Registered() {
-		registrations[registration.Rule.Name] = registration
+		registrations[registration.Name] = registration
 	}
 	for _, testCase := range nestedOptionCases {
 		test.Run(testCase.rule+" "+testCase.refusal, func(test *testing.T) {
@@ -278,10 +291,7 @@ func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
 			if !registered {
 				test.Fatalf("%s is not registered under that name", testCase.rule)
 			}
-			decode := registration.Decode
-			if decode == nil {
-				decode = registration.DecodeOptionList
-			}
+			decode := decoderOf(registration)
 			if decode == nil {
 				test.Fatalf("%s registers neither Decode nor DecodeOptionList", testCase.rule)
 			}

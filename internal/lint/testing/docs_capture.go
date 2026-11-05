@@ -19,15 +19,29 @@ type capturedRun struct {
 	rule       string
 	file       string
 	otherFiles int
-	options    any
+
+	// options is the options the case was run with, as JSON, nil for a rule run unconfigured. optionsError is
+	// why they did not encode, reported when the case is recorded.
+	options      []byte
+	optionsError error
 }
 
 // newCapturedRun starts a record for a Run, or returns nil when capture is off.
-func newCapturedRun(subject rule.Rule, fileName string, otherFiles int, options any) *capturedRun {
+func newCapturedRun[Options any](
+	ruleName string,
+	fileName string,
+	otherFiles int,
+	options rule.Given[Options],
+) *capturedRun {
 	if capture.Directory() == "" {
 		return nil
 	}
-	return &capturedRun{rule: subject.Name, file: fileName, otherFiles: otherFiles, options: options}
+	captured := &capturedRun{rule: ruleName, file: fileName, otherFiles: otherFiles}
+	// Encoded here, while the options' type is known, so the record holds bytes rather than an untyped value.
+	if value, configured := options.Read(); configured {
+		captured.options, captured.optionsError = json.Marshal(value)
+	}
+	return captured
 }
 
 // RecordAssertedCase records a case a test has just asserted by its own comparison rather than through
@@ -58,14 +72,13 @@ func recordCase(test *testing.T, result Result, outcome string, fixedSource stri
 		Outcome:     outcome,
 		FixedSource: fixedSource,
 	}
+	if result.capture.optionsError != nil {
+		// A case whose options cannot be shown cannot be an example either; the test itself passed.
+		test.Logf("docs capture: skipping a case whose options do not encode: %v", result.capture.optionsError)
+		return
+	}
 	if result.capture.options != nil {
-		encoded, encodeError := json.Marshal(result.capture.options)
-		if encodeError != nil {
-			// A case whose options cannot be shown cannot be an example either; the test itself passed.
-			test.Logf("docs capture: skipping a case whose options do not encode: %v", encodeError)
-			return
-		}
-		record.Options = encoded
+		record.Options = result.capture.options
 	}
 	for _, diagnostic := range result.Diagnostics {
 		sourceFile := result.SourceFile

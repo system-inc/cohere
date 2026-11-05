@@ -15,9 +15,9 @@ import (
 
 // captureProbe reports every debugger statement and proposes deleting it, a rule written to exercise
 // the docs capture rather than to ship.
-var captureProbe = rule.Rule{
+var captureProbe = rule.Rule[rule.NoOptions]{
 	Name: "probe-docs-capture",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
 				ruleContext.ReportNodeWithFixes(

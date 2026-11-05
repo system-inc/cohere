@@ -150,7 +150,7 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 // never return from a listener; context cancellation alone cannot interrupt them.
 // The caller must return immediately on a deadline, ending the dedicated test
 // process. The deadline is a separate safety bound, never reported as CPU time.
-func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration) (program.Result, error) {
+func measureOne(graph *program.Graph, subject rule.Entry, deadline time.Duration) (program.Result, error) {
 	type answer struct {
 		result program.Result
 		err    error
@@ -159,7 +159,7 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 	cancelContext, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		result, walkError := graph.Walk(cancelContext, graph.ProjectFiles(), []rule.Rule{subject})
+		result, walkError := graph.Walk(cancelContext, graph.ProjectFiles(), []rule.Entry{subject})
 		done <- answer{result, walkError}
 	}()
 	timer := time.NewTimer(deadline)
@@ -180,7 +180,7 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 func checkRuleBudget(
 	test *testing.T,
 	graph *program.Graph,
-	rules []rule.Rule,
+	rules []rule.Entry,
 	budget time.Duration,
 ) ([]program.RuleTiming, error) {
 	test.Helper()

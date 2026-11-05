@@ -221,7 +221,7 @@ type RuleNotes map[string]map[string]int
 //
 // Files are walked in parallel, one goroutine per checker, because a file must be visited by the
 // checker that owns it and there is no use in more workers than there are checkers.
-func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.Rule) (Result, error) {
+func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.Entry) (Result, error) {
 	if len(files) == 0 {
 		return Result{}, fmt.Errorf(
 			"nothing to walk: the file set is empty (the program holds %d files)",
@@ -979,14 +979,10 @@ func (containment *ruleContainment) recoverPanic() {
 	}
 }
 
-// run calls the rule's Run inside the boundary.
-func (containment *ruleContainment) run(
-	subject rule.Rule,
-	context rule.Context,
-	options any,
-) (listeners rule.Listeners) {
+// run calls the rule's Run, its options already bound, inside the boundary.
+func (containment *ruleContainment) run(subject rule.Bound, context rule.Context) (listeners rule.Listeners) {
 	defer containment.recoverPanic()
-	return subject.Run(context, options)
+	return subject.Run(context)
 }
 
 // anyRuleNeedsTypeChecker reports whether any of these rules declared that it reads the checker.
@@ -994,7 +990,7 @@ func (containment *ruleContainment) run(
 // Asked per file against the applicable set rather than once against the whole catalog, because
 // applicability is per file: a type-aware rule that declines this file should not make it pay for a
 // checker nobody will read.
-func anyRuleNeedsTypeChecker(rules []rule.Rule) bool {
+func anyRuleNeedsTypeChecker(rules []rule.Entry) bool {
 	for _, subject := range rules {
 		if subject.NeedsTypeChecker {
 			return true
@@ -1060,7 +1056,7 @@ type fileDispatcher struct {
 // tally, and every rule applicable to the file, replayed ones included, as the rules that ran.
 type directiveReplay struct {
 	withheld []LintCacheWithheld
-	rules    []rule.Rule
+	rules    []rule.Entry
 }
 
 // ruleSlot is one rule on one worker: what dispatching the rule needs that does not change between files.
@@ -1215,12 +1211,12 @@ func (slot *ruleSlot) hear(meter *workerMeter, listener func(node *ast.Node), no
 func (dispatcher *fileDispatcher) dispatchFileSafely(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
-	rules []rule.Rule,
+	rules []rule.Entry,
 	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
-	ruleOptions map[string]any,
+	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
 	resolution configuration.Resolved,
 ) (
@@ -1271,12 +1267,12 @@ func (dispatcher *fileDispatcher) dispatchFileSafely(
 func (dispatcher *fileDispatcher) dispatchFile(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
-	rules []rule.Rule,
+	rules []rule.Entry,
 	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
-	ruleOptions map[string]any,
+	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
 	resolution configuration.Resolved,
 ) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness) {
@@ -1323,16 +1319,13 @@ func (dispatcher *fileDispatcher) dispatchFile(
 		// slot rather than built for each file.
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     slot.programView.Point(dispatcher.graph.Program, sourceFile, subject),
+			Program:     slot.programView.Point(dispatcher.graph.Program, sourceFile, subject.Traits),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      slot.report,
 			RecordNote:  slot.recordNote,
 		}
 
-		// Options are decoded to the type the rule declares rather than handed through as JSON. A
-		// rule that receives the wrong shape fails its type assertion and declines every file, which
-		// looks exactly like a rule with nothing to report.
 		// Counted before Run rather than after, because the question this answers is whether anything
 		// ever handed this rule a file. A rule that panics or declines has still been offered one; a
 		// rule nobody wired never reaches this line at all.
@@ -1340,14 +1333,18 @@ func (dispatcher *fileDispatcher) dispatchFile(
 
 		slot.containment = ruleContainment{ruleName: subject.Name, fileName: sourceFile.FileName().AsString()}
 
+		// The rule runs bound to the options its selection decoded, to the type the rule declares rather than
+		// handed through as JSON.
+		bound := boundIn(ruleOptions, subject)
+
 		// Branched rather than always passing a closure, which would allocate once per rule per file on
 		// every run to serve a flag most runs don't set.
 		var listeners rule.Listeners
 		if meter == nil {
-			listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
+			listeners = slot.containment.run(bound, context)
 		} else {
 			meter.setup(slot.timing, func() {
-				listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
+				listeners = slot.containment.run(bound, context)
 			})
 		}
 		if slot.containment.crash != nil {
@@ -1640,7 +1637,7 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 // Mutates: unconfigured counts each rule left unconfigured for this file, for the caller's totals
 func (graph *Graph) rulesFor(
 	fileName string,
-	rules []rule.Rule,
+	rules []rule.Entry,
 	selections map[any]*ruleSelection,
 	scopedOff map[string]int,
 	unconfigured map[string]int,
@@ -1680,17 +1677,18 @@ func (graph *Graph) rulesFor(
 	return selection, resolution
 }
 
-// noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options.
+// noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options, so
+// each runs as its Unconfigured (boundIn).
 type noConfiguration struct{}
 
-// ruleSelection is what one resolution decides about the rule set: the rules that apply, their decoded
-// options, and the rules left out and why.
+// ruleSelection is what one resolution decides about the rule set: the rules that apply, each bound to its
+// decoded options, and the rules left out and why.
 //
 // Shared by every file that resolved the same way, on one worker, so nothing may write into it after it
 // is made, its options included: a rule reads its options and never writes them.
 type ruleSelection struct {
-	applicable []rule.Rule
-	options    map[string]any
+	applicable []rule.Entry
+	options    map[string]rule.Bound
 
 	// optionsKeys is each applicable rule's option elements as the config wrote them, joined, which is
 	// what the walk's program fingerprints are keyed on. One run decodes every option through one registry,
@@ -1736,7 +1734,7 @@ type ruleClassNames struct {
 
 	// derivedRules is the derived rules themselves, in derived's order, for their program fingerprints. See
 	// programFingerprints.
-	derivedRules []rule.Rule
+	derivedRules []rule.Entry
 }
 
 // classNames returns the selection's cache classes, made once. Made per file they were about 470 MB of a
@@ -1763,10 +1761,10 @@ func (selection *ruleSelection) classNames() *ruleClassNames {
 }
 
 // selectRules makes the selection for one resolution.
-func (graph *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved) *ruleSelection {
+func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Resolved) *ruleSelection {
 	selection := &ruleSelection{
-		applicable:  make([]rule.Rule, 0, len(rules)),
-		options:     map[string]any{},
+		applicable:  make([]rule.Entry, 0, len(rules)),
+		options:     map[string]rule.Bound{},
 		optionsKeys: map[string]string{},
 	}
 	for _, subject := range rules {
@@ -1775,14 +1773,12 @@ func (graph *Graph) selectRules(rules []rule.Rule, resolution configuration.Reso
 			if status == configuration.StatusScopedOff || status == configuration.StatusUnconfigured {
 				// Off for the chain and run for readiness: still counted as off below, since that is what
 				// the chain says, and run at the set's own options.
-				decoded, decodeError := graph.RuleOptions.Decode(subject.Name, graph.Readiness.Options[subject.Name])
+				bound, decodeError := graph.Bind(subject, graph.Readiness.Options[subject.Name])
 				if decodeError != nil {
 					selection.err = decodeError
 					return selection
 				}
-				if decoded != nil {
-					selection.options[subject.Name] = decoded
-				}
+				selection.options[subject.Name] = bound
 				selection.optionsKeys[subject.Name] = optionsKey(graph.Readiness.Options[subject.Name])
 				if selection.measureOnly == nil {
 					selection.measureOnly = map[string]bool{}
@@ -1807,18 +1803,40 @@ func (graph *Graph) selectRules(rules []rule.Rule, resolution configuration.Reso
 		}
 
 		raw := resolution.RawOptionsFor(subject.Name)
-		decoded, decodeError := graph.RuleOptions.Decode(subject.Name, raw)
+		bound, decodeError := graph.Bind(subject, raw)
 		if decodeError != nil {
 			selection.err = decodeError
 			return selection
 		}
-		if decoded != nil {
-			selection.options[subject.Name] = decoded
-		}
+		selection.options[subject.Name] = bound
 		selection.optionsKeys[subject.Name] = optionsKey(raw)
 		selection.applicable = append(selection.applicable, subject)
 	}
 	return selection
+}
+
+// Bind decodes subject's option elements through the run's registry and returns the rule bound to them. A
+// rule the registry holds no entry for runs as its Unconfigured, as it ran with no options before: an empty
+// registry is a walk where no rule takes options (Graph.RuleOptions), and Decode still refuses any element
+// written for such a rule.
+func (graph *Graph) Bind(subject rule.Entry, elements []json.RawMessage) (rule.Bound, error) {
+	bound, decodeError := graph.RuleOptions.Decode(subject.Name, elements)
+	if decodeError != nil {
+		return rule.Bound{}, decodeError
+	}
+	if _, declared := graph.RuleOptions[subject.Name]; !declared {
+		return subject.Unconfigured, nil
+	}
+	return bound, nil
+}
+
+// boundIn is subject as options decided it, or its Unconfigured when options holds nothing for it, as for every
+// rule of a walk with no configuration.
+func boundIn(options map[string]rule.Bound, subject rule.Entry) rule.Bound {
+	if bound, decided := options[subject.Name]; decided {
+		return bound
+	}
+	return subject.Unconfigured
 }
 
 // optionsKey spells a rule's option elements as one string that no other list of elements shares: each
@@ -1966,8 +1984,7 @@ func (graph *Graph) programFingerprints(
 	for _, subject := range derived {
 		if fingerprint, usable := memo.fingerprint(
 			graph,
-			subject,
-			selection.options[subject.Name],
+			boundIn(selection.options, subject),
 			selection.optionsKeys[subject.Name],
 		); usable {
 			fingerprints[subject.Name] = fingerprint
@@ -2000,13 +2017,12 @@ type programFingerprintEntry struct {
 	usable      bool
 }
 
-// fingerprint is subject's program fingerprint under options, computed once for the walk through a Program
-// viewed under the rule's own reads. optionsKey names the options; see ruleSelection.optionsKeys. The second
-// return is false when the fingerprint panicked, every time it is asked.
+// fingerprint is subject's program fingerprint under the options it is bound to, computed once for the walk
+// through a Program viewed under the rule's own reads. optionsKey names the options; see
+// ruleSelection.optionsKeys. The second return is false when the fingerprint panicked, every time it is asked.
 func (memo *programFingerprintMemo) fingerprint(
 	g *Graph,
-	subject rule.Rule,
-	options any,
+	subject rule.Bound,
 	optionsKey string,
 ) ([sha256.Size]byte, bool) {
 	key := programFingerprintKey{rule: subject.Name, options: optionsKey}
@@ -2024,7 +2040,7 @@ func (memo *programFingerprintMemo) fingerprint(
 				entry.usable = false
 			}
 		}()
-		entry.fingerprint = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject), options)
+		entry.fingerprint = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject.Traits))
 		entry.usable = true
 	})
 	return entry.fingerprint, entry.usable

@@ -25,12 +25,15 @@ type Result struct {
 
 // LintFile runs every rule against one already-parsed file.
 //
+// Each rule comes with its options already decided, so a rule run with none is handed as its Entry's
+// Unconfigured.
+//
 // program and typeChecker may be nil for a syntax-only pass. A rule that needs type information
 // reads them off the context and is responsible for handling their absence, rather than the linter
 // guessing which rules to skip.
 func LintFile(
 	sourceFile *ast.SourceFile,
-	rules []rule.Rule,
+	rules []rule.Bound,
 	program *compiler.Program,
 	typeChecker *checker.Checker,
 ) []rule.Diagnostic {
@@ -50,7 +53,7 @@ func LintFile(
 		currentRule := subject
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     rule.ViewProgram(program, sourceFile, currentRule),
+			Program:     rule.ViewProgram(program, sourceFile, currentRule.Traits),
 			TypeChecker: typeChecker,
 			FileCache:   fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
@@ -62,7 +65,7 @@ func LintFile(
 			},
 		}
 
-		listeners := currentRule.Run(context, nil)
+		listeners := currentRule.Run(context)
 		for kind, listener := range listeners {
 			combined[kind] = append(combined[kind], listener)
 		}

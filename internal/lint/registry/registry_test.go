@@ -48,7 +48,7 @@ func TestEveryRuleIsRegistered(test *testing.T) {
 	}
 }
 
-// ruleDeclaration is one `var Name = rule.Rule{...}` found on disk.
+// ruleDeclaration is one `var Name = rule.Rule[Options]{...}` found on disk.
 //
 // Both halves are needed. The identifier is what a reader greps for when the test fails, and the
 // declared Name is the only thing the catalog can be checked against, since registration keys on
@@ -58,7 +58,7 @@ type ruleDeclaration struct {
 	ruleName   string
 }
 
-// declaredRules parses the rules packages for `var Name = rule.Rule{...}` declarations.
+// declaredRules parses the rules packages for `var Name = rule.Rule[Options]{...}` declarations.
 //
 // Parsing rather than reflecting: a rule that never registers is also absent from anything the
 // catalog could reflect over, so reflection would see exactly the rules that are already fine.
@@ -117,7 +117,7 @@ func declaredRules(test *testing.T) []ruleDeclaration {
 	return declarations
 }
 
-// ruleNameIn reads the Name field out of a `rule.Rule{...}` literal.
+// ruleNameIn reads the Name field out of a `rule.Rule[Options]{...}` literal.
 func ruleNameIn(expression ast.Expr) (string, bool) {
 	composite, isComposite := expression.(*ast.CompositeLit)
 	if !isComposite {
@@ -141,13 +141,18 @@ func ruleNameIn(expression ast.Expr) (string, bool) {
 	return "", false
 }
 
-// isRuleLiteral reports whether an expression is a `rule.Rule{...}` composite literal.
+// isRuleLiteral reports whether an expression is a `rule.Rule[Options]{...}` composite literal.
 func isRuleLiteral(expression ast.Expr) bool {
 	composite, isComposite := expression.(*ast.CompositeLit)
 	if !isComposite {
 		return false
 	}
-	selector, isSelector := composite.Type.(*ast.SelectorExpr)
+	// A Rule is generic over its options, so its literal's type is `rule.Rule` indexed by them.
+	indexed, isIndexed := composite.Type.(*ast.IndexExpr)
+	if !isIndexed {
+		return false
+	}
+	selector, isSelector := indexed.X.(*ast.SelectorExpr)
 	if !isSelector {
 		return false
 	}

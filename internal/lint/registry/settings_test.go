@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -93,38 +94,39 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(test *testing.T) {
 
 // The settings reach a rule through the options registry the run builds, merged under the rule's own
 // element: the path a real config takes, not the decoder alone.
+//
+// The rule the registry binds holds its options out of sight, so each part of the merge is shown by what the
+// decode refuses beside an options element: a settings key the element leaves alone stays merged and is
+// refused when it is the wrong type, and an element's own key overrides settings' wrong one. The control
+// decodes the same shapes well typed, so each refusal is the wrong type and nothing else.
+//
+// A bare severity is not probed this way: the config layer runs a rule whose options only tune it as its
+// Unconfigured when its decode of nothing fails (configuration.OptionsRegistry.Decode), so a wrong settings
+// value there reads as no refusal. CheckSettings refuses that value before any rule decodes, which
+// TestCheckSettingsRefusesWhatWouldBeIgnored covers.
 func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	test.Parallel()
-	base := settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc", "callees": ["mergeClassNames"]}`})
-	options := OptionsAt(base)
-
-	bare, err := options.Decode("better-tailwindcss/enforce-consistent-class-order", nil)
-	if err != nil {
-		test.Fatal(err)
-	}
-	encoded, encodeError := json.Marshal(bare)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	if !strings.Contains(string(encoded), `"order":"desc"`) ||
-		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		test.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
+	const ruleName = "better-tailwindcss/enforce-consistent-class-order"
+	ownOrder := []json.RawMessage{json.RawMessage(`{"order": "asc"}`)}
+	optionsWith := func(block string) configuration.OptionsRegistry {
+		return OptionsAt(settingsOf(map[string]string{"better-tailwindcss": block}))
 	}
 
-	overridden, err := options.Decode("better-tailwindcss/enforce-consistent-class-order",
-		[]json.RawMessage{json.RawMessage(`{"order": "asc"}`)})
-	if err != nil {
-		test.Fatal(err)
+	control := optionsWith(`{"order": "desc", "callees": ["mergeClassNames"]}`)
+	if _, err := control.Decode(ruleName, nil); err != nil {
+		test.Fatalf("well-typed settings were refused on a bare severity: %v", err)
 	}
-	encoded, encodeError = json.Marshal(overridden)
-	if encodeError != nil {
-		test.Fatal(encodeError)
+	if _, err := control.Decode(ruleName, ownOrder); err != nil {
+		test.Fatalf("well-typed settings were refused beside an options element: %v", err)
 	}
-	if !strings.Contains(string(encoded), `"order":"asc"`) ||
-		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		test.Fatalf(
-			"an options element decoded %s, want its own order over settings' and settings' callees kept",
-			encoded,
-		)
+
+	misordered := optionsWith(`{"order": 7, "callees": ["mergeClassNames"]}`)
+	if _, err := misordered.Decode(ruleName, ownOrder); err != nil {
+		test.Errorf("an options element's order did not override settings' order of 7: %v", err)
+	}
+
+	miscalled := optionsWith(`{"order": "desc", "callees": 7}`)
+	if _, err := miscalled.Decode(ruleName, ownOrder); err == nil {
+		test.Error("an options element decoded beside settings' callees of 7, so settings' callees were not kept")
 	}
 }
